@@ -8,6 +8,7 @@ import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
 import 'package:delegate_app/features/hr/data/models/company_payroll_config_model.dart';
+import 'package:delegate_app/features/hr/domain/services/payroll_day_rules.dart';
 import 'package:delegate_app/features/hr/domain/entities/company_payroll_config.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
@@ -17,6 +18,9 @@ class _DelegatePayrollItem {
   final Delegate delegate;
   int attendedDays;
   int approvedLeaveDays;
+
+  /// إجازات معتمدة غير مدفوعة (مرضية / طارئة / بدون أجر) — تُخصم كالغياب
+  int unpaidLeaveDays;
   int absentDays;
   int elapsedWorkingDays;
   int totalWorkMinutes;
@@ -36,6 +40,7 @@ class _DelegatePayrollItem {
     required this.delegate,
     this.attendedDays = 0,
     this.approvedLeaveDays = 0,
+    this.unpaidLeaveDays = 0,
     this.absentDays = 0,
     this.elapsedWorkingDays = 0,
     this.totalWorkMinutes = 0,
@@ -84,7 +89,10 @@ class _DelegatePayrollItem {
   }
 
   /// ساعات النقص الناتجة عن أيام الغياب الفعلية
-  double get shortfallHours => absentDays * dailyShiftHours;
+  double get shortfallHours => deductibleDays * dailyShiftHours;
+
+  /// الأيام المخصومة = الغياب + الإجازات غير المدفوعة
+  int get deductibleDays => absentDays + unpaidLeaveDays;
 
   /// قيمة استقطاع أيام الغياب الفعلية (عدد أيام الغياب × أجر اليوم المعتمد)
   double get absenceDeductionAmount {
@@ -93,7 +101,7 @@ class _DelegatePayrollItem {
       return 0.0;
     }
     // استقطاع الغياب = عدد أيام الغياب الفعلية × أجر اليوم
-    final deduction = absentDays * effectiveDailyRate;
+    final deduction = deductibleDays * effectiveDailyRate;
     return deduction > grossEarned ? grossEarned : deduction;
   }
 
@@ -272,19 +280,31 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
           .where('status', isEqualTo: 'approved')
           .get();
 
-      final Map<String, int> leaveDaysByDelegateId = {};
+      // السنوية تُدفع في حدود الرصيد؛ المرضية/الطارئة/بدون أجر غير مدفوعة؛ التأخير/الانصراف المبكر لا تُحتسب
+      final Map<String, int> unpaidLeaveDaysByDelegateId = {};
+      final Map<String, int> annualDaysThisMonth = {};
+      final Map<String, int> annualDaysEarlierThisYear = {};
+      final yearStart = DateTime(monthStart.year);
       for (final doc in leavesSnap.docs) {
         final data = doc.data();
-        final sTs = data['startDate'];
-        if (sTs is Timestamp) {
-          final sDate = sTs.toDate();
-          if (sDate.isBefore(monthStart) || sDate.isAfter(monthEnd)) continue;
-        }
         final delId = (data['delegateUid'] ?? '').toString();
+        if (delId.isEmpty) continue;
         final days = (data['daysCount'] as num?)?.toInt() ?? 1;
-        if (delId.isNotEmpty) {
-          leaveDaysByDelegateId[delId] = (leaveDaysByDelegateId[delId] ?? 0) + days;
+        final sTs = data['startDate'];
+        final sDate = sTs is Timestamp ? sTs.toDate() : null;
+        final inMonth = sDate == null || !(sDate.isBefore(monthStart) || sDate.isAfter(monthEnd));
+        final category = PayrollDayRules.categorize(data);
+        if (category == PayrollLeaveCategory.notALeaveDay) continue;
+        if (category == PayrollLeaveCategory.annual) {
+          if (inMonth) {
+            annualDaysThisMonth[delId] = (annualDaysThisMonth[delId] ?? 0) + days;
+          } else if (!sDate.isBefore(yearStart) && sDate.isBefore(monthStart)) {
+            annualDaysEarlierThisYear[delId] = (annualDaysEarlierThisYear[delId] ?? 0) + days;
+          }
+          continue;
         }
+        if (!inMonth) continue;
+        unpaidLeaveDaysByDelegateId[delId] = (unpaidLeaveDaysByDelegateId[delId] ?? 0) + days;
       }
 
       // 6. Fetch Attendance logs for the month
@@ -341,6 +361,9 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
         final daysMap = attendanceByDelegateAndDay[d.uid] ?? {};
         int attendedDaysCount = 0;
         int totalMins = 0;
+        final walletData = walletConfigByDelegateId[d.uid] ?? {};
+        final delegateShiftHours = (walletData['dailyShiftHours'] as num?)?.toDouble() ??
+            _companyPayrollConfig.defaultDailyShiftHours;
 
         for (final logs in daysMap.values) {
           DateTime? inTime;
@@ -360,33 +383,33 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
 
           if (inTime != null) {
             attendedDaysCount++;
-            if (outTime != null) {
-              final diff = outTime.difference(inTime).inMinutes;
-              if (diff > 0) totalMins += diff;
-            } else {
-              // قاعدة الـ 9 ساعات: إغلاق تلقائي واحتساب 9 ساعات عمل كاملة (540 دقيقة)
-              final isPastDay = inTime.isBefore(DateTime(now.year, now.month, now.day));
-              final isElapsed9Hours = now.difference(inTime) >= const Duration(hours: 9);
-              if (isPastDay || isElapsed9Hours) {
-                totalMins += (9 * 60);
-              }
-            }
+            // الأقل من (الفعلي، الوردية المحددة) — بدون أوفر تايم، واليوم المغلق تلقائياً = الوردية
+            totalMins += PayrollDayRules.paidMinutesForDay(
+              checkIn: inTime,
+              checkOut: outTime,
+              now: now,
+              shiftHours: delegateShiftHours,
+            );
           }
         }
 
-        final leaveDays = leaveDaysByDelegateId[d.uid] ?? 0;
-        final absent = (elapsedWorkingDays - attendedDaysCount - leaveDays).clamp(0, elapsedWorkingDays);
+        final paidAnnualDays = PayrollDayRules.paidAnnualLeaveDays(
+          annualLeaveEnabled: d.isAnnualLeaveEnabled,
+          annualQuota: d.annualLeaveQuota,
+          usedEarlierThisYear: annualDaysEarlierThisYear[d.uid] ?? 0,
+          requestedThisMonth: annualDaysThisMonth[d.uid] ?? 0,
+        );
+        final leaveDays = paidAnnualDays;
+        final unpaidLeaveDays =
+            (unpaidLeaveDaysByDelegateId[d.uid] ?? 0).clamp(0, (elapsedWorkingDays - attendedDaysCount - leaveDays).clamp(0, elapsedWorkingDays));
+        final absent = (elapsedWorkingDays - attendedDaysCount - leaveDays - unpaidLeaveDays).clamp(0, elapsedWorkingDays);
 
         // Configuration resolution (Custom Wallet Override vs Company Policy)
-        final walletData = walletConfigByDelegateId[d.uid] ?? {};
         final alloc = (walletData['monthlyAllocation'] as num?)?.toDouble() ?? 0.0;
         final base = (walletData['baseSalary'] as num?)?.toDouble() ?? 0.0;
         final delegateBaseSalary = alloc > 0
             ? alloc
             : (base > 0 ? base : _companyPayrollConfig.defaultMonthlyBaseSalary);
-
-        final delegateShiftHours = (walletData['dailyShiftHours'] as num?)?.toDouble() ??
-            _companyPayrollConfig.defaultDailyShiftHours;
 
         final customRate = (walletData['customHourlyRate'] as num?)?.toDouble();
 
@@ -407,6 +430,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
             delegate: d,
             attendedDays: attendedDaysCount,
             approvedLeaveDays: leaveDays,
+            unpaidLeaveDays: unpaidLeaveDays,
             absentDays: absent,
             elapsedWorkingDays: elapsedWorkingDays,
             totalWorkMinutes: totalMins,
@@ -457,7 +481,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
     try {
       final monthStr = DateFormat('yyyy-MM').format(_selectedMonth);
       final csvHeader =
-          '\uFEFFاسم المندوب,رقم الهاتف,المسمى الوظيفي,أيام الحضور,أيام الإجازات,أيام الغياب,ساعات العمل الفعلية,الساعات المستهدفة,الراتب الأساسي (ج.م),أجر الساعة (ج.م),الاستحقاق الفعلي (ج.م),استقطاع الغياب/العجز (ج.م),خصومات الجزاءات (ج.م),صافي الصرف المستحق (ج.م)\n';
+          '\uFEFFاسم المندوب,رقم الهاتف,المسمى الوظيفي,أيام الحضور,أيام الإجازات المدفوعة,إجازات غير مدفوعة,أيام الغياب,ساعات العمل الفعلية,الساعات المستهدفة,الراتب الأساسي (ج.م),أجر الساعة (ج.م),الاستحقاق الفعلي (ج.م),استقطاع الغياب/العجز (ج.م),خصومات الجزاءات (ج.م),صافي الصرف المستحق (ج.م)\n';
 
       final csvRows = list.map((item) {
         final name = item.delegate.fullName.replaceAll(',', ' ');
@@ -465,6 +489,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
         final pos = item.delegate.position == DelegatePosition.supervisor ? 'مشرف' : 'مندوب / مروج';
         final attended = item.attendedDays;
         final leaves = item.approvedLeaveDays;
+        final unpaidLeaves = item.unpaidLeaveDays;
         final absent = item.absentDays;
         final hours = item.formattedTotalHours;
         final targetHours = item.targetWorkHours.toStringAsFixed(1);
@@ -475,7 +500,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
         final pen = item.penaltiesDeductions.toStringAsFixed(2);
         final net = item.netSalary.toStringAsFixed(2);
 
-        return '$name,$phone,$pos,$attended,$leaves,$absent,$hours,$targetHours,$base,$rate,$gross,$absenceDed,$pen,$net';
+        return '$name,$phone,$pos,$attended,$leaves,$unpaidLeaves,$absent,$hours,$targetHours,$base,$rate,$gross,$absenceDed,$pen,$net';
       }).join('\n');
 
       final content = '$csvHeader$csvRows';
@@ -1685,7 +1710,7 @@ class _CompanyPayrollPolicySheetState
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      'يُحدد راتب أساسي ثابت، ويُخصم منه ما يعادل ساعات الغياب أو العجز عن وردية الـ 9 ساعات',
+                                      'يُحدد راتب أساسي ثابت، ويُخصم منه ما يعادل ساعات الغياب أو العجز عن ساعات الوردية المحددة لكل موظف',
                                       style: TextStyle(
                                         fontSize: 11,
                                         color: colorScheme.onSurfaceVariant,
@@ -2724,6 +2749,14 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                         value: '${item.approvedLeaveDays} يوم (${item.earnedLeaveAmount.toStringAsFixed(0)} ج.م)',
                         valueColor: colorScheme.primary,
                       ),
+                    if (item.unpaidLeaveDays > 0)
+                      _buildDetailRow(
+                        context: context,
+                        icon: Icons.event_busy_rounded,
+                        label: 'إجازات غير مدفوعة (مرضية / طارئة / بدون أجر):',
+                        value: '${item.unpaidLeaveDays} يوم',
+                        valueColor: colorScheme.error,
+                      ),
                     _buildDetailRow(
                       context: context,
                       icon: Icons.cancel_outlined,
@@ -2746,7 +2779,7 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                       label: 'إجمالي ساعات العمل الفعلية:',
                       value: '${item.formattedTotalHours} (${item.earnedWorkAmount.toStringAsFixed(0)} ج.م)',
                     ),
-                    if (item.absentDays > 0 &&
+                    if (item.deductibleDays > 0 &&
                         item.calculationMode == PayrollCalculationMode.monthlyWithDeductions) ...[
                       const SizedBox(height: 6),
                       Container(
@@ -2764,7 +2797,7 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'استقطاع أيام الغياب (${item.absentDays} يوم × ${item.effectiveDailyRate.toStringAsFixed(1)} ج.م): -${item.absenceDeductionAmount.toStringAsFixed(0)} ج.م',
+                                'استقطاع أيام الغياب${item.unpaidLeaveDays > 0 ? ' والإجازات غير المدفوعة' : ''} (${item.deductibleDays} يوم × ${item.effectiveDailyRate.toStringAsFixed(1)} ج.م): -${item.absenceDeductionAmount.toStringAsFixed(0)} ج.م',
                                 style: TextStyle(
                                   color: colorScheme.error,
                                   fontSize: 11.5,

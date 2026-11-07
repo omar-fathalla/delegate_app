@@ -1,6 +1,7 @@
 // ignore: unnecessary_import
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'color_schemes.dart';
@@ -15,6 +16,51 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: colorScheme,
       textTheme: baseTextTheme,
+      materialTapTargetSize: MaterialTapTargetSize.padded,
+
+      // Snackbars: floating, inverse surface (M3), lifted above FAB by Scaffold.
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: colorScheme.inverseSurface,
+        contentTextStyle: baseTextTheme.bodyMedium
+            ?.copyWith(color: colorScheme.onInverseSurface),
+        actionTextColor: colorScheme.inversePrimary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      ),
+
+      // Selected segments/chips use secondaryContainer (not primary/red).
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          backgroundColor: WidgetStateProperty.resolveWith((s) =>
+              s.contains(WidgetState.selected)
+                  ? colorScheme.secondaryContainer
+                  : null),
+          foregroundColor: WidgetStateProperty.resolveWith((s) =>
+              s.contains(WidgetState.selected)
+                  ? colorScheme.onSecondaryContainer
+                  : colorScheme.onSurface),
+          minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        selectedColor: colorScheme.secondaryContainer,
+        checkmarkColor: colorScheme.onSecondaryContainer,
+        secondaryLabelStyle:
+            TextStyle(color: colorScheme.onSecondaryContainer),
+      ),
+
+      bottomSheetTheme: BottomSheetThemeData(
+        showDragHandle: true,
+        backgroundColor: colorScheme.surfaceContainerLow,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+      ),
+      navigationDrawerTheme: NavigationDrawerThemeData(
+        backgroundColor: colorScheme.surfaceContainerLow,
+        indicatorColor: colorScheme.secondaryContainer,
+        tileHeight: 56,
+      ),
 
       // Inputs (Spacing & White Space)
       inputDecorationTheme: InputDecorationTheme(
@@ -147,11 +193,13 @@ class AppTheme {
       ),
 
       // Material Design 3 Motion Page Transitions
+      // One transition for every route (go_router pages use the same
+      // AppMotionTransitions.sharedAxisX), so nothing overlaps mid-push.
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
-          TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
-          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.android: M3PageTransitionsBuilder(),
+          TargetPlatform.iOS: M3PageTransitionsBuilder(),
+          TargetPlatform.macOS: M3PageTransitionsBuilder(),
         },
       ),
     );
@@ -159,10 +207,48 @@ class AppTheme {
 
   static ThemeData lightTheme([Color? seedColor]) {
     final color = seedColor ?? AppColorSchemes.seedColors[0];
-    final colorScheme = ColorScheme.fromSeed(
+    var colorScheme = ColorScheme.fromSeed(
       seedColor: color,
       brightness: Brightness.light,
     );
+    // Approved neutral light surfaces (home_v2n). Applied to every seed;
+    // brand roles are pinned only for the default #6750A4 seed.
+    colorScheme = colorScheme.copyWith(
+      surface: const Color(0xFFFDF8F8),
+      surfaceBright: const Color(0xFFFDF8F8),
+      onSurface: const Color(0xFF1C1B1C),
+      surfaceDim: const Color(0xFFDDD9D9),
+      surfaceContainerLowest: const Color(0xFFFFFFFF),
+      surfaceContainerLow: const Color(0xFFF7F3F2),
+      surfaceContainer: const Color(0xFFF1EDED),
+      surfaceContainerHigh: const Color(0xFFEBE7E7),
+      surfaceContainerHighest: const Color(0xFFE6E1E1),
+      onSurfaceVariant: const Color(0xFF48464B),
+      // ignore: deprecated_member_use
+      surfaceVariant: const Color(0xFFE6E1E7),
+      outline: const Color(0xFF79767B),
+      outlineVariant: const Color(0xFFCAC5CB),
+      inverseSurface: const Color(0xFF313030),
+      onInverseSurface: const Color(0xFFF4F0F0),
+    );
+    if (color.toARGB32() == 0xFF6750A4) {
+      colorScheme = colorScheme.copyWith(
+        primary: const Color(0xFF6750A4),
+        onPrimary: const Color(0xFFFFFFFF),
+        primaryContainer: const Color(0xFFE9DDFF),
+        onPrimaryContainer: const Color(0xFF22005D),
+        inversePrimary: const Color(0xFFCFBCFF),
+        secondary: const Color(0xFF625B70),
+        secondaryContainer: const Color(0xFFE8DEF8),
+        onSecondaryContainer: const Color(0xFF1E192B),
+        tertiary: const Color(0xFF7E5260),
+        tertiaryContainer: const Color(0xFFFFD9E3),
+        onTertiaryContainer: const Color(0xFF31101D),
+        error: const Color(0xFFBA1A1A),
+        errorContainer: const Color(0xFFFFDAD6),
+        onErrorContainer: const Color(0xFF410002),
+      );
+    }
     final baseTextTheme = GoogleFonts.cairoTextTheme();
 
     return _baseTheme(colorScheme, baseTextTheme);
@@ -170,10 +256,46 @@ class AppTheme {
 
   static ThemeData darkTheme([Color? seedColor]) {
     final color = seedColor ?? AppColorSchemes.seedColors[0];
-    final colorScheme = ColorScheme.fromSeed(
+    var colorScheme = ColorScheme.fromSeed(
       seedColor: color,
       brightness: Brightness.dark,
     );
+    // Approved M3 dark values (Material Design 3 review, HCT tones fitted
+    // from the light palette). fromSeed alone drops primary chroma, so pin
+    // every role explicitly. Neutral surfaces apply to every seed.
+    colorScheme = colorScheme.copyWith(
+      surface: const Color(0xFF141313),
+      surfaceDim: const Color(0xFF141313),
+      surfaceBright: const Color(0xFF3A3939),
+      surfaceContainerLowest: const Color(0xFF0F0E0E),
+      surfaceContainerLow: const Color(0xFF1C1B1C),
+      surfaceContainer: const Color(0xFF201F20),
+      surfaceContainerHigh: const Color(0xFF2B2A2A),
+      surfaceContainerHighest: const Color(0xFF363435),
+      onSurface: const Color(0xFFE6E1E1),
+      onSurfaceVariant: const Color(0xFFCAC5CB),
+      // ignore: deprecated_member_use
+      surfaceVariant: const Color(0xFF48464B),
+      outline: const Color(0xFF938F95),
+      outlineVariant: const Color(0xFF48464B),
+      inverseSurface: const Color(0xFFE6E1E1),
+      onInverseSurface: const Color(0xFF313030),
+      error: const Color(0xFFFFB4AB),
+      onError: const Color(0xFF690005),
+      errorContainer: const Color(0xFF93000A),
+      onErrorContainer: const Color(0xFFFFDAD6),
+    );
+    if (color.toARGB32() == 0xFF6750A4) {
+      colorScheme = colorScheme.copyWith(
+        primary: const Color(0xFFCFBCFF),
+        onPrimary: const Color(0xFF381E72),
+        primaryContainer: const Color(0xFF4F378A),
+        onPrimaryContainer: const Color(0xFFE9DDFF),
+        inversePrimary: const Color(0xFF6750A4),
+        secondaryContainer: const Color(0xFF4A4458),
+        onSecondaryContainer: const Color(0xFFE8DEF8),
+      );
+    }
     final baseTextTheme = GoogleFonts.cairoTextTheme().apply(
       bodyColor: colorScheme.onSurface,
       displayColor: colorScheme.onSurface,

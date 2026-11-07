@@ -225,6 +225,8 @@ void main() {
 
     // Tap on Private Label tab (index 3)
     await tester.tap(find.descendant(of: navBarFinder, matching: find.text('Private Label')));
+    // Fade through: 90ms out (old tab) then 210ms in.
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
     // Verify PrivateLabelHubScreen is mounted and visible

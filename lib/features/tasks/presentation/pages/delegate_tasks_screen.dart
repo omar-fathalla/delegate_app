@@ -1,3 +1,5 @@
+import 'package:delegate_app/features/tasks/presentation/widgets/task_image_widgets.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
@@ -55,8 +57,11 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
   }
 
   void _loadTasks() {
-    context.read<DelegateTasksBloc>().add(
+    final bloc = context.read<DelegateTasksBloc>();
+    bloc.add(
       LoadDelegateTasksRequested(
+        // Keep the active filter on refresh (it used to reset to "all").
+        status: bloc.state.statusFilter,
         organizationId: widget.delegate.organizationUID,
         delegateId: widget.delegate.uid,
         companyId: widget.delegate.companyUID,
@@ -80,7 +85,8 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded),
+            icon: const Icon(Symbols.refresh_rounded),
+            tooltip: AppLocalizations.of(context)!.retry,
             onPressed: _loadTasks,
           ),
         ],
@@ -92,8 +98,8 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
               SnackBar(
                 content: Text(
                   state.newStatus == TaskStatus.completed
-                      ? 'تم تأكيد إنجاز المهمة بنجاح ✅'
-                      : 'تم بدء العمل على المهمة بنجاح ⏱️',
+                      ? AppLocalizations.of(context)!.taskCompletedConfirmed
+                      : AppLocalizations.of(context)!.taskStarted,
                 ),
                 backgroundColor: state.newStatus == TaskStatus.completed
                     ? theme.colorScheme.primary
@@ -153,7 +159,7 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'لا توجد مهام مسندة إليك حالياً',
+                        AppLocalizations.of(context)!.noTasksNow,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: theme.colorScheme.onSurface,
@@ -161,7 +167,7 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'ستظهر هنا أي مهام يوجهها المشرف أو الإدارة فور إسنادها.',
+                        AppLocalizations.of(context)!.tasksAppearHere,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -444,6 +450,10 @@ class _TaskCard extends StatelessWidget {
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.outline,
                       ),
+                    ),
+                    TaskCardMeta(
+                      hasImage: task.hasImage,
+                      isEdited: task.isEdited,
                     ),
                   ],
                 ),

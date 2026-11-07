@@ -53,6 +53,8 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/login',
+      // Splash → login: M3 fade-through (90ms out + 210ms in). The header
+      // colour equals the splash colour, so only the sheet content fades in.
       pageBuilder: (context, state) => AppMotionPage.fadeThrough(
         state: state,
         child: const LoginScreen(),
@@ -184,6 +186,7 @@ final appRouter = GoRouter(
             task: extras['task'] as TaskEntity,
             isAdmin: extras['isAdmin'] as bool,
             organizationId: extras['organizationId'] as String,
+            currentUserId: extras['currentUserId'] as String?,
           ),
         );
       },

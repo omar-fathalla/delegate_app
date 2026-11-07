@@ -42,8 +42,8 @@ assert_no_crashlytics_upload_in_pbxproj() {
   if ! grep -q 'strip_dev_crashlytics_plugin_registration' ios/Runner.xcodeproj/project.pbxproj; then
     fail "project.pbxproj missing derived registrant Run Script (strip_dev_crashlytics_plugin_registration.sh)"
   fi
-  if ! grep -q '\[Tashil\] Derived plugin registrant' ios/Runner.xcodeproj/project.pbxproj; then
-    fail "project.pbxproj missing [Tashil] Derived plugin registrant build phase"
+  if ! grep -q '\[Tashil\] Prepare derived plugin registrant' ios/Runner.xcodeproj/project.pbxproj; then
+    fail "project.pbxproj missing [Tashil] Prepare derived plugin registrant build phase"
   fi
   if ! grep -q 'DERIVED_FILE_DIR' ios/Runner.xcodeproj/project.pbxproj; then
     fail "project.pbxproj missing DERIVED_FILE_DIR for derived registrant"

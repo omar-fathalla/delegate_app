@@ -18,6 +18,9 @@ class TaskModel extends TaskEntity {
     super.completedAt,
     super.completedBy,
     super.notes,
+    super.imageUrl,
+    super.imagePath,
+    super.editedAt,
   });
 
   factory TaskModel.fromFirestore(DocumentSnapshot doc) {
@@ -40,6 +43,11 @@ class TaskModel extends TaskEntity {
           : null,
       completedBy: data['completedBy'],
       notes: data['notes'],
+      imageUrl: data['imageUrl'] as String?,
+      imagePath: data['imagePath'] as String?,
+      editedAt: data['editedAt'] is Timestamp
+          ? (data['editedAt'] as Timestamp).toDate()
+          : null,
     );
   }
 
@@ -61,6 +69,11 @@ class TaskModel extends TaskEntity {
           : null,
       'completedBy': completedBy,
       'notes': notes,
+      // Only written when present, so delegate status updates never touch
+      // the sender-owned fields (the rules reject that).
+      if (imageUrl != null) 'imageUrl': imageUrl,
+      if (imagePath != null) 'imagePath': imagePath,
+      if (editedAt != null) 'editedAt': Timestamp.fromDate(editedAt!),
     };
   }
 
@@ -107,6 +120,9 @@ class TaskModel extends TaskEntity {
       completedAt: entity.completedAt,
       completedBy: entity.completedBy,
       notes: entity.notes,
+      imageUrl: entity.imageUrl,
+      imagePath: entity.imagePath,
+      editedAt: entity.editedAt,
     );
   }
 }

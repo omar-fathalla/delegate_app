@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:animations/animations.dart';
 
 /// Material Design 3 (M3) Motion Duration Tokens
 ///
@@ -156,6 +157,30 @@ abstract final class AppMotionTransitions {
   ///
   /// Respects RTL directionality: in Arabic, the X-axis motion is inverted
   /// so that "Forward / Next" moves right-to-left naturally.
+  /// M3 shared axis X for full-screen routes: the outgoing page fades out
+  /// (first 30%) while the incoming fades in, over an opaque surface fill so
+  /// two pages are never visible through each other. Mirrored in RTL so
+  /// forward navigation enters from the reading-order end.
+  static Widget sharedAxisX(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return FadeTransition(opacity: animation, child: child);
+    }
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    final transition = SharedAxisTransition(
+      animation: animation,
+      secondaryAnimation: secondaryAnimation,
+      transitionType: SharedAxisTransitionType.horizontal,
+      fillColor: Theme.of(context).colorScheme.surface,
+      child: rtl ? Transform.flip(flipX: true, child: child) : child,
+    );
+    return rtl ? Transform.flip(flipX: true, child: transition) : transition;
+  }
+
   static Widget buildSharedAxis({
     required BuildContext context,
     required Animation<double> animation,
@@ -273,6 +298,23 @@ abstract final class AppMotionTransitions {
   }
 }
 
+/// The single [PageTransitionsBuilder] used by the app theme on every
+/// platform (Settings and other imperative pushes included).
+class M3PageTransitionsBuilder extends PageTransitionsBuilder {
+  const M3PageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) =>
+      AppMotionTransitions.sharedAxisX(
+          context, animation, secondaryAnimation, child);
+}
+
 /// GoRouter CustomTransitionPage helpers adhering to M3 Motion
 abstract final class AppMotionPage {
   /// Returns a [CustomTransitionPage] implementing M3 Shared Axis transition.
@@ -280,8 +322,8 @@ abstract final class AppMotionPage {
     required GoRouterState state,
     required Widget child,
     M3SharedAxisDirection direction = M3SharedAxisDirection.horizontal,
-    Duration duration = AppMotionDurations.medium3, // 350ms
-    Duration reverseDuration = AppMotionDurations.short4, // 200ms
+    Duration duration = AppMotionDurations.medium2, // 300ms
+    Duration reverseDuration = AppMotionDurations.medium2, // 300ms
   }) {
     return CustomTransitionPage<T>(
       key: state.pageKey,
@@ -289,6 +331,13 @@ abstract final class AppMotionPage {
       transitionDuration: duration,
       reverseTransitionDuration: reverseDuration,
       transitionsBuilder: (context, animation, secondaryAnimation, pageChild) {
+        // Same transition as every Navigator/MaterialPageRoute push (see
+        // M3PageTransitionsBuilder) so go_router and imperative routes never
+        // mix two different animations on screen at once.
+        if (direction == M3SharedAxisDirection.horizontal) {
+          return AppMotionTransitions.sharedAxisX(
+              context, animation, secondaryAnimation, pageChild);
+        }
         return AppMotionTransitions.buildSharedAxis(
           context: context,
           animation: animation,
@@ -313,9 +362,11 @@ abstract final class AppMotionPage {
       transitionDuration: duration,
       reverseTransitionDuration: reverseDuration,
       transitionsBuilder: (context, animation, secondaryAnimation, pageChild) {
-        return AppMotionTransitions.buildFadeThrough(
+        // animations package FadeThroughTransition (used for login → home).
+        return FadeThroughTransition(
           animation: animation,
           secondaryAnimation: secondaryAnimation,
+          fillColor: Theme.of(context).colorScheme.surface,
           child: pageChild,
         );
       },
@@ -393,6 +444,12 @@ Future<T?> showM3ModalBottomSheet<T>({
   return showModalBottomSheet<T>(
     context: context,
     builder: builder,
+    sheetAnimationStyle: const AnimationStyle(
+      duration: AppMotionDurations.long1,
+      curve: AppMotionCurves.expressiveDefaultSpatial,
+      reverseDuration: AppMotionDurations.short4,
+      reverseCurve: AppMotionCurves.emphasizedAccelerate,
+    ),
     backgroundColor: backgroundColor,
     isScrollControlled: isScrollControlled,
     shape: shape ??
@@ -405,10 +462,10 @@ Future<T?> showM3ModalBottomSheet<T>({
   );
 }
 
-/// An [IndexedStack] that transitions between children using the M3 Fade Through pattern.
-///
-/// Keeps visited children alive in memory while animating the transition
-/// between the previous and current index with M3 standard timing (300ms, scale from 0.92 to 1.0, fade in from 35% progress).
+/// An [IndexedStack] with the M3 Fade Through pattern (home_v2 / §37):
+/// outgoing child fades out for 90ms (emphasized-accelerate), then the
+/// incoming child fades in over 210ms while scaling 0.92→1 (emphasized-
+/// decelerate). Reduced motion → 150ms cross-fade. Visited children stay alive.
 class M3FadeThroughIndexedStack extends StatefulWidget {
   final int index;
   final List<Widget> children;
@@ -418,7 +475,7 @@ class M3FadeThroughIndexedStack extends StatefulWidget {
     super.key,
     required this.index,
     required this.children,
-    this.duration = AppMotionDurations.medium2, // 300ms
+    this.duration = AppMotionDurations.medium2, // 90 + 210
   });
 
   @override
@@ -428,13 +485,16 @@ class M3FadeThroughIndexedStack extends StatefulWidget {
 
 class _M3FadeThroughIndexedStackState extends State<M3FadeThroughIndexedStack>
     with SingleTickerProviderStateMixin {
+  static const double _outFrac = 0.3; // 90 / 300
   late final AnimationController _controller;
   late int _currentIndex;
+  late int _previousIndex;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.index;
+    _previousIndex = widget.index;
     _controller = AnimationController(
       vsync: this,
       duration: widget.duration,
@@ -446,7 +506,11 @@ class _M3FadeThroughIndexedStackState extends State<M3FadeThroughIndexedStack>
   void didUpdateWidget(covariant M3FadeThroughIndexedStack oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.index != widget.index) {
+      _previousIndex = _currentIndex;
       _currentIndex = widget.index;
+      final reduced = MediaQuery.of(context).disableAnimations;
+      _controller.duration =
+          reduced ? AppMotionDurations.short3 : widget.duration;
       _controller.forward(from: 0.0);
     }
   }
@@ -459,36 +523,41 @@ class _M3FadeThroughIndexedStackState extends State<M3FadeThroughIndexedStack>
 
   @override
   Widget build(BuildContext context) {
-    final disableAnimations = MediaQuery.of(context).disableAnimations;
-
-    final stack = IndexedStack(
-      index: _currentIndex,
-      children: widget.children,
-    );
-
-    if (disableAnimations) {
-      return stack;
-    }
-
-    final fadeIn = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.35, 1.0,
-          curve: AppMotionCurves.standardDecelerate),
-    );
-
-    final scaleIn = Tween<double>(begin: 0.92, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: AppMotionCurves.standardDecelerate,
-      ),
-    );
-
-    return FadeTransition(
-      opacity: fadeIn,
-      child: ScaleTransition(
-        scale: scaleIn,
-        child: stack,
-      ),
+    final reduced = MediaQuery.of(context).disableAnimations;
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final t = _controller.value;
+        if (reduced) {
+          return Opacity(
+            opacity: t,
+            child: IndexedStack(index: _currentIndex, children: widget.children),
+          );
+        }
+        final outgoing = t < _outFrac && _previousIndex != _currentIndex;
+        final double opacity;
+        final double scale;
+        if (outgoing) {
+          opacity = 1 -
+              AppMotionCurves.emphasizedAccelerate.transform(t / _outFrac);
+          scale = 1;
+        } else {
+          final u = ((t - _outFrac) / (1 - _outFrac)).clamp(0.0, 1.0);
+          final e = AppMotionCurves.emphasizedDecelerate.transform(u);
+          opacity = _controller.isCompleted ? 1 : e;
+          scale = 0.92 + 0.08 * e;
+        }
+        return Opacity(
+          opacity: opacity.clamp(0.0, 1.0),
+          child: Transform.scale(
+            scale: scale,
+            child: IndexedStack(
+              index: outgoing ? _previousIndex : _currentIndex,
+              children: widget.children,
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -505,8 +574,8 @@ class M3StaggeredItem extends StatefulWidget {
     super.key,
     required this.index,
     required this.child,
-    this.delayStep = const Duration(milliseconds: 35),
-    this.duration = AppMotionDurations.medium3, // 350ms
+    this.delayStep = const Duration(milliseconds: 40),
+    this.duration = AppMotionDurations.medium1, // 250ms
     this.slideOffset = 0.10,
   });
 
@@ -544,7 +613,8 @@ class _M3StaggeredItemState extends State<M3StaggeredItem>
     );
 
     final delayMs =
-        math.min(widget.index * widget.delayStep.inMilliseconds, 350);
+        // Stagger capped at 5 items (index 0..4) so the entrance stays short.
+        math.min(widget.index, 4) * widget.delayStep.inMilliseconds;
     Future.delayed(Duration(milliseconds: delayMs), () {
       if (mounted) {
         _controller.forward();

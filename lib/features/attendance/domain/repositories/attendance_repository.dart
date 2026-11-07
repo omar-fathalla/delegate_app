@@ -39,6 +39,14 @@ abstract class AttendanceRepository {
     dynamic lastDoc,
   });
 
+  /// All sessions whose check-in falls in [month], across all organizations.
+  Future<Either<Failure, List<Attendance>>> getHistoryForMonth(
+    String userId, {
+    required DateTime month,
+    String? nationalityID,
+    String? phoneNumber,
+  });
+
   /// Finds the active attendance session (no checkOutTime) for the delegate.
   Future<Either<Failure, Attendance?>> findActiveAttendance(
     String userId,

@@ -165,17 +165,11 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       _screens = [
         AdminHomeScreen(adminDelegate: delegate),
         AdminDelegatesScreen(adminDelegate: delegate),
-        AdminTasksScreen(adminDelegate: delegate),
-        MultiBlocProvider(
-          providers: [
-            BlocProvider(create: (_) => di.sl<PhotoPermissionBloc>()),
-            BlocProvider(create: (_) => di.sl<BranchBloc>()),
-          ],
-          child: SupervisorPermissionsScreen(
-            supervisorDelegate: delegate,
-            showAppBar: false,
-          ),
-        ),
+        // تبويب سجل الحضور والانصراف (المهام انتقلت للقائمة الجانبية)
+        HRAttendanceScreen(hrDelegate: delegate, showAppBar: false),
+        // تبويب الطلبات: طلبات الإجازات والأعذار الواردة من المناديب
+        // (أذونات التصوير انتقلت للقائمة الجانبية)
+        HRLeavesAndExcusesScreen(hrDelegate: delegate, showAppBar: false),
       ];
     }
   }
@@ -493,6 +487,22 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           ),
         );
         break;
+      case 'supervisor_photo_permissions':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => MultiBlocProvider(
+              providers: [
+                BlocProvider(create: (_) => di.sl<PhotoPermissionBloc>()),
+                BlocProvider(create: (_) => di.sl<BranchBloc>()),
+              ],
+              child: SupervisorPermissionsScreen(
+                supervisorDelegate: widget.delegate,
+                showAppBar: true,
+              ),
+            ),
+          ),
+        );
+        break;
       case 'tasks':
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -598,8 +608,8 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               : _currentIndex == 1
               ? l10n.companyDelegates
               : _currentIndex == 2
-              ? l10n.tasks
-              : l10n.photoPermissions);
+              ? (isArabic ? 'سجل الحضور والانصراف' : 'Attendance & Departure')
+              : (isArabic ? 'طلبات الإجازات والأعذار' : 'Leave Requests'));
 
     Widget buildBadgeIcon(IconData icon, String collection) {
       if (widget.delegate.companyUID.isEmpty) {
@@ -666,6 +676,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
       appBar: UniversalAppHeader(
         delegate: delegate,
+        showActiveOrganization: false,
         customTitle: _currentIndex == 0 ? null : subtitle,
         customSubtitle: _currentIndex == 0
             ? null
@@ -860,6 +871,26 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               ),
             ],
           ],
+
+          // المهام انتقلت من الشريط السفلي إلى القائمة لمشرف/مسؤول الشركة
+          if (!isSuperAdmin &&
+              !isTechnicalSupport &&
+              !isOrganizationAdmin &&
+              !isBranchesMarketingManager)
+            buildPopupItem(
+              value: 'tasks',
+              icon: Icons.task_alt_rounded,
+              title: isArabic ? 'المهام' : 'Tasks',
+            ),
+          if (!isSuperAdmin &&
+              !isTechnicalSupport &&
+              !isOrganizationAdmin &&
+              !isBranchesMarketingManager)
+            buildPopupItem(
+              value: 'supervisor_photo_permissions',
+              icon: Icons.collections_rounded,
+              title: isArabic ? 'أذونات التصوير' : 'Photo Permissions',
+            ),
 
           if (isBranchesMarketingManager) ...[
             buildPopupItem(
@@ -1073,14 +1104,14 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                     label: l10n.companyDelegates,
                   ),
                   NavigationDestination(
-                    icon: const Icon(Icons.task_alt_rounded),
-                    selectedIcon: const Icon(Icons.task_alt_rounded),
-                    label: l10n.tasks,
+                    icon: const Icon(Icons.event_available_outlined),
+                    selectedIcon: const Icon(Icons.event_available_rounded),
+                    label: isArabic ? 'الحضور' : 'Attendance',
                   ),
                   NavigationDestination(
-                    icon: const Icon(Icons.collections_rounded),
-                    selectedIcon: const Icon(Icons.collections_rounded),
-                    label: l10n.photoPermissions,
+                    icon: const Icon(Icons.inbox_outlined),
+                    selectedIcon: const Icon(Icons.inbox_rounded),
+                    label: isArabic ? 'الطلبات' : 'Requests',
                   ),
                 ],
               ),

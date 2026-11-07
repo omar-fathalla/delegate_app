@@ -183,7 +183,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               Icon(Icons.error_outline, size: 64, color: colorScheme.error),
               const SizedBox(height: 16),
               Text(
-                'لم يتم العثور على المستخدم',
+                AppLocalizations.of(context)!.userNotFound,
                 style: theme.textTheme.titleMedium?.copyWith(
                   color: colorScheme.error,
                 ),
@@ -254,7 +254,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       final uid = _delegate?.uid ?? delegate?.uid ?? _firestoreUserData?['uid'] ?? _currentUser?.uid;
       if (uid == null || uid.isEmpty || uid == 'super-admin-login') {
         if (mounted) {
-          AppSnackBar.showError(context, 'تعذر تحديد الحساب');
+          AppSnackBar.showError(context, AppLocalizations.of(context)!.accountNotIdentified);
         }
         return;
       }
@@ -351,11 +351,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         }
 
         context.read<AuthBloc>().add(CheckAutoLoginRequested());
-        AppSnackBar.showSuccess(context, '✅ تم تحديث الصورة الشخصية بنجاح');
+        AppSnackBar.showSuccess(context, AppLocalizations.of(context)!.profilePhotoUpdated);
       }
     } catch (e) {
       if (mounted) {
-        AppSnackBar.showError(context, 'فشل رفع الصورة: $e');
+        AppSnackBar.showError(context, AppLocalizations.of(context)!.photoUploadFailed(e));
       }
     } finally {
       if (mounted) {
@@ -370,7 +370,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       final uid = _delegate?.uid ?? delegate?.uid ?? _firestoreUserData?['uid'] ?? _currentUser?.uid;
       if (uid == null || uid.isEmpty || uid == 'super-admin-login') {
         if (mounted) {
-          AppSnackBar.showError(context, 'تعذر تحديد الحساب');
+          AppSnackBar.showError(context, AppLocalizations.of(context)!.accountNotIdentified);
         }
         return;
       }
@@ -437,11 +437,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         }
 
         context.read<AuthBloc>().add(CheckAutoLoginRequested());
-        AppSnackBar.showSuccess(context, 'تم حذف الصورة الشخصية');
+        AppSnackBar.showSuccess(context, AppLocalizations.of(context)!.profilePhotoDeleted);
       }
     } catch (e) {
       if (mounted) {
-        AppSnackBar.showError(context, 'فشل حذف الصورة: $e');
+        AppSnackBar.showError(context, AppLocalizations.of(context)!.photoDeleteFailed(e));
       }
     } finally {
       if (mounted) {
@@ -484,14 +484,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'الصورة الشخصية',
+              Text(
+                AppLocalizations.of(context)!.profilePhoto,
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 12),
               ListTile(
                 leading: const Icon(Icons.camera_alt_rounded, color: Colors.blue),
-                title: const Text('التقاط صورة بالكاميرا'),
+                title: Text(AppLocalizations.of(context)!.takePhotoCamera),
                 onTap: () {
                   Navigator.pop(ctx);
                   _pickAndUploadImage(ImageSource.camera, delegate);
@@ -499,7 +499,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library_rounded, color: Colors.purple),
-                title: const Text('اختيار من معرض الصور'),
+                title: Text(AppLocalizations.of(context)!.chooseFromGallery),
                 onTap: () {
                   Navigator.pop(ctx);
                   _pickAndUploadImage(ImageSource.gallery, delegate);
@@ -508,7 +508,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               if (hasPhoto)
                 ListTile(
                   leading: const Icon(Icons.delete_outline_rounded, color: Colors.red),
-                  title: const Text('حذف الصورة الحالية', style: TextStyle(color: Colors.red)),
+                  title: Text(AppLocalizations.of(context)!.removeCurrentPhoto, style: TextStyle(color: Colors.red)),
                   onTap: () {
                     Navigator.pop(ctx);
                     _removePhoto(delegate);
@@ -524,30 +524,30 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   String _getRoleDisplayName(Delegate? delegate, Map<String, dynamic>? firestoreData) {
     final roleStr = firestoreData?['role']?.toString().toLowerCase() ?? '';
     if (delegate?.role == UserRole.superAdmin || roleStr == 'super-admin' || roleStr == 'super_admin') {
-      return 'المشرف العام (Super Admin)';
+      return AppLocalizations.of(context)!.roleSuperAdmin2;
     }
     if (delegate?.role == UserRole.technicalSupport || roleStr.contains('technical')) {
-      return 'الدعم الفني (Technical Support)';
+      return AppLocalizations.of(context)!.roleTechSupport2;
     }
     if (delegate?.role == UserRole.organizationAdmin || roleStr.contains('organization')) {
-      return 'مسؤول المنظمة (Organization Admin)';
+      return AppLocalizations.of(context)!.roleOrgAdmin2;
     }
     if (delegate?.role == UserRole.admin || roleStr.contains('company-admin')) {
-      return 'مشرف الشركة (Company Admin)';
+      return AppLocalizations.of(context)!.roleCompanyAdmin2;
     }
     if (delegate?.role == UserRole.hr || roleStr == 'hr' || roleStr.contains('hr')) {
-      return 'مسؤول موارد بشرية (HR)';
+      return AppLocalizations.of(context)!.roleHrOfficer;
     }
     if (delegate?.role == UserRole.accountant || roleStr.contains('account')) {
-      return 'إدارة الحسابات (Accountant)';
+      return AppLocalizations.of(context)!.roleAccountant;
     }
     if (delegate?.role == UserRole.marketing || delegate?.role == UserRole.marketingPromotion || roleStr.contains('marketing')) {
-      return 'التسويق والعلاقات (Marketing)';
+      return AppLocalizations.of(context)!.roleMarketing2;
     }
     if (delegate?.position == DelegatePosition.supervisor) {
-      return 'مشرف (Supervisor)';
+      return AppLocalizations.of(context)!.roleSupervisor;
     }
-    return 'مندوب (Delegate)';
+    return AppLocalizations.of(context)!.roleDelegate;
   }
 
   // ─── Profile Header ─────────────────────────────────────────────
@@ -561,7 +561,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         delegate?.fullName ??
         _currentUser?.displayName ??
         '';
-    final displayName = rawName.isNotEmpty ? rawName : 'مستخدم';
+    final displayName = rawName.isNotEmpty ? rawName : AppLocalizations.of(context)!.defaultUserName;
 
     final rawEmail = _firestoreUserData?['email'] ??
         delegate?.email ??
@@ -756,7 +756,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         delegate?.fullName ??
         _currentUser?.displayName ??
         '';
-    final displayName = rawName.isNotEmpty ? rawName : 'مستخدم';
+    final displayName = rawName.isNotEmpty ? rawName : AppLocalizations.of(context)!.defaultUserName;
 
     final rawEmail = _firestoreUserData?['email'] ??
         delegate?.email ??
@@ -798,7 +798,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  'المعلومات الشخصية',
+                  AppLocalizations.of(context)!.personalInfo,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: colorScheme.onSurface,
@@ -812,7 +812,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             // Display Name
             _buildInfoRow(
               icon: Icons.badge_outlined,
-              label: 'الاسم',
+              label: AppLocalizations.of(context)!.nameLabel,
               value: displayName,
               colorScheme: colorScheme,
               theme: theme,
@@ -827,7 +827,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             // Email
             _buildInfoRow(
               icon: Icons.email_outlined,
-              label: 'البريد الإلكتروني',
+              label: AppLocalizations.of(context)!.emailLabel,
               value: email,
               colorScheme: colorScheme,
               theme: theme,
@@ -842,7 +842,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             // Phone Number
             _buildInfoRow(
               icon: Icons.phone_outlined,
-              label: 'رقم الموبايل',
+              label: AppLocalizations.of(context)!.phoneNumberLabel,
               value: phone,
               colorScheme: colorScheme,
               theme: theme,
@@ -896,7 +896,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  'الأمان',
+                  AppLocalizations.of(context)!.securitySection,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: colorScheme.onSurface,
@@ -925,8 +925,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   ),
                 ),
                 icon: const Icon(Icons.lock_reset_rounded),
-                label: const Text(
-                  'تغيير كلمة المرور',
+                label: Text(
+                  AppLocalizations.of(context)!.changePassword,
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -1016,7 +1016,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     color: colorScheme.primary,
                     size: 20,
                   ),
-                  tooltip: 'تعديل $label',
+                  tooltip: AppLocalizations.of(context)!.editField(label),
                   onPressed: onEdit,
                 ),
             ],
@@ -1259,10 +1259,10 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
           SnackBar(
             content: Text(
               isName
-                  ? '✅ تم تحديث الاسم بنجاح'
+                  ? AppLocalizations.of(context)!.nameUpdated
                   : (isEmail
-                      ? '✅ تم تحديث البريد الإلكتروني بنجاح'
-                      : '✅ تم تحديث رقم الموبايل بنجاح'),
+                      ? AppLocalizations.of(context)!.emailUpdated
+                      : AppLocalizations.of(context)!.phoneUpdated),
             ),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
@@ -1297,11 +1297,11 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
     final isName = widget.fieldType == 'name';
     final isEmail = widget.fieldType == 'email';
     final title = isName
-        ? 'تعديل الاسم'
-        : (isEmail ? 'تعديل البريد الإلكتروني' : 'تعديل رقم الموبايل');
+        ? AppLocalizations.of(context)!.editName2
+        : (isEmail ? AppLocalizations.of(context)!.editEmail : AppLocalizations.of(context)!.editPhone);
     final label = isName
-        ? 'الاسم بالكامل'
-        : (isEmail ? 'البريد الإلكتروني الجديد' : 'رقم الموبايل الجديد');
+        ? AppLocalizations.of(context)!.fullName2
+        : (isEmail ? AppLocalizations.of(context)!.newEmail : AppLocalizations.of(context)!.newPhone);
     final icon = isName
         ? Icons.badge_outlined
         : (isEmail ? Icons.email_outlined : Icons.phone_outlined);
@@ -1370,17 +1370,17 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    if (isName) return 'يرجى إدخال الاسم';
-                    return isEmail ? 'يرجى إدخال البريد الإلكتروني' : 'يرجى إدخال رقم الموبايل';
+                    if (isName) return AppLocalizations.of(context)!.enterName;
+                    return isEmail ? AppLocalizations.of(context)!.enterEmail : AppLocalizations.of(context)!.enterPhone;
                   }
                   if (isName && value.trim().length < 3) {
-                    return 'يجب أن يتكون الاسم من 3 أحرف على الأقل';
+                    return AppLocalizations.of(context)!.nameMin3;
                   }
                   if (isEmail && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
-                    return 'يرجى إدخال بريد إلكتروني صحيح';
+                    return AppLocalizations.of(context)!.invalidEmail2;
                   }
                   if (!isEmail && !isName && value.trim().length < 10) {
-                    return 'يرجى إدخال رقم موبايل صحيح';
+                    return AppLocalizations.of(context)!.invalidPhone;
                   }
                   return null;
                 },
@@ -1419,7 +1419,7 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Text('حفظ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          : Text(AppLocalizations.of(context)!.saveAction, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
@@ -1516,8 +1516,8 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ تم تغيير كلمة المرور بنجاح'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.passwordChanged),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
@@ -1619,7 +1619,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                   Icon(Icons.lock_reset_rounded, size: 28, color: colorScheme.primary),
                   const SizedBox(width: 12),
                   Text(
-                    'تغيير كلمة المرور',
+                    AppLocalizations.of(context)!.changePassword,
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: colorScheme.onSurface,
@@ -1632,7 +1632,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
               // Current Password
               _buildTextField(
                 controller: _currentPasswordController,
-                label: 'كلمة المرور الحالية',
+                label: AppLocalizations.of(context)!.currentPassword,
                 obscureText: _obscureCurrentPassword,
                 colorScheme: colorScheme,
                 onToggleVisibility: () {
@@ -1640,7 +1640,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                 },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'يرجى إدخال كلمة المرور الحالية';
+                    return AppLocalizations.of(context)!.enterCurrentPassword;
                   }
                   return null;
                 },
@@ -1651,7 +1651,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
               // New Password
               _buildTextField(
                 controller: _newPasswordController,
-                label: 'كلمة المرور الجديدة',
+                label: AppLocalizations.of(context)!.newPassword,
                 obscureText: _obscureNewPassword,
                 colorScheme: colorScheme,
                 onToggleVisibility: () {
@@ -1659,10 +1659,10 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                 },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'يرجى إدخال كلمة المرور الجديدة';
+                    return AppLocalizations.of(context)!.enterNewPassword;
                   }
                   if (value.length < 6) {
-                    return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+                    return AppLocalizations.of(context)!.passwordMin6;
                   }
                   return null;
                 },
@@ -1673,7 +1673,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
               // Confirm Password
               _buildTextField(
                 controller: _confirmPasswordController,
-                label: 'تأكيد كلمة المرور',
+                label: AppLocalizations.of(context)!.confirmPassword,
                 obscureText: _obscureConfirmPassword,
                 colorScheme: colorScheme,
                 onToggleVisibility: () {
@@ -1681,10 +1681,10 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                 },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'يرجى تأكيد كلمة المرور';
+                    return AppLocalizations.of(context)!.enterConfirmPassword;
                   }
                   if (value != _newPasswordController.text) {
-                    return 'كلمة المرور غير متطابقة';
+                    return AppLocalizations.of(context)!.passwordsDontMatch;
                   }
                   return null;
                 },
@@ -1723,7 +1723,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                               height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
-                          : const Text('تغيير', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          : Text(AppLocalizations.of(context)!.saveAction, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],

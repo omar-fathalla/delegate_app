@@ -1,4 +1,6 @@
+import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:bloc/bloc.dart';
+import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/check_in.dart';
@@ -45,12 +47,16 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     ReviewService? reviewService,
   })  : _reviewService = reviewService,
         super(AttendanceInitial()) {
-    on<CheckInRequested>(_onCheckIn);
-    on<CheckOutRequested>(_onCheckOut);
+    // droppable: a second check-in/out while one is running is ignored.
+    on<CheckInRequested>(_onCheckIn, transformer: droppable());
+    on<CheckOutRequested>(_onCheckOut, transformer: droppable());
     on<HistoryRequested>(_onGetHistory);
     on<LoadMoreHistoryRequested>(_onLoadMoreHistory);
     on<SyncRequested>(_onSync);
-    on<CheckOutAndCheckInRequested>(_onCheckOutAndCheckIn);
+    on<CheckOutAndCheckInRequested>(
+      _onCheckOutAndCheckIn,
+      transformer: droppable(),
+    );
   }
 
   Future<void> _onCheckIn(
@@ -86,7 +92,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         } else {
           emit(AttendanceError(
             message:
-                'لديك تسجيل حضور نشط في فرع ${activeAttendance.branchName ?? "آخر"}. يرجى تسجيل الانصراف أولاً.',
+                'لديك تسجيل حضور نشط في فرع ${activeAttendance.branchName == null ? "آخر" : BranchDisplayCache.instance.displayName(activeAttendance.branchName!)}. يرجى تسجيل الانصراف أولاً.',
           ));
           if (previousLoadedState != null) emit(previousLoadedState);
           return;
@@ -177,7 +183,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         }
       },
       (result) {
-        // Check for any active check-in (within 9h and not checked out)
+        // Check for any active check-in (within the 11.5h auto-close window and not checked out)
         Attendance? activeAttendance;
         try {
           activeAttendance = result.items.firstWhere(

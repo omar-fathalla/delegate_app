@@ -1,3 +1,7 @@
+import 'package:delegate_app/features/tasks/data/services/task_image_storage.dart';
+import 'package:delegate_app/features/tasks/presentation/widgets/task_image_widgets.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
@@ -15,11 +19,20 @@ class TaskDetailsScreen extends StatefulWidget {
   final bool isAdmin;
   final String organizationId;
 
+  /// Profile id of the signed-in staff member, compared with
+  /// [TaskEntity.createdBy] alongside the Firebase Auth uid.
+  final String? currentUserId;
+
+  /// Test seam; defaults to the Firebase Auth uid.
+  final String? authUidOverride;
+
   const TaskDetailsScreen({
     super.key,
     required this.task,
     required this.isAdmin,
     required this.organizationId,
+    this.currentUserId,
+    this.authUidOverride,
   });
 
   @override
@@ -35,6 +48,19 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   late TaskPriority _currentPriority;
   late DateTime _dueDate;
   bool _isEditing = false;
+  TaskImageUpload? _newImage;
+  bool _imageRemoved = false;
+  bool _imageUploading = false;
+
+  /// Only the supervisor who sent the task may edit or delete it.
+  bool get _isSender {
+    if (!widget.isAdmin) return false;
+    final authUid =
+        widget.authUidOverride ?? FirebaseAuth.instance.currentUser?.uid;
+    final createdBy = _task.createdBy;
+    if (createdBy.isEmpty) return false;
+    return createdBy == authUid || createdBy == widget.currentUserId;
+  }
 
   @override
   void initState() {
@@ -57,7 +83,18 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   }
 
   void _saveChanges(BuildContext context) {
-    final updatedTask = _task.copyWith(
+    final imageChanged = _newImage != null || _imageRemoved;
+    final contentChanged = imageChanged ||
+        _titleController.text != _task.title ||
+        _descriptionController.text != _task.description;
+    var base = _task;
+    if (_newImage != null) {
+      base = base.copyWith(imageUrl: _newImage!.url, imagePath: _newImage!.path);
+    } else if (_imageRemoved) {
+      base = base.copyWith(clearImage: true);
+    }
+    if (contentChanged) base = base.copyWith(editedAt: DateTime.now());
+    final updatedTask = base.copyWith(
       title: _titleController.text,
       description: _descriptionController.text,
       status: _currentStatus,
@@ -85,6 +122,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     setState(() {
       _task = updatedTask;
       _isEditing = false;
+      _newImage = null;
+      _imageRemoved = false;
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -113,21 +152,48 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               actions: [
-                if (widget.isAdmin)
+                if (_isSender && _isEditing)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8.0),
                     child: IconButton.filledTonal(
-                      icon: Icon(
-                        _isEditing ? Icons.check_rounded : Icons.edit_rounded,
-                      ),
-                      onPressed: () {
-                        if (_isEditing) {
-                          _saveChanges(context);
-                        } else {
-                          setState(() => _isEditing = true);
-                        }
-                      },
+                      icon: const Icon(Symbols.check_rounded),
+                      onPressed: _imageUploading
+                          ? null
+                          : () => _saveChanges(context),
                     ),
+                  )
+                else if (_isSender)
+                  PopupMenuButton<String>(
+                    key: const Key('task-more-actions'),
+                    tooltip: l10n.taskMoreActions,
+                    icon: const Icon(Symbols.more_vert_rounded),
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        setState(() => _isEditing = true);
+                      } else if (value == 'delete') {
+                        _confirmDelete(context);
+                      }
+                    },
+                    itemBuilder: (ctx) => [
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Symbols.edit_rounded),
+                          title: Text(l10n.taskEditAction),
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(Symbols.delete_rounded,
+                              color: theme.colorScheme.error),
+                          title: Text(l10n.taskDeleteAction,
+                              style: TextStyle(color: theme.colorScheme.error)),
+                        ),
+                      ),
+                    ],
                   ),
               ],
             ),
@@ -242,6 +308,26 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                             ),
                           ),
                   ),
+                  if (_isEditing && _isSender) ...[
+                    const SizedBox(height: 12),
+                    TaskImagePickerField(
+                      organizationId: widget.organizationId,
+                      initialUrl: _imageRemoved ? null : _task.imageUrl,
+                      onChanged: (upload) => setState(() {
+                        _newImage = upload;
+                        _imageRemoved = upload == null;
+                      }),
+                      onUploadingChanged: (v) =>
+                          setState(() => _imageUploading = v),
+                    ),
+                  ] else if (_task.hasImage) ...[
+                    const SizedBox(height: 12),
+                    TaskImageThumbnail(url: _task.imageUrl!),
+                  ],
+                  if (_task.isEdited && !_isEditing) ...[
+                    const SizedBox(height: 8),
+                    const TaskEditedLabel(),
+                  ],
                   const SizedBox(height: 12),
                   _buildField(
                     label: l10n.taskPriority,
@@ -531,7 +617,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
-                  if (widget.isAdmin) ...[
+                  if (_isSender && !_isEditing) ...[
                     const SizedBox(height: 16),
                     FilledButton.tonalIcon(
                       onPressed: () => _confirmDelete(context),
@@ -804,7 +890,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                                       Navigator.pop(context, true);
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
-                                          content: const Text('تم حذف المهمة بنجاح'),
+                                          content: Text(AppLocalizations.of(context)!.taskDeleted),
                                           backgroundColor: Colors.green.shade700,
                                         ),
                                       );
@@ -815,7 +901,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                                     setModalState(() => isDeleting = false);
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text('حدث خطأ أثناء حذف المهمة: $e'),
+                                        content: Text(AppLocalizations.of(context)!.taskDeleteFailed(e)),
                                         backgroundColor: colorScheme.error,
                                       ),
                                     );

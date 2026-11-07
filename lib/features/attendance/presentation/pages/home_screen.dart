@@ -3,6 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/features/attendance/presentation/widgets/attendance_action_button.dart';
+import 'package:delegate_app/features/attendance/presentation/attendance_action_lock.dart';
+import 'package:delegate_app/features/attendance/presentation/widgets/early_checkout_confirm_sheet.dart';
+import 'package:delegate_app/core/services/trusted_time_service.dart';
 import 'package:delegate_app/features/attendance/presentation/widgets/attendance_history_list.dart';
 import 'package:delegate_app/features/attendance/presentation/widgets/current_status_card.dart';
 import 'package:delegate_app/features/attendance/presentation/widgets/home_app_bar.dart';
@@ -29,6 +32,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final AttendanceActionLock _actionLock = AttendanceActionLock();
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -94,13 +99,31 @@ class _HomeScreenState extends State<HomeScreen> {
                   Center(
                     child: AttendanceActionButton(
                       isCheckedIn: isCheckedIn,
-                      isLoading: state is AttendanceLoading,
-                      onTap: () async {
+                      isLoading:
+                          state is AttendanceLoading || _actionLock.isBusy,
+                      loadingLabel:
+                          _actionLock.isBusy ? l10n.attLocatingShort : null,
+                      onTap: () => _actionLock.run(
+                        bloc: context.read<AttendanceBloc>(),
+                        onChanged: () {
+                          if (mounted) setState(() {});
+                        },
+                        action: () async {
                         final position = await _getCurrentLocation(context);
                         if (position == null || !context.mounted) return;
 
                         if (isCheckedIn) {
                           if (activeAttendance == null) return;
+                          if (!await confirmEarlyCheckOutIfNeeded(
+                            context,
+                            checkInTime: activeAttendance.checkInTime,
+                            now: sl.isRegistered<TrustedTimeService>()
+                                ? sl<TrustedTimeService>().now
+                                : DateTime.now(),
+                          )) {
+                            return;
+                          }
+                          if (!context.mounted) return;
                           context.read<AttendanceBloc>().add(
                             CheckOutRequested(
                               attendanceId: activeAttendance.id,
@@ -135,7 +158,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           );
                         }
-                      },
+                        },
+                      ),
                     ),
                   ),
 

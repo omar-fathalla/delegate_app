@@ -73,6 +73,7 @@ import 'package:delegate_app/features/attendance/domain/usecases/check_in.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/check_out.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/get_history.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/get_history_paginated.dart';
+import 'package:delegate_app/features/attendance/domain/usecases/get_history_for_month.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/sync_attendance.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 
@@ -269,6 +270,7 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   sl.registerLazySingleton(() => CheckOut(sl()));
   sl.registerLazySingleton(() => GetHistory(sl()));
   sl.registerLazySingleton(() => GetHistoryPaginated(sl()));
+  sl.registerLazySingleton(() => GetHistoryForMonth(sl()));
   sl.registerLazySingleton(() => SyncAttendance(sl()));
 
   // Repository

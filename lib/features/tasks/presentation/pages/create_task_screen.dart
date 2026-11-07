@@ -1,3 +1,5 @@
+import 'package:delegate_app/features/tasks/data/services/task_image_storage.dart';
+import 'package:delegate_app/features/tasks/presentation/widgets/task_image_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -27,6 +29,8 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   String _selectedAssignedTo = 'all';
   String _selectedAssignedToName = '';
+  TaskImageUpload? _image;
+  bool _imageUploading = false;
 
   @override
   void initState() {
@@ -199,6 +203,13 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                           return null;
                         },
                         keyboardType: TextInputType.multiline,
+                      ),
+                      const SizedBox(height: 16),
+                      TaskImagePickerField(
+                        organizationId: widget.adminDelegate.organizationUID,
+                        onChanged: (upload) => setState(() => _image = upload),
+                        onUploadingChanged: (v) =>
+                            setState(() => _imageUploading = v),
                       ),
                       const SizedBox(height: 24),
                       _buildSectionHeader(theme, l10n.taskPriority),
@@ -424,7 +435,8 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                       BlocBuilder<CreateTaskBloc, CreateTaskState>(
                         builder: (context, state) {
                           return FilledButton.icon(
-                            onPressed: state is CreateTaskLoading
+                            onPressed:
+                                state is CreateTaskLoading || _imageUploading
                                 ? null
                                 : () {
                                     if (_formKey.currentState!.validate()) {
@@ -448,6 +460,8 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                                           createdBy: widget.adminDelegate.uid,
                                           createdByName:
                                               '${widget.adminDelegate.firstName} ${widget.adminDelegate.lastName}',
+                                          imageUrl: _image?.url,
+                                          imagePath: _image?.path,
                                         ),
                                       );
                                     }
@@ -460,12 +474,12 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                               elevation: 0,
                             ),
                             icon: state is CreateTaskLoading
-                                ? const SizedBox(
+                                ? SizedBox(
                                     width: 24,
                                     height: 24,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 3,
-                                      color: Colors.white,
+                                      color: theme.colorScheme.onPrimary,
                                     ),
                                   )
                                 : const Icon(
@@ -475,7 +489,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                             label: Text(
                               l10n.createTask,
                               style: theme.textTheme.titleLarge?.copyWith(
-                                color: Colors.white,
+                                color: theme.colorScheme.onPrimary,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),

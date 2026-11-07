@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
 import 'package:equatable/equatable.dart';
 
 class Attendance extends Equatable {
@@ -33,20 +34,20 @@ class Attendance extends Equatable {
     this.autoCheckOutReason,
   });
 
-  /// ما إذا كانت هذه الجلسة قد أغلقت تلقائياً (سواء مسجلة كإغلاق تلقائي أو مر عليها أكثر من 9 ساعات)
+  /// ما إذا كانت هذه الجلسة قد أغلقت تلقائياً (سواء مسجلة كإغلاق تلقائي أو مر عليها أكثر من 11.5 ساعة)
   bool get isEffectiveAutoCheckOut =>
       isAutoCheckOut ||
       (checkOutTime == null &&
-          DateTime.now().difference(checkInTime) >= const Duration(hours: 9));
+          DateTime.now().difference(checkInTime) >= kAttendanceAutoCloseAfter);
 
-  /// وقت الانصراف الفعلي: الانصراف المسجل يدوياً، أو بعد 9 ساعات من الحضور إذا أغلقت تلقائياً
+  /// وقت الانصراف الفعلي: الانصراف المسجل يدوياً، أو بعد 11.5 ساعة من الحضور إذا أغلقت تلقائياً
   DateTime? get effectiveCheckOutTime =>
       checkOutTime ??
       (isEffectiveAutoCheckOut
-          ? checkInTime.add(const Duration(hours: 9))
+          ? checkInTime.add(kAttendanceAutoCloseAfter)
           : null);
 
-  /// ما إذا كانت الجلسة نشطة حالياً (حاضر الآن ولم تنته وردية الـ 9 ساعات بعد)
+  /// ما إذا كانت الجلسة نشطة حالياً (حاضر الآن ولم تنته وردية الـ 11.5 ساعة بعد)
   bool get isActive => checkOutTime == null && !isEffectiveAutoCheckOut;
 
   @override

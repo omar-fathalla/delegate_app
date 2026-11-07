@@ -1,1273 +1,2327 @@
 {
-    "@@locale": "en",
-    "appTitle": "Tashil",
-    "@appTitle": {
-        "description": "App title"
-    },
-    "delegateApp": "Employees App",
-    "@delegateApp": {
-        "description": "Employees app subtitle"
-    },
-    "login": "Login",
-    "@login": {
-        "description": "Login label"
-    },
-    "logout": "Logout",
-    "@logout": {
-        "description": "Logout label"
-    },
-    "loginToContinue": "Welcome back, please enter your details",
-    "@loginToContinue": {
-        "description": "Login subtitle"
-    },
-    "loginSuccessful": "Login Successful!",
-    "@loginSuccessful": {
-        "description": "Login success snackbar"
-    },
-    "loginButton": "Login",
-    "@loginButton": {
-        "description": "Login button text"
-    },
-    "mobileNumber": "Phone Number",
-    "@mobileNumber": {
-        "description": "Mobile number field label"
-    },
-    "password": "Password",
-    "@password": {
-        "description": "Password field label"
-    },
-    "motherName": "Mother's Name",
-    "@motherName": {
-        "description": "Mother name field label"
-    },
-    "enterMobileNumber": "Please enter mobile number",
-    "@enterMobileNumber": {
-        "description": "Mobile validation error"
-    },
-    "enterPassword": "Please enter password",
-    "@enterPassword": {
-        "description": "Password validation error"
-    },
-    "nationalIdNumber": "National ID number",
-    "@nationalIdNumber": {
-        "description": "Delegate login national ID field label"
-    },
-    "enterNationalId": "Please enter the national ID number",
-    "@enterNationalId": {
-        "description": "Empty national ID validation error"
-    },
-    "invalidNationalId": "National ID must be 14 digits",
-    "@invalidNationalId": {
-        "description": "National ID format validation error"
-    },
-    "invalidMobileNumber": "Enter a valid mobile number",
-    "@invalidMobileNumber": {
-        "description": "Mobile number format validation error"
-    },
-    "loginNationalIdHelp": "Delegates sign in with their national ID. Other roles use their password.",
-    "@loginNationalIdHelp": {
-        "description": "Helper under the delegate login secret field"
-    },
-    "invalidLoginCredentials": "The phone number, national ID, or password is incorrect.",
-    "@invalidLoginCredentials": {
-        "description": "Delegate credential mismatch"
-    },
-    "delegateAccountInactive": "This account is pending or suspended. Contact your company admin.",
-    "@delegateAccountInactive": {
-        "description": "Pending or blocked delegate login error"
-    },
-    "tooManyLoginAttempts": "Too many attempts. Please try again later.",
-    "@tooManyLoginAttempts": {
-        "description": "Delegate login lockout message"
-    },
-    "loginTemporarilyUnavailable": "Sign-in is temporarily unavailable. Please try again.",
-    "@loginTemporarilyUnavailable": {
-        "description": "Delegate login service unavailable"
-    },
-    "rememberMe": "Remember Me",
-    "@rememberMe": {
-        "description": "Remember me checkbox label"
-    },
-    "home": "Home",
-    "@home": {
-        "description": "Home nav label"
-    },
-    "profile": "Profile",
-    "@profile": {
-        "description": "Profile nav label"
-    },
-    "attendance": "Attendance",
-    "@attendance": {
-        "description": "Attendance nav label"
-    },
-    "myProfile": "My Profile",
-    "@myProfile": {
-        "description": "Profile screen title"
-    },
-    "personalInformation": "Personal Information",
-    "@personalInformation": {
-        "description": "Personal info section title"
-    },
-    "delegateId": "Delegate ID",
-    "@delegateId": {
-        "description": "Delegate ID label"
-    },
-    "delegateRole": "Delegate",
-    "@delegateRole": {
-        "description": "Delegate role label"
-    },
-    "checkIn": "Check In",
-    "@checkIn": {
-        "description": "Check in action"
-    },
-    "checkOut": "Check Out",
-    "@checkOut": {
-        "description": "Check out action"
-    },
-    "checkedInSuccessfully": "Checked In Successfully",
-    "@checkedInSuccessfully": {
-        "description": "Check in success message"
-    },
-    "checkedOutSuccessfully": "Checked Out Successfully",
-    "@checkedOutSuccessfully": {
-        "description": "Check out success message"
-    },
-    "scanToCheckIn": "Scan to Check In",
-    "@scanToCheckIn": {
-        "description": "FAB label for check in"
-    },
-    "scanToCheckOut": "Scan to Check Out",
-    "@scanToCheckOut": {
-        "description": "FAB label for check out"
-    },
-    "scanQrInstruction": "Scan the QR code located in the marketing office.",
-    "@scanQrInstruction": {
-        "description": "Instruction to scan QR on empty history screen"
-    },
-    "scanForAction": "Scan for {action}",
-    "@scanForAction": {
-        "description": "QR scanner title",
-        "placeholders": {
-            "action": {
-                "type": "String"
-            }
-        }
-    },
-    "pointCameraToQR": "Point camera at QR Code for {action}",
-    "@pointCameraToQR": {
-        "description": "QR scanner instruction",
-        "placeholders": {
-            "action": {
-                "type": "String"
-            }
-        }
-    },
-    "checkingInAt": "Checking in at {branch}...",
-    "@checkingInAt": {
-        "description": "Check in at branch snackbar",
-        "placeholders": {
-            "branch": {
-                "type": "String"
-            }
-        }
-    },
-    "invalidQRCode": "Invalid QR Code. Please scan a valid branch code.",
-    "@invalidQRCode": {
-        "description": "Invalid QR error"
-    },
-    "currentStatus": "Current Status",
-    "@currentStatus": {
-        "description": "Status card title"
-    },
-    "online": "ONLINE",
-    "@online": {
-        "description": "Online status"
-    },
-    "offline": "OFFLINE",
-    "@offline": {
-        "description": "Offline status"
-    },
-    "active": "Active",
-    "@active": {
-        "description": "Active check-in indicator"
-    },
-    "inLabel": "In: {time}",
-    "@inLabel": {
-        "description": "Check in time label",
-        "placeholders": {
-            "time": {
-                "type": "String"
-            }
-        }
-    },
-    "outLabel": "Out: {time}",
-    "@outLabel": {
-        "description": "Check out time label",
-        "placeholders": {
-            "time": {
-                "type": "String"
-            }
-        }
-    },
-    "noRecordsForMonth": "No attendance records for {month}",
-    "@noRecordsForMonth": {
-        "description": "Empty month message",
-        "placeholders": {
-            "month": {
-                "type": "String"
-            }
-        }
-    },
-    "recentHistory": "Recent History",
-    "@recentHistory": {
-        "description": "History section title"
-    },
-    "noHistoryAvailable": "No history available",
-    "@noHistoryAvailable": {
-        "description": "Empty history message"
-    },
-    "somethingWentWrong": "Something went wrong",
-    "@somethingWentWrong": {
-        "description": "Generic error message"
-    },
-    "unspecifiedBranch": "Unspecified",
-    "@unspecifiedBranch": {
-        "description": "Fallback branch name"
-    },
-    "helloUser": "Hello, {name}",
-    "@helloUser": {
-        "description": "Greeting with user name",
-        "placeholders": {
-            "name": {
-                "type": "String"
-            }
-        }
-    },
-    "historyInOut": "In: {inTime} - Out: {outTime}",
-    "@historyInOut": {
-        "description": "History row in/out label",
-        "placeholders": {
-            "inTime": {
-                "type": "String"
-            },
-            "outTime": {
-                "type": "String"
-            }
-        }
-    },
-    "errorGeneral": "An error occurred. Please try again.",
-    "@errorGeneral": {
-        "description": "General error"
-    },
-    "errorNetwork": "No internet connection.",
-    "@errorNetwork": {
-        "description": "Network error"
-    },
-    "errorLocation": "Could not determine your location.",
-    "@errorLocation": {
-        "description": "Location error"
-    },
-    "errorOutOfRange": "You are outside the worksite range.",
-    "@errorOutOfRange": {
-        "description": "Out of range error"
-    },
-    "errorMockLocation": "Mock location detected. Cannot check in.",
-    "@errorMockLocation": {
-        "description": "Mock location error"
-    },
-    "errorAuth": "Invalid credentials.",
-    "@errorAuth": {
-        "description": "Auth error"
-    },
-    "success": "Operation completed successfully",
-    "@success": {
-        "description": "Success message"
-    },
-    "loading": "Loading...",
-    "@loading": {
-        "description": "Loading indicator"
-    },
-    "pendingSync": "Pending sync",
-    "@pendingSync": {
-        "description": "Pending sync indicator"
-    },
-    "settings": "Settings",
-    "@settings": {
-        "description": "Settings menu title"
-    },
-    "companies": "Companies",
-    "@companies": {
-        "description": "Companies tab label"
-    },
-    "search": "Search",
-    "@search": {
-        "description": "Search tab label"
-    },
-    "language": "Language",
-    "@language": {
-        "description": "Language menu item"
-    },
-    "changeLanguage": "Change Language",
-    "@changeLanguage": {
-        "description": "Change language menu item"
-    },
-    "arabic": "العربية",
-    "@arabic": {
-        "description": "Arabic language name"
-    },
-    "english": "English",
-    "@english": {
-        "description": "English language name"
-    },
-    "languageChangedTo": "Language changed to {language}",
-    "@languageChangedTo": {
-        "description": "Language changed confirmation",
-        "placeholders": {
-            "language": {
-                "type": "String"
-            }
-        }
-    },
-    "duration": "Duration: {hours}h {minutes}m",
-    "@duration": {
-        "description": "Duration in hours and minutes",
-        "placeholders": {
-            "hours": {
-                "type": "String"
-            },
-            "minutes": {
-                "type": "String"
-            }
-        }
-    },
-    "inProgress": "In progress...",
-    "@inProgress": {
-        "description": "Ongoing session indicator"
-    },
-    "fullName": "Full Name",
-    "@fullName": {
-        "description": "Full name label"
-    },
-    "phoneNumber": "Phone Number",
-    "@phoneNumber": {
-        "description": "Phone number label"
-    },
-    "birthDate": "Date of Birth",
-    "@birthDate": {
-        "description": "Birth date label"
-    },
-    "cityLabel": "City",
-    "@cityLabel": {
-        "description": "City label"
-    },
-    "organizationAndCompany": "Organization & Company",
-    "@organizationAndCompany": {
-        "description": "Organization and company section title"
-    },
-    "organizationLabel": "Organization",
-    "@organizationLabel": {
-        "description": "Organization label"
-    },
-    "companyLabel": "Company",
-    "@companyLabel": {
-        "description": "Company label"
-    },
-    "positionLabel": "Position",
-    "@positionLabel": {
-        "description": "Position label"
-    },
-    "documents": "Documents",
-    "@documents": {
-        "description": "Documents tab label"
-    },
-    "requestHistory": "Request History",
-    "@requestHistory": {
-        "description": "Request history tab label"
-    },
-    "personalPhoto": "Personal Photo",
-    "@personalPhoto": {
-        "description": "Personal photo document"
-    },
-    "nationalId": "National ID",
-    "@nationalId": {
-        "description": "National ID document"
-    },
-    "authorizationLetter": "Authorization Letter",
-    "@authorizationLetter": {
-        "description": "Authorization letter document"
-    },
-    "insuranceLetter": "Insurance Letter",
-    "@insuranceLetter": {
-        "description": "Insurance letter document"
-    },
-    "healthCertificate": "Health Certificate",
-    "@healthCertificate": {
-        "description": "Health certificate document"
-    },
-    "paymentReceipt": "Payment Receipt",
-    "@paymentReceipt": {
-        "description": "Payment receipt document"
-    },
-    "electronicPaymentReceipt": "Electronic Payment Receipt",
-    "@electronicPaymentReceipt": {
-        "description": "Electronic payment receipt document"
-    },
-    "pendingStatus": "Pending",
-    "@pendingStatus": {
-        "description": "Pending status label"
-    },
-    "uploadedOn": "Uploaded: {date}",
-    "@uploadedOn": {
-        "description": "Upload date label",
-        "placeholders": {
-            "date": {
-                "type": "String"
-            }
-        }
-    },
-    "clickToView": "Click to View",
-    "@clickToView": {
-        "description": "Click to view link"
-    },
-    "receiptCode": "Receipt Code: {code}",
-    "@receiptCode": {
-        "description": "Receipt code label",
-        "placeholders": {
-            "code": {
-                "type": "String"
-            }
-        }
-    },
-    "noRequestsYet": "No requests yet",
-    "@noRequestsYet": {
-        "description": "Empty request history message"
-    },
-    "approvedStatus": "Approved",
-    "@approvedStatus": {
-        "description": "Approved status label"
-    },
-    "rejectedStatus": "Rejected",
-    "@rejectedStatus": {
-        "description": "Rejected status label"
-    },
-    "noDocumentsUploaded": "No documents uploaded",
-    "@noDocumentsUploaded": {
-        "description": "Empty documents message"
-    },
-    "retry": "Retry",
-    "@retry": {
-        "description": "Retry button text"
-    },
-    "gender": "Gender",
-    "@gender": {
-        "description": "Gender label"
-    },
-    "male": "Male",
-    "@male": {
-        "description": "Male gender"
-    },
-    "female": "Female",
-    "@female": {
-        "description": "Female gender"
-    },
-    "joinDate": "Join Date",
-    "@joinDate": {
-        "description": "Join date label"
-    },
-    "employmentDetails": "Employment Details",
-    "@employmentDetails": {
-        "description": "Employment details section title"
-    },
-    "statusReason": "Status Reason",
-    "@statusReason": {
-        "description": "Status reason label"
-    },
-    "profileComplete": "Profile Complete",
-    "@profileComplete": {
-        "description": "Profile complete status"
-    },
-    "profileIncomplete": "Profile Incomplete",
-    "@profileIncomplete": {
-        "description": "Profile incomplete status"
-    },
-    "reviewedBy": "Reviewed By: {name}",
-    "@reviewedBy": {
-        "description": "Reviewer name label",
-        "placeholders": {
-            "name": {
-                "type": "String"
-            }
-        }
-    },
-    "notProvidedStatus": "Not Provided",
-    "@notProvidedStatus": {
-        "description": "Not provided document status"
-    },
-    "adminDashboard": "Admin Dashboard",
-    "@adminDashboard": {
-        "description": "Admin dashboard title"
-    },
-    "addBranch": "Add New Branch",
-    "@addBranch": {
-        "description": "Add new branch title"
-    },
-    "branchName": "Branch Name",
-    "@branchName": {
-        "description": "Branch name label"
-    },
-    "branchLocation": "Branch Location",
-    "@branchLocation": {
-        "description": "Branch location label"
-    },
-    "geofenceRadius": "Attendance Radius (Meters)",
-    "@geofenceRadius": {
-        "description": "Geofence radius label"
-    },
-    "saveBranch": "Save Branch",
-    "@saveBranch": {
-        "description": "Save branch button"
-    },
-    "branchAddedSuccessfully": "Branch Added Successfully",
-    "@branchAddedSuccessfully": {
-        "description": "Branch added success message"
-    },
-    "pleaseEnterBranchName": "Please enter branch name",
-    "@pleaseEnterBranchName": {
-        "description": "Branch name required validation"
-    },
-    "pleaseSelectLocation": "Please select a location on the map",
-    "@pleaseSelectLocation": {
-        "description": "Location required validation"
-    },
-    "searchCityOrRegion": "Search city or region...",
-    "@searchCityOrRegion": {
-        "description": "Search bar hint"
-    },
-    "branches": "Branches",
-
-    "roleBranchMarketing": "Branch Marketing",
-    "@roleBranchMarketing": {
-        "description": "Role title for branch marketing staff"
-    },
-    "roleBranchesMarketingManager": "Branches Marketing Manager",
-    "@roleBranchesMarketingManager": {
-        "description": "Role title for branches marketing manager"
-    },
-    "roleBranchesMarketingMgrShort": "Branches Marketing Mgr",
-    "@roleBranchesMarketingMgrShort": {
-        "description": "Short label for branches marketing manager"
-    },
-    "roleMarketingPromotion": "Marketing Promotion",
-    "@roleMarketingPromotion": {
-        "description": "Role title for marketing promotion staff"
-    },
-    "branchMarketingFollowUp": "Branch Marketing Follow-up",
-    "@branchMarketingFollowUp": {
-        "description": "Subtitle for branch marketing follow-up"
-    },
-    "branchMarketingCoordination": "Branch Marketing Coordination",
-    "@branchMarketingCoordination": {
-        "description": "Subtitle for branch marketing coordination"
-    },    "@branches": {
-        "description": "Label for the branches tab in the admin dashboard navigation."
-    },
-    "admin": "Admin",
-    "@admin": {
-        "description": "Label for the admin dashboard title."
-    },
-    "myLocation": "My Location",
-    "@myLocation": {
-        "description": "Label for the fetch current location button."
-    },
-    "locationServicesDisabled": "Location services are disabled.",
-    "@locationServicesDisabled": {
-        "description": "Error when GPS is disabled."
-    },
-    "locationPermissionDenied": "Location permission denied.",
-    "@locationPermissionDenied": {
-        "description": "Error when location permission is denied."
-    },
-    "errorFetchingLocation": "Error fetching location.",
-    "@errorFetchingLocation": {
-        "description": "Generic error when fetching location fails."
-    },
-    "branchDetails": "Branch Details",
-    "@branchDetails": {
-        "description": "Title for the branch details screen."
-    },
-    "downloadQR": "Download QR",
-    "@downloadQR": {
-        "description": "Button to download the QR code."
-    },
-    "qrSavedToGallery": "QR Code saved to gallery successfully!",
-    "@qrSavedToGallery": {
-        "description": "Message shown when QR is saved to gallery"
-    },
-    "editName": "Edit Name",
-    "@editName": {
-        "description": "Button to edit the branch name."
-    },
-    "editBranch": "Edit Branch",
-    "@editBranch": {
-        "description": "Button to edit the branch details."
-    },
-    "branchUpdatedSuccessfully": "Branch updated successfully.",
-    "@branchUpdatedSuccessfully": {
-        "description": "Success message after updating a branch."
-    },
-    "deleteBranch": "Delete Branch",
-    "@deleteBranch": {
-        "description": "Button to delete the branch."
-    },
-    "deleteBranchConfirmation": "Are you sure you want to delete this branch?",
-    "@deleteBranchConfirmation": {
-        "description": "Confirmation message before deleting a branch."
-    },
-    "branchDeletedSuccessfully": "Branch deleted successfully.",
-    "@branchDeletedSuccessfully": {
-        "description": "Success message after deleting a branch."
-    },
-    "saveChanges": "Save Changes",
-    "@saveChanges": {
-        "description": "Button to save edited branch name."
-    },
-    "networkStatusOffline": "Offline",
-    "@networkStatusOffline": {
-        "description": "Offline network status indicator"
-    },
-    "networkStatusOnline": "Online",
-    "@networkStatusOnline": {
-        "description": "Online network status indicator"
-    },
-    "noAccountContact": "Don't have an account? Contact the following number",
-    "@noAccountContact": {
-        "description": "No account contact text on login screen"
-    },
-    "noAccountTitle": "Don't have an account?",
-    "@noAccountTitle": {
-        "description": "No account title text on login screen"
-    },
-    "noAccountSubtitle": "Contact the following number",
-    "@noAccountSubtitle": {
-        "description": "No account subtitle text on login screen"
-    },
-    "contactNumber": "01211857725",
-    "@contactNumber": {
-        "description": "Contact phone number"
-    },
-    "darkMode": "Dark Mode",
-    "@darkMode": {
-        "description": "Dark mode setting label"
-    },
-    "privacyPolicy": "Privacy Policy",
-    "@privacyPolicy": {
-        "description": "Privacy policy setting label"
-    },
-    "helpCenter": "Help Center",
-    "@helpCenter": {
-        "description": "Help center setting label"
-    },
-    "version": "Tashil Representative - Version {version}",
-    "@version": {
-        "description": "App version label in settings",
-        "placeholders": {
-            "version": {
-                "type": "String"
-            }
-        }
-    },
-    "account": "Account",
-    "@account": {
-        "description": "Account section header"
-    },
-    "privacyPolicyDesc": "This Privacy Policy describes how we collect, use, and disclose your personal information when you use our delegate services. We are committed to protecting your privacy and ensuring your data is handled securely.",
-    "@privacyPolicyDesc": {
-        "description": "Main privacy policy description"
-    },
-    "locationData": "LOCATION DATA",
-    "@locationData": {
-        "description": "Location data section title"
-    },
-    "locationDataDesc": "Our app collects location data to enable real-time tracking of deliveries and to match delegates with nearby orders even when the app is closed or not in use. This data is essential for the core functionality of our service.",
-    "@locationDataDesc": {
-        "description": "Location data section description"
-    },
-    "cameraAccess": "CAMERA ACCESS",
-    "@cameraAccess": {
-        "description": "Camera access section title"
-    },
-    "cameraAccessDesc": "We require camera access to allow you to take photos of bills, packages, or delivery proofs. Photos are only captured when you explicitly use the camera feature within the app.",
-    "@cameraAccessDesc": {
-        "description": "Camera access section description"
-    },
-    "dataSecurity": "DATA SECURITY",
-    "@dataSecurity": {
-        "description": "Data security section title"
-    },
-    "dataSecurityDesc": "We implement industry-standard security measures to protect your data. We do not sell your personal data. Your information is shared only with authorized partners for service processing.",
-    "@dataSecurityDesc": {
-        "description": "Data security section description"
-    },
-    "contactUs": "Contact Us",
-    "@contactUs": {
-        "description": "Contact Us section title"
-    },
-    "website": "Website",
-    "@website": {
-        "description": "Website label"
-    },
-    "emailAddress": "Email Address",
-    "@emailAddress": {
-        "description": "Email address label"
-    },
-    "egyptOffice": "Egypt Office",
-    "@egyptOffice": {
-        "description": "Egypt office label"
-    },
-    "uaeOffice": "UAE Office",
-    "@uaeOffice": {
-        "description": "UAE office label"
-    },
-    "swPointWebsite": "https://sw-point.com/",
-    "@swPointWebsite": {
-        "description": "SwitchPoint website value"
-    },
-    "swPointEmail": "support@sw-point.com",
-    "@swPointEmail": {
-        "description": "SwitchPoint support email value"
-    },
-    "swPointEgyptPhone": "Alexandria, Egypt +20 121 185 7725",
-    "@swPointEgyptPhone": {
-        "description": "SwitchPoint Egypt phone value"
-    },
-    "swPointUaePhone": "United Arab Emirates WhatsApp: +971 55 871 5615",
-    "@swPointUaePhone": {
-        "description": "SwitchPoint UAE phone value"
-    },
-    "createAdmin": "Create Admin",
-    "@createAdmin": {
-        "description": "Create admin screen title and button"
-    },
-    "adminName": "Admin Name",
-    "@adminName": {
-        "description": "Admin name field label"
-    },
-    "adminPhone": "Phone Number",
-    "@adminPhone": {
-        "description": "Admin phone field label"
-    },
-    "adminEmail": "Email Address",
-    "@adminEmail": {
-        "description": "Admin email field label"
-    },
-    "pleaseEnterAdminName": "Please enter admin name",
-    "@pleaseEnterAdminName": {
-        "description": "Admin name validation error"
-    },
-    "pleaseEnterAdminPhone": "Please enter phone number",
-    "@pleaseEnterAdminPhone": {
-        "description": "Admin phone validation error"
-    },
-    "pleaseEnterAdminEmail": "Please enter email address",
-    "@pleaseEnterAdminEmail": {
-        "description": "Admin email validation error"
-    },
-    "invalidPhoneNumber": "Invalid phone number",
-    "@invalidPhoneNumber": {
-        "description": "Invalid phone number validation error"
-    },
-    "invalidEmail": "Invalid email address",
-    "@invalidEmail": {
-        "description": "Invalid email validation error"
-    },
-    "adminCreatedSuccessfully": "Admin account created successfully! Activation email sent.",
-    "@adminCreatedSuccessfully": {
-        "description": "Admin created success message"
-    },
-    "manageAdmins": "Manage Admins",
-    "@manageAdmins": {
-        "description": "Manage admins menu item"
-    },
-    "noAdminsFound": "No admins found",
-    "@noAdminsFound": {
-        "description": "Empty admins list message"
-    },
-    "suspended": "Suspended",
-    "@suspended": {
-        "description": "Suspended status badge"
-    },
-    "editAdmin": "Edit",
-    "@editAdmin": {
-        "description": "Edit admin action"
-    },
-    "deleteAdmin": "Delete",
-    "@deleteAdmin": {
-        "description": "Delete admin action"
-    },
-    "suspendAdmin": "Suspend",
-    "@suspendAdmin": {
-        "description": "Suspend admin action"
-    },
-    "activateAdmin": "Activate",
-    "@activateAdmin": {
-        "description": "Activate admin action"
-    },
-    "deleteAdminConfirmation": "Are you sure you want to delete this admin? This action cannot be undone.",
-    "@deleteAdminConfirmation": {
-        "description": "Delete admin confirmation message"
-    },
-    "cancel": "Cancel",
-    "@cancel": {
-        "description": "Cancel button text"
-    },
-    "companyDelegates": "Delegates",
-    "@companyDelegates": {
-        "description": "Company delegates screen title"
-    },
-    "viewAttendance": "View Attendance",
-    "@viewAttendance": {
-        "description": "View attendance button"
-    },
-    "noDelegatesFound": "No delegates found",
-    "@noDelegatesFound": {
-        "description": "Empty delegates list message"
-    },
-    "viewProfileData": "View Profile",
-    "@viewProfileData": {
-        "description": "View profile data button text"
-    },
-    "addDelegate": "Add Delegate",
-    "@addDelegate": {
-        "description": "Add delegate button text"
-    },
-    "addDelegateViaWeb": "Add via Web",
-    "@addDelegateViaWeb": {
-        "description": "Add delegate via web title"
-    },
-    "tasks": "Tasks",
-    "@tasks": {
-        "description": "Tasks tab or screen title"
-    },
-    "todayOverview": "Today's Overview",
-    "@todayOverview": {
-        "description": "Dashboard section title"
-    },
-    "totalDelegates": "Total Delegates",
-    "@totalDelegates": {
-        "description": "Total delegates card title"
-    },
-    "checkedInToday": "Checked In Today",
-    "@checkedInToday": {
-        "description": "Checked in today card title"
-    },
-    "absentToday": "Absent Today",
-    "addTask": "Add Task",
-    "@addTask": {
-        "description": "Button text to add a new task"
-    },
-    "taskTitle": "Task Title",
-    "@taskTitle": {
-        "description": "Label for task title input"
-    },
-    "taskDescription": "Task Description",
-    "@taskDescription": {
-        "description": "Label for task description input"
-    },
-    "taskPriority": "Priority",
-    "@taskPriority": {
-        "description": "Label for task priority selection"
-    },
-    "high": "High",
-    "@high": {
-        "description": "High priority label"
-    },
-    "medium": "Medium",
-    "@medium": {
-        "description": "Medium priority label"
-    },
-    "low": "Low",
-    "@low": {
-        "description": "Low priority label"
-    },
-    "taskDueDate": "Due Date",
-    "@taskDueDate": {
-        "description": "Label for task due date input"
-    },
-    "assignTo": "Assign To",
-    "@assignTo": {
-        "description": "Label for assigning task to a delegate"
-    },
-    "allDelegates": "All Delegates",
-    "@allDelegates": {
-        "description": "Option for assigning task to all delegates"
-    },
-    "createTask": "Create Task",
-    "@createTask": {
-        "description": "Button text to create a task"
-    },
-    "taskCreatedSuccessfully": "Task created successfully",
-    "@taskCreatedSuccessfully": {
-        "description": "Success message after creating a task"
-    },
-    "taskUpdatedSuccessfully": "Task updated successfully",
-    "@taskUpdatedSuccessfully": {
-        "description": "Success message after updating a task"
-    },
-    "noTasksFound": "No tasks found",
-    "@noTasksFound": {
-        "description": "Message shown when no tasks match the filter"
-    },
-    "taskStatus": "Task Status",
-    "@taskStatus": {
-        "description": "Label for task status selection"
-    },
-    "taskPending": "Pending",
-    "@taskPending": {
-        "description": "Pending task status label"
-    },
-    "taskInProgress": "In Progress",
-    "@taskInProgress": {
-        "description": "In Progress task status label"
-    },
-    "taskCompleted": "Completed",
-    "@taskCompleted": {
-        "description": "Completed task status label"
-    },
-    "all": "All",
-    "@all": {
-        "description": "Filter option for all items"
-    },
-    "today": "Today",
-    "@today": {
-        "description": "Today label"
-    },
-    "yesterday": "Yesterday",
-    "@yesterday": {
-        "description": "Yesterday label"
-    },
-    "taskCancelled": "Cancelled",
-    "@taskCancelled": {
-        "description": "Cancelled task status label"
-    },
-    "taskDetails": "Task Details",
-    "@taskDetails": {
-        "description": "Task details title"
-    },
-    "taskSchedule": "Schedule",
-    "@taskSchedule": {
-        "description": "Task schedule title"
-    },
-    "selectDelegate": "Select Delegate",
-    "@selectDelegate": {
-        "description": "Select delegate label"
-    },
-    "errorFieldRequired": "This field is required",
-    "addTaskToGetStarted": "Add a task to get started",
-    "@addTaskToGetStarted": {
-        "description": "Message when no tasks are found and user is prompted to add one"
-    },
-    "@errorFieldRequired": {
-        "description": "Validation error for required field"
-    },
-    "myTasks": "My Tasks",
-    "@myTasks": {
-        "description": "Title for the delegate's tasks screen"
-    },
-    "noTasksYet": "No tasks yet",
-    "@noTasksYet": {
-        "description": "Message when no tasks are assigned to the delegate"
-    },
-    "complete": "Complete",
-    "@complete": {
-        "description": "Button text to complete a task"
-    },
-    "delete": "Delete",
-    "@delete": {
-        "description": "General delete button text"
-    },
-    "deleteTask": "Delete Task",
-    "@deleteTask": {
-        "description": "Title for delete task dialog/button"
-    },
-    "deleteTaskConfirmation": "Are you sure you want to delete this task? This action cannot be undone.",
-    "@deleteTaskConfirmation": {
-        "description": "Confirmation message for deleting a task"
-    },
-    "notes": "Notes",
-    "@notes": {
-        "description": "Label for task notes"
-    },
-    "@absentToday": {
-        "description": "Absent today card title"
-    },
-    "tasksSummary": "Tasks Summary",
-    "@tasksSummary": {
-        "description": "Title for the task summary card on home screen"
-    },
-    "total": "Total",
-    "@total": {
-        "description": "Label for total count"
-    },
-    "searchDelegates": "Search delegates...",
-    "@searchDelegates": {
-      "description": "Placeholder for searching delegates"
-    },
-    "filterByStatus": "Filter by status",
-    "@filterByStatus": {
-      "description": "Label for status filter"
-    },
-    "noDelegateSearchResults": "No delegates match your search",
-    "@noDelegateSearchResults": {
-      "description": "Message shown when no delegates match search or filter"
-    },
-    "notifications": "Notifications",
-    "@notifications": {
-        "description": "Notifications page title"
-    },
-    "noNotifications": "No notifications",
-    "@noNotifications": {
-        "description": "Message when there are no notifications"
-    },
-    "markAllRead": "Mark all as read",
-    "@markAllRead": {
-        "description": "Button to mark all notifications as read"
-    },
-    "newNotification": "New notification",
-    "@newNotification": {
-        "description": "New notification label"
-    },
-    "searchCompanies": "Search Companies",
-    "@searchCompanies": {
-        "description": "Search companies screen title"
-    },
-    "searchCompaniesHint": "Search for companies using company code",
-    "@searchCompaniesHint": {
-        "description": "Hint text for company search"
-    },
-    "enterCompanyCode": "Enter company code",
-    "@enterCompanyCode": {
-        "description": "Placeholder for company code search input"
-    },
-    "clear": "Clear",
-    "@clear": {
-        "description": "Clear button text"
-    },
-    "noCompaniesFound": "No companies found",
-    "@noCompaniesFound": {
-        "description": "Message when no companies are found"
-    },
-    "searchQuery": "Search Query",
-    "@searchQuery": {
-        "description": "Search query label"
-    },
-    "errorOccurred": "Error Occurred",
-    "@errorOccurred": {
-        "description": "Error occurred message"
-    },
-    "tryAgain": "Try Again",
-    "@tryAgain": {
-        "description": "Try again button text"
-    },
-    "manageMarketing": "Manage Marketing Employees",
-    "@manageMarketing": {
-        "description": "Manage marketing employees menu item"
-    },
-    "noMarketingEmployeesFound": "No marketing employees found",
-    "@noMarketingEmployeesFound": {
-        "description": "Empty marketing employees list message"
-    },
-    "searchByPhone": "Search by phone number...",
-    "@searchByPhone": {
-        "description": "Search by phone number placeholder"
-    },
-    "filterByOrganization": "Filter by organization",
-    "@filterByOrganization": {
-        "description": "Filter by organization label"
-    },
-    "allOrganizations": "All Organizations",
-    "@allOrganizations": {
-        "description": "All organizations filter option"
-    },
-    "marketingEmployee": "Marketing Employee",
-    "@marketingEmployee": {
-        "description": "Marketing employee label"
-    },
-    "editMarketingEmployee": "Edit Employee",
-    "@editMarketingEmployee": {
-        "description": "Edit marketing employee action"
-    },
-    "deleteMarketingEmployee": "Delete Employee",
-    "@deleteMarketingEmployee": {
-        "description": "Delete marketing employee action"
-    },
-    "deleteMarketingEmployeeConfirmation": "Are you sure you want to delete this employee? This action cannot be undone.",
-    "@deleteMarketingEmployeeConfirmation": {
-        "description": "Delete marketing employee confirmation"
-    },
-    "suspendMarketingEmployee": "Suspend Employee",
-    "@suspendMarketingEmployee": {
-        "description": "Suspend marketing employee action"
-    },
-    "activateMarketingEmployee": "Activate Employee",
-    "@activateMarketingEmployee": {
-        "description": "Activate marketing employee action"
-    },
-    "employeeSuspended": "Employee suspended",
-    "@employeeSuspended": {
-        "description": "Employee suspended success message"
-    },
-    "employeeActivated": "Employee activated",
-    "@employeeActivated": {
-        "description": "Employee activated success message"
-    },
-    "employeeDeleted": "Employee deleted successfully",
-    "@employeeDeleted": {
-        "description": "Employee deleted success message"
-    },
-    "employeeUpdated": "Employee updated successfully",
-    "@employeeUpdated": {
-        "description": "Employee updated success message"
-    },
-    "employeeName": "Employee Name",
-    "@employeeName": {
-        "description": "Employee name field label"
-    },
-    "employeePhone": "Phone Number",
-    "@employeePhone": {
-        "description": "Employee phone field label"
-    },
-    "employeeEmail": "Email Address",
-    "@employeeEmail": {
-        "description": "Employee email field label"
-    },
-    "organization": "Organization",
-    "@organization": {
-        "description": "Organization label"
-    },
-    "forgotCheckoutTitle": "Pending Check-in Alert",
-    "@forgotCheckoutTitle": {
-        "description": "Title for forgot checkout dialog"
-    },
-    "forgotCheckoutMessage": "You have a pending check-in at {oldBranch}. Do you want to check out from it and check in to {newBranch}?",
-    "@forgotCheckoutMessage": {
-        "description": "Message for forgot checkout in a different branch",
-        "placeholders": {
-            "oldBranch": {
-                "type": "String"
-            },
-            "newBranch": {
-                "type": "String"
-            }
-        }
-    },
-    "previousDayCheckoutMessage": "You have a pending check-in from a previous day at {oldBranch}. The system will check you out from it and check you in today at {newBranch}.",
-    "@previousDayCheckoutMessage": {
-        "description": "Message for forgot checkout from a previous day",
-        "placeholders": {
-            "oldBranch": {
-                "type": "String"
-            },
-            "newBranch": {
-                "type": "String"
-            }
-        }
-    },
-    "confirmAction": "Confirm",
-    "@confirmAction": {
-        "description": "Confirm button text"
-    },
-    "photoPermissions": "Photo",
-    "@photoPermissions": {
-        "description": "Photo permissions section or screen title"
-    },
-    "photoPermissionsDesc": "Manage photo permissions and view photo reports",
-    "@photoPermissionsDesc": {
-        "description": "Description of photo permissions feature"
-    },
-    "supervisor": "Supervisor",
-    "@supervisor": {
-        "description": "Supervisor role label"
-    },
-    "supervisorUser": "Supervisor: {name}",
-    "@supervisorUser": {
-        "description": "Supervisor greeting label",
-        "placeholders": {
-            "name": {
-                "type": "String"
-            }
-        }
-    },
-    "adminUser": "Admin: {name}",
-    "@adminUser": {
-        "description": "Admin greeting label",
-        "placeholders": {
-            "name": {
-                "type": "String"
-            }
-        }
-    },
-    "paymentReceiptsReport": "Payment Receipts Billing Report",
-    "@paymentReceiptsReport": {
-        "description": "Payment receipts upload report screen title"
-    },
-    "uploadsCount": "Uploads Count",
-    "@uploadsCount": {
-        "description": "Uploaded receipts count label"
-    },
-    "totalUploadedReceipts": "Total Uploaded Receipts",
-    "@totalUploadedReceipts": {
-        "description": "Total uploaded receipts summary label"
-    },
-    "companiesWithUploads": "Billed Companies",
-    "@companiesWithUploads": {
-        "description": "Companies with uploaded receipts summary label"
-    },
-    "receiptsReport": "Receipts Report",
-    "@receiptsReport": {
-        "description": "Receipts report menu item text"
-    },
-    "accountant": "Financial Accountant",
-    "@accountant": {
-        "description": "Accountant role title"
-    },
-    "accountantDashboard": "Financial Management Dashboard",
-    "@accountantDashboard": {
-        "description": "Accountant dashboard title"
-    },
-    "financialReports": "Financial Reports",
-    "@financialReports": {
-        "description": "Financial reports label"
-    },
-    "paymentReceipts": "Payment Receipts",
-    "@paymentReceipts": {
-        "description": "Payment receipts label"
-    },
-    "subscriptionRequests": "Subscription Requests",
-    "@subscriptionRequests": {
-        "description": "Subscription requests label"
-    },
-    "walletsManagement": "Wallets Management",
-    "@walletsManagement": {
-        "description": "Wallets management label"
-    },
-    "splashConnectionFailed": "Couldn't connect",
-    "@splashConnectionFailed": {
-        "description": "Splash stall message"
-    },
-    "splashRetry": "Retry",
-    "@splashRetry": {
-        "description": "Splash retry button"
-    },
-    "splashSignIn": "Sign in",
-    "@splashSignIn": {
-        "description": "Splash go-to-login button"
-    },
-    "mapUnavailable": "Map unavailable",
-    "@mapUnavailable": {
-        "description": "Map gate timeout message"
-    },
-    "mapRetry": "Retry",
-    "@mapRetry": {
-        "description": "Map gate retry button"
+  "@@locale": "en",
+  "appTitle": "Tashil",
+  "@appTitle": {
+    "description": "App title"
+  },
+  "delegateApp": "Employees App",
+  "@delegateApp": {
+    "description": "Employees app subtitle"
+  },
+  "login": "Login",
+  "@login": {
+    "description": "Login label"
+  },
+  "logout": "Log out",
+  "@logout": {
+    "description": "Logout label"
+  },
+  "loginToContinue": "Welcome back, please enter your details",
+  "@loginToContinue": {
+    "description": "Login subtitle"
+  },
+  "loginSuccessful": "Login Successful!",
+  "@loginSuccessful": {
+    "description": "Login success snackbar"
+  },
+  "loginButton": "Login",
+  "@loginButton": {
+    "description": "Login button text"
+  },
+  "mobileNumber": "Phone Number",
+  "@mobileNumber": {
+    "description": "Mobile number field label"
+  },
+  "password": "Password",
+  "@password": {
+    "description": "Password field label"
+  },
+  "motherName": "Mother's Name",
+  "@motherName": {
+    "description": "Mother name field label"
+  },
+  "enterMobileNumber": "Please enter mobile number",
+  "@enterMobileNumber": {
+    "description": "Mobile validation error"
+  },
+  "enterPassword": "Please enter password",
+  "@enterPassword": {
+    "description": "Password validation error"
+  },
+  "nationalIdNumber": "National ID number",
+  "@nationalIdNumber": {
+    "description": "Delegate login national ID field label"
+  },
+  "enterNationalId": "Please enter the national ID number",
+  "@enterNationalId": {
+    "description": "Empty national ID validation error"
+  },
+  "invalidNationalId": "National ID must be 14 digits",
+  "@invalidNationalId": {
+    "description": "National ID format validation error"
+  },
+  "invalidMobileNumber": "Enter a valid mobile number",
+  "@invalidMobileNumber": {
+    "description": "Mobile number format validation error"
+  },
+  "loginNationalIdHelp": "Delegates sign in with their national ID. Other roles use their password.",
+  "@loginNationalIdHelp": {
+    "description": "Helper under the delegate login secret field"
+  },
+  "invalidLoginCredentials": "The phone number, national ID, or password is incorrect.",
+  "@invalidLoginCredentials": {
+    "description": "Delegate credential mismatch"
+  },
+  "delegateAccountInactive": "This account is pending or suspended. Contact your company admin.",
+  "@delegateAccountInactive": {
+    "description": "Pending or blocked delegate login error"
+  },
+  "tooManyLoginAttempts": "Too many attempts. Please try again later.",
+  "@tooManyLoginAttempts": {
+    "description": "Delegate login lockout message"
+  },
+  "loginTemporarilyUnavailable": "Sign-in is temporarily unavailable. Please try again.",
+  "@loginTemporarilyUnavailable": {
+    "description": "Delegate login service unavailable"
+  },
+  "rememberMe": "Remember Me",
+  "@rememberMe": {
+    "description": "Remember me checkbox label"
+  },
+  "home": "Home",
+  "@home": {
+    "description": "Home nav label"
+  },
+  "profile": "Profile",
+  "@profile": {
+    "description": "Profile nav label"
+  },
+  "attendance": "Attendance",
+  "@attendance": {
+    "description": "Attendance nav label"
+  },
+  "myProfile": "My Profile",
+  "@myProfile": {
+    "description": "Profile screen title"
+  },
+  "personalInformation": "Personal Information",
+  "@personalInformation": {
+    "description": "Personal info section title"
+  },
+  "delegateId": "Delegate ID",
+  "@delegateId": {
+    "description": "Delegate ID label"
+  },
+  "delegateRole": "Delegate",
+  "@delegateRole": {
+    "description": "Delegate role label"
+  },
+  "checkIn": "Check In",
+  "@checkIn": {
+    "description": "Check in action"
+  },
+  "checkOut": "Check Out",
+  "@checkOut": {
+    "description": "Check out action"
+  },
+  "checkedInSuccessfully": "Checked In Successfully",
+  "@checkedInSuccessfully": {
+    "description": "Check in success message"
+  },
+  "checkedOutSuccessfully": "Checked Out Successfully",
+  "@checkedOutSuccessfully": {
+    "description": "Check out success message"
+  },
+  "scanToCheckIn": "Scan to Check In",
+  "@scanToCheckIn": {
+    "description": "FAB label for check in"
+  },
+  "scanToCheckOut": "Scan to Check Out",
+  "@scanToCheckOut": {
+    "description": "FAB label for check out"
+  },
+  "scanQrInstruction": "Scan the QR code in the marketing office.",
+  "@scanQrInstruction": {
+    "description": "Instruction to scan QR on empty history screen"
+  },
+  "scanForAction": "Scan to {action}",
+  "@scanForAction": {
+    "description": "QR scanner title",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
     }
+  },
+  "pointCameraToQR": "Point camera at QR Code for {action}",
+  "@pointCameraToQR": {
+    "description": "QR scanner instruction",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "checkingInAt": "Checking in at {branch}...",
+  "@checkingInAt": {
+    "description": "Check in at branch snackbar",
+    "placeholders": {
+      "branch": {
+        "type": "String"
+      }
+    }
+  },
+  "invalidQRCode": "Invalid QR Code. Please scan a valid branch code.",
+  "@invalidQRCode": {
+    "description": "Invalid QR error"
+  },
+  "currentStatus": "Current Status",
+  "@currentStatus": {
+    "description": "Status card title"
+  },
+  "online": "ONLINE",
+  "@online": {
+    "description": "Online status"
+  },
+  "offline": "OFFLINE",
+  "@offline": {
+    "description": "Offline status"
+  },
+  "active": "Active",
+  "@active": {
+    "description": "Active check-in indicator"
+  },
+  "inLabel": "In: {time}",
+  "@inLabel": {
+    "description": "Check in time label",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "outLabel": "Out: {time}",
+  "@outLabel": {
+    "description": "Check out time label",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "noRecordsForMonth": "No attendance records for {month}",
+  "@noRecordsForMonth": {
+    "description": "Empty month message",
+    "placeholders": {
+      "month": {
+        "type": "String"
+      }
+    }
+  },
+  "recentHistory": "Recent History",
+  "@recentHistory": {
+    "description": "History section title"
+  },
+  "noHistoryAvailable": "No attendance records",
+  "@noHistoryAvailable": {
+    "description": "Empty history message"
+  },
+  "somethingWentWrong": "Something went wrong",
+  "@somethingWentWrong": {
+    "description": "Generic error message"
+  },
+  "unspecifiedBranch": "Unspecified",
+  "@unspecifiedBranch": {
+    "description": "Fallback branch name"
+  },
+  "helloUser": "Hello, {name}",
+  "@helloUser": {
+    "description": "Greeting with user name",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "historyInOut": "In: {inTime} - Out: {outTime}",
+  "@historyInOut": {
+    "description": "History row in/out label",
+    "placeholders": {
+      "inTime": {
+        "type": "String"
+      },
+      "outTime": {
+        "type": "String"
+      }
+    }
+  },
+  "errorGeneral": "An error occurred. Please try again.",
+  "@errorGeneral": {
+    "description": "General error"
+  },
+  "errorNetwork": "No internet connection.",
+  "@errorNetwork": {
+    "description": "Network error"
+  },
+  "errorLocation": "Could not determine your location.",
+  "@errorLocation": {
+    "description": "Location error"
+  },
+  "errorOutOfRange": "You are outside the worksite range.",
+  "@errorOutOfRange": {
+    "description": "Out of range error"
+  },
+  "errorMockLocation": "Mock location detected. Cannot check in.",
+  "@errorMockLocation": {
+    "description": "Mock location error"
+  },
+  "errorAuth": "Invalid credentials.",
+  "@errorAuth": {
+    "description": "Auth error"
+  },
+  "success": "Operation completed successfully",
+  "@success": {
+    "description": "Success message"
+  },
+  "loading": "Loading...",
+  "@loading": {
+    "description": "Loading indicator"
+  },
+  "pendingSync": "Pending sync",
+  "@pendingSync": {
+    "description": "Pending sync indicator"
+  },
+  "settings": "Settings",
+  "@settings": {
+    "description": "Settings menu title"
+  },
+  "companies": "Companies",
+  "@companies": {
+    "description": "Companies tab label"
+  },
+  "search": "Search",
+  "@search": {
+    "description": "Search tab label"
+  },
+  "language": "Language",
+  "@language": {
+    "description": "Language menu item"
+  },
+  "changeLanguage": "Change Language",
+  "@changeLanguage": {
+    "description": "Change language menu item"
+  },
+  "arabic": "العربية",
+  "@arabic": {
+    "description": "Arabic language name"
+  },
+  "english": "English",
+  "@english": {
+    "description": "English language name"
+  },
+  "languageChangedTo": "Language changed to {language}",
+  "@languageChangedTo": {
+    "description": "Language changed confirmation",
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "duration": "Duration: {hours}h {minutes}m",
+  "@duration": {
+    "description": "Duration in hours and minutes",
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      },
+      "minutes": {
+        "type": "String"
+      }
+    }
+  },
+  "inProgress": "In progress...",
+  "@inProgress": {
+    "description": "Ongoing session indicator"
+  },
+  "fullName": "Full Name",
+  "@fullName": {
+    "description": "Full name label"
+  },
+  "phoneNumber": "Phone Number",
+  "@phoneNumber": {
+    "description": "Phone number label"
+  },
+  "birthDate": "Date of Birth",
+  "@birthDate": {
+    "description": "Birth date label"
+  },
+  "cityLabel": "City",
+  "@cityLabel": {
+    "description": "City label"
+  },
+  "organizationAndCompany": "Organization & Company",
+  "@organizationAndCompany": {
+    "description": "Organization and company section title"
+  },
+  "organizationLabel": "Organization",
+  "@organizationLabel": {
+    "description": "Organization label"
+  },
+  "companyLabel": "Company",
+  "@companyLabel": {
+    "description": "Company label"
+  },
+  "positionLabel": "Position",
+  "@positionLabel": {
+    "description": "Position label"
+  },
+  "documents": "Documents",
+  "@documents": {
+    "description": "Documents tab label"
+  },
+  "requestHistory": "Request History",
+  "@requestHistory": {
+    "description": "Request history tab label"
+  },
+  "personalPhoto": "Personal Photo",
+  "@personalPhoto": {
+    "description": "Personal photo document"
+  },
+  "nationalId": "National ID",
+  "@nationalId": {
+    "description": "National ID document"
+  },
+  "authorizationLetter": "Authorization Letter",
+  "@authorizationLetter": {
+    "description": "Authorization letter document"
+  },
+  "insuranceLetter": "Insurance Letter",
+  "@insuranceLetter": {
+    "description": "Insurance letter document"
+  },
+  "healthCertificate": "Health Certificate",
+  "@healthCertificate": {
+    "description": "Health certificate document"
+  },
+  "paymentReceipt": "Payment Receipt",
+  "@paymentReceipt": {
+    "description": "Payment receipt document"
+  },
+  "electronicPaymentReceipt": "Electronic Payment Receipt",
+  "@electronicPaymentReceipt": {
+    "description": "Electronic payment receipt document"
+  },
+  "pendingStatus": "Pending",
+  "@pendingStatus": {
+    "description": "Pending status label"
+  },
+  "uploadedOn": "Uploaded: {date}",
+  "@uploadedOn": {
+    "description": "Upload date label",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "clickToView": "Click to View",
+  "@clickToView": {
+    "description": "Click to view link"
+  },
+  "receiptCode": "Receipt Code: {code}",
+  "@receiptCode": {
+    "description": "Receipt code label",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "noRequestsYet": "No requests yet",
+  "@noRequestsYet": {
+    "description": "Empty request history message"
+  },
+  "approvedStatus": "Approved",
+  "@approvedStatus": {
+    "description": "Approved status label"
+  },
+  "rejectedStatus": "Rejected",
+  "@rejectedStatus": {
+    "description": "Rejected status label"
+  },
+  "noDocumentsUploaded": "No documents uploaded",
+  "@noDocumentsUploaded": {
+    "description": "Empty documents message"
+  },
+  "retry": "Retry",
+  "@retry": {
+    "description": "Retry button text"
+  },
+  "gender": "Gender",
+  "@gender": {
+    "description": "Gender label"
+  },
+  "male": "Male",
+  "@male": {
+    "description": "Male gender"
+  },
+  "female": "Female",
+  "@female": {
+    "description": "Female gender"
+  },
+  "joinDate": "Join Date",
+  "@joinDate": {
+    "description": "Join date label"
+  },
+  "employmentDetails": "Employment Details",
+  "@employmentDetails": {
+    "description": "Employment details section title"
+  },
+  "statusReason": "Status Reason",
+  "@statusReason": {
+    "description": "Status reason label"
+  },
+  "profileComplete": "Profile Complete",
+  "@profileComplete": {
+    "description": "Profile complete status"
+  },
+  "profileIncomplete": "Profile Incomplete",
+  "@profileIncomplete": {
+    "description": "Profile incomplete status"
+  },
+  "reviewedBy": "Reviewed By: {name}",
+  "@reviewedBy": {
+    "description": "Reviewer name label",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "notProvidedStatus": "Not Provided",
+  "@notProvidedStatus": {
+    "description": "Not provided document status"
+  },
+  "adminDashboard": "Admin Dashboard",
+  "@adminDashboard": {
+    "description": "Admin dashboard title"
+  },
+  "addBranch": "Add New Branch",
+  "@addBranch": {
+    "description": "Add new branch title"
+  },
+  "branchName": "Branch Name",
+  "@branchName": {
+    "description": "Branch name label"
+  },
+  "branchLocation": "Branch Location",
+  "@branchLocation": {
+    "description": "Branch location label"
+  },
+  "geofenceRadius": "Attendance Radius (Meters)",
+  "@geofenceRadius": {
+    "description": "Geofence radius label"
+  },
+  "saveBranch": "Save Branch",
+  "@saveBranch": {
+    "description": "Save branch button"
+  },
+  "branchAddedSuccessfully": "Branch Added Successfully",
+  "@branchAddedSuccessfully": {
+    "description": "Branch added success message"
+  },
+  "pleaseEnterBranchName": "Please enter branch name",
+  "@pleaseEnterBranchName": {
+    "description": "Branch name required validation"
+  },
+  "pleaseSelectLocation": "Please select a location on the map",
+  "@pleaseSelectLocation": {
+    "description": "Location required validation"
+  },
+  "searchCityOrRegion": "Search city or region...",
+  "@searchCityOrRegion": {
+    "description": "Search bar hint"
+  },
+  "branches": "Branches",
+  "roleBranchMarketing": "Branch Marketing",
+  "@roleBranchMarketing": {
+    "description": "Role title for branch marketing staff"
+  },
+  "roleBranchesMarketingManager": "Branches Marketing Manager",
+  "@roleBranchesMarketingManager": {
+    "description": "Role title for branches marketing manager"
+  },
+  "roleBranchesMarketingMgrShort": "Branches Marketing Mgr",
+  "@roleBranchesMarketingMgrShort": {
+    "description": "Short label for branches marketing manager"
+  },
+  "roleMarketingPromotion": "Marketing Promotion",
+  "@roleMarketingPromotion": {
+    "description": "Role title for marketing promotion staff"
+  },
+  "branchMarketingFollowUp": "Branch Marketing Follow-up",
+  "@branchMarketingFollowUp": {
+    "description": "Subtitle for branch marketing follow-up"
+  },
+  "branchMarketingCoordination": "Branch Marketing Coordination",
+  "@branchMarketingCoordination": {
+    "description": "Subtitle for branch marketing coordination"
+  },
+  "@branches": {
+    "description": "Label for the branches tab in the admin dashboard navigation."
+  },
+  "admin": "Admin",
+  "@admin": {
+    "description": "Label for the admin dashboard title."
+  },
+  "myLocation": "My Location",
+  "@myLocation": {
+    "description": "Label for the fetch current location button."
+  },
+  "locationServicesDisabled": "Location services are disabled.",
+  "@locationServicesDisabled": {
+    "description": "Error when GPS is disabled."
+  },
+  "locationPermissionDenied": "Location access denied",
+  "@locationPermissionDenied": {
+    "description": "Error when location permission is denied."
+  },
+  "errorFetchingLocation": "Error fetching location.",
+  "@errorFetchingLocation": {
+    "description": "Generic error when fetching location fails."
+  },
+  "branchDetails": "Branch Details",
+  "@branchDetails": {
+    "description": "Title for the branch details screen."
+  },
+  "downloadQR": "Download QR",
+  "@downloadQR": {
+    "description": "Button to download the QR code."
+  },
+  "qrSavedToGallery": "QR Code saved to gallery successfully!",
+  "@qrSavedToGallery": {
+    "description": "Message shown when QR is saved to gallery"
+  },
+  "editName": "Edit Name",
+  "@editName": {
+    "description": "Button to edit the branch name."
+  },
+  "editBranch": "Edit Branch",
+  "@editBranch": {
+    "description": "Button to edit the branch details."
+  },
+  "branchUpdatedSuccessfully": "Branch updated successfully.",
+  "@branchUpdatedSuccessfully": {
+    "description": "Success message after updating a branch."
+  },
+  "deleteBranch": "Delete Branch",
+  "@deleteBranch": {
+    "description": "Button to delete the branch."
+  },
+  "deleteBranchConfirmation": "Are you sure you want to delete this branch?",
+  "@deleteBranchConfirmation": {
+    "description": "Confirmation message before deleting a branch."
+  },
+  "branchDeletedSuccessfully": "Branch deleted successfully.",
+  "@branchDeletedSuccessfully": {
+    "description": "Success message after deleting a branch."
+  },
+  "saveChanges": "Save Changes",
+  "@saveChanges": {
+    "description": "Button to save edited branch name."
+  },
+  "networkStatusOffline": "Offline",
+  "@networkStatusOffline": {
+    "description": "Offline network status indicator"
+  },
+  "networkStatusOnline": "Online",
+  "@networkStatusOnline": {
+    "description": "Online network status indicator"
+  },
+  "noAccountContact": "Don't have an account? Contact the following number",
+  "@noAccountContact": {
+    "description": "No account contact text on login screen"
+  },
+  "noAccountTitle": "Don't have an account?",
+  "@noAccountTitle": {
+    "description": "No account title text on login screen"
+  },
+  "noAccountSubtitle": "Contact the following number",
+  "@noAccountSubtitle": {
+    "description": "No account subtitle text on login screen"
+  },
+  "contactNumber": "01211857725",
+  "@contactNumber": {
+    "description": "Contact phone number"
+  },
+  "darkMode": "Dark mode",
+  "@darkMode": {
+    "description": "Dark mode setting label"
+  },
+  "privacyPolicy": "Privacy policy",
+  "@privacyPolicy": {
+    "description": "Privacy policy setting label"
+  },
+  "helpCenter": "Help center",
+  "@helpCenter": {
+    "description": "Help center setting label"
+  },
+  "version": "Tashil Representative - Version {version}",
+  "@version": {
+    "description": "App version label in settings",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "account": "Account",
+  "@account": {
+    "description": "Account section header"
+  },
+  "privacyPolicyDesc": "This Privacy Policy describes how we collect, use, and disclose your personal information when you use our delegate services. We are committed to protecting your privacy and ensuring your data is handled securely.",
+  "@privacyPolicyDesc": {
+    "description": "Main privacy policy description"
+  },
+  "locationData": "LOCATION DATA",
+  "@locationData": {
+    "description": "Location data section title"
+  },
+  "locationDataDesc": "Our app collects location data to enable real-time tracking of deliveries and to match delegates with nearby orders even when the app is closed or not in use. This data is essential for the core functionality of our service.",
+  "@locationDataDesc": {
+    "description": "Location data section description"
+  },
+  "cameraAccess": "CAMERA ACCESS",
+  "@cameraAccess": {
+    "description": "Camera access section title"
+  },
+  "cameraAccessDesc": "We require camera access to allow you to take photos of bills, packages, or delivery proofs. Photos are only captured when you explicitly use the camera feature within the app.",
+  "@cameraAccessDesc": {
+    "description": "Camera access section description"
+  },
+  "dataSecurity": "DATA SECURITY",
+  "@dataSecurity": {
+    "description": "Data security section title"
+  },
+  "dataSecurityDesc": "We implement industry-standard security measures to protect your data. We do not sell your personal data. Your information is shared only with authorized partners for service processing.",
+  "@dataSecurityDesc": {
+    "description": "Data security section description"
+  },
+  "contactUs": "Contact Us",
+  "@contactUs": {
+    "description": "Contact Us section title"
+  },
+  "website": "Website",
+  "@website": {
+    "description": "Website label"
+  },
+  "emailAddress": "Email Address",
+  "@emailAddress": {
+    "description": "Email address label"
+  },
+  "egyptOffice": "Egypt Office",
+  "@egyptOffice": {
+    "description": "Egypt office label"
+  },
+  "uaeOffice": "UAE Office",
+  "@uaeOffice": {
+    "description": "UAE office label"
+  },
+  "swPointWebsite": "https://sw-point.com/",
+  "@swPointWebsite": {
+    "description": "SwitchPoint website value"
+  },
+  "swPointEmail": "support@sw-point.com",
+  "@swPointEmail": {
+    "description": "SwitchPoint support email value"
+  },
+  "swPointEgyptPhone": "Alexandria, Egypt +20 121 185 7725",
+  "@swPointEgyptPhone": {
+    "description": "SwitchPoint Egypt phone value"
+  },
+  "swPointUaePhone": "United Arab Emirates WhatsApp: +971 55 871 5615",
+  "@swPointUaePhone": {
+    "description": "SwitchPoint UAE phone value"
+  },
+  "createAdmin": "Create Admin",
+  "@createAdmin": {
+    "description": "Create admin screen title and button"
+  },
+  "adminName": "Admin Name",
+  "@adminName": {
+    "description": "Admin name field label"
+  },
+  "adminPhone": "Phone Number",
+  "@adminPhone": {
+    "description": "Admin phone field label"
+  },
+  "adminEmail": "Email Address",
+  "@adminEmail": {
+    "description": "Admin email field label"
+  },
+  "pleaseEnterAdminName": "Please enter admin name",
+  "@pleaseEnterAdminName": {
+    "description": "Admin name validation error"
+  },
+  "pleaseEnterAdminPhone": "Please enter phone number",
+  "@pleaseEnterAdminPhone": {
+    "description": "Admin phone validation error"
+  },
+  "pleaseEnterAdminEmail": "Please enter email address",
+  "@pleaseEnterAdminEmail": {
+    "description": "Admin email validation error"
+  },
+  "invalidPhoneNumber": "Invalid phone number",
+  "@invalidPhoneNumber": {
+    "description": "Invalid phone number validation error"
+  },
+  "invalidEmail": "Invalid email address",
+  "@invalidEmail": {
+    "description": "Invalid email validation error"
+  },
+  "adminCreatedSuccessfully": "Admin account created successfully! Activation email sent.",
+  "@adminCreatedSuccessfully": {
+    "description": "Admin created success message"
+  },
+  "manageAdmins": "Manage Admins",
+  "@manageAdmins": {
+    "description": "Manage admins menu item"
+  },
+  "noAdminsFound": "No admins found",
+  "@noAdminsFound": {
+    "description": "Empty admins list message"
+  },
+  "suspended": "Suspended",
+  "@suspended": {
+    "description": "Suspended status badge"
+  },
+  "editAdmin": "Edit",
+  "@editAdmin": {
+    "description": "Edit admin action"
+  },
+  "deleteAdmin": "Delete",
+  "@deleteAdmin": {
+    "description": "Delete admin action"
+  },
+  "suspendAdmin": "Suspend",
+  "@suspendAdmin": {
+    "description": "Suspend admin action"
+  },
+  "activateAdmin": "Activate",
+  "@activateAdmin": {
+    "description": "Activate admin action"
+  },
+  "deleteAdminConfirmation": "Are you sure you want to delete this admin? This action cannot be undone.",
+  "@deleteAdminConfirmation": {
+    "description": "Delete admin confirmation message"
+  },
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Cancel button text"
+  },
+  "companyDelegates": "Delegates",
+  "@companyDelegates": {
+    "description": "Company delegates screen title"
+  },
+  "viewAttendance": "View Attendance",
+  "@viewAttendance": {
+    "description": "View attendance button"
+  },
+  "noDelegatesFound": "No delegates found",
+  "@noDelegatesFound": {
+    "description": "Empty delegates list message"
+  },
+  "viewProfileData": "View Profile",
+  "@viewProfileData": {
+    "description": "View profile data button text"
+  },
+  "addDelegate": "Add Delegate",
+  "@addDelegate": {
+    "description": "Add delegate button text"
+  },
+  "addDelegateViaWeb": "Add via Web",
+  "@addDelegateViaWeb": {
+    "description": "Add delegate via web title"
+  },
+  "tasks": "Tasks",
+  "@tasks": {
+    "description": "Tasks tab or screen title"
+  },
+  "todayOverview": "Today's Overview",
+  "@todayOverview": {
+    "description": "Dashboard section title"
+  },
+  "totalDelegates": "Total Delegates",
+  "@totalDelegates": {
+    "description": "Total delegates card title"
+  },
+  "checkedInToday": "Checked In Today",
+  "@checkedInToday": {
+    "description": "Checked in today card title"
+  },
+  "absentToday": "Absent Today",
+  "addTask": "Add Task",
+  "@addTask": {
+    "description": "Button text to add a new task"
+  },
+  "taskTitle": "Task Title",
+  "@taskTitle": {
+    "description": "Label for task title input"
+  },
+  "taskDescription": "Task Description",
+  "@taskDescription": {
+    "description": "Label for task description input"
+  },
+  "taskPriority": "Priority",
+  "@taskPriority": {
+    "description": "Label for task priority selection"
+  },
+  "high": "High",
+  "@high": {
+    "description": "High priority label"
+  },
+  "medium": "Medium",
+  "@medium": {
+    "description": "Medium priority label"
+  },
+  "low": "Low",
+  "@low": {
+    "description": "Low priority label"
+  },
+  "taskDueDate": "Due Date",
+  "@taskDueDate": {
+    "description": "Label for task due date input"
+  },
+  "assignTo": "Assign To",
+  "@assignTo": {
+    "description": "Label for assigning task to a delegate"
+  },
+  "allDelegates": "All Delegates",
+  "@allDelegates": {
+    "description": "Option for assigning task to all delegates"
+  },
+  "createTask": "Create Task",
+  "@createTask": {
+    "description": "Button text to create a task"
+  },
+  "taskCreatedSuccessfully": "Task created successfully",
+  "@taskCreatedSuccessfully": {
+    "description": "Success message after creating a task"
+  },
+  "taskUpdatedSuccessfully": "Task updated successfully",
+  "@taskUpdatedSuccessfully": {
+    "description": "Success message after updating a task"
+  },
+  "noTasksFound": "No tasks found",
+  "@noTasksFound": {
+    "description": "Message shown when no tasks match the filter"
+  },
+  "taskStatus": "Task Status",
+  "@taskStatus": {
+    "description": "Label for task status selection"
+  },
+  "taskPending": "Pending",
+  "@taskPending": {
+    "description": "Pending task status label"
+  },
+  "taskInProgress": "In progress",
+  "@taskInProgress": {
+    "description": "In Progress task status label"
+  },
+  "taskCompleted": "Completed",
+  "@taskCompleted": {
+    "description": "Completed task status label"
+  },
+  "all": "All",
+  "@all": {
+    "description": "Filter option for all items"
+  },
+  "today": "Today",
+  "@today": {
+    "description": "Today label"
+  },
+  "yesterday": "Yesterday",
+  "@yesterday": {
+    "description": "Yesterday label"
+  },
+  "taskCancelled": "Cancelled",
+  "@taskCancelled": {
+    "description": "Cancelled task status label"
+  },
+  "taskDetails": "Task Details",
+  "@taskDetails": {
+    "description": "Task details title"
+  },
+  "taskSchedule": "Schedule",
+  "@taskSchedule": {
+    "description": "Task schedule title"
+  },
+  "selectDelegate": "Select Delegate",
+  "@selectDelegate": {
+    "description": "Select delegate label"
+  },
+  "errorFieldRequired": "This field is required",
+  "addTaskToGetStarted": "Add a task to get started",
+  "@addTaskToGetStarted": {
+    "description": "Message when no tasks are found and user is prompted to add one"
+  },
+  "@errorFieldRequired": {
+    "description": "Validation error for required field"
+  },
+  "myTasks": "My Tasks",
+  "@myTasks": {
+    "description": "Title for the delegate's tasks screen"
+  },
+  "noTasksYet": "No tasks yet",
+  "@noTasksYet": {
+    "description": "Message when no tasks are assigned to the delegate"
+  },
+  "complete": "Complete",
+  "@complete": {
+    "description": "Button text to complete a task"
+  },
+  "delete": "Delete",
+  "@delete": {
+    "description": "General delete button text"
+  },
+  "deleteTask": "Delete Task",
+  "@deleteTask": {
+    "description": "Title for delete task dialog/button"
+  },
+  "deleteTaskConfirmation": "Are you sure you want to delete this task? This action cannot be undone.",
+  "@deleteTaskConfirmation": {
+    "description": "Confirmation message for deleting a task"
+  },
+  "notes": "Notes",
+  "@notes": {
+    "description": "Label for task notes"
+  },
+  "@absentToday": {
+    "description": "Absent today card title"
+  },
+  "tasksSummary": "Tasks Summary",
+  "@tasksSummary": {
+    "description": "Title for the task summary card on home screen"
+  },
+  "total": "Total",
+  "@total": {
+    "description": "Label for total count"
+  },
+  "searchDelegates": "Search delegates...",
+  "@searchDelegates": {
+    "description": "Placeholder for searching delegates"
+  },
+  "filterByStatus": "Filter by status",
+  "@filterByStatus": {
+    "description": "Label for status filter"
+  },
+  "noDelegateSearchResults": "No delegates match your search",
+  "@noDelegateSearchResults": {
+    "description": "Message shown when no delegates match search or filter"
+  },
+  "notifications": "Notifications",
+  "@notifications": {
+    "description": "Notifications page title"
+  },
+  "noNotifications": "No notifications",
+  "@noNotifications": {
+    "description": "Message when there are no notifications"
+  },
+  "markAllRead": "Mark all as read",
+  "@markAllRead": {
+    "description": "Button to mark all notifications as read"
+  },
+  "newNotification": "New notification",
+  "@newNotification": {
+    "description": "New notification label"
+  },
+  "searchCompanies": "Search Companies",
+  "@searchCompanies": {
+    "description": "Search companies screen title"
+  },
+  "searchCompaniesHint": "Search for companies using company code",
+  "@searchCompaniesHint": {
+    "description": "Hint text for company search"
+  },
+  "enterCompanyCode": "Enter company code",
+  "@enterCompanyCode": {
+    "description": "Placeholder for company code search input"
+  },
+  "clear": "Clear",
+  "@clear": {
+    "description": "Clear button text"
+  },
+  "noCompaniesFound": "No companies found",
+  "@noCompaniesFound": {
+    "description": "Message when no companies are found"
+  },
+  "searchQuery": "Search Query",
+  "@searchQuery": {
+    "description": "Search query label"
+  },
+  "errorOccurred": "Error Occurred",
+  "@errorOccurred": {
+    "description": "Error occurred message"
+  },
+  "tryAgain": "Try Again",
+  "@tryAgain": {
+    "description": "Try again button text"
+  },
+  "manageMarketing": "Manage Marketing Employees",
+  "@manageMarketing": {
+    "description": "Manage marketing employees menu item"
+  },
+  "noMarketingEmployeesFound": "No marketing employees found",
+  "@noMarketingEmployeesFound": {
+    "description": "Empty marketing employees list message"
+  },
+  "searchByPhone": "Search by phone number...",
+  "@searchByPhone": {
+    "description": "Search by phone number placeholder"
+  },
+  "filterByOrganization": "Filter by organization",
+  "@filterByOrganization": {
+    "description": "Filter by organization label"
+  },
+  "allOrganizations": "All Organizations",
+  "@allOrganizations": {
+    "description": "All organizations filter option"
+  },
+  "marketingEmployee": "Marketing Employee",
+  "@marketingEmployee": {
+    "description": "Marketing employee label"
+  },
+  "editMarketingEmployee": "Edit Employee",
+  "@editMarketingEmployee": {
+    "description": "Edit marketing employee action"
+  },
+  "deleteMarketingEmployee": "Delete Employee",
+  "@deleteMarketingEmployee": {
+    "description": "Delete marketing employee action"
+  },
+  "deleteMarketingEmployeeConfirmation": "Are you sure you want to delete this employee? This action cannot be undone.",
+  "@deleteMarketingEmployeeConfirmation": {
+    "description": "Delete marketing employee confirmation"
+  },
+  "suspendMarketingEmployee": "Suspend Employee",
+  "@suspendMarketingEmployee": {
+    "description": "Suspend marketing employee action"
+  },
+  "activateMarketingEmployee": "Activate Employee",
+  "@activateMarketingEmployee": {
+    "description": "Activate marketing employee action"
+  },
+  "employeeSuspended": "Employee suspended",
+  "@employeeSuspended": {
+    "description": "Employee suspended success message"
+  },
+  "employeeActivated": "Employee activated",
+  "@employeeActivated": {
+    "description": "Employee activated success message"
+  },
+  "employeeDeleted": "Employee deleted successfully",
+  "@employeeDeleted": {
+    "description": "Employee deleted success message"
+  },
+  "employeeUpdated": "Employee updated successfully",
+  "@employeeUpdated": {
+    "description": "Employee updated success message"
+  },
+  "employeeName": "Employee Name",
+  "@employeeName": {
+    "description": "Employee name field label"
+  },
+  "employeePhone": "Phone Number",
+  "@employeePhone": {
+    "description": "Employee phone field label"
+  },
+  "employeeEmail": "Email Address",
+  "@employeeEmail": {
+    "description": "Employee email field label"
+  },
+  "organization": "Organization",
+  "@organization": {
+    "description": "Organization label"
+  },
+  "forgotCheckoutTitle": "Pending Check-in Alert",
+  "@forgotCheckoutTitle": {
+    "description": "Title for forgot checkout dialog"
+  },
+  "forgotCheckoutMessage": "You have a pending check-in at {oldBranch}. Do you want to check out from it and check in to {newBranch}?",
+  "@forgotCheckoutMessage": {
+    "description": "Message for forgot checkout in a different branch",
+    "placeholders": {
+      "oldBranch": {
+        "type": "String"
+      },
+      "newBranch": {
+        "type": "String"
+      }
+    }
+  },
+  "previousDayCheckoutMessage": "You have a pending check-in from a previous day at {oldBranch}. The system will check you out from it and check you in today at {newBranch}.",
+  "@previousDayCheckoutMessage": {
+    "description": "Message for forgot checkout from a previous day",
+    "placeholders": {
+      "oldBranch": {
+        "type": "String"
+      },
+      "newBranch": {
+        "type": "String"
+      }
+    }
+  },
+  "confirmAction": "Confirm",
+  "@confirmAction": {
+    "description": "Confirm button text"
+  },
+  "photoPermissions": "Photo",
+  "@photoPermissions": {
+    "description": "Photo permissions section or screen title"
+  },
+  "photoPermissionsDesc": "Manage photo permissions and view photo reports",
+  "@photoPermissionsDesc": {
+    "description": "Description of photo permissions feature"
+  },
+  "supervisor": "Supervisor",
+  "@supervisor": {
+    "description": "Supervisor role label"
+  },
+  "supervisorUser": "Supervisor: {name}",
+  "@supervisorUser": {
+    "description": "Supervisor greeting label",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "adminUser": "Admin: {name}",
+  "@adminUser": {
+    "description": "Admin greeting label",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentReceiptsReport": "Payment Receipts Billing Report",
+  "@paymentReceiptsReport": {
+    "description": "Payment receipts upload report screen title"
+  },
+  "uploadsCount": "Uploads Count",
+  "@uploadsCount": {
+    "description": "Uploaded receipts count label"
+  },
+  "totalUploadedReceipts": "Total Uploaded Receipts",
+  "@totalUploadedReceipts": {
+    "description": "Total uploaded receipts summary label"
+  },
+  "companiesWithUploads": "Billed Companies",
+  "@companiesWithUploads": {
+    "description": "Companies with uploaded receipts summary label"
+  },
+  "receiptsReport": "Receipts Report",
+  "@receiptsReport": {
+    "description": "Receipts report menu item text"
+  },
+  "accountant": "Financial Accountant",
+  "@accountant": {
+    "description": "Accountant role title"
+  },
+  "accountantDashboard": "Financial Management Dashboard",
+  "@accountantDashboard": {
+    "description": "Accountant dashboard title"
+  },
+  "financialReports": "Financial Reports",
+  "@financialReports": {
+    "description": "Financial reports label"
+  },
+  "paymentReceipts": "Payment Receipts",
+  "@paymentReceipts": {
+    "description": "Payment receipts label"
+  },
+  "subscriptionRequests": "Subscription Requests",
+  "@subscriptionRequests": {
+    "description": "Subscription requests label"
+  },
+  "walletsManagement": "Wallets Management",
+  "@walletsManagement": {
+    "description": "Wallets management label"
+  },
+  "violationsPolicy": "Violations policy",
+  "myViolations": "My violations",
+  "switchOrganization": "Switch organization",
+  "manageOrganizationsChains": "Manage organizations and chains",
+  "delegateSubscriptionsMenu": "Delegate subscriptions",
+  "mainMenu": "Main menu",
+  "navRequests": "Requests",
+  "navPhotoReports": "Photos",
+  "roleDelegate": "Delegate",
+  "roleSupervisor": "Supervisor",
+  "roleCompanyAdmin": "Company admin",
+  "roleSuperAdmin": "Super admin",
+  "roleOrgAdmin": "Organization admin",
+  "roleTechSupport": "Technical support",
+  "roleMarketing": "Marketing",
+  "roleHr": "HR",
+  "defaultUserName": "User",
+  "offlineBannerTitle": "You're offline",
+  "offlineLastSync": "Last updated {time}",
+  "@offlineLastSync": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "offlineNoSyncYet": "We'll update when you're back online",
+  "offlineNotifications": "Notifications can't load while you're offline. Connect and try again.",
+  "refreshFailed": "Couldn't refresh. Check your connection and try again.",
+  "startPhotosCta": "Start photos",
+  "switchOn": "On",
+  "switchOff": "Off",
+  "releaseVersionDate": "Version {version} – {date}",
+  "@releaseVersionDate": {
+    "placeholders": {
+      "version": {},
+      "date": {}
+    }
+  },
+  "feedbackTypeFeature": "Feature request",
+  "feedbackTypeBug": "Report a problem",
+  "feedbackTypeQuestion": "General question",
+  "feedbackTypeImprovement": "Improvement",
+  "feedbackTypeOther": "Other",
+  "reqTitle": "My requests",
+  "refreshAction": "Refresh",
+  "newRequest": "New request",
+  "reqEmptyAll": "No requests yet",
+  "reqEmptyFilter": "No requests with this status",
+  "reqEmptyHint": "Tap “New request” to send one to your supervisor",
+  "annualLeaveBalance": "Annual leave balance",
+  "weeklyOffPlan": "Weekly day-off plan",
+  "daysOffPerMonth": "4 days off/month",
+  "weeklyDayOff": "Weekly day off",
+  "oneDayEvery7": "1 day every 7 days",
+  "hourlyPermission": "Hourly permission",
+  "availableLabel": "Available",
+  "annualBalance21": "Annual: 21 days",
+  "onceActivated": "Once activated",
+  "filterAll": "All",
+  "statusPendingReview": "Pending",
+  "statusApprovedPl": "Approved",
+  "statusRejectedPl": "Rejected",
+  "leaveSick": "Sick leave",
+  "leaveEmergency": "Emergency leave",
+  "excuseLate": "Late arrival",
+  "excuseEarlyLeave": "Early leave",
+  "excuseAbsence": "Excused absence",
+  "leaveUnpaid": "Unpaid leave",
+  "leaveAnnual": "Annual leave",
+  "statusApproved": "Approved",
+  "statusRejected": "Rejected",
+  "statusPending": "Pending",
+  "previewAttachment": "Preview attachment",
+  "cancelRequest": "Cancel request",
+  "cancelRequestConfirm": "Cancel this request?",
+  "keepRequest": "Keep",
+  "yesCancel": "Yes, cancel",
+  "requestCancelled": "Request cancelled",
+  "requestType": "Request type",
+  "weeklyPlanAvailableInfo": "You can request: hourly permission, an excused absence, or unpaid leave.",
+  "remainingDays": "Remaining: {count} days",
+  "@remainingDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "usedDays": "Used: {count} days",
+  "@usedDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "totalQuotaDays": "Total: {count} days",
+  "@totalQuotaDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "forYear": "For {year}",
+  "@forYear": {
+    "placeholders": {
+      "year": {
+        "type": "int"
+      }
+    }
+  },
+  "reasonLabel": "Reason: {reason}",
+  "@reasonLabel": {
+    "placeholders": {
+      "reason": {}
+    }
+  },
+  "rejectReasonLabel": "Rejection reason: {reason}",
+  "@rejectReasonLabel": {
+    "placeholders": {
+      "reason": {}
+    }
+  },
+  "approvedBy": "Approved by {name}",
+  "@approvedBy": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "homeSupervisorsTitle": "Your supervisors",
+  "homeGreeting": "Hi, {firstName}",
+  "@homeGreeting": {
+    "placeholders": {
+      "firstName": {}
+    }
+  },
+  "roleFieldSupervisor": "Field supervisor",
+  "homeCoreDuties": "Your core duties",
+  "homeDutyAttendance": "Check in and out from the branch location.",
+  "homeDutyTasks": "Complete and track your daily tasks.",
+  "homeDutyPhotos": "Photograph offers and brands in hypermarkets and branches.",
+  "companySupervisor": "Company supervisor",
+  "supervisorOfCompany": "Supervisor · {companyName}",
+  "@supervisorOfCompany": {
+    "placeholders": {
+      "companyName": {}
+    }
+  },
+  "assignedCompanySupervisor": "Assigned company supervisor",
+  "callAction": "Call",
+  "offerPhotosTitle": "Offer photos",
+  "offerPhotosSubtitle": "Take and upload approved offer photos in the hypermarket",
+  "homeAttendanceSummary": "Attendance – {monthName}",
+  "@homeAttendanceSummary": {
+    "placeholders": {
+      "monthName": {}
+    }
+  },
+  "detailsAction": "Details",
+  "statAttended": "Attended",
+  "daysCount": "{count, plural, =1{1 day} other{{count} days}}",
+  "@daysCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "statAbsent": "Absent",
+  "statDaysOff": "Days off",
+  "leavesOfFour": "{count} of 4 days",
+  "@leavesOfFour": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workPolicyNote": "26 workdays/month • 4 days off not counted as absence",
+  "chainGomlaMarket": "Gomla Market",
+  "chainFathallaMarket": "Fathalla Market",
+  "chainZahranMarket": "Zahran Market",
+  "recentBranchActivity": "Recent activity",
+  "viewLog": "View history",
+  "unknownBranch": "Unknown branch",
+  "onShift": "On shift",
+  "durationHm": "{hours}h {minutes}m",
+  "@durationHm": {
+    "placeholders": {
+      "hours": {},
+      "minutes": {}
+    }
+  },
+  "branchLabel": "Branch: {cleanBranchName}",
+  "@branchLabel": {
+    "placeholders": {
+      "cleanBranchName": {}
+    }
+  },
+  "homeRequestsSubtitle": "Submit and track leave and excuse requests",
+  "companySupervisorWithName": "Company supervisor ({companyName})",
+  "@companySupervisorWithName": {
+    "placeholders": {
+      "companyName": {}
+    }
+  },
+  "errorWithMessage": "Error: {error}",
+  "@errorWithMessage": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "noSupervisorForCompany": "No supervisor registered for this company yet\n(Company ID: {companyUID})",
+  "@noSupervisorForCompany": {
+    "placeholders": {
+      "companyUID": {}
+    }
+  },
+  "pendingCountBadge": "{count} pending",
+  "@pendingCountBadge": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "orgMarketing": "Marketing",
+  "orgAdminPanel": "Administration",
+  "orgAccounting": "Finance & accounting",
+  "switchedToOrg": "Switched to {orgLabel}",
+  "@switchedToOrg": {
+    "placeholders": {
+      "orgLabel": {}
+    }
+  },
+  "unknownOrganization": "Unknown organization",
+  "alreadyInOrg": "You're already in this organization.",
+  "logoutConfirm": "Log out?\nYour local data will be saved first.",
+  "logoutFailed": "Couldn't log out: {error}",
+  "@logoutFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "backAction": "Back",
+  "sendFeedback": "Send feedback",
+  "rateTheApp": "Rate the app",
+  "manageFeedback": "Manage feedback",
+  "myFeedback": "My feedback",
+  "photoPermissions2": "Photo permissions",
+  "appColor": "App color",
+  "attCheckingZone": "Checking location…",
+  "attVerifyingCoords": "Checking your location…",
+  "attInsideZone": "You're in the work zone",
+  "attWithinBranchRange": "Within range of {branch}",
+  "@attWithinBranchRange": {
+    "placeholders": {
+      "branch": {}
+    }
+  },
+  "attOutsideZone": "You're outside the work zone",
+  "attMoveCloserTo": "Move closer to {branch} to check in",
+  "@attMoveCloserTo": {
+    "placeholders": {
+      "branch": {}
+    }
+  },
+  "attOutsideApprovedBranches": "You're not at an approved branch",
+  "distanceKmM": "{km} km ({meters} m)",
+  "@distanceKmM": {
+    "placeholders": {
+      "km": {},
+      "meters": {}
+    }
+  },
+  "previousMonth": "Previous month",
+  "currentMonth": "Current month",
+  "nextMonth": "Next month",
+  "attWorkPolicyNote": "26 workdays • 4 days off not counted as absence",
+  "distanceLabel": "Distance: {formattedDistance}",
+  "@distanceLabel": {
+    "placeholders": {
+      "formattedDistance": {}
+    }
+  },
+  "radiusLabel": "Allowed radius: {allowedRadius} m",
+  "@radiusLabel": {
+    "placeholders": {
+      "allowedRadius": {}
+    }
+  },
+  "recheckLocation": "Check again",
+  "activeChain": "Current chain",
+  "allChains": "All chains",
+  "attNoSessionsInChain": "No attendance records for {chain} this month",
+  "@attNoSessionsInChain": {
+    "placeholders": {
+      "chain": {}
+    }
+  },
+  "attDaysInOtherChains": "You have {count} attended days in other chains.",
+  "@attDaysInOtherChains": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "attAutoClosedNote": "Checked out automatically 11.5 hours after the shift started, since no check-out was recorded",
+  "autoClosedAuto": "Auto-closed (11.5h)",
+  "checkOut2": "Check out",
+  "attCheckingLocation": "Checking location…",
+  "checkIn2": "Check in",
+  "noBranchesForOrg": "No branches for this organization yet",
+  "attYouAreWithinBranch": "You are within range of {branch}",
+  "@attYouAreWithinBranch": {
+    "placeholders": {
+      "branch": {}
+    }
+  },
+  "attMoveCloser": "Move closer to the branch to check in",
+  "attCheckInSavedOffline": "Check-in saved on this device. It will sync when you are back online.",
+  "attCheckOutSavedOffline": "Check-out saved on this device. It will sync when you are back online.",
+  "syncDone": "Synced",
+  "syncFailed": "Couldn't sync",
+  "attDelegateOfCompany": "Delegate · {companyName}",
+  "@attDelegateOfCompany": {
+    "placeholders": {
+      "companyName": {}
+    }
+  },
+  "attendanceLog": "Attendance history",
+  "distanceMeters": "{meters} m",
+  "@distanceMeters": {
+    "placeholders": {
+      "meters": {}
+    }
+  },
+  "attLocatingYou": "Finding your location and checking branches…",
+  "attLocatingShort": "Finding your location…",
+  "attEarlyCheckOutTitle": "Check out already?",
+  "attEarlyCheckOutBody": "You checked in {minutes} min ago. Checking out now will close this attendance.",
+  "@attEarlyCheckOutBody": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "attEarlyCheckOutConfirm": "Yes, check out",
+  "attEarlyCheckOutCancel": "Stay checked in",
+  "attLocationUnavailable": "Couldn't get your location. Turn on GPS.",
+  "attInsideBranchWithDistance": "You are within range of {branch} ({meters} m)",
+  "@attInsideBranchWithDistance": {
+    "placeholders": {
+      "branch": {},
+      "meters": {}
+    }
+  },
+  "attOutsideBranchWithRadius": "You are outside the branch range ({meters} m). Allowed range: {radius} m.",
+  "@attOutsideBranchWithRadius": {
+    "placeholders": {
+      "meters": {},
+      "radius": {}
+    }
+  },
+  "attEnsureGps": "Make sure GPS is on and wait for your location.",
+  "attCannotActOutside": "You can't {action} while outside the branch ({distance}). Please be inside the branch.",
+  "@attCannotActOutside": {
+    "placeholders": {
+      "action": {},
+      "distance": {}
+    }
+  },
+  "attCheckingInAt": "Checking in at {branchName}…",
+  "@attCheckingInAt": {
+    "placeholders": {
+      "branchName": {}
+    }
+  },
+  "locationServicesOff": "Location services are off. Turn them on.",
+  "locationPermissionDenied2": "Location permission denied",
+  "locationPermissionDeniedForever": "Location access is off. Turn it on in Settings.",
+  "fakeGpsDetected": "A fake GPS app was detected. Turn it off to check in or out.",
+  "locationTimeout": "Timed out getting your location. Make sure GPS is on and you're in an open area.",
+  "locationError": "Couldn't get your location. Try again.",
+  "trustedTime": "Trusted time",
+  "attActionCheckIn": "check in",
+  "attActionCheckOut": "check out",
+  "userNotFound": "User not found",
+  "accountNotIdentified": "Couldn't identify the account",
+  "profilePhotoUpdated": "Profile photo updated",
+  "photoUploadFailed": "Couldn't upload the photo: {error}",
+  "@photoUploadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "profilePhotoDeleted": "Profile photo deleted",
+  "photoDeleteFailed": "Couldn't remove the photo: {error}",
+  "@photoDeleteFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "profilePhoto": "Profile photo",
+  "takePhotoCamera": "Take a photo",
+  "chooseFromGallery": "Choose from gallery",
+  "removeCurrentPhoto": "Delete photo",
+  "roleSuperAdmin2": "Super admin",
+  "roleTechSupport2": "Technical support",
+  "roleOrgAdmin2": "Organization admin",
+  "roleCompanyAdmin2": "Company admin",
+  "roleHrOfficer": "HR officer",
+  "roleAccountant": "Accounting",
+  "roleMarketing2": "Marketing",
+  "personalInfo": "Personal information",
+  "nameLabel": "Name",
+  "emailLabel": "Email",
+  "phoneNumberLabel": "Phone number",
+  "securitySection": "Security",
+  "changePassword": "Change password",
+  "editField": "Edit {label}",
+  "@editField": {
+    "placeholders": {
+      "label": {}
+    }
+  },
+  "nameUpdated": "Name updated",
+  "emailUpdated": "Email updated",
+  "phoneUpdated": "Phone number updated",
+  "editName2": "Edit name",
+  "editEmail": "Edit email",
+  "editPhone": "Edit phone number",
+  "fullName2": "Full name",
+  "newEmail": "New email",
+  "newPhone": "New phone number",
+  "enterName": "Enter your name",
+  "enterEmail": "Enter your email",
+  "enterPhone": "Enter your phone number",
+  "nameMin3": "Name must be at least 3 characters",
+  "invalidEmail2": "Enter a valid email",
+  "invalidPhone": "Enter a valid phone number",
+  "saveAction": "Save",
+  "passwordChanged": "Password changed",
+  "currentPassword": "Current password",
+  "enterCurrentPassword": "Enter your current password",
+  "newPassword": "New password",
+  "enterNewPassword": "Enter a new password",
+  "passwordMin6": "Password must be at least 6 characters",
+  "confirmPassword": "Confirm password",
+  "enterConfirmPassword": "Confirm your password",
+  "passwordsDontMatch": "Passwords don't match",
+  "refreshPolicy": "Refresh",
+  "allPolicyItems": "All items ({count})",
+  "@allPolicyItems": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "penPolicyCardBody": "The deduction for each violation, first time and when repeated.",
+  "searchPolicy": "Search the policy",
+  "allWithCount": "All ({count})",
+  "@allWithCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "adminRestricted": "Admin only",
+  "firstTime": "First time",
+  "amountEgp": "{amount} EGP",
+  "@amountEgp": {
+    "placeholders": {
+      "amount": {}
+    }
+  },
+  "whenRepeated": "When repeated",
+  "perManagementDecision": "Per management decision",
+  "plannedAction": "Action: {action}",
+  "@plannedAction": {
+    "placeholders": {
+      "action": {}
+    }
+  },
+  "noResults": "No results",
+  "tryOtherSearch": "Try other words or a different category.",
+  "noViolationDocs": "No attachments",
+  "violationReceipt": "Violation document",
+  "closeAction": "Close",
+  "imageLoadFailed": "Couldn't load image",
+  "openInBrowser": "Open in browser",
+  "attachedDocuments": "Attachments",
+  "receiptNumber": "Document {number}",
+  "@receiptNumber": {
+    "placeholders": {
+      "number": {}
+    }
+  },
+  "photoReceipt": "Document photo",
+  "tapToPreview": "Tap to preview",
+  "tapToOpen": "Tap to open",
+  "deleteAllNotifications": "Delete all notifications",
+  "deleteAllNotificationsConfirm": "Delete all notifications from your list?\n(They won't appear in your account again but stay in the system log.)",
+  "allNotificationsDeleted": "All notifications deleted from your list",
+  "deleteAll": "Delete all",
+  "sendNewNotification": "Send notification",
+  "deleteNotification": "Delete notification",
+  "deleteNotificationConfirm": "Delete this notification from your list?\n(It stays in the system log.)",
+  "notificationDeleted": "Notification deleted",
+  "systemAdministration": "System administration",
+  "senderLine": "From: {name} ({role})",
+  "@senderLine": {
+    "placeholders": {
+      "name": {},
+      "role": {}
+    }
+  },
+  "markAsRead": "Mark as read",
+  "viewTask": "View task",
+  "updateAppNow": "Update now",
+  "justNow": "Just now",
+  "taskCompletedConfirmed": "Task marked as completed",
+  "taskStarted": "Task started",
+  "noTasksNow": "No tasks right now",
+  "tasksAppearHere": "Tasks will appear here as soon as they are assigned to you.",
+  "taskDeleted": "Task deleted",
+  "taskDeleteFailed": "Couldn't delete the task: {error}",
+  "@taskDeleteFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "timeAgoDays": "{count, plural, =1{1 day ago} other{{count} days ago}}",
+  "@timeAgoDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoHours": "{count, plural, =1{1 hour ago} other{{count} hours ago}}",
+  "@timeAgoHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoMinutes": "{count, plural, =1{1 minute ago} other{{count} minutes ago}}",
+  "@timeAgoMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "confirmDeletePhoto": "Delete photo?",
+  "deletePhotoFromConfirm": "Delete this photo sent by \"{delegateName}\" at \"{branch}\"?",
+  "@deletePhotoFromConfirm": {
+    "placeholders": {
+      "delegateName": {},
+      "branch": {}
+    }
+  },
+  "photoDeletePermanentNote": "The photo will be permanently deleted from the database and storage.",
+  "deletePermanently": "Delete permanently",
+  "chooseMonth": "Choose month",
+  "photosCount": "{count, plural, =0{No photos} =1{1 photo} other{{count} photos}}",
+  "@photosCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "photoReportsTitle": "Photo reports",
+  "refreshPhotos": "Refresh photos",
+  "photosArchiveNote": "Photos are stored in the company archive, separate from delegate accounts",
+  "totalPhotos": "Total photos",
+  "branchesVisited": "Branches visited",
+  "activeDelegates": "Active delegates",
+  "byDate": "By date",
+  "byBranch": "By branch",
+  "byDelegate": "By delegate",
+  "photoReportsLoadFailed": "Couldn't load photo reports",
+  "unknownDelegate": "Unknown delegate",
+  "pendingOnPhone": "On phone",
+  "uploadedToServer": "Uploaded",
+  "noPhotosInMonth": "No photos in {month}",
+  "@noPhotosInMonth": {
+    "placeholders": {
+      "month": {}
+    }
+  },
+  "useArrowsForMonths": "Use the arrows above to view earlier months.",
+  "photoDetails": "Photo details",
+  "deletePhotoPermanently": "Delete photo permanently",
+  "pinchToZoom": "Pinch to zoom in",
+  "deletePhoto": "Delete photo",
+  "photoSavedToGallery": "Photo saved to your gallery.",
+  "grantPhotosPermission": "Allow photo access in your phone settings.",
+  "photoSaveFailed": "Couldn't save the photo: {error}",
+  "@photoSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "savingPhoto": "Saving photo…",
+  "savedToPhone": "Saved to phone",
+  "savePhoto": "Save photo",
+  "branchField": "Branch",
+  "capturedAtField": "Captured at",
+  "delegateField": "Delegate",
+  "delegateCommentField": "Delegate's comment",
+  "cameraOpenFailed": "Couldn't open the camera: {error}",
+  "@cameraOpenFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "photoRemovedFromSession": "Photo deleted",
+  "offerPhotosSupervisor": "Offer photos (supervisor)",
+  "photosSavedOffline": "{count} photos saved on this device. They will upload automatically when you are back online.",
+  "@photosSavedOffline": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "photosUploaded": "{count} photos uploaded and the report saved.",
+  "@photosUploaded": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "photoSavedOffline": "Photo saved on this device. It will upload automatically when you are back online.",
+  "photoUploaded": "Photo uploaded and the report saved.",
+  "loadingPhotoPermissions": "Loading photo permissions…",
+  "choosePhotoPermission": "Choose a photo permission *",
+  "permissionOption": "{companyName}{dept} - {length} branches",
+  "@permissionOption": {
+    "placeholders": {
+      "companyName": {},
+      "dept": {},
+      "length": {}
+    }
+  },
+  "branchWithId": "Branch {id}",
+  "@branchWithId": {
+    "placeholders": {
+      "id": {}
+    }
+  },
+  "offerPhotoPermissionOf": "Photo permission: {companyName}",
+  "@offerPhotoPermissionOf": {
+    "placeholders": {
+      "companyName": {}
+    }
+  },
+  "companyLabel2": "Company: {companyName}",
+  "@companyLabel2": {
+    "placeholders": {
+      "companyName": {}
+    }
+  },
+  "departmentLabel": "Department: {department}",
+  "@departmentLabel": {
+    "placeholders": {
+      "department": {}
+    }
+  },
+  "noBranchesInPermissionFor": "No branches are registered for ({organizationName}) in this permission.",
+  "@noBranchesInPermissionFor": {
+    "placeholders": {
+      "organizationName": {}
+    }
+  },
+  "noBranchesInPermission": "No branches are set for this permission yet. Ask your supervisor to add them.",
+  "chooseBranchOf": "Select branch ({organizationName}) *",
+  "@chooseBranchOf": {
+    "placeholders": {
+      "organizationName": {}
+    }
+  },
+  "chooseBranchRequired": "Select branch *",
+  "takeOfferPhotos": "Take offer photos",
+  "multiPhotoHint": "You can take several photos of this branch's products and stands at once",
+  "takeFirstPhoto": "Take first photo",
+  "visitGallery": "Visit photos",
+  "addPhoto": "Add photo",
+  "photoNumber": "Photo {number}",
+  "@photoNumber": {
+    "placeholders": {
+      "number": {}
+    }
+  },
+  "retakePhoto": "Retake this photo",
+  "addAction": "Add",
+  "visitNotesLabel": "Visit notes ({count} photos) (optional)",
+  "@visitNotesLabel": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "visitNotesHint": "e.g. Products displayed, shelf arranged and prices clearly visible…",
+  "uploadingPhotoXofY": "Uploading photo {current} of {total}…",
+  "@uploadingPhotoXofY": {
+    "placeholders": {
+      "current": {},
+      "total": {}
+    }
+  },
+  "uploadingPhotosReport": "Uploading photos and saving the report…",
+  "nameCompanySupervisor": "{fullName} (company supervisor)",
+  "@nameCompanySupervisor": {
+    "placeholders": {
+      "fullName": {}
+    }
+  },
+  "chooseBranchFirst": "Choose a branch first.",
+  "takeAtLeastOnePhoto": "Take at least one photo before saving.",
+  "submitReportCount": "Submit report ({count} photos)",
+  "@submitReportCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "chooseBranchToStart": "Choose a branch to start taking photos",
+  "chooseBranchHint": "Select the branch you are in from the list above to enable the camera button.",
+  "noPhotoPermissions": "No photo permissions right now",
+  "askSupervisorForPermission": "Ask your supervisor for a photo permission.",
+  "photoReportsOf": "Photo reports: {companyName}",
+  "@photoReportsOf": {
+    "placeholders": {
+      "companyName": {}
+    }
+  },
+  "loadingPhotoReports": "Loading photo reports…",
+  "noUploadedPhotos": "No uploaded photos yet",
+  "filterByBranch": "Filter by branch",
+  "allBranches": "All branches",
+  "filterByDelegate": "Filter by delegate",
+  "allDelegates2": "All delegates",
+  "shownResults": "Showing {shown} of {total}",
+  "@shownResults": {
+    "placeholders": {
+      "shown": {},
+      "total": {}
+    }
+  },
+  "clearFilters": "Clear filters",
+  "noComment": "No comment",
+  "showMorePhotos": "Show more ({count} more photos)",
+  "@showMorePhotos": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "loadingPhotosReports": "Loading photos and reports…",
+  "syncingPhotosXofY": "Uploading photos ({synced} of {total})…",
+  "@syncingPhotosXofY": {
+    "placeholders": {
+      "synced": {},
+      "total": {}
+    }
+  },
+  "syncingRemainingPhotos": "Uploading remaining photos…",
+  "photosSavedOnPhone": "{count} photos saved on the phone",
+  "@photosSavedOnPhone": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "waitingToUpload": "Will upload when you are online",
+  "syncNow": "Sync now",
+  "noFeedbackYet": "No feedback yet",
+  "sendFirstFeedback": "Send your first feedback",
+  "adminResponse": "Admin response",
+  "feedbackIntro": "Your opinion matters. Help us improve the app",
+  "feedbackType": "Type",
+  "yourMessage": "Your message",
+  "feedbackHint": "Write your feedback",
+  "enterMessage": "Enter your message",
+  "messageTooShort": "Message is too short (at least 10 characters)",
+  "screenshotOptional": "Screenshot (optional)",
+  "chooseImage": "Choose photo",
+  "sendAction": "Send",
+  "thankYou": "Thank you!",
+  "feedbackReceived": "We've received your feedback and will review it soon.",
+  "okAction": "OK",
+  "loginSubtitleStaff": "Choose your account type and sign in",
+  "loginSubtitleDelegate": "Choose your account type and enter your details",
+  "staffLabel": "Staff",
+  "forgotPasswordQ": "Forgot password?",
+  "phoneHelper": "The phone number registered with your company",
+  "nationalIdHelper": "14 digits",
+  "showAction": "Show",
+  "hideAction": "Hide",
+  "enterPassword2": "Enter your password",
+  "signingIn": "Signing in…",
+  "contactSupport": "Contact support",
+  "checkHighlightedFields": "Check the highlighted fields",
+  "resetLinkSentIfRegistered": "If this email is registered, a reset link is on its way.",
+  "resetLinkFailed": "Couldn't send the reset link. Try again.",
+  "forgotPassword": "Forgot password",
+  "sendLink": "Send link",
+  "selectOrganization": "Select organization",
+  "multipleOrgsChoose": "You're registered in more than one organization. Choose one to continue.",
+  "weeklyPlanNote": "You get one day off a week (4 a month). Annual leave becomes available once your supervisor approves it.",
+  "dateWithHours": "{date} • ({hours}h)",
+  "@dateWithHours": {
+    "placeholders": {
+      "date": {},
+      "hours": {}
+    }
+  },
+  "hoursCount": "{count} h",
+  "@hoursCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "cancelRequestFailed": "Couldn't cancel the request: {error}",
+  "@cancelRequestFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "requestAttachment": "Attachment",
+  "attachmentLoadFailed": "Couldn't load the attachment image",
+  "annualLeaveFromBalance": "Annual leave (from annual balance)",
+  "annualLeaveUnavailable": "Annual leave (not available yet)",
+  "lateArrivalHourly": "Late arrival (hourly)",
+  "earlyLeaveHourly": "Early leave (hourly)",
+  "excusedAbsenceFullDay": "Excused absence (full day)",
+  "dateField": "Date",
+  "timeField": "Time",
+  "fromField": "From",
+  "toField": "To",
+  "periodField": "Period",
+  "daysExceedBalance": "Requested days ({requested}) exceed your remaining balance ({remaining})",
+  "@daysExceedBalance": {
+    "placeholders": {
+      "requested": {},
+      "remaining": {}
+    }
+  },
+  "reasonField": "Reason",
+  "reasonHint": "Briefly describe the reason",
+  "attachmentOptional": "Attachment (optional)",
+  "cameraLabel": "Camera",
+  "galleryLabel": "Gallery",
+  "sendingRequest": "Uploading the attachment and sending your request…",
+  "enterLeaveReason": "Enter the reason for the leave or excuse",
+  "annualNotActive": "Annual leave isn't active on your account yet. Choose another type.",
+  "requestSent": "Your request was sent to your supervisor and is pending review.",
+  "sendRequestFailed": "Couldn't send the request: {error}",
+  "@sendRequestFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "sendingEllipsis": "Sending…",
+  "durationLabel": "Duration: {duration}",
+  "@durationLabel": {
+    "placeholders": {
+      "duration": {}
+    }
+  },
+  "settingsGeneral": "General",
+  "senderRoleSystem": "System",
+  "senderRoleCompanySupervisor": "Company supervisor",
+  "senderRoleOrgAdmin": "Organization admin",
+  "senderRoleBranchesMarketing": "Branch marketing",
+  "senderRolePromotionMarketing": "Promotion marketing",
+  "senderRoleMarketing": "Marketing",
+  "senderRoleTechSupport": "Tech support",
+  "codeLabel": "Code: {code}",
+  "policyOfficialSubtitle": "Official list of violations and fines",
+  "catBranchRules": "Branch rule violation",
+  "catTheftDamage": "Theft / damage",
+  "@codeLabel": {
+    "placeholders": {
+      "code": {}
+    }
+  },
+  "chainCarrefour": "Carrefour",
+  "chainBeitElGomla": "Beit El Gomla",
+  "penSelectBranchesFirst": "Select one or more branches to pin as the default",
+  "penDefaultUnpinned": "Default branch group unpinned",
+  "penBranchPinned": "Branch pinned as the default for fines",
+  "penBranchesPinned": "{count} branches pinned as the default for fines",
+  "@penBranchesPinned": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "penSelectDisplayBranches": "Select branches to show",
+  "penShowingAllBranches": "Showing all branches",
+  "penBranchesSelected": "{count} branches selected",
+  "@penBranchesSelected": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "clearSelection": "Clear selection",
+  "searchBranchName": "Search by branch name…",
+  "allBranchesAll": "All branches",
+  "selectAll": "Select all",
+  "noMatchingBranches": "No matching branches",
+  "inDefault": "In default",
+  "confirmShowAllBranches": "Confirm (all branches)",
+  "confirmFilterCount": "Confirm filter ({count} branches)",
+  "@confirmFilterCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "finesSection": "Fines and violations",
+  "promoNoFinesAccess": "Promotion marketing accounts can't access fines and violations",
+  "myViolationsTitle": "My violations",
+  "violationsRecord": "Violations and fines",
+  "finesSettings": "Fines settings and policy",
+  "recordViolation": "Record violation",
+  "unknownCompany": "Unknown company",
+  "allBranchesOverview": "All branches",
+  "selectedGroupCount": "Selected group ({count} branches)",
+  "@selectedGroupCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "finesPolicyCardSubtitle": "The deduction for each violation, first time and when repeated",
+  "showViolationsFor": "Show violations for branch / group:",
+  "unpinDefaultGroup": "Unpin default group",
+  "pinSelectedAsDefault": "Pin selected branches as default",
+  "refreshFinesData": "Refresh fines data",
+  "finesDataRefreshed": "Fines data refreshed",
+  "pinnedDefaultGroup": "Pinned default group",
+  "showAll": "Show all",
+  "mySummary": "Summary",
+  "finesSummaryOf": "Fines summary ({branch})",
+  "@finesSummaryOf": {
+    "placeholders": {
+      "branch": {}
+    }
+  },
+  "companiesFinesSummary": "Fines summary by company",
+  "finesSummary": "Fines summary",
+  "myTotalFines": "Total fines",
+  "totalFines": "Total fines",
+  "deductedFromMe": "Deducted",
+  "deducted": "Deducted",
+  "violationsCountLabel": "Violations",
+  "companiesCount": "Companies",
+  "companiesN": "{count} companies",
+  "@companiesN": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "filterByCompany": "Filter by company:",
+  "allCompaniesCount": "All companies ({count})",
+  "@allCompaniesCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "recordClean": "Your record is clean!",
+  "noViolationsAnyCompany": "No violations recorded for any company yet",
+  "noViolationsThisCompany": "No violations recorded for this company",
+  "noViolationsRecorded": "No violations recorded.",
+  "rejectionReason": "Rejection reason",
+  "rejectionReasonHint": "Write the reason for rejecting this violation…",
+  "confirmRejection": "Confirm rejection",
+  "repeatedViolation": "Repeated violation",
+  "confidential": "Confidential",
+  "targetDelegate": "Delegate: {name}",
+  "@targetDelegate": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "violationDetails": "Violation details:",
+  "branchesMarketingApproval": "Branch marketing manager approval: {name}",
+  "@branchesMarketingApproval": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "generalManagerApproval": "General manager approval: {name}",
+  "@generalManagerApproval": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "attachmentsCount": "Attachments ({count})",
+  "@attachmentsCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "tapToPreview2": "Tap to preview",
+  "editorName": "Recorded by: {name}",
+  "@editorName": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "documentsCount": "Documents ({count})",
+  "@documentsCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "approveAction": "Approve",
+  "rejectAction": "Reject",
+  "violationsWithCount": "Violations: {count}",
+  "@violationsWithCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "totalWithValue": "Total: {value}",
+  "@totalWithValue": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "deductedWithValue": "Deducted: {value}",
+  "@deductedWithValue": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "catUnauthorizedPhoto": "Photography without permission",
+  "catDataMissing": "Missing data / features not enabled",
+  "catOther": "Other",
+  "themeModeTitle": "Appearance",
+  "themeModeSystem": "System default",
+  "themeModeSystemHint": "Follows your phone's dark theme setting",
+  "themeModeLight": "Light",
+  "themeModeDark": "Dark",
+  "taskImageAttach": "Attach image",
+  "taskImageFromCamera": "Take photo",
+  "taskImageFromGallery": "Choose from gallery",
+  "taskImageReplace": "Replace image",
+  "taskImageRemove": "Remove image",
+  "taskImageUploading": "Uploading image…",
+  "taskImageUploadFailed": "Couldn't upload the image. Try again.",
+  "taskImageRetry": "Retry",
+  "taskImageLoadFailed": "Couldn't load the image",
+  "taskImageAttached": "Attached image",
+  "taskImageTooLarge": "The image is too large. Choose a smaller one.",
+  "taskEditedLabel": "Edited",
+  "taskEditAction": "Edit",
+  "taskDeleteAction": "Delete",
+  "taskMoreActions": "Task options",
+  "taskCloseImage": "Close",
+  "splashConnectionFailed": "Couldn't connect",
+  "@splashConnectionFailed": {
+    "description": "Splash stall message"
+  },
+  "splashRetry": "Retry",
+  "@splashRetry": {
+    "description": "Splash retry button"
+  },
+  "splashSignIn": "Sign in",
+  "@splashSignIn": {
+    "description": "Splash go-to-login button"
+  },
+  "mapUnavailable": "Map unavailable",
+  "@mapUnavailable": {
+    "description": "Map gate timeout message"
+  },
+  "mapRetry": "Retry",
+  "@mapRetry": {
+    "description": "Map gate retry button"
+  }
 }

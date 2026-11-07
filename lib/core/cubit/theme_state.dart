@@ -5,7 +5,7 @@ class ThemeState extends Equatable {
   final Color seedColor;
 
   const ThemeState({
-    this.themeMode = ThemeMode.light,
+    this.themeMode = ThemeMode.system,
     this.seedColor = const Color(0xFF6750A4),
   });
 

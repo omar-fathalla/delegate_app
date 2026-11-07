@@ -1,3 +1,4 @@
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/notifications/domain/entities/notification_entity.dart';
 import 'package:delegate_app/features/notifications/data/models/notification_model.dart';
@@ -58,7 +59,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
             Icon(Icons.delete_rounded, color: colorScheme.error),
             const SizedBox(width: 8),
             Text(
-              'حذف الإشعار',
+              AppLocalizations.of(context)!.deleteNotification,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -68,7 +69,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
           ],
         ),
         content: Text(
-          'هل تريد حذف هذا الإشعار من قائمة إشعاراتك؟\n(سيظل مسجلاً في سجل النظام العام).',
+          AppLocalizations.of(context)!.deleteNotificationConfirm,
           style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
         ),
         actions: [
@@ -92,7 +93,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
               );
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: const Text('تم حذف الإشعار من قائمتك'),
+                  content: Text(AppLocalizations.of(context)!.notificationDeleted),
                   backgroundColor: colorScheme.inverseSurface,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -100,7 +101,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
                 ),
               );
             },
-            child: const Text('حذف'),
+            child: Text(AppLocalizations.of(context)!.delete),
           ),
         ],
       ),
@@ -120,7 +121,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
 
     final displaySenderName = (rawSenderName != null && rawSenderName.isNotEmpty)
         ? NotificationModel.sanitizeText(rawSenderName)
-        : 'إدارة النظام';
+        : AppLocalizations.of(context)!.systemAdministration;
     final displaySenderRoleArabic = NotificationModel.formatSenderRoleArabic(rawSenderRole);
 
     return Dismissible(
@@ -144,7 +145,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
             Icon(Icons.delete_rounded, color: colorScheme.onErrorContainer, size: 24),
             const SizedBox(width: 8),
             Text(
-              'حذف',
+              AppLocalizations.of(context)!.delete,
               style: TextStyle(
                 color: colorScheme.onErrorContainer,
                 fontWeight: FontWeight.bold,
@@ -248,7 +249,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
                         size: 19,
                         color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                       ),
-                      tooltip: 'حذف الإشعار',
+                      tooltip: AppLocalizations.of(context)!.deleteNotification,
                       onPressed: _confirmDelete,
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
@@ -280,7 +281,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
-                          'المرسل: $displaySenderName ($displaySenderRoleArabic)',
+                          AppLocalizations.of(context)!.senderLine(displaySenderName, _localizedSenderRole(displaySenderRoleArabic, AppLocalizations.of(context)!)),
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -326,7 +327,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
                               onPressed: _markAsRead,
                               icon: Icon(Icons.check_circle_rounded, size: 16, color: colorScheme.primary),
                               label: Text(
-                                'تعليم كمقروء',
+                                AppLocalizations.of(context)!.markAsRead,
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: colorScheme.primary,
@@ -349,7 +350,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
                                 );
                               },
                               icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-                              label: const Text('عرض المهمة', style: TextStyle(fontSize: 12)),
+                              label: Text(AppLocalizations.of(context)!.viewTask, style: TextStyle(fontSize: 12)),
                               style: FilledButton.styleFrom(
                                 visualDensity: VisualDensity.compact,
                                 padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -369,8 +370,8 @@ class _NotificationListItemState extends State<NotificationListItem> {
                                 }
                               },
                               icon: const Icon(Icons.system_update_rounded, size: 16),
-                              label: const Text(
-                                'تحديث التطبيق الآن',
+                              label: Text(
+                                AppLocalizations.of(context)!.updateAppNow,
                                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                               ),
                               style: FilledButton.styleFrom(
@@ -501,13 +502,40 @@ class _NotificationListItemState extends State<NotificationListItem> {
     if (difference.inDays > 7) {
       return DateFormat('dd/MM/yyyy').format(dateTime);
     } else if (difference.inDays > 0) {
-      return 'منذ ${difference.inDays} ${difference.inDays == 1 ? 'يوم' : 'أيام'}';
+      return AppLocalizations.of(context)!.timeAgoDays(difference.inDays);
     } else if (difference.inHours > 0) {
-      return 'منذ ${difference.inHours} ${difference.inHours == 1 ? 'ساعة' : 'ساعات'}';
+      return AppLocalizations.of(context)!.timeAgoHours(difference.inHours);
     } else if (difference.inMinutes > 0) {
-      return 'منذ ${difference.inMinutes} ${difference.inMinutes == 1 ? 'دقيقة' : 'دقائق'}';
+      return AppLocalizations.of(context)!.timeAgoMinutes(difference.inMinutes);
     } else {
-      return 'الآن';
+      return AppLocalizations.of(context)!.justNow;
     }
   }
+}
+
+/// Maps the Arabic sender role from [NotificationModel.formatSenderRoleArabic]
+/// to the active locale. Unknown values are shown as-is (raw data).
+String _localizedSenderRole(String arabicRole, AppLocalizations l10n) {
+  switch (arabicRole) {
+    case 'النظام':
+      return l10n.senderRoleSystem;
+    case 'مشرف الشركة':
+      return l10n.senderRoleCompanySupervisor;
+    case 'سوبر أدمن':
+      return l10n.roleSuperAdmin;
+    case 'مسؤول المنظمة':
+      return l10n.senderRoleOrgAdmin;
+    case 'مسؤول تسويق الفروع':
+      return l10n.senderRoleBranchesMarketing;
+    case 'مسؤول تسويق العروض':
+      return l10n.senderRolePromotionMarketing;
+    case 'مسؤول التسويق':
+      return l10n.senderRoleMarketing;
+    case 'الدعم الفني':
+      return l10n.senderRoleTechSupport;
+    case 'مروج':
+    case 'مندوب':
+      return l10n.roleDelegate;
+  }
+  return arabicRole;
 }

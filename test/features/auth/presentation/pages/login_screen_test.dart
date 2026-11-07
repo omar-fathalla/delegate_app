@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:delegate_app/features/auth/presentation/pages/login_screen.dart';
@@ -75,11 +76,11 @@ void main() {
 
     // Interact with text fields to ensure controllers are active
     await tester.enterText(find.byType(TextFormField).at(0), '1234567890');
-    await tester.enterText(find.byType(TextFormField).at(1), 'password123');
+    await tester.enterText(find.byType(TextFormField).at(1), '29712200201981');
 
     // Verify text is entered
     expect(find.text('1234567890'), findsOneWidget);
-    expect(find.text('password123'), findsOneWidget);
+    expect(find.text('29712200201981'), findsOneWidget);
 
     // Pump another widget to trigger disposal of LoginScreen
     await tester.pumpWidget(const SizedBox());
@@ -92,7 +93,10 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(createWidgetUnderTest());
+    await tester.pumpAndSettle(); // let the sheet entrance animation finish
 
+    await tester.tap(find.byKey(ValueKey('group_item_${LoginMode.staff}')));
+    await tester.pumpAndSettle();
     final passwordFieldFinder = find.byType(TextFormField).at(1);
     
     // Verify initial state: obscured
@@ -107,6 +111,7 @@ void main() {
     expect(visibilityOffIconFinder, findsOneWidget);
 
     // Tap the visibility toggle button (IconButton)
+    await tester.ensureVisible(visibilityOffIconFinder);
     await tester.tap(find.ancestor(
       of: visibilityOffIconFinder,
       matching: find.byType(IconButton),
@@ -147,6 +152,10 @@ void main() {
 
     when(() => mockAuthBloc.add(any())).thenAnswer((_) {});
     await tester.pumpWidget(createWidgetUnderTest());
+    await tester.pumpAndSettle(); // let the sheet entrance animation finish
+    // The previous test may have saved staff mode; pick delegate explicitly.
+    await tester.tap(find.byKey(ValueKey('group_item_${LoginMode.delegate}')));
+    await tester.pumpAndSettle();
 
     final loginButton = find.widgetWithText(FilledButton, 'Login');
     await tester.ensureVisible(loginButton);
@@ -174,5 +183,6 @@ void main() {
     final captured = verify(() => mockAuthBloc.add(captureAny())).captured.single as LoginRequested;
     expect(captured.phoneNumber, '01234567890');
     expect(captured.password, '29712200201981');
+    expect(captured.mode, LoginMode.delegate);
   });
 }

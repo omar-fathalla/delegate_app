@@ -1,3 +1,8 @@
+import 'package:delegate_app/core/l10n/display_names.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
+import 'package:delegate_app/config/theme/app_motion.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/material.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/photo_permission/presentation/widgets/sync_status_banner.dart';
@@ -10,7 +15,8 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_remote_data_source.dart';
-import 'package:delegate_app/features/attendance/domain/usecases/get_history.dart';
+import 'package:delegate_app/features/attendance/domain/usecases/get_history_for_month.dart';
+import 'package:delegate_app/features/attendance/domain/monthly_attendance_stats.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/core/services/trusted_time_service.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
@@ -430,7 +436,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: RefreshIndicator(
+      body: M3Refresh(
         onRefresh: () async {
           await Future.wait([
             _fetchSupervisors(forceRefresh: true),
@@ -445,23 +451,54 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SyncStatusBanner(),
-              _buildWelcomeHeroCard(context),
+              M3StaggeredItem(index: 0, child: _buildWelcomeHeroCard(context)),
               const SizedBox(height: 16),
-              _buildMonthlyAttendanceSummaryCard(context),
-              const SizedBox(height: 14),
-              _buildRecentActivityBriefCard(context),
-              const SizedBox(height: 14),
-              _buildLeavesAndRequestsCard(context),
+              M3StaggeredItem(
+                  index: 1, child: _buildMonthlyAttendanceSummaryCard(context)),
+              if (_recentSessions.isNotEmpty) const SizedBox(height: 16),
+              M3StaggeredItem(
+                  index: 2, child: _buildRecentActivityBriefCard(context)),
               const SizedBox(height: 16),
-              ..._buildSupervisorsList(context),
-              const SizedBox(height: 12),
-              _buildPhotoCaptureCard(context),
-              const SizedBox(height: 80), // Padding for bottom nav
+              M3StaggeredItem(
+                  index: 3, child: _buildLeavesAndRequestsCard(context)),
+              const SizedBox(height: 24),
+              M3StaggeredItem(
+                index: 4,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(start: 4, bottom: 8),
+                      child: Text(AppLocalizations.of(context)!.homeSupervisorsTitle,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                    ),
+                    ..._buildSupervisorsList(context),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              M3StaggeredItem(index: 4, child: _buildPhotoCaptureCard(context)),
+              const SizedBox(height: 24),
             ],
           ),
         ),
       ),
     );
+  }
+
+  /// Foreground for the home hero. Uses the screen's [context] theme
+  /// directly so it is correct in both modes: onPrimary on the light
+  /// primary hero, onPrimaryContainer on the dark primaryContainer hero.
+  Color _heroOn(BuildContext context, [double? light, double? dark]) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final base = isDark ? cs.onPrimaryContainer : cs.onPrimary;
+    final a = isDark ? dark : light;
+    return a == null ? base : base.withValues(alpha: a);
   }
 
   Widget _buildWelcomeHeroCard(BuildContext context) {
@@ -472,19 +509,11 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [colorScheme.primary, colorScheme.tertiary],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.3),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        // Dark: primaryContainer (no glare); light unchanged.
+        color: theme.brightness == Brightness.dark
+            ? colorScheme.primaryContainer
+            : colorScheme.primary,
+        borderRadius: BorderRadius.circular(28),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -497,14 +526,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      isArabic
-                          ? 'أهلاً بك، ${widget.delegate.firstName}'
-                          : 'Welcome, ${widget.delegate.firstName}',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                    Text(AppLocalizations.of(context)!.homeGreeting(firstNameForLocale(widget.delegate.fullName, widget.delegate.firstName, isArabic: Localizations.localeOf(context).languageCode == 'ar')),
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: _heroOn(context),
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -519,11 +544,11 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                                     DelegatePosition.promoter ||
                                 widget.delegate.role ==
                                     UserRole.marketingPromotion
-                            ? (isArabic ? 'مروج ميداني' : 'Field Promoter')
+                            ? AppLocalizations.of(context)!.roleDelegate
                             : widget.delegate.position ==
                                     DelegatePosition.supervisor
-                                ? (isArabic ? 'مشرف ميداني' : 'Field Supervisor')
-                                : (isArabic ? 'مندوب ميداني' : 'Field Delegate');
+                                ? AppLocalizations.of(context)!.roleFieldSupervisor
+                                : AppLocalizations.of(context)!.roleDelegate;
 
                         final activeOrg = widget.delegate.organizationName.trim();
                         final affiliatedOrgs = <String>{};
@@ -608,25 +633,15 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   return Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.4),
-                        width: 2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.15),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+
                     ),
                     child: AppAvatar(
                       imageUrl: photoUrl,
                       fallbackText: widget.delegate.firstName,
                       radius: 26,
-                      backgroundColor: Colors.white.withValues(alpha: 0.22),
-                      foregroundColor: Colors.white,
-                      fallbackIcon: Icons.person_pin_rounded,
+                      backgroundColor: _heroOn(context, 0.12, 0.15),
+                      foregroundColor: _heroOn(context),
+                      fallbackIcon: Symbols.person_pin_rounded,
                     ),
                   );
                 },
@@ -634,42 +649,34 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             ],
           ),
           const SizedBox(height: 16),
-          const Divider(color: Colors.white24, height: 1),
-          const SizedBox(height: 14),
+          Divider(color: _heroOn(context, 0.16, 0.2), height: 1),
+          const SizedBox(height: 16),
 
           // Core Duties Summary
-          Text(
-            isArabic ? 'المهام الأساسية للمندوب:' : 'Core Delegate Duties:',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+          Text(AppLocalizations.of(context)!.homeCoreDuties,
+            style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: _heroOn(context),
             ),
           ),
           const SizedBox(height: 8),
 
           _buildDutyItem(
-            icon: Icons.location_on_rounded,
+            icon: Symbols.location_on_rounded,
             text:
-                isArabic
-                    ? 'تسجيل الحضور والانصراف المعتمد جغرافياً عند الوصول إلى الفرع.'
-                    : 'Geofenced attendance check-in & check-out at branches.',
+                AppLocalizations.of(context)!.homeDutyAttendance,
           ),
           const SizedBox(height: 6),
           _buildDutyItem(
-            icon: Icons.assignment_turned_in_rounded,
+            icon: Symbols.assignment_turned_in_rounded,
             text:
-                isArabic
-                    ? 'متابعة وتنفيذ المهام اليومية الموكلة بدقة.'
-                    : 'Review and complete assigned daily tasks accurately.',
+                AppLocalizations.of(context)!.homeDutyTasks,
           ),
           const SizedBox(height: 6),
           _buildDutyItem(
-            icon: Icons.camera_alt_rounded,
+            icon: Symbols.camera_alt_rounded,
             text:
-                isArabic
-                    ? 'توثيق وتصوير العروض والبرندات الميدانية داخل الهايبر ماركت والفروع.'
-                    : 'Capture & document approved offers and brands in hypermarkets.',
+                AppLocalizations.of(context)!.homeDutyPhotos,
           ),
         ],
       ),
@@ -680,15 +687,15 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: Colors.white.withValues(alpha: 0.9)),
+        Icon(icon, size: 18, color: _heroOn(context, 0.8, 0.8)),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
             style: TextStyle(
-              fontSize: 12,
-              color: Colors.white.withValues(alpha: 0.9),
-              height: 1.35,
+              fontSize: 13,
+              color: _heroOn(context),
+              height: 1.45,
             ),
           ),
         ),
@@ -703,27 +710,24 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         vertical: 3,
       ),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.3),
-        ),
+        color: _heroOn(context, 0.12, 0.12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.badge_rounded,
-            size: 14,
-            color: Colors.white,
+          Icon(
+            Symbols.badge_rounded,
+            size: 16,
+            color: _heroOn(context),
           ),
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 11,
+            style: TextStyle(
+              fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Colors.white,
+              color: _heroOn(context),
             ),
           ),
         ],
@@ -743,37 +747,36 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           vertical: 3,
         ),
         decoration: BoxDecoration(
-          color: const Color(0xFFFBBF24).withValues(alpha: 0.22),
-          borderRadius: BorderRadius.circular(12),
+          color: _heroOn(context, 0.12, 0.12),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: const Color(0xFFFDE68A).withValues(alpha: 0.7),
-            width: 1.2,
+            color: _heroOn(context, 0.24, 0.4),
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.domain_rounded,
-              size: 14,
-              color: Color(0xFFFEF3C7),
+            Icon(
+              Symbols.domain_rounded,
+              size: 16,
+              color: _heroOn(context),
             ),
             const SizedBox(width: 6),
             Text(
-              orgName,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFFFEF3C7),
+              localizeChainName(orgName, AppLocalizations.of(context)),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: _heroOn(context),
               ),
             ),
             const SizedBox(width: 6),
             Container(
               width: 5.5,
               height: 5.5,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Color(0xFF10B981),
+                color: _heroOn(context),
               ),
             ),
           ],
@@ -787,28 +790,24 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         vertical: 3,
       ),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.35),
-          width: 1.0,
-        ),
+        color: _heroOn(context, 0.12, 0.12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.storefront_outlined,
+            Symbols.storefront_rounded,
             size: 14,
-            color: Colors.white.withValues(alpha: 0.85),
+            color: _heroOn(context),
           ),
           const SizedBox(width: 6),
           Text(
-            orgName,
+            localizeChainName(orgName, AppLocalizations.of(context)),
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: Colors.white.withValues(alpha: 0.95),
+              color: _heroOn(context),
             ),
           ),
         ],
@@ -818,11 +817,24 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
   List<Widget> _buildSupervisorsList(BuildContext context) {
     if (_loadingSupervisor) {
+      // Layout is known → skeleton (never together with an indicator).
       return [
-        const Center(
-          child: Padding(
-            padding: EdgeInsets.all(16.0),
-            child: CircularProgressIndicator(),
+        M3Card(
+          child: Row(
+            children: const [
+              M3Skeleton(height: 40, width: 40, radius: 20),
+              SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    M3Skeleton(height: 14, width: 140),
+                    SizedBox(height: 8),
+                    M3Skeleton(height: 12, width: 100),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ];
@@ -842,22 +854,19 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
     return Card(
       elevation: 0,
-      color: colorScheme.surfaceContainerLow,
+      color: colorScheme.surfaceContainer,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant),
       ),
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         child: Row(
           children: [
             CircleAvatar(
-              backgroundColor: colorScheme.errorContainer.withValues(
-                alpha: 0.2,
-              ),
-              foregroundColor: colorScheme.error,
-              child: const Icon(Icons.person_off_rounded),
+              backgroundColor: colorScheme.surfaceContainerHigh,
+              foregroundColor: colorScheme.onSurfaceVariant,
+              child: const Icon(Symbols.person_off_rounded),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -865,7 +874,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'مشرف الشركة (${widget.delegate.companyName})',
+                    AppLocalizations.of(context)!.companySupervisorWithName(widget.delegate.companyName),
                     style: TextStyle(
                       fontSize: 10,
                       color: colorScheme.onSurfaceVariant,
@@ -875,8 +884,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   const SizedBox(height: 2),
                   Text(
                     _supervisorError != null
-                        ? 'خطأ: $_supervisorError'
-                        : 'لا يوجد مشرف مسجل لهذه الشركة حالياً\n(Company ID: ${widget.delegate.companyUID})',
+                        ? AppLocalizations.of(context)!.errorWithMessage(_supervisorError ?? '')
+                        : AppLocalizations.of(context)!.noSupervisorForCompany(widget.delegate.companyUID),
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -900,7 +909,6 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     Map<String, dynamic> supervisorData,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final rawName = (supervisorData['displayName'] as String?)?.trim() ??
         (supervisorData['fullName'] as String?)?.trim() ??
         (supervisorData['name'] as String?)?.trim() ??
@@ -911,30 +919,27 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
     final displayName = rawName.isNotEmpty
         ? rawName
-        : (isArabic ? 'مشرف الشركة' : 'Company Supervisor');
+        : AppLocalizations.of(context)!.companySupervisor;
 
     final subtitleText = companyName.isNotEmpty
-        ? (isArabic
-            ? 'مشرف شركة $companyName'
-            : 'Supervisor - $companyName')
-        : (isArabic ? 'مشرف الشركة المنتدبة' : 'Assigned Company Supervisor');
+        ? AppLocalizations.of(context)!.supervisorOfCompany(companyName)
+        : AppLocalizations.of(context)!.assignedCompanySupervisor;
 
     return Card(
       elevation: 0,
-      color: colorScheme.surfaceContainerLow,
+      color: colorScheme.surfaceContainer,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant),
       ),
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         child: Row(
           children: [
             CircleAvatar(
               backgroundColor: colorScheme.primaryContainer,
               foregroundColor: colorScheme.onPrimaryContainer,
-              child: const Icon(Icons.person_rounded),
+              child: const Icon(Symbols.person_rounded),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -976,21 +981,21 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             if (phone.isNotEmpty) ...[
               IconButton(
                 onPressed: () => _callNumber(phone),
-                icon: const Icon(Icons.phone_rounded),
+                icon: const Icon(Symbols.phone_rounded),
+                tooltip: AppLocalizations.of(context)!.callAction,
                 style: IconButton.styleFrom(
-                  backgroundColor: colorScheme.tertiaryContainer,
-                  foregroundColor: colorScheme.onTertiaryContainer,
+                  backgroundColor: colorScheme.secondaryContainer,
+                  foregroundColor: colorScheme.onSecondaryContainer,
                 ),
               ),
               const SizedBox(width: 8),
               IconButton(
                 onPressed: () => _openWhatsApp(phone),
-                icon: const Icon(Icons.chat_rounded),
+                icon: const Icon(Symbols.chat_rounded),
+                tooltip: 'WhatsApp',
                 style: IconButton.styleFrom(
-                  backgroundColor: const Color(
-                    0xFF25D366,
-                  ).withValues(alpha: 0.2),
-                  foregroundColor: const Color(0xFF1DA851),
+                  backgroundColor: colorScheme.secondaryContainer,
+                  foregroundColor: colorScheme.onSecondaryContainer,
                 ),
               ),
             ],
@@ -1003,37 +1008,22 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
   Widget _buildPhotoCaptureCard(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
-    return Card(
-      elevation: 2,
-      shadowColor: colorScheme.primary.withValues(alpha: 0.2),
+    return M3PressScale(scale: 0.98, child: Card(
+      elevation: 0,
+      color: colorScheme.surfaceContainer,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: colorScheme.primary.withValues(alpha: 0.35),
-          width: 1.5,
-        ),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: InkWell(
         onTap: () {
           context.push('/photo-permissions/delegate', extra: widget.delegate);
         },
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              colors: [
-                colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                colorScheme.primaryContainer.withValues(alpha: 0.15),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
+
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1042,41 +1032,28 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: colorScheme.primary,
+                      color: colorScheme.primaryContainer,
                       shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: colorScheme.primary.withValues(alpha: 0.35),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
                     ),
-                    child: const Icon(
-                      Icons.camera_alt_rounded,
-                      color: Colors.white,
-                      size: 26,
+                    child: Icon(
+                      Symbols.photo_camera_rounded,
+                      color: colorScheme.onPrimaryContainer,
+                      size: 24,
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          isArabic
-                              ? 'تصوير العروض الميدانية'
-                              : 'Field Offer Photos',
+                        Text(AppLocalizations.of(context)!.offerPhotosTitle,
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: colorScheme.onSurface,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          isArabic
-                              ? 'التقاط وإرسال صور العروض والبرندات المعتمدة داخل الهايبر ماركت'
-                              : 'Capture & upload approved brand photos inside hypermarket',
+                        Text(AppLocalizations.of(context)!.offerPhotosSubtitle,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                             fontSize: 12,
@@ -1087,46 +1064,44 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               Container(
                 width: double.infinity,
+                constraints: const BoxConstraints(minHeight: 48),
                 padding: const EdgeInsets.symmetric(
-                  vertical: 10,
+                  vertical: 8,
                   horizontal: 16,
                 ),
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: colorScheme.primary.withValues(alpha: 0.25),
-                  ),
+                  color: colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(24),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.touch_app_rounded,
+                      Symbols.touch_app_rounded,
                       size: 18,
-                      color: colorScheme.primary,
+                      color: colorScheme.onSecondaryContainer,
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      isArabic
-                          ? 'اضغط هنا لبدء التصوير داخل الهايبر ماركت'
-                          : 'Tap here to start photographing inside hypermarket',
+                    Flexible(
+                      child: Text(
+                      AppLocalizations.of(context)!.startPhotosCta,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
+                        fontSize: 14,
+                        height: 1.4,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSecondaryContainer,
                       ),
                     ),
+                    ),
                     const SizedBox(width: 4),
-                    Icon(
-                      isArabic
-                          ? Icons.arrow_back_rounded
-                          : Icons.arrow_forward_rounded,
+                    Icon(Symbols.arrow_forward_rounded,
                       size: 16,
-                      color: colorScheme.primary,
+                      color: colorScheme.onSecondaryContainer,
                     ),
                   ],
                 ),
@@ -1135,7 +1110,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           ),
         ),
       ),
-    );
+    ));
   }
 
   // --- Monthly Attendance Summary Logic & UI ---
@@ -1190,14 +1165,15 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       approvedLeaves = count;
     } catch (_) {}
 
-    // 3. Remote fetch cross-organization attendance for unified monthly stats
+    // 3. Remote fetch: every session of the current month across all
+    // affiliated organizations (not a paginated slice), shared with the
+    // Attendance tab so both screens always show the same figures.
     try {
-      if (sl.isRegistered<GetHistory>()) {
-        final getHistory = sl<GetHistory>();
-        final result = await getHistory(
-          GetHistoryParams(
+      if (sl.isRegistered<GetHistoryForMonth>()) {
+        final result = await sl<GetHistoryForMonth>()(
+          GetHistoryForMonthParams(
             userId: widget.delegate.uid,
-            organizationId: '', // Empty means all affiliated organizations
+            month: _getTrustedNow(),
             nationalityID: widget.delegate.nationalityID,
             phoneNumber: widget.delegate.phoneNumber,
           ),
@@ -1214,25 +1190,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
   void _computeStats(List<Attendance> history, {int? approvedLeavesCount}) {
     final trustedNow = _getTrustedNow();
-    final currentMonth = trustedNow.month;
-    final currentYear = trustedNow.year;
-    final currentDay = trustedNow.day;
-    final totalDaysInMonth = DateUtils.getDaysInMonth(currentYear, currentMonth);
 
-    // Filter unique days attended in current month across ALL affiliated organizations
-    final daySet = <String>{};
-    for (final item in history) {
-      if (item.checkInTime.month == currentMonth &&
-          item.checkInTime.year == currentYear &&
-          item.userId == widget.delegate.uid) {
-        final dayKey =
-            '${item.checkInTime.year}-${item.checkInTime.month}-${item.checkInTime.day}';
-        daySet.add(dayKey);
-      }
-    }
-    final attended = daySet.length;
-
-    // Active days for new delegates (using earliest registration date across all chains)
+    // Earliest registration date across all chains (new delegates).
     DateTime earliestCreatedAt = widget.delegate.createdAt;
     try {
       if (sl.isRegistered<AuthLocalDataSource>()) {
@@ -1245,20 +1204,16 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       }
     } catch (_) {}
 
-    int activeDays = currentDay;
-    if (earliestCreatedAt.year == currentYear &&
-        earliestCreatedAt.month == currentMonth &&
-        earliestCreatedAt.day > 1) {
-      activeDays = (currentDay - earliestCreatedAt.day + 1)
-          .clamp(1, totalDaysInMonth);
-    }
-
     final leavesThisMonth = approvedLeavesCount ?? _approvedLeavesThisMonth;
-    // 4 off days per month (~1 every 7 days)
-    final offSoFar = (activeDays / 7).floor().clamp(0, 4);
-    // Working days elapsed excludes regular off days and approved leave days
-    final elapsedWorkDays = (activeDays - offSoFar - leavesThisMonth).clamp(0, 26);
-    final absent = (elapsedWorkDays - attended).clamp(0, 26);
+    final stats = MonthlyAttendanceStats.compute(
+      sessions: history,
+      month: trustedNow,
+      now: trustedNow,
+      approvedLeaveDays: leavesThisMonth,
+      createdAt: earliestCreatedAt,
+    );
+    final attended = stats.presentDays;
+    final absent = stats.absentDays;
 
     if (mounted) {
       setState(() {
@@ -1279,15 +1234,12 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
     return InkWell(
       onTap: widget.onNavigateToAttendance,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-          ),
+          color: colorScheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1299,15 +1251,12 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 Row(
                   children: [
                     Icon(
-                      Icons.insights_rounded,
+                      Symbols.insights_rounded,
                       size: 20,
                       color: colorScheme.primary,
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      isArabic
-                          ? 'ملخص الحضور والغياب ($monthName)'
-                          : 'Attendance Summary ($monthName)',
+                    Text(AppLocalizations.of(context)!.homeAttendanceSummary(monthName),
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -1319,18 +1268,14 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 if (widget.onNavigateToAttendance != null)
                   Row(
                     children: [
-                      Text(
-                        isArabic ? 'التفاصيل' : 'Details',
+                      Text(AppLocalizations.of(context)!.detailsAction,
                         style: TextStyle(
                           fontSize: 12,
                           color: colorScheme.primary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      Icon(
-                        isArabic
-                            ? Icons.chevron_left_rounded
-                            : Icons.chevron_right_rounded,
+                      Icon(Symbols.chevron_right_rounded,
                         size: 20,
                         color: colorScheme.primary,
                       ),
@@ -1338,7 +1283,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
 
             // 3 Stat Badges: Attendance, Absence, Off Days
             Row(
@@ -1347,11 +1292,11 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 Expanded(
                   child: _buildAttendanceStatPill(
                     context,
-                    title: isArabic ? 'أيام الحضور' : 'Attended',
-                    value: isArabic ? '$_attendedDays يوم' : '$_attendedDays d',
-                    icon: Icons.check_circle_rounded,
-                    containerColor: colorScheme.primaryContainer,
-                    iconColor: colorScheme.primary,
+                    title: AppLocalizations.of(context)!.statAttended,
+                    value: AppLocalizations.of(context)!.daysCount(_attendedDays),
+                    icon: Symbols.check_circle_rounded,
+                    containerColor: colorScheme.surfaceContainer,
+                    iconColor: colorScheme.onSurfaceVariant,
                     textColor: colorScheme.onSurface,
                   ),
                 ),
@@ -1361,11 +1306,13 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 Expanded(
                   child: _buildAttendanceStatPill(
                     context,
-                    title: isArabic ? 'أيام الغياب' : 'Absent',
-                    value: isArabic ? '$_absentDays يوم' : '$_absentDays d',
-                    icon: Icons.cancel_rounded,
-                    containerColor: colorScheme.errorContainer,
-                    iconColor: colorScheme.onErrorContainer,
+                    title: AppLocalizations.of(context)!.statAbsent,
+                    value: AppLocalizations.of(context)!.daysCount(_absentDays),
+                    icon: Symbols.cancel_rounded,
+                    containerColor: colorScheme.surfaceContainer,
+                    iconColor: _absentDays > 0
+                        ? colorScheme.error
+                        : colorScheme.onSurfaceVariant,
                     textColor: _absentDays > 0
                         ? colorScheme.error
                         : colorScheme.onSurface,
@@ -1377,41 +1324,36 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 Expanded(
                   child: _buildAttendanceStatPill(
                     context,
-                    title: isArabic ? 'أيام الإجازة' : 'Days Off',
-                    value: isArabic
-                        ? '$_approvedLeavesThisMonth من 4 أيام'
-                        : '$_approvedLeavesThisMonth of 4 days',
-                    icon: Icons.event_available_rounded,
-                    containerColor: colorScheme.tertiaryContainer,
-                    iconColor: colorScheme.onTertiaryContainer,
+                    title: AppLocalizations.of(context)!.statDaysOff,
+                    value: AppLocalizations.of(context)!.leavesOfFour(_approvedLeavesThisMonth),
+                    icon: Symbols.event_available_rounded,
+                    containerColor: colorScheme.surfaceContainer,
+                    iconColor: colorScheme.onSurfaceVariant,
                     textColor: colorScheme.onSurface,
                   ),
                 ),
               ],
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
 
             // Clarification Note
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(10),
+                color: colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
                   Icon(
-                    Icons.info_outline_rounded,
+                    Symbols.info_rounded,
                     size: 13,
                     color: colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 6),
                   Expanded(
-                    child: Text(
-                      isArabic
-                          ? 'نظام 26 يوم عمل شهرياً • 4 أيام إجازة مستبعدة من الغياب'
-                          : '26 work days/month • 4 off days excluded from absence',
+                    child: Text(AppLocalizations.of(context)!.workPolicyNote,
                       style: TextStyle(
                         fontSize: 10,
                         color: colorScheme.onSurfaceVariant,
@@ -1472,13 +1414,13 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         bLower.startsWith('جمله ماركت') ||
         bLower.startsWith('gomla market') ||
         bLower.startsWith('jomla market')) {
-      return isArabic ? 'جملة ماركت' : 'Gomla Market';
+      return AppLocalizations.of(context)!.chainGomlaMarket;
     }
     if (bLower.startsWith('فتح الله') || bLower.startsWith('fathalla')) {
-      return isArabic ? 'فتح الله ماركت' : 'Fathalla Market';
+      return AppLocalizations.of(context)!.chainFathallaMarket;
     }
     if (bLower.startsWith('زهران') || bLower.startsWith('zahran')) {
-      return isArabic ? 'زهران ماركت' : 'Zahran Market';
+      return AppLocalizations.of(context)!.chainZahranMarket;
     }
 
     final rClean = raw.trim();
@@ -1486,16 +1428,16 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     if (lower.contains('fathalla') ||
         rClean.contains('فتح الله') ||
         rClean.contains('فتح_الله')) {
-      return isArabic ? 'فتح الله ماركت' : 'Fathalla Market';
+      return AppLocalizations.of(context)!.chainFathallaMarket;
     }
     if (lower.contains('gomla') ||
         lower.contains('jomla') ||
         rClean.contains('جملة') ||
         rClean.contains('جمله')) {
-      return isArabic ? 'جملة ماركت' : 'Gomla Market';
+      return AppLocalizations.of(context)!.chainGomlaMarket;
     }
     if (lower.contains('zahran') || rClean.contains('زهران')) {
-      return isArabic ? 'زهران ماركت' : 'Zahran Market';
+      return AppLocalizations.of(context)!.chainZahranMarket;
     }
     return rClean;
   }
@@ -1583,11 +1525,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
+        color: colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1599,15 +1538,12 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               Row(
                 children: [
                   Icon(
-                    Icons.history_toggle_off_rounded,
+                    Symbols.history_toggle_off_rounded,
                     size: 20,
                     color: colorScheme.primary,
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    isArabic
-                        ? 'آخر الفروع والنشاط الميداني'
-                        : 'Recent Branch Activity',
+                  Text(AppLocalizations.of(context)!.recentBranchActivity,
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
@@ -1625,18 +1561,14 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          isArabic ? 'عرض السجل' : 'View Log',
+                        Text(AppLocalizations.of(context)!.viewLog,
                           style: TextStyle(
                             fontSize: 11.5,
                             color: colorScheme.primary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        Icon(
-                          isArabic
-                              ? Icons.chevron_left_rounded
-                              : Icons.chevron_right_rounded,
+                        Icon(Symbols.chevron_right_rounded,
                           size: 16,
                           color: colorScheme.primary,
                         ),
@@ -1651,7 +1583,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           // Session Items (latest 2-3 sessions)
           ..._recentSessions.take(3).map((session) {
             final rawBranchName = session.branchName ??
-                (isArabic ? 'فرع غير محدد' : 'Unknown Branch');
+                AppLocalizations.of(context)!.unknownBranch;
             final cleanBranchName = _cleanBranchName(rawBranchName);
             final orgName = _resolveOrgLabel(
               session.organizationId,
@@ -1666,7 +1598,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 DateFormat('hh:mm a', isArabic ? 'ar' : 'en').format(session.checkInTime);
             final checkOutStr = session.checkOutTime != null
                 ? DateFormat('hh:mm a', isArabic ? 'ar' : 'en').format(session.checkOutTime!)
-                : (isArabic ? 'قيد العمل' : 'Active');
+                : AppLocalizations.of(context)!.onShift;
 
             // Format date relative (اليوم، أمس، أو التاريخ)
             final now = _getTrustedNow();
@@ -1678,9 +1610,9 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 session.checkInTime.day == now.day - 1;
 
             final dateLabel = isToday
-                ? (isArabic ? 'اليوم' : 'Today')
+                ? AppLocalizations.of(context)!.today
                 : isYesterday
-                    ? (isArabic ? 'أمس' : 'Yesterday')
+                    ? AppLocalizations.of(context)!.yesterday
                     : DateFormat('EEE، d MMM', isArabic ? 'ar' : 'en').format(session.checkInTime);
 
             // Compute Duration
@@ -1689,9 +1621,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               final diff = session.checkOutTime!.difference(session.checkInTime);
               final hours = diff.inHours;
               final minutes = diff.inMinutes % 60;
-              durationLabel = isArabic
-                  ? '$hours س $minutes د'
-                  : '${hours}h ${minutes}m';
+              durationLabel = AppLocalizations.of(context)!.durationHm(hours, minutes);
             }
 
             return Container(
@@ -1700,9 +1630,6 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               decoration: BoxDecoration(
                 color: colorScheme.surface,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1725,7 +1652,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                Icons.storefront_rounded,
+                                Symbols.storefront_rounded,
                                 size: 12,
                                 color: chipFg,
                               ),
@@ -1744,16 +1671,13 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                         const SizedBox(width: 8),
                       ],
                       Icon(
-                        Icons.location_on_rounded,
+                        Symbols.location_on_rounded,
                         size: 15,
                         color: colorScheme.primary,
                       ),
                       const SizedBox(width: 4),
                       Expanded(
-                        child: Text(
-                          isArabic
-                              ? 'الفرع: $cleanBranchName'
-                              : 'Branch: $cleanBranchName',
+                        child: Text(AppLocalizations.of(context)!.branchLabel(cleanBranchName),
                           style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.bold,
@@ -1793,10 +1717,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            Icons.login_rounded,
+                          Icon(
+                            Symbols.login_rounded,
                             size: 12,
-                            color: Color(0xFF10B981),
+                            color: colorScheme.primary,
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -1813,11 +1737,9 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.logout_rounded,
+                            Symbols.logout_rounded,
                             size: 12,
-                            color: session.checkOutTime != null
-                                ? colorScheme.error
-                                : const Color(0xFF10B981),
+                            color: colorScheme.onSurfaceVariant,
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -1829,7 +1751,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                                   : FontWeight.normal,
                               color: session.checkOutTime != null
                                   ? colorScheme.onSurfaceVariant
-                                  : const Color(0xFF10B981),
+                                  : colorScheme.primary,
                             ),
                           ),
                         ],
@@ -1840,7 +1762,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.timelapse_rounded,
+                              Symbols.timelapse_rounded,
                               size: 12,
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -1875,33 +1797,23 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     required Color textColor,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-        ),
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: containerColor,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 16, color: iconColor),
-          ),
-          const SizedBox(height: 6),
+          Icon(icon, size: 20, color: iconColor),
+          const SizedBox(height: 4),
           Text(
-            title,
-            style: TextStyle(
-              fontSize: 10.5,
-              color: colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
+            value,
+            style: tt.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: textColor,
             ),
             textAlign: TextAlign.center,
             maxLines: 1,
@@ -1909,13 +1821,13 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           ),
           const SizedBox(height: 2),
           Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: textColor,
+            title,
+            style: tt.labelMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
             textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -1925,7 +1837,6 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
   Widget _buildLeavesAndRequestsCard(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
@@ -1945,18 +1856,13 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
         return Card(
           elevation: 0,
-          color: colorScheme.surface,
+          margin: EdgeInsets.zero,
+          color: colorScheme.surfaceContainer,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-            side: BorderSide(
-              color: pendingCount > 0
-                  ? Colors.amber.withValues(alpha: 0.6)
-                  : colorScheme.outlineVariant.withValues(alpha: 0.45),
-              width: pendingCount > 0 ? 1.5 : 1.0,
-            ),
+            borderRadius: BorderRadius.circular(16),
           ),
           child: InkWell(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
             onTap: () {
               if (widget.onNavigateToLeaves != null) {
                 widget.onNavigateToLeaves!();
@@ -1981,7 +1887,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Icon(
-                      Icons.event_note_rounded,
+                      Symbols.event_note_rounded,
                       size: 26,
                       color: colorScheme.primary,
                     ),
@@ -1993,10 +1899,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       children: [
                         Row(
                           children: [
-                            Text(
-                              isArabic
-                                  ? 'طلباتي (الإجازات والأعذار)'
-                                  : 'My Requests & Leaves',
+                            Text(AppLocalizations.of(context)!.reqTitle,
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 15,
@@ -2010,15 +1913,15 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.amber.shade800,
+                                  color: colorScheme.tertiaryContainer,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
-                                  '$pendingCount معلق',
-                                  style: const TextStyle(
+                                  AppLocalizations.of(context)!.pendingCountBadge(pendingCount),
+                                  style: TextStyle(
                                     fontSize: 10.5,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    color: colorScheme.onTertiaryContainer,
                                   ),
                                 ),
                               ),
@@ -2026,10 +1929,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                           ],
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          isArabic
-                              ? 'تقديم ومتابعة طلبات الإجازة والأعذار ورصيدك السنوي'
-                              : 'Submit & track your leave and excuse requests',
+                        Text(AppLocalizations.of(context)!.homeRequestsSubtitle,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                             fontSize: 12,
@@ -2039,10 +1939,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Icon(
-                    isArabic
-                        ? Icons.chevron_left_rounded
-                        : Icons.chevron_right_rounded,
+                  Icon(Symbols.chevron_right_rounded,
                     color: colorScheme.outline,
                   ),
                 ],

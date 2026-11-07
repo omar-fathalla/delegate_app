@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -6,6 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/core/services/branch_display_cache.dart';
+import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/tashil_button_group.dart';
@@ -99,7 +102,7 @@ class HRAttendanceRecord {
       return checkOutTime!.difference(checkInTime!);
     }
     if (isAutoCheckOut) {
-      return const Duration(hours: 9);
+      return kAttendanceAutoCloseAfter;
     }
     // إذا كان المندوب على رأس العمل اليوم ولم ينصرف بعد
     final now = DateTime.now();
@@ -133,7 +136,7 @@ class HRAttendanceRecord {
       }
       return 'لم يسجل انصراف';
     }
-    final effectiveOut = checkOutTime ?? checkInTime!.add(const Duration(hours: 9));
+    final effectiveOut = checkOutTime ?? checkInTime!.add(kAttendanceAutoCloseAfter);
     final d = effectiveOut.difference(checkInTime!);
     final hours = d.inHours;
     final minutes = d.inMinutes.remainder(60);
@@ -287,6 +290,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       // 1. Load branches to calculate geofence distances accurately
       final branchesSnap =
           await FirebaseFirestore.instance.collection('branches').get();
+      BranchDisplayCache.instance.registerSnapshot(branchesSnap);
       final Map<String, Branch> branchesMap = {};
       for (final doc in branchesSnap.docs) {
         final b = BranchModel.fromFirestore(doc);
@@ -540,16 +544,16 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
           }
         }
 
-        // قاعدة الـ 9 ساعات: إغلاق الانصراف ديناميكياً إذا انقضت الوردية (9 ساعات) أو كان تاريخاً سابقاً
+        // قاعدة الإغلاق التلقائي: إغلاق الانصراف ديناميكياً إذا انقضت الوردية (11.5 ساعة) أو كان تاريخاً سابقاً
         if (checkIn != null && checkOut == null) {
           final now = DateTime.now();
           final isPastDate = _selectedDate.isBefore(DateTime(now.year, now.month, now.day));
-          final isElapsed9Hours = now.difference(checkIn) >= const Duration(hours: 9);
+          final isElapsedAutoClose = now.difference(checkIn) >= kAttendanceAutoCloseAfter;
 
-          if (isPastDate || isElapsed9Hours) {
-            checkOut = checkIn.add(const Duration(hours: 9));
+          if (isPastDate || isElapsedAutoClose) {
+            checkOut = checkIn.add(kAttendanceAutoCloseAfter);
             isAutoCheckOut = true;
-            autoCheckOutReason = 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي';
+            autoCheckOutReason = kAttendanceAutoCloseReasonAr;
           }
         }
 
@@ -1372,7 +1376,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     value: record.distanceMeters != null
                         ? '${record.distanceMeters!.toStringAsFixed(1)} متر (${record.distanceMeters! <= 50 ? 'نطاق دقيق < 50م' : 'خارج النطاق الدقيق'})'
                         : 'غير متوفرة',
-                    subtitle: 'الفرع المستهدف: ${record.branchName ?? 'غير محدد'}',
+                    subtitle: 'الفرع المستهدف: ${BranchDisplayCache.instance.displayName(record.branchName, fallback: 'غير محدد')}',
                     theme: theme,
                     colorScheme: colorScheme,
                   ),
@@ -1732,7 +1736,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     icon: Icons.store_rounded,
                     iconColor: colorScheme.primary,
                     title: 'الفرع المستهدف',
-                    value: branchName ?? 'غير محدد',
+                    value: BranchDisplayCache.instance.displayName(branchName, fallback: 'غير محدد'),
                     subtitle: (matchedBranch != null && matchedBranch.latitude != 0.0)
                         ? 'إحداثيات الفرع: ${matchedBranch.latitude.toStringAsFixed(6)}, ${matchedBranch.longitude.toStringAsFixed(6)}\nنصف القطر المعتمد: ${matchedBranch.geofenceRadius.toInt()} متر'
                         : 'لم يتم العثور على إحداثيات مسجلة للفرع',
@@ -3003,7 +3007,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     bool isFullWidth = false,
   }) {
     final isSelectedAll = _selectedBranch == 'all';
-    final displayText = isSelectedAll ? 'جميع الفروع' : _selectedBranch;
+    final displayText = isSelectedAll ? 'جميع الفروع' : BranchDisplayCache.instance.displayName(_selectedBranch);
 
     return PopupMenuButton<String>(
       tooltip: 'تصفية حسب الفرع',
@@ -3069,7 +3073,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        b,
+                        BranchDisplayCache.instance.displayName(b),
                         style: TextStyle(
                           fontWeight: isSelected
                               ? FontWeight.bold
@@ -3322,13 +3326,11 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         size: 16, color: colorScheme.primary),
                     const SizedBox(width: 6),
                     Expanded(
-                      child: Text(
-                        record.branchName!,
+                      child: BranchNameLabel(
+                        branchName: record.branchName,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -3372,7 +3374,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     if (record.isAutoCheckOut) ...[
                       const SizedBox(width: 6),
                       Tooltip(
-                        message: 'تم إغلاق الانصراف تلقائياً بعد مرور 9 ساعات على بداية الوردية لعدم تسجيل الانصراف يدوياً',
+                        message: 'تم إغلاق الانصراف تلقائياً بعد مرور 11.5 ساعة على بداية الوردية لعدم تسجيل الانصراف يدوياً',
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
@@ -3386,7 +3388,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                               Icon(Icons.auto_mode_rounded, size: 12, color: Colors.amber[800]),
                               const SizedBox(width: 3),
                               Text(
-                                'إغلاق تلقائي (9 س)',
+                                'إغلاق تلقائي (11.5 س)',
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: Colors.amber[900],
                                   fontWeight: FontWeight.bold,
@@ -3822,14 +3824,12 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                       Expanded(
                         child: Tooltip(
                           message: record.branchName ?? 'غير محدد',
-                          child: Text(
-                            record.branchName ?? 'غير محدد',
+                          child: BranchNameLabel(
+                            branchName: record.branchName,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                               fontSize: 12.5,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ),
@@ -4091,7 +4091,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
               // 2. الانصراف (Check-out)
               Tooltip(
                 message: record.isAutoCheckOut
-                    ? 'تم إغلاق الانصراف تلقائياً بعد مرور 9 ساعات على بداية الوردية لعدم تسجيل الانصراف يدوياً ($checkOutStr)'
+                    ? 'تم إغلاق الانصراف تلقائياً بعد مرور 11.5 ساعة على بداية الوردية لعدم تسجيل الانصراف يدوياً ($checkOutStr)'
                     : (record.checkOutTime != null
                         ? 'وقت الانصراف: $checkOutStr'
                         : 'لم يسجل انصراف بعد'),
@@ -4133,7 +4133,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                           border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
                         ),
                         child: Text(
-                          'تلقائي (9 س)',
+                          'تلقائي (11.5 س)',
                           style: TextStyle(
                             fontSize: 9.5,
                             fontWeight: FontWeight.bold,

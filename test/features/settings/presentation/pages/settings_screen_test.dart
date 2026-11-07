@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -84,8 +85,8 @@ void main() {
 
       // Language tile is visible
       expect(find.byIcon(Icons.translate_rounded), findsOneWidget);
-      // Dark mode switch is visible
-      expect(find.byType(Switch), findsOneWidget);
+      // Appearance (theme mode) tile is visible
+      expect(find.byIcon(Symbols.dark_mode_rounded), findsOneWidget);
       // Logout tile is visible
       expect(find.byIcon(Icons.logout_rounded), findsAtLeastNWidgets(1));
     });
@@ -100,17 +101,22 @@ void main() {
       expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
     });
 
-    testWidgets('dark mode switch toggles theme', (WidgetTester tester) async {
+    testWidgets('appearance sheet sets System/Light/Dark', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(buildSettingsScreen());
       await tester.pumpAndSettle();
-
       final themeCubit = sl<ThemeCubit>();
-      final initialDark = themeCubit.state.isDarkMode;
 
-      await tester.tap(find.byType(Switch));
-      await tester.pumpAndSettle();
-
-      expect(themeCubit.state.isDarkMode, !initialDark);
+      for (final m in [ThemeMode.dark, ThemeMode.light, ThemeMode.system]) {
+        final tile = find.byIcon(Symbols.dark_mode_rounded).first;
+        await tester.ensureVisible(tile);
+        await tester.tap(tile);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(ValueKey('theme_mode_${m.name}')));
+        await tester.pumpAndSettle();
+        expect(themeCubit.state.themeMode, m);
+      }
     });
 
     testWidgets('tapping logout shows confirmation dialog', (
@@ -128,7 +134,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Confirmation modal should appear
-      expect(find.textContaining('Are you sure you want to logout?'), findsOneWidget);
+      expect(find.textContaining('Log out?'), findsOneWidget);
     });
 
     testWidgets('logout dialog has cancel and confirm buttons', (
@@ -145,7 +151,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Cancel'), findsOneWidget);
-      expect(find.text('Logout'), findsWidgets);
+      expect(find.text('Log out'), findsWidgets);
     });
 
     testWidgets('tapping cancel closes logout dialog', (
@@ -161,12 +167,12 @@ void main() {
       await tester.tap(logoutTile);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Are you sure you want to logout?'), findsOneWidget);
+      expect(find.textContaining('Log out?'), findsOneWidget);
 
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Are you sure you want to logout?'), findsNothing);
+      expect(find.textContaining('Log out?'), findsNothing);
     });
 
     testWidgets('color picker circles are rendered', (

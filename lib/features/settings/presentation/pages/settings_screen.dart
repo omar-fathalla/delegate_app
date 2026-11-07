@@ -7,6 +7,7 @@ import 'package:delegate_app/l10n/app_localizations.dart';
 
 import 'package:delegate_app/main.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
 import 'package:delegate_app/config/theme/color_schemes.dart';
@@ -41,7 +42,7 @@ class SettingsScreen extends StatelessWidget {
               centerTitle: false,
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back_rounded),
-                tooltip: isArabic ? 'رجوع' : 'Back',
+                tooltip: AppLocalizations.of(context)!.backAction,
                 onPressed: () {
                   if (Navigator.of(context).canPop()) {
                     Navigator.of(context).pop();
@@ -106,24 +107,13 @@ class SettingsScreen extends StatelessWidget {
                           ),
                           _buildSettingsTile(
                             context: context,
-                            icon: Icons.dark_mode_rounded,
-                            title: l10n.darkMode,
-                            subtitle:
-                                context.watch<ThemeCubit>().state.isDarkMode
-                                    ? 'On'
-                                    : 'Off',
-                            trailing: Switch(
-                              value:
-                                  context.watch<ThemeCubit>().state.isDarkMode,
-                              onChanged: (val) =>
-                                  context.read<ThemeCubit>().toggleTheme(),
-                              activeTrackColor: Theme.of(
-                                context,
-                              ).colorScheme.primary.withValues(alpha: 0.5),
-                              activeThumbColor: Theme.of(
-                                context,
-                              ).colorScheme.primary,
+                            icon: Symbols.dark_mode_rounded,
+                            title: l10n.themeModeTitle,
+                            subtitle: _themeModeLabel(
+                              l10n,
+                              context.watch<ThemeCubit>().state.themeMode,
                             ),
+                            onTap: () => _showThemeModeSheet(context),
                           ),
                         ],
                       ),
@@ -133,7 +123,7 @@ class SettingsScreen extends StatelessWidget {
                     // Section: Account
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _buildSectionHeader(context, l10n.account),
+                      child: _buildSectionHeader(context, l10n.settingsGeneral),
                     ),
                     const SizedBox(height: 12),
 
@@ -160,7 +150,7 @@ class SettingsScreen extends StatelessWidget {
                           _buildSettingsTile(
                             context: context,
                             icon: Icons.feedback_rounded,
-                            title: isArabic ? 'إرسال مقترح' : 'Submit Feedback',
+                            title: AppLocalizations.of(context)!.sendFeedback,
                             onTap: () => context.push(
                               '/submit-feedback',
                               extra: delegate,
@@ -174,7 +164,7 @@ class SettingsScreen extends StatelessWidget {
                           _buildSettingsTile(
                             context: context,
                             icon: Icons.star_rate_rounded,
-                            title: isArabic ? 'تقييم التطبيق على المتجر' : 'Rate Application',
+                            title: AppLocalizations.of(context)!.rateTheApp,
                             onTap: () => sl<ReviewService>().requestManualReview(),
                           ),
                           Divider(
@@ -186,10 +176,8 @@ class SettingsScreen extends StatelessWidget {
                             context: context,
                             icon: Icons.history_rounded,
                             title: delegate.role == UserRole.superAdmin
-                                ? (isArabic
-                                    ? 'إدارة المقترحات'
-                                    : 'Manage Feedbacks')
-                                : (isArabic ? 'مقترحاتي' : 'My Feedbacks'),
+                                ? AppLocalizations.of(context)!.manageFeedback
+                                : AppLocalizations.of(context)!.myFeedback,
                             onTap: () {
                               if (delegate.role == UserRole.superAdmin) {
                                 context.push('/admin/feedbacks');
@@ -207,7 +195,7 @@ class SettingsScreen extends StatelessWidget {
                             _buildSettingsTile(
                               context: context,
                               icon: Icons.camera_alt_rounded,
-                              title: isArabic ? 'أذونات التصوير المتاحة' : 'Photo Permissions',
+                              title: AppLocalizations.of(context)!.photoPermissions2,
                               onTap: () => context.push('/photo-permissions/delegate', extra: delegate),
                             ),
                             Divider(
@@ -217,17 +205,8 @@ class SettingsScreen extends StatelessWidget {
                             ),
                           ],
 
-                          _buildSettingsTile(
-                            context: context,
-                            icon: Icons.help_outline_rounded,
-                            title: l10n.helpCenter,
-                            onTap: () {},
-                          ),
-                          Divider(
-                            height: 1,
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                            indent: 64,
-                          ),
+                          // Help center hidden: no destination exists yet
+                          // (was a dead `onTap: () {}`).
                           _buildSettingsTile(
                             context: context,
                             icon: Icons.logout_rounded,
@@ -257,8 +236,7 @@ class SettingsScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              isArabic ? 'ألوان التطبيق' : 'App Colors',
+                            Text(AppLocalizations.of(context)!.appColor,
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
@@ -319,6 +297,62 @@ class SettingsScreen extends StatelessWidget {
           fontSize: 14,
           fontWeight: FontWeight.bold,
           color: Theme.of(context).colorScheme.primary,
+        ),
+      ),
+    );
+  }
+
+  String _themeModeLabel(AppLocalizations l10n, ThemeMode mode) =>
+      switch (mode) {
+        ThemeMode.system => l10n.themeModeSystem,
+        ThemeMode.light => l10n.themeModeLight,
+        ThemeMode.dark => l10n.themeModeDark,
+      };
+
+  Future<void> _showThemeModeSheet(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cubit = context.read<ThemeCubit>();
+    return showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: BlocBuilder<ThemeCubit, ThemeState>(
+          bloc: cubit,
+          builder: (_, state) => RadioGroup<ThemeMode>(
+            groupValue: state.themeMode,
+            onChanged: (m) {
+              if (m == null) return;
+              cubit.setThemeMode(m);
+              Navigator.of(sheetContext).pop();
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                  child: Text(
+                    l10n.themeModeTitle,
+                    style: Theme.of(sheetContext).textTheme.titleLarge,
+                  ),
+                ),
+                for (final (m, icon) in [
+                  (ThemeMode.system, Symbols.brightness_auto_rounded),
+                  (ThemeMode.light, Symbols.light_mode_rounded),
+                  (ThemeMode.dark, Symbols.dark_mode_rounded),
+                ])
+                  RadioListTile<ThemeMode>(
+                    key: ValueKey('theme_mode_${m.name}'),
+                    value: m,
+                    secondary: Icon(icon, fill: state.themeMode == m ? 1 : 0),
+                    title: Text(_themeModeLabel(l10n, m)),
+                    subtitle: m == ThemeMode.system
+                        ? Text(l10n.themeModeSystemHint)
+                        : null,
+                  ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
         ),
       ),
     );

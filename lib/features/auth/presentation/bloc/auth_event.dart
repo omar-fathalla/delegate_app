@@ -11,15 +11,17 @@ class LoginRequested extends AuthEvent {
   final String phoneNumber;
   final String password;
   final bool rememberMe;
+  final LoginMode mode;
 
   const LoginRequested({
     required this.phoneNumber,
     required this.password,
     this.rememberMe = false,
+    this.mode = LoginMode.auto,
   });
 
   @override
-  List<Object> get props => [phoneNumber, password, rememberMe];
+  List<Object> get props => [phoneNumber, password, rememberMe, mode];
 }
 
 class CheckAutoLoginRequested extends AuthEvent {}

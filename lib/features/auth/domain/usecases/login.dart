@@ -12,6 +12,10 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
 
   @override
   Future<Either<Failure, List<Delegate>>> call(LoginParams params) async {
+    // The login screen picks the account type, so each mode runs only its
+    // own path. [LoginMode.auto] keeps the old delegate-then-staff chain for
+    // callers that do not choose.
+    if (params.mode == LoginMode.staff) return _loginStaff(params);
     final delegateResult = await repository.loginDelegate(
       phoneNumber: params.phoneNumber,
       nationalId: params.password,
@@ -21,6 +25,7 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
     // rate-limited, and outages stay on the delegate path.
     return delegateResult.fold((failure) async {
       if (failure is! DelegateCredentialsFailure) return Left(failure);
+      if (params.mode == LoginMode.delegate) return Left(failure);
       return _loginStaff(params);
     }, (delegates) => _finish(delegates, params));
   }
@@ -60,9 +65,11 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
       }
 
       if (matched.isEmpty) {
-        return const Left(
+        return Left(
           AuthFailure(
-            'رقم الهاتف أو الرقم القومي غير صحيح',
+            params.mode == LoginMode.staff
+                ? 'رقم الهاتف أو كلمة المرور غير صحيحة'
+                : 'رقم الهاتف أو الرقم القومي غير صحيح',
             'invalid_credentials',
           ),
         );
@@ -83,19 +90,33 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
   }
 }
 
+/// Account type chosen on the login screen.
+enum LoginMode {
+  /// Phone + national ID through `delegateLoginV2` only.
+  delegate,
+
+  /// Phone + password through the staff lookup and Firebase Auth only.
+  staff,
+
+  /// Delegate first, then staff on a credential miss (legacy behavior).
+  auto,
+}
+
 class LoginParams extends Equatable {
   final String phoneNumber;
 
   /// National ID for delegates. Password for admin and other roles.
   final String password;
   final bool rememberMe;
+  final LoginMode mode;
 
   const LoginParams({
     required this.phoneNumber,
     required this.password,
     this.rememberMe = false,
+    this.mode = LoginMode.auto,
   });
 
   @override
-  List<Object> get props => [phoneNumber, password, rememberMe];
+  List<Object> get props => [phoneNumber, password, rememberMe, mode];
 }

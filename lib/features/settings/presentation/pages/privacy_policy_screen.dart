@@ -235,6 +235,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     value,
+                    // URL / e-mail / phone are LTR runs (bidi fix in RTL).
+                    textDirection: TextDirection.ltr,
                     style: TextStyle(
                       fontSize: 14,
                       color: theme.colorScheme.onSurface,

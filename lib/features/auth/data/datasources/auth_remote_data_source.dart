@@ -508,7 +508,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     final isCompanyAdmin = normRole == 'company_admin' ||
         normRole == 'companyadmin' ||
         normRole == 'admin';
-    final isSupervisor = normRole == 'supervisor';
+    final isSupervisor = isSupervisorRole(userRole);
     final isMarketing = normRole == 'marketing';
     final isMarketingPromotion = normRole == 'marketing_promotion' ||
         normRole == 'marketingpromotion';
@@ -615,8 +615,26 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     return '';
   }
 
+  /// True for `supervisor` and company supervisor spellings such as
+  /// `company_supervisor`, `companySupervisor`, and `company-supervisor`.
+  static bool isSupervisorRole(String role) {
+    final norm =
+        role.trim().toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+    return norm == 'supervisor' ||
+        norm == 'company_supervisor' ||
+        norm == 'companysupervisor';
+  }
+
+  @visibleForTesting
+  static int staffRoleWeightForTest(String role) => _staffRoleWeight(role);
+
+  /// Email for a staff phone, for the "forgot password" flow. Null when the
+  /// lookup is unavailable or the phone is not a staff account. Read-only.
+  Future<String?> lookupStaffEmail(String phoneNumber) =>
+      _staffEmailForPhone(phoneNumber);
+
   static int _staffRoleWeight(String role) {
-    final norm = role.toLowerCase().replaceAll('-', '_');
+    final norm = role.trim().toLowerCase().replaceAll('-', '_');
     if (norm == 'super_admin' || norm == 'superadmin') return 100;
     if (norm == 'technical_support' ||
         norm == 'technicalsupport' ||
@@ -641,7 +659,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         norm == 'branchesmarketingmanager') {
       return 65;
     }
-    if (norm == 'supervisor') return 60;
+    if (isSupervisorRole(norm)) return 60;
     if (norm == 'marketing' ||
         norm == 'marketing_promotion' ||
         norm == 'marketingpromotion') {

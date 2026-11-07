@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/widgets/offline_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -25,7 +26,8 @@ import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/core/widgets/universal_app_header.dart';
 import 'package:delegate_app/core/widgets/app_logout_modal.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:delegate_app/main.dart';
+import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 class MainScreen extends StatefulWidget {
   final Delegate delegate;
@@ -108,47 +110,8 @@ class _MainScreenState extends State<MainScreen> {
     final l10n = AppLocalizations.of(context)!;
     final delegate = widget.delegate;
     final colorScheme = Theme.of(context).colorScheme;
-    final isArabic = localeProvider.isArabic;
 
-    return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerLowest,
-      appBar: UniversalAppHeader(
-        delegate: delegate,
-        extraActions: [
-          // Notification Bell with Badge
-          BlocProvider(
-            create: (_) => di.sl<NotificationBloc>()
-              ..add(
-                SubscribeToUnreadCount(
-                  delegateUid: delegate.uid,
-                  organizationId: delegate.organizationUID,
-                  phoneNumber: delegate.phoneNumber,
-                  userRole: delegate.role.name,
-                  accountCreatedAt: delegate.createdAt,
-                ),
-              ),
-            child: BlocBuilder<NotificationBloc, NotificationState>(
-              builder: (context, state) {
-                final unreadCount = state is NotificationLoaded
-                    ? state.unreadCount
-                    : 0;
-
-                return Badge(
-                  label: Text('$unreadCount'),
-                  isLabelVisible: unreadCount > 0,
-                  child: IconButton(
-                    icon: const Icon(Icons.notifications_rounded),
-                    tooltip: l10n.notifications,
-                    onPressed: () {
-                      context.push('/notifications', extra: delegate);
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-        onMenuSelected: (value) {
+    void onMenu(String value) {
           if (value == 'profile') {
             context.push('/user-profile', extra: delegate);
           } else if (value == 'penalties') {
@@ -217,154 +180,78 @@ class _MainScreenState extends State<MainScreen> {
               ),
             );
           }
-        },
-        menuItems: [
-          PopupMenuItem<String>(
-            value: 'profile',
-            child: Row(
-              children: [
-                const Icon(Icons.person_rounded),
-                const SizedBox(width: 12),
-                Text(l10n.profile),
-              ],
-            ),
-          ),
-          PopupMenuItem<String>(
-            value: 'penalty_rules_catalog',
-            child: Row(
-              children: [
-                Icon(Icons.menu_book_rounded, color: colorScheme.primary),
-                const SizedBox(width: 12),
-                const Text('لائحة الغرامات'),
-              ],
-            ),
-          ),
-          if (delegate.role == UserRole.superAdmin) ...[
-            PopupMenuItem<String>(
-              value: 'manage_organizations',
-              child: Row(
-                children: [
-                  Icon(Icons.corporate_fare_rounded, color: colorScheme.primary),
-                  const SizedBox(width: 12),
-                  const Text('إدارة المنظمات والسلاسل'),
-                ],
-              ),
-            ),
-          ],
-          if (delegate.role == UserRole.superAdmin ||
-              delegate.role == UserRole.technicalSupport ||
-              delegate.role == UserRole.organizationAdmin) ...[
-            PopupMenuItem<String>(
-              value: 'delegate_subscriptions',
-              child: Row(
-                children: [
-                  Icon(Icons.how_to_reg_rounded, color: colorScheme.tertiary),
-                  const SizedBox(width: 12),
-                  const Text('اشتراكات واعتماد المناديب'),
-                ],
-              ),
-            ),
-          ],
-          if (_allDelegates.length > 1) ...[
-            PopupMenuItem<String>(
-              value: 'org_switch',
-              child: Row(
-                children: [
-                  const Icon(Icons.swap_horiz_rounded),
-                  const SizedBox(width: 12),
-                  Text(isArabic ? 'تبديل المنظمة' : 'Switch Organization'),
-                ],
-              ),
-            ),
-          ],
-          PopupMenuItem<String>(
-            value: 'tasks',
-            child: Row(
-              children: [
-                Icon(Icons.task_alt_rounded, color: colorScheme.primary),
-                const SizedBox(width: 12),
-                Text(l10n.tasks),
-              ],
-            ),
-          ),
-          // المخالفات والغرامات دائماً فوق تسجيل الخروج لتطابق اللون والتنسيق
-          PopupMenuItem<String>(
-            value: 'penalties',
-            child: Row(
-              children: [
-                Icon(Icons.gavel_rounded, color: colorScheme.error),
-                const SizedBox(width: 12),
-                Text(
-                  'المخالفات والغرامات',
-                  style: TextStyle(color: colorScheme.error),
+        }
+
+    return Scaffold(
+      backgroundColor: colorScheme.surface,
+      appBar: UniversalAppHeader(
+        delegate: delegate,
+        extraActions: [
+          // Notification Bell with Badge
+          BlocProvider(
+            create: (_) => di.sl<NotificationBloc>()
+              ..add(
+                SubscribeToUnreadCount(
+                  delegateUid: delegate.uid,
+                  organizationId: delegate.organizationUID,
+                  phoneNumber: delegate.phoneNumber,
+                  userRole: delegate.role.name,
+                  accountCreatedAt: delegate.createdAt,
                 ),
-              ],
-            ),
-          ),
-          PopupMenuItem<String>(
-            value: 'logout',
-            child: Row(
-              children: [
-                Icon(Icons.logout_rounded, color: colorScheme.error),
-                const SizedBox(width: 12),
-                Text(l10n.logout, style: TextStyle(color: colorScheme.error)),
-              ],
-            ),
-          ),
-          const PopupMenuDivider(),
-          // الإعدادات دائماً في أسفل القائمة
-          PopupMenuItem<String>(
-            value: 'settings',
-            child: Row(
-              children: [
-                const Icon(Icons.settings_rounded),
-                const SizedBox(width: 12),
-                Text(l10n.settings),
-              ],
+              ),
+            child: BlocBuilder<NotificationBloc, NotificationState>(
+              builder: (context, state) {
+                final unreadCount = state is NotificationLoaded
+                    ? state.unreadCount
+                    : 0;
+
+                return Badge(
+                  label: Text('$unreadCount'),
+                  isLabelVisible: unreadCount > 0,
+                  child: IconButton(
+                    icon: const Icon(Symbols.notifications_rounded),
+                    tooltip: l10n.notifications,
+                    onPressed: () {
+                      context.push('/notifications', extra: delegate);
+                    },
+                  ),
+                );
+              },
             ),
           ),
         ],
+        useDrawer: true,
+        onMenuSelected: onMenu,
+        menuItems: const [],
       ),
-          body: _buildBody(delegate),
-          bottomNavigationBar: Container(
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainer,
-              border: Border(
-                top: BorderSide(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-                  width: 0.8,
-                ),
+      drawer: _buildDrawer(context, delegate, l10n, onMenu),
+          body: Column(
+            children: [
+              OfflineBanner(onRetry: () => setState(() {})),
+              Expanded(child: _buildBody(delegate)),
+            ],
+          ),
+          bottomNavigationBar: M3NavBar(
+            selectedIndex: _currentIndex,
+            onSelected: (index) {
+              setState(() {
+                _currentIndex = index;
+                _initializedTabs.add(index); // Mark tab as visited
+              });
+            },
+            destinations: [
+              M3NavDestination(icon: Symbols.home_rounded, label: l10n.home),
+              M3NavDestination(
+                  icon: Symbols.schedule_rounded, label: l10n.attendance),
+              M3NavDestination(
+                icon: Symbols.event_note_rounded,
+                label: l10n.navRequests,
               ),
-            ),
-            child: NavigationBar(
-              backgroundColor: colorScheme.surfaceContainer,
-              elevation: 0,
-              selectedIndex: _currentIndex,
-              onDestinationSelected: (index) {
-                setState(() {
-                  _currentIndex = index;
-                  _initializedTabs.add(index); // Mark tab as visited
-                });
-              },
-              destinations: [
-                NavigationDestination(
-                  icon: const Icon(Icons.home_rounded),
-                  label: l10n.home,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.access_time_filled_rounded),
-                  label: l10n.attendance,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.event_note_rounded),
-                  label: isArabic ? 'طلباتي' : 'My Requests',
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.photo_library_rounded),
-                  label: isArabic ? 'تقارير الصور' : 'Photo Report',
-                ),
-              ],
-            ),
+              M3NavDestination(
+                icon: Symbols.photo_library_rounded,
+                label: l10n.navPhotoReports,
+              ),
+            ],
           ),
         );
   }
@@ -411,7 +298,11 @@ class _MainScreenState extends State<MainScreen> {
         if (_initializedTabs.contains(3))
           BlocProvider(
             create: (context) => di.sl<PhotoPermissionBloc>(),
-            child: MonthlyPhotoReportScreen(delegate: delegate),
+            child: MonthlyPhotoReportScreen(
+              delegate: delegate,
+              // Single title: the workspace app bar; refresh = pull-to-refresh.
+              showAppBar: false,
+            ),
           )
         else
           const SizedBox.shrink(),
@@ -428,7 +319,7 @@ class _MainScreenState extends State<MainScreen> {
           : delegate.organizationName;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('تم التبديل بنجاح إلى: $orgLabel'),
+          content: Text(AppLocalizations.of(context)!.switchedToOrg(orgLabel)),
           backgroundColor: Theme.of(context).colorScheme.primary,
           behavior: SnackBarBehavior.floating,
         ),
@@ -454,8 +345,8 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _showOrgSwitcher(BuildContext context, ColorScheme colorScheme) {
-    final isArabic = localeProvider.isArabic;
     final currentDelegate = widget.delegate;
+    final l10n = AppLocalizations.of(context)!;
 
     showM3Dialog(
       context: context,
@@ -468,10 +359,10 @@ class _MainScreenState extends State<MainScreen> {
           contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           title: Row(
             children: [
-              Icon(Icons.swap_horiz_rounded, color: colorScheme.primary),
+              Icon(Symbols.swap_horiz_rounded, color: colorScheme.primary),
               const SizedBox(width: 12),
               Text(
-                isArabic ? 'تبديل المنظمة' : 'Switch Organization',
+                l10n.switchOrganization,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -489,13 +380,13 @@ class _MainScreenState extends State<MainScreen> {
                 ? delegate.companyName.trim()
                 : (delegate.role == UserRole.marketing ||
                         delegate.role == UserRole.marketingPromotion
-                    ? (isArabic ? 'إدارة التسويق' : 'Marketing Department')
+                    ? AppLocalizations.of(context)!.orgMarketing
                     : (delegate.role == UserRole.admin ||
                             delegate.role == UserRole.superAdmin ||
                             delegate.role == UserRole.organizationAdmin
-                        ? (isArabic ? 'لوحة الإدارة' : 'Admin Panel')
+                        ? AppLocalizations.of(context)!.orgAdminPanel
                         : (delegate.role == UserRole.accountant
-                            ? (isArabic ? 'الحسابات والمالية' : 'Accounting')
+                            ? AppLocalizations.of(context)!.orgAccounting
                             : '')));
 
             return Padding(
@@ -513,7 +404,7 @@ class _MainScreenState extends State<MainScreen> {
                 ),
                 child: ListTile(
                   leading: Icon(
-                    Icons.business_rounded,
+                    Symbols.business_rounded,
                     color: isCurrentOrg
                         ? colorScheme.primary
                         : colorScheme.onSurfaceVariant,
@@ -521,7 +412,7 @@ class _MainScreenState extends State<MainScreen> {
                   title: Text(
                     delegate.organizationName.isNotEmpty
                         ? delegate.organizationName
-                        : 'منظمة غير محددة',
+                        : AppLocalizations.of(context)!.unknownOrganization,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -538,14 +429,14 @@ class _MainScreenState extends State<MainScreen> {
                         )
                       : null,
                   trailing: isCurrentOrg
-                      ? Icon(Icons.check_circle_rounded, color: colorScheme.primary)
+                      ? Icon(Symbols.check_circle_rounded, color: colorScheme.primary)
                       : null,
                   onTap: () {
                     Navigator.pop(dialogContext);
                     if (isCurrentOrg) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('أنت تعمل بالفعل ضمن هذه المنظمة حالياً.'),
+                        SnackBar(
+                          content: Text(AppLocalizations.of(context)!.alreadyInOrg),
                           behavior: SnackBarBehavior.floating,
                         ),
                       );
@@ -559,6 +450,91 @@ class _MainScreenState extends State<MainScreen> {
           }).toList(),
         );
       },
+    );
+  }
+
+  Widget _buildDrawer(
+    BuildContext context,
+    Delegate delegate,
+    AppLocalizations l10n,
+    void Function(String) onMenu,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+    final role = delegate.role;
+    final entries = <(String, IconData, String)>[
+      ('profile', Symbols.person_rounded, l10n.profile),
+      ('tasks', Symbols.task_alt_rounded, l10n.tasks),
+      ('penalty_rules_catalog', Symbols.menu_book_rounded, l10n.violationsPolicy),
+      ('penalties', Symbols.gavel_rounded, l10n.myViolations),
+      if (role == UserRole.superAdmin)
+        ('manage_organizations', Symbols.corporate_fare_rounded,
+            l10n.manageOrganizationsChains),
+      if (role == UserRole.superAdmin ||
+          role == UserRole.technicalSupport ||
+          role == UserRole.organizationAdmin)
+        ('delegate_subscriptions', Symbols.how_to_reg_rounded,
+            l10n.delegateSubscriptionsMenu),
+      if (_allDelegates.length > 1)
+        ('org_switch', Symbols.swap_horiz_rounded, l10n.switchOrganization),
+      ('settings', Symbols.settings_rounded, l10n.settings),
+    ];
+    final name = delegate.fullName.trim().isEmpty
+        ? l10n.defaultUserName
+        : delegate.fullName.trim();
+
+    return NavigationDrawer(
+      selectedIndex: null,
+      onDestinationSelected: (i) {
+        Navigator.of(context).pop();
+        if (i < entries.length) {
+          onMenu(entries[i].$1);
+        } else {
+          onMenu('logout');
+        }
+      },
+      children: [
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(28, 16, 16, 16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: cs.primaryContainer,
+                foregroundColor: cs.onPrimaryContainer,
+                child: Text(name.characters.first),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 28),
+          child: Divider(),
+        ),
+        for (final e in entries.take(entries.length - 1))
+          NavigationDrawerDestination(icon: Icon(e.$2), label: Text(e.$3)),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 28, vertical: 8),
+          child: Divider(),
+        ),
+        NavigationDrawerDestination(
+          icon: Icon(entries.last.$2),
+          label: Text(entries.last.$3),
+        ),
+        // Red is reserved for the one destructive action.
+        NavigationDrawerDestination(
+          icon: Icon(Symbols.logout_rounded, color: cs.error),
+          label: Text(l10n.logout, style: TextStyle(color: cs.error)),
+        ),
+      ],
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/feedback/domain/entities/feedback_entity.dart';
@@ -32,7 +33,7 @@ class _MyFeedbacksScreenState extends State<MyFeedbacksScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isArabic ? 'مقترحاتي' : 'My Feedbacks'),
+        title: Text(AppLocalizations.of(context)!.myFeedback),
         centerTitle: true,
       ),
       body: BlocBuilder<FeedbackBloc, FeedbackState>(
@@ -65,7 +66,7 @@ class _MyFeedbacksScreenState extends State<MyFeedbacksScreen> {
                       );
                     },
                     icon: const Icon(Icons.refresh),
-                    label: Text(isArabic ? 'إعادة المحاولة' : 'Retry'),
+                    label: Text(AppLocalizations.of(context)!.retry),
                   ),
                 ],
               ),
@@ -84,17 +85,11 @@ class _MyFeedbacksScreenState extends State<MyFeedbacksScreen> {
                       color: theme.colorScheme.primary.withValues(alpha: 0.5),
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      isArabic
-                          ? 'لم ترسل أي مقترحات بعد'
-                          : 'No feedbacks submitted yet',
+                    Text(AppLocalizations.of(context)!.noFeedbackYet,
                       style: theme.textTheme.titleMedium,
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      isArabic
-                          ? 'ابدأ بإرسال مقترحك الأول!'
-                          : 'Start by submitting your first feedback!',
+                    Text(AppLocalizations.of(context)!.sendFirstFeedback,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurface.withValues(
                           alpha: 0.6,
@@ -277,8 +272,7 @@ class _FeedbackCard extends StatelessWidget {
                           color: theme.colorScheme.primary,
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          isArabic ? 'رد الإدارة:' : 'Admin Response:',
+                        Text(AppLocalizations.of(context)!.adminResponse,
                           style: theme.textTheme.labelSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: theme.colorScheme.primary,

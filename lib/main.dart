@@ -18,6 +18,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 
 import 'package:delegate_app/config/theme/app_theme.dart';
 import 'package:delegate_app/config/routes/app_router.dart';
@@ -78,6 +79,8 @@ Future<void> bootstrapDelegateAppForPatrol() async {
 
   WidgetsFlutterBinding.ensureInitialized();
   GoogleFonts.config.allowRuntimeFetching = false;
+  // M3 design system: Latin digits in Arabic locales (dates, numbers).
+  DateFormat.useNativeDigitsByDefaultFor('ar', false);
 
   final results = await Future.wait([
     Firebase.initializeApp(options: AppEnv.firebaseOptions),

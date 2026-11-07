@@ -1,3 +1,5 @@
+import 'package:delegate_app/core/l10n/display_names.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -27,6 +29,14 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
   final VoidCallback? onBackPressed;
   final FirebaseFirestore? firestore;
 
+  /// إظهار شريحة المنظمة النشطة بجانب الدور (تُخفى في هيدر مشرف/مسؤول الشركة).
+  final bool showActiveOrganization;
+
+  /// M3 layout used by the delegate workspace: `leading` opens
+  /// [Scaffold.drawer] (start edge, so right in RTL), `actions` hold the
+  /// extra actions and the avatar. Other roles keep the popup menu.
+  final bool useDrawer;
+
   const UniversalAppHeader({
     super.key,
     required this.delegate,
@@ -38,43 +48,114 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
     this.showBackButton = false,
     this.onBackPressed,
     this.firestore,
+    this.showActiveOrganization = true,
+    this.useDrawer = false,
   });
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
-  String _getRoleLabel(BuildContext context, Delegate del) {
+  String _getRoleLabel(
+    BuildContext context,
+    Delegate del, [
+    Map<String, dynamic>? userData,
+  ]) {
     final l10n = AppLocalizations.of(context);
-    switch (del.role) {
+    final label = roleLabelFor(
+      del.role,
+      position: del.position,
+      rawRole: userData?['role'] as String?,
+      accountantLabel: l10n?.accountant,
+      marketingPromotionLabel: l10n?.roleMarketingPromotion,
+      branchesMarketingManagerLabel: l10n?.roleBranchesMarketingManager,
+    );
+    return localizeRoleLabel(label, l10n);
+  }
+
+  /// Glossary: one role name per locale («مندوب» / Delegate; never «مروج»).
+  static String localizeRoleLabel(String label, AppLocalizations? l10n) {
+    if (l10n == null) return label;
+    switch (label) {
+      case 'مندوب':
+      case 'مروج':
+        return l10n.roleDelegate;
+      case 'مشرف':
+        return l10n.roleSupervisor;
+      case 'مسؤول شركة':
+        return l10n.roleCompanyAdmin;
+      case 'سوبر أدمن':
+        return l10n.roleSuperAdmin;
+      case 'أدمن منظمة':
+        return l10n.roleOrgAdmin;
+      case 'دعم فني':
+        return l10n.roleTechSupport;
+      case 'تسويق':
+        return l10n.roleMarketing;
+      case 'موارد بشرية (HR)':
+        return l10n.roleHr;
+    }
+    return label;
+  }
+
+  /// يحوّل دور المستخدم إلى تسمية عربية قصيرة تظهر تحت الاسم في الهيدر.
+  /// [rawRole] هو قيمة الحقل `role` الخام من مستند المستخدم إن توفرت،
+  /// ويُستخدم للتمييز بين مشرف الشركة ومسؤول الشركة (كلاهما UserRole.admin).
+  @visibleForTesting
+  static String roleLabelFor(
+    UserRole role, {
+    DelegatePosition? position,
+    String? rawRole,
+    String? accountantLabel,
+    String? marketingPromotionLabel,
+    String? branchesMarketingManagerLabel,
+  }) {
+    final raw = (rawRole ?? '').trim().toLowerCase();
+    if (raw.contains('supervisor') || raw == 'مشرف') return 'مشرف';
+    switch (role) {
       case UserRole.accountant:
-        return l10n?.accountant ?? 'إدارة الحسابات';
+        return accountantLabel ?? 'إدارة الحسابات';
       case UserRole.superAdmin:
         return 'سوبر أدمن';
       case UserRole.organizationAdmin:
         return 'أدمن منظمة';
       case UserRole.admin:
-        if (del.position == DelegatePosition.supervisor) {
-          return 'مشرف';
-        }
+        if (position == DelegatePosition.supervisor) return 'مشرف';
         return 'مسؤول شركة';
       case UserRole.technicalSupport:
         return 'دعم فني';
       case UserRole.marketingPromotion:
-        return l10n?.roleMarketingPromotion ?? 'تسويق العروض';
+        return marketingPromotionLabel ?? 'تسويق العروض';
       case UserRole.marketing:
         return 'تسويق';
       case UserRole.branchesMarketingManager:
-        return l10n?.roleBranchesMarketingManager ?? 'مدير تسويق الفروع';
+        return branchesMarketingManagerLabel ?? 'مدير تسويق الفروع';
       case UserRole.hr:
         return 'موارد بشرية (HR)';
       case UserRole.delegate:
-        if (del.position == DelegatePosition.supervisor) {
-          return 'مشرف';
-        } else if (del.position == DelegatePosition.promoter) {
-          return 'مروج';
-        }
+        if (position == DelegatePosition.supervisor) return 'مشرف';
+        if (position == DelegatePosition.promoter) return 'مروج';
         return 'مندوب';
     }
+  }
+
+  /// اسم العرض في الهيدر بنفس ترتيب شاشة الملف الشخصي:
+  /// fullName من المستند ← اسم الجلسة ← name/displayName من المستند.
+  @visibleForTesting
+  static String resolveDisplayName(
+    Delegate del,
+    Map<String, dynamic>? userData,
+  ) {
+    String? clean(Object? v) {
+      final t = (v is String) ? v.trim() : '';
+      return t.isEmpty ? null : t;
+    }
+
+    return clean(userData?['fullName']) ??
+        clean(del.fullName) ??
+        clean(del.firstName) ??
+        clean(userData?['name']) ??
+        clean(userData?['displayName']) ??
+        'مستخدم';
   }
 
   String _formatOrgLabel(String raw) {
@@ -192,19 +273,29 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return AppBar(
       backgroundColor: colorScheme.surfaceContainer,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 2.0,
+      automaticallyImplyLeading: false,
       leading: showBackButton
           ? IconButton(
               icon: const BackButtonIcon(),
               onPressed: onBackPressed ?? () => Navigator.of(context).pop(),
             )
-          : null,
-      titleSpacing: showBackButton ? 0 : null,
+          : useDrawer
+              ? Builder(
+                  builder: (ctx) => IconButton(
+                    icon: const Icon(Symbols.menu_rounded),
+                    tooltip: AppLocalizations.of(ctx)?.mainMenu,
+                    onPressed: () => Scaffold.of(ctx).openDrawer(),
+                  ),
+                )
+              : null,
+      titleSpacing: showBackButton || useDrawer ? 0 : null,
       shape: Border(
         bottom: BorderSide(
           color: colorScheme.outlineVariant.withValues(alpha: 0.35),
@@ -258,29 +349,28 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
           final photoUrl = _resolvePhotoUrl(delegate, userData);
 
           // حل الاسم
-          final rawName = userData?['fullName'] as String? ??
-              userData?['name'] as String? ??
-              userData?['displayName'] as String? ??
-              (delegate.fullName.isNotEmpty
-                  ? delegate.fullName
-                  : delegate.firstName);
-          final displayName = rawName.isNotEmpty ? rawName : 'مستخدم';
+          final resolvedName = resolveDisplayName(delegate, userData);
+          final displayName = nameForLocale(resolvedName, resolvedName,
+              isArabic: Localizations.localeOf(context).languageCode == 'ar');
 
-          // حل الدور والمنظمة
-          final roleLabel = _getRoleLabel(context, delegate);
-          final activeOrgName = _getActiveOrganizationLabel(delegate, userData);
+          final roleLabel = _getRoleLabel(context, delegate, userData);
+          final activeOrgName = showActiveOrganization
+              ? localizeChainName(_getActiveOrganizationLabel(delegate, userData), AppLocalizations.of(context))
+              : '';
 
           return Row(
             children: [
-              GestureDetector(
-                onTap: () => context.push('/user-profile', extra: delegate),
-                child: AppAvatar(
-                  imageUrl: photoUrl,
-                  fallbackText: displayName.isNotEmpty ? displayName[0] : 'U',
-                  radius: 20,
+              if (!useDrawer) ...[
+                GestureDetector(
+                  onTap: () => context.push('/user-profile', extra: delegate),
+                  child: AppAvatar(
+                    imageUrl: photoUrl,
+                    fallbackText: displayName.characters.first,
+                    radius: 20,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
+                const SizedBox(width: 12),
+              ],
               Expanded(
                 child: GestureDetector(
                   onTap: () => context.push('/user-profile', extra: delegate),
@@ -291,31 +381,24 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
                     children: [
                       Text(
                         displayName,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
+                        style: textTheme.titleSmall?.copyWith(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
+                          Flexible(
                             child: Text(
                               roleLabel,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: colorScheme.onPrimaryContainer,
+                              style: textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           if (activeOrgName.isNotEmpty) ...[
@@ -336,15 +419,27 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
           );
         },
       ),
-      actions: [
+      actions: useDrawer
+          ? [
+              ...?extraActions,
+              Padding(
+                padding: const EdgeInsetsDirectional.only(end: 8),
+                child: IconButton(
+                  tooltip: AppLocalizations.of(context)?.profile,
+                  onPressed: () => context.push('/user-profile', extra: delegate),
+                  icon: _HeaderAvatar(delegate: delegate, header: this),
+                ),
+              ),
+            ]
+          : [
         ...?extraActions,
         tashilMaestroDevSemantics(
           identifier: 'tashil_main_menu_button',
           label: 'القائمة الرئيسية',
           button: true,
           child: PopupMenuButton<String>(
-            icon: const Icon(Icons.menu_rounded),
-            tooltip: 'القائمة الرئيسية',
+            icon: const Icon(Symbols.menu_rounded),
+            tooltip: AppLocalizations.of(context)?.mainMenu ?? 'القائمة الرئيسية',
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
             ),
@@ -448,7 +543,7 @@ class _PulsingActiveOrgChipState extends State<_PulsingActiveOrgChip>
               ),
               const SizedBox(width: 4.5),
               Icon(
-                Icons.storefront_rounded,
+                Symbols.storefront_rounded,
                 size: 12,
                 color: colorScheme.primary,
               ),
@@ -467,6 +562,39 @@ class _PulsingActiveOrgChipState extends State<_PulsingActiveOrgChip>
               ),
             ],
           ),
+        );
+      },
+    );
+  }
+}
+
+/// Avatar shown in the app bar actions in drawer mode (live photo from the
+/// user document, initial as fallback).
+class _HeaderAvatar extends StatelessWidget {
+  const _HeaderAvatar({required this.delegate, required this.header});
+  final Delegate delegate;
+  final UniversalAppHeader header;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: () {
+        try {
+          return (header.firestore ?? FirebaseFirestore.instance)
+              .collection('users')
+              .doc(delegate.uid)
+              .snapshots();
+        } catch (_) {
+          return const Stream<DocumentSnapshot<Map<String, dynamic>>>.empty();
+        }
+      }(),
+      builder: (context, snapshot) {
+        final userData = snapshot.data?.data();
+        final name = UniversalAppHeader.resolveDisplayName(delegate, userData);
+        return AppAvatar(
+          imageUrl: header._resolvePhotoUrl(delegate, userData),
+          fallbackText: name.characters.first,
+          radius: 16,
         );
       },
     );

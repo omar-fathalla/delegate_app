@@ -1,1273 +1,1860 @@
 {
-    "@@locale": "ar",
-    "appTitle": "تسهيل",
-    "@appTitle": {
-        "description": "App title"
-    },
-    "delegateApp": "تطبيق الموظفين",
-    "@delegateApp": {
-        "description": "Employees app subtitle"
-    },
-    "login": "تسجيل الدخول",
-    "@login": {
-        "description": "Login label"
-    },
-    "logout": "تسجيل الخروج",
-    "@logout": {
-        "description": "Logout label"
-    },
-    "loginToContinue": "مرحباً بعودتك، يرجى إدخال بياناتك",
-    "@loginToContinue": {
-        "description": "Login subtitle"
-    },
-    "loginSuccessful": "تم تسجيل الدخول بنجاح!",
-    "@loginSuccessful": {
-        "description": "Login success snackbar"
-    },
-    "loginButton": "تسجيل الدخول",
-    "@loginButton": {
-        "description": "Login button text"
-    },
-    "errorFieldRequired": "هذا الحقل مطلوب",
-    "@errorFieldRequired": {
-        "description": "Error message for required field"
-    },
-    "addTaskToGetStarted": "أضف مهمة للبدء",
-    "@addTaskToGetStarted": {
-        "description": "Message to add task to get started"
-    },
-    "mobileNumber": "رقم الجوال",
-    "@mobileNumber": {
-        "description": "Mobile number field label"
-    },
-    "password": "كلمة المرور",
-    "@password": {
-        "description": "Password field label"
-    },
-    "motherName": "اسم الأم",
-    "@motherName": {
-        "description": "Mother name field label"
-    },
-    "enterMobileNumber": "يرجى إدخال رقم الموبايل",
-    "@enterMobileNumber": {
-        "description": "Mobile validation error"
-    },
-    "enterPassword": "يرجى إدخال كلمة المرور",
-    "@enterPassword": {
-        "description": "Password validation error"
-    },
-    "nationalIdNumber": "الرقم القومي",
-    "@nationalIdNumber": {
-        "description": "Delegate login national ID field label"
-    },
-    "enterNationalId": "يرجى إدخال الرقم القومي",
-    "@enterNationalId": {
-        "description": "Empty national ID validation error"
-    },
-    "invalidNationalId": "يجب أن يتكون الرقم القومي من 14 رقمًا",
-    "@invalidNationalId": {
-        "description": "National ID format validation error"
-    },
-    "invalidMobileNumber": "يرجى إدخال رقم موبايل صحيح",
-    "@invalidMobileNumber": {
-        "description": "Mobile number format validation error"
-    },
-    "loginNationalIdHelp": "المندوب يسجّل الدخول بالرقم القومي. باقي الأدوار تستخدم كلمة المرور.",
-    "@loginNationalIdHelp": {
-        "description": "Helper under the delegate login secret field"
-    },
-    "invalidLoginCredentials": "رقم الهاتف أو الرقم القومي أو كلمة المرور غير صحيح.",
-    "@invalidLoginCredentials": {
-        "description": "Delegate credential mismatch"
-    },
-    "delegateAccountInactive": "هذا الحساب قيد المراجعة أو موقوف. يرجى التواصل مع مسؤول الشركة.",
-    "@delegateAccountInactive": {
-        "description": "Pending or blocked delegate login error"
-    },
-    "tooManyLoginAttempts": "تم تجاوز عدد المحاولات. يرجى المحاولة لاحقاً.",
-    "@tooManyLoginAttempts": {
-        "description": "Delegate login lockout message"
-    },
-    "loginTemporarilyUnavailable": "تعذر تسجيل الدخول حالياً. يرجى المحاولة مرة أخرى.",
-    "@loginTemporarilyUnavailable": {
-        "description": "Delegate login service unavailable"
-    },
-    "rememberMe": "تذكرني",
-    "@rememberMe": {
-        "description": "Remember me checkbox label"
-    },
-    "home": "الرئيسية",
-    "@home": {
-        "description": "Home nav label"
-    },
-    "profile": "الملف الشخصي",
-    "@profile": {
-        "description": "Profile nav label"
-    },
-    "attendance": "الحضور",
-    "@attendance": {
-        "description": "Attendance nav label"
-    },
-    "myProfile": "ملفي الشخصي",
-    "@myProfile": {
-        "description": "Profile screen title"
-    },
-    "personalInformation": "المعلومات الشخصية",
-    "@personalInformation": {
-        "description": "Personal info section title"
-    },
-    "delegateId": "رقم المندوب",
-    "@delegateId": {
-        "description": "Delegate ID label"
-    },
-    "delegateRole": "مندوب",
-    "@delegateRole": {
-        "description": "Delegate role label"
-    },
-    "checkIn": "تسجيل الحضور",
-    "@checkIn": {
-        "description": "Check in action"
-    },
-    "checkOut": "تسجيل الانصراف",
-    "@checkOut": {
-        "description": "Check out action"
-    },
-    "checkedInSuccessfully": "تم تسجيل الحضور بنجاح",
-    "@checkedInSuccessfully": {
-        "description": "Check in success message"
-    },
-    "checkedOutSuccessfully": "تم تسجيل الانصراف بنجاح",
-    "@checkedOutSuccessfully": {
-        "description": "Check out success message"
-    },
-    "scanToCheckIn": "مسح لتسجيل الحضور",
-    "@scanToCheckIn": {
-        "description": "FAB label for check in"
-    },
-    "scanToCheckOut": "مسح لتسجيل الانصراف",
-    "@scanToCheckOut": {
-        "description": "FAB label for check out"
-    },
-    "scanQrInstruction": "اعمل اسكان لـ QR Code المتواجد في مكتب التسويق.",
-    "@scanQrInstruction": {
-        "description": "Instruction to scan QR on empty history screen"
-    },
-    "scanForAction": "مسح لـ {action}",
-    "@scanForAction": {
-        "description": "QR scanner title",
-        "placeholders": {
-            "action": {
-                "type": "String"
-            }
-        }
-    },
-    "pointCameraToQR": "وجه الكاميرا نحو QR Code لـ {action}",
-    "@pointCameraToQR": {
-        "description": "QR scanner instruction",
-        "placeholders": {
-            "action": {
-                "type": "String"
-            }
-        }
-    },
-    "checkingInAt": "تسجيل حضور في {branch}...",
-    "@checkingInAt": {
-        "description": "Check in at branch snackbar",
-        "placeholders": {
-            "branch": {
-                "type": "String"
-            }
-        }
-    },
-    "invalidQRCode": "QR Code غير صالح. يرجى مسح كود فرع صحيح.",
-    "@invalidQRCode": {
-        "description": "Invalid QR error"
-    },
-    "currentStatus": "الحالة الحالية",
-    "@currentStatus": {
-        "description": "Status card title"
-    },
-    "online": "متصل",
-    "@online": {
-        "description": "Online status"
-    },
-    "offline": "غير متصل",
-    "@offline": {
-        "description": "Offline status"
-    },
-    "active": "نشط",
-    "@active": {
-        "description": "Active check-in indicator"
-    },
-    "inLabel": "دخول: {time}",
-    "@inLabel": {
-        "description": "Check in time label",
-        "placeholders": {
-            "time": {
-                "type": "String"
-            }
-        }
-    },
-    "outLabel": "خروج: {time}",
-    "@outLabel": {
-        "description": "Check out time label",
-        "placeholders": {
-            "time": {
-                "type": "String"
-            }
-        }
-    },
-    "noRecordsForMonth": "لا توجد سجلات حضور لشهر {month}",
-    "@noRecordsForMonth": {
-        "description": "Empty month message",
-        "placeholders": {
-            "month": {
-                "type": "String"
-            }
-        }
-    },
-    "recentHistory": "السجل الأخير",
-    "@recentHistory": {
-        "description": "History section title"
-    },
-    "noHistoryAvailable": "لا يوجد سجل حضور",
-    "@noHistoryAvailable": {
-        "description": "Empty history message"
-    },
-    "somethingWentWrong": "حدث خطأ",
-    "@somethingWentWrong": {
-        "description": "Generic error message"
-    },
-    "unspecifiedBranch": "غير محدد",
-    "@unspecifiedBranch": {
-        "description": "Fallback branch name"
-    },
-    "helloUser": "مرحباً، {name}",
-    "@helloUser": {
-        "description": "Greeting with user name",
-        "placeholders": {
-            "name": {
-                "type": "String"
-            }
-        }
-    },
-    "historyInOut": "دخول: {inTime} - خروج: {outTime}",
-    "@historyInOut": {
-        "description": "History row in/out label",
-        "placeholders": {
-            "inTime": {
-                "type": "String"
-            },
-            "outTime": {
-                "type": "String"
-            }
-        }
-    },
-    "errorGeneral": "حدث خطأ. يرجى المحاولة مرة أخرى.",
-    "@errorGeneral": {
-        "description": "General error"
-    },
-    "errorNetwork": "لا يوجد اتصال بالإنترنت.",
-    "@errorNetwork": {
-        "description": "Network error"
-    },
-    "errorLocation": "لم يتم العثور على موقعك.",
-    "@errorLocation": {
-        "description": "Location error"
-    },
-    "errorOutOfRange": "أنت خارج نطاق موقع العمل.",
-    "@errorOutOfRange": {
-        "description": "Out of range error"
-    },
-    "errorMockLocation": "تم اكتشاف موقع وهمي. لا يمكن تسجيل الحضور.",
-    "@errorMockLocation": {
-        "description": "Mock location error"
-    },
-    "errorAuth": "بيانات الدخول غير صحيحة.",
-    "@errorAuth": {
-        "description": "Auth error"
-    },
-    "success": "تمت العملية بنجاح",
-    "@success": {
-        "description": "Success message"
-    },
-    "loading": "جاري التحميل...",
-    "@loading": {
-        "description": "Loading indicator"
-    },
-    "pendingSync": "في انتظار المزامنة",
-    "@pendingSync": {
-        "description": "Pending sync indicator"
-    },
-    "settings": "الإعدادات",
-    "@settings": {
-        "description": "Settings menu title"
-    },
-    "companies": "الشركات",
-    "@companies": {
-        "description": "Companies tab label"
-    },
-    "search": "بحث",
-    "@search": {
-        "description": "Search tab label"
-    },
-    "language": "اللغة",
-    "@language": {
-        "description": "Language menu item"
-    },
-    "changeLanguage": "تغيير اللغة",
-    "@changeLanguage": {
-        "description": "Change language menu item"
-    },
-    "arabic": "العربية",
-    "@arabic": {
-        "description": "Arabic language name"
-    },
-    "english": "English",
-    "@english": {
-        "description": "English language name"
-    },
-    "languageChangedTo": "تم تغيير اللغة إلى {language}",
-    "@languageChangedTo": {
-        "description": "Language changed confirmation",
-        "placeholders": {
-            "language": {
-                "type": "String"
-            }
-        }
-    },
-    "duration": "المدة: {hours} س {minutes} د",
-    "@duration": {
-        "description": "Duration in hours and minutes",
-        "placeholders": {
-            "hours": {
-                "type": "String"
-            },
-            "minutes": {
-                "type": "String"
-            }
-        }
-    },
-    "inProgress": "جاري...",
-    "@inProgress": {
-        "description": "Ongoing session indicator"
-    },
-    "fullName": "الاسم الكامل",
-    "@fullName": {
-        "description": "Full name label"
-    },
-    "phoneNumber": "رقم الهاتف",
-    "@phoneNumber": {
-        "description": "Phone number label"
-    },
-    "birthDate": "تاريخ الميلاد",
-    "@birthDate": {
-        "description": "Birth date label"
-    },
-    "cityLabel": "المدينة",
-    "@cityLabel": {
-        "description": "City label"
-    },
-    "organizationAndCompany": "المنظمة والشركة",
-    "@organizationAndCompany": {
-        "description": "Organization and company section title"
-    },
-    "organizationLabel": "المنظمة",
-    "@organizationLabel": {
-        "description": "Organization label"
-    },
-    "companyLabel": "الشركة",
-    "@companyLabel": {
-        "description": "Company label"
-    },
-    "positionLabel": "المنصب",
-    "@positionLabel": {
-        "description": "Position label"
-    },
-    "documents": "المستندات",
-    "@documents": {
-        "description": "Documents tab label"
-    },
-    "requestHistory": "سجل الطلبات",
-    "@requestHistory": {
-        "description": "Request history tab label"
-    },
-    "personalPhoto": "الصورة الشخصية",
-    "@personalPhoto": {
-        "description": "Personal photo document"
-    },
-    "nationalId": "رقم الهوية الوطنية",
-    "@nationalId": {
-        "description": "National ID document"
-    },
-    "authorizationLetter": "خطاب التفويض",
-    "@authorizationLetter": {
-        "description": "Authorization letter document"
-    },
-    "insuranceLetter": "خطاب التأمين",
-    "@insuranceLetter": {
-        "description": "Insurance letter document"
-    },
-    "healthCertificate": "شهادة صحية",
-    "@healthCertificate": {
-        "description": "Health certificate document"
-    },
-    "paymentReceipt": "إيصال الدفع",
-    "@paymentReceipt": {
-        "description": "Payment receipt document"
-    },
-    "electronicPaymentReceipt": "إيصال دفع إلكتروني",
-    "@electronicPaymentReceipt": {
-        "description": "Electronic payment receipt document"
-    },
-    "pendingStatus": "قيد الانتظار",
-    "@pendingStatus": {
-        "description": "Pending status label"
-    },
-    "uploadedOn": "تم التحميل: {date}",
-    "@uploadedOn": {
-        "description": "Upload date label",
-        "placeholders": {
-            "date": {
-                "type": "String"
-            }
-        }
-    },
-    "clickToView": "انقر للعرض",
-    "@clickToView": {
-        "description": "Click to view link"
-    },
-    "receiptCode": "رمز الإيصال: {code}",
-    "@receiptCode": {
-        "description": "Receipt code label",
-        "placeholders": {
-            "code": {
-                "type": "String"
-            }
-        }
-    },
-    "noRequestsYet": "لا توجد طلبات حتى الآن",
-    "@noRequestsYet": {
-        "description": "Empty request history message"
-    },
-    "approvedStatus": "مقبول",
-    "@approvedStatus": {
-        "description": "Approved status label"
-    },
-    "rejectedStatus": "مرفوض",
-    "@rejectedStatus": {
-        "description": "Rejected status label"
-    },
-    "noDocumentsUploaded": "لا توجد مستندات مرفوعة",
-    "@noDocumentsUploaded": {
-        "description": "Empty documents message"
-    },
-    "retry": "إعادة المحاولة",
-    "@retry": {
-        "description": "Retry button text"
-    },
-    "gender": "الجنس",
-    "@gender": {
-        "description": "Gender label"
-    },
-    "male": "ذكر",
-    "@male": {
-        "description": "Male gender"
-    },
-    "female": "أنثى",
-    "@female": {
-        "description": "Female gender"
-    },
-    "joinDate": "تاريخ الانضمام",
-    "@joinDate": {
-        "description": "Join date label"
-    },
-    "employmentDetails": "تفاصيل العمل",
-    "@employmentDetails": {
-        "description": "Employment details section title"
-    },
-    "statusReason": "سبب الحالة",
-    "@statusReason": {
-        "description": "Status reason label"
-    },
-    "profileComplete": "الملف مكتمل",
-    "@profileComplete": {
-        "description": "Profile complete status"
-    },
-    "profileIncomplete": "الملف غير مكتمل",
-    "@profileIncomplete": {
-        "description": "Profile incomplete status"
-    },
-    "reviewedBy": "تمت المراجعة بواسطة: {name}",
-    "@reviewedBy": {
-        "description": "Reviewer name label",
-        "placeholders": {
-            "name": {
-                "type": "String"
-            }
-        }
-    },
-    "notProvidedStatus": "لم يتم تقديمها",
-    "@notProvidedStatus": {
-        "description": "Not provided document status"
-    },
-    "adminDashboard": "لوحة الإدارة",
-    "@adminDashboard": {
-        "description": "Admin dashboard title"
-    },
-    "addBranch": "إضافة فرع",
-    "@addBranch": {
-        "description": "Add new branch title"
-    },
-    "branchName": "اسم الفرع",
-    "@branchName": {
-        "description": "Branch name label"
-    },
-    "branchLocation": "موقع الفرع",
-    "@branchLocation": {
-        "description": "Branch location label"
-    },
-    "geofenceRadius": "نطاق الحضور (بالأمتار)",
-    "@geofenceRadius": {
-        "description": "Geofence radius label"
-    },
-    "saveBranch": "حفظ الفرع",
-    "@saveBranch": {
-        "description": "Save branch button"
-    },
-    "branchAddedSuccessfully": "تمت إضافة الفرع بنجاح",
-    "@branchAddedSuccessfully": {
-        "description": "Branch added success message"
-    },
-    "pleaseEnterBranchName": "يرجى إدخال اسم الفرع",
-    "@pleaseEnterBranchName": {
-        "description": "Branch name required validation"
-    },
-    "pleaseSelectLocation": "يرجى تحديد الموقع على الخريطة",
-    "@pleaseSelectLocation": {
-        "description": "Location required validation"
-    },
-    "searchCityOrRegion": "ابحث عن مدينة أو منطقة...",
-    "@searchCityOrRegion": {
-        "description": "Search bar hint"
-    },
-    "branches": "الفروع",
-
-    "roleBranchMarketing": "تسويق الفروع",
-    "@roleBranchMarketing": {
-        "description": "Role title for branch marketing staff"
-    },
-    "roleBranchesMarketingManager": "مدير تسويق الفروع",
-    "@roleBranchesMarketingManager": {
-        "description": "Role title for branches marketing manager"
-    },
-    "roleBranchesMarketingMgrShort": "مدير تسويق فروع",
-    "@roleBranchesMarketingMgrShort": {
-        "description": "Short label for branches marketing manager"
-    },
-    "roleMarketingPromotion": "تسويق العروض",
-    "@roleMarketingPromotion": {
-        "description": "Role title for marketing promotion staff"
-    },
-    "branchMarketingFollowUp": "متابعة تسويق الفروع",
-    "@branchMarketingFollowUp": {
-        "description": "Subtitle for branch marketing follow-up"
-    },
-    "branchMarketingCoordination": "تنسيق تسويق الفروع",
-    "@branchMarketingCoordination": {
-        "description": "Subtitle for branch marketing coordination"
-    },    "@branches": {
-        "description": "Label for the branches tab in the admin dashboard navigation."
-    },
-    "admin": "المدير",
-    "@admin": {
-        "description": "Label for the admin dashboard title."
-    },
-    "myLocation": "موقعي الحالي",
-    "@myLocation": {
-        "description": "Label for the fetch current location button."
-    },
-    "locationServicesDisabled": "خدمات الموقع معطلة.",
-    "@locationServicesDisabled": {
-        "description": "Error when GPS is disabled."
-    },
-    "locationPermissionDenied": "تم رفض صلاحية الموقع.",
-    "@locationPermissionDenied": {
-        "description": "Error when location permission is denied."
-    },
-    "errorFetchingLocation": "حدث خطأ أثناء جلب الموقع.",
-    "@errorFetchingLocation": {
-        "description": "Generic error when fetching location fails."
-    },
-    "branchDetails": "تفاصيل الفرع",
-    "@branchDetails": {
-        "description": "Title for the branch details screen."
-    },
-    "downloadQR": "تحميل كصورة",
-    "@downloadQR": {
-        "description": "Button to download the QR code."
-    },
-    "qrSavedToGallery": "تم حفظ رمز QR في المعرض بنجاح!",
-    "@qrSavedToGallery": {
-        "description": "Message shown when QR is saved to gallery"
-    },
-    "editName": "تعديل الاسم",
-    "@editName": {
-        "description": "Button to edit the branch name."
-    },
-    "editBranch": "تعديل الفرع",
-    "@editBranch": {
-        "description": "زر تعديل بيانات الفرع."
-    },
-    "branchUpdatedSuccessfully": "تم تعديل الفرع بنجاح.",
-    "@branchUpdatedSuccessfully": {
-        "description": "رسالة نجاح عند تعديل بيانات الفرع."
-    },
-    "deleteBranch": "مسح الفرع",
-    "@deleteBranch": {
-        "description": "Button to delete the branch."
-    },
-    "deleteBranchConfirmation": "هل أنت متأكد من مسح هذا الفرع بالكامل؟",
-    "@deleteBranchConfirmation": {
-        "description": "Confirmation message before deleting a branch."
-    },
-    "branchDeletedSuccessfully": "تم مسح الفرع بنجاح.",
-    "@branchDeletedSuccessfully": {
-        "description": "Success message after deleting a branch."
-    },
-    "saveChanges": "حفظ التعديلات",
-    "@saveChanges": {
-        "description": "Button to save edited branch name."
-    },
-    "networkStatusOffline": "غير متصل بالشبكة",
-    "@networkStatusOffline": {
-        "description": "Offline network status indicator"
-    },
-    "networkStatusOnline": "متصل بالشبكة",
-    "@networkStatusOnline": {
-        "description": "Online network status indicator"
-    },
-    "noAccountContact": "ليس لديك حساب؟ تواصل على الرقم التالي",
-    "@noAccountContact": {
-        "description": "No account contact text on login screen"
-    },
-    "noAccountTitle": "ليس لديك حساب؟",
-    "@noAccountTitle": {
-        "description": "No account title text on login screen"
-    },
-    "noAccountSubtitle": "تواصل على الرقم التالي",
-    "@noAccountSubtitle": {
-        "description": "No account subtitle text on login screen"
-    },
-    "contactNumber": "01211857725",
-    "@contactNumber": {
-        "description": "Contact phone number"
-    },
-    "darkMode": "الوضع الداكن",
-    "@darkMode": {
-        "description": "Dark mode setting label"
-    },
-    "privacyPolicy": "سياسة الخصوصية",
-    "@privacyPolicy": {
-        "description": "Privacy policy setting label"
-    },
-    "helpCenter": "مركز المساعدة",
-    "@helpCenter": {
-        "description": "Help center setting label"
-    },
-    "version": "مندوب تسهيل - الإصدار {version}",
-    "@version": {
-        "description": "App version label in settings",
-        "placeholders": {
-            "version": {
-                "type": "String"
-            }
-        }
-    },
-    "account": "الحساب",
-    "@account": {
-        "description": "Account section header"
-    },
-    "privacyPolicyDesc": "توضح سياسة الخصوصية هذه كيف نقوم بجمع، استخدام، والإفصاح عن معلوماتك الشخصية عند استخدامك لخدمات المندوب. نحن ملتزمون بحماية خصوصيتك وضمان التعامل مع بياناتك بشكل آمن.",
-    "@privacyPolicyDesc": {
-        "description": "Main privacy policy description"
-    },
-    "locationData": "بيانات الموقع",
-    "@locationData": {
-        "description": "Location data section title"
-    },
-    "locationDataDesc": "يجمع تطبيقنا بيانات الموقع لتمكين تتبع الطلبات في الوقت الفعلي ومطابقة المناديب مع الطلبات القريبة حتى عندما يكون التطبيق مغلقاً أو غير مستخدم. هذه البيانات أساسية للوظيفة الأساسية لخدمتنا.",
-    "@locationDataDesc": {
-        "description": "Location data section description"
-    },
-    "cameraAccess": "الوصول للكاميرا",
-    "@cameraAccess": {
-        "description": "Camera access section title"
-    },
-    "cameraAccessDesc": "نطلب الوصول إلى الكاميرا للسماح لك بالتقاط صور الفواتير، الطرود أو إثباتات التوصيل. يتم التقاط الصور فقط عندما تستخدم ميزة الكاميرا بوضوح داخل التطبيق.",
-    "@cameraAccessDesc": {
-        "description": "Camera access section description"
-    },
-    "dataSecurity": "أمن البيانات",
-    "@dataSecurity": {
-        "description": "Data security section title"
-    },
-    "dataSecurityDesc": "ننطبق معايير الأمان المعتمدة في الصناعة لحماية بياناتك. نحن لا نبيع بياناتك الشخصية. تتم مشاركة معلوماتك فقط مع الشركاء المعتمدين لمعالجة الخدمات.",
-    "@dataSecurityDesc": {
-        "description": "Data security section description"
-    },
-    "contactUs": "تواصل معنا",
-    "@contactUs": {
-        "description": "Contact Us section title"
-    },
-    "website": "الموقع الإلكتروني",
-    "@website": {
-        "description": "Website label"
-    },
-    "emailAddress": "البريد الإلكتروني",
-    "@emailAddress": {
-        "description": "Email address label"
-    },
-    "egyptOffice": "مكتب مصر",
-    "@egyptOffice": {
-        "description": "Egypt office label"
-    },
-    "uaeOffice": "مكتب الإمارات",
-    "@uaeOffice": {
-        "description": "UAE office label"
-    },
-    "swPointWebsite": "https://sw-point.com/",
-    "@swPointWebsite": {
-        "description": "SwitchPoint website value"
-    },
-    "swPointEmail": "support@sw-point.com",
-    "@swPointEmail": {
-        "description": "SwitchPoint support email value"
-    },
-    "swPointEgyptPhone": "Alexandria, Egypt +20 121 185 7725",
-    "@swPointEgyptPhone": {
-        "description": "SwitchPoint Egypt phone value"
-    },
-    "swPointUaePhone": "United Arab Emirates WhatsApp: +971 55 871 5615",
-    "@swPointUaePhone": {
-        "description": "SwitchPoint UAE phone value"
-    },
-    "createAdmin": "إنشاء أدمن",
-    "@createAdmin": {
-        "description": "Create admin screen title and button"
-    },
-    "adminName": "اسم الأدمن",
-    "@adminName": {
-        "description": "Admin name field label"
-    },
-    "adminPhone": "رقم الهاتف",
-    "@adminPhone": {
-        "description": "Admin phone field label"
-    },
-    "adminEmail": "البريد الإلكتروني",
-    "@adminEmail": {
-        "description": "Admin email field label"
-    },
-    "pleaseEnterAdminName": "يرجى إدخال اسم الأدمن",
-    "@pleaseEnterAdminName": {
-        "description": "Admin name validation error"
-    },
-    "pleaseEnterAdminPhone": "يرجى إدخال رقم الهاتف",
-    "@pleaseEnterAdminPhone": {
-        "description": "Admin phone validation error"
-    },
-    "pleaseEnterAdminEmail": "يرجى إدخال البريد الإلكتروني",
-    "@pleaseEnterAdminEmail": {
-        "description": "Admin email validation error"
-    },
-    "invalidPhoneNumber": "رقم هاتف غير صالح",
-    "@invalidPhoneNumber": {
-        "description": "Invalid phone number validation error"
-    },
-    "invalidEmail": "بريد إلكتروني غير صالح",
-    "@invalidEmail": {
-        "description": "Invalid email validation error"
-    },
-    "adminCreatedSuccessfully": "تم إنشاء حساب الأدمن بنجاح! تم إرسال بريد التفعيل.",
-    "@adminCreatedSuccessfully": {
-        "description": "Admin created success message"
-    },
-    "manageAdmins": "إدارة الأدمن",
-    "@manageAdmins": {
-        "description": "Manage admins menu item"
-    },
-    "noAdminsFound": "لا يوجد أدمن",
-    "@noAdminsFound": {
-        "description": "Empty admins list message"
-    },
-    "suspended": "موقوف",
-    "@suspended": {
-        "description": "Suspended status badge"
-    },
-    "editAdmin": "تعديل",
-    "@editAdmin": {
-        "description": "Edit admin action"
-    },
-    "deleteAdmin": "حذف",
-    "@deleteAdmin": {
-        "description": "Delete admin action"
-    },
-    "suspendAdmin": "إيقاف",
-    "@suspendAdmin": {
-        "description": "Suspend admin action"
-    },
-    "activateAdmin": "تفعيل",
-    "@activateAdmin": {
-        "description": "Activate admin action"
-    },
-    "deleteAdminConfirmation": "هل أنت متأكد من حذف هذا الأدمن؟ لا يمكن التراجع عن هذا الإجراء.",
-    "@deleteAdminConfirmation": {
-        "description": "Delete admin confirmation message"
-    },
-    "cancel": "إلغاء",
-    "@cancel": {
-        "description": "Cancel button text"
-    },
-    "companyDelegates": "المناديب",
-    "@companyDelegates": {
-        "description": "Company delegates screen title"
-    },
-    "viewAttendance": "عرض الحضور",
-    "@viewAttendance": {
-        "description": "View attendance button"
-    },
-    "noDelegatesFound": "لا يوجد مناديب",
-    "@noDelegatesFound": {
-        "description": "Empty delegates list message"
-    },
-    "viewProfileData": "عرض البيانات",
-    "@viewProfileData": {
-        "description": "View profile data button text"
-    },
-    "addDelegate": "إضافة مندوب",
-    "@addDelegate": {
-        "description": "Add delegate button text"
-    },
-    "addDelegateViaWeb": "إضافة عبر الموقع",
-    "@addDelegateViaWeb": {
-        "description": "Add delegate via web title"
-    },
-    "tasks": "المهام",
-    "@tasks": {
-        "description": "Tasks tab or screen title"
-    },
-    "todayOverview": "نظرة عامة اليوم",
-    "@todayOverview": {
-        "description": "Dashboard section title"
-    },
-    "totalDelegates": "إجمالي المناديب",
-    "@totalDelegates": {
-        "description": "Total delegates card title"
-    },
-    "checkedInToday": "الحاضرون اليوم",
-    "@checkedInToday": {
-        "description": "Checked in today card title"
-    },
-    "absentToday": "الغائبون",
-    "addTask": "إضافة مهمة",
-    "@addTask": {
-        "description": "Button text to add a new task"
-    },
-    "taskTitle": "عنوان المهمة",
-    "@taskTitle": {
-        "description": "Label for task title input"
-    },
-    "taskDescription": "وصف المهمة",
-    "@taskDescription": {
-        "description": "Label for task description input"
-    },
-    "taskPriority": "الأولوية",
-    "@taskPriority": {
-        "description": "Label for task priority selection"
-    },
-    "high": "عالية",
-    "@high": {
-        "description": "High priority label"
-    },
-    "medium": "متوسطة",
-    "@medium": {
-        "description": "Medium priority label"
-    },
-    "low": "منخفضة",
-    "@low": {
-        "description": "Low priority label"
-    },
-    "taskDueDate": "تاريخ التنفيذ",
-    "@taskDueDate": {
-        "description": "Label for task due date input"
-    },
-    "assignTo": "تعيين إلى",
-    "@assignTo": {
-        "description": "Label for assigning task to a delegate"
-    },
-    "all": "الكل",
-    "@all": {
-        "description": "Filter option for all items"
-    },
-    "today": "اليوم",
-    "@today": {
-        "description": "Today label"
-    },
-    "yesterday": "أمس",
-    "@yesterday": {
-        "description": "Yesterday label"
-    },
-    "allDelegates": "جميع المناديب",
-    "@allDelegates": {
-        "description": "Option for assigning task to all delegates"
-    },
-    "createTask": "إنشاء مهمة",
-    "@createTask": {
-        "description": "Button text to create a task"
-    },
-    "taskCreatedSuccessfully": "تم إنشاء المهمة بنجاح",
-    "@taskCreatedSuccessfully": {
-        "description": "Success message after creating a task"
-    },
-    "taskUpdatedSuccessfully": "تم تحديث المهمة بنجاح",
-    "@taskUpdatedSuccessfully": {
-        "description": "Success message after updating a task"
-    },
-    "noTasksFound": "لا توجد مهام حالياً",
-    "@noTasksFound": {
-        "description": "Message shown when no tasks match the filter"
-    },
-    "taskStatus": "حالة المهمة",
-    "@taskStatus": {
-        "description": "Label for task status selection"
-    },
-    "taskPending": "معلقة",
-    "@taskPending": {
-        "description": "Pending task status label"
-    },
-    "taskInProgress": "قيد التنفيذ",
-    "@taskInProgress": {
-        "description": "In Progress task status label"
-    },
-    "taskCompleted": "منجزة",
-    "@taskCompleted": {
-        "description": "Completed task status label"
-    },
-    "taskCancelled": "ملغاة",
-    "@taskCancelled": {
-        "description": "Cancelled task status label"
-    },
-    "taskDetails": "تفاصيل المهمة",
-    "@taskDetails": {
-        "description": "Task details title"
-    },
-    "taskSchedule": "الجدول الزمني",
-    "@taskSchedule": {
-        "description": "Task schedule title"
-    },
-    "selectDelegate": "اختر المندوب",
-    "@selectDelegate": {
-        "description": "Select delegate label"
-    },
-    "myTasks": "مهامي",
-    "@myTasks": {
-        "description": "Title for the delegate's tasks screen"
-    },
-    "noTasksYet": "لا توجد مهامي بعد",
-    "@noTasksYet": {
-        "description": "Message when no tasks are assigned to the delegate"
-    },
-    "complete": "إكمال",
-    "@complete": {
-        "description": "Button text to complete a task"
-    },
-    "delete": "حذف",
-    "@delete": {
-        "description": "General delete button text"
-    },
-    "deleteTask": "حذف المهمة",
-    "@deleteTask": {
-        "description": "Title for delete task dialog/button"
-    },
-    "deleteTaskConfirmation": "هل أنت متأكد من رغبتك في حذف هذه المهمة؟ لا يمكن التراجع عن هذا الإجراء.",
-    "@deleteTaskConfirmation": {
-        "description": "Confirmation message for deleting a task"
-    },
-    "notes": "الملاحظات",
-    "@notes": {
-        "description": "Label for task notes"
-    },
-    "@absentToday": {
-        "description": "Absent today card title"
-    },
-    "tasksSummary": "ملخص المهام",
-    "@tasksSummary": {
-        "description": "Title for the task summary card on home screen"
-    },
-    "total": "الإجمالي",
-    "@total": {
-        "description": "Label for total count"
-    },
-    "searchDelegates": "البحث عن مندوب...",
-    "@searchDelegates": {
-      "description": "Placeholder for searching delegates"
-    },
-    "filterByStatus": "تصفية حسب الحالة",
-    "@filterByStatus": {
-      "description": "Label for status filter"
-    },
-    "noDelegateSearchResults": "لا توجد نتائج مطابقة لبحثك",
-    "@noDelegateSearchResults": {
-      "description": "Message shown when no delegates match search or filter"
-    },
-    "notifications": "الإشعارات",
-    "@notifications": {
-        "description": "Notifications page title"
-    },
-    "noNotifications": "لا توجد إشعارات",
-    "@noNotifications": {
-        "description": "Message when there are no notifications"
-    },
-    "markAllRead": "تعليم الكل كمقروء",
-    "@markAllRead": {
-        "description": "Button to mark all notifications as read"
-    },
-    "newNotification": "إشعار جديد",
-    "@newNotification": {
-        "description": "New notification label"
-    },
-    "searchCompanies": "البحث عن الشركات",
-    "@searchCompanies": {
-        "description": "Search companies screen title"
-    },
-    "searchCompaniesHint": "ابحث عن الشركات باستخدام كود الشركة",
-    "@searchCompaniesHint": {
-        "description": "Hint text for company search"
-    },
-    "enterCompanyCode": "أدخل كود الشركة",
-    "@enterCompanyCode": {
-        "description": "Placeholder for company code search input"
-    },
-    "clear": "مسح",
-    "@clear": {
-        "description": "Clear button text"
-    },
-    "noCompaniesFound": "لا توجد شركات",
-    "@noCompaniesFound": {
-        "description": "Message when no companies are found"
-    },
-    "searchQuery": "البحث",
-    "@searchQuery": {
-        "description": "Search query label"
-    },
-    "errorOccurred": "حدث خطأ",
-    "@errorOccurred": {
-        "description": "Error occurred message"
-    },
-    "tryAgain": "حاول مرة أخرى",
-    "@tryAgain": {
-        "description": "Try again button text"
-    },
-    "manageMarketing": "إدارة موظفي التسويق",
-    "@manageMarketing": {
-        "description": "Manage marketing employees menu item"
-    },
-    "noMarketingEmployeesFound": "لا يوجد موظفي تسويق",
-    "@noMarketingEmployeesFound": {
-        "description": "Empty marketing employees list message"
-    },
-    "searchByPhone": "البحث برقم الموبايل...",
-    "@searchByPhone": {
-        "description": "Search by phone number placeholder"
-    },
-    "filterByOrganization": "تصفية حسب المنظمة",
-    "@filterByOrganization": {
-        "description": "Filter by organization label"
-    },
-    "allOrganizations": "جميع المنظمات",
-    "@allOrganizations": {
-        "description": "All organizations filter option"
-    },
-    "marketingEmployee": "موظف تسويق",
-    "@marketingEmployee": {
-        "description": "Marketing employee label"
-    },
-    "editMarketingEmployee": "تعديل بيانات الموظف",
-    "@editMarketingEmployee": {
-        "description": "Edit marketing employee action"
-    },
-    "deleteMarketingEmployee": "حذف الموظف",
-    "@deleteMarketingEmployee": {
-        "description": "Delete marketing employee action"
-    },
-    "deleteMarketingEmployeeConfirmation": "هل أنت متأكد من حذف هذا الموظف؟ لا يمكن التراجع عن هذا الإجراء.",
-    "@deleteMarketingEmployeeConfirmation": {
-        "description": "Delete marketing employee confirmation"
-    },
-    "suspendMarketingEmployee": "إيقاف الموظف",
-    "@suspendMarketingEmployee": {
-        "description": "Suspend marketing employee action"
-    },
-    "activateMarketingEmployee": "تفعيل الموظف",
-    "@activateMarketingEmployee": {
-        "description": "Activate marketing employee action"
-    },
-    "employeeSuspended": "تم إيقاف الموظف",
-    "@employeeSuspended": {
-        "description": "Employee suspended success message"
-    },
-    "employeeActivated": "تم تفعيل الموظف",
-    "@employeeActivated": {
-        "description": "Employee activated success message"
-    },
-    "employeeDeleted": "تم حذف الموظف بنجاح",
-    "@employeeDeleted": {
-        "description": "Employee deleted success message"
-    },
-    "employeeUpdated": "تم تحديث بيانات الموظف بنجاح",
-    "@employeeUpdated": {
-        "description": "Employee updated success message"
-    },
-    "employeeName": "اسم الموظف",
-    "@employeeName": {
-        "description": "Employee name field label"
-    },
-    "employeePhone": "رقم الهاتف",
-    "@employeePhone": {
-        "description": "Employee phone field label"
-    },
-    "employeeEmail": "البريد الإلكتروني",
-    "@employeeEmail": {
-        "description": "Employee email field label"
-    },
-    "organization": "المنظمة",
-    "@organization": {
-        "description": "Organization label"
-    },
-    "forgotCheckoutTitle": "تنبيه حضور معلق",
-    "@forgotCheckoutTitle": {
-        "description": "Title for forgot checkout dialog"
-    },
-    "forgotCheckoutMessage": "لديك حضور معلق في {oldBranch}. هل تريد تسجيل الانصراف منه وتسجيل الحضور في {newBranch}؟",
-    "@forgotCheckoutMessage": {
-        "description": "Message for forgot checkout in a different branch",
-        "placeholders": {
-            "oldBranch": {
-                "type": "String"
-            },
-            "newBranch": {
-                "type": "String"
-            }
-        }
-    },
-    "previousDayCheckoutMessage": "لديك حضور معلق من يوم سابق في {oldBranch}. سيتم إغلاقه وتسجيل حضورك لليوم في {newBranch}.",
-    "@previousDayCheckoutMessage": {
-        "description": "Message for forgot checkout from a previous day",
-        "placeholders": {
-            "oldBranch": {
-                "type": "String"
-            },
-            "newBranch": {
-                "type": "String"
-            }
-        }
-    },
-    "confirmAction": "تأكيد",
-    "@confirmAction": {
-        "description": "Confirm button text"
-    },
-    "photoPermissions": "أذونات التصوير",
-    "@photoPermissions": {
-        "description": "Photo permissions section or screen title"
-    },
-    "photoPermissionsDesc": "إدارة أذونات التصوير ومتابعة تقارير الصور",
-    "@photoPermissionsDesc": {
-        "description": "Description of photo permissions feature"
-    },
-    "supervisor": "مشرف",
-    "@supervisor": {
-        "description": "Supervisor role label"
-    },
-    "supervisorUser": "مشرف: {name}",
-    "@supervisorUser": {
-        "description": "Supervisor greeting label",
-        "placeholders": {
-            "name": {
-                "type": "String"
-            }
-        }
-    },
-    "adminUser": "المدير: {name}",
-    "@adminUser": {
-        "description": "Admin greeting label",
-        "placeholders": {
-            "name": {
-                "type": "String"
-            }
-        }
-    },
-    "paymentReceiptsReport": "تقرير إيصالات الدفع الإلكتروني",
-    "@paymentReceiptsReport": {
-        "description": "Payment receipts upload report screen title"
-    },
-    "uploadsCount": "عدد الإيصالات",
-    "@uploadsCount": {
-        "description": "Uploaded receipts count label"
-    },
-    "totalUploadedReceipts": "إجمالي الإيصالات",
-    "@totalUploadedReceipts": {
-        "description": "Total uploaded receipts summary label"
-    },
-    "companiesWithUploads": "الشركات المفعلة",
-    "@companiesWithUploads": {
-        "description": "Companies with uploaded receipts summary label"
-    },
-    "receiptsReport": "تقرير إيصالات الدفع الإلكتروني",
-    "@receiptsReport": {
-        "description": "Receipts report menu item text"
-    },
-    "accountant": "إدارة الحسابات",
-    "@accountant": {
-        "description": "Accountant role title"
-    },
-    "accountantDashboard": "لوحة تحكم الحسابات والماليات",
-    "@accountantDashboard": {
-        "description": "Accountant dashboard title"
-    },
-    "financialReports": "التقارير المالية",
-    "@financialReports": {
-        "description": "Financial reports label"
-    },
-    "paymentReceipts": "إيصالات السداد",
-    "@paymentReceipts": {
-        "description": "Payment receipts label"
-    },
-    "subscriptionRequests": "طلبات الاشتراك",
-    "@subscriptionRequests": {
-        "description": "Subscription requests label"
-    },
-    "walletsManagement": "إدارة المحافظ",
-    "@walletsManagement": {
-        "description": "Wallets management label"
-    },
-    "splashConnectionFailed": "تعذّر الاتصال",
-    "@splashConnectionFailed": {
-        "description": "Splash stall message"
-    },
-    "splashRetry": "إعادة المحاولة",
-    "@splashRetry": {
-        "description": "Splash retry button"
-    },
-    "splashSignIn": "تسجيل الدخول",
-    "@splashSignIn": {
-        "description": "Splash go-to-login button"
-    },
-    "mapUnavailable": "الخريطة غير متاحة",
-    "@mapUnavailable": {
-        "description": "Map gate timeout message"
-    },
-    "mapRetry": "إعادة المحاولة",
-    "@mapRetry": {
-        "description": "Map gate retry button"
+  "@@locale": "ar",
+  "appTitle": "تسهيل",
+  "@appTitle": {
+    "description": "App title"
+  },
+  "delegateApp": "تطبيق الموظفين",
+  "@delegateApp": {
+    "description": "Employees app subtitle"
+  },
+  "login": "تسجيل الدخول",
+  "@login": {
+    "description": "Login label"
+  },
+  "logout": "تسجيل الخروج",
+  "@logout": {
+    "description": "Logout label"
+  },
+  "loginToContinue": "مرحباً بعودتك، يرجى إدخال بياناتك",
+  "@loginToContinue": {
+    "description": "Login subtitle"
+  },
+  "loginSuccessful": "تم تسجيل الدخول بنجاح!",
+  "@loginSuccessful": {
+    "description": "Login success snackbar"
+  },
+  "loginButton": "تسجيل الدخول",
+  "@loginButton": {
+    "description": "Login button text"
+  },
+  "errorFieldRequired": "هذا الحقل مطلوب",
+  "@errorFieldRequired": {
+    "description": "Error message for required field"
+  },
+  "addTaskToGetStarted": "أضف مهمة للبدء",
+  "@addTaskToGetStarted": {
+    "description": "Message to add task to get started"
+  },
+  "mobileNumber": "رقم الجوال",
+  "@mobileNumber": {
+    "description": "Mobile number field label"
+  },
+  "password": "كلمة المرور",
+  "@password": {
+    "description": "Password field label"
+  },
+  "motherName": "اسم الأم",
+  "@motherName": {
+    "description": "Mother name field label"
+  },
+  "enterMobileNumber": "يرجى إدخال رقم الموبايل",
+  "@enterMobileNumber": {
+    "description": "Mobile validation error"
+  },
+  "enterPassword": "يرجى إدخال كلمة المرور",
+  "@enterPassword": {
+    "description": "Password validation error"
+  },
+  "nationalIdNumber": "الرقم القومي",
+  "@nationalIdNumber": {
+    "description": "Delegate login national ID field label"
+  },
+  "enterNationalId": "يرجى إدخال الرقم القومي",
+  "@enterNationalId": {
+    "description": "Empty national ID validation error"
+  },
+  "invalidNationalId": "يجب أن يتكون الرقم القومي من 14 رقمًا",
+  "@invalidNationalId": {
+    "description": "National ID format validation error"
+  },
+  "invalidMobileNumber": "يرجى إدخال رقم موبايل صحيح",
+  "@invalidMobileNumber": {
+    "description": "Mobile number format validation error"
+  },
+  "loginNationalIdHelp": "المندوب يسجّل الدخول بالرقم القومي. باقي الأدوار تستخدم كلمة المرور.",
+  "@loginNationalIdHelp": {
+    "description": "Helper under the delegate login secret field"
+  },
+  "invalidLoginCredentials": "رقم الهاتف أو الرقم القومي أو كلمة المرور غير صحيح.",
+  "@invalidLoginCredentials": {
+    "description": "Delegate credential mismatch"
+  },
+  "delegateAccountInactive": "هذا الحساب قيد المراجعة أو موقوف. يرجى التواصل مع مسؤول الشركة.",
+  "@delegateAccountInactive": {
+    "description": "Pending or blocked delegate login error"
+  },
+  "tooManyLoginAttempts": "تم تجاوز عدد المحاولات. يرجى المحاولة لاحقاً.",
+  "@tooManyLoginAttempts": {
+    "description": "Delegate login lockout message"
+  },
+  "loginTemporarilyUnavailable": "تعذر تسجيل الدخول حالياً. يرجى المحاولة مرة أخرى.",
+  "@loginTemporarilyUnavailable": {
+    "description": "Delegate login service unavailable"
+  },
+  "rememberMe": "تذكرني",
+  "@rememberMe": {
+    "description": "Remember me checkbox label"
+  },
+  "home": "الرئيسية",
+  "@home": {
+    "description": "Home nav label"
+  },
+  "profile": "الملف الشخصي",
+  "@profile": {
+    "description": "Profile nav label"
+  },
+  "attendance": "الحضور",
+  "@attendance": {
+    "description": "Attendance nav label"
+  },
+  "myProfile": "ملفي الشخصي",
+  "@myProfile": {
+    "description": "Profile screen title"
+  },
+  "personalInformation": "المعلومات الشخصية",
+  "@personalInformation": {
+    "description": "Personal info section title"
+  },
+  "delegateId": "رقم المندوب",
+  "@delegateId": {
+    "description": "Delegate ID label"
+  },
+  "delegateRole": "مندوب",
+  "@delegateRole": {
+    "description": "Delegate role label"
+  },
+  "checkIn": "تسجيل الحضور",
+  "@checkIn": {
+    "description": "Check in action"
+  },
+  "checkOut": "تسجيل الانصراف",
+  "@checkOut": {
+    "description": "Check out action"
+  },
+  "checkedInSuccessfully": "تم تسجيل الحضور بنجاح",
+  "@checkedInSuccessfully": {
+    "description": "Check in success message"
+  },
+  "checkedOutSuccessfully": "تم تسجيل الانصراف بنجاح",
+  "@checkedOutSuccessfully": {
+    "description": "Check out success message"
+  },
+  "scanToCheckIn": "مسح لتسجيل الحضور",
+  "@scanToCheckIn": {
+    "description": "FAB label for check in"
+  },
+  "scanToCheckOut": "مسح لتسجيل الانصراف",
+  "@scanToCheckOut": {
+    "description": "FAB label for check out"
+  },
+  "scanQrInstruction": "اعمل اسكان لـ QR Code المتواجد في مكتب التسويق.",
+  "@scanQrInstruction": {
+    "description": "Instruction to scan QR on empty history screen"
+  },
+  "scanForAction": "امسح ل{action}",
+  "@scanForAction": {
+    "description": "QR scanner title",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
     }
+  },
+  "pointCameraToQR": "وجه الكاميرا نحو QR Code لـ {action}",
+  "@pointCameraToQR": {
+    "description": "QR scanner instruction",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "checkingInAt": "تسجيل حضور في {branch}...",
+  "@checkingInAt": {
+    "description": "Check in at branch snackbar",
+    "placeholders": {
+      "branch": {
+        "type": "String"
+      }
+    }
+  },
+  "invalidQRCode": "QR Code غير صالح. يرجى مسح كود فرع صحيح.",
+  "@invalidQRCode": {
+    "description": "Invalid QR error"
+  },
+  "currentStatus": "الحالة الحالية",
+  "@currentStatus": {
+    "description": "Status card title"
+  },
+  "online": "متصل",
+  "@online": {
+    "description": "Online status"
+  },
+  "offline": "غير متصل",
+  "@offline": {
+    "description": "Offline status"
+  },
+  "active": "نشط",
+  "@active": {
+    "description": "Active check-in indicator"
+  },
+  "inLabel": "دخول: {time}",
+  "@inLabel": {
+    "description": "Check in time label",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "outLabel": "خروج: {time}",
+  "@outLabel": {
+    "description": "Check out time label",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "noRecordsForMonth": "لا توجد سجلات حضور لشهر {month}",
+  "@noRecordsForMonth": {
+    "description": "Empty month message",
+    "placeholders": {
+      "month": {
+        "type": "String"
+      }
+    }
+  },
+  "recentHistory": "السجل الأخير",
+  "@recentHistory": {
+    "description": "History section title"
+  },
+  "noHistoryAvailable": "لا توجد سجلات حضور",
+  "@noHistoryAvailable": {
+    "description": "Empty history message"
+  },
+  "somethingWentWrong": "حدث خطأ",
+  "@somethingWentWrong": {
+    "description": "Generic error message"
+  },
+  "unspecifiedBranch": "غير محدد",
+  "@unspecifiedBranch": {
+    "description": "Fallback branch name"
+  },
+  "helloUser": "مرحباً، {name}",
+  "@helloUser": {
+    "description": "Greeting with user name",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "historyInOut": "دخول: {inTime} - خروج: {outTime}",
+  "@historyInOut": {
+    "description": "History row in/out label",
+    "placeholders": {
+      "inTime": {
+        "type": "String"
+      },
+      "outTime": {
+        "type": "String"
+      }
+    }
+  },
+  "errorGeneral": "حدث خطأ. يرجى المحاولة مرة أخرى.",
+  "@errorGeneral": {
+    "description": "General error"
+  },
+  "errorNetwork": "لا يوجد اتصال بالإنترنت.",
+  "@errorNetwork": {
+    "description": "Network error"
+  },
+  "errorLocation": "لم يتم العثور على موقعك.",
+  "@errorLocation": {
+    "description": "Location error"
+  },
+  "errorOutOfRange": "أنت خارج نطاق موقع العمل.",
+  "@errorOutOfRange": {
+    "description": "Out of range error"
+  },
+  "errorMockLocation": "تم اكتشاف موقع وهمي. لا يمكن تسجيل الحضور.",
+  "@errorMockLocation": {
+    "description": "Mock location error"
+  },
+  "errorAuth": "بيانات الدخول غير صحيحة.",
+  "@errorAuth": {
+    "description": "Auth error"
+  },
+  "success": "تمت العملية بنجاح",
+  "@success": {
+    "description": "Success message"
+  },
+  "loading": "جاري التحميل...",
+  "@loading": {
+    "description": "Loading indicator"
+  },
+  "pendingSync": "في انتظار المزامنة",
+  "@pendingSync": {
+    "description": "Pending sync indicator"
+  },
+  "settings": "الإعدادات",
+  "@settings": {
+    "description": "Settings menu title"
+  },
+  "companies": "الشركات",
+  "@companies": {
+    "description": "Companies tab label"
+  },
+  "search": "بحث",
+  "@search": {
+    "description": "Search tab label"
+  },
+  "language": "اللغة",
+  "@language": {
+    "description": "Language menu item"
+  },
+  "changeLanguage": "تغيير اللغة",
+  "@changeLanguage": {
+    "description": "Change language menu item"
+  },
+  "arabic": "العربية",
+  "@arabic": {
+    "description": "Arabic language name"
+  },
+  "english": "English",
+  "@english": {
+    "description": "English language name"
+  },
+  "languageChangedTo": "تم تغيير اللغة إلى {language}",
+  "@languageChangedTo": {
+    "description": "Language changed confirmation",
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "duration": "المدة: {hours} س {minutes} د",
+  "@duration": {
+    "description": "Duration in hours and minutes",
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      },
+      "minutes": {
+        "type": "String"
+      }
+    }
+  },
+  "inProgress": "جاري...",
+  "@inProgress": {
+    "description": "Ongoing session indicator"
+  },
+  "fullName": "الاسم الكامل",
+  "@fullName": {
+    "description": "Full name label"
+  },
+  "phoneNumber": "رقم الهاتف",
+  "@phoneNumber": {
+    "description": "Phone number label"
+  },
+  "birthDate": "تاريخ الميلاد",
+  "@birthDate": {
+    "description": "Birth date label"
+  },
+  "cityLabel": "المدينة",
+  "@cityLabel": {
+    "description": "City label"
+  },
+  "organizationAndCompany": "المنظمة والشركة",
+  "@organizationAndCompany": {
+    "description": "Organization and company section title"
+  },
+  "organizationLabel": "المنظمة",
+  "@organizationLabel": {
+    "description": "Organization label"
+  },
+  "companyLabel": "الشركة",
+  "@companyLabel": {
+    "description": "Company label"
+  },
+  "positionLabel": "المنصب",
+  "@positionLabel": {
+    "description": "Position label"
+  },
+  "documents": "المستندات",
+  "@documents": {
+    "description": "Documents tab label"
+  },
+  "requestHistory": "سجل الطلبات",
+  "@requestHistory": {
+    "description": "Request history tab label"
+  },
+  "personalPhoto": "الصورة الشخصية",
+  "@personalPhoto": {
+    "description": "Personal photo document"
+  },
+  "nationalId": "رقم الهوية الوطنية",
+  "@nationalId": {
+    "description": "National ID document"
+  },
+  "authorizationLetter": "خطاب التفويض",
+  "@authorizationLetter": {
+    "description": "Authorization letter document"
+  },
+  "insuranceLetter": "خطاب التأمين",
+  "@insuranceLetter": {
+    "description": "Insurance letter document"
+  },
+  "healthCertificate": "شهادة صحية",
+  "@healthCertificate": {
+    "description": "Health certificate document"
+  },
+  "paymentReceipt": "إيصال الدفع",
+  "@paymentReceipt": {
+    "description": "Payment receipt document"
+  },
+  "electronicPaymentReceipt": "إيصال دفع إلكتروني",
+  "@electronicPaymentReceipt": {
+    "description": "Electronic payment receipt document"
+  },
+  "pendingStatus": "قيد الانتظار",
+  "@pendingStatus": {
+    "description": "Pending status label"
+  },
+  "uploadedOn": "تم التحميل: {date}",
+  "@uploadedOn": {
+    "description": "Upload date label",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "clickToView": "انقر للعرض",
+  "@clickToView": {
+    "description": "Click to view link"
+  },
+  "receiptCode": "رمز الإيصال: {code}",
+  "@receiptCode": {
+    "description": "Receipt code label",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "noRequestsYet": "لا توجد طلبات حتى الآن",
+  "@noRequestsYet": {
+    "description": "Empty request history message"
+  },
+  "approvedStatus": "مقبول",
+  "@approvedStatus": {
+    "description": "Approved status label"
+  },
+  "rejectedStatus": "مرفوض",
+  "@rejectedStatus": {
+    "description": "Rejected status label"
+  },
+  "noDocumentsUploaded": "لا توجد مستندات مرفوعة",
+  "@noDocumentsUploaded": {
+    "description": "Empty documents message"
+  },
+  "retry": "إعادة المحاولة",
+  "@retry": {
+    "description": "Retry button text"
+  },
+  "gender": "الجنس",
+  "@gender": {
+    "description": "Gender label"
+  },
+  "male": "ذكر",
+  "@male": {
+    "description": "Male gender"
+  },
+  "female": "أنثى",
+  "@female": {
+    "description": "Female gender"
+  },
+  "joinDate": "تاريخ الانضمام",
+  "@joinDate": {
+    "description": "Join date label"
+  },
+  "employmentDetails": "تفاصيل العمل",
+  "@employmentDetails": {
+    "description": "Employment details section title"
+  },
+  "statusReason": "سبب الحالة",
+  "@statusReason": {
+    "description": "Status reason label"
+  },
+  "profileComplete": "الملف مكتمل",
+  "@profileComplete": {
+    "description": "Profile complete status"
+  },
+  "profileIncomplete": "الملف غير مكتمل",
+  "@profileIncomplete": {
+    "description": "Profile incomplete status"
+  },
+  "reviewedBy": "تمت المراجعة بواسطة: {name}",
+  "@reviewedBy": {
+    "description": "Reviewer name label",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "notProvidedStatus": "لم يتم تقديمها",
+  "@notProvidedStatus": {
+    "description": "Not provided document status"
+  },
+  "adminDashboard": "لوحة الإدارة",
+  "@adminDashboard": {
+    "description": "Admin dashboard title"
+  },
+  "addBranch": "إضافة فرع",
+  "@addBranch": {
+    "description": "Add new branch title"
+  },
+  "branchName": "اسم الفرع",
+  "@branchName": {
+    "description": "Branch name label"
+  },
+  "branchLocation": "موقع الفرع",
+  "@branchLocation": {
+    "description": "Branch location label"
+  },
+  "geofenceRadius": "نطاق الحضور (بالأمتار)",
+  "@geofenceRadius": {
+    "description": "Geofence radius label"
+  },
+  "saveBranch": "حفظ الفرع",
+  "@saveBranch": {
+    "description": "Save branch button"
+  },
+  "branchAddedSuccessfully": "تمت إضافة الفرع بنجاح",
+  "@branchAddedSuccessfully": {
+    "description": "Branch added success message"
+  },
+  "pleaseEnterBranchName": "يرجى إدخال اسم الفرع",
+  "@pleaseEnterBranchName": {
+    "description": "Branch name required validation"
+  },
+  "pleaseSelectLocation": "يرجى تحديد الموقع على الخريطة",
+  "@pleaseSelectLocation": {
+    "description": "Location required validation"
+  },
+  "searchCityOrRegion": "ابحث عن مدينة أو منطقة...",
+  "@searchCityOrRegion": {
+    "description": "Search bar hint"
+  },
+  "branches": "الفروع",
+  "roleBranchMarketing": "تسويق الفروع",
+  "@roleBranchMarketing": {
+    "description": "Role title for branch marketing staff"
+  },
+  "roleBranchesMarketingManager": "مدير تسويق الفروع",
+  "@roleBranchesMarketingManager": {
+    "description": "Role title for branches marketing manager"
+  },
+  "roleBranchesMarketingMgrShort": "مدير تسويق فروع",
+  "@roleBranchesMarketingMgrShort": {
+    "description": "Short label for branches marketing manager"
+  },
+  "roleMarketingPromotion": "تسويق العروض",
+  "@roleMarketingPromotion": {
+    "description": "Role title for marketing promotion staff"
+  },
+  "branchMarketingFollowUp": "متابعة تسويق الفروع",
+  "@branchMarketingFollowUp": {
+    "description": "Subtitle for branch marketing follow-up"
+  },
+  "branchMarketingCoordination": "تنسيق تسويق الفروع",
+  "@branchMarketingCoordination": {
+    "description": "Subtitle for branch marketing coordination"
+  },
+  "@branches": {
+    "description": "Label for the branches tab in the admin dashboard navigation."
+  },
+  "admin": "المدير",
+  "@admin": {
+    "description": "Label for the admin dashboard title."
+  },
+  "myLocation": "موقعي الحالي",
+  "@myLocation": {
+    "description": "Label for the fetch current location button."
+  },
+  "locationServicesDisabled": "خدمات الموقع معطلة.",
+  "@locationServicesDisabled": {
+    "description": "Error when GPS is disabled."
+  },
+  "locationPermissionDenied": "لم يُسمح بالوصول إلى الموقع",
+  "@locationPermissionDenied": {
+    "description": "Error when location permission is denied."
+  },
+  "errorFetchingLocation": "حدث خطأ أثناء جلب الموقع.",
+  "@errorFetchingLocation": {
+    "description": "Generic error when fetching location fails."
+  },
+  "branchDetails": "تفاصيل الفرع",
+  "@branchDetails": {
+    "description": "Title for the branch details screen."
+  },
+  "downloadQR": "تحميل كصورة",
+  "@downloadQR": {
+    "description": "Button to download the QR code."
+  },
+  "qrSavedToGallery": "تم حفظ رمز QR في المعرض بنجاح!",
+  "@qrSavedToGallery": {
+    "description": "Message shown when QR is saved to gallery"
+  },
+  "editName": "تعديل الاسم",
+  "@editName": {
+    "description": "Button to edit the branch name."
+  },
+  "editBranch": "تعديل الفرع",
+  "@editBranch": {
+    "description": "زر تعديل بيانات الفرع."
+  },
+  "branchUpdatedSuccessfully": "تم تعديل الفرع بنجاح.",
+  "@branchUpdatedSuccessfully": {
+    "description": "رسالة نجاح عند تعديل بيانات الفرع."
+  },
+  "deleteBranch": "مسح الفرع",
+  "@deleteBranch": {
+    "description": "Button to delete the branch."
+  },
+  "deleteBranchConfirmation": "هل أنت متأكد من مسح هذا الفرع بالكامل؟",
+  "@deleteBranchConfirmation": {
+    "description": "Confirmation message before deleting a branch."
+  },
+  "branchDeletedSuccessfully": "تم مسح الفرع بنجاح.",
+  "@branchDeletedSuccessfully": {
+    "description": "Success message after deleting a branch."
+  },
+  "saveChanges": "حفظ التعديلات",
+  "@saveChanges": {
+    "description": "Button to save edited branch name."
+  },
+  "networkStatusOffline": "غير متصل بالشبكة",
+  "@networkStatusOffline": {
+    "description": "Offline network status indicator"
+  },
+  "networkStatusOnline": "متصل بالشبكة",
+  "@networkStatusOnline": {
+    "description": "Online network status indicator"
+  },
+  "noAccountContact": "ليس لديك حساب؟ تواصل على الرقم التالي",
+  "@noAccountContact": {
+    "description": "No account contact text on login screen"
+  },
+  "noAccountTitle": "ليس لديك حساب؟",
+  "@noAccountTitle": {
+    "description": "No account title text on login screen"
+  },
+  "noAccountSubtitle": "تواصل على الرقم التالي",
+  "@noAccountSubtitle": {
+    "description": "No account subtitle text on login screen"
+  },
+  "contactNumber": "01211857725",
+  "@contactNumber": {
+    "description": "Contact phone number"
+  },
+  "darkMode": "الوضع الداكن",
+  "@darkMode": {
+    "description": "Dark mode setting label"
+  },
+  "privacyPolicy": "سياسة الخصوصية",
+  "@privacyPolicy": {
+    "description": "Privacy policy setting label"
+  },
+  "helpCenter": "مركز المساعدة",
+  "@helpCenter": {
+    "description": "Help center setting label"
+  },
+  "version": "مندوب تسهيل - الإصدار {version}",
+  "@version": {
+    "description": "App version label in settings",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "account": "الحساب",
+  "@account": {
+    "description": "Account section header"
+  },
+  "privacyPolicyDesc": "توضح سياسة الخصوصية هذه كيف نقوم بجمع، استخدام، والإفصاح عن معلوماتك الشخصية عند استخدامك لخدمات المندوب. نحن ملتزمون بحماية خصوصيتك وضمان التعامل مع بياناتك بشكل آمن.",
+  "@privacyPolicyDesc": {
+    "description": "Main privacy policy description"
+  },
+  "locationData": "بيانات الموقع",
+  "@locationData": {
+    "description": "Location data section title"
+  },
+  "locationDataDesc": "يجمع تطبيقنا بيانات الموقع لتمكين تتبع الطلبات في الوقت الفعلي ومطابقة المناديب مع الطلبات القريبة حتى عندما يكون التطبيق مغلقاً أو غير مستخدم. هذه البيانات أساسية للوظيفة الأساسية لخدمتنا.",
+  "@locationDataDesc": {
+    "description": "Location data section description"
+  },
+  "cameraAccess": "الوصول للكاميرا",
+  "@cameraAccess": {
+    "description": "Camera access section title"
+  },
+  "cameraAccessDesc": "نطلب الوصول إلى الكاميرا للسماح لك بالتقاط صور الفواتير، الطرود أو إثباتات التوصيل. يتم التقاط الصور فقط عندما تستخدم ميزة الكاميرا بوضوح داخل التطبيق.",
+  "@cameraAccessDesc": {
+    "description": "Camera access section description"
+  },
+  "dataSecurity": "أمن البيانات",
+  "@dataSecurity": {
+    "description": "Data security section title"
+  },
+  "dataSecurityDesc": "نطبّق معايير الأمان المعتمدة في الصناعة لحماية بياناتك. نحن لا نبيع بياناتك الشخصية. تتم مشاركة معلوماتك فقط مع الشركاء المعتمدين لمعالجة الخدمات.",
+  "@dataSecurityDesc": {
+    "description": "Data security section description"
+  },
+  "contactUs": "تواصل معنا",
+  "@contactUs": {
+    "description": "Contact Us section title"
+  },
+  "website": "الموقع الإلكتروني",
+  "@website": {
+    "description": "Website label"
+  },
+  "emailAddress": "البريد الإلكتروني",
+  "@emailAddress": {
+    "description": "Email address label"
+  },
+  "egyptOffice": "مكتب مصر",
+  "@egyptOffice": {
+    "description": "Egypt office label"
+  },
+  "uaeOffice": "مكتب الإمارات",
+  "@uaeOffice": {
+    "description": "UAE office label"
+  },
+  "swPointWebsite": "https://sw-point.com/",
+  "@swPointWebsite": {
+    "description": "SwitchPoint website value"
+  },
+  "swPointEmail": "support@sw-point.com",
+  "@swPointEmail": {
+    "description": "SwitchPoint support email value"
+  },
+  "swPointEgyptPhone": "Alexandria, Egypt +20 121 185 7725",
+  "@swPointEgyptPhone": {
+    "description": "SwitchPoint Egypt phone value"
+  },
+  "swPointUaePhone": "United Arab Emirates WhatsApp: +971 55 871 5615",
+  "@swPointUaePhone": {
+    "description": "SwitchPoint UAE phone value"
+  },
+  "createAdmin": "إنشاء أدمن",
+  "@createAdmin": {
+    "description": "Create admin screen title and button"
+  },
+  "adminName": "اسم الأدمن",
+  "@adminName": {
+    "description": "Admin name field label"
+  },
+  "adminPhone": "رقم الهاتف",
+  "@adminPhone": {
+    "description": "Admin phone field label"
+  },
+  "adminEmail": "البريد الإلكتروني",
+  "@adminEmail": {
+    "description": "Admin email field label"
+  },
+  "pleaseEnterAdminName": "يرجى إدخال اسم الأدمن",
+  "@pleaseEnterAdminName": {
+    "description": "Admin name validation error"
+  },
+  "pleaseEnterAdminPhone": "يرجى إدخال رقم الهاتف",
+  "@pleaseEnterAdminPhone": {
+    "description": "Admin phone validation error"
+  },
+  "pleaseEnterAdminEmail": "يرجى إدخال البريد الإلكتروني",
+  "@pleaseEnterAdminEmail": {
+    "description": "Admin email validation error"
+  },
+  "invalidPhoneNumber": "رقم هاتف غير صالح",
+  "@invalidPhoneNumber": {
+    "description": "Invalid phone number validation error"
+  },
+  "invalidEmail": "بريد إلكتروني غير صالح",
+  "@invalidEmail": {
+    "description": "Invalid email validation error"
+  },
+  "adminCreatedSuccessfully": "تم إنشاء حساب الأدمن بنجاح! تم إرسال بريد التفعيل.",
+  "@adminCreatedSuccessfully": {
+    "description": "Admin created success message"
+  },
+  "manageAdmins": "إدارة الأدمن",
+  "@manageAdmins": {
+    "description": "Manage admins menu item"
+  },
+  "noAdminsFound": "لا يوجد أدمن",
+  "@noAdminsFound": {
+    "description": "Empty admins list message"
+  },
+  "suspended": "موقوف",
+  "@suspended": {
+    "description": "Suspended status badge"
+  },
+  "editAdmin": "تعديل",
+  "@editAdmin": {
+    "description": "Edit admin action"
+  },
+  "deleteAdmin": "حذف",
+  "@deleteAdmin": {
+    "description": "Delete admin action"
+  },
+  "suspendAdmin": "إيقاف",
+  "@suspendAdmin": {
+    "description": "Suspend admin action"
+  },
+  "activateAdmin": "تفعيل",
+  "@activateAdmin": {
+    "description": "Activate admin action"
+  },
+  "deleteAdminConfirmation": "هل أنت متأكد من حذف هذا الأدمن؟ لا يمكن التراجع عن هذا الإجراء.",
+  "@deleteAdminConfirmation": {
+    "description": "Delete admin confirmation message"
+  },
+  "cancel": "إلغاء",
+  "@cancel": {
+    "description": "Cancel button text"
+  },
+  "companyDelegates": "المناديب",
+  "@companyDelegates": {
+    "description": "Company delegates screen title"
+  },
+  "viewAttendance": "عرض الحضور",
+  "@viewAttendance": {
+    "description": "View attendance button"
+  },
+  "noDelegatesFound": "لا يوجد مناديب",
+  "@noDelegatesFound": {
+    "description": "Empty delegates list message"
+  },
+  "viewProfileData": "عرض البيانات",
+  "@viewProfileData": {
+    "description": "View profile data button text"
+  },
+  "addDelegate": "إضافة مندوب",
+  "@addDelegate": {
+    "description": "Add delegate button text"
+  },
+  "addDelegateViaWeb": "إضافة عبر الموقع",
+  "@addDelegateViaWeb": {
+    "description": "Add delegate via web title"
+  },
+  "tasks": "المهام",
+  "@tasks": {
+    "description": "Tasks tab or screen title"
+  },
+  "todayOverview": "نظرة عامة اليوم",
+  "@todayOverview": {
+    "description": "Dashboard section title"
+  },
+  "totalDelegates": "إجمالي المناديب",
+  "@totalDelegates": {
+    "description": "Total delegates card title"
+  },
+  "checkedInToday": "الحاضرون اليوم",
+  "@checkedInToday": {
+    "description": "Checked in today card title"
+  },
+  "absentToday": "الغائبون",
+  "addTask": "إضافة مهمة",
+  "@addTask": {
+    "description": "Button text to add a new task"
+  },
+  "taskTitle": "عنوان المهمة",
+  "@taskTitle": {
+    "description": "Label for task title input"
+  },
+  "taskDescription": "وصف المهمة",
+  "@taskDescription": {
+    "description": "Label for task description input"
+  },
+  "taskPriority": "الأولوية",
+  "@taskPriority": {
+    "description": "Label for task priority selection"
+  },
+  "high": "عالية",
+  "@high": {
+    "description": "High priority label"
+  },
+  "medium": "متوسطة",
+  "@medium": {
+    "description": "Medium priority label"
+  },
+  "low": "منخفضة",
+  "@low": {
+    "description": "Low priority label"
+  },
+  "taskDueDate": "تاريخ التنفيذ",
+  "@taskDueDate": {
+    "description": "Label for task due date input"
+  },
+  "assignTo": "تعيين إلى",
+  "@assignTo": {
+    "description": "Label for assigning task to a delegate"
+  },
+  "all": "الكل",
+  "@all": {
+    "description": "Filter option for all items"
+  },
+  "today": "اليوم",
+  "@today": {
+    "description": "Today label"
+  },
+  "yesterday": "أمس",
+  "@yesterday": {
+    "description": "Yesterday label"
+  },
+  "allDelegates": "جميع المناديب",
+  "@allDelegates": {
+    "description": "Option for assigning task to all delegates"
+  },
+  "createTask": "إنشاء مهمة",
+  "@createTask": {
+    "description": "Button text to create a task"
+  },
+  "taskCreatedSuccessfully": "تم إنشاء المهمة بنجاح",
+  "@taskCreatedSuccessfully": {
+    "description": "Success message after creating a task"
+  },
+  "taskUpdatedSuccessfully": "تم تحديث المهمة بنجاح",
+  "@taskUpdatedSuccessfully": {
+    "description": "Success message after updating a task"
+  },
+  "noTasksFound": "لا توجد مهام حالياً",
+  "@noTasksFound": {
+    "description": "Message shown when no tasks match the filter"
+  },
+  "taskStatus": "حالة المهمة",
+  "@taskStatus": {
+    "description": "Label for task status selection"
+  },
+  "taskPending": "معلقة",
+  "@taskPending": {
+    "description": "Pending task status label"
+  },
+  "taskInProgress": "قيد التنفيذ",
+  "@taskInProgress": {
+    "description": "In Progress task status label"
+  },
+  "taskCompleted": "منجزة",
+  "@taskCompleted": {
+    "description": "Completed task status label"
+  },
+  "taskCancelled": "ملغاة",
+  "@taskCancelled": {
+    "description": "Cancelled task status label"
+  },
+  "taskDetails": "تفاصيل المهمة",
+  "@taskDetails": {
+    "description": "Task details title"
+  },
+  "taskSchedule": "الجدول الزمني",
+  "@taskSchedule": {
+    "description": "Task schedule title"
+  },
+  "selectDelegate": "اختر المندوب",
+  "@selectDelegate": {
+    "description": "Select delegate label"
+  },
+  "myTasks": "مهامي",
+  "@myTasks": {
+    "description": "Title for the delegate's tasks screen"
+  },
+  "noTasksYet": "لا توجد مهامي بعد",
+  "@noTasksYet": {
+    "description": "Message when no tasks are assigned to the delegate"
+  },
+  "complete": "إكمال",
+  "@complete": {
+    "description": "Button text to complete a task"
+  },
+  "delete": "حذف",
+  "@delete": {
+    "description": "General delete button text"
+  },
+  "deleteTask": "حذف المهمة",
+  "@deleteTask": {
+    "description": "Title for delete task dialog/button"
+  },
+  "deleteTaskConfirmation": "هل أنت متأكد من رغبتك في حذف هذه المهمة؟ لا يمكن التراجع عن هذا الإجراء.",
+  "@deleteTaskConfirmation": {
+    "description": "Confirmation message for deleting a task"
+  },
+  "notes": "الملاحظات",
+  "@notes": {
+    "description": "Label for task notes"
+  },
+  "@absentToday": {
+    "description": "Absent today card title"
+  },
+  "tasksSummary": "ملخص المهام",
+  "@tasksSummary": {
+    "description": "Title for the task summary card on home screen"
+  },
+  "total": "الإجمالي",
+  "@total": {
+    "description": "Label for total count"
+  },
+  "searchDelegates": "البحث عن مندوب...",
+  "@searchDelegates": {
+    "description": "Placeholder for searching delegates"
+  },
+  "filterByStatus": "تصفية حسب الحالة",
+  "@filterByStatus": {
+    "description": "Label for status filter"
+  },
+  "noDelegateSearchResults": "لا توجد نتائج مطابقة لبحثك",
+  "@noDelegateSearchResults": {
+    "description": "Message shown when no delegates match search or filter"
+  },
+  "notifications": "الإشعارات",
+  "@notifications": {
+    "description": "Notifications page title"
+  },
+  "noNotifications": "لا توجد إشعارات",
+  "@noNotifications": {
+    "description": "Message when there are no notifications"
+  },
+  "markAllRead": "تعليم الكل كمقروء",
+  "@markAllRead": {
+    "description": "Button to mark all notifications as read"
+  },
+  "newNotification": "إشعار جديد",
+  "@newNotification": {
+    "description": "New notification label"
+  },
+  "searchCompanies": "البحث عن الشركات",
+  "@searchCompanies": {
+    "description": "Search companies screen title"
+  },
+  "searchCompaniesHint": "ابحث عن الشركات باستخدام كود الشركة",
+  "@searchCompaniesHint": {
+    "description": "Hint text for company search"
+  },
+  "enterCompanyCode": "أدخل كود الشركة",
+  "@enterCompanyCode": {
+    "description": "Placeholder for company code search input"
+  },
+  "clear": "مسح",
+  "@clear": {
+    "description": "Clear button text"
+  },
+  "noCompaniesFound": "لا توجد شركات",
+  "@noCompaniesFound": {
+    "description": "Message when no companies are found"
+  },
+  "searchQuery": "البحث",
+  "@searchQuery": {
+    "description": "Search query label"
+  },
+  "errorOccurred": "حدث خطأ",
+  "@errorOccurred": {
+    "description": "Error occurred message"
+  },
+  "tryAgain": "حاول مرة أخرى",
+  "@tryAgain": {
+    "description": "Try again button text"
+  },
+  "manageMarketing": "إدارة موظفي التسويق",
+  "@manageMarketing": {
+    "description": "Manage marketing employees menu item"
+  },
+  "noMarketingEmployeesFound": "لا يوجد موظفي تسويق",
+  "@noMarketingEmployeesFound": {
+    "description": "Empty marketing employees list message"
+  },
+  "searchByPhone": "البحث برقم الموبايل...",
+  "@searchByPhone": {
+    "description": "Search by phone number placeholder"
+  },
+  "filterByOrganization": "تصفية حسب المنظمة",
+  "@filterByOrganization": {
+    "description": "Filter by organization label"
+  },
+  "allOrganizations": "جميع المنظمات",
+  "@allOrganizations": {
+    "description": "All organizations filter option"
+  },
+  "marketingEmployee": "موظف تسويق",
+  "@marketingEmployee": {
+    "description": "Marketing employee label"
+  },
+  "editMarketingEmployee": "تعديل بيانات الموظف",
+  "@editMarketingEmployee": {
+    "description": "Edit marketing employee action"
+  },
+  "deleteMarketingEmployee": "حذف الموظف",
+  "@deleteMarketingEmployee": {
+    "description": "Delete marketing employee action"
+  },
+  "deleteMarketingEmployeeConfirmation": "هل أنت متأكد من حذف هذا الموظف؟ لا يمكن التراجع عن هذا الإجراء.",
+  "@deleteMarketingEmployeeConfirmation": {
+    "description": "Delete marketing employee confirmation"
+  },
+  "suspendMarketingEmployee": "إيقاف الموظف",
+  "@suspendMarketingEmployee": {
+    "description": "Suspend marketing employee action"
+  },
+  "activateMarketingEmployee": "تفعيل الموظف",
+  "@activateMarketingEmployee": {
+    "description": "Activate marketing employee action"
+  },
+  "employeeSuspended": "تم إيقاف الموظف",
+  "@employeeSuspended": {
+    "description": "Employee suspended success message"
+  },
+  "employeeActivated": "تم تفعيل الموظف",
+  "@employeeActivated": {
+    "description": "Employee activated success message"
+  },
+  "employeeDeleted": "تم حذف الموظف بنجاح",
+  "@employeeDeleted": {
+    "description": "Employee deleted success message"
+  },
+  "employeeUpdated": "تم تحديث بيانات الموظف بنجاح",
+  "@employeeUpdated": {
+    "description": "Employee updated success message"
+  },
+  "employeeName": "اسم الموظف",
+  "@employeeName": {
+    "description": "Employee name field label"
+  },
+  "employeePhone": "رقم الهاتف",
+  "@employeePhone": {
+    "description": "Employee phone field label"
+  },
+  "employeeEmail": "البريد الإلكتروني",
+  "@employeeEmail": {
+    "description": "Employee email field label"
+  },
+  "organization": "المنظمة",
+  "@organization": {
+    "description": "Organization label"
+  },
+  "forgotCheckoutTitle": "تنبيه حضور معلق",
+  "@forgotCheckoutTitle": {
+    "description": "Title for forgot checkout dialog"
+  },
+  "forgotCheckoutMessage": "لديك حضور معلق في {oldBranch}. هل تريد تسجيل الانصراف منه وتسجيل الحضور في {newBranch}؟",
+  "@forgotCheckoutMessage": {
+    "description": "Message for forgot checkout in a different branch",
+    "placeholders": {
+      "oldBranch": {
+        "type": "String"
+      },
+      "newBranch": {
+        "type": "String"
+      }
+    }
+  },
+  "previousDayCheckoutMessage": "لديك حضور معلق من يوم سابق في {oldBranch}. سيتم إغلاقه وتسجيل حضورك لليوم في {newBranch}.",
+  "@previousDayCheckoutMessage": {
+    "description": "Message for forgot checkout from a previous day",
+    "placeholders": {
+      "oldBranch": {
+        "type": "String"
+      },
+      "newBranch": {
+        "type": "String"
+      }
+    }
+  },
+  "confirmAction": "تأكيد",
+  "@confirmAction": {
+    "description": "Confirm button text"
+  },
+  "photoPermissions": "أذونات التصوير",
+  "@photoPermissions": {
+    "description": "Photo permissions section or screen title"
+  },
+  "photoPermissionsDesc": "إدارة أذونات التصوير ومتابعة تقارير الصور",
+  "@photoPermissionsDesc": {
+    "description": "Description of photo permissions feature"
+  },
+  "supervisor": "مشرف",
+  "@supervisor": {
+    "description": "Supervisor role label"
+  },
+  "supervisorUser": "مشرف: {name}",
+  "@supervisorUser": {
+    "description": "Supervisor greeting label",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "adminUser": "المدير: {name}",
+  "@adminUser": {
+    "description": "Admin greeting label",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentReceiptsReport": "تقرير إيصالات الدفع الإلكتروني",
+  "@paymentReceiptsReport": {
+    "description": "Payment receipts upload report screen title"
+  },
+  "uploadsCount": "عدد الإيصالات",
+  "@uploadsCount": {
+    "description": "Uploaded receipts count label"
+  },
+  "totalUploadedReceipts": "إجمالي الإيصالات",
+  "@totalUploadedReceipts": {
+    "description": "Total uploaded receipts summary label"
+  },
+  "companiesWithUploads": "الشركات المفعلة",
+  "@companiesWithUploads": {
+    "description": "Companies with uploaded receipts summary label"
+  },
+  "receiptsReport": "تقرير إيصالات الدفع الإلكتروني",
+  "@receiptsReport": {
+    "description": "Receipts report menu item text"
+  },
+  "accountant": "إدارة الحسابات",
+  "@accountant": {
+    "description": "Accountant role title"
+  },
+  "accountantDashboard": "لوحة تحكم الحسابات والماليات",
+  "@accountantDashboard": {
+    "description": "Accountant dashboard title"
+  },
+  "financialReports": "التقارير المالية",
+  "@financialReports": {
+    "description": "Financial reports label"
+  },
+  "paymentReceipts": "إيصالات السداد",
+  "@paymentReceipts": {
+    "description": "Payment receipts label"
+  },
+  "subscriptionRequests": "طلبات الاشتراك",
+  "@subscriptionRequests": {
+    "description": "Subscription requests label"
+  },
+  "walletsManagement": "إدارة المحافظ",
+  "@walletsManagement": {
+    "description": "Wallets management label"
+  },
+  "violationsPolicy": "لائحة المخالفات",
+  "myViolations": "مخالفاتي",
+  "switchOrganization": "تبديل المنظمة",
+  "manageOrganizationsChains": "إدارة المنظمات والسلاسل",
+  "delegateSubscriptionsMenu": "اشتراكات واعتماد المندوبين",
+  "mainMenu": "القائمة الرئيسية",
+  "navRequests": "طلباتي",
+  "navPhotoReports": "تقارير الصور",
+  "roleDelegate": "مندوب",
+  "roleSupervisor": "مشرف",
+  "roleCompanyAdmin": "مسؤول شركة",
+  "roleSuperAdmin": "سوبر أدمن",
+  "roleOrgAdmin": "أدمن منظمة",
+  "roleTechSupport": "دعم فني",
+  "roleMarketing": "تسويق",
+  "roleHr": "موارد بشرية (HR)",
+  "defaultUserName": "مستخدم",
+  "offlineBannerTitle": "أنت غير متصل",
+  "offlineLastSync": "آخر تحديث {time}",
+  "offlineNoSyncYet": "سيتم التحديث عند عودة الاتصال",
+  "offlineNotifications": "لا يمكن تحميل الإشعارات بدون إنترنت. اتصل بالإنترنت وحاول مرة أخرى.",
+  "refreshFailed": "تعذّر التحديث. تحقق من الاتصال وحاول مرة أخرى.",
+  "startPhotosCta": "ابدأ التصوير",
+  "switchOn": "مفعّل",
+  "switchOff": "متوقف",
+  "releaseVersionDate": "الإصدار {version} – {date}",
+  "feedbackTypeFeature": "فكرة تطويرية",
+  "feedbackTypeBug": "الإبلاغ عن مشكلة",
+  "feedbackTypeQuestion": "استفسار عام",
+  "feedbackTypeImprovement": "تحسين",
+  "feedbackTypeOther": "أخرى",
+  "reqTitle": "طلباتي",
+  "refreshAction": "تحديث",
+  "newRequest": "طلب جديد",
+  "reqEmptyAll": "لا توجد طلبات بعد",
+  "reqEmptyFilter": "لا توجد طلبات بهذه الحالة",
+  "reqEmptyHint": "اضغط «طلب جديد» لإرسال طلبك إلى المشرف",
+  "annualLeaveBalance": "رصيد الإجازات السنوي",
+  "weeklyOffPlan": "نظام الراحة الأسبوعية",
+  "daysOffPerMonth": "4 أيام راحة شهريًا",
+  "weeklyDayOff": "راحة أسبوعية",
+  "oneDayEvery7": "يوم كل 7 أيام",
+  "hourlyPermission": "استئذان بالساعة",
+  "availableLabel": "متاح",
+  "annualBalance21": "السنوي: 21 يومًا",
+  "onceActivated": "بعد التفعيل",
+  "filterAll": "الكل",
+  "statusPendingReview": "قيد المراجعة",
+  "statusApprovedPl": "مقبولة",
+  "statusRejectedPl": "مرفوضة",
+  "leaveSick": "إجازة مرضية",
+  "leaveEmergency": "إجازة عارضة",
+  "excuseLate": "عذر تأخير",
+  "excuseEarlyLeave": "إذن انصراف مبكر",
+  "excuseAbsence": "غياب بعذر",
+  "leaveUnpaid": "إجازة بدون أجر",
+  "leaveAnnual": "إجازة اعتيادية",
+  "statusApproved": "مقبول",
+  "statusRejected": "مرفوض",
+  "statusPending": "قيد المراجعة",
+  "previewAttachment": "معاينة المرفق",
+  "cancelRequest": "إلغاء الطلب",
+  "cancelRequestConfirm": "هل تريد إلغاء هذا الطلب؟",
+  "keepRequest": "تراجع",
+  "yesCancel": "نعم، إلغاء",
+  "requestCancelled": "تم إلغاء الطلب",
+  "requestType": "نوع الطلب",
+  "weeklyPlanAvailableInfo": "المتاح لك حاليًا: استئذان بالساعة، أو غياب بعذر، أو إجازة بدون أجر.",
+  "remainingDays": "المتبقي: {count} يوم",
+  "usedDays": "المستهلك: {count} يوم",
+  "totalQuotaDays": "إجمالي الرصيد: {count} يوم",
+  "forYear": "لعام {year}",
+  "reasonLabel": "السبب: {reason}",
+  "rejectReasonLabel": "سبب الرفض: {reason}",
+  "approvedBy": "اعتمده: {name}",
+  "homeSupervisorsTitle": "المشرفون",
+  "homeGreeting": "أهلًا، {firstName}",
+  "roleFieldSupervisor": "مشرف ميداني",
+  "homeCoreDuties": "مهامك الأساسية",
+  "homeDutyAttendance": "سجّل حضورك وانصرافك من موقع الفرع.",
+  "homeDutyTasks": "نفّذ مهامك اليومية وتابِعها.",
+  "homeDutyPhotos": "صوّر العروض والعلامات التجارية في الهايبر ماركت والفروع.",
+  "companySupervisor": "مشرف الشركة",
+  "supervisorOfCompany": "مشرف – {companyName}",
+  "assignedCompanySupervisor": "مشرف الشركة المنتدبة",
+  "callAction": "اتصال",
+  "offerPhotosTitle": "تصوير العروض",
+  "offerPhotosSubtitle": "صوّر العروض المعتمدة وارفعها من داخل الهايبر ماركت",
+  "homeAttendanceSummary": "الحضور والغياب – {monthName}",
+  "detailsAction": "التفاصيل",
+  "statAttended": "حضور",
+  "daysCount": "{count, plural, =0{0 يوم} =1{يوم واحد} =2{يومان} few{{count} أيام} many{{count} يومًا} other{{count} يوم}}",
+  "statAbsent": "غياب",
+  "statDaysOff": "إجازة",
+  "leavesOfFour": "{count} من 4 أيام",
+  "workPolicyNote": "26 يوم عمل شهريًا • 4 أيام راحة لا تُحسب غيابًا",
+  "chainGomlaMarket": "جملة ماركت",
+  "chainFathallaMarket": "فتح الله ماركت",
+  "chainZahranMarket": "زهران ماركت",
+  "recentBranchActivity": "آخر النشاط",
+  "viewLog": "عرض السجل",
+  "unknownBranch": "فرع غير محدد",
+  "onShift": "على رأس العمل",
+  "durationHm": "{hours} س {minutes} د",
+  "branchLabel": "الفرع: {cleanBranchName}",
+  "homeRequestsSubtitle": "قدّم طلبات الإجازة والأعذار وتابع رصيدك",
+  "companySupervisorWithName": "مشرف الشركة ({companyName})",
+  "errorWithMessage": "خطأ: {error}",
+  "noSupervisorForCompany": "لا يوجد مشرف مسجّل لهذه الشركة حاليًا\n(Company ID: {companyUID})",
+  "pendingCountBadge": "{count} قيد المراجعة",
+  "orgMarketing": "إدارة التسويق",
+  "orgAdminPanel": "الإدارة",
+  "orgAccounting": "الحسابات والمالية",
+  "switchedToOrg": "تم التبديل إلى: {orgLabel}",
+  "unknownOrganization": "مؤسسة غير محددة",
+  "alreadyInOrg": "أنت تعمل ضمن هذه المنظمة بالفعل.",
+  "logoutConfirm": "تسجيل الخروج؟\nستُحفظ بياناتك المحلية قبل الخروج.",
+  "logoutFailed": "تعذّر تسجيل الخروج: {error}",
+  "backAction": "رجوع",
+  "sendFeedback": "إرسال ملاحظات",
+  "rateTheApp": "قيّم التطبيق",
+  "manageFeedback": "إدارة الملاحظات",
+  "myFeedback": "ملاحظاتي",
+  "photoPermissions2": "أذونات التصوير",
+  "appColor": "لون التطبيق",
+  "attCheckingZone": "جارٍ فحص النطاق...",
+  "attVerifyingCoords": "جارٍ التحقق من موقعك…",
+  "attInsideZone": "أنت داخل نطاق العمل",
+  "attWithinBranchRange": "داخل نطاق فرع {branch}",
+  "attOutsideZone": "أنت خارج نطاق العمل",
+  "attMoveCloserTo": "اقترب من فرع {branch} لتسجيل الحضور",
+  "attOutsideApprovedBranches": "أنت خارج نطاق الفروع المعتمدة",
+  "distanceKmM": "{km} كم ({meters} م)",
+  "previousMonth": "الشهر السابق",
+  "currentMonth": "الشهر الحالي",
+  "nextMonth": "الشهر التالي",
+  "attWorkPolicyNote": "26 يوم عمل • 4 أيام راحة لا تُحسب غيابًا",
+  "distanceLabel": "المسافة: {formattedDistance}",
+  "radiusLabel": "النطاق المسموح: {allowedRadius} م",
+  "recheckLocation": "تحقق مجددًا",
+  "activeChain": "السلسلة الحالية",
+  "allChains": "كل السلاسل",
+  "attNoSessionsInChain": "لا توجد سجلات حضور في {chain} هذا الشهر",
+  "attDaysInOtherChains": "لديك {count} يوم حضور مسجّل في السلاسل الأخرى.",
+  "attAutoClosedNote": "أُغلق الانصراف تلقائيًا بعد 11.5 ساعة من بداية الوردية لعدم تسجيله يدويًا",
+  "autoClosedAuto": "أُغلق تلقائيًا (11.5 س)",
+  "checkOut2": "تسجيل الانصراف",
+  "attCheckingLocation": "جارٍ فحص الموقع...",
+  "checkIn2": "تسجيل الحضور",
+  "noBranchesForOrg": "لا توجد فروع لهذه المؤسسة بعد",
+  "attYouAreWithinBranch": "أنت داخل نطاق فرع {branch}",
+  "attMoveCloser": "اقترب من الفرع لتسجيل الحضور",
+  "attCheckInSavedOffline": "سُجّل الحضور على الجهاز، وستتم المزامنة عند الاتصال بالإنترنت.",
+  "attCheckOutSavedOffline": "سُجّل الانصراف على الجهاز، وستتم المزامنة عند الاتصال بالإنترنت.",
+  "syncDone": "تمت المزامنة",
+  "syncFailed": "تعذّرت المزامنة",
+  "attDelegateOfCompany": "مندوب – {companyName}",
+  "attendanceLog": "سجل الحضور",
+  "distanceMeters": "{meters} م",
+  "attLocatingYou": "جارٍ تحديد موقعك والتحقق من الفروع...",
+  "attLocatingShort": "جارٍ تحديد موقعك…",
+  "attEarlyCheckOutTitle": "متأكد إنك عايز تسجّل انصراف؟",
+  "attEarlyCheckOutBody": "إنت لسه مسجّل حضور من {minutes} دقيقة. لو سجّلت انصراف دلوقتي هيتقفل الحضور ده.",
+  "@attEarlyCheckOutBody": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "attEarlyCheckOutConfirm": "أيوه، سجّل انصراف",
+  "attEarlyCheckOutCancel": "لأ، خليني حاضر",
+  "attLocationUnavailable": "تعذّر تحديد موقعك. فعّل GPS.",
+  "attInsideBranchWithDistance": "أنت داخل نطاق فرع {branch} ({meters} متر)",
+  "attOutsideBranchWithRadius": "أنت خارج نطاق الفرع ({meters} متر). النطاق المسموح: {radius} متر.",
+  "attEnsureGps": "تأكد من تشغيل GPS وانتظر حتى يُحدَّد موقعك.",
+  "attCannotActOutside": "لا يمكنك {action} وأنت خارج نطاق الفرع ({distance}). كن داخل الفرع.",
+  "attCheckingInAt": "تسجيل الحضور في {branchName}...",
+  "locationServicesOff": "خدمات الموقع متوقفة. فعّلها.",
+  "locationPermissionDenied2": "تم رفض إذن الوصول للموقع",
+  "locationPermissionDeniedForever": "الوصول إلى الموقع متوقف. فعّله من الإعدادات.",
+  "fakeGpsDetected": "تم اكتشاف تطبيق لتزييف الموقع. أوقفه لتتمكن من تسجيل الحضور والانصراف.",
+  "locationTimeout": "انتهى الوقت ولم نتمكن من تحديد موقعك. تأكد من تفعيل GPS وأنك في مكان مفتوح.",
+  "locationError": "تعذّر تحديد موقعك. حاول مرة أخرى.",
+  "trustedTime": "وقت موثوق",
+  "attActionCheckIn": "تسجيل الحضور",
+  "attActionCheckOut": "تسجيل الانصراف",
+  "userNotFound": "لم يتم العثور على المستخدم",
+  "accountNotIdentified": "تعذّر تحديد الحساب",
+  "profilePhotoUpdated": "تم تحديث الصورة الشخصية",
+  "photoUploadFailed": "تعذّر رفع الصورة: {error}",
+  "profilePhotoDeleted": "تم حذف الصورة الشخصية",
+  "photoDeleteFailed": "تعذّر حذف الصورة: {error}",
+  "profilePhoto": "الصورة الشخصية",
+  "takePhotoCamera": "التقط صورة بالكاميرا",
+  "chooseFromGallery": "اختر من معرض الصور",
+  "removeCurrentPhoto": "حذف الصورة",
+  "roleSuperAdmin2": "المشرف العام",
+  "roleTechSupport2": "الدعم الفني",
+  "roleOrgAdmin2": "مسؤول المنظمة",
+  "roleCompanyAdmin2": "مشرف الشركة",
+  "roleHrOfficer": "مسؤول موارد بشرية",
+  "roleAccountant": "إدارة الحسابات",
+  "roleMarketing2": "التسويق والعلاقات",
+  "personalInfo": "المعلومات الشخصية",
+  "nameLabel": "الاسم",
+  "emailLabel": "البريد الإلكتروني",
+  "phoneNumberLabel": "رقم الجوال",
+  "securitySection": "الأمان",
+  "changePassword": "تغيير كلمة المرور",
+  "editField": "تعديل {label}",
+  "nameUpdated": "تم تحديث الاسم",
+  "emailUpdated": "تم تحديث البريد الإلكتروني",
+  "phoneUpdated": "تم تحديث رقم الجوال",
+  "editName2": "تعديل الاسم",
+  "editEmail": "تعديل البريد الإلكتروني",
+  "editPhone": "تعديل رقم الجوال",
+  "fullName2": "الاسم الكامل",
+  "newEmail": "البريد الإلكتروني الجديد",
+  "newPhone": "رقم الجوال الجديد",
+  "enterName": "أدخل الاسم",
+  "enterEmail": "أدخل البريد الإلكتروني",
+  "enterPhone": "أدخل رقم الجوال",
+  "nameMin3": "يجب ألا يقل الاسم عن 3 أحرف",
+  "invalidEmail2": "أدخل بريدًا إلكترونيًا صحيحًا",
+  "invalidPhone": "أدخل رقم جوال صحيحًا",
+  "saveAction": "حفظ",
+  "passwordChanged": "تم تغيير كلمة المرور",
+  "currentPassword": "كلمة المرور الحالية",
+  "enterCurrentPassword": "أدخل كلمة المرور الحالية",
+  "newPassword": "كلمة المرور الجديدة",
+  "enterNewPassword": "أدخل كلمة المرور الجديدة",
+  "passwordMin6": "يجب ألا تقل كلمة المرور عن 6 أحرف",
+  "confirmPassword": "تأكيد كلمة المرور",
+  "enterConfirmPassword": "أكّد كلمة المرور",
+  "passwordsDontMatch": "كلمتا المرور غير متطابقتين",
+  "refreshPolicy": "تحديث",
+  "allPolicyItems": "كل البنود ({count})",
+  "penPolicyCardBody": "قيمة الخصم لكل مخالفة عند أول مرة وعند التكرار.",
+  "searchPolicy": "ابحث في اللائحة",
+  "allWithCount": "الكل ({count})",
+  "adminRestricted": "للإدارة فقط",
+  "firstTime": "أول مرة",
+  "amountEgp": "{amount} ج.م",
+  "whenRepeated": "عند التكرار",
+  "perManagementDecision": "حسب قرار الإدارة",
+  "plannedAction": "الإجراء: {action}",
+  "noResults": "لا توجد نتائج",
+  "tryOtherSearch": "جرّب كلمات أخرى أو تصنيفًا مختلفًا.",
+  "noViolationDocs": "لا توجد مرفقات",
+  "violationReceipt": "مستند المخالفة",
+  "closeAction": "إغلاق",
+  "imageLoadFailed": "تعذّر تحميل الصورة",
+  "openInBrowser": "فتح في المتصفح",
+  "attachedDocuments": "المرفقات",
+  "receiptNumber": "مستند {number}",
+  "photoReceipt": "صورة المستند",
+  "tapToPreview": "اضغط للمعاينة",
+  "tapToOpen": "اضغط للفتح",
+  "deleteAllNotifications": "حذف جميع الإشعارات",
+  "deleteAllNotificationsConfirm": "حذف كل الإشعارات من قائمتك؟\n(لن تظهر في حسابك مرة أخرى، لكنها تبقى في سجل النظام).",
+  "allNotificationsDeleted": "تم حذف كل الإشعارات من قائمتك",
+  "deleteAll": "حذف الكل",
+  "sendNewNotification": "إرسال إشعار",
+  "deleteNotification": "حذف الإشعار",
+  "deleteNotificationConfirm": "حذف هذا الإشعار من قائمتك؟\n(يبقى مسجّلًا في سجل النظام).",
+  "notificationDeleted": "تم حذف الإشعار",
+  "systemAdministration": "إدارة النظام",
+  "senderLine": "المرسل: {name} ({role})",
+  "markAsRead": "تحديد كمقروء",
+  "viewTask": "عرض المهمة",
+  "updateAppNow": "حدّث الآن",
+  "justNow": "الآن",
+  "taskCompletedConfirmed": "تم تأكيد إنجاز المهمة",
+  "taskStarted": "بدأت العمل على المهمة",
+  "noTasksNow": "لا توجد مهام حاليًا",
+  "tasksAppearHere": "ستظهر هنا المهام فور إسنادها إليك.",
+  "taskDeleted": "تم حذف المهمة",
+  "taskDeleteFailed": "تعذّر حذف المهمة: {error}",
+  "timeAgoDays": "{count, plural, =1{منذ يوم} =2{منذ يومين} few{منذ {count} أيام} many{منذ {count} يومًا} other{منذ {count} يوم}}",
+  "timeAgoHours": "{count, plural, =1{منذ ساعة} =2{منذ ساعتين} few{منذ {count} ساعات} many{منذ {count} ساعة} other{منذ {count} ساعة}}",
+  "timeAgoMinutes": "{count, plural, =1{منذ دقيقة} =2{منذ دقيقتين} few{منذ {count} دقائق} many{منذ {count} دقيقة} other{منذ {count} دقيقة}}",
+  "confirmDeletePhoto": "حذف الصورة؟",
+  "deletePhotoFromConfirm": "حذف هذه الصورة المرسلة من «{delegateName}» في فرع «{branch}»؟",
+  "photoDeletePermanentNote": "ستُحذف الصورة نهائيًا من قاعدة البيانات والتخزين.",
+  "deletePermanently": "حذف نهائي",
+  "chooseMonth": "اختر الشهر",
+  "photosCount": "{count, plural, =0{لا توجد صور} =1{صورة واحدة} =2{صورتان} few{{count} صور} many{{count} صورة} other{{count} صورة}}",
+  "photoReportsTitle": "تقارير الصور",
+  "refreshPhotos": "تحديث الصور",
+  "photosArchiveNote": "الصور محفوظة في أرشيف الشركة بشكل مستقل عن حسابات المندوبين",
+  "totalPhotos": "إجمالي الصور",
+  "branchesVisited": "الفروع",
+  "activeDelegates": "المندوبون النشطون",
+  "byDate": "حسب التاريخ",
+  "byBranch": "حسب الفرع",
+  "byDelegate": "حسب المندوب",
+  "photoReportsLoadFailed": "تعذّر تحميل تقارير الصور",
+  "unknownDelegate": "مندوب غير محدد",
+  "pendingOnPhone": "على الهاتف",
+  "uploadedToServer": "مرفوعة",
+  "noPhotosInMonth": "لا توجد صور في {month}",
+  "useArrowsForMonths": "استخدم الأسهم بالأعلى لعرض الشهور السابقة.",
+  "photoDetails": "تفاصيل الصورة",
+  "deletePhotoPermanently": "حذف الصورة نهائيًا",
+  "pinchToZoom": "قرّب بإصبعين لتكبير التفاصيل",
+  "deletePhoto": "حذف الصورة",
+  "photoSavedToGallery": "تم حفظ الصورة في معرض الهاتف.",
+  "grantPhotosPermission": "اسمح بالوصول إلى الصور من إعدادات الهاتف.",
+  "photoSaveFailed": "تعذّر حفظ الصورة: {error}",
+  "savingPhoto": "جارٍ حفظ الصورة...",
+  "savedToPhone": "تم الحفظ في الهاتف",
+  "savePhoto": "حفظ الصورة",
+  "branchField": "الفرع",
+  "capturedAtField": "وقت الالتقاط",
+  "delegateField": "المندوب",
+  "delegateCommentField": "تعليق المندوب",
+  "cameraOpenFailed": "تعذّر فتح الكاميرا: {error}",
+  "photoRemovedFromSession": "تم حذف الصورة",
+  "offerPhotosSupervisor": "تصوير العروض (مشرف)",
+  "photosSavedOffline": "حُفظت {count} صور على الجهاز، وستُرفع تلقائيًا عند الاتصال بالإنترنت.",
+  "photosUploaded": "تم رفع {count} صور وحفظ التقرير.",
+  "photoSavedOffline": "حُفظت الصورة على الجهاز، وستُرفع تلقائيًا عند الاتصال بالإنترنت.",
+  "photoUploaded": "تم رفع الصورة وحفظ التقرير.",
+  "loadingPhotoPermissions": "جارٍ تحميل أذونات التصوير...",
+  "choosePhotoPermission": "اختر إذن التصوير *",
+  "permissionOption": "{companyName}{dept} - {length} فرع",
+  "branchWithId": "فرع {id}",
+  "offerPhotoPermissionOf": "إذن التصوير: {companyName}",
+  "companyLabel2": "الشركة: {companyName}",
+  "departmentLabel": "القسم: {department}",
+  "noBranchesInPermissionFor": "لا توجد فروع مسجّلة لـ({organizationName}) في هذا الإذن.",
+  "noBranchesInPermission": "لا توجد فروع محددة لهذا الإذن حاليًا. تواصل مع مشرفك لإضافة الفروع.",
+  "chooseBranchOf": "اختر الفرع ({organizationName}) *",
+  "chooseBranchRequired": "اختر الفرع *",
+  "takeOfferPhotos": "صوّر العرض بالكاميرا",
+  "multiPhotoHint": "يمكنك التقاط عدة صور لمنتجات وستاندات هذا الفرع مرة واحدة",
+  "takeFirstPhoto": "التقط أول صورة",
+  "visitGallery": "صور الزيارة",
+  "addPhoto": "إضافة صورة",
+  "photoNumber": "صورة {number}",
+  "retakePhoto": "أعد التقاط هذه الصورة",
+  "addAction": "إضافة",
+  "visitNotesLabel": "ملاحظات الزيارة ({count} صور) (اختياري)",
+  "visitNotesHint": "مثال: تم عرض المنتجات وتنسيق الرف بالكامل والتأكد من وضوح الأسعار...",
+  "uploadingPhotoXofY": "جارٍ رفع الصورة {current} من {total}...",
+  "uploadingPhotosReport": "جارٍ رفع الصور وحفظ التقرير...",
+  "nameCompanySupervisor": "{fullName} (مشرف الشركة)",
+  "chooseBranchFirst": "اختر الفرع أولًا.",
+  "takeAtLeastOnePhoto": "التقط صورة واحدة على الأقل قبل الحفظ.",
+  "submitReportCount": "إرسال التقرير ({count} صور)",
+  "chooseBranchToStart": "اختر الفرع أولًا لبدء التصوير",
+  "chooseBranchHint": "حدد الفرع الذي أنت فيه من القائمة بالأعلى لتفعيل زر التصوير.",
+  "noPhotoPermissions": "لا توجد أذونات تصوير حاليًا",
+  "askSupervisorForPermission": "تواصل مع مشرفك لطلب إذن تصوير.",
+  "photoReportsOf": "تقارير الصور: {companyName}",
+  "loadingPhotoReports": "جارٍ تحميل تقارير الصور...",
+  "noUploadedPhotos": "لا توجد صور مرفوعة بعد",
+  "filterByBranch": "تصفية حسب الفرع",
+  "allBranches": "كل الفروع",
+  "filterByDelegate": "تصفية حسب المندوب",
+  "allDelegates2": "كل المندوبين",
+  "shownResults": "المعروض: {shown} من {total}",
+  "clearFilters": "مسح الفلاتر",
+  "noComment": "بدون تعليق",
+  "showMorePhotos": "عرض المزيد ({count} صورة إضافية)",
+  "loadingPhotosReports": "جارٍ تحميل الصور والتقارير...",
+  "syncingPhotosXofY": "جارٍ رفع الصور ({synced} من {total})...",
+  "syncingRemainingPhotos": "جارٍ رفع الصور المتبقية...",
+  "photosSavedOnPhone": "{count} صور محفوظة على الهاتف",
+  "waitingToUpload": "ستُرفع عند الاتصال بالإنترنت",
+  "syncNow": "مزامنة الآن",
+  "noFeedbackYet": "لا توجد ملاحظات بعد",
+  "sendFirstFeedback": "أرسل ملاحظتك الأولى",
+  "adminResponse": "رد الإدارة",
+  "feedbackIntro": "رأيك يهمنا، ساعدنا نحسّن التطبيق",
+  "feedbackType": "النوع",
+  "yourMessage": "رسالتك",
+  "feedbackHint": "اكتب ملاحظتك",
+  "enterMessage": "اكتب رسالتك",
+  "messageTooShort": "الرسالة قصيرة جدًا (10 أحرف على الأقل)",
+  "screenshotOptional": "لقطة شاشة (اختياري)",
+  "chooseImage": "اختر صورة",
+  "sendAction": "إرسال",
+  "thankYou": "شكرًا لك!",
+  "feedbackReceived": "استلمنا ملاحظتك وسنراجعها قريبًا.",
+  "okAction": "حسنًا",
+  "loginSubtitleStaff": "اختر نوع الحساب وسجّل الدخول بكلمة المرور",
+  "loginSubtitleDelegate": "اختر نوع الحساب وأدخل بياناتك",
+  "staffLabel": "موظف إداري",
+  "forgotPasswordQ": "نسيت كلمة المرور؟",
+  "phoneHelper": "رقم الجوال المسجَّل في الشركة",
+  "nationalIdHelper": "14 رقمًا",
+  "showAction": "إظهار",
+  "hideAction": "إخفاء",
+  "enterPassword2": "أدخل كلمة المرور",
+  "signingIn": "جارٍ تسجيل الدخول…",
+  "contactSupport": "تواصل مع الدعم الفني",
+  "checkHighlightedFields": "راجع الحقول المحددة",
+  "resetLinkSentIfRegistered": "إذا كان البريد مسجّلًا، سيصلك رابط لتغيير كلمة المرور.",
+  "resetLinkFailed": "تعذّر إرسال رابط تغيير كلمة المرور. حاول مرة أخرى.",
+  "forgotPassword": "نسيت كلمة المرور",
+  "sendLink": "إرسال الرابط",
+  "selectOrganization": "اختر المؤسسة",
+  "multipleOrgsChoose": "أنت مسجّل في أكثر من مؤسسة. اختر واحدة للمتابعة.",
+  "weeklyPlanNote": "لك يوم راحة كل أسبوع (4 أيام شهريًا). يُفعَّل رصيد الإجازة السنوية بعد موافقة المشرف.",
+  "dateWithHours": "{date} • ({hours} س)",
+  "hoursCount": "{count} ساعة",
+  "cancelRequestFailed": "تعذّر إلغاء الطلب: {error}",
+  "requestAttachment": "مرفق",
+  "attachmentLoadFailed": "تعذّر تحميل صورة المرفق",
+  "annualLeaveFromBalance": "إجازة سنوية (تُخصم من الرصيد السنوي)",
+  "annualLeaveUnavailable": "إجازة سنوية (غير متاحة حاليًا)",
+  "lateArrivalHourly": "تأخير صباحي (بالساعة)",
+  "earlyLeaveHourly": "انصراف مبكر (بالساعة)",
+  "excusedAbsenceFullDay": "غياب بعذر (يوم كامل)",
+  "dateField": "التاريخ",
+  "timeField": "الوقت",
+  "fromField": "من",
+  "toField": "إلى",
+  "periodField": "الفترة",
+  "daysExceedBalance": "الأيام المطلوبة ({requested} يوم) أكثر من رصيدك المتبقي ({remaining} يوم)",
+  "reasonField": "السبب",
+  "reasonHint": "اكتب السبب باختصار",
+  "attachmentOptional": "مرفق (اختياري)",
+  "cameraLabel": "الكاميرا",
+  "galleryLabel": "المعرض",
+  "sendingRequest": "جارٍ رفع المرفق وإرسال الطلب إلى المشرف...",
+  "enterLeaveReason": "اكتب سبب الإجازة أو العذر",
+  "annualNotActive": "رصيد الإجازة السنوية غير مفعّل لحسابك حاليًا. اختر نوعًا آخر.",
+  "requestSent": "أُرسل طلبك إلى المشرف وهو قيد المراجعة.",
+  "sendRequestFailed": "تعذّر إرسال الطلب: {error}",
+  "sendingEllipsis": "جارٍ الإرسال…",
+  "durationLabel": "المدة: {duration}",
+  "settingsGeneral": "عام",
+  "senderRoleSystem": "النظام",
+  "senderRoleCompanySupervisor": "مشرف الشركة",
+  "senderRoleOrgAdmin": "مسؤول المؤسسة",
+  "senderRoleBranchesMarketing": "مسؤول تسويق الفروع",
+  "senderRolePromotionMarketing": "مسؤول تسويق العروض",
+  "senderRoleMarketing": "مسؤول التسويق",
+  "senderRoleTechSupport": "الدعم الفني",
+  "codeLabel": "كود: {code}",
+  "policyOfficialSubtitle": "دليل بنود المخالفات والجزاءات المالية الرسمية",
+  "catBranchRules": "مخالفة تعليمات الفرع",
+  "catTheftDamage": "سرقة / تلفيات",
+  "chainCarrefour": "كارفور",
+  "chainBeitElGomla": "بيت الجملة",
+  "penSelectBranchesFirst": "يرجى تحديد فرع أو أكثر لتثبيتها كقطاع افتراضي",
+  "penDefaultUnpinned": "تم إلغاء تثبيت القطاع الافتراضي للفروع",
+  "penBranchPinned": "تم تثبيت الفرع كفرع افتراضي لقسم الغرامات",
+  "penBranchesPinned": "تم تثبيت ({count} فروع) كقطاع افتراضي لقسم الغرامات",
+  "penSelectDisplayBranches": "تحديد فروع العرض (قطاع الفروع)",
+  "penShowingAllBranches": "يتم عرض جميع الفروع حاليًا",
+  "penBranchesSelected": "تم تحديد {count} فرع للفلترة",
+  "clearSelection": "مسح التحديد",
+  "searchBranchName": "ابحث باسم الفرع…",
+  "allBranchesAll": "جميع الفروع (الكل)",
+  "selectAll": "تحديد الكل",
+  "noMatchingBranches": "لا توجد فروع مطابقة للبحث",
+  "inDefault": "ضمن الافتراضي",
+  "confirmShowAllBranches": "تأكيد (عرض جميع الفروع)",
+  "confirmFilterCount": "تأكيد الفلترة ({count} فروع)",
+  "finesSection": "قسم الغرامات والمخالفات",
+  "promoNoFinesAccess": "غير مسموح لحسابات تسويق العروض الوصول لنظام الغرامات والمخالفات",
+  "myViolationsTitle": "سجل مخالفاتي وغراماتي",
+  "violationsRecord": "سجل المخالفات والغرامات",
+  "finesSettings": "إعدادات ولائحة الغرامات",
+  "recordViolation": "تسجيل مخالفة",
+  "unknownCompany": "شركة غير محددة",
+  "allBranchesOverview": "جميع الفروع (عرض شامل)",
+  "selectedGroupCount": "قطاع محدد: ({count} فروع)",
+  "finesPolicyCardSubtitle": "قيمة الخصم لكل مخالفة، أول مرة وعند التكرار",
+  "showViolationsFor": "عرض مخالفات الفرع / القطاع:",
+  "unpinDefaultGroup": "إلغاء تثبيت القطاع الافتراضي",
+  "pinSelectedAsDefault": "تثبيت الفروع المحددة كقطاع افتراضي",
+  "refreshFinesData": "تحديث بيانات الغرامات",
+  "finesDataRefreshed": "تم تحديث بيانات الغرامات",
+  "pinnedDefaultGroup": "القطاع الافتراضي المثبت",
+  "showAll": "عرض الكل",
+  "mySummary": "الملخص",
+  "finesSummaryOf": "ملخص الغرامات ({branch})",
+  "companiesFinesSummary": "ملخص غرامات ومخالفات الشركات",
+  "finesSummary": "ملخص الغرامات والمخالفات",
+  "myTotalFines": "إجمالي غراماتي",
+  "totalFines": "إجمالي الغرامات",
+  "deductedFromMe": "المخصوم مني",
+  "deducted": "المخصوم",
+  "violationsCountLabel": "عدد المخالفات",
+  "companiesCount": "عدد الشركات",
+  "companiesN": "{count} شركة",
+  "filterByCompany": "تصفية حسب الشركة:",
+  "allCompaniesCount": "جميع الشركات ({count})",
+  "recordClean": "سجلك نظيف ومتميز!",
+  "noViolationsAnyCompany": "لا توجد مخالفات مسجلة على أية شركة بعد",
+  "noViolationsThisCompany": "لا توجد مخالفات مسجلة على هذه الشركة",
+  "noViolationsRecorded": "لا توجد مخالفات مسجلة عليك حتى الآن.",
+  "rejectionReason": "سبب الرفض",
+  "rejectionReasonHint": "اكتب سبب رفض المخالفة…",
+  "confirmRejection": "تأكيد الرفض",
+  "repeatedViolation": "مخالفة مكررة",
+  "confidential": "سرية ومقيدة",
+  "targetDelegate": "المندوب المستهدف: {name}",
+  "violationDetails": "تفاصيل المخالفة:",
+  "branchesMarketingApproval": "موافقة مدير تسويق الفروع: {name}",
+  "generalManagerApproval": "اعتماد المدير العام: {name}",
+  "attachmentsCount": "المرفقات ({count})",
+  "tapToPreview2": "اضغط للمعاينة والتكبير",
+  "editorName": "المحرر: {name}",
+  "documentsCount": "المستندات ({count})",
+  "approveAction": "اعتماد",
+  "rejectAction": "رفض",
+  "violationsWithCount": "المخالفات: {count}",
+  "totalWithValue": "الإجمالي: {value}",
+  "deductedWithValue": "المخصوم: {value}",
+  "catUnauthorizedPhoto": "تصوير بدون إذن رسمي",
+  "catDataMissing": "عدم تفعيل خصائص / بيانات ناقصة",
+  "catOther": "أخرى",
+  "themeModeTitle": "المظهر",
+  "themeModeSystem": "تلقائي (حسب الموبايل)",
+  "themeModeSystemHint": "يتبع إعداد الوضع الداكن في جهازك",
+  "themeModeLight": "فاتح",
+  "themeModeDark": "داكن",
+  "taskImageAttach": "إرفاق صورة",
+  "@taskImageAttach": {
+    "description": "Button to attach an image to a task"
+  },
+  "taskImageFromCamera": "التقاط صورة",
+  "@taskImageFromCamera": {
+    "description": "Pick task image from camera"
+  },
+  "taskImageFromGallery": "اختيار من المعرض",
+  "@taskImageFromGallery": {
+    "description": "Pick task image from gallery"
+  },
+  "taskImageReplace": "تغيير الصورة",
+  "@taskImageReplace": {
+    "description": "Replace attached task image"
+  },
+  "taskImageRemove": "إزالة الصورة",
+  "@taskImageRemove": {
+    "description": "Remove attached task image"
+  },
+  "taskImageUploading": "جارٍ رفع الصورة…",
+  "@taskImageUploading": {
+    "description": "Shown while the task image uploads"
+  },
+  "taskImageUploadFailed": "تعذّر رفع الصورة. حاول مرة أخرى.",
+  "@taskImageUploadFailed": {
+    "description": "Task image upload failed"
+  },
+  "taskImageRetry": "إعادة المحاولة",
+  "@taskImageRetry": {
+    "description": "Retry task image upload"
+  },
+  "taskImageLoadFailed": "تعذّر تحميل الصورة",
+  "@taskImageLoadFailed": {
+    "description": "Task image failed to load"
+  },
+  "taskImageAttached": "صورة مرفقة",
+  "@taskImageAttached": {
+    "description": "Label/semantic for the task image"
+  },
+  "taskImageTooLarge": "حجم الصورة كبير. اختر صورة أصغر.",
+  "@taskImageTooLarge": {
+    "description": "Task image over size limit"
+  },
+  "taskEditedLabel": "معدّلة",
+  "@taskEditedLabel": {
+    "description": "Label on a task the sender edited"
+  },
+  "taskEditAction": "تعديل",
+  "@taskEditAction": {
+    "description": "Edit task menu item"
+  },
+  "taskDeleteAction": "حذف",
+  "@taskDeleteAction": {
+    "description": "Delete task menu item"
+  },
+  "taskMoreActions": "خيارات المهمة",
+  "@taskMoreActions": {
+    "description": "Tooltip for the task overflow menu"
+  },
+  "taskCloseImage": "إغلاق",
+  "@taskCloseImage": {
+    "description": "Close full-screen task image"
+  },
+  "splashConnectionFailed": "تعذّر الاتصال",
+  "@splashConnectionFailed": {
+    "description": "Splash stall message"
+  },
+  "splashRetry": "إعادة المحاولة",
+  "@splashRetry": {
+    "description": "Splash retry button"
+  },
+  "splashSignIn": "تسجيل الدخول",
+  "@splashSignIn": {
+    "description": "Splash go-to-login button"
+  },
+  "mapUnavailable": "الخريطة غير متاحة",
+  "@mapUnavailable": {
+    "description": "Map gate timeout message"
+  },
+  "mapRetry": "إعادة المحاولة",
+  "@mapRetry": {
+    "description": "Map gate retry button"
+  }
 }

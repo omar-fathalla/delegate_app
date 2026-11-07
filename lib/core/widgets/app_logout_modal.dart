@@ -1,3 +1,4 @@
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
@@ -120,7 +121,7 @@ class _LogoutModalContentState extends State<_LogoutModalContent> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('حدث خطأ أثناء تسجيل الخروج: $e'),
+            content: Text(AppLocalizations.of(context)!.logoutFailed(e)),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -181,8 +182,7 @@ class _LogoutModalContentState extends State<_LogoutModalContent> {
           const SizedBox(height: 16),
 
           // عنوان التأكيد
-          Text(
-            isArabic ? 'تسجيل الخروج' : 'Logout',
+          Text(AppLocalizations.of(context)!.logout,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
               fontSize: 18,
@@ -193,10 +193,7 @@ class _LogoutModalContentState extends State<_LogoutModalContent> {
           const SizedBox(height: 8),
 
           // الرسالة التوضيحية
-          Text(
-            isArabic
-                ? 'هل أنت متأكد من تسجيل الخروج؟\nسيتم إنهاء جلستك الحالية وحفظ أي سجلات محلية بأمان.'
-                : 'Are you sure you want to logout?\nYour active session will be closed safely.',
+          Text(AppLocalizations.of(context)!.logoutConfirm,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
               fontSize: 13.5,
@@ -242,8 +239,7 @@ class _LogoutModalContentState extends State<_LogoutModalContent> {
                                   color: colorScheme.error,
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  isArabic ? 'تسجيل الخروج' : 'Logout',
+                                Text(AppLocalizations.of(context)!.logout,
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
@@ -273,8 +269,7 @@ class _LogoutModalContentState extends State<_LogoutModalContent> {
                         : const BorderRadius.horizontal(right: Radius.circular(24)),
                     onTap: _isLoggingOut ? null : () => Navigator.of(context).pop(),
                     child: Center(
-                      child: Text(
-                        isArabic ? 'إلغاء' : 'Cancel',
+                      child: Text(AppLocalizations.of(context)!.cancel,
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,

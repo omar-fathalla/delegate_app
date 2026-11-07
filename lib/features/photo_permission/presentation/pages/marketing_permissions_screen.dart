@@ -1,4 +1,5 @@
 import 'package:delegate_app/config/theme/app_motion.dart';
+import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'supervisor_permissions_screen.dart';
 import '../widgets/company_name_with_code.dart';
 import 'package:flutter/material.dart';
@@ -319,8 +320,8 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                           ),
                         ),
                       ),
-                      title: Text(
-                        branchNames[index],
+                      title: BranchNameLabel(
+                        branchName: branchNames[index],
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                       ),
                     );

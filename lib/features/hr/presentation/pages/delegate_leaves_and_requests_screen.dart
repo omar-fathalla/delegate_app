@@ -1,3 +1,6 @@
+import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -89,8 +92,8 @@ class _DelegateLeavesAndRequestsScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    'طلباتي (الإجازات والأعذار)',
+                  Text(
+                    AppLocalizations.of(context)!.reqTitle,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14.5,
@@ -114,28 +117,25 @@ class _DelegateLeavesAndRequestsScreenState
               ),
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.refresh_rounded),
-                  tooltip: 'تحديث',
+                  icon: const Icon(Symbols.refresh_rounded),
+                  tooltip: AppLocalizations.of(context)!.refreshAction,
                   onPressed: () => setState(() {}),
                 ),
                 const SizedBox(width: 8),
               ],
             )
           : null,
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: M3ExtendedFab(
         onPressed: () => _showCreateRequestDialog(context),
-        icon: const Icon(Icons.add_task_rounded),
-        label: const Text(
-          'تسجيل إجازة / عذر',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+        icon: Symbols.add_rounded,
+        label: AppLocalizations.of(context)!.newRequest,
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: query.snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting &&
               !snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: M3DelayedLoading());
           }
 
           final docs = snapshot.data?.docs ?? [];
@@ -260,12 +260,12 @@ class _DelegateLeavesAndRequestsScreenState
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHighest
+                            color: colorScheme.surfaceContainerHigh
                                 .withValues(alpha: 0.4),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
-                            Icons.event_busy_rounded,
+                            Symbols.event_busy_rounded,
                             size: 54,
                             color: colorScheme.outline,
                           ),
@@ -273,8 +273,8 @@ class _DelegateLeavesAndRequestsScreenState
                         const SizedBox(height: 16),
                         Text(
                           _selectedStatusFilter == 'all'
-                              ? 'لم تقم بتقديم أي طلبات إجازة أو عذر حتى الآن'
-                              : 'لا توجد طلبات في هذا التبويب',
+                              ? AppLocalizations.of(context)!.reqEmptyAll
+                              : AppLocalizations.of(context)!.reqEmptyFilter,
                           style: theme.textTheme.titleSmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.w600,
@@ -282,7 +282,7 @@ class _DelegateLeavesAndRequestsScreenState
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'اضغط على زر "تسجيل إجازة / عذر" لتقديم طلبك لمشرف الشركة',
+                          AppLocalizations.of(context)!.reqEmptyHint,
                           style: TextStyle(
                             fontSize: 12,
                             color: colorScheme.outline,
@@ -331,9 +331,6 @@ class _DelegateLeavesAndRequestsScreenState
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.45),
-        ),
         boxShadow: [
           BoxShadow(
             color: colorScheme.shadow.withValues(alpha: 0.04),
@@ -354,7 +351,7 @@ class _DelegateLeavesAndRequestsScreenState
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
-                  Icons.account_balance_wallet_outlined,
+                  Symbols.account_balance_wallet_rounded,
                   size: 20,
                   color: colorScheme.primary,
                 ),
@@ -364,15 +361,15 @@ class _DelegateLeavesAndRequestsScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'رصيد الإجازات السنوي',
+                    Text(
+                      AppLocalizations.of(context)!.annualLeaveBalance,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
                     ),
                     Text(
-                      'للعام الحالي ${DateTime.now().year}',
+                      AppLocalizations.of(context)!.forYear(DateTime.now().year),
                       style: TextStyle(
                         fontSize: 11,
                         color: colorScheme.onSurfaceVariant,
@@ -385,17 +382,17 @@ class _DelegateLeavesAndRequestsScreenState
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: remainingDays > 3
-                      ? const Color(0xFF2E7D32).withValues(alpha: 0.12)
+                      ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)
                       : colorScheme.error.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  'المتبقي: $remainingDays يوم',
+                  AppLocalizations.of(context)!.remainingDays(remainingDays),
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: remainingDays > 3
-                        ? const Color(0xFF2E7D32)
+                        ? Theme.of(context).colorScheme.primary
                         : colorScheme.error,
                   ),
                 ),
@@ -408,7 +405,7 @@ class _DelegateLeavesAndRequestsScreenState
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 7,
-              backgroundColor: colorScheme.surfaceContainerHighest,
+              backgroundColor: colorScheme.surfaceContainerHigh,
               valueColor: AlwaysStoppedAnimation<Color>(
                 progress > 0.85 ? colorScheme.error : colorScheme.primary,
               ),
@@ -419,14 +416,14 @@ class _DelegateLeavesAndRequestsScreenState
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'المستهلك: $usedDays يوم',
+                AppLocalizations.of(context)!.usedDays(usedDays),
                 style: TextStyle(
                   fontSize: 11,
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
               Text(
-                'إجمالي الرصيد: $totalQuota يوم',
+                AppLocalizations.of(context)!.totalQuotaDays(totalQuota),
                 style: TextStyle(
                   fontSize: 11,
                   color: colorScheme.onSurfaceVariant,
@@ -448,18 +445,8 @@ class _DelegateLeavesAndRequestsScreenState
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.amber.withValues(alpha: 0.35),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -469,19 +456,19 @@ class _DelegateLeavesAndRequestsScreenState
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.15),
+                  color: Theme.of(context).colorScheme.tertiaryContainer,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
-                  Icons.event_repeat_rounded,
+                  Symbols.event_repeat_rounded,
                   size: 20,
-                  color: Colors.amber.shade900,
+                  color: Theme.of(context).colorScheme.onTertiaryContainer,
                 ),
               ),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'نظام الإجازات الأسبوعية فقط',
+                  AppLocalizations.of(context)!.weeklyOffPlan,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -491,18 +478,15 @@ class _DelegateLeavesAndRequestsScreenState
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.15),
+                  color: Theme.of(context).colorScheme.tertiaryContainer,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.amber.withValues(alpha: 0.4),
-                  ),
                 ),
                 child: Text(
-                  '4 أيام راحة شهرياً',
+                  AppLocalizations.of(context)!.daysOffPerMonth,
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.bold,
-                    color: Colors.amber.shade900,
+                    color: Theme.of(context).colorScheme.onTertiaryContainer,
                   ),
                 ),
               ),
@@ -519,14 +503,14 @@ class _DelegateLeavesAndRequestsScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
-                  Icons.info_outline_rounded,
+                  Symbols.info_rounded,
                   size: 16,
                   color: colorScheme.primary,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'أنت حالياً على نظام الإجازات الأسبوعية (يوم راحة أسبوعياً بمعدل 4 أيام شهرياً). يتم تفعيل رصيد الإجازات السنوية الإضافي عند اعتماده من قِبل المشرف.',
+                    AppLocalizations.of(context)!.weeklyPlanNote,
                     style: TextStyle(
                       fontSize: 11,
                       color: colorScheme.onSurfaceVariant,
@@ -542,27 +526,27 @@ class _DelegateLeavesAndRequestsScreenState
             children: [
               Expanded(
                 child: _buildLeaveFeaturePill(
-                  icon: Icons.calendar_today_rounded,
-                  label: 'راحة أسبوعية',
-                  sublabel: 'يوم لكل 7 أيام',
+                  icon: Symbols.calendar_today_rounded,
+                  label: AppLocalizations.of(context)!.weeklyDayOff,
+                  sublabel: AppLocalizations.of(context)!.oneDayEvery7,
                   colorScheme: colorScheme,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: _buildLeaveFeaturePill(
-                  icon: Icons.schedule_rounded,
-                  label: 'الأعذار الساعية',
-                  sublabel: 'متاحة للتقديم',
+                  icon: Symbols.schedule_rounded,
+                  label: AppLocalizations.of(context)!.hourlyPermission,
+                  sublabel: AppLocalizations.of(context)!.availableLabel,
                   colorScheme: colorScheme,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: _buildLeaveFeaturePill(
-                  icon: Icons.lock_clock_rounded,
-                  label: 'الرصيد السنوي (21)',
-                  sublabel: 'عند التفعيل',
+                  icon: Symbols.lock_clock_rounded,
+                  label: AppLocalizations.of(context)!.annualBalance21,
+                  sublabel: AppLocalizations.of(context)!.onceActivated,
                   colorScheme: colorScheme,
                   isMuted: true,
                 ),
@@ -585,14 +569,9 @@ class _DelegateLeavesAndRequestsScreenState
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: isMuted
-            ? colorScheme.surfaceContainerLow
-            : colorScheme.primaryContainer.withValues(alpha: 0.25),
+            ? colorScheme.surfaceContainer
+            : colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isMuted
-              ? colorScheme.outlineVariant.withValues(alpha: 0.3)
-              : colorScheme.primary.withValues(alpha: 0.2),
-        ),
       ),
       child: Column(
         children: [
@@ -638,9 +617,6 @@ class _DelegateLeavesAndRequestsScreenState
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.45),
-        ),
         boxShadow: [
           BoxShadow(
             color: colorScheme.shadow.withValues(alpha: 0.03),
@@ -654,9 +630,9 @@ class _DelegateLeavesAndRequestsScreenState
         children: [
           Expanded(
             child: _buildMiniKpi(
-              title: 'الإجمالي',
+              title: AppLocalizations.of(context)!.filterAll,
               value: '$totalCount',
-              icon: Icons.event_note_rounded,
+              icon: Symbols.event_note_rounded,
               color: colorScheme.primary,
               colorScheme: colorScheme,
             ),
@@ -664,29 +640,29 @@ class _DelegateLeavesAndRequestsScreenState
           _buildKpiDivider(colorScheme),
           Expanded(
             child: _buildMiniKpi(
-              title: 'المراجعة',
+              title: AppLocalizations.of(context)!.statusPendingReview,
               value: '$pendingCount',
-              icon: Icons.hourglass_top_rounded,
-              color: Colors.amber.shade800,
+              icon: Symbols.hourglass_top_rounded,
+              color: Theme.of(context).colorScheme.onTertiaryContainer,
               colorScheme: colorScheme,
             ),
           ),
           _buildKpiDivider(colorScheme),
           Expanded(
             child: _buildMiniKpi(
-              title: 'المعتمدة',
+              title: AppLocalizations.of(context)!.statusApprovedPl,
               value: '$approvedCount',
-              icon: Icons.check_circle_rounded,
-              color: const Color(0xFF2E7D32),
+              icon: Symbols.check_circle_rounded,
+              color: Theme.of(context).colorScheme.primary,
               colorScheme: colorScheme,
             ),
           ),
           _buildKpiDivider(colorScheme),
           Expanded(
             child: _buildMiniKpi(
-              title: 'المرفوضة',
+              title: AppLocalizations.of(context)!.statusRejectedPl,
               value: '$rejectedCount',
-              icon: Icons.cancel_rounded,
+              icon: Symbols.cancel_rounded,
               color: colorScheme.error,
               colorScheme: colorScheme,
             ),
@@ -760,37 +736,34 @@ class _DelegateLeavesAndRequestsScreenState
     return Container(
       height: 38,
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
       ),
       padding: const EdgeInsets.all(2.5),
       child: Row(
         children: [
           _buildFilterSegment(
-            label: 'الكل',
+            label: AppLocalizations.of(context)!.filterAll,
             count: totalCount,
             value: 'all',
             colorScheme: colorScheme,
           ),
           _buildFilterSegment(
-            label: 'المراجعة',
+            label: AppLocalizations.of(context)!.statusPendingReview,
             count: pendingCount,
             value: 'pending',
-            activeColor: Colors.amber.shade800,
+            activeColor: Theme.of(context).colorScheme.onTertiaryContainer,
             colorScheme: colorScheme,
           ),
           _buildFilterSegment(
-            label: 'المعتمدة',
+            label: AppLocalizations.of(context)!.statusApprovedPl,
             count: approvedCount,
             value: 'approved',
-            activeColor: const Color(0xFF2E7D32),
+            activeColor: Theme.of(context).colorScheme.primary,
             colorScheme: colorScheme,
           ),
           _buildFilterSegment(
-            label: 'المرفوضة',
+            label: AppLocalizations.of(context)!.statusRejectedPl,
             count: rejectedCount,
             value: 'rejected',
             activeColor: colorScheme.error,
@@ -809,7 +782,6 @@ class _DelegateLeavesAndRequestsScreenState
     required ColorScheme colorScheme,
   }) {
     final isSelected = _selectedStatusFilter == value;
-    final themeColor = activeColor ?? colorScheme.primary;
 
     return Expanded(
       child: InkWell(
@@ -818,12 +790,12 @@ class _DelegateLeavesAndRequestsScreenState
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           decoration: BoxDecoration(
-            color: isSelected ? themeColor : Colors.transparent,
+            color: isSelected ? colorScheme.secondaryContainer : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: themeColor.withValues(alpha: 0.25),
+                      color: Colors.transparent,
                       blurRadius: 4,
                       offset: const Offset(0, 1),
                     ),
@@ -842,7 +814,7 @@ class _DelegateLeavesAndRequestsScreenState
                     fontSize: 10.5,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                     color: isSelected
-                        ? (themeColor == Colors.amber.shade800 ? Colors.black87 : Colors.white)
+                        ? colorScheme.onSecondaryContainer
                         : colorScheme.onSurfaceVariant,
                   ),
                   maxLines: 1,
@@ -854,7 +826,7 @@ class _DelegateLeavesAndRequestsScreenState
                 padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? Colors.white.withValues(alpha: 0.25)
+                      ? colorScheme.onSecondaryContainer.withValues(alpha: 0.12)
                       : colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -864,7 +836,7 @@ class _DelegateLeavesAndRequestsScreenState
                     fontSize: 9.5,
                     fontWeight: FontWeight.bold,
                     color: isSelected
-                        ? (themeColor == Colors.amber.shade800 ? Colors.black87 : Colors.white)
+                        ? colorScheme.onSecondaryContainer
                         : colorScheme.onSurfaceVariant,
                   ),
                 ),
@@ -911,7 +883,7 @@ class _DelegateLeavesAndRequestsScreenState
       if (fromTime.isNotEmpty && toTime.isNotEmpty) {
         periodStr = '$dateStr • ($fromTime - $toTime)';
       } else {
-        periodStr = '$dateStr • ($hoursCount س)';
+        periodStr = AppLocalizations.of(context)!.dateWithHours(dateStr, hoursCount);
       }
     } else {
       final start = req['startDate'] is Timestamp
@@ -932,32 +904,32 @@ class _DelegateLeavesAndRequestsScreenState
     IconData typeIcon;
     switch (type) {
       case 'sick':
-        typeLabel = 'إجازة مرضية';
-        typeIcon = Icons.medical_services_rounded;
+        typeLabel = AppLocalizations.of(context)!.leaveSick;
+        typeIcon = Symbols.medical_services_rounded;
         break;
       case 'emergency':
-        typeLabel = 'إجازة عارضة';
-        typeIcon = Icons.warning_amber_rounded;
+        typeLabel = AppLocalizations.of(context)!.leaveEmergency;
+        typeIcon = Symbols.warning_amber_rounded;
         break;
       case 'delay':
-        typeLabel = 'عذر تأخير';
-        typeIcon = Icons.timer_outlined;
+        typeLabel = AppLocalizations.of(context)!.excuseLate;
+        typeIcon = Symbols.timer_rounded;
         break;
       case 'early_leave':
-        typeLabel = 'إذن انصراف مبكر';
-        typeIcon = Icons.logout_rounded;
+        typeLabel = AppLocalizations.of(context)!.excuseEarlyLeave;
+        typeIcon = Symbols.logout_rounded;
         break;
       case 'absence':
-        typeLabel = 'عذر غياب';
-        typeIcon = Icons.person_off_outlined;
+        typeLabel = AppLocalizations.of(context)!.excuseAbsence;
+        typeIcon = Symbols.person_off_rounded;
         break;
       case 'unpaid':
-        typeLabel = 'إجازة بدون أجر';
-        typeIcon = Icons.money_off_rounded;
+        typeLabel = AppLocalizations.of(context)!.leaveUnpaid;
+        typeIcon = Symbols.money_off_rounded;
         break;
       default:
-        typeLabel = 'إجازة اعتيادية';
-        typeIcon = Icons.beach_access_rounded;
+        typeLabel = AppLocalizations.of(context)!.leaveAnnual;
+        typeIcon = Symbols.beach_access_rounded;
         break;
     }
 
@@ -967,23 +939,23 @@ class _DelegateLeavesAndRequestsScreenState
     IconData statusIcon;
     switch (status) {
       case 'approved':
-        statusColor = const Color(0xFF2E7D32);
-        statusLabel = 'معتمد';
-        statusIcon = Icons.check_circle_rounded;
+        statusColor = Theme.of(context).colorScheme.primary;
+        statusLabel = AppLocalizations.of(context)!.statusApproved;
+        statusIcon = Symbols.check_circle_rounded;
         break;
       case 'rejected':
         statusColor = colorScheme.error;
-        statusLabel = 'مرفوض';
-        statusIcon = Icons.cancel_rounded;
+        statusLabel = AppLocalizations.of(context)!.statusRejected;
+        statusIcon = Symbols.cancel_rounded;
         break;
       default:
-        statusColor = Colors.amber.shade800;
-        statusLabel = 'قيد المراجعة';
-        statusIcon = Icons.hourglass_top_rounded;
+        statusColor = Theme.of(context).colorScheme.onTertiaryContainer;
+        statusLabel = AppLocalizations.of(context)!.statusPending;
+        statusIcon = Symbols.hourglass_top_rounded;
         break;
     }
 
-    final durationText = isHourly ? '$hoursCount ساعة' : '$daysCount يوم';
+    final durationText = isHourly ? AppLocalizations.of(context)!.hoursCount(hoursCount) : AppLocalizations.of(context)!.daysCount(daysCount);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -1077,7 +1049,7 @@ class _DelegateLeavesAndRequestsScreenState
                             Row(
                               children: [
                                 Icon(
-                                  Icons.calendar_today_rounded,
+                                  Symbols.calendar_today_rounded,
                                   size: 11,
                                   color: colorScheme.onSurfaceVariant,
                                 ),
@@ -1131,7 +1103,7 @@ class _DelegateLeavesAndRequestsScreenState
                         turns: isExpanded ? 0.5 : 0.0,
                         duration: const Duration(milliseconds: 200),
                         child: Icon(
-                          Icons.expand_more_rounded,
+                          Symbols.expand_more_rounded,
                           size: 18,
                           color: colorScheme.outline,
                         ),
@@ -1159,7 +1131,7 @@ class _DelegateLeavesAndRequestsScreenState
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          'السبب: $reason',
+                          AppLocalizations.of(context)!.reasonLabel(reason),
                           style: TextStyle(
                             fontSize: 11.5,
                             color: colorScheme.onSurfaceVariant,
@@ -1184,14 +1156,14 @@ class _DelegateLeavesAndRequestsScreenState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Icon(
-                              Icons.info_outline_rounded,
+                              Symbols.info_rounded,
                               size: 14,
                               color: colorScheme.error,
                             ),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                'سبب الرفض: $rejectReason',
+                                AppLocalizations.of(context)!.rejectReasonLabel(rejectReason),
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   color: colorScheme.error,
@@ -1209,18 +1181,18 @@ class _DelegateLeavesAndRequestsScreenState
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          const Icon(
-                            Icons.verified_user_rounded,
+                          Icon(
+                            Symbols.verified_user_rounded,
                             size: 13,
-                            color: Color(0xFF2E7D32),
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                           const SizedBox(width: 5),
                           Text(
-                            'تم الاعتماد بواسطة: $resolvedByName',
-                            style: const TextStyle(
+                            AppLocalizations.of(context)!.approvedBy(resolvedByName),
+                            style: TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF2E7D32),
+                              color: Theme.of(context).colorScheme.primary,
                             ),
                           ),
                           if (resolvedAt != null) ...[
@@ -1252,9 +1224,9 @@ class _DelegateLeavesAndRequestsScreenState
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
-                              icon: const Icon(Icons.attachment_rounded, size: 14),
-                              label: const Text(
-                                'معاينة المرفق',
+                              icon: const Icon(Symbols.attachment_rounded, size: 14),
+                              label: Text(
+                                AppLocalizations.of(context)!.previewAttachment,
                                 style: TextStyle(fontSize: 11),
                               ),
                               onPressed: () => _viewAttachment(context, attachmentUrl),
@@ -1271,9 +1243,9 @@ class _DelegateLeavesAndRequestsScreenState
                                 foregroundColor: colorScheme.error,
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                               ),
-                              icon: const Icon(Icons.delete_outline_rounded, size: 15),
-                              label: const Text(
-                                'إلغاء الطلب',
+                              icon: const Icon(Symbols.delete_outline_rounded, size: 15),
+                              label: Text(
+                                AppLocalizations.of(context)!.cancelRequest,
                                 style: TextStyle(fontSize: 11),
                               ),
                               onPressed: () =>
@@ -1295,22 +1267,23 @@ class _DelegateLeavesAndRequestsScreenState
   // ── إلغاء الطلب المعلق ──
   Future<void> _cancelPendingRequest(BuildContext context, String docId) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('إلغاء الطلب'),
-        content: const Text('هل أنت متأكد من رغبتك في إلغاء هذا الطلب المعلق؟'),
+        title: Text(AppLocalizations.of(context)!.cancelRequest),
+        content: Text(AppLocalizations.of(context)!.cancelRequestConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('تراجع'),
+            child: Text(AppLocalizations.of(context)!.keepRequest),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('نعم، إلغاء'),
+            child: Text(AppLocalizations.of(context)!.yesCancel),
           ),
         ],
       ),
@@ -1325,11 +1298,11 @@ class _DelegateLeavesAndRequestsScreenState
           .delete();
 
       messenger.showSnackBar(
-        const SnackBar(content: Text('تم إلغاء طلب الإجازة بنجاح')),
+        SnackBar(content: Text(l10n.requestCancelled)),
       );
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('حدث خطأ أثناء إلغاء الطلب: $e')),
+        SnackBar(content: Text(l10n.cancelRequestFailed(e))),
       );
     }
   }
@@ -1349,12 +1322,12 @@ class _DelegateLeavesAndRequestsScreenState
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'مرفق الطلب',
+                  Text(
+                    AppLocalizations.of(context)!.requestAttachment,
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close_rounded),
+                    icon: const Icon(Symbols.close_rounded),
                     onPressed: () => Navigator.pop(ctx),
                   ),
                 ],
@@ -1377,10 +1350,10 @@ class _DelegateLeavesAndRequestsScreenState
                       child: Center(child: CircularProgressIndicator()),
                     );
                   },
-                  errorBuilder: (_, _, _) => const SizedBox(
+                  errorBuilder: (_, _, _) => SizedBox(
                     height: 160,
                     child: Center(
-                      child: Text('فشل في تحميل صورة المرفق'),
+                      child: Text(AppLocalizations.of(context)!.attachmentLoadFailed),
                     ),
                   ),
                 ),
@@ -1411,9 +1384,11 @@ class _DelegateLeavesAndRequestsScreenState
     XFile? pickedAttachment;
     bool isSubmitting = false;
 
-    await showDialog(
+    await showModalBottomSheet(
       context: context,
-      barrierDismissible: false,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDlgState) {
           final isLeaveType = selectedType == 'annual' ||
@@ -1428,19 +1403,12 @@ class _DelegateLeavesAndRequestsScreenState
 
           final calculatedDays = endDate.difference(startDate).inDays + 1;
 
-          return Dialog(
-            backgroundColor: colorScheme.surface,
-            surfaceTintColor: Colors.transparent,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: BorderSide(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-              ),
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(context).bottom,
             ),
-            insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-            clipBehavior: Clip.antiAlias,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
+              constraints: const BoxConstraints(maxWidth: 640),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1457,15 +1425,15 @@ class _DelegateLeavesAndRequestsScreenState
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(
-                            Icons.edit_calendar_rounded,
+                            Symbols.edit_calendar_rounded,
                             size: 18,
                             color: colorScheme.primary,
                           ),
                         ),
                         const SizedBox(width: 10),
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            'تسجيل إجازة / عذر جديد',
+                            AppLocalizations.of(context)!.newRequest,
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15.5,
@@ -1478,7 +1446,7 @@ class _DelegateLeavesAndRequestsScreenState
                           child: Padding(
                             padding: const EdgeInsets.all(4),
                             child: Icon(
-                              Icons.close_rounded,
+                              Symbols.close_rounded,
                               size: 20,
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -1506,27 +1474,27 @@ class _DelegateLeavesAndRequestsScreenState
                               padding: const EdgeInsets.all(10),
                               margin: const EdgeInsets.only(bottom: 12),
                               decoration: BoxDecoration(
-                                color: Colors.amber.withValues(alpha: 0.12),
+                                color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: Colors.amber.withValues(alpha: 0.35),
+                                  color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.35),
                                 ),
                               ),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Icon(
-                                    Icons.info_outline_rounded,
+                                    Symbols.info_rounded,
                                     size: 16,
-                                    color: Colors.amber.shade900,
+                                    color: Theme.of(context).colorScheme.onTertiaryContainer,
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      'تنبيه: حسابك حالياً على نظام الإجازات الأسبوعية فقط. يمكنك التقديم على أعذار ساعية، أو عذر غياب، أو إجازة بدون أجر.',
+                                      AppLocalizations.of(context)!.weeklyPlanAvailableInfo,
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: Colors.amber.shade900,
+                                        color: Theme.of(context).colorScheme.onTertiaryContainer,
                                         fontWeight: FontWeight.w600,
                                         height: 1.35,
                                       ),
@@ -1539,7 +1507,7 @@ class _DelegateLeavesAndRequestsScreenState
 
                           // نوع الطلب
                           Text(
-                            'نوع الطلب:',
+                            AppLocalizations.of(context)!.requestType,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 12,
@@ -1547,73 +1515,40 @@ class _DelegateLeavesAndRequestsScreenState
                             ),
                           ),
                           const SizedBox(height: 6),
-                          DropdownButtonFormField<String>(
-                            initialValue: selectedType,
-                            isExpanded: true,
-                            style: TextStyle(
-                              fontSize: 12.5,
+                          DropdownMenu<String>(
+                            initialSelection: selectedType,
+                            expandedInsets: EdgeInsets.zero,
+                            requestFocusOnTap: false,
+                            textStyle: TextStyle(
+                              fontSize: 14,
                               color: colorScheme.onSurface,
-                              fontWeight: FontWeight.w500,
                             ),
-                            decoration: InputDecoration(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
+                            dropdownMenuEntries: [
+                              DropdownMenuEntry(
+                                value: 'annual',
+                                enabled: _isAnnualLeaveEnabled,
+                                label: _isAnnualLeaveEnabled
+                                    ? AppLocalizations.of(context)!.annualLeaveFromBalance
+                                    : AppLocalizations.of(context)!.annualLeaveUnavailable,
                               ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(
-                                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(
-                                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                                ),
-                              ),
-                            ),
-                            items: [
-                              if (_isAnnualLeaveEnabled)
-                                const DropdownMenuItem(
-                                  value: 'annual',
-                                  child: Text('إجازة اعتيادية (خصم من الرصيد السنوي)'),
-                                )
-                              else
-                                DropdownMenuItem(
-                                  value: 'annual',
-                                  enabled: false,
-                                  child: Text(
-                                    'إجازة اعتيادية (غير مفعلة لحسابك حالياً)',
-                                    style: TextStyle(color: colorScheme.outline),
-                                  ),
-                                ),
-                              const DropdownMenuItem(
-                                value: 'sick',
-                                child: Text('إجازة مرضية'),
-                              ),
-                              const DropdownMenuItem(
-                                value: 'emergency',
-                                child: Text('إجازة عارضة'),
-                              ),
-                              const DropdownMenuItem(
-                                value: 'unpaid',
-                                child: Text('إجازة بدون أجر (إجازة استثنائية)'),
-                              ),
-                              const DropdownMenuItem(
-                                value: 'delay',
-                                child: Text('عذر تأخير عن العمل (ساعي)'),
-                              ),
-                              const DropdownMenuItem(
-                                value: 'early_leave',
-                                child: Text('إذن انصراف مبكر (ساعي)'),
-                              ),
-                              const DropdownMenuItem(
-                                value: 'absence',
-                                child: Text('عذر غياب يوم كامل'),
-                              ),
+                              DropdownMenuEntry(
+                                  value: 'sick', label: AppLocalizations.of(context)!.leaveSick),
+                              DropdownMenuEntry(
+                                  value: 'emergency', label: AppLocalizations.of(context)!.leaveEmergency),
+                              DropdownMenuEntry(
+                                  value: 'unpaid',
+                                  label: AppLocalizations.of(context)!.leaveUnpaid),
+                              DropdownMenuEntry(
+                                  value: 'delay',
+                                  label: AppLocalizations.of(context)!.lateArrivalHourly),
+                              DropdownMenuEntry(
+                                  value: 'early_leave',
+                                  label: AppLocalizations.of(context)!.earlyLeaveHourly),
+                              DropdownMenuEntry(
+                                  value: 'absence',
+                                  label: AppLocalizations.of(context)!.excusedAbsenceFullDay),
                             ],
-                            onChanged: (val) {
+                            onSelected: (val) {
                               if (val != null) {
                                 setDlgState(() {
                                   selectedType = val;
@@ -1629,7 +1564,7 @@ class _DelegateLeavesAndRequestsScreenState
                           if (isHourly) ...[
                             // اختيار يوم العذر
                             Text(
-                              'تاريخ العذر:',
+                              AppLocalizations.of(context)!.dateField,
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 12,
@@ -1656,16 +1591,13 @@ class _DelegateLeavesAndRequestsScreenState
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: colorScheme.surfaceContainerLow,
+                                  color: colorScheme.surfaceContainer,
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                                  ),
                                 ),
                                 child: Row(
                                   children: [
                                     Icon(
-                                      Icons.calendar_today_rounded,
+                                      Symbols.calendar_today_rounded,
                                       size: 15,
                                       color: colorScheme.primary,
                                     ),
@@ -1679,7 +1611,7 @@ class _DelegateLeavesAndRequestsScreenState
                                     ),
                                     const Spacer(),
                                     Icon(
-                                      Icons.edit_calendar_rounded,
+                                      Symbols.edit_calendar_rounded,
                                       size: 15,
                                       color: colorScheme.onSurfaceVariant,
                                     ),
@@ -1690,7 +1622,7 @@ class _DelegateLeavesAndRequestsScreenState
                             const SizedBox(height: 10),
                             // ساعات الاستئذان أو التأخير (Button Group موحد ومتصل)
                             Text(
-                              'ساعات الاستئذان أو التأخير:',
+                              AppLocalizations.of(context)!.timeField,
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 12,
@@ -1700,11 +1632,8 @@ class _DelegateLeavesAndRequestsScreenState
                             const SizedBox(height: 6),
                             Container(
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerLow,
+                                color: colorScheme.surfaceContainer,
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                                ),
                               ),
                               child: Row(
                                 children: [
@@ -1731,7 +1660,7 @@ class _DelegateLeavesAndRequestsScreenState
                                         child: Row(
                                           children: [
                                             Icon(
-                                              Icons.schedule_rounded,
+                                              Symbols.schedule_rounded,
                                               size: 15,
                                               color: colorScheme.primary,
                                             ),
@@ -1742,7 +1671,7 @@ class _DelegateLeavesAndRequestsScreenState
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
                                                   Text(
-                                                    'من الساعة',
+                                                    AppLocalizations.of(context)!.fromField,
                                                     style: TextStyle(
                                                       fontSize: 9.5,
                                                       fontWeight: FontWeight.w600,
@@ -1793,7 +1722,7 @@ class _DelegateLeavesAndRequestsScreenState
                                         child: Row(
                                           children: [
                                             Icon(
-                                              Icons.schedule_rounded,
+                                              Symbols.schedule_rounded,
                                               size: 15,
                                               color: colorScheme.primary,
                                             ),
@@ -1804,7 +1733,7 @@ class _DelegateLeavesAndRequestsScreenState
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
                                                   Text(
-                                                    'إلى الساعة',
+                                                    AppLocalizations.of(context)!.toField,
                                                     style: TextStyle(
                                                       fontSize: 9.5,
                                                       fontWeight: FontWeight.w600,
@@ -1835,7 +1764,7 @@ class _DelegateLeavesAndRequestsScreenState
                             Row(
                               children: [
                                 Text(
-                                  'الفترة بالأيام:',
+                                  AppLocalizations.of(context)!.periodField,
                                   style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     fontSize: 12,
@@ -1853,7 +1782,7 @@ class _DelegateLeavesAndRequestsScreenState
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
-                                    'المدة: $calculatedDays ${calculatedDays == 1 ? 'يوم' : 'أيام'}',
+                                    AppLocalizations.of(context)!.durationLabel(AppLocalizations.of(context)!.daysCount(calculatedDays)),
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,
@@ -1866,11 +1795,8 @@ class _DelegateLeavesAndRequestsScreenState
                             const SizedBox(height: 6),
                             Container(
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerLow,
+                                color: colorScheme.surfaceContainer,
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                                ),
                               ),
                               child: Row(
                                 children: [
@@ -1904,7 +1830,7 @@ class _DelegateLeavesAndRequestsScreenState
                                         child: Row(
                                           children: [
                                             Icon(
-                                              Icons.calendar_today_rounded,
+                                              Symbols.calendar_today_rounded,
                                               size: 15,
                                               color: colorScheme.primary,
                                             ),
@@ -1915,7 +1841,7 @@ class _DelegateLeavesAndRequestsScreenState
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
                                                   Text(
-                                                    'من تاريخ',
+                                                    AppLocalizations.of(context)!.fromField,
                                                     style: TextStyle(
                                                       fontSize: 9.5,
                                                       fontWeight: FontWeight.w600,
@@ -1968,7 +1894,7 @@ class _DelegateLeavesAndRequestsScreenState
                                         child: Row(
                                           children: [
                                             Icon(
-                                              Icons.event_available_rounded,
+                                              Symbols.event_available_rounded,
                                               size: 15,
                                               color: colorScheme.primary,
                                             ),
@@ -1979,7 +1905,7 @@ class _DelegateLeavesAndRequestsScreenState
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
                                                   Text(
-                                                    'إلى تاريخ',
+                                                    AppLocalizations.of(context)!.toField,
                                                     style: TextStyle(
                                                       fontSize: 9.5,
                                                       fontWeight: FontWeight.w600,
@@ -2010,24 +1936,24 @@ class _DelegateLeavesAndRequestsScreenState
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: Colors.amber.withValues(alpha: 0.15),
+                                  color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                                  border: Border.all(color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.4)),
                                 ),
                                 child: Row(
                                   children: [
                                     Icon(
-                                      Icons.warning_amber_rounded,
+                                      Symbols.warning_amber_rounded,
                                       size: 15,
-                                      color: Colors.amber.shade900,
+                                      color: Theme.of(context).colorScheme.onTertiaryContainer,
                                     ),
                                     const SizedBox(width: 6),
                                     Expanded(
                                       child: Text(
-                                        'تنبيه: الأيام المطلوبة ($calculatedDays يوم) تتجاوز رصيد إجازاتك المتبقي ($_currentRemainingBalance يوم)',
+                                        AppLocalizations.of(context)!.daysExceedBalance(calculatedDays, _currentRemainingBalance),
                                         style: TextStyle(
                                           fontSize: 10.5,
-                                          color: Colors.amber.shade900,
+                                          color: Theme.of(context).colorScheme.onTertiaryContainer,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -2042,7 +1968,7 @@ class _DelegateLeavesAndRequestsScreenState
 
                           // سبب الطلب (بفونت وارتفاع أصغر وكتابة مختصرة)
                           Text(
-                            'سبب الطلب:',
+                            AppLocalizations.of(context)!.reasonField,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 12,
@@ -2054,7 +1980,7 @@ class _DelegateLeavesAndRequestsScreenState
                             controller: reasonCtrl,
                             style: const TextStyle(fontSize: 12),
                             decoration: InputDecoration(
-                              hintText: 'اكتب السبب باختصار...',
+                              hintText: AppLocalizations.of(context)!.reasonHint,
                               hintStyle: TextStyle(
                                 fontSize: 11,
                                 color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
@@ -2090,7 +2016,7 @@ class _DelegateLeavesAndRequestsScreenState
 
                           // المقترح 3: إرفاق صورة / تقرير طبي (Buttons Group: الكاميرا والمعرض)
                           Text(
-                            'إرفاق تقرير طبي أو مستند (اختياري):',
+                            AppLocalizations.of(context)!.attachmentOptional,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 12,
@@ -2102,17 +2028,17 @@ class _DelegateLeavesAndRequestsScreenState
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerLow,
+                                color: colorScheme.surfaceContainer,
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: const Color(0xFF2E7D32).withValues(alpha: 0.4),
+                                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
                                 ),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(
-                                    Icons.check_circle_rounded,
-                                    color: Color(0xFF2E7D32),
+                                  Icon(
+                                    Symbols.check_circle_rounded,
+                                    color: Theme.of(context).colorScheme.primary,
                                     size: 16,
                                   ),
                                   const SizedBox(width: 8),
@@ -2131,7 +2057,7 @@ class _DelegateLeavesAndRequestsScreenState
                                     borderRadius: BorderRadius.circular(20),
                                     child: const Padding(
                                       padding: EdgeInsets.all(4),
-                                      child: Icon(Icons.close_rounded, size: 16, color: Colors.red),
+                                      child: Icon(Symbols.close_rounded, size: 16, color: Colors.red),
                                     ),
                                   ),
                                 ],
@@ -2141,11 +2067,8 @@ class _DelegateLeavesAndRequestsScreenState
                             Container(
                               height: 38,
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerLow,
+                                color: colorScheme.surfaceContainer,
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                                ),
                               ),
                               child: Row(
                                 children: [
@@ -2169,13 +2092,13 @@ class _DelegateLeavesAndRequestsScreenState
                                         mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
                                           Icon(
-                                            Icons.camera_alt_rounded,
+                                            Symbols.camera_alt_rounded,
                                             size: 15,
                                             color: colorScheme.primary,
                                           ),
                                           const SizedBox(width: 6),
-                                          const Text(
-                                            'الكاميرا',
+                                          Text(
+                                            AppLocalizations.of(context)!.cameraLabel,
                                             style: TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.w600,
@@ -2210,13 +2133,13 @@ class _DelegateLeavesAndRequestsScreenState
                                         mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
                                           Icon(
-                                            Icons.photo_library_rounded,
+                                            Symbols.photo_library_rounded,
                                             size: 15,
                                             color: colorScheme.primary,
                                           ),
                                           const SizedBox(width: 6),
-                                          const Text(
-                                            'المعرض',
+                                          Text(
+                                            AppLocalizations.of(context)!.galleryLabel,
                                             style: TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.w600,
@@ -2232,7 +2155,7 @@ class _DelegateLeavesAndRequestsScreenState
 
                           if (isSubmitting) ...[
                             const SizedBox(height: 12),
-                            const Center(
+                            Center(
                               child: Column(
                                 children: [
                                   SizedBox(
@@ -2242,7 +2165,7 @@ class _DelegateLeavesAndRequestsScreenState
                                   ),
                                   SizedBox(height: 6),
                                   Text(
-                                    'جاري رفع المرفق وإرسال الطلب للمشرف...',
+                                    AppLocalizations.of(context)!.sendingRequest,
                                     style: TextStyle(fontSize: 11),
                                   ),
                                 ],
@@ -2274,16 +2197,13 @@ class _DelegateLeavesAndRequestsScreenState
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
-                                side: BorderSide(
-                                  color: colorScheme.outlineVariant.withValues(alpha: 0.7),
-                                ),
                                 foregroundColor: colorScheme.onSurfaceVariant,
                                 padding: EdgeInsets.zero,
                               ),
                               onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
-                              icon: const Icon(Icons.close_rounded, size: 16),
-                              label: const Text(
-                                'إلغاء',
+                              icon: const Icon(Symbols.close_rounded, size: 16),
+                              label: Text(
+                                AppLocalizations.of(context)!.cancel,
                                 style: TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w600,
@@ -2308,12 +2228,14 @@ class _DelegateLeavesAndRequestsScreenState
                               onPressed: isSubmitting
                                   ? null
                                   : () async {
+                                    final l10n = AppLocalizations.of(context)!;
                                       final reason = reasonCtrl.text.trim();
                                       final messenger = ScaffoldMessenger.of(context);
+                                      final successColor = Theme.of(context).colorScheme.primary;
                                       if (reason.isEmpty) {
                                         messenger.showSnackBar(
-                                          const SnackBar(
-                                            content: Text('يرجى كتابة سبب الإجازة أو العذر'),
+                                          SnackBar(
+                                            content: Text(AppLocalizations.of(context)!.enterLeaveReason),
                                           ),
                                         );
                                         return;
@@ -2321,9 +2243,9 @@ class _DelegateLeavesAndRequestsScreenState
 
                                       if (!_isAnnualLeaveEnabled && selectedType == 'annual') {
                                         messenger.showSnackBar(
-                                          const SnackBar(
+                                          SnackBar(
                                             content: Text(
-                                              'رصيد الإجازات السنوية غير مفعّل لحسابك حالياً. يرجى اختيار نوع آخر.',
+                                              AppLocalizations.of(context)!.annualNotActive,
                                             ),
                                           ),
                                         );
@@ -2429,18 +2351,26 @@ class _DelegateLeavesAndRequestsScreenState
 
                                         if (ctx.mounted) Navigator.pop(ctx);
                                         messenger.showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'تم إرسال طلبك بنجاح لمشرف الشركة وهو قيد المراجعة الآن.',
+                                          SnackBar(
+                                            content: Row(
+                                              children: [
+                                                M3AnimatedCheck(size: 28),
+                                                SizedBox(width: 12),
+                                                Expanded(
+                                                  child: Text(
+                                                    l10n.requestSent,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                            backgroundColor: Color(0xFF2E7D32),
+                                            backgroundColor: successColor,
                                           ),
                                         );
                                       } catch (e) {
                                         setDlgState(() => isSubmitting = false);
                                         messenger.showSnackBar(
                                           SnackBar(
-                                            content: Text('حدث خطأ أثناء إرسال الطلب: $e'),
+                                            content: Text(l10n.sendRequestFailed(e)),
                                           ),
                                         );
                                       }
@@ -2454,9 +2384,9 @@ class _DelegateLeavesAndRequestsScreenState
                                         color: Colors.white,
                                       ),
                                     )
-                                  : const Icon(Icons.send_rounded, size: 16),
+                                  : const Icon(Symbols.send_rounded, size: 16),
                               label: Text(
-                                isSubmitting ? 'جارٍ الإرسال...' : 'إرسال الطلب',
+                                isSubmitting ? AppLocalizations.of(context)!.sendingEllipsis : AppLocalizations.of(context)!.sendAction,
                                 style: const TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.bold,

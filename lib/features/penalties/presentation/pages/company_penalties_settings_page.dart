@@ -1,3 +1,4 @@
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -112,8 +113,8 @@ class _CompanyPenaltiesSettingsPageState
   Future<void> _togglePinCurrentBranches() async {
     if (_selectedBranchIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('يرجى تحديد فرع أو أكثر لتثبيتها كقطاع افتراضي'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.penSelectBranchesFirst),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -133,8 +134,8 @@ class _CompanyPenaltiesSettingsPageState
         _pinnedBranchIds.clear();
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم إلغاء تثبيت القطاع الافتراضي للفروع'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.penDefaultUnpinned),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -152,8 +153,8 @@ class _CompanyPenaltiesSettingsPageState
 
       final count = _selectedBranchIds.length;
       final msg = count == 1
-          ? 'تم تثبيت الفرع كفرع افتراضي لقسم الغرامات'
-          : 'تم تثبيت ($count فروع) كقطاع افتراضي لقسم الغرامات';
+          ? AppLocalizations.of(context)!.penBranchPinned
+          : AppLocalizations.of(context)!.penBranchesPinned(count);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -217,8 +218,8 @@ class _CompanyPenaltiesSettingsPageState
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'تحديد فروع العرض (قطاع الفروع)',
+                              Text(
+                                AppLocalizations.of(context)!.penSelectDisplayBranches,
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -226,8 +227,8 @@ class _CompanyPenaltiesSettingsPageState
                               ),
                               Text(
                                 selectedCount == 0
-                                    ? 'يتم عرض جميع الفروع حالياً'
-                                    : 'تم تحديد $selectedCount فرع للفلترة',
+                                    ? AppLocalizations.of(context)!.penShowingAllBranches
+                                    : AppLocalizations.of(context)!.penBranchesSelected(selectedCount),
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: colorScheme.onSurfaceVariant,
@@ -244,7 +245,7 @@ class _CompanyPenaltiesSettingsPageState
                               });
                             },
                             icon: const Icon(Icons.clear_all_rounded, size: 18),
-                            label: const Text('مسح التحديد'),
+                            label: Text(AppLocalizations.of(context)!.clearSelection),
                           ),
                       ],
                     ),
@@ -259,7 +260,7 @@ class _CompanyPenaltiesSettingsPageState
                           onChanged: (_) => setSheetState(() {}),
                           style: const TextStyle(fontSize: 13),
                           decoration: InputDecoration(
-                            hintText: 'بحث باسم الفرع...',
+                            hintText: AppLocalizations.of(context)!.searchBranchName,
                             prefixIcon: const Icon(Icons.search_rounded, size: 20),
                             suffixIcon: searchController.text.isNotEmpty
                                 ? IconButton(
@@ -291,7 +292,7 @@ class _CompanyPenaltiesSettingsPageState
                                 size: 16,
                                 color: isAllSelected ? colorScheme.primary : null,
                               ),
-                              label: const Text('جميع الفروع (الكل)', style: TextStyle(fontSize: 12)),
+                              label: Text(AppLocalizations.of(context)!.allBranchesAll, style: TextStyle(fontSize: 12)),
                               backgroundColor: isAllSelected
                                   ? colorScheme.primaryContainer
                                   : colorScheme.surfaceContainerHigh,
@@ -304,7 +305,7 @@ class _CompanyPenaltiesSettingsPageState
                             const SizedBox(width: 8),
                             ActionChip(
                               avatar: const Icon(Icons.select_all_rounded, size: 16),
-                              label: const Text('تحديد الكل', style: TextStyle(fontSize: 12)),
+                              label: Text(AppLocalizations.of(context)!.selectAll, style: TextStyle(fontSize: 12)),
                               onPressed: () {
                                 setSheetState(() {
                                   tempSelection.clear();
@@ -323,7 +324,7 @@ class _CompanyPenaltiesSettingsPageState
                     child: filteredBranches.isEmpty
                         ? Center(
                             child: Text(
-                              'لا توجد فروع مطابقة للبحث',
+                              AppLocalizations.of(context)!.noMatchingBranches,
                               style: TextStyle(color: colorScheme.onSurfaceVariant),
                             ),
                           )
@@ -360,7 +361,7 @@ class _CompanyPenaltiesSettingsPageState
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Text(
-                                          'ضمن الافتراضي',
+                                          AppLocalizations.of(context)!.inDefault,
                                           style: TextStyle(
                                             fontSize: 10,
                                             fontWeight: FontWeight.bold,
@@ -371,7 +372,7 @@ class _CompanyPenaltiesSettingsPageState
                                   ],
                                 ),
                                 subtitle: Text(
-                                  'كود: $branchId',
+                                  AppLocalizations.of(context)!.codeLabel(branchId),
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
@@ -420,8 +421,8 @@ class _CompanyPenaltiesSettingsPageState
                             icon: const Icon(Icons.check_rounded, size: 18),
                             label: Text(
                               tempSelection.isEmpty
-                                  ? 'تأكيد (عرض جميع الفروع)'
-                                  : 'تأكيد الفلترة (${tempSelection.length} فروع)',
+                                  ? AppLocalizations.of(context)!.confirmShowAllBranches
+                                  : AppLocalizations.of(context)!.confirmFilterCount(tempSelection.length),
                               style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -524,7 +525,7 @@ class _CompanyPenaltiesSettingsPageState
         backgroundColor: colorScheme.surfaceContainerLowest,
         appBar: widget.showAppBar
             ? AppBar(
-                title: const Text('قسم الغرامات والمخالفات'),
+                title: Text(AppLocalizations.of(context)!.finesSection),
                 backgroundColor: colorScheme.surfaceContainer,
                 elevation: 0,
                 shape: Border(
@@ -535,11 +536,11 @@ class _CompanyPenaltiesSettingsPageState
                 ),
               )
             : null,
-        body: const Center(
+        body: Center(
           child: Padding(
             padding: EdgeInsets.all(16.0),
             child: Text(
-              'غير مسموح لحسابات تسويق العروض الوصول لنظام الغرامات والمخالفات',
+              AppLocalizations.of(context)!.promoNoFinesAccess,
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
@@ -571,21 +572,21 @@ class _CompanyPenaltiesSettingsPageState
               ),
               title: Text(
                 isDelegate
-                    ? 'سجل مخالفاتي وغراماتي'
-                    : 'سجل المخالفات والغرامات',
+                    ? AppLocalizations.of(context)!.myViolationsTitle
+                    : AppLocalizations.of(context)!.violationsRecord,
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               leading: Navigator.canPop(context)
                   ? IconButton(
                       icon: const Icon(Icons.arrow_back_rounded),
-                      tooltip: 'رجوع',
+                      tooltip: AppLocalizations.of(context)!.backAction,
                       onPressed: () => Navigator.of(context).pop(),
                     )
                   : null,
               actions: [
                 IconButton(
                   icon: const Icon(Icons.menu_book_rounded),
-                  tooltip: 'لائحة الغرامات المعتمدة',
+                  tooltip: AppLocalizations.of(context)!.violationsPolicy,
                   onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -600,7 +601,7 @@ class _CompanyPenaltiesSettingsPageState
                     widget.delegate.role == UserRole.technicalSupport)
                   IconButton(
                     icon: const Icon(Icons.tune_rounded),
-                    tooltip: 'إعدادات ولائحة الغرامات',
+                    tooltip: AppLocalizations.of(context)!.finesSettings,
                     onPressed: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -611,7 +612,7 @@ class _CompanyPenaltiesSettingsPageState
                   ),
                 IconButton(
                   icon: const Icon(Icons.refresh_rounded),
-                  tooltip: 'تحديث',
+                  tooltip: AppLocalizations.of(context)!.refreshPolicy,
                   onPressed: () {
                     _loadData();
                     _loadBranchesAndPinned();
@@ -639,7 +640,7 @@ class _CompanyPenaltiesSettingsPageState
                 }
               },
               icon: const Icon(Icons.add_rounded),
-              label: const Text('تسجيل مخالفة'),
+              label: Text(AppLocalizations.of(context)!.recordViolation),
             )
           : null,
       body: BlocBuilder<PenaltyBloc, PenaltyState>(
@@ -665,7 +666,7 @@ class _CompanyPenaltiesSettingsPageState
                   ElevatedButton.icon(
                     onPressed: _loadData,
                     icon: const Icon(Icons.refresh_rounded),
-                    label: const Text('إعادة المحاولة'),
+                    label: Text(AppLocalizations.of(context)!.retry),
                   ),
                 ],
               ),
@@ -703,7 +704,7 @@ class _CompanyPenaltiesSettingsPageState
             final Map<String, List<PenaltyEntity>> groupedByCompany = {};
             for (var p in penalties) {
               final compName =
-                  p.companyName.isNotEmpty ? p.companyName : 'شركة غير محددة';
+                  p.companyName.isNotEmpty ? p.companyName : AppLocalizations.of(context)!.unknownCompany;
               groupedByCompany.putIfAbsent(compName, () => []).add(p);
             }
 
@@ -726,7 +727,7 @@ class _CompanyPenaltiesSettingsPageState
 
             String branchLabel;
             if (selectedCount == 0) {
-              branchLabel = 'جميع الفروع (عرض شامل)';
+              branchLabel = AppLocalizations.of(context)!.allBranchesOverview;
             } else if (selectedCount == 1) {
               final singleId = _selectedBranchIds.first;
               final match = _availableBranches.firstWhere(
@@ -735,7 +736,7 @@ class _CompanyPenaltiesSettingsPageState
               );
               branchLabel = match['name'] ?? singleId;
             } else {
-              branchLabel = 'قطاع محدد: ($selectedCount فروع)';
+              branchLabel = AppLocalizations.of(context)!.selectedGroupCount(selectedCount);
             }
 
             return RefreshIndicator(
@@ -790,14 +791,14 @@ class _CompanyPenaltiesSettingsPageState
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'لائحة الغرامات والجزاءات الرسمية',
+                                      AppLocalizations.of(context)!.violationsPolicy,
                                       style: theme.textTheme.labelLarge?.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: colorScheme.onSurface,
                                       ),
                                     ),
                                     Text(
-                                      'استعراض بنود التجاوزات وقيم الخصم المعتمدة للمرة الأولى والتكرار',
+                                      AppLocalizations.of(context)!.finesPolicyCardSubtitle,
                                       style: theme.textTheme.bodySmall?.copyWith(
                                         color: colorScheme.onSurfaceVariant,
                                         fontSize: 11,
@@ -845,7 +846,7 @@ class _CompanyPenaltiesSettingsPageState
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  'عرض مخالفات الفرع / القطاع:',
+                                  AppLocalizations.of(context)!.showViolationsFor,
                                   style: theme.textTheme.labelLarge?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: colorScheme.onSurface,
@@ -854,8 +855,8 @@ class _CompanyPenaltiesSettingsPageState
                                 const Spacer(),
                                 IconButton.filledTonal(
                                   tooltip: isPinned
-                                      ? 'إلغاء تثبيت القطاع الافتراضي'
-                                      : 'تثبيت الفروع المحددة كقطاع افتراضي',
+                                      ? AppLocalizations.of(context)!.unpinDefaultGroup
+                                      : AppLocalizations.of(context)!.pinSelectedAsDefault,
                                   style: IconButton.styleFrom(
                                     backgroundColor: isPinned
                                         ? colorScheme.tertiaryContainer
@@ -882,7 +883,7 @@ class _CompanyPenaltiesSettingsPageState
                                 ),
                                 const SizedBox(width: 6),
                                 IconButton.filledTonal(
-                                  tooltip: 'تحديث بيانات الغرامات',
+                                  tooltip: AppLocalizations.of(context)!.refreshFinesData,
                                   style: IconButton.styleFrom(
                                     backgroundColor: colorScheme.surface,
                                     foregroundColor: colorScheme.primary,
@@ -899,8 +900,8 @@ class _CompanyPenaltiesSettingsPageState
                                     _loadData();
                                     _loadBranchesAndPinned();
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('تم تحديث بيانات وسجلات الغرامات بنجاح'),
+                                      SnackBar(
+                                        content: Text(AppLocalizations.of(context)!.finesDataRefreshed),
                                         duration: Duration(seconds: 1),
                                         behavior: SnackBarBehavior.floating,
                                       ),
@@ -945,7 +946,7 @@ class _CompanyPenaltiesSettingsPageState
                                               ),
                                               if (isPinned)
                                                 Text(
-                                                  'القطاع الافتراضي المثبت',
+                                                  AppLocalizations.of(context)!.pinnedDefaultGroup,
                                                   style: TextStyle(
                                                     fontSize: 10.5,
                                                     fontWeight: FontWeight.bold,
@@ -1000,7 +1001,7 @@ class _CompanyPenaltiesSettingsPageState
                                   Padding(
                                     padding: const EdgeInsetsDirectional.only(start: 6),
                                     child: ActionChip(
-                                      label: const Text('عرض الكل', style: TextStyle(fontSize: 11)),
+                                      label: Text(AppLocalizations.of(context)!.showAll, style: TextStyle(fontSize: 11)),
                                       visualDensity: VisualDensity.compact,
                                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                       onPressed: () {
@@ -1028,10 +1029,18 @@ class _CompanyPenaltiesSettingsPageState
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [
-                            colorScheme.errorContainer,
-                            colorScheme.surfaceContainerHighest,
-                          ],
+                          // Dark: no large errorContainer fill (M3 dark
+                          // guidance); light is unchanged.
+                          colors: Theme.of(context).brightness ==
+                                  Brightness.dark
+                              ? [
+                                  colorScheme.surfaceContainer,
+                                  colorScheme.surfaceContainerHigh,
+                                ]
+                              : [
+                                  colorScheme.errorContainer,
+                                  colorScheme.surfaceContainerHighest,
+                                ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
@@ -1062,12 +1071,12 @@ class _CompanyPenaltiesSettingsPageState
                               Expanded(
                                 child: Text(
                                   isDelegate
-                                      ? 'ملخص مخالفاتي وغراماتي الشخصية'
+                                      ? AppLocalizations.of(context)!.mySummary
                                       : (_selectedBranchIds.isNotEmpty
-                                          ? 'ملخص الغرامات ($branchLabel)'
+                                          ? AppLocalizations.of(context)!.finesSummaryOf(branchLabel)
                                           : (isOrgAdmin
-                                              ? 'ملخص غرامات ومخالفات الشركات'
-                                              : 'ملخص الغرامات والمخالفات')),
+                                              ? AppLocalizations.of(context)!.companiesFinesSummary
+                                              : AppLocalizations.of(context)!.finesSummary)),
                                   style: theme.textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: colorScheme.onErrorContainer,
@@ -1086,14 +1095,14 @@ class _CompanyPenaltiesSettingsPageState
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      isDelegate ? 'إجمالي غراماتي' : 'إجمالي الغرامات',
+                                      isDelegate ? AppLocalizations.of(context)!.myTotalFines : AppLocalizations.of(context)!.totalFines,
                                       style: theme.textTheme.bodySmall?.copyWith(
                                         color: colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      filteredTotalFines.toStringAsFixed(2),
+                                      AppLocalizations.of(context)!.amountEgp(filteredTotalFines.toStringAsFixed(2)),
                                       style: theme.textTheme.titleLarge?.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: filteredTotalFines > 0
@@ -1115,14 +1124,14 @@ class _CompanyPenaltiesSettingsPageState
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      isDelegate ? 'المخصوم مني' : 'المخصوم',
+                                      isDelegate ? AppLocalizations.of(context)!.deductedFromMe : AppLocalizations.of(context)!.deducted,
                                       style: theme.textTheme.bodySmall?.copyWith(
                                         color: colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      filteredDeducted.toStringAsFixed(2),
+                                      AppLocalizations.of(context)!.amountEgp(filteredDeducted.toStringAsFixed(2)),
                                       style: theme.textTheme.titleLarge?.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: Colors.green.shade700,
@@ -1143,7 +1152,7 @@ class _CompanyPenaltiesSettingsPageState
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'عدد المخالفات',
+                                        AppLocalizations.of(context)!.violationsCountLabel,
                                         style: theme.textTheme.bodySmall?.copyWith(
                                           color: colorScheme.onSurfaceVariant,
                                         ),
@@ -1172,7 +1181,7 @@ class _CompanyPenaltiesSettingsPageState
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'عدد الشركات',
+                                        AppLocalizations.of(context)!.companiesCount,
                                         style: theme.textTheme.bodySmall
                                             ?.copyWith(
                                           color: colorScheme.onSurfaceVariant,
@@ -1180,7 +1189,7 @@ class _CompanyPenaltiesSettingsPageState
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        '${groupedByCompany.keys.length} شركة',
+                                        AppLocalizations.of(context)!.companiesN(groupedByCompany.keys.length),
                                         style: theme.textTheme.titleLarge
                                             ?.copyWith(
                                           fontWeight: FontWeight.bold,
@@ -1211,7 +1220,7 @@ class _CompanyPenaltiesSettingsPageState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'تصفية حسب الشركة:',
+                            AppLocalizations.of(context)!.filterByCompany,
                             style: theme.textTheme.labelMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: colorScheme.primary,
@@ -1224,7 +1233,7 @@ class _CompanyPenaltiesSettingsPageState
                               children: [
                                 ChoiceChip(
                                   label: Text(
-                                    'جميع الشركات (${penalties.length})',
+                                    AppLocalizations.of(context)!.allCompaniesCount(penalties.length),
                                     style: TextStyle(
                                       color: _selectedCompanyFilter == 'all'
                                           ? colorScheme.onPrimary
@@ -1310,10 +1319,10 @@ class _CompanyPenaltiesSettingsPageState
                             const SizedBox(height: 16),
                             Text(
                               isDelegate
-                                  ? 'سجلك نظيف ومتميز!'
+                                  ? AppLocalizations.of(context)!.recordClean
                                   : (isOrgAdmin
-                                      ? 'لا توجد مخالفات مسجلة على أية شركة بعد'
-                                      : 'لا توجد مخالفات مسجلة على هذه الشركة'),
+                                      ? AppLocalizations.of(context)!.noViolationsAnyCompany
+                                      : AppLocalizations.of(context)!.noViolationsThisCompany),
                               textAlign: TextAlign.center,
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
@@ -1323,7 +1332,7 @@ class _CompanyPenaltiesSettingsPageState
                             if (isDelegate) ...[
                               const SizedBox(height: 8),
                               Text(
-                                'لا توجد أي مخالفات أو غرامات مسجلة بحقك حتى الآن.',
+                                AppLocalizations.of(context)!.noViolationsRecorded,
                                 textAlign: TextAlign.center,
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
@@ -1435,19 +1444,19 @@ class _PenaltyCardState extends State<_PenaltyCard> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('سبب الرفض'),
+        title: Text(AppLocalizations.of(context)!.rejectionReason),
         content: TextField(
           controller: controller,
           maxLines: 3,
-          decoration: const InputDecoration(
-            hintText: 'يرجى كتابة سبب رفض المخالفة...',
+          decoration: InputDecoration(
+            hintText: AppLocalizations.of(context)!.rejectionReasonHint,
             border: OutlineInputBorder(),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('إلغاء'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -1465,7 +1474,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                     ),
                   );
             },
-            child: const Text('تأكيد الرفض'),
+            child: Text(AppLocalizations.of(context)!.confirmRejection),
           ),
         ],
       ),
@@ -1532,7 +1541,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                         border: Border.all(color: colorScheme.error.withValues(alpha: 0.5)),
                       ),
                       child: Text(
-                        'مخالفة مكررة',
+                        AppLocalizations.of(context)!.repeatedViolation,
                         style: TextStyle(
                           color: colorScheme.onErrorContainer,
                           fontSize: 11,
@@ -1556,7 +1565,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                           Icon(Icons.lock_rounded, size: 12, color: Colors.purple.shade700),
                           const SizedBox(width: 3),
                           Text(
-                            'سرية ومقيدة',
+                            AppLocalizations.of(context)!.confidential,
                             style: TextStyle(
                               color: Colors.purple.shade700,
                               fontSize: 11,
@@ -1657,7 +1666,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                         size: 14, color: colorScheme.primary),
                     const SizedBox(width: 4),
                     Text(
-                      'المندوب المستهدف: ${widget.penalty.targetDelegateName}',
+                      AppLocalizations.of(context)!.targetDelegate(widget.penalty.targetDelegateName ?? ''),
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: colorScheme.primary,
                         fontWeight: FontWeight.bold,
@@ -1674,7 +1683,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                 const SizedBox(height: 10),
                 if (widget.penalty.incidentDescription.isNotEmpty) ...[
                   Text(
-                    'تفاصيل المخالفة:',
+                    AppLocalizations.of(context)!.violationDetails,
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.bold,
@@ -1703,7 +1712,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                       border: Border.all(color: Colors.red.shade200),
                     ),
                     child: Text(
-                      'سبب الرفض: ${widget.penalty.rejectionReason}',
+                      AppLocalizations.of(context)!.rejectReasonLabel(widget.penalty.rejectionReason ?? ''),
                       style: TextStyle(
                         color: Colors.red.shade800,
                         fontSize: 12,
@@ -1716,7 +1725,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                 // Audit Trail Info
                 if (widget.penalty.branchesMarketingApprovedBy != null) ...[
                   Text(
-                    'موافقة مدير تسويق الفروع: ${widget.penalty.branchesMarketingApprovedBy}',
+                    AppLocalizations.of(context)!.branchesMarketingApproval(widget.penalty.branchesMarketingApprovedBy ?? ''),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: Colors.green.shade800,
                     ),
@@ -1725,7 +1734,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                 ],
                 if (widget.penalty.generalManagerApprovedBy != null) ...[
                   Text(
-                    'اعتماد المدير العام: ${widget.penalty.generalManagerApprovedBy}',
+                    AppLocalizations.of(context)!.generalManagerApproval(widget.penalty.generalManagerApprovedBy ?? ''),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: Colors.green.shade900,
                       fontWeight: FontWeight.bold,
@@ -1758,7 +1767,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              'المرفقات والمستندات (${widget.penalty.evidenceFiles.length})',
+                              AppLocalizations.of(context)!.attachmentsCount(widget.penalty.evidenceFiles.length),
                               style: TextStyle(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.bold,
@@ -1767,7 +1776,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                             ),
                             const Spacer(),
                             Text(
-                              'اضغط للمعاينة والتكبير',
+                              AppLocalizations.of(context)!.tapToPreview2,
                               style: TextStyle(
                                 fontSize: 10.5,
                                 color: colorScheme.onSurfaceVariant,
@@ -1911,7 +1920,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'لا توجد مستندات أو صور مرفقة بهذه المخالفة',
+                          AppLocalizations.of(context)!.noViolationDocs,
                           style: TextStyle(
                             fontSize: 11,
                             color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
@@ -1930,7 +1939,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
-                          'المحرر: ${widget.penalty.createdByName}',
+                          AppLocalizations.of(context)!.editorName(widget.penalty.createdByName),
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 11,
@@ -1955,7 +1964,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                               Icon(Icons.phone_in_talk_rounded, size: 11, color: Colors.green.shade700),
                               const SizedBox(width: 3),
                               Text(
-                                'اتصال',
+                                AppLocalizations.of(context)!.callAction,
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
@@ -1993,7 +2002,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                         onPressed: () => _showEvidenceSheet(context, widget.penalty),
                         icon: const Icon(Icons.attach_file_rounded, size: 15),
                         label: Text(
-                          'المستندات (${widget.penalty.evidenceFiles.length})',
+                          AppLocalizations.of(context)!.documentsCount(widget.penalty.evidenceFiles.length),
                           style: const TextStyle(fontSize: 11.5),
                         ),
                       ),
@@ -2048,8 +2057,8 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                                     : Icons.arrow_forward_rounded,
                                 size: 18,
                               ),
-                              label: const Text(
-                                'اعتماد',
+                              label: Text(
+                                AppLocalizations.of(context)!.approveAction,
                                 style: TextStyle(
                                     fontWeight: FontWeight.bold, fontSize: 13),
                               ),
@@ -2072,8 +2081,8 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                                 PenaltyStatus.rejectedByBranchesMarketing,
                               ),
                               icon: const Icon(Icons.cancel_rounded, size: 18),
-                              label: const Text(
-                                'رفض',
+                              label: Text(
+                                AppLocalizations.of(context)!.rejectAction,
                                 style: TextStyle(
                                     fontWeight: FontWeight.bold, fontSize: 13),
                               ),
@@ -2123,8 +2132,8 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                                     );
                               },
                               icon: const Icon(Icons.verified_rounded, size: 18),
-                              label: const Text(
-                                'اعتماد',
+                              label: Text(
+                                AppLocalizations.of(context)!.approveAction,
                                 style: TextStyle(
                                     fontWeight: FontWeight.bold, fontSize: 13),
                               ),
@@ -2147,8 +2156,8 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                                 PenaltyStatus.rejectedByGeneralManager,
                               ),
                               icon: const Icon(Icons.cancel_rounded, size: 18),
-                              label: const Text(
-                                'رفض',
+                              label: Text(
+                                AppLocalizations.of(context)!.rejectAction,
                                 style: TextStyle(
                                     fontWeight: FontWeight.bold, fontSize: 13),
                               ),
@@ -2272,7 +2281,7 @@ class _CompanyPenaltiesGroupCardState
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    'المخالفات: ${widget.penalties.length}',
+                    AppLocalizations.of(context)!.violationsWithCount(widget.penalties.length),
                     style: theme.textTheme.labelMedium?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.bold,
@@ -2287,7 +2296,7 @@ class _CompanyPenaltiesGroupCardState
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    'الإجمالي: ${totalFine.toStringAsFixed(2)}',
+                    AppLocalizations.of(context)!.totalWithValue(totalFine.toStringAsFixed(2)),
                     style: theme.textTheme.labelMedium?.copyWith(
                       color: colorScheme.error,
                       fontWeight: FontWeight.bold,
@@ -2303,7 +2312,7 @@ class _CompanyPenaltiesGroupCardState
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      'المخصوم: ${totalDeducted.toStringAsFixed(2)}',
+                      AppLocalizations.of(context)!.deductedWithValue(totalDeducted.toStringAsFixed(2)),
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: Colors.green.shade700,
                         fontWeight: FontWeight.bold,

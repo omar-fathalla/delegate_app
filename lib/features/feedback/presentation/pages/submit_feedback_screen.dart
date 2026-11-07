@@ -1,3 +1,5 @@
+import 'package:material_symbols_icons/symbols.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -74,7 +76,7 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isArabic ? 'إرسال مقترح' : 'Submit Feedback'),
+        title: Text(AppLocalizations.of(context)!.sendFeedback),
         centerTitle: true,
       ),
       body: BlocListener<FeedbackBloc, FeedbackState>(
@@ -117,10 +119,7 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Text(
-                                isArabic
-                                    ? 'نحن نقدّر رأيك! ساعدنا في تحسين تجربتك'
-                                    : 'We value your opinion! Help us improve your experience',
+                              child: Text(AppLocalizations.of(context)!.feedbackIntro,
                                 style: theme.textTheme.bodyLarge?.copyWith(
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -133,8 +132,7 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
                     const SizedBox(height: 24),
 
                     // نوع المقترح
-                    Text(
-                      isArabic ? 'نوع الرسالة' : 'Message Type',
+                    Text(AppLocalizations.of(context)!.feedbackType,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -146,7 +144,8 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
                       children: FeedbackType.values.map((type) {
                         final isSelected = _selectedType == type;
                         return ChoiceChip(
-                          label: Text(type.getLabel(isArabic)),
+                          avatar: Icon(_feedbackIcon(type), size: 18),
+                          label: Text(_feedbackLabel(context, type)),
                           selected: isSelected,
                           onSelected: (selected) {
                             if (selected) {
@@ -155,14 +154,11 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
                               });
                             }
                           },
-                          selectedColor: theme.colorScheme.primaryContainer,
+                          showCheckmark: false,
                           labelStyle: TextStyle(
                             color: isSelected
-                                ? theme.colorScheme.primary
+                                ? theme.colorScheme.onSecondaryContainer
                                 : theme.colorScheme.onSurface,
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
                           ),
                         );
                       }).toList(),
@@ -170,8 +166,7 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
                     const SizedBox(height: 24),
 
                     // محتوى الرسالة
-                    Text(
-                      isArabic ? 'رسالتك' : 'Your Message',
+                    Text(AppLocalizations.of(context)!.yourMessage,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -182,9 +177,7 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
                       maxLines: 8,
                       maxLength: 1000,
                       decoration: InputDecoration(
-                        hintText: isArabic
-                            ? 'أخبرنا كيف يمكننا تحسين تجربتك...'
-                            : 'Tell us how we can improve your experience...',
+                        hintText: AppLocalizations.of(context)!.feedbackHint,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -193,14 +186,10 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                          return isArabic
-                              ? 'الرجاء كتابة رسالتك'
-                              : 'Please enter your message';
+                          return AppLocalizations.of(context)!.enterMessage;
                         }
                         if (value.trim().length < 10) {
-                          return isArabic
-                              ? 'الرسالة قصيرة جداً (10 أحرف على الأقل)'
-                              : 'Message is too short (at least 10 characters)';
+                          return AppLocalizations.of(context)!.messageTooShort;
                         }
                         return null;
                       },
@@ -208,10 +197,7 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
                     const SizedBox(height: 24),
 
                     // إرفاق صورة
-                    Text(
-                      isArabic
-                          ? 'إرفاق لقطة شاشة (اختياري)'
-                          : 'Attach Screenshot (Optional)',
+                    Text(AppLocalizations.of(context)!.screenshotOptional,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -247,7 +233,7 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
                       OutlinedButton.icon(
                         onPressed: _pickImage,
                         icon: const Icon(Icons.add_photo_alternate),
-                        label: Text(isArabic ? 'اختر صورة' : 'Choose Image'),
+                        label: Text(AppLocalizations.of(context)!.chooseImage),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.all(16),
                           shape: RoundedRectangleBorder(
@@ -261,8 +247,7 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
                     FilledButton.icon(
                       onPressed: _submitFeedback,
                       icon: const Icon(Icons.send),
-                      label: Text(
-                        isArabic ? 'إرسال المقترح' : 'Submit Feedback',
+                      label: Text(AppLocalizations.of(context)!.sendAction,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -296,17 +281,13 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
           children: [
             const Icon(Icons.check_circle, color: Colors.green, size: 64),
             const SizedBox(height: 16),
-            Text(
-              isArabic ? 'شكراً لك!' : 'Thank You!',
+            Text(AppLocalizations.of(context)!.thankYou,
               style: Theme.of(
                 context,
               ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            Text(
-              isArabic
-                  ? 'تم استلام مقترحك بنجاح. سنقوم بمراجعته قريباً.'
-                  : 'Your feedback has been received successfully. We will review it soon.',
+            Text(AppLocalizations.of(context)!.feedbackReceived,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
@@ -318,10 +299,29 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
               Navigator.of(context).pop(); // إغلاق الـ Dialog
               context.pop(); // العودة للصفحة السابقة
             },
-            child: Text(isArabic ? 'حسناً' : 'OK'),
+            child: Text(AppLocalizations.of(context)!.okAction),
           ),
         ],
       ),
     );
+  }
+
+  IconData _feedbackIcon(FeedbackType t) => switch (t) {
+        FeedbackType.featureRequest => Symbols.lightbulb_rounded,
+        FeedbackType.bugReport => Symbols.bug_report_rounded,
+        FeedbackType.generalQuestion => Symbols.help_rounded,
+        FeedbackType.improvement => Symbols.star_rounded,
+        FeedbackType.other => Symbols.edit_note_rounded,
+      };
+
+  String _feedbackLabel(BuildContext context, FeedbackType t) {
+    final l10n = AppLocalizations.of(context)!;
+    return switch (t) {
+      FeedbackType.featureRequest => l10n.feedbackTypeFeature,
+      FeedbackType.bugReport => l10n.feedbackTypeBug,
+      FeedbackType.generalQuestion => l10n.feedbackTypeQuestion,
+      FeedbackType.improvement => l10n.feedbackTypeImprovement,
+      FeedbackType.other => l10n.feedbackTypeOther,
+    };
   }
 }

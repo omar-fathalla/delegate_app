@@ -2,11 +2,11 @@ import 'package:equatable/equatable.dart';
 
 /// أنواع المقترحات المتاحة
 enum FeedbackType {
-  featureRequest('feature_request', '💡 فكرة تطويرية', 'Feature Request'),
-  bugReport('bug_report', '🐛 الإبلاغ عن مشكلة', 'Bug Report'),
-  generalQuestion('general_question', '❓ استفسار عام', 'General Question'),
-  improvement('improvement', '⭐ تحسين', 'Improvement'),
-  other('other', '📝 أخرى', 'Other');
+  featureRequest('feature_request', 'فكرة تطويرية', 'Feature Request'),
+  bugReport('bug_report', 'الإبلاغ عن مشكلة', 'Bug Report'),
+  generalQuestion('general_question', 'استفسار عام', 'General Question'),
+  improvement('improvement', 'تحسين', 'Improvement'),
+  other('other', 'أخرى', 'Other');
 
   final String value;
   final String labelAr;

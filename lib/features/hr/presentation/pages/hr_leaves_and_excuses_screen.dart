@@ -358,6 +358,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
       )
           : null,
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'hr_leaves_create_fab',
         onPressed: _showCreateLeaveDialog,
         icon: const Icon(Icons.add_task_rounded),
         label: const Text('تسجيل'),

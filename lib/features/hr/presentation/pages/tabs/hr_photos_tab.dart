@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:delegate_app/core/services/branch_display_cache.dart';
+import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
@@ -142,7 +144,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'هل أنت متأكد من حذف هذه الصورة المرسلة من المندوب "${photo.delegateName}" بفرع "${photo.branchName}"؟',
+              'هل أنت متأكد من حذف هذه الصورة المرسلة من المندوب "${photo.delegateName}" بفرع "${BranchDisplayCache.instance.displayName(photo.branchName)}"؟',
               style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 12),
@@ -314,7 +316,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                             const Icon(Icons.storefront_rounded, size: 16, color: Colors.amber),
                             const SizedBox(width: 6),
                             Text(
-                              photo.branchName.isNotEmpty ? photo.branchName : 'الفرع غير محدد',
+                              photo.branchName.isNotEmpty ? BranchDisplayCache.instance.displayName(photo.branchName) : 'الفرع غير محدد',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 13,
@@ -842,8 +844,8 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                             const Icon(Icons.storefront_rounded, size: 12, color: Colors.amber),
                             const SizedBox(width: 4),
                             Expanded(
-                              child: Text(
-                                photo.branchName,
+                              child: BranchNameLabel(
+                                branchName: photo.branchName,
                                 style: const TextStyle(
                                   color: Colors.white70,
                                   fontSize: 11,
@@ -1022,7 +1024,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                   final isSelected = _selectedBranch == b;
                   return _buildM3MenuItem(
                     value: b,
-                    label: b,
+                    label: BranchDisplayCache.instance.displayName(b),
                     count: branchCounts[b],
                     icon: Icons.storefront_outlined,
                     isSelected: isSelected,
@@ -1689,7 +1691,7 @@ class _HRBranchNamesListState extends State<_HRBranchNamesList> {
     final theme = Theme.of(context);
     final text = widget.branchNames.isEmpty
         ? 'جميع فروع الشركة'
-        : widget.branchNames.join('، ');
+        : widget.branchNames.map(BranchDisplayCache.instance.displayName).join('، ');
 
     return GestureDetector(
       onTap: () {

@@ -1,4 +1,7 @@
+import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
+import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -7,7 +10,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
-import 'package:delegate_app/core/widgets/tashil_button_group.dart';
 import 'package:delegate_app/core/widgets/tashil_icon_button.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
@@ -71,7 +73,7 @@ class DelegateAttendanceSession {
     return checkInTime.year == now.year &&
         checkInTime.month == now.month &&
         checkInTime.day == now.day &&
-        now.difference(checkInTime) < const Duration(hours: 9);
+        now.difference(checkInTime) < kAttendanceAutoCloseAfter;
   }
 
   /// Formatted duration string e.g. "8 س و 15 د"
@@ -125,9 +127,34 @@ class _HRDelegateAttendanceDetailScreenState
   String _selectedBranchFilter = 'all';
   String _selectedStatusFilter = 'all'; // 'all', 'completed', 'incomplete'
 
+  // Layout-only: scroll state for the collapsing delegate header.
+  final ScrollController _scrollController = ScrollController();
+  bool _headerShrunk = false; // header card scaled down slightly
+  bool _showCompactHeader = false; // header scrolled away -> photo + name in AppBar
+
+  void _onScroll() {
+    final o = _scrollController.hasClients ? _scrollController.offset : 0.0;
+    final shrunk = o > 24;
+    final compact = o > 150;
+    if (shrunk != _headerShrunk || compact != _showCompactHeader) {
+      setState(() {
+        _headerShrunk = shrunk;
+        _showCompactHeader = compact;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     final init = widget.initialMonth ?? DateTime.now();
     _selectedMonth = DateTime(init.year, init.month, 1);
     if (widget.branchesByName != null) {
@@ -343,15 +370,15 @@ class _HRDelegateAttendanceDetailScreenState
       String? autoCheckOutReason = checkOutData?['autoCheckOutReason']?.toString() ??
           checkInData['autoCheckOutReason']?.toString();
 
-      // قاعدة الـ 9 ساعات: إغلاق الانصراف ديناميكياً إذا انقضت الوردية (9 ساعات) أو كان تاريخاً سابقاً
+      // قاعدة الإغلاق التلقائي: إغلاق الانصراف ديناميكياً إذا انقضت الوردية (11.5 ساعة) أو كان تاريخاً سابقاً
       if (checkOutTime == null) {
         final now = DateTime.now();
         final isPastDay = checkInTime.isBefore(DateTime(now.year, now.month, now.day));
-        final isElapsed9Hours = now.difference(checkInTime) >= const Duration(hours: 9);
-        if (isPastDay || isElapsed9Hours) {
-          checkOutTime = checkInTime.add(const Duration(hours: 9));
+        final isElapsedAutoClose = now.difference(checkInTime) >= kAttendanceAutoCloseAfter;
+        if (isPastDay || isElapsedAutoClose) {
+          checkOutTime = checkInTime.add(kAttendanceAutoCloseAfter);
           isAutoCheckOut = true;
-          autoCheckOutReason = 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي';
+          autoCheckOutReason = kAttendanceAutoCloseReasonAr;
         }
       }
 
@@ -910,7 +937,7 @@ class _HRDelegateAttendanceDetailScreenState
       'organizationId': orgUID,
       'title': 'تعديل إداري في سجل الحضور والانصراف',
       'body':
-          'قامت إدارة الموارد البشرية بتعديل توقيت جلسة حضورك في فرع "${session.branchName}" بتاريخ $dateStr. السبب: $reason.',
+          'قامت إدارة الموارد البشرية بتعديل توقيت جلسة حضورك في فرع "${BranchDisplayCache.instance.displayName(session.branchName)}" بتاريخ $dateStr. السبب: $reason.',
       'type': 'attendance_adjusted',
       'isRead': false,
       'createdAt': FieldValue.serverTimestamp(),
@@ -959,7 +986,32 @@ class _HRDelegateAttendanceDetailScreenState
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: AppBar(
         titleSpacing: 0,
-        title: Column(
+        title: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          child: _showCompactHeader
+              ? Row(
+                  key: const ValueKey('compact'),
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AppAvatar(
+                      imageUrl: widget.delegate.personalPhotoUrl,
+                      fallbackText: widget.delegate.fullName,
+                      radius: 16,
+                    ),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        widget.delegate.fullName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                )
+              : KeyedSubtree(
+                  key: const ValueKey('full'),
+                  child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -985,99 +1037,21 @@ class _HRDelegateAttendanceDetailScreenState
             ),
           ],
         ),
+                ),
+        ),
         centerTitle: false,
         actions: [
-          if (isWide) ...[
-            Padding(
-              padding: const EdgeInsetsDirectional.only(end: 8),
-              child: FilledButton.tonalIcon(
-                onPressed: _navigateToAdjustments,
-                icon: const Icon(Icons.history_edu_rounded, size: 18),
-                label: const Text('سجل التعديلات الإدارية'),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsetsDirectional.only(end: 12),
-              child: FilledButton.tonalIcon(
-                onPressed: _exportMonthlyReportToCSV,
-                icon: const Icon(Icons.download_rounded, size: 18),
-                label: const Text('تصدير التقرير الشهري (CSV)'),
-              ),
-            ),
-          ] else ...[
-            Container(
-              height: 38,
-              margin: const EdgeInsetsDirectional.only(end: 12),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(19),
-                border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-                ),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(19),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Tooltip(
-                      message: 'سجل التعديلات الإدارية',
-                      child: InkWell(
-                        onTap: _navigateToAdjustments,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.history_edu_rounded, size: 16, color: colorScheme.primary),
-                              const SizedBox(width: 4),
-                              Text(
-                                'التعديلات',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.primary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Container(
-                      width: 1,
-                      height: 18,
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-                    ),
-                    Tooltip(
-                      message: 'تصدير التقرير الشهري (CSV)',
-                      child: InkWell(
-                        onTap: _exportMonthlyReportToCSV,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.download_rounded, size: 16, color: colorScheme.onSurfaceVariant),
-                              const SizedBox(width: 4),
-                              Text(
-                                'تصدير',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+          IconButton(
+            tooltip: 'سجل التعديلات الإدارية',
+            onPressed: _navigateToAdjustments,
+            icon: const Icon(Icons.history_edu_rounded),
+          ),
+          IconButton(
+            tooltip: 'تصدير التقرير الشهري (CSV)',
+            onPressed: _exportMonthlyReportToCSV,
+            icon: const Icon(Icons.download_rounded),
+          ),
+          const SizedBox(width: 4),
         ],
       ),
       body: _isLoading
@@ -1101,6 +1075,7 @@ class _HRDelegateAttendanceDetailScreenState
               : RefreshIndicator(
                   onRefresh: _fetchDelegateLogs,
                   child: SingleChildScrollView(
+                    controller: _scrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: EdgeInsets.symmetric(
                       horizontal: isWide ? 24 : 12,
@@ -1110,7 +1085,15 @@ class _HRDelegateAttendanceDetailScreenState
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         // 1. Delegate Profile Card
-                        _buildDelegateProfileHeader(colorScheme, isWide),
+                        AnimatedScale(
+                          scale: _headerShrunk ? 0.96 : 1.0,
+                          duration: const Duration(milliseconds: 200),
+                          child: AnimatedOpacity(
+                            opacity: _showCompactHeader ? 0.4 : 1.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: _buildDelegateProfileHeader(colorScheme, isWide),
+                          ),
+                        ),
                         const SizedBox(height: 16),
 
                         // 2. Month Selector Navigation Bar
@@ -1136,6 +1119,15 @@ class _HRDelegateAttendanceDetailScreenState
 
   // --- 1. Delegate Profile Header ---
   Widget _buildDelegateProfileHeader(ColorScheme colorScheme, bool isWide) {
+    final textTheme = Theme.of(context).textTheme;
+    final infoLines = <Widget>[
+      _buildInfoBadge(Icons.phone_rounded, widget.delegate.phoneNumber),
+      _buildInfoBadge(Icons.badge_outlined, widget.delegate.nationalityID),
+      if (widget.delegate.companyName.isNotEmpty)
+        _buildInfoBadge(Icons.apartment_rounded, widget.delegate.companyName),
+      if (widget.delegate.boundDeviceModel != null && widget.delegate.boundDeviceModel!.isNotEmpty)
+        _buildInfoBadge(Icons.smartphone_rounded, widget.delegate.boundDeviceModel!),
+    ];
     return Card(
       elevation: 0,
       color: colorScheme.surface,
@@ -1148,81 +1140,77 @@ class _HRDelegateAttendanceDetailScreenState
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            AppAvatar(
-              imageUrl: widget.delegate.personalPhotoUrl,
-              fallbackText: widget.delegate.fullName,
-              radius: isWide ? 32 : 26,
-            ),
-            const SizedBox(width: 16),
+            // Start side (right in RTL): name + data lines.
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 8,
-                    children: [
-                      Text(
-                        widget.delegate.fullName,
-                        style: TextStyle(
-                          fontSize: isWide ? 20 : 16.5,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          widget.delegate.role == UserRole.delegate ? 'مندوب / مروج' : 'مشرف',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    widget.delegate.fullName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
                   ),
                   const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 16,
-                    runSpacing: 4,
-                    children: [
-                      _buildInfoBadge(Icons.phone_rounded, widget.delegate.phoneNumber),
-                      _buildInfoBadge(Icons.badge_outlined, 'قومي: ${widget.delegate.nationalityID}'),
-                      if (widget.delegate.companyName.isNotEmpty)
-                        _buildInfoBadge(Icons.apartment_rounded, widget.delegate.companyName),
-                      if (widget.delegate.boundDeviceModel != null &&
-                          widget.delegate.boundDeviceModel!.isNotEmpty)
-                        _buildInfoBadge(Icons.smartphone_rounded, widget.delegate.boundDeviceModel!),
-                    ],
-                  ),
+                  if (isWide)
+                    Wrap(spacing: 16, runSpacing: 4, children: infoLines)
+                  else
+                    ...infoLines.map((w) => Padding(padding: const EdgeInsets.only(bottom: 3), child: w)),
                 ],
               ),
             ),
-            Row(
+            const SizedBox(width: 12),
+            // End side (left in RTL): avatar, then actions, then role badge.
+            Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TashilIconButton(
-                  icon: Icons.call_rounded,
-                  color: Colors.green.shade700,
-                  size: isWide ? 40 : 34,
-                  iconSize: isWide ? 20 : 17,
-                  tooltip: 'اتصال هاتفي بالمندوب',
-                  onPressed: () => _makePhoneCall(widget.delegate.phoneNumber),
+                AppAvatar(
+                  imageUrl: widget.delegate.personalPhotoUrl,
+                  fallbackText: widget.delegate.fullName,
+                  radius: isWide ? 32 : 28,
                 ),
-                const SizedBox(width: 6),
-                TashilIconButton(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  color: Colors.teal.shade700,
-                  size: isWide ? 40 : 34,
-                  iconSize: isWide ? 20 : 17,
-                  tooltip: 'مراسلة عبر واتساب',
-                  onPressed: () => _openWhatsApp(widget.delegate.phoneNumber),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TashilIconButton(
+                      icon: Icons.call_rounded,
+                      color: Colors.green.shade700,
+                      size: isWide ? 36 : 32,
+                      iconSize: isWide ? 18 : 16,
+                      tooltip: 'اتصال هاتفي بالمندوب',
+                      onPressed: () => _makePhoneCall(widget.delegate.phoneNumber),
+                    ),
+                    const SizedBox(width: 6),
+                    TashilIconButton(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      color: Colors.teal.shade700,
+                      size: isWide ? 36 : 32,
+                      iconSize: isWide ? 18 : 16,
+                      tooltip: 'مراسلة عبر واتساب',
+                      onPressed: () => _openWhatsApp(widget.delegate.phoneNumber),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    widget.delegate.role == UserRole.delegate ? 'مندوب / مروج' : 'مشرف',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -1239,7 +1227,9 @@ class _HRDelegateAttendanceDetailScreenState
       children: [
         Icon(icon, size: 14, color: colorScheme.onSurfaceVariant),
         const SizedBox(width: 4),
-        Text(text, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+        Flexible(
+          child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+        ),
       ],
     );
   }
@@ -1249,7 +1239,7 @@ class _HRDelegateAttendanceDetailScreenState
     final monthDisplay = DateFormat('MMMM yyyy', 'ar').format(_selectedMonth);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: EdgeInsets.symmetric(horizontal: isWide ? 16 : 8, vertical: isWide ? 10 : 6),
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
@@ -1263,62 +1253,85 @@ class _HRDelegateAttendanceDetailScreenState
         ],
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Previous Month Button (> الشهر السابق)
-          FilledButton.tonalIcon(
-            onPressed: _goToPreviousMonth,
-            style: FilledButton.styleFrom(
-              padding: EdgeInsets.symmetric(horizontal: isWide ? 16 : 10, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            icon: const Icon(
-              Icons.chevron_right_rounded,
-              size: 18,
-              textDirection: TextDirection.ltr,
-            ),
-            label: Text(isWide ? 'الشهر السابق' : 'السابق'),
-          ),
-
-          // Current Displayed Month
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.calendar_month_rounded, color: colorScheme.primary, size: 22),
-              const SizedBox(width: 8),
-              Text(
-                monthDisplay,
-                style: TextStyle(
-                  fontSize: isWide ? 18 : 15,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
+          // Previous month (start side = right in RTL)
+          if (isWide)
+            FilledButton.tonalIcon(
+              onPressed: _goToPreviousMonth,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              if (!_isCurrentMonth) ...[
-                const SizedBox(width: 10),
-                ActionChip(
-                  visualDensity: VisualDensity.compact,
-                  label: const Text('الشهر الحالي', style: TextStyle(fontSize: 11)),
-                  onPressed: _goToCurrentMonth,
+              icon: const Icon(Icons.chevron_right_rounded, size: 18, textDirection: TextDirection.ltr),
+              label: const Text('الشهر السابق'),
+            )
+          else
+            IconButton.filledTonal(
+              tooltip: 'الشهر السابق',
+              onPressed: _goToPreviousMonth,
+              icon: const Icon(Icons.chevron_right_rounded, textDirection: TextDirection.ltr),
+            ),
+
+          // Current displayed month (+ jump to current month)
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.calendar_month_rounded, color: colorScheme.primary, size: isWide ? 22 : 20),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      monthDisplay,
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: isWide ? 18 : 15,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
                 ),
+                if (!_isCurrentMonth) ...[
+                  const SizedBox(width: 4),
+                  if (isWide)
+                    ActionChip(
+                      visualDensity: VisualDensity.compact,
+                      avatar: const Icon(Icons.today_rounded, size: 16),
+                      label: const Text('الشهر الحالي', style: TextStyle(fontSize: 11)),
+                      onPressed: _goToCurrentMonth,
+                    )
+                  else
+                    IconButton(
+                      tooltip: 'الشهر الحالي',
+                      visualDensity: VisualDensity.compact,
+                      color: colorScheme.primary,
+                      onPressed: _goToCurrentMonth,
+                      icon: const Icon(Icons.today_rounded, size: 20),
+                    ),
+                ],
               ],
-            ],
+            ),
           ),
 
-          // Next Month Button (الشهر التالي <)
-          FilledButton.tonalIcon(
-            onPressed: _goToNextMonth,
-            style: FilledButton.styleFrom(
-              padding: EdgeInsets.symmetric(horizontal: isWide ? 16 : 10, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          // Next month (end side = left in RTL)
+          if (isWide)
+            FilledButton.tonalIcon(
+              onPressed: _goToNextMonth,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              label: const Text('الشهر التالي'),
+              icon: const Icon(Icons.chevron_left_rounded, size: 18, textDirection: TextDirection.ltr),
+            )
+          else
+            IconButton.filledTonal(
+              tooltip: 'الشهر التالي',
+              onPressed: _goToNextMonth,
+              icon: const Icon(Icons.chevron_left_rounded, textDirection: TextDirection.ltr),
             ),
-            label: Text(isWide ? 'الشهر التالي' : 'التالي'),
-            icon: const Icon(
-              Icons.chevron_left_rounded,
-              size: 18,
-              textDirection: TextDirection.ltr,
-            ),
-          ),
         ],
       ),
     );
@@ -1358,225 +1371,197 @@ class _HRDelegateAttendanceDetailScreenState
       _KpiItem(
         title: 'الفروع المزارة',
         value: '${_branchesInCurrentMonth.length} فرع',
-        subtitle: _branchesInCurrentMonth.isEmpty ? 'لا فروع' : _branchesInCurrentMonth.take(2).join(', '),
+        subtitle: _branchesInCurrentMonth.isEmpty ? 'لا فروع' : _branchesInCurrentMonth.take(2).map((b) => BranchDisplayCache.instance.displayName(b)).join(', '),
         icon: Icons.store_rounded,
         color: Colors.deepPurple,
       ),
     ];
 
-    if (isWide) {
-      return Row(
-        children: kpis.map((kpi) {
-          return Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: _buildSingleKpiCard(kpi, colorScheme),
-            ),
-          );
-        }).toList(),
-      );
-    } else {
-      return Column(
-        children: [
-          Row(
-            children: [
-              Expanded(child: _buildCompactKpiCard(kpis[0], colorScheme)),
-              const SizedBox(width: 8),
-              Expanded(child: _buildCompactKpiCard(kpis[1], colorScheme)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: _buildCompactKpiCard(kpis[2], colorScheme)),
-              const SizedBox(width: 8),
-              Expanded(child: _buildCompactKpiCard(kpis[3], colorScheme)),
-            ],
-          ),
+    // One compact single-line row with the four stats (phone and wide).
+    return Column(
+      children: [
+          _buildCompactStatsRow(kpis.take(4).toList(), colorScheme),
           if (_branchesInCurrentMonth.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
+            Card.outlined(
+              margin: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.35)),
+                side: BorderSide(color: colorScheme.outlineVariant),
               ),
-              child: Row(
+              child: ExpansionTile(
+                initiallyExpanded: false,
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+                childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                shape: const Border(),
+                collapsedShape: const Border(),
+                leading: Icon(Icons.storefront_rounded, size: 18, color: Colors.deepPurple.shade600),
+                title: Text(
+                  'الفروع المزارة (${_branchesInCurrentMonth.length})',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                ),
                 children: [
-                  Icon(Icons.storefront_rounded, size: 15, color: Colors.deepPurple.shade600),
-                  const SizedBox(width: 6),
-                  Text(
-                    'الفروع المزارة (${_branchesInCurrentMonth.length}): ',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
-                  ),
-                  Expanded(
-                    child: Text(
-                      _branchesInCurrentMonth.join('، '),
-                      style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
-                      overflow: TextOverflow.ellipsis,
+                  for (int i = 0; i < _branchesInCurrentMonth.length; i++) ...[
+                    if (i > 0) Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          Icon(Icons.store_rounded, size: 16, color: colorScheme.onSurfaceVariant),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: BranchNameLabel(
+                              branchName: _branchesInCurrentMonth.elementAt(i),
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          _buildChainChip(_branchesInCurrentMonth.elementAt(i), colorScheme),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
           ],
         ],
-      );
-    }
-  }
-
-  Widget _buildCompactKpiCard(_KpiItem kpi, ColorScheme colorScheme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.35)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Text(
-                  kpi.title,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: kpi.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(kpi.icon, size: 14, color: kpi.color),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            kpi.value,
-            style: TextStyle(
-              fontSize: 14.5,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            kpi.subtitle,
-            style: TextStyle(
-              fontSize: 9.5,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
     );
   }
 
-  Widget _buildSingleKpiCard(_KpiItem kpi, ColorScheme colorScheme) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                kpi.title,
-                style: TextStyle(
-                  fontSize: 12,
+  /// Small chip with the branch's chain (organization) name; hidden if unknown.
+  Widget _buildChainChip(
+    String branchName,
+    ColorScheme colorScheme, {
+    EdgeInsetsGeometry margin = const EdgeInsetsDirectional.only(start: 8),
+  }) {
+    return ValueListenableBuilder<int>(
+      valueListenable: BranchDisplayCache.instance.version,
+      builder: (context, _, child) {
+        final chain = BranchDisplayCache.instance.organizationNameFor(branchName);
+        if (chain.isEmpty) return const SizedBox.shrink();
+        return Container(
+          margin: margin,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          constraints: const BoxConstraints(maxWidth: 120),
+          decoration: BoxDecoration(
+            color: colorScheme.secondaryContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            chain,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSecondaryContainer,
                   fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurfaceVariant,
+                ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Shortens the existing value strings for the compact row (display only).
+  String _compactKpiValue(String v) => v
+      .replaceAll(' ساعة و ', 'س ')
+      .replaceAll(' دقيقة', 'د')
+      .replaceAll(' ساعة/يوم', ' س/يوم')
+      .replaceAll(' ساعة', 'س');
+
+  Widget _buildCompactStatsRow(List<_KpiItem> items, ColorScheme colorScheme) {
+    final textTheme = Theme.of(context).textTheme;
+    return Card.outlined(
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        child: Row(
+          children: [
+            for (int i = 0; i < items.length; i++) ...[
+              if (i > 0) SizedBox(height: 28, child: VerticalDivider(width: 8, color: colorScheme.outlineVariant)),
+              Expanded(
+                child: Tooltip(
+                  message: '${items[i].title}: ${items[i].value}',
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(items[i].icon, size: 14, color: items[i].color),
+                          const SizedBox(width: 3),
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                _compactKpiValue(items[i].value),
+                                maxLines: 1,
+                                style: textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        items[i].title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.labelSmall?.copyWith(fontSize: 9.5, color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w400),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              CircleAvatar(
-                radius: 14,
-                backgroundColor: kpi.color.withValues(alpha: 0.15),
-                child: Icon(kpi.icon, size: 16, color: kpi.color),
-              ),
             ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            kpi.value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            kpi.subtitle,
-            style: TextStyle(
-              fontSize: 10,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   // --- 4. Filter Bar (Single Row: Branch Dropdown + Status Button Group + Compact Count Badge) ---
+  /// Month sessions narrowed by the selected branch only (used for status counts).
+  List<DelegateAttendanceSession> get _branchFilteredMonthlySessions {
+    if (_selectedBranchFilter == 'all') return _monthlySessions;
+    final sel = _selectedBranchFilter.toLowerCase().trim();
+    return _monthlySessions.where((s) => s.branchName.toLowerCase().trim() == sel).toList();
+  }
+
   Widget _buildFilterBar(ColorScheme colorScheme, bool isWide) {
     final branches = ['all', ..._branchesInCurrentMonth];
-
-    if (isWide) {
-      return Row(
+    if (!isWide) {
+      // Phone: branch chip on its own line, the three status chips on a second line.
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildBranchFilterControl(branches, colorScheme),
-          const SizedBox(width: 10),
+          const SizedBox(height: 8),
           _buildStatusFilterControl(colorScheme),
-          const SizedBox(width: 10),
-          _buildRecordCountBadge(colorScheme),
         ],
       );
     }
-
-    return Row(
-      children: [
-        // 1. Branch Selector (Right in RTL, expands naturally)
-        Expanded(
-          child: _buildBranchFilterControl(branches, colorScheme),
-        ),
-        const SizedBox(width: 6),
-
-        // 2. Status Filter Group (Center in RTL)
-        _buildStatusFilterControl(colorScheme),
-        const SizedBox(width: 6),
-
-        // 3. Compact Count Badge (Left in RTL, shows: عدد: X)
-        _buildRecordCountBadge(colorScheme),
-      ],
+    // Wide: one horizontally scrollable row.
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 220),
+            child: _buildBranchFilterControl(branches, colorScheme),
+          ),
+          const SizedBox(width: 8),
+          _buildStatusFilterControl(colorScheme),
+        ],
+      ),
     );
   }
 
@@ -1584,7 +1569,7 @@ class _HRDelegateAttendanceDetailScreenState
     final selectedBranch = branches.contains(_selectedBranchFilter) ? _selectedBranchFilter : 'all';
     final label = selectedBranch == 'all'
         ? 'جميع الفروع (${_branchesInCurrentMonth.length})'
-        : selectedBranch;
+        : BranchDisplayCache.instance.displayName(selectedBranch);
 
     return Container(
       height: 38,
@@ -1617,7 +1602,7 @@ class _HRDelegateAttendanceDetailScreenState
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    b == 'all' ? 'جميع الفروع (${_branchesInCurrentMonth.length})' : b,
+                    b == 'all' ? 'جميع الفروع (${_branchesInCurrentMonth.length})' : BranchDisplayCache.instance.displayName(b),
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
@@ -1663,48 +1648,41 @@ class _HRDelegateAttendanceDetailScreenState
   }
 
   Widget _buildStatusFilterControl(ColorScheme colorScheme) {
-    return TashilConnectedButtonGroup<String>(
-      height: 38,
-      itemPadding: const EdgeInsets.symmetric(horizontal: 7),
-      items: const [
-        TashilConnectedButtonItem(value: 'all', label: 'الكل'),
-        TashilConnectedButtonItem(value: 'completed', label: 'مكتمل'),
-        TashilConnectedButtonItem(value: 'incomplete', label: 'غير مكتمل'),
-      ],
-      selectedValue: _selectedStatusFilter,
-      onSelected: (val) {
-        setState(() => _selectedStatusFilter = val);
-      },
-    );
-  }
-
-  Widget _buildRecordCountBadge(ColorScheme colorScheme) {
-    return Container(
-      height: 38,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(19),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-          width: 1.0,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.receipt_long_rounded, size: 15, color: colorScheme.primary),
-          const SizedBox(width: 5),
-          Text(
-            'عدد: ${_filteredMonthlySessions.length}',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
+    final base = _branchFilteredMonthlySessions;
+    final completed = base.where((s) => s.checkOutTime != null).length;
+    // Red only for truly unfinished sessions (present-now is not an error).
+    final hasAlert = base.any(_isIncompleteSession);
+    final options = <(String, String, int)>[
+      ('all', 'الكل', base.length),
+      ('completed', 'مكتمل', completed),
+      ('incomplete', 'غير مكتمل', base.length - completed),
+    ];
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final (value, label, count) in options) ...[
+          ChoiceChip(
+            showCheckmark: false,
+            visualDensity: VisualDensity.compact,
+            selected: _selectedStatusFilter == value,
+            onSelected: (_) => setState(() => _selectedStatusFilter = value),
+            selectedColor: value == 'incomplete' && hasAlert ? colorScheme.errorContainer : colorScheme.secondaryContainer,
+            label: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                const SizedBox(width: 6),
+                Badge(
+                  label: Text('$count'),
+                  backgroundColor: value == 'incomplete' && hasAlert ? colorScheme.error : colorScheme.primary,
+                  textColor: value == 'incomplete' && hasAlert ? colorScheme.onError : colorScheme.onPrimary,
+                ),
+              ],
             ),
           ),
+          const SizedBox(width: 6),
         ],
-      ),
+      ],
     );
   }
 
@@ -1756,7 +1734,7 @@ class _HRDelegateAttendanceDetailScreenState
 
   // Desktop & Mobile Table Column Flex Constants (Guaranteed 1:1 Header/Row Synchronization)
   static const int _colFlexDate = 15;        // التاريخ واليوم
-  static const int _colFlexBranch = 15;      // الفرع
+  static const int _colFlexBranch = 20;      // الفرع
   static const int _colFlexInTime = 14;      // تسجيل الحضور
   static const int _colFlexOutTime = 18;     // تسجيل الانصراف
   static const int _colFlexDuration = 13;    // مدة العمل
@@ -1765,6 +1743,174 @@ class _HRDelegateAttendanceDetailScreenState
 
   // Table View (Responsive on Mobile with Smooth Horizontal Scroll & Direct on Desktop)
   Widget _buildAttendanceTable(List<DelegateAttendanceSession> sessions, ColorScheme colorScheme) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 840) {
+          return _buildAttendanceDayCards(sessions, colorScheme);
+        }
+        return _buildAttendanceTableView(sessions, colorScheme);
+      },
+    );
+  }
+
+  // Compact/medium widths (<840dp): one Material 3 card per session instead of the wide table.
+  Widget _buildAttendanceDayCards(List<DelegateAttendanceSession> sessions, ColorScheme colorScheme) {
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      itemCount: sessions.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (ctx, index) => _buildAttendanceDayCard(sessions[index], colorScheme),
+    );
+  }
+
+  Widget _buildAttendanceDayCard(DelegateAttendanceSession s, ColorScheme colorScheme) {
+    final dateStr = DateFormat('yyyy/MM/dd', 'en').format(s.checkInTime);
+    final dayStr = DateFormat('EEEE', 'ar').format(s.checkInTime);
+    final inTimeStr = DateFormat('hh:mm a', 'ar').format(s.checkInTime);
+    final outTimeStr = s.checkOutTime != null ? DateFormat('hh:mm a', 'ar').format(s.checkOutTime!) : '-';
+    final outColor = s.isAutoCheckOut
+        ? Colors.deepPurple.shade900
+        : (s.checkOutTime != null ? Colors.indigo.shade900 : colorScheme.onSurfaceVariant);
+    final outIconColor = s.isAutoCheckOut
+        ? Colors.deepPurple.shade700
+        : (s.checkOutTime != null ? Colors.indigo.shade700 : colorScheme.error.withValues(alpha: 0.6));
+
+    Widget metric(IconData icon, Color iconColor, String label, String value, Color valueColor) {
+      return Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label, style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(icon, size: 15, color: iconColor),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: valueColor),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    final bool isAlert = _isIncompleteSession(s);
+    return Card.outlined(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isAlert ? colorScheme.error.withValues(alpha: 0.55) : colorScheme.outlineVariant,
+        ),
+      ),
+      child: Container(
+        decoration: isAlert
+            ? BoxDecoration(
+                border: BorderDirectional(start: BorderSide(color: colorScheme.error, width: 4)),
+              )
+            : null,
+        child: InkWell(
+        onTap: () => _showSessionDetailsDialog(s),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 8, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Date + weekday, status and actions
+              Row(
+                children: [
+                  Icon(Icons.calendar_today_rounded, size: 16, color: colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Text(dayStr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(width: 8),
+                  Text(dateStr, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+                  const Spacer(),
+                  TashilIconButton(
+                    icon: Icons.edit_calendar_rounded,
+                    size: 32,
+                    iconSize: 16,
+                    tooltip: 'تعديل توقيت الجلسة',
+                    onPressed: () => _showEditAttendanceDialog(s),
+                  ),
+                  const SizedBox(width: 4),
+                  TashilIconButton(
+                    icon: Icons.info_outline_rounded,
+                    size: 32,
+                    iconSize: 16,
+                    tooltip: 'عرض تفاصيل الجلسة',
+                    onPressed: () => _showSessionDetailsDialog(s),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              // Branch (full name, up to 2 lines, address underneath)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Icon(Icons.storefront_rounded, size: 16, color: colorScheme.primary),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: BranchNameLabel(
+                      branchName: s.branchName,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  _buildChainChip(s.branchName, colorScheme),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Align(alignment: AlignmentDirectional.centerStart, child: _buildStatusBadge(s, colorScheme)),
+              const Divider(height: 20),
+              // Check-in / check-out / duration
+              Padding(
+                padding: const EdgeInsetsDirectional.only(end: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    metric(Icons.login_rounded, Colors.green.shade700, 'الحضور', inTimeStr, Colors.green.shade800),
+                    metric(
+                      s.isAutoCheckOut ? Icons.auto_mode_rounded : Icons.logout_rounded,
+                      outIconColor,
+                      s.isAutoCheckOut ? 'الانصراف (تلقائي)' : 'الانصراف',
+                      outTimeStr,
+                      outColor,
+                    ),
+                    metric(
+                      Icons.schedule_rounded,
+                      colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                      'مدة العمل',
+                      s.formattedDuration,
+                      colorScheme.onSurface,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      ),
+    );
+  }
+
+  // Expanded widths (>=840dp): table with flexible, wrapping branch column.
+  Widget _buildAttendanceTableView(List<DelegateAttendanceSession> sessions, ColorScheme colorScheme) {
     return Card(
       elevation: 0,
       color: colorScheme.surface,
@@ -1821,10 +1967,16 @@ class _HRDelegateAttendanceDetailScreenState
                         ? DateFormat('hh:mm a', 'ar').format(s.checkOutTime!)
                         : '-';
 
+                    final bool isAlert = _isIncompleteSession(s);
                     return Material(
-                      color: isEven
-                          ? colorScheme.surface
-                          : colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
+                      color: isAlert
+                          ? colorScheme.errorContainer.withValues(alpha: 0.18)
+                          : (isEven
+                              ? colorScheme.surface
+                              : colorScheme.surfaceContainerHighest.withValues(alpha: 0.15)),
+                      shape: isAlert
+                          ? BorderDirectional(start: BorderSide(color: colorScheme.error, width: 4))
+                          : null,
                       child: InkWell(
                         onTap: () => _showSessionDetailsDialog(s),
                         hoverColor: colorScheme.primary.withValues(alpha: 0.04),
@@ -1871,10 +2023,19 @@ class _HRDelegateAttendanceDetailScreenState
                                         Icon(Icons.storefront_rounded, size: 16, color: colorScheme.primary),
                                         const SizedBox(width: 6),
                                         Flexible(
-                                          child: Text(
-                                            s.branchName,
-                                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                                            overflow: TextOverflow.ellipsis,
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              _buildChainChip(s.branchName, colorScheme,
+                                                  margin: const EdgeInsets.only(bottom: 2)),
+                                              BranchNameLabel(
+                                                branchName: s.branchName,
+                                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
@@ -1952,7 +2113,7 @@ class _HRDelegateAttendanceDetailScreenState
                                         ),
                                         if (s.isAutoCheckOut)
                                           Tooltip(
-                                            message: 'تم إغلاق الانصراف تلقائياً بعد مرور 9 ساعات على بداية الوردية لعدم تسجيل الانصراف يدوياً',
+                                            message: 'تم إغلاق الانصراف تلقائياً بعد مرور 11.5 ساعة على بداية الوردية لعدم تسجيل الانصراف يدوياً',
                                             child: Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 1.5),
                                               decoration: BoxDecoration(
@@ -1961,7 +2122,7 @@ class _HRDelegateAttendanceDetailScreenState
                                                 border: Border.all(color: Colors.deepPurple.withValues(alpha: 0.3)),
                                               ),
                                               child: Text(
-                                                'تلقائي (9 س)',
+                                                'تلقائي (11.5 س)',
                                                 style: TextStyle(
                                                   fontSize: 9.5,
                                                   fontWeight: FontWeight.bold,
@@ -2094,6 +2255,10 @@ class _HRDelegateAttendanceDetailScreenState
     );
   }
 
+  /// No check-out recorded and not currently checked in (unfinished session).
+  bool _isIncompleteSession(DelegateAttendanceSession s) =>
+      s.checkOutTime == null && !s.isAutoCheckOut && !s.isOngoing;
+
   Widget _buildStatusBadge(DelegateAttendanceSession s, ColorScheme colorScheme) {
     final bool isCompleted = s.checkOutTime != null;
     final bool isOngoing = s.isOngoing;
@@ -2105,9 +2270,10 @@ class _HRDelegateAttendanceDetailScreenState
     final String label;
 
     if (s.isAutoCheckOut) {
-      bgColor = Colors.deepPurple.shade50;
-      borderColor = Colors.deepPurple.shade200;
-      textColor = Colors.deepPurple.shade900;
+      // Closed by the system: counted as complete, shown neutral (not an error).
+      bgColor = colorScheme.secondaryContainer;
+      borderColor = colorScheme.outlineVariant;
+      textColor = colorScheme.onSecondaryContainer;
       icon = Icons.auto_mode_rounded;
       label = 'مكتمل (تلقائي)';
     } else if (isCompleted) {
@@ -2117,17 +2283,17 @@ class _HRDelegateAttendanceDetailScreenState
       icon = Icons.check_circle_rounded;
       label = 'مكتمل الانصراف';
     } else if (isOngoing) {
-      bgColor = Colors.blue.shade50;
-      borderColor = Colors.blue.shade200;
-      textColor = Colors.blue.shade800;
+      bgColor = colorScheme.primaryContainer;
+      borderColor = colorScheme.primary.withValues(alpha: 0.4);
+      textColor = colorScheme.onPrimaryContainer;
       icon = Icons.timelapse_rounded;
       label = 'حاضر الآن';
     } else {
-      bgColor = Colors.red.shade50;
-      borderColor = Colors.red.shade200;
-      textColor = Colors.red.shade800;
+      bgColor = colorScheme.errorContainer;
+      borderColor = colorScheme.error.withValues(alpha: 0.5);
+      textColor = colorScheme.onErrorContainer;
       icon = Icons.warning_amber_rounded;
-      label = 'لم يسجل انصراف';
+      label = 'غير مكتمل - لم يسجل انصراف';
     }
 
     final badgeWidget = Container(
@@ -2487,8 +2653,9 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                       Icon(Icons.storefront_rounded, size: 18, color: colorScheme.primary),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text(
-                          'الفرع: ${widget.session.branchName}',
+                        child: BranchNameLabel(
+                          branchName: widget.session.branchName,
+                          prefix: 'الفرع: ',
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -3273,7 +3440,7 @@ class _SessionDetailsSheet extends StatelessWidget {
                             Icon(Icons.auto_mode_rounded, size: 18, color: Colors.deepPurple.shade900),
                             const SizedBox(width: 8),
                             Text(
-                              'تم إغلاق الانصراف تلقائياً (نظام الـ 9 ساعات)',
+                              'تم إغلاق الانصراف تلقائياً (نظام الـ 11.5 ساعة)',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
@@ -3285,7 +3452,7 @@ class _SessionDetailsSheet extends StatelessWidget {
                         const SizedBox(height: 6),
                         Text(
                           session.autoCheckOutReason ??
-                              'تم إغلاق الجلسة أوتوماتيكياً لاكتمال مدة الشفت (9 ساعات) دون تسجيل انصراف يدوي من المندوب.',
+                              'تم إغلاق الجلسة أوتوماتيكياً لاكتمال مدة الشفت (11.5 ساعة) دون تسجيل انصراف يدوي من المندوب.',
                           style: TextStyle(fontSize: 12, color: Colors.deepPurple.shade900),
                         ),
                       ],
@@ -3338,7 +3505,7 @@ class _SessionDetailsSheet extends StatelessWidget {
                     ),
                   ),
                 ],
-                _buildDetailRow(context, Icons.store_rounded, 'الفرع', session.branchName),
+                _buildDetailRow(context, Icons.store_rounded, 'الفرع', BranchDisplayCache.instance.displayName(session.branchName)),
                 const Divider(height: 16),
                 _buildDetailRow(
                   context,

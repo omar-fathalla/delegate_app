@@ -151,7 +151,7 @@ const List<StandardViolation> officialViolationsSchedule = [
   ),
   StandardViolation(
     id: 14,
-    title: 'عدم اثبات الحضور والانصراف',
+    title: 'عدم إثبات الحضور والانصراف',
     defaultFine: 100.0,
     repeatedFine: 200.0,
     action1: '100',

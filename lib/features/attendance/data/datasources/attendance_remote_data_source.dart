@@ -1,4 +1,7 @@
 import 'package:delegate_app/core/services/branches_session_cache.dart';
+import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
+import 'package:delegate_app/features/attendance/domain/attendance_action_messages.dart';
+import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -47,6 +50,16 @@ abstract class AttendanceRemoteDataSource {
     String? phoneNumber,
     int limit = 20,
     DocumentSnapshot? startAfter,
+  });
+
+  /// Fetches ALL attendance sessions whose check-in falls in [month]
+  /// (device-local calendar month) across all affiliated organizations.
+  /// Used for the monthly summary so figures never depend on pagination.
+  Future<List<AttendanceModel>> getHistoryForMonth(
+    String userId, {
+    required DateTime month,
+    String? nationalityID,
+    String? phoneNumber,
   });
 
   /// Fetches recent attendance sessions across all affiliated organizations (for the home brief).
@@ -112,41 +125,45 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     String? personalPhotoURL,
   }) async {
     try {
-      // Guard against duplicate active check-in in Firestore
+      final trustedNow = _trustedNow();
+      final pendingKey = _pendingCheckInKey(userId, trustedNow);
+      final pendingId = _pendingCheckInIds[pendingKey];
+
+      // Guard against duplicate active check-in, decided on the server only.
+      // If the server can't be reached nothing is written.
+      AttendanceModel? existingActive;
       try {
-        final existingActive = await findActiveAttendance(
+        existingActive = await findActiveAttendance(
           userId,
           organizationId,
-        ).timeout(const Duration(seconds: 4));
+        ).timeout(const Duration(seconds: 8));
+      } catch (e) {
+        debugPrint('Active check-in verification failed: $e');
+        throw const ServerFailure(kCheckInOfflineMessage);
+      }
 
-        if (existingActive != null) {
-          DateTime now;
-          try {
-            now = sl<TrustedTimeService>().now;
-          } catch (_) {
-            now = DateTime.now();
-          }
+      if (existingActive != null) {
+        // A previous attempt that timed out has landed: that IS this check-in.
+        if (pendingId != null && existingActive.id == pendingId) {
+          _pendingCheckInIds.remove(pendingKey);
+          return existingActive;
+        }
 
-          final isSameDay = existingActive.checkInTime.year == now.year &&
-              existingActive.checkInTime.month == now.month &&
-              existingActive.checkInTime.day == now.day;
+        final isSameDay = existingActive.checkInTime.year == trustedNow.year &&
+            existingActive.checkInTime.month == trustedNow.month &&
+            existingActive.checkInTime.day == trustedNow.day;
 
-          if (isSameDay) {
-            if (existingActive.branchName == branchName) {
-              throw const ServerFailure(
-                'أنت مسجل حضور بالفعل في هذا الفرع وما زالت الجلسة جارية.',
-              );
-            } else {
-              throw ServerFailure(
-                'لديك تسجيل حضور نشط في فرع ${existingActive.branchName ?? "آخر"}. يرجى تسجيل الانصراف أولاً.',
-              );
-            }
+        if (isSameDay) {
+          if (existingActive.branchName == branchName) {
+            throw const ServerFailure(
+              'أنت مسجل حضور بالفعل في هذا الفرع وما زالت الجلسة جارية.',
+            );
+          } else {
+            throw ServerFailure(
+              'لديك تسجيل حضور نشط في فرع ${existingActive.branchName == null ? "آخر" : BranchDisplayCache.instance.displayName(existingActive.branchName!)}. يرجى تسجيل الانصراف أولاً.',
+            );
           }
         }
-      } on Failure {
-        rethrow;
-      } catch (e) {
-        debugPrint('Active check-in verification warning: $e');
       }
 
       final Map<String, dynamic> checkInPayload = {
@@ -178,9 +195,21 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         checkInPayload['personalPhotoURL'] = trimmedPhoto;
       }
 
-      final docRef = await _attendanceCollection(organizationId)
-          .add(checkInPayload)
-          .timeout(const Duration(seconds: 15));
+      // Idempotent write: a retry after an unconfirmed attempt reuses the same
+      // document ID, so a queued (offline-persisted) write can never become a
+      // second check-in.
+      final docId =
+          pendingId ?? _attendanceCollection(organizationId).doc().id;
+      _pendingCheckInIds[pendingKey] = docId;
+      final docRef = _attendanceCollection(organizationId).doc(docId);
+      try {
+        await docRef.set(checkInPayload).timeout(const Duration(seconds: 15));
+      } on TimeoutException {
+        if (!await _existsOnServer(docRef)) {
+          throw const ServerFailure(kCheckInUnknownMessage);
+        }
+      }
+      _pendingCheckInIds.remove(pendingKey);
 
       DateTime currentTime;
       try {
@@ -240,22 +269,39 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     double long,
   ) async {
     try {
-      final lastCheckInSnapshot = await _attendanceCollection(
-        organizationId,
-      ).doc(attendanceId).get().timeout(const Duration(seconds: 15));
+      final checkInRef = _attendanceCollection(organizationId).doc(attendanceId);
+      // Deterministic ID: repeating the same check-out can't add a 2nd record.
+      final outRef = _attendanceCollection(organizationId)
+          .doc('${attendanceId}_out');
+
+      // Decide on the server only, never on the offline cache.
+      final DocumentSnapshot<Map<String, dynamic>> lastCheckInSnapshot;
+      try {
+        lastCheckInSnapshot = await checkInRef
+            .get(const GetOptions(source: Source.server))
+            .timeout(const Duration(seconds: 8));
+      } catch (e) {
+        debugPrint('Check-out server read failed: $e');
+        throw const ServerFailure(kCheckOutOfflineMessage);
+      }
 
       if (!lastCheckInSnapshot.exists) {
         throw const ServerFailure('سجل الحضور غير موجود.');
       }
       final lastData = lastCheckInSnapshot.data()!;
+      if (lastData['checkOutTime'] != null) {
+        if (lastData['checkOutDocId'] == outRef.id) {
+          // An earlier attempt that timed out has landed.
+          return _checkedOutModel(attendanceId, organizationId, lastData);
+        }
+        throw const ServerFailure(kAlreadyCheckedOutMessage);
+      }
       final userId = lastData['delegateId'] ?? lastData['userId'];
       final companyId = lastData['companyId'];
 
       // Keep a separate check_out log for history/HR, and denormalize
       // checkOutTime onto the check-in doc so marketing today-views skip
       // the historical follow-up query.
-      final outRef = _attendanceCollection(organizationId).doc();
-      final checkInRef = _attendanceCollection(organizationId).doc(attendanceId);
       final batch = firestore.batch();
       batch.set(outRef, {
         'delegateId': userId,
@@ -273,7 +319,14 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'checkOutLocation': {'latitude': lat, 'longitude': long},
         'checkOutDocId': outRef.id,
       });
-      await batch.commit().timeout(const Duration(seconds: 15));
+      try {
+        await batch.commit().timeout(const Duration(seconds: 15));
+      } on TimeoutException {
+        final confirmed = await _serverDocData(checkInRef);
+        if (confirmed?['checkOutDocId'] != outRef.id) {
+          throw const ServerFailure(kCheckOutUnknownMessage);
+        }
+      }
 
       // Auto-resolve any orphaned unclosed check-in for the same user and branch today
       try {
@@ -360,6 +413,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       throwFirestoreFailure(e, 'فشل في تسجيل الانصراف. حاول مرة أخرى.');
     } on TimeoutException {
       throwTimeoutFailure();
+    } on Failure {
+      rethrow;
     } catch (_) {
       throwUnexpectedFailure('حدث خطأ غير متوقع أثناء تسجيل الانصراف.');
     }
@@ -416,53 +471,11 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     DocumentSnapshot? startAfter,
   }) async {
     try {
-      final Set<String> identifiers = {userId};
-
-      if (nationalityID != null && nationalityID.trim().isNotEmpty) {
-        final cleanNat = nationalityID.trim();
-        identifiers.add(cleanNat);
-
-        // Resolve any other delegate UIDs registered under this National ID
-        try {
-          final natSnap = await firestore
-              .collectionGroup('delegates')
-              .where('nationalityID', isEqualTo: cleanNat)
-              .limit(10)
-              .getResilient(
-                timeout: const Duration(seconds: 4),
-                forceServer: true,
-              );
-          for (final doc in natSnap.docs) {
-            identifiers.add(doc.id);
-          }
-        } catch (_) {}
-      }
-
-      if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
-        final cleanPhone = phoneNumber.trim();
-        final normalizedPhone = _normalizePhone(cleanPhone);
-        identifiers.add(cleanPhone);
-        if (normalizedPhone.isNotEmpty) {
-          identifiers.add(normalizedPhone);
-        }
-
-        // Resolve any other delegate UIDs registered under this phone number
-        try {
-          final phoneSnap = await firestore
-              .collectionGroup('delegates')
-              .where('phoneNumber', isEqualTo: normalizedPhone)
-              .limit(10)
-              .getResilient(
-                timeout: const Duration(seconds: 4),
-                forceServer: true,
-              );
-          for (final doc in phoneSnap.docs) {
-            identifiers.add(doc.id);
-          }
-        } catch (_) {}
-      }
-
-      final queryList = identifiers.where((id) => id.isNotEmpty).take(30).toList();
+      final queryList = await _resolveHistoryIdentifiers(
+        userId,
+        nationalityID: nationalityID,
+        phoneNumber: phoneNumber,
+      );
       final cleanOrgId = organizationId.trim();
 
       Query<Map<String, dynamic>> query = _attendanceCollection(organizationId);
@@ -524,6 +537,107 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       debugPrint('Error in getHistoryPaginated: $e\n$stack');
       return PaginationResponse(items: [], lastDoc: null, hasReachedMax: true);
     }
+  }
+
+  /// Resolves every delegateId under which this person's logs may be stored
+  /// (own uid, national ID, phone, and other delegate docs sharing them).
+  Future<List<String>> _resolveHistoryIdentifiers(
+    String userId, {
+    String? nationalityID,
+    String? phoneNumber,
+  }) async {
+    final Set<String> identifiers = {userId};
+
+    if (nationalityID != null && nationalityID.trim().isNotEmpty) {
+      final cleanNat = nationalityID.trim();
+      identifiers.add(cleanNat);
+
+      // Resolve any other delegate UIDs registered under this National ID
+      try {
+        final natSnap = await firestore
+            .collectionGroup('delegates')
+            .where('nationalityID', isEqualTo: cleanNat)
+            .limit(10)
+            .getResilient(
+              timeout: const Duration(seconds: 4),
+              forceServer: true,
+            );
+        for (final doc in natSnap.docs) {
+          identifiers.add(doc.id);
+        }
+      } catch (_) {}
+    }
+
+    if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
+      final cleanPhone = phoneNumber.trim();
+      final normalizedPhone = _normalizePhone(cleanPhone);
+      identifiers.add(cleanPhone);
+      if (normalizedPhone.isNotEmpty) {
+        identifiers.add(normalizedPhone);
+      }
+
+      // Resolve any other delegate UIDs registered under this phone number
+      try {
+        final phoneSnap = await firestore
+            .collectionGroup('delegates')
+            .where('phoneNumber', isEqualTo: normalizedPhone)
+            .limit(10)
+            .getResilient(
+              timeout: const Duration(seconds: 4),
+              forceServer: true,
+            );
+        for (final doc in phoneSnap.docs) {
+          identifiers.add(doc.id);
+        }
+      } catch (_) {}
+    }
+
+    return identifiers.where((id) => id.isNotEmpty).take(30).toList();
+  }
+
+  @override
+  Future<List<AttendanceModel>> getHistoryForMonth(
+    String userId, {
+    required DateTime month,
+    String? nationalityID,
+    String? phoneNumber,
+  }) async {
+    final queryList = await _resolveHistoryIdentifiers(
+      userId,
+      nationalityID: nationalityID,
+      phoneNumber: phoneNumber,
+    );
+    final monthStart = DateTime(month.year, month.month);
+    final monthEnd = DateTime(month.year, month.month + 1);
+    // Check-outs of the month's last overnight session land after monthEnd,
+    // so widen the upper bound by one day; sessions are filtered by check-in.
+    final upper = monthEnd.add(const Duration(days: 1));
+
+    final docs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+    DocumentSnapshot? cursor;
+    const pageSize = 300;
+    while (true) {
+      Query<Map<String, dynamic>> query = _attendanceCollection('')
+          .where('delegateId', whereIn: queryList)
+          .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(monthStart))
+          .where('timestamp', isLessThan: Timestamp.fromDate(upper))
+          .orderBy('timestamp', descending: true)
+          .limit(pageSize);
+      if (cursor != null) query = query.startAfterDocument(cursor);
+      final snap = await query.getResilient(
+        timeout: const Duration(seconds: 10),
+        forceServer: true,
+      );
+      docs.addAll(snap.docs);
+      if (snap.docs.length < pageSize) break;
+      cursor = snap.docs.last;
+    }
+
+    return _pairAttendanceDocs(docs, userId, '')
+        .where((a) =>
+            !a.checkInTime.isBefore(monthStart) &&
+            a.checkInTime.isBefore(monthEnd))
+        .toList();
   }
 
   @override
@@ -645,8 +759,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           ),
         );
       } else {
-        // إذا مر أكثر من 9 ساعات على وقت تسجيل الحضور ولم يسجل انصراف، يتم إغلاقه ديناميكياً
-        final isExpired = DateTime.now().difference(checkInTime) >= const Duration(hours: 9);
+        // إذا مر أكثر من 11.5 ساعة على وقت تسجيل الحضور ولم يسجل انصراف، يتم إغلاقه ديناميكياً
+        final isExpired = DateTime.now().difference(checkInTime) >= kAttendanceAutoCloseAfter;
         if (isExpired) {
           history.add(
             AttendanceModel(
@@ -654,12 +768,12 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
               userId: userId,
               organizationId: targetOrgId,
               checkInTime: checkInTime,
-              checkOutTime: checkInTime.add(const Duration(hours: 9)),
+              checkOutTime: checkInTime.add(kAttendanceAutoCloseAfter),
               latitude: lat,
               longitude: lng,
               branchName: branchName,
               isAutoCheckOut: true,
-              autoCheckOutReason: 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي',
+              autoCheckOutReason: kAttendanceAutoCloseReasonAr,
             ),
           );
         } else {
@@ -692,10 +806,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           .where('delegateId', isEqualTo: userId)
           .orderBy('timestamp', descending: true)
           .limit(1)
-          .getResilient(
-            timeout: const Duration(seconds: 5),
-            forceServer: true,
-          );
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 6));
 
       if (querySnapshot.docs.isEmpty) return null;
 
@@ -719,13 +831,13 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           nowTime = DateTime.now();
         }
 
-        if (nowTime.difference(checkInTime) >= const Duration(hours: 9)) {
-          // انتهت مدة الشفت (9 ساعات) - إغلاق الجلسة تلقائياً في الخلفية وتحرير المندوب
+        if (nowTime.difference(checkInTime) >= kAttendanceAutoCloseAfter) {
+          // انتهت مدة الشفت (11.5 ساعة) - إغلاق الجلسة تلقائياً في الخلفية وتحرير المندوب
           unawaited(
             _autoCheckOutExpiredSession(
               checkInDoc: doc,
               organizationId: organizationId,
-              autoCheckOutTime: checkInTime.add(const Duration(hours: 9)),
+              autoCheckOutTime: checkInTime.add(kAttendanceAutoCloseAfter),
             ),
           );
           return null;
@@ -753,6 +865,60 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     }
   }
 
+  /// In-flight check-in attempts whose result is unknown (timed out), keyed
+  /// by delegate + day, so a retry reuses the same document ID.
+  static final Map<String, String> _pendingCheckInIds = {};
+
+  @visibleForTesting
+  static void resetPendingAttempts() => _pendingCheckInIds.clear();
+
+  static String _pendingCheckInKey(String userId, DateTime now) =>
+      '$userId|${now.year}-${now.month}-${now.day}';
+
+  DateTime _trustedNow() {
+    try {
+      return sl<TrustedTimeService>().now;
+    } catch (_) {
+      return DateTime.now();
+    }
+  }
+
+  Future<Map<String, dynamic>?> _serverDocData(
+    DocumentReference<Map<String, dynamic>> ref,
+  ) async {
+    try {
+      final snap = await ref
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 6));
+      return snap.exists ? snap.data() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<bool> _existsOnServer(
+    DocumentReference<Map<String, dynamic>> ref,
+  ) async =>
+      await _serverDocData(ref) != null;
+
+  AttendanceModel _checkedOutModel(
+    String attendanceId,
+    String organizationId,
+    Map<String, dynamic> data,
+  ) {
+    final out = data['checkOutTime'];
+    return AttendanceModel(
+      id: attendanceId,
+      userId: (data['delegateId'] ?? data['userId'] ?? '').toString(),
+      organizationId: organizationId,
+      checkInTime: (data['timestamp'] as Timestamp).toDate(),
+      checkOutTime: out is Timestamp ? out.toDate() : _trustedNow(),
+      latitude: (data['location']?['latitude'] as num?)?.toDouble() ?? 0.0,
+      longitude: (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0,
+      branchName: data['branchName'],
+    );
+  }
+
   Future<void> _autoCheckOutExpiredSession({
     required DocumentSnapshot<Map<String, dynamic>> checkInDoc,
     required String organizationId,
@@ -778,7 +944,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'location': {'latitude': lat, 'longitude': lng},
         'relatedCheckInId': checkInDoc.id,
         'isAutoCheckOut': true,
-        'autoCheckOutReason': 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي',
+        'autoCheckOutReason': kAttendanceAutoCloseReasonAr,
         'branchName': ?branchName,
       });
       autoBatch.update(checkInDoc.reference, {
@@ -786,7 +952,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'checkOutLocation': {'latitude': lat, 'longitude': lng},
         'checkOutDocId': autoOutRef.id,
         'isAutoCheckOut': true,
-        'autoCheckOutReason': 'نهاية شيفت العمل (9 ساعات) - إغلاق تلقائي',
+        'autoCheckOutReason': kAttendanceAutoCloseReasonAr,
       });
       await autoBatch.commit();
 

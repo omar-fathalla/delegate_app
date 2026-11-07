@@ -1,3 +1,4 @@
+import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:equatable/equatable.dart';
 
 enum ViolationCategory {
@@ -253,3 +254,21 @@ class PenaltyEntity extends Equatable {
       ];
 }
 
+/// Localized label for UI. [ViolationCategory.displayName] stays Arabic
+/// because it is also used for search matching.
+extension ViolationCategoryL10n on ViolationCategory {
+  String localizedName(AppLocalizations l10n) {
+    switch (this) {
+      case ViolationCategory.unauthorizedPhotography:
+        return l10n.catUnauthorizedPhoto;
+      case ViolationCategory.dataMissing:
+        return l10n.catDataMissing;
+      case ViolationCategory.theft:
+        return l10n.catTheftDamage;
+      case ViolationCategory.protocolBreach:
+        return l10n.catBranchRules;
+      case ViolationCategory.other:
+        return l10n.catOther;
+    }
+  }
+}

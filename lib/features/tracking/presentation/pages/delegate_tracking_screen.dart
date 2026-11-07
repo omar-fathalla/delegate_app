@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:flutter/material.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
@@ -876,7 +877,7 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
     required Set<String> branches,
   }) {
     final currentLabel =
-        _selectedBranch == 'all' ? 'جميع الفروع' : _selectedBranch;
+        _selectedBranch == 'all' ? 'جميع الفروع' : BranchDisplayCache.instance.displayName(_selectedBranch);
 
     return LayoutBuilder(
       builder: (context, menuConstraints) {
@@ -906,7 +907,7 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
               final isSelected = _selectedBranch == b;
               return _buildM3MenuItem(
                 value: b,
-                label: b == 'all' ? 'جميع الفروع' : b,
+                label: b == 'all' ? 'جميع الفروع' : BranchDisplayCache.instance.displayName(b),
                 count: null,
                 icon: Icons.storefront_rounded,
                 isSelected: isSelected,
