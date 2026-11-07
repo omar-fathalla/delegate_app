@@ -15,3 +15,7 @@ patrol test \
 `patrol_cli` still invokes `xcodebuild build-for-testing` with `-destination generic/platform=iOS Simulator` (upstream behavior). This repo pins **arm64-only** simulator builds for all `*-dev` configurations via `ios/Flutter/Dev-simulator-arch.xcconfig` and `pod install` so Runner and Pods do not link an **x86_64** slice against arm64-only Flutter simulator artifacts.
 
 Override the sim with `PATROL_IOS_SIM_UDID` if needed (same value as `-d`).
+
+## Smoke assertions
+
+The dev login smoke does **not** log in. It waits for splash/auto-login to settle, taps `splash_sign_in` when the stall UI appears, then asserts the delegate login screen using the ENV=dev Maestro semantics id `tashil_login_submit`, with fallback to the phone field icon (`Icons.phone_android_rounded`).

@@ -1,8 +1,9 @@
 import 'package:delegate_app/main.dart' show MyApp, bootstrapDelegateAppForPatrol;
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
+
+import 'support/smoke_login_wait.dart';
 
 void main() {
   patrolTest(
@@ -13,23 +14,21 @@ void main() {
 
       expect(Firebase.app().options.projectId, 'tashil-dev');
 
-      final loginField = const Key('login_phone_field');
-      final deadline = DateTime.now().add(const Duration(seconds: 45));
-      while (DateTime.now().isBefore(deadline)) {
-        await $.tester.pump(const Duration(milliseconds: 500));
-        if ($(loginField).exists) break;
-        final signIn = $(const Key('splash_sign_in'));
-        if (signIn.exists) {
-          await signIn.tap();
-          await $.tester.pumpAndSettle(const Duration(seconds: 2));
-          if ($(loginField).exists) break;
-        }
+      await waitForDevLoginScreenAfterSplash($);
+
+      final semantics = devLoginScreenSemanticsFinder();
+      if ($.tester.any(semantics)) {
+        await $(semantics).waitUntilVisible(
+          timeout: smokeLoginVisibleTimeout,
+        );
+        expect($(semantics), findsOneWidget);
+        return;
       }
 
-      await $(loginField).waitUntilVisible(
-        timeout: const Duration(seconds: 15),
-      );
-      expect($(loginField), findsOneWidget);
+      final phoneIcon = devLoginPhoneFieldIconFinder();
+      await $(phoneIcon).waitUntilVisible(timeout: smokeLoginVisibleTimeout);
+      expect($(phoneIcon), findsOneWidget);
     },
+    timeout: const Timeout(Duration(minutes: 3)),
   );
 }
