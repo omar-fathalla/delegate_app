@@ -1,3 +1,4 @@
 #include? "../Pods/Target Support Files/Pods-Runner/Pods-Runner.debug-dev.xcconfig"
 #include "Generated.xcconfig"
 #include "Env-dev.xcconfig"
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) TASHIL_DEV_FLAVOR

@@ -1,7 +1,12 @@
 import Flutter
 import UIKit
-import FirebaseCore
 import GoogleMaps
+#if !TASHIL_DEV_FLAVOR
+import FirebaseCore
+#endif
+#if canImport(workmanager_apple)
+import workmanager_apple
+#endif
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -9,6 +14,11 @@ import GoogleMaps
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    #if canImport(workmanager_apple)
+    // UIScene lifecycle: register BGTask handlers before didFinishLaunching returns.
+    WorkmanagerPlugin.registerLaunchHandlers()
+    #endif
+
     // Configure Firebase natively only for prod. TashilEnv is written into the
     // built Info.plist by ios/scripts/firebase_config.sh from the Xcode
     // configuration (APP_ENV).
@@ -20,7 +30,9 @@ import GoogleMaps
     let tashilEnv = Bundle.main.object(forInfoDictionaryKey: "TashilEnv") as? String
     switch tashilEnv {
     case "prod":
+      #if !TASHIL_DEV_FLAVOR
       FirebaseApp.configure()
+      #endif
     case "dev":
       // Never call FirebaseApp.configure() in dev; Dart initializes tashil-dev only.
       let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist")

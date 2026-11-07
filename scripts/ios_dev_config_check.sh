@@ -51,8 +51,14 @@ assert_no_crashlytics_upload_in_pbxproj() {
   if ! grep -q 'tashil_registrant/GeneratedPluginRegistrant.m' ios/Runner.xcodeproj/project.pbxproj; then
     fail "project.pbxproj missing derived registrant path (tashil_registrant under DERIVED_FILE_DIR)"
   fi
-  if ! grep -q 'strip_dev_crashlytics_spm_package.sh' ios/Runner.xcodeproj/project.pbxproj; then
-    fail "project.pbxproj missing [Tashil] Strip dev Crashlytics SPM build phase"
+  if ! grep -q 'tashil_after_flutter_xcode_backend.sh' ios/Runner.xcodeproj/project.pbxproj; then
+    fail "project.pbxproj must chain tashil_after_flutter_xcode_backend.sh after xcode_backend build"
+  fi
+  if grep -q 'Strip dev Crashlytics SPM' ios/Runner.xcodeproj/project.pbxproj; then
+    fail "standalone [Tashil] Strip dev Crashlytics SPM phase must not exist (use in-phase strip)"
+  fi
+  if ! grep -q 'tashil_dev_build_context.sh' ios/scripts/strip_dev_crashlytics_plugin_registration.sh; then
+    fail "derived registrant script must invoke dev SPM strip before compile"
   fi
 }
 
@@ -121,8 +127,8 @@ assert_no_crashlytics_upload_in_pbxproj
 
 grep -q 'keychain-access-groups' ios/Runner/Runner-dev.entitlements \
   || fail "Runner-dev.entitlements must declare keychain-access-groups for Firebase Auth"
-grep -q 'offlineSyncTask' ios/Runner/Info.plist \
-  || fail "Info.plist must list offlineSyncTask in BGTaskSchedulerPermittedIdentifiers"
+grep -q 'tashil_dev_build_context.sh' ios/scripts/tashil_after_flutter_xcode_backend.sh \
+  || fail "tashil_after_flutter_xcode_backend.sh must source tashil_dev_build_context"
 
 echo "== strip_dev_crashlytics_spm_package unit test"
 bash ios/scripts/test_strip_dev_crashlytics_spm_package.sh

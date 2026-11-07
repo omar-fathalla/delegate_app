@@ -32,6 +32,14 @@ fi
 
 mkdir -p "$DERIVED_DIR"
 
+if [ -f "${SRCROOT:?}/scripts/tashil_dev_build_context.sh" ]; then
+  # shellcheck source=tashil_dev_build_context.sh
+  . "${SRCROOT}/scripts/tashil_dev_build_context.sh"
+  if tashil_is_dev_build; then
+    /bin/sh "${SRCROOT}/scripts/strip_dev_crashlytics_spm_package.sh" || exit 1
+  fi
+fi
+
 case "${CONFIGURATION:-}" in
   Debug-dev|Profile-dev|Release-dev)
     exec python3 - "$SOURCE" "$DERIVED" <<'PY'

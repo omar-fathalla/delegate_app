@@ -83,10 +83,6 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<key>BGTaskSchedulerPermittedIdentifiers</key>
-	<array>
-		<string>offlineSyncTask</string>
-	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

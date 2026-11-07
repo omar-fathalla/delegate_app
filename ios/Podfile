@@ -42,6 +42,15 @@ target 'Runner' do
   end
 end
 
+def tashil_dev_flutter_build?
+  return true if ENV['APP_ENV'] == 'dev'
+  return true if ENV['CONFIGURATION']&.end_with?('-dev')
+  return true if ENV['PRODUCT_BUNDLE_IDENTIFIER']&.include?('delegate.dev')
+  dart = ENV['DART_DEFINES'].to_s
+  return true if dart.include?('RVOWPWRldg==') # ENV=dev
+  false
+end
+
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
@@ -51,5 +60,18 @@ post_install do |installer|
       config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
       config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = ''
     end
+  end
+
+  strip_script = File.expand_path('scripts/strip_dev_crashlytics_spm_package.sh', __dir__)
+  if File.exist?(strip_script) && tashil_dev_flutter_build?
+    env = {
+      'SRCROOT' => File.expand_path(__dir__),
+      'CONFIGURATION' => ENV['CONFIGURATION'],
+      'APP_ENV' => ENV['APP_ENV'],
+      'DART_DEFINES' => ENV['DART_DEFINES'],
+      'PRODUCT_BUNDLE_IDENTIFIER' => ENV['PRODUCT_BUNDLE_IDENTIFIER'],
+    }
+    success = system(env, '/bin/sh', strip_script)
+    raise '[Tashil] strip_dev_crashlytics_spm_package.sh failed during pod install' unless success
   end
 end
