@@ -22,12 +22,13 @@ codegen and **before** Compile Sources. It writes **only** under Xcode’s per-c
 - **Dev** (`Debug-dev`, `Profile-dev`, `Release-dev`): copies from the generated file and strips
   native Crashlytics plugin registration so dev never initializes Crashlytics.
 
-**SPM link strip (native Crashlytics off):** Immediately **before and after** Flutter's `xcode_backend.sh build`
+**SPM link strip (native Crashlytics off):** The **dev** scheme runs `strip_dev_crashlytics_spm_package.sh` as a **Build pre-action** (before Xcode resolves SwiftPM). Immediately **before and after** Flutter's `xcode_backend.sh build`
 (same Run Script phase, then again in the derived-registrant prep, and on dev `pod install`),
 `strip_dev_crashlytics_spm_package.sh` removes `firebase_crashlytics` from
 `FlutterGeneratedPluginSwiftPackage/Package.swift` and drops the `.packages/firebase_crashlytics`
 symlink on dev only — **before** Xcode resolves SPM. Do not add a separate SPM-only build phase.
 Prod configurations fail closed if `firebase_crashlytics` is absent from that manifest.
+After `embed_and_thin`, dev builds run `strip_dev_crashlytics_from_app.sh` to fail closed if `FirebaseCrashlytics.framework` would ship in the `.app`.
 - **Prod** (all other configurations): copies the generated file verbatim and **fails the build**
   if Crashlytics registration lines are missing in the derived file (fail closed).
 

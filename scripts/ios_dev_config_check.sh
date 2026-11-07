@@ -54,6 +54,12 @@ assert_no_crashlytics_upload_in_pbxproj() {
   if ! grep -q 'tashil_before_flutter_xcode_backend.sh' ios/Runner.xcodeproj/project.pbxproj; then
     fail "project.pbxproj must run tashil_before_flutter_xcode_backend.sh before xcode_backend build (dev SPM strip)"
   fi
+  if ! grep -q 'tashil_after_embed_and_thin.sh' ios/Runner.xcodeproj/project.pbxproj; then
+    fail "project.pbxproj must chain tashil_after_embed_and_thin.sh after embed_and_thin (dev bundle strip)"
+  fi
+  if ! grep -q 'strip_dev_crashlytics_spm_package.sh' ios/Runner.xcodeproj/xcshareddata/xcschemes/dev.xcscheme; then
+    fail "dev.xcscheme must pre-build strip Crashlytics SPM before implicit dependency resolution"
+  fi
   if ! grep -q 'tashil_after_flutter_xcode_backend.sh' ios/Runner.xcodeproj/project.pbxproj; then
     fail "project.pbxproj must chain tashil_after_flutter_xcode_backend.sh after xcode_backend build"
   fi

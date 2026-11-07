@@ -374,7 +374,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" embed_and_thin";
+			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" embed_and_thin\n/bin/sh \"${SRCROOT}/scripts/tashil_after_embed_and_thin.sh\"\n";
 		};
 		65F88028DFF99F710F975233 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
