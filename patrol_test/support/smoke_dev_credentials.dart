@@ -12,8 +12,26 @@ class SmokeDevPatrolCredentials {
   /// Default supervisor dev phone ([docs/DEV_ENVIRONMENT.md]).
   static const String defaultPhone = '01500000002';
 
-  /// Role badge on profile for supervisor @ `01500000002`.
-  static const String defaultSupervisorRoleLabel = 'مشرف (Supervisor)';
+  /// Profile header badge for dev **staff** supervisor @ [defaultPhone].
+  ///
+  /// Auth maps Firestore `role: supervisor` to [UserRole.admin] with
+  /// [DelegatePosition.supervisor] (`auth_remote_data_source` staff model).
+  /// `UserProfileScreen._getRoleDisplayName` evaluates `UserRole.admin`
+  /// before `DelegatePosition.supervisor`, so the badge is company admin text.
+  static const String staffSupervisorProfileRoleLabel =
+      'مشرف الشركة (Company Admin)';
+
+  /// Resolves the profile role badge for known tashil-dev Patrol accounts.
+  static String expectedProfileRoleLabelForPatrolPhone(String phone) {
+    switch (phone) {
+      case defaultPhone:
+        return staffSupervisorProfileRoleLabel;
+      default:
+        throw ArgumentError(
+          'Unknown PATROL_DEV_PHONE $phone — set PATROL_DEV_ROLE_LABEL explicitly.',
+        );
+    }
+  }
 
   final String phone;
   final String secret;
@@ -28,14 +46,14 @@ class SmokeDevPatrolCredentials {
       defaultValue: defaultPhone,
     );
     const secret = String.fromEnvironment('PATROL_DEV_SECRET');
-    const roleLabel = String.fromEnvironment(
-      'PATROL_DEV_ROLE_LABEL',
-      defaultValue: defaultSupervisorRoleLabel,
-    );
+    const roleOverride = String.fromEnvironment('PATROL_DEV_ROLE_LABEL');
+    final expectedRoleLabel = roleOverride.isNotEmpty
+        ? roleOverride
+        : expectedProfileRoleLabelForPatrolPhone(phone);
     return SmokeDevPatrolCredentials(
       phone: phone,
       secret: secret,
-      expectedRoleLabel: roleLabel,
+      expectedRoleLabel: expectedRoleLabel,
     );
   }
 }

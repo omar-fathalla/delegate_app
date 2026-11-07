@@ -103,11 +103,18 @@ Future<void> verifyDevLoggedInRole(
     deadline: smokePostLoginDeadline,
   );
 
-  if ($.tester.any(devProfilePhoneValueFinder())) {
-    await $(devProfilePhoneValueFinder()).waitUntilVisible(
-      timeout: smokeLoginFieldTimeout,
-    );
-  }
-  expect(find.textContaining(creds.phone), findsWidgets);
-  expect(find.text(creds.expectedRoleLabel), findsOneWidget);
+  await $(devProfilePhoneValueFinder()).waitUntilVisible(
+    timeout: smokeLoginFieldTimeout,
+  );
+  expect(devProfilePhoneValueFinder(), findsOneWidget);
+  expect(find.text(creds.phone), findsWidgets);
+
+  final roleBadge = find.text(creds.expectedRoleLabel);
+  await _pumpUntil(
+    $,
+    () => $.tester.any(roleBadge),
+    deadline: smokePostLoginDeadline,
+  );
+  await $(roleBadge).waitUntilVisible(timeout: smokeLoginFieldTimeout);
+  expect(roleBadge, findsOneWidget);
 }

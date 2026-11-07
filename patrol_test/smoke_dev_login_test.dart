@@ -8,7 +8,7 @@ import 'support/smoke_dummy_login.dart';
 
 void main() {
   patrolTest(
-    'dev flavor: tashil-dev dummy login and supervisor role',
+    'dev flavor: tashil-dev dummy login and staff supervisor profile role',
     ($) async {
       await bootstrapDelegateAppForPatrol();
       await $.pumpWidget(const MyApp());
