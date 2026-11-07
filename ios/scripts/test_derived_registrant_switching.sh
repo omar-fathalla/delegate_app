@@ -1,23 +1,20 @@
 #!/usr/bin/env bash
 # Regression test: derived plugin registrant stays correct when switching dev ↔ prod builds.
 #
-# Runs on macOS with Xcode only (requires xcodebuild). From repo root:
+# Runs on macOS with Flutter + Xcode (`xcodebuild -showBuildSettings` only). From repo root:
 #   bash ios/scripts/test_derived_registrant_switching.sh
 # Or from ios/:
 #   bash scripts/test_derived_registrant_switching.sh
 #
-# Flow: Debug-dev build → verify shared GeneratedPluginRegistrant.m unchanged vs baseline;
-# then Debug-prod → shared file still has Crashlytics; derived prod copy has Crashlytics;
-# then Debug-dev again → derived dev file has no Crashlytics registration line.
+# Flow: baseline snapshot of Flutter-generated `Runner/GeneratedPluginRegistrant.m` (never
+# edited in place); then **flutter build ios** simulator **dev → prod → dev** (each pass runs
+# `config-only` + `pod install` so CocoaPods matches the flavor, then a full build so SwiftPM
+# resolves, including the `Flutter` package — raw `xcodebuild build` alone fails on Flutter 3.44.5).
+# After each build: shared generated file unchanged vs baseline; derived file under
+# `$(DERIVED_FILE_DIR)/tashil_registrant/` has Crashlytics registration **only** for prod.
 #
-# Concurrent Flutter codegen (`xcode_backend.sh`) for the same Runner tree is still unsafe;
-# the derived registrant file now lives under each configuration’s `DERIVED_FILE_DIR` so dev
-# and prod builds do not overwrite the same path on disk.
-#
-# Raw `xcodebuild` needs the same prep Flutter applies (Pods + xcconfigs + module maps).
-# This script runs `flutter build ios --config-only` per flavor and `pod install` before
-# the dev→prod→dev sequence, without re-running Flutter between xcodebuild steps (User Test
-# scenario: switch configuration in Xcode only).
+# The derived registrant path is per-configuration (`DERIVED_FILE_DIR`) so dev/prod do not race
+# on one on-disk path when builds overlap.
 set -euo pipefail
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
@@ -44,7 +41,6 @@ resolve_flutter_bin() {
     return 0
   fi
   if [[ -f "$GENERATED_XCCONFIG" ]]; then
-    # shellcheck disable=SC2002
     local root
     root="$(grep -m1 '^FLUTTER_ROOT=' "$GENERATED_XCCONFIG" | sed 's/^FLUTTER_ROOT=//')"
     root="${root//[[:space:]]/}"
@@ -70,43 +66,15 @@ encode_dart_defines() {
   printf '%s' "$out"
 }
 
-prep_workspace() {
-  local flutter_bin
-  flutter_bin="$(resolve_flutter_bin)" || {
-    echo "test_derived_registrant_switching: need flutter on PATH or valid Flutter/Generated.xcconfig (run flutter pub get)" >&2
-    exit 1
-  }
-
-  echo "test_derived_registrant_switching: using flutter: $flutter_bin"
-  (cd "$REPO_ROOT" && "$flutter_bin" pub get)
-
-  # Per-flavor: regenerate iOS config and pod integration without a full compile.
-  echo "test_derived_registrant_switching: flutter build ios --config-only (dev)"
-  (cd "$REPO_ROOT" && "$flutter_bin" build ios --config-only --no-codesign --simulator \
-    --flavor dev --dart-define=ENV=dev)
-  echo "test_derived_registrant_switching: pod install (after dev config-only)"
-  (cd "$IOS_ROOT" && pod install)
-
-  echo "test_derived_registrant_switching: flutter build ios --config-only (prod)"
-  (cd "$REPO_ROOT" && "$flutter_bin" build ios --config-only --no-codesign --simulator \
-    --flavor prod --dart-define=ENV=prod)
-  echo "test_derived_registrant_switching: pod install (after prod config-only)"
-  (cd "$IOS_ROOT" && pod install)
-
-  [[ -f "$SRC_GENERATED" ]] || {
-    echo "test_derived_registrant_switching: missing $SRC_GENERATED after flutter config-only" >&2
-    exit 1
-  }
-}
-
-prep_workspace
-
-baseline_copy="$(mktemp)"
-cp "$SRC_GENERATED" "$baseline_copy"
-trap 'rm -f "$baseline_copy"' EXIT
-
-sha_file() {
-  shasum -a 256 "$1" | awk '{print $1}'
+xcode_configuration_for_flavor() {
+  case "$1" in
+    dev) printf '%s' "Debug-dev" ;;
+    prod) printf '%s' "Debug-prod" ;;
+    *)
+      echo "test_derived_registrant_switching: unknown flavor: $1" >&2
+      exit 1
+      ;;
+  esac
 }
 
 dart_defines_for_configuration() {
@@ -120,6 +88,7 @@ dart_defines_for_configuration() {
   esac
 }
 
+# Resolve DERIVED_FILE_DIR for a Runner configuration (no compile — SPM not required).
 derived_registrant_path_for_configuration() {
   local config="$1"
   local defines
@@ -148,32 +117,58 @@ derived_registrant_path_for_configuration() {
   printf '%s' "${ddir}/tashil_registrant/GeneratedPluginRegistrant.m"
 }
 
-build() {
-  local config="$1"
-  local defines
-  defines="$(dart_defines_for_configuration "$config")"
-  local -a xcode_flags=(
-    -workspace "$IOS_ROOT/Runner.xcworkspace"
-    -scheme Runner
-    -configuration "$config"
-    -destination 'generic/platform=iOS Simulator'
-    "DART_DEFINES=$defines"
-    CODE_SIGNING_ALLOWED=NO
-  )
+# One flavor: config-only + pod install + full simulator debug build (SwiftPM + Flutter OK).
+flutter_build_sim_flavor() {
+  local flavor="$1"
+  local env="$2"
+  local flutter_bin="$3"
+  local -a excl
   case "$(uname -m)" in
-    arm64) xcode_flags+=(EXCLUDED_ARCHS=x86_64) ;;
-    *) xcode_flags+=(EXCLUDED_ARCHS=arm64) ;;
+    arm64) excl=(-- "EXCLUDED_ARCHS=x86_64") ;;
+    *) excl=(-- "EXCLUDED_ARCHS=arm64") ;;
   esac
-  xcodebuild "${xcode_flags[@]}" build
+  echo "test_derived_registrant_switching: flutter build ios --config-only ($flavor)"
+  (cd "$REPO_ROOT" && "$flutter_bin" build ios --config-only --no-codesign --simulator \
+    --flavor "$flavor" --dart-define="ENV=$env")
+  echo "test_derived_registrant_switching: pod install (after $flavor config-only)"
+  (cd "$IOS_ROOT" && pod install)
+  echo "test_derived_registrant_switching: flutter build ios --debug --simulator ($flavor)"
+  (cd "$REPO_ROOT" && "$flutter_bin" build ios --debug --no-codesign --simulator \
+    --flavor "$flavor" --dart-define="ENV=$env" "${excl[@]}")
+}
+
+FLUTTER_BIN="$(resolve_flutter_bin)" || {
+  echo "test_derived_registrant_switching: need flutter on PATH or valid Flutter/Generated.xcconfig (run flutter pub get)" >&2
+  exit 1
+}
+
+echo "test_derived_registrant_switching: using flutter: $FLUTTER_BIN"
+(cd "$REPO_ROOT" && "$FLUTTER_BIN" pub get)
+
+echo "test_derived_registrant_switching: initial config-only (dev) + pod for workspace"
+(cd "$REPO_ROOT" && "$FLUTTER_BIN" build ios --config-only --no-codesign --simulator \
+  --flavor dev --dart-define=ENV=dev)
+(cd "$IOS_ROOT" && pod install)
+
+[[ -f "$SRC_GENERATED" ]] || {
+  echo "test_derived_registrant_switching: missing $SRC_GENERATED after prep (run flutter pub get / config-only)" >&2
+  exit 1
+}
+
+baseline_copy="$(mktemp)"
+cp "$SRC_GENERATED" "$baseline_copy"
+trap 'rm -f "$baseline_copy"' EXIT
+
+sha_file() {
+  shasum -a 256 "$1" | awk '{print $1}'
 }
 
 check_shared_unchanged() {
-  local current
+  local current base
   current="$(sha_file "$SRC_GENERATED")"
-  local base
   base="$(sha_file "$baseline_copy")"
   [[ "$current" == "$base" ]] || {
-    echo "test_derived_registrant_switching: shared GeneratedPluginRegistrant.m was modified (must stay read-only for strip script)" >&2
+    echo "test_derived_registrant_switching: shared GeneratedPluginRegistrant.m changed vs baseline (strip script must not edit in place)" >&2
     exit 1
   }
 }
@@ -183,30 +178,33 @@ has_crashlytics_registration() {
     || grep -q 'FirebaseCrashlyticsPlugin registerWithRegistrar' "$1"
 }
 
-echo "== 1/3 xcodebuild Debug-dev"
-build "Debug-dev"
+CONFIG_DEV="$(xcode_configuration_for_flavor dev)"
+CONFIG_PROD="$(xcode_configuration_for_flavor prod)"
+
+echo "== 1/3 flutter build dev (simulator)"
+flutter_build_sim_flavor dev dev "$FLUTTER_BIN"
 check_shared_unchanged
-DERIVED="$(derived_registrant_path_for_configuration "Debug-dev")"
-[[ -f "$DERIVED" ]] || { echo "test_derived_registrant_switching: missing derived file after dev build" >&2; exit 1; }
+DERIVED="$(derived_registrant_path_for_configuration "$CONFIG_DEV")"
+[[ -f "$DERIVED" ]] || { echo "test_derived_registrant_switching: missing derived file after dev build: $DERIVED" >&2; exit 1; }
 if has_crashlytics_registration "$DERIVED"; then
   echo "test_derived_registrant_switching: dev derived file must NOT register Crashlytics" >&2
   exit 1
 fi
 
-echo "== 2/3 xcodebuild Debug-prod"
-build "Debug-prod"
+echo "== 2/3 flutter build prod (simulator)"
+flutter_build_sim_flavor prod prod "$FLUTTER_BIN"
 check_shared_unchanged
-DERIVED="$(derived_registrant_path_for_configuration "Debug-prod")"
-[[ -f "$DERIVED" ]] || { echo "test_derived_registrant_switching: missing derived file after prod build" >&2; exit 1; }
+DERIVED="$(derived_registrant_path_for_configuration "$CONFIG_PROD")"
+[[ -f "$DERIVED" ]] || { echo "test_derived_registrant_switching: missing derived file after prod build: $DERIVED" >&2; exit 1; }
 if ! has_crashlytics_registration "$DERIVED"; then
   echo "test_derived_registrant_switching: prod derived file must include Crashlytics registration" >&2
   exit 1
 fi
 
-echo "== 3/3 xcodebuild Debug-dev (again)"
-build "Debug-dev"
+echo "== 3/3 flutter build dev (simulator, again)"
+flutter_build_sim_flavor dev dev "$FLUTTER_BIN"
 check_shared_unchanged
-DERIVED="$(derived_registrant_path_for_configuration "Debug-dev")"
+DERIVED="$(derived_registrant_path_for_configuration "$CONFIG_DEV")"
 if has_crashlytics_registration "$DERIVED"; then
   echo "test_derived_registrant_switching: dev derived file must NOT register Crashlytics after prod→dev" >&2
   exit 1
