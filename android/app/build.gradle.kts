@@ -138,7 +138,7 @@ val dartEnv: String = (project.findProperty("dart-defines") as String?)
     ?: "prod"
 
 gradle.taskGraph.whenReady {
-    val names = allTasks.filter { it.project == project }.map { it.name }
+    val names = gradle.taskGraph.allTasks.filter { it.project == project }.map { it.name }
     val buildsDev = names.any { Regex("Dev(Debug|Profile|Release)").containsMatchIn(it) }
     val buildsProd = names.any { Regex("Prod(Debug|Profile|Release)").containsMatchIn(it) }
     if (buildsDev && dartEnv != "dev") {
