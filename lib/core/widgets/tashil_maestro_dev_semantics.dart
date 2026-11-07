@@ -15,6 +15,8 @@ Widget tashilMaestroDevSemantics({
     identifier: identifier,
     label: label,
     button: button,
-    child: child,
+    container: true,
+    explicitChildNodes: true,
+    child: ExcludeSemantics(child: child),
   );
 }
