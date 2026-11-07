@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:delegate_app/core/widgets/app_avatar.dart';
+import 'package:delegate_app/core/widgets/tashil_maestro_dev_semantics.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 
@@ -337,14 +338,19 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
       ),
       actions: [
         ...?extraActions,
-        PopupMenuButton<String>(
-          icon: const Icon(Icons.menu_rounded),
-          tooltip: 'القائمة الرئيسية',
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+        tashilMaestroDevSemantics(
+          identifier: 'tashil_main_menu_button',
+          label: 'القائمة الرئيسية',
+          button: true,
+          child: PopupMenuButton<String>(
+            icon: const Icon(Icons.menu_rounded),
+            tooltip: 'القائمة الرئيسية',
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            onSelected: onMenuSelected,
+            itemBuilder: (_) => menuItems,
           ),
-          onSelected: onMenuSelected,
-          itemBuilder: (_) => menuItems,
         ),
         const SizedBox(width: 4),
       ],
