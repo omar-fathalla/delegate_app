@@ -45,13 +45,22 @@ class RenewalSelection extends Equatable {
 
   RenewalSelection toggle(String uid) {
     final next = Set<String>.from(selectedUids);
-    if (!next.remove(uid)) next.add(uid);
+    if (next.contains(uid)) {
+      next.remove(uid);
+    } else if (next.length < SubscriptionCycleHelper.maxDelegatesPerRenewal) {
+      next.add(uid);
+    }
     return RenewalSelection(next);
   }
 
-  /// Selects every delegate that is not already awaiting payment.
-  RenewalSelection selectAll(Iterable<RenewableDelegate> delegates) =>
-      RenewalSelection(delegates.where((d) => !d.isAwaitingPayment).map((d) => d.uid).toSet());
+  /// Selects every delegate that is not already awaiting payment (up to [maxDelegatesPerRenewal]).
+  RenewalSelection selectAll(Iterable<RenewableDelegate> delegates) => RenewalSelection(
+        delegates
+            .where((d) => !d.isAwaitingPayment)
+            .map((d) => d.uid)
+            .take(SubscriptionCycleHelper.maxDelegatesPerRenewal)
+            .toSet(),
+      );
 
   RenewalSelection clear() => const RenewalSelection();
 

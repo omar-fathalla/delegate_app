@@ -14,6 +14,7 @@ import {
   quoteFor,
   requestCoversPeriod,
   shouldSuspendStatus,
+  MAX_DELEGATES_PER_RENEWAL,
 } from "./subscription_logic";
 
 type Db = admin.firestore.Firestore;
@@ -182,6 +183,7 @@ export async function quoteSubscriptionRequest(db: Db, requestId: string, at: Da
   if (str(data.periodCode) !== periodOf(at).code) throw new QuoteError("period_mismatch");
   const uids = coveredUids(requestId, data);
   if (uids.length === 0) throw new QuoteError("no_delegates");
+  if (uids.length > MAX_DELEGATES_PER_RENEWAL) throw new QuoteError("too_many_delegates");
   if (type === REQUEST_TYPE_RENEWAL) await assertRenewable(db, data, uids);
   const quote = quoteFor(uids, at);
   if (quote.amountCents <= 0) throw new QuoteError("free_period");

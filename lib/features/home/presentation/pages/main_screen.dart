@@ -18,7 +18,6 @@ import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.
 import 'package:delegate_app/features/penalties/presentation/pages/company_penalties_settings_page.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/penalty_rules_catalog_page.dart';
 import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
-import 'package:delegate_app/features/admin/presentation/pages/subscription_renewal_screen.dart';
 import 'dart:async';
 import 'package:delegate_app/features/admin/presentation/pages/manage_organizations_page.dart';
 import 'package:delegate_app/features/hr/presentation/pages/delegate_leaves_and_requests_screen.dart';
@@ -181,12 +180,6 @@ class _MainScreenState extends State<MainScreen> {
                 ),
               ),
             );
-          } else if (value == 'delegate_renewal') {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => SubscriptionRenewalScreen(supervisor: delegate),
-              ),
-            );
           } else if (value == 'manage_organizations') {
             Navigator.of(context).push(
               MaterialPageRoute(
@@ -268,18 +261,6 @@ class _MainScreenState extends State<MainScreen> {
                   Icon(Icons.how_to_reg_rounded, color: colorScheme.tertiary),
                   const SizedBox(width: 12),
                   const Text('اشتراكات واعتماد المناديب'),
-                ],
-              ),
-            ),
-          ],
-          if (delegate.position == DelegatePosition.supervisor) ...[
-            PopupMenuItem<String>(
-              value: 'delegate_renewal',
-              child: Row(
-                children: [
-                  Icon(Icons.autorenew_rounded, color: colorScheme.tertiary),
-                  const SizedBox(width: 12),
-                  const Text(SubscriptionRenewalScreen.title),
                 ],
               ),
             ),

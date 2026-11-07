@@ -100,6 +100,12 @@ class SubscriptionRenewalRepository {
     if (delegates.isEmpty) {
       return const Left(ServerFailure('اختر مندوباً واحداً على الأقل للتجديد.'));
     }
+    if (delegates.length > SubscriptionCycleHelper.maxDelegatesPerRenewal) {
+      return Left(ServerFailure(
+        'الحد الأقصى ${SubscriptionCycleHelper.maxDelegatesPerRenewal} مندوباً في طلب تجديد واحد. '
+        'اختر جزءاً منهم الآن وجدّد الباقي في طلب لاحق.',
+      ));
+    }
     final now = _clock();
     if (SubscriptionCycleHelper.isFreePromotionActive(now)) {
       return const Left(ServerFailure('لا حاجة للتجديد خلال فترة العرض المجاني (حتى 31/12/2026).'));

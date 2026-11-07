@@ -13,6 +13,9 @@ class SubscriptionCycleHelper {
   static const double periodFee = 500.0;
   static const int monthsPerPeriod = 6;
 
+  /// Mohamed policy (PR #212): max delegates per single renewal / Paymob payment.
+  static const int maxDelegatesPerRenewal = 100;
+
   /// Last free day (inclusive), Cairo calendar date.
   static final DateTime freePromotionLastDay = DateTime(2026, 12, 31);
 

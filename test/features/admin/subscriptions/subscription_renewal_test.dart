@@ -1,5 +1,6 @@
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
+import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/features/admin/data/repositories/subscription_renewal_repository.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/admin/domain/entities/subscription_renewal.dart';
@@ -121,6 +122,21 @@ void main() {
     test('nothing to pay during the free promotion', () {
       expect(const RenewalSelection().selectAll(ds).total(nov2026), 0);
     });
+
+    test('selectAll and toggle respect maxDelegatesPerRenewal', () {
+      final many = List.generate(
+        SubscriptionCycleHelper.maxDelegatesPerRenewal + 5,
+        (i) => RenewableDelegate(uid: 'u$i', fullName: '$i', phoneNumber: '', organizationName: ''),
+      );
+      final all = const RenewalSelection().selectAll(many);
+      expect(all.count, SubscriptionCycleHelper.maxDelegatesPerRenewal);
+      var s = RenewalSelection(
+        {for (var i = 0; i < SubscriptionCycleHelper.maxDelegatesPerRenewal; i++) 'u$i'},
+      );
+      s = s.toggle('extra');
+      expect(s.count, SubscriptionCycleHelper.maxDelegatesPerRenewal);
+      expect(s.isSelected('extra'), isFalse);
+    });
   });
 
   group('SubscriptionRenewalRepository', () {
@@ -187,6 +203,26 @@ void main() {
       expect((await repo.cancelRenewal('r1')).isRight(), isTrue);
       expect((await db.doc('delegate_requests/r1').get()).data()!['status'], 'cancelled');
       expect((await repo.cancelRenewal('r2')).isLeft(), isTrue);
+    });
+
+    test('rejects more than maxDelegatesPerRenewal in one renewal', () async {
+      final repo = SubscriptionRenewalRepository(firestore: await seed(), clock: () => feb2027);
+      final s = supervisor();
+      final tooMany = List.generate(
+        SubscriptionCycleHelper.maxDelegatesPerRenewal + 1,
+        (i) => RenewableDelegate(uid: 'x$i', fullName: 'x', phoneNumber: '', organizationName: ''),
+      );
+      final r = await repo.submitRenewal(
+        supervisorUid: s.uid,
+        supervisorName: s.fullName,
+        supervisorPhone: s.phoneNumber,
+        companyUID: s.companyUID,
+        companyName: s.companyName,
+        organizationUID: s.organizationUID,
+        organizationName: s.organizationName,
+        delegates: tooMany,
+      );
+      expect(r.isLeft(), isTrue);
     });
 
     test('no renewal during the free promotion, and empty selection is refused', () async {

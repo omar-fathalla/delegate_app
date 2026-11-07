@@ -6,6 +6,9 @@ month counted in full, rounded half-up to 2 dp (500, 416.67, 333.33, 250,
 166.67, 83.33). Free until 2026-12-31; first paid period 2027_H1. One
 subscription per delegate covers every chain (add_organization is free).
 Payment is online via Paymob only, charged once at registration/renewal.
+Renewal creation: company admin (`UserRole.admin`) or HR (`UserRole.hr`) only — not
+supervisors. Max **100** delegates per renewal request (one Paymob charge). Stale quotes:
+server re-quotes at Paymob checkout; period or amount mismatch → reject, no activation.
 
 Same rules in two places, kept in sync by tests:
 `lib/core/utils/subscription_cycle_helper.dart` (UI) and

@@ -30,6 +30,10 @@ test("rounding is half-up to 2 decimals, in one helper", () => {
   assert.equal(L.quoteFor(["a", "b", "c"], mid(2027, 2)).amountCents, 125001);
 });
 
+test("max delegates per renewal constant", () => {
+  assert.equal(L.MAX_DELEGATES_PER_RENEWAL, 100);
+});
+
 test("free promotion boundary: free through 2026-12-31 23:59:59 Cairo, paid from 2027-01-01 00:00 Cairo", () => {
   const jan1 = L.cairoMidnight(2027, 1, 1);
   assert.equal(jan1.toISOString(), "2026-12-31T22:00:00.000Z");

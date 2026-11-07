@@ -11,7 +11,7 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// «تجديد المناديب»: the company supervisor's renewal page.
+/// «تجديد المناديب»: company admin or HR renewal page (Mohamed policy #212).
 ///
 /// Lists his company's suspended (subscription expired) app-added delegates,
 /// lets him select any subset, and pays for the selection in ONE Paymob
@@ -245,7 +245,22 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
         return CheckboxListTile(
           key: Key('renewal_row_${d.uid}'),
           value: _selection.isSelected(d.uid),
-          onChanged: _submitting ? null : (_) => setState(() => _selection = _selection.toggle(d.uid)),
+          onChanged: _submitting
+              ? null
+              : (_) {
+                  final wasSelected = _selection.isSelected(d.uid);
+                  final next = _selection.toggle(d.uid);
+                  if (!wasSelected &&
+                      next.count == _selection.count &&
+                      _selection.count >= SubscriptionCycleHelper.maxDelegatesPerRenewal) {
+                    AppSnackBar.showError(
+                      context,
+                      'الحد الأقصى ${SubscriptionCycleHelper.maxDelegatesPerRenewal} مندوباً في طلب تجديد واحد.',
+                    );
+                    return;
+                  }
+                  setState(() => _selection = next);
+                },
           title: Text(d.fullName),
           subtitle: subtitle.isEmpty ? null : Text(subtitle),
           secondary: Icon(Icons.person_off_rounded, color: cs.error),
@@ -315,7 +330,8 @@ class _PeriodBanner extends StatelessWidget {
     final text = isFree
         ? 'الاشتراك مجاني حتى 31/12/2026، لا حاجة للتجديد الآن.'
         : '${SubscriptionCycleHelper.getCycleTitleArabic(now)} • متبقٍ $months ${months == 1 ? 'شهر' : 'أشهر'}. '
-            'الاشتراك الواحد يغطي كل السلاسل. يمكنك تجديد بعض المناديب الآن والباقي لاحقاً.';
+            'الحد الأقصى ${SubscriptionCycleHelper.maxDelegatesPerRenewal} مندوباً في طلب واحد. '
+            'يمكنك تجديد بعض المناديب الآن والباقي لاحقاً.';
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.all(12),

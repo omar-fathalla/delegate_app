@@ -12,6 +12,8 @@
 export const TIME_ZONE = "Africa/Cairo";
 export const PERIOD_FEE_EGP = 500;
 export const MONTHS_PER_PERIOD = 6;
+/** Mohamed policy (PR #212): max delegates per single renewal / Paymob payment. */
+export const MAX_DELEGATES_PER_RENEWAL = 100;
 /** Last free day (inclusive), Cairo calendar date. */
 export const FREE_PROMOTION_LAST_DAY = "2026-12-31";
 
