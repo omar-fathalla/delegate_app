@@ -51,6 +51,9 @@ assert_no_crashlytics_upload_in_pbxproj() {
   if ! grep -q 'tashil_registrant/GeneratedPluginRegistrant.m' ios/Runner.xcodeproj/project.pbxproj; then
     fail "project.pbxproj missing derived registrant path (tashil_registrant under DERIVED_FILE_DIR)"
   fi
+  if ! grep -q 'strip_dev_crashlytics_spm_package.sh' ios/Runner.xcodeproj/project.pbxproj; then
+    fail "project.pbxproj missing [Tashil] Strip dev Crashlytics SPM build phase"
+  fi
 }
 
 check_built_app() {
@@ -115,6 +118,14 @@ if sed 's|//.*||' ios/Runner/AppDelegate.swift | awk '/case "dev":/,/^    defaul
 fi
 
 assert_no_crashlytics_upload_in_pbxproj
+
+grep -q 'keychain-access-groups' ios/Runner/Runner-dev.entitlements \
+  || fail "Runner-dev.entitlements must declare keychain-access-groups for Firebase Auth"
+grep -q 'offlineSyncTask' ios/Runner/Info.plist \
+  || fail "Info.plist must list offlineSyncTask in BGTaskSchedulerPermittedIdentifiers"
+
+echo "== strip_dev_crashlytics_spm_package unit test"
+bash ios/scripts/test_strip_dev_crashlytics_spm_package.sh
 
 # CI uses committed fixture as the dev GoogleService-Info (no secrets).
 FIXTURE_DEV="ios/config/test/GoogleService-Info-tashil-dev.fixture.plist"
