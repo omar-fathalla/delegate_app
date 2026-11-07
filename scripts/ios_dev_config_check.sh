@@ -127,8 +127,24 @@ assert_no_crashlytics_upload_in_pbxproj
 
 grep -q 'keychain-access-groups' ios/Runner/Runner-dev.entitlements \
   || fail "Runner-dev.entitlements must declare keychain-access-groups for Firebase Auth"
+if grep -q 'keychain-access-groups' ios/Runner/Runner.entitlements; then
+  fail "prod Runner.entitlements must not declare keychain-access-groups (dev-only in Runner-dev.entitlements)"
+fi
 grep -q 'tashil_dev_build_context.sh' ios/scripts/tashil_after_flutter_xcode_backend.sh \
   || fail "tashil_after_flutter_xcode_backend.sh must source tashil_dev_build_context"
+
+if grep -q 'RVOWPWRldg==' ios/Podfile; then
+  fail "Podfile must not use wrong DART_DEFINES token RVOWPWRldg== (use shared tashil_is_dev_build.sh / ENV=dev decode)"
+fi
+if ! grep -q 'tashil_is_dev_build.sh' ios/Podfile; then
+  fail "Podfile must delegate dev detection to scripts/tashil_is_dev_build.sh"
+fi
+if ! grep -q 'pre_install' ios/Podfile; then
+  fail "Podfile must strip dev Crashlytics SPM in pre_install (before pod resolution)"
+fi
+
+echo "== tashil_dev_build_context allow/deny unit test"
+bash ios/scripts/test_tashil_dev_build_context.sh
 
 echo "== strip_dev_crashlytics_spm_package unit test"
 bash ios/scripts/test_strip_dev_crashlytics_spm_package.sh

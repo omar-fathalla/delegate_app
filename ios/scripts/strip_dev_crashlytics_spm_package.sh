@@ -2,7 +2,8 @@
 # Remove firebase_crashlytics from FlutterGeneratedPluginSwiftPackage on dev builds so the
 # FirebaseCrashlytics native module is not linked and cannot log/init at startup.
 #
-# Invoked from: xcode_backend post-hook, derived registrant prep, and Podfile post_install
+# Invoked from: Podfile pre_install (before resolution), xcode_backend post-hook,
+# derived registrant prep, and Podfile post_install
 # (see ios/scripts/tashil_dev_build_context.sh).
 #
 # - Dev (`Debug-dev`, `Profile-dev`, `Release-dev` or APP_ENV=dev): strip manifest + plugin symlink.
