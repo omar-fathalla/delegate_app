@@ -246,6 +246,7 @@
 				E8F1A2B3C4D5061728394A5B /* [Tashil] Dev strip Crashlytics from app */,
 				170A61BE810DC90489385D65 /* [Tashil] Select Firebase config */,
 				F7DD36EDC1DCCA02088D6F3C /* [Tashil] Dev Crashlytics upload guard */,
+				A7B8C9D0E1F2345612345AB /* [Tashil] Embed dev sim entitlements */,
 			);
 			buildRules = (
 			);
@@ -525,6 +526,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"${SRCROOT}/scripts/dev_upload_guard.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		A7B8C9D0E1F2345612345AB /* [Tashil] Embed dev sim entitlements */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Runner/Runner-dev.entitlements",
+				"${TARGET_BUILD_DIR}/${WRAPPER_NAME}",
+			);
+			name = "[Tashil] Embed dev sim entitlements";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"${SRCROOT}/scripts/tashil_embed_dev_sim_entitlements.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
