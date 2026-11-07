@@ -1,3 +1,5 @@
+import java.io.File
+
 pluginManagement {
     val flutterSdkPath =
         run {
@@ -27,3 +29,31 @@ plugins {
 }
 
 include(":app")
+
+// Patrol CLI's second Gradle invocation requests only `assemble*AndroidTest`, which
+// prevents Flutter from registering `compileFlutterBuild*`. Append the matching app
+// assemble task before :app is configured (Gradle Kotlin DSL forbids mutating
+// startParameter from app/build.gradle.kts).
+var patrolAssembleCompanionHookApplied = false
+gradle.beforeProject {
+    if (patrolAssembleCompanionHookApplied || project.path != ":app") return@beforeProject
+    patrolAssembleCompanionHookApplied = true
+
+    val requested = gradle.startParameter.taskNames
+    if (requested.size != 1) return@beforeProject
+
+    val taskPath = requested.first()
+    val sole = taskPath.substringAfterLast(":")
+    val match = Regex("^assemble(.+?)(Debug|Release|Profile)AndroidTest$").find(sole) ?: return@beforeProject
+
+    val appAssemble = "assemble${match.groupValues[1]}${match.groupValues[2]}"
+    if (requested.any { it.endsWith(appAssemble) }) return@beforeProject
+
+    val prefix = taskPath.substringBeforeLast(":", missingDelimiterValue = "")
+    val companion =
+        when {
+            prefix.isEmpty() -> ":app:$appAssemble"
+            else -> "$prefix:$appAssemble"
+        }
+    gradle.startParameter.setTaskNames(requested + companion)
+}

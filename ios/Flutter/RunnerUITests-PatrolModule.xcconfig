@@ -1,0 +1,7 @@
+// Patrol @import — always use plugin source module.modulemap (umbrella patrol.h).
+// Do not use Target Support Files/patrol/patrol.modulemap (patrol-umbrella.h) for RunnerUITests.
+#include? "RunnerUITests-Runpath.xcconfig"
+PATROL_MODULEMAP=${PODS_ROOT}/../.symlinks/plugins/patrol/darwin/patrol/Sources/patrol/include/module.modulemap
+OTHER_CFLAGS=$(inherited) -fmodule-map-file="$(PATROL_MODULEMAP)"
+HEADER_SEARCH_PATHS=$(inherited) "${PODS_ROOT}/../.symlinks/plugins/patrol/darwin/patrol/Sources/patrol/include" "${PODS_CONFIGURATION_BUILD_DIR}/patrol/patrol.framework/Headers"
+SWIFT_INCLUDE_PATHS=$(inherited) "${PODS_CONFIGURATION_BUILD_DIR}/patrol"
