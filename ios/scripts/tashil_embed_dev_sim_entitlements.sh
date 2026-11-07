@@ -1,12 +1,11 @@
 #!/bin/sh
-# Debug-dev + iphonesimulator only: re-sign Runner.app so embedded entitlements
-# match Runner-dev.entitlements (Flutter --no-codesign / thin leaves empty dict).
+# Debug-dev + iphonesimulator only: ad-hoc re-sign with expanded Runner-dev.entitlements.
 set -eu
 
 . "${SRCROOT:?}/scripts/tashil_dev_build_context.sh"
 
-case "${EFFECTIVE_PLATFORM_NAME:-}" in
-  -iphonesimulator) ;;
+case "${EFFECTIVE_PLATFORM_NAME:-}${PLATFORM_NAME:-}" in
+  *iphonesimulator*) ;;
   *) exit 0 ;;
 esac
 
@@ -14,8 +13,8 @@ tashil_is_dev_build || exit 0
 
 APP="${TARGET_BUILD_DIR:?}/${WRAPPER_NAME:?}"
 ENT_SRC="${SRCROOT}/Runner/Runner-dev.entitlements"
-[ -f "$ENT_SRC" ] || exit 0
 [ -d "$APP" ] || exit 0
+[ -f "$ENT_SRC" ] || exit 0
 
 TEAM="${DEVELOPMENT_TEAM:-}"
 BUNDLE="${PRODUCT_BUNDLE_IDENTIFIER:-}"

@@ -537,7 +537,7 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
-				"$(SRCROOT)/Runner/Runner-dev.entitlements",
+				"${LD_ENTITLEMENTS_SECTION}",
 				"${TARGET_BUILD_DIR}/${WRAPPER_NAME}",
 			);
 			name = "[Tashil] Embed dev sim entitlements";

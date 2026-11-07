@@ -2,3 +2,6 @@
 #include "Generated.xcconfig"
 #include "Env-dev.xcconfig"
 SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) TASHIL_DEV_FLAVOR
+// Release-dev iphonesimulator only (same embed policy as Debug-dev experiment).
+ENTITLEMENTS_ALLOWED[sdk=iphonesimulator*]=YES
+CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]=Runner/Runner-dev.entitlements

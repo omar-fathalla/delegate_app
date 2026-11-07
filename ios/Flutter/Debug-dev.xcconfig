@@ -2,3 +2,6 @@
 #include "Generated.xcconfig"
 #include "Env-dev.xcconfig"
 SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) TASHIL_DEV_FLAVOR
+// Debug-dev iphonesimulator only: allow embedding Runner-dev.entitlements at codesign.
+ENTITLEMENTS_ALLOWED[sdk=iphonesimulator*]=YES
+CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]=Runner/Runner-dev.entitlements
