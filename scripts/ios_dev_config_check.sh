@@ -177,6 +177,9 @@ bash ios/scripts/test_strip_dev_crashlytics_spm_package.sh
 echo "== tashil_strip_crashlytics_from_dev_pod_support unit test"
 bash ios/scripts/test_tashil_strip_crashlytics_from_dev_pod_support.sh
 
+echo "== offlineSyncTask BGTask plist + AppDelegate registration"
+bash ios/scripts/test_offline_sync_bgtask_registration.sh
+
 # CI uses committed fixture as the dev GoogleService-Info (no secrets).
 FIXTURE_DEV="ios/config/test/GoogleService-Info-tashil-dev.fixture.plist"
 [[ -f "$FIXTURE_DEV" ]] || fail "missing fixture $FIXTURE_DEV"
