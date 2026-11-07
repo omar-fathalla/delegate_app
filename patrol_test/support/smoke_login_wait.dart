@@ -21,10 +21,37 @@ const Duration smokePostSignInPumpStep = Duration(milliseconds: 200);
 
 const int smokePostSignInPumpIterations = 40;
 
+/// Which credential fields are visible for the active M3 login mode segment.
+enum SmokeDevLoginFieldMode {
+  /// Default [LoginScreen] segment (**مندوب**): phone + national ID.
+  delegate,
+
+  /// **موظف إداري** segment: phone + staff password.
+  staff,
+}
+
+/// ValueKeys waited on per mode (Patrol smoke contract; unit-tested).
+List<String> smokeDevLoginFieldValueKeys(SmokeDevLoginFieldMode mode) {
+  switch (mode) {
+    case SmokeDevLoginFieldMode.delegate:
+      return const ['login_phone', 'login_national_id'];
+    case SmokeDevLoginFieldMode.staff:
+      return const ['login_phone', 'login_staff_password'];
+  }
+}
+
 bool _loginSubmitHitTestable(WidgetTester tester) {
   final hitTestable =
       devLoginSubmitFinder().hitTestable(at: Alignment.center);
   return hitTestable.evaluate().isNotEmpty;
+}
+
+bool _delegateLoginFieldsHitTestable(WidgetTester tester) {
+  final phone =
+      devLoginPhoneFieldFinder().hitTestable(at: Alignment.center);
+  final nationalId =
+      devLoginDelegateNationalIdFieldFinder().hitTestable(at: Alignment.center);
+  return phone.evaluate().isNotEmpty && nationalId.evaluate().isNotEmpty;
 }
 
 bool _staffLoginFieldsHitTestable(WidgetTester tester) {
@@ -33,6 +60,27 @@ bool _staffLoginFieldsHitTestable(WidgetTester tester) {
   final secret =
       devLoginStaffPasswordFieldFinder().hitTestable(at: Alignment.center);
   return phone.evaluate().isNotEmpty && secret.evaluate().isNotEmpty;
+}
+
+bool _loginFieldsHitTestable(
+  WidgetTester tester,
+  SmokeDevLoginFieldMode mode,
+) {
+  switch (mode) {
+    case SmokeDevLoginFieldMode.delegate:
+      return _delegateLoginFieldsHitTestable(tester);
+    case SmokeDevLoginFieldMode.staff:
+      return _staffLoginFieldsHitTestable(tester);
+  }
+}
+
+Finder _secondaryFieldFinder(SmokeDevLoginFieldMode mode) {
+  switch (mode) {
+    case SmokeDevLoginFieldMode.delegate:
+      return devLoginDelegateNationalIdFieldFinder();
+    case SmokeDevLoginFieldMode.staff:
+      return devLoginStaffPasswordFieldFinder();
+  }
 }
 
 /// Pumps through the login screen slide/fade so fields are hit-testable.
@@ -45,8 +93,14 @@ Future<void> settleDevLoginScreenEntrance(PatrolIntegrationTester $) async {
   }
 }
 
-/// Scrolls the dev login form into view and waits for both [TextFormField]s.
-Future<void> waitForDevLoginFormFieldsReady(PatrolIntegrationTester $) async {
+/// Scrolls the dev login form into view and waits for mode-appropriate fields.
+///
+/// Default is [SmokeDevLoginFieldMode.delegate] (**مندوب**). For staff flows,
+/// tap **موظف إداري** first, then call again with [SmokeDevLoginFieldMode.staff].
+Future<void> waitForDevLoginFormFieldsReady(
+  PatrolIntegrationTester $, {
+  SmokeDevLoginFieldMode mode = SmokeDevLoginFieldMode.delegate,
+}) async {
   final submit = devLoginSubmitFinder();
   if ($.tester.any(submit)) {
     await $(submit).scrollTo();
@@ -54,9 +108,10 @@ Future<void> waitForDevLoginFormFieldsReady(PatrolIntegrationTester $) async {
 
   await settleDevLoginScreenEntrance($);
 
+  final secondaryFinder = _secondaryFieldFinder(mode);
   final deadline = DateTime.now().add(smokeLoginVisibleTimeout);
   while (DateTime.now().isBefore(deadline)) {
-    if (_staffLoginFieldsHitTestable($.tester)) return;
+    if (_loginFieldsHitTestable($.tester, mode)) return;
 
     if ($.tester.any(submit)) {
       await $(submit).scrollTo();
@@ -71,10 +126,21 @@ Future<void> waitForDevLoginFormFieldsReady(PatrolIntegrationTester $) async {
     timeout: smokeLoginVisibleTimeout,
     alignment: Alignment.topCenter,
   );
-  await $(devLoginStaffPasswordFieldFinder()).waitUntilVisible(
+  await $(secondaryFinder).waitUntilVisible(
     timeout: smokeLoginVisibleTimeout,
     alignment: Alignment.topCenter,
   );
+}
+
+/// Taps **موظف إداري** / [LoginMode.staff] then waits for staff credential fields.
+Future<void> tapDevLoginStaffModeAndWaitForFields(
+  PatrolIntegrationTester $,
+) async {
+  final staffMode = devLoginStaffModeFinder();
+  await $(staffMode).waitUntilVisible(timeout: smokeLoginVisibleTimeout);
+  await $.tester.tap(staffMode);
+  await $.tester.pump(smokePostSignInPumpStep);
+  await waitForDevLoginFormFieldsReady($, mode: SmokeDevLoginFieldMode.staff);
 }
 
 /// Waits for splash / auto-login to finish, taps [splash_sign_in] when the stall UI
