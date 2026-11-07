@@ -15,8 +15,14 @@ import workmanager_apple
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     #if canImport(workmanager_apple)
-    // UIScene lifecycle: register BGTask handlers before didFinishLaunching returns.
+    // UIScene lifecycle: handlers must be registered before didFinishLaunching returns.
+    // registerLaunchHandlers() only replays ids from UserDefaults (workmanager_apple 0.9.10);
+    // cold start requires explicit registerPeriodicTask for each Dart task id.
     WorkmanagerPlugin.registerLaunchHandlers()
+    WorkmanagerPlugin.registerPeriodicTask(
+      withIdentifier: "offlineSyncTask",
+      earliestBeginInSeconds: 120
+    )
     #endif
 
     // Configure Firebase natively only for prod. TashilEnv is written into the
