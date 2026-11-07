@@ -29,12 +29,4 @@ patrol test -t patrol_test/smoke_dev_login_test.dart --flavor dev \
 git add patrol_test/manifest/frozen-<shortsha>.{yaml,json}
 ```
 
-## Verify hashes
-
-```bash
-shasum -a 256 path/to/Runner.app/Runner
-shasum -a 256 path/to/RunnerUITests.xctest
-shasum -a 256 path/to/*.xctestrun
-```
-
-Compare output to `artifacts.*.sha256` in the manifest for the same `git_commit`.
+`patrol_ios_dev_freeze_manifest.sh` fingerprints **`.app` / `.xctest` directories** with a sorted per-file manifest (deterministic across machines). Key binaries (`Runner`, `RunnerUITests`, `Info.plist`, `*.xctestrun`) are listed separately; compare a Mac rebuild to the committed `frozen-<shortsha>.*` files for the same `git_commit`.

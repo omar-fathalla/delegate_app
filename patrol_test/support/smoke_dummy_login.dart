@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
 
@@ -9,8 +8,6 @@ const Duration smokeLoginFieldTimeout = Duration(seconds: 30);
 const Duration smokePostLoginDeadline = Duration(seconds: 120);
 const Duration smokePostLoginPumpStep = Duration(milliseconds: 250);
 
-Finder devLoginPhoneLabelFinder() => find.text('رقم الجوال');
-Finder devLoginSecretLabelFinder() => find.text('الرقم القومي');
 Finder devLoginSubmitSemanticsFinder() =>
     find.bySemanticsIdentifier('tashil_login_submit');
 Finder devMainMenuButtonFinder() =>
@@ -51,28 +48,24 @@ Future<void> submitDevDummyLogin(
 
   await waitForDevLoginScreenAfterSplash($);
 
-  await $(devLoginPhoneLabelFinder()).waitUntilVisible(
-    timeout: smokeLoginFieldTimeout,
-  );
-  await $(devLoginSecretLabelFinder()).waitUntilVisible(
-    timeout: smokeLoginFieldTimeout,
-  );
+  final phoneField = devLoginPhoneFieldFinder();
+  final secretField = devLoginSecretFieldFinder();
+  expect(phoneField, findsOneWidget);
+  expect(secretField, findsOneWidget);
 
-  final fields = find.byType(TextFormField);
-  expect(fields, findsAtLeastNWidgets(2));
-
-  await $.tester.tap(fields.at(0));
+  await $.tester.tap(phoneField);
   await $.tester.pump(smokePostLoginPumpStep);
-  await $.tester.enterText(fields.at(0), creds.phone);
+  await $.tester.enterText(phoneField, creds.phone);
   await $.tester.pump(smokePostLoginPumpStep);
 
-  await $.tester.tap(fields.at(1));
+  await $.tester.tap(secretField);
   await $.tester.pump(smokePostLoginPumpStep);
-  await $.tester.enterText(fields.at(1), creds.secret);
+  await $.tester.enterText(secretField, creds.secret);
   await $.tester.pump(smokePostLoginPumpStep);
 
   final submit = devLoginSubmitSemanticsFinder();
   expect($.tester.any(submit), isTrue, reason: 'tashil_login_submit must be visible');
+  await $(submit).scrollTo();
   await $.tester.tap(submit);
   await $.tester.pump(smokePostLoginPumpStep);
 
@@ -97,6 +90,7 @@ Future<void> verifyDevLoggedInRole(
   await $.tester.pump(smokePostLoginPumpStep);
 
   final profileEntry = find.text('الملف الشخصي');
+  await $(profileEntry).scrollTo();
   await $(profileEntry).waitUntilVisible(timeout: smokeLoginFieldTimeout);
   await $.tester.tap(profileEntry);
   await $.tester.pump(smokePostLoginPumpStep);

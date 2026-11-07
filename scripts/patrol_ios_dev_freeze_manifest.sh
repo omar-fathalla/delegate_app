@@ -23,11 +23,30 @@ if [[ "$(git rev-parse --short=7 HEAD)" != "$SHORT_SHA" ]]; then
 fi
 
 hash_file() {
-  if [[ ! -e "$1" ]]; then
+  if [[ ! -f "$1" ]]; then
     echo "error: missing artifact: $1" >&2
     exit 1
   fi
   shasum -a 256 "$1" | awk '{print $1}'
+}
+
+# Deterministic directory fingerprint: sorted relative paths + per-file sha256 manifest.
+hash_directory() {
+  local dir="$1"
+  if [[ ! -d "$dir" ]]; then
+    echo "error: missing directory: $dir" >&2
+    exit 1
+  fi
+  local manifest
+  manifest="$(mktemp)"
+  while IFS= read -r -d '' f; do
+    local rel="${f#"$dir"/}"
+    local h
+    h="$(shasum -a 256 "$f" | awk '{print $1}')"
+    printf '%s\t%s\n' "$rel" "$h"
+  done < <(find "$dir" -type f -print0 | LC_ALL=C sort -z) >"$manifest"
+  shasum -a 256 "$manifest" | awk '{print $1}'
+  rm -f "$manifest"
 }
 
 APP_CANDIDATES=(
@@ -52,11 +71,7 @@ for c in \
   if [[ -d "$c" ]]; then XCTEST="$c"; break; fi
 done
 
-XCTESTRUN=""
-while IFS= read -r -d '' f; do
-  XCTESTRUN="$f"
-  break
-done < <(find "$ROOT/build" -name '*.xctestrun' -print 2>/dev/null | head -n 1)
+XCTESTRUN="$(find "$ROOT/build" -name '*.xctestrun' 2>/dev/null | LC_ALL=C sort | head -n 1 || true)"
 
 RUNNER_EXEC="$APP/Runner"
 INFO_PLIST="$APP/Info.plist"
@@ -68,15 +83,16 @@ sha_runner="$(hash_file "$RUNNER_EXEC")"
 sha_plist="$(hash_file "$INFO_PLIST")"
 sha_gsp=""
 if [[ -f "$GSP" ]]; then sha_gsp="$(hash_file "$GSP")"; fi
+sha_app_tree="$(hash_directory "$APP")"
 sha_xctest=""
 sha_xctest_bundle=""
 if [[ -n "$XCTEST" ]]; then
-  sha_xctest_bundle="$(hash_file "$XCTEST")"
+  sha_xctest_bundle="$(hash_directory "$XCTEST")"
   XCTEST_BIN="$XCTEST/RunnerUITests"
   if [[ -f "$XCTEST_BIN" ]]; then sha_xctest="$(hash_file "$XCTEST_BIN")"; fi
 fi
 sha_xctestrun=""
-if [[ -n "$XCTESTRUN" ]]; then sha_xctestrun="$(hash_file "$XCTESTRUN")"; fi
+if [[ -n "$XCTESTRUN" && -f "$XCTESTRUN" ]]; then sha_xctestrun="$(hash_file "$XCTESTRUN")"; fi
 
 CAPTURED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
@@ -91,6 +107,7 @@ artifacts:
   runner_app:
     path: $APP
     sha256:
+      tree: $sha_app_tree
       Runner: $sha_runner
       Info.plist: $sha_plist
       GoogleService-Info.plist: ${sha_gsp:-null}
@@ -115,6 +132,7 @@ cat >"$JSON" <<EOF
     "runner_app": {
       "path": "$APP",
       "sha256": {
+        "tree": "$sha_app_tree",
         "Runner": "$sha_runner",
         "Info.plist": "$sha_plist",
         "GoogleService-Info.plist": "${sha_gsp:-null}"
