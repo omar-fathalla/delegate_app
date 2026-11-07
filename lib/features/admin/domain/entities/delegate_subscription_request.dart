@@ -5,6 +5,10 @@ enum SubscriptionPaymentMethod {
   instaPay,
   branchReceipt,
   freePromotion,
+  /// Online payment through Paymob (the only paid method from 2027).
+  paymob,
+  /// No charge: e.g. adding a chain (one subscription covers all chains).
+  notRequired,
 }
 
 extension SubscriptionPaymentMethodX on SubscriptionPaymentMethod {
@@ -18,6 +22,10 @@ extension SubscriptionPaymentMethodX on SubscriptionPaymentMethod {
         return 'إيصال إلكتروني من تسويق الفرع';
       case SubscriptionPaymentMethod.freePromotion:
         return 'عرض ترويجي مجاني (حتى 31/12)';
+      case SubscriptionPaymentMethod.paymob:
+        return 'دفع إلكتروني (Paymob)';
+      case SubscriptionPaymentMethod.notRequired:
+        return 'بدون رسوم (مشمول في اشتراك المندوب)';
     }
   }
 
@@ -31,11 +39,79 @@ extension SubscriptionPaymentMethodX on SubscriptionPaymentMethod {
         return 'إيصال إلكتروني';
       case SubscriptionPaymentMethod.freePromotion:
         return 'عرض مجاني';
+      case SubscriptionPaymentMethod.paymob:
+        return 'Paymob';
+      case SubscriptionPaymentMethod.notRequired:
+        return 'بدون رسوم';
     }
   }
 }
 
 enum SubscriptionRequestStatus { pending, approved, rejected }
+
+/// Payment state of a request. Only the server (verified Paymob webhook)
+/// may set [paid]; firestore.rules deny it from clients.
+enum SubscriptionPaymentStatus { pending, paid, failed, waived, notRequired }
+
+extension SubscriptionPaymentStatusX on SubscriptionPaymentStatus {
+  String get wire => switch (this) {
+        SubscriptionPaymentStatus.pending => 'pending',
+        SubscriptionPaymentStatus.paid => 'paid',
+        SubscriptionPaymentStatus.failed => 'failed',
+        SubscriptionPaymentStatus.waived => 'waived',
+        SubscriptionPaymentStatus.notRequired => 'not_required',
+      };
+
+  String get arabicLabel => switch (this) {
+        SubscriptionPaymentStatus.pending => 'بانتظار الدفع',
+        SubscriptionPaymentStatus.paid => 'مدفوع',
+        SubscriptionPaymentStatus.failed => 'فشل الدفع',
+        SubscriptionPaymentStatus.waived => 'مجاني (عرض 2026)',
+        SubscriptionPaymentStatus.notRequired => 'بدون رسوم',
+      };
+
+  static SubscriptionPaymentStatus parse(dynamic v, {SubscriptionPaymentStatus fallback = SubscriptionPaymentStatus.pending}) {
+    switch (v?.toString().trim()) {
+      case 'paid':
+        return SubscriptionPaymentStatus.paid;
+      case 'failed':
+        return SubscriptionPaymentStatus.failed;
+      case 'waived':
+        return SubscriptionPaymentStatus.waived;
+      case 'not_required':
+        return SubscriptionPaymentStatus.notRequired;
+      case 'pending':
+        return SubscriptionPaymentStatus.pending;
+      default:
+        return fallback;
+    }
+  }
+}
+
+/// One delegate inside a (multi-delegate) renewal request.
+class RenewalItem extends Equatable {
+  final String uid;
+  final String fullName;
+  final double fee;
+
+  const RenewalItem({required this.uid, required this.fullName, required this.fee});
+
+  Map<String, dynamic> toMap() => {'uid': uid, 'fullName': fullName, 'fee': fee};
+
+  factory RenewalItem.fromMap(Map<String, dynamic> m) => RenewalItem(
+        uid: (m['uid'] ?? '').toString(),
+        fullName: (m['fullName'] ?? '').toString(),
+        fee: (m['fee'] as num?)?.toDouble() ?? 0.0,
+      );
+
+  @override
+  List<Object?> get props => [uid, fullName, fee];
+}
+
+const String kRequestTypeNewDelegate = 'new_delegate';
+const String kRequestTypeAddOrganization = 'add_organization';
+const String kRequestTypeDeleteDelegate = 'delete_delegate';
+const String kRequestTypeRenewal = 'renewal';
 
 class DelegateSubscriptionRequest extends Equatable {
   final String id;
@@ -71,6 +147,11 @@ class DelegateSubscriptionRequest extends Equatable {
   final String? reviewedBy;
   final DateTime? reviewedAt;
   final DateTime createdAt;
+  final SubscriptionPaymentStatus paymentStatus;
+  final List<String> coveredDelegateUids;
+  final List<RenewalItem> items;
+  final String? paymobTransactionId;
+  final String? paymentError;
 
   const DelegateSubscriptionRequest({
     required this.id,
@@ -106,7 +187,16 @@ class DelegateSubscriptionRequest extends Equatable {
     this.reviewedBy,
     this.reviewedAt,
     required this.createdAt,
+    this.paymentStatus = SubscriptionPaymentStatus.pending,
+    this.coveredDelegateUids = const [],
+    this.items = const [],
+    this.paymobTransactionId,
+    this.paymentError,
   });
+
+  /// Amount this request charges (server re-computes it before Paymob).
+  double get amountDue => fee;
+  String get periodCode => subscriptionCycle;
 
   Map<String, dynamic> toMap() {
     return {
@@ -132,6 +222,8 @@ class DelegateSubscriptionRequest extends Equatable {
         SubscriptionPaymentMethod.instaPay => 'instapay',
         SubscriptionPaymentMethod.branchReceipt => 'branch_receipt',
         SubscriptionPaymentMethod.freePromotion => 'free_promotion',
+        SubscriptionPaymentMethod.paymob => 'paymob',
+        SubscriptionPaymentMethod.notRequired => 'not_required',
       },
       'receiptCode': receiptCode,
       'receiptImageUrl': receiptImageUrl,
@@ -148,6 +240,12 @@ class DelegateSubscriptionRequest extends Equatable {
       'reviewedBy': reviewedBy,
       'reviewedAt': reviewedAt?.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
+      // Subscription fields read by the server (functions/src/subscription_*.ts).
+      'periodCode': subscriptionCycle,
+      'amountDue': fee,
+      'paymentStatus': paymentStatus.wire,
+      if (coveredDelegateUids.isNotEmpty) 'coveredDelegateUids': coveredDelegateUids,
+      if (items.isNotEmpty) 'items': items.map((i) => i.toMap()).toList(),
     };
   }
 
@@ -156,6 +254,8 @@ class DelegateSubscriptionRequest extends Equatable {
       if (val == 'company_deduction') return SubscriptionPaymentMethod.companyDeduction;
       if (val == 'instapay' || val == 'insta_pay') return SubscriptionPaymentMethod.instaPay;
       if (val == 'free_promotion' || val == 'free') return SubscriptionPaymentMethod.freePromotion;
+      if (val == 'paymob') return SubscriptionPaymentMethod.paymob;
+      if (val == 'not_required') return SubscriptionPaymentMethod.notRequired;
       return SubscriptionPaymentMethod.branchReceipt;
     }
 
@@ -212,6 +312,17 @@ class DelegateSubscriptionRequest extends Equatable {
       reviewedBy: map['reviewedBy'],
       reviewedAt: map['reviewedAt'] != null ? parseDate(map['reviewedAt']) : null,
       createdAt: parseDate(map['createdAt']),
+      // Legacy requests have no paymentStatus: they were free (2026) or settled manually.
+      paymentStatus: SubscriptionPaymentStatusX.parse(map['paymentStatus'],
+          fallback: SubscriptionPaymentStatus.waived),
+      coveredDelegateUids: (map['coveredDelegateUids'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      items: (map['items'] as List?)
+              ?.whereType<Map>()
+              .map((e) => RenewalItem.fromMap(Map<String, dynamic>.from(e)))
+              .toList() ??
+          const [],
+      paymobTransactionId: (map['paymob'] is Map) ? (map['paymob']['transactionId'])?.toString() : null,
+      paymentError: map['paymentError'] as String?,
     );
   }
 
@@ -249,6 +360,9 @@ class DelegateSubscriptionRequest extends Equatable {
     String? reviewedBy,
     DateTime? reviewedAt,
     DateTime? createdAt,
+    SubscriptionPaymentStatus? paymentStatus,
+    List<String>? coveredDelegateUids,
+    List<RenewalItem>? items,
   }) {
     return DelegateSubscriptionRequest(
       id: id ?? this.id,
@@ -284,12 +398,24 @@ class DelegateSubscriptionRequest extends Equatable {
       reviewedBy: reviewedBy ?? this.reviewedBy,
       reviewedAt: reviewedAt ?? this.reviewedAt,
       createdAt: createdAt ?? this.createdAt,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      coveredDelegateUids: coveredDelegateUids ?? this.coveredDelegateUids,
+      items: items ?? this.items,
+      paymobTransactionId: paymobTransactionId,
+      paymentError: paymentError,
     );
   }
 
   bool get isDeleteRequest => requestType == 'delete_delegate';
   bool get isAddOrganizationRequest => requestType == 'add_organization';
   bool get isNewDelegateRequest => requestType == 'new_delegate';
+  bool get isRenewalRequest => requestType == kRequestTypeRenewal;
+
+  /// Staff may activate a new delegate only when the subscription is settled.
+  bool get isPaymentSettled =>
+      paymentStatus == SubscriptionPaymentStatus.paid ||
+      paymentStatus == SubscriptionPaymentStatus.waived ||
+      paymentStatus == SubscriptionPaymentStatus.notRequired;
 
   @override
   List<Object?> get props => [
@@ -309,5 +435,8 @@ class DelegateSubscriptionRequest extends Equatable {
         existingDelegateUid,
         currentOrganizationName,
         createdAt,
+        paymentStatus,
+        coveredDelegateUids,
+        items,
       ];
 }

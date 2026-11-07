@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/features/admin/data/repositories/subscription_renewal_repository.dart';
+import 'package:delegate_app/features/admin/domain/services/subscription_payment_gateway.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:delegate_app/features/auth/data/datasources/firebase_phone_otp.dart';
@@ -368,6 +370,13 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
   );
 
   // Delegate Subscription Repository
+  sl.registerLazySingleton<SubscriptionRenewalRepository>(
+    () => SubscriptionRenewalRepository(),
+  );
+  // Replace with Engineering's Paymob implementation when it lands.
+  sl.registerLazySingleton<SubscriptionPaymentGateway>(
+    () => const PaymobNotConnectedGateway(),
+  );
   sl.registerLazySingleton<DelegateSubscriptionRepository>(
     () => DelegateSubscriptionRepositoryImpl(),
   );

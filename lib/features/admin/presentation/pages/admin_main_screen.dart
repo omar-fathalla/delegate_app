@@ -40,6 +40,7 @@ import 'package:delegate_app/features/marketing_search/presentation/pages/market
 import 'package:delegate_app/features/marketing/presentation/pages/branches_marketing_home_screen.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/branch_home_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
+import 'package:delegate_app/features/admin/presentation/pages/subscription_renewal_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_session_control_screen.dart';
 import 'package:delegate_app/features/tracking/presentation/pages/delegate_tracking_screen.dart';
@@ -246,6 +247,13 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               currentDelegate: widget.delegate,
               currentUserRole: widget.delegate.role,
             ),
+          ),
+        );
+        break;
+      case 'delegate_renewal':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SubscriptionRenewalScreen(supervisor: widget.delegate),
           ),
         );
         break;
@@ -715,6 +723,12 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               icon: Icons.how_to_reg_rounded,
               title: 'طلبات اشتراك واعتماد المناديب',
             ),
+            if (widget.delegate.role == UserRole.admin)
+              buildPopupItem(
+                value: 'delegate_renewal',
+                icon: Icons.autorenew_rounded,
+                title: SubscriptionRenewalScreen.title,
+              ),
             if (isSuperAdmin) ...[
               buildPopupItem(
                 value: 'super_admin_hr_system',
