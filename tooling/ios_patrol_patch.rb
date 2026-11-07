@@ -92,28 +92,7 @@ end
 
 runner = project.targets.find { |t| t.name == 'Runner' }
 
-unless runner.shell_script_build_phases.any? { |p| p.name&.include?('Firebase config check') }
-  check = runner.new_shell_script_build_phase('Tashil Firebase config check')
-  check.shell_script = "/bin/sh \"${SRCROOT}/scripts/firebase_config.sh\" check\n"
-  runner.build_phases.insert(1, check)
-end
-
-unless runner.shell_script_build_phases.any? { |p| p.name&.include?('Firebase config install') }
-  install = runner.new_shell_script_build_phase('Tashil Firebase config install')
-  install.shell_script = "/bin/sh \"${SRCROOT}/scripts/firebase_config.sh\" install\n"
-  idx = runner.build_phases.index { |p| p.is_a?(Xcodeproj::Project::Object::PBXResourcesBuildPhase) }
-  runner.build_phases.insert(idx + 1, install) if idx
-end
-
-unless runner.shell_script_build_phases.any? { |p| p.name&.include?('dev upload guard') }
-  guard = runner.new_shell_script_build_phase('Tashil dev upload guard')
-  guard.shell_script = "/bin/sh \"${SRCROOT}/scripts/dev_upload_guard.sh\"\n"
-  idx = runner.build_phases.index do |p|
-    p.is_a?(Xcodeproj::Project::Object::PBXShellScriptBuildPhase) &&
-      p.name&.include?('Firebase config install')
-  end
-  runner.build_phases.insert(idx + 1, guard) if idx
-end
+# Runner script phases (Firebase config / dev upload guard) come from #220 — do not duplicate on stack.
 
 package_ref = project.root_object.package_references&.find { |r| r.path&.include?('FlutterGeneratedPluginSwiftPackage') }
 unless package_ref
