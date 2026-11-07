@@ -104,4 +104,12 @@ post_install do |installer|
 
   require_relative 'patrol_runner_ui_tests_post_install'
   PatrolRunnerUiTestsPostInstall.apply!(installer)
+
+  require_relative 'patrol_dev_simulator_arch'
+  PatrolDevSimulatorArch.apply_to_pods_project!(installer.pods_project)
+  installer.aggregate_targets.map(&:user_project).uniq.compact.each do |user_project|
+    PatrolDevSimulatorArch.apply_to_user_project!(user_project)
+    user_project.save
+  end
+  installer.pods_project.save
 end

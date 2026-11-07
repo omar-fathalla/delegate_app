@@ -3,6 +3,8 @@
 
 require 'xcodeproj'
 
+require_relative '../ios/patrol_dev_simulator_arch'
+
 ROOT = File.expand_path('..', __dir__)
 PROJECT = File.join(ROOT, 'ios', 'Runner.xcodeproj')
 FEAT = File.join(ROOT, 'tmp_feat_ios', 'Runner.xcodeproj')
@@ -35,13 +37,10 @@ def pods_runner_ui_tests_xcconfig(project, name)
   project.files.find { |f| f.name == "Pods-RunnerUITests.#{slug}.xcconfig" }
 end
 
-def apply_runner_ui_tests_debug_dev_arch!(cfg)
-  return unless cfg.name == 'Debug-dev'
+def apply_dev_simulator_arch!(cfg)
+  return unless PatrolDevSimulatorArch.dev_configuration?(cfg.name)
 
-  cfg.build_settings['ARCHS[sdk=iphonesimulator*]'] = 'arm64'
-  cfg.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = '$(inherited) arm64e i386 x86_64'
-  cfg.build_settings['ONLY_ACTIVE_ARCH[sdk=iphonesimulator*]'] = 'YES'
-  cfg.build_settings['SDKROOT[sdk=iphonesimulator*]'] = 'iphonesimulator'
+  PatrolDevSimulatorArch.apply_build_settings!(cfg.build_settings)
 end
 
 def append_dev_configs(project, feat_list, dest_list, runner: false, ui: false, unit: false)
@@ -67,7 +66,7 @@ def append_dev_configs(project, feat_list, dest_list, runner: false, ui: false, 
       cfg.build_settings['CODE_SIGN_STYLE'] = 'Automatic'
       cfg.build_settings.delete('BUNDLE_LOADER')
       cfg.build_settings.delete('TEST_HOST')
-      apply_runner_ui_tests_debug_dev_arch!(cfg)
+      apply_dev_simulator_arch!(cfg)
     end
     cfg.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.tashil.delegate.dev.RunnerTests' if unit
     dest_list.build_configurations << cfg
@@ -91,6 +90,9 @@ feat.targets.each do |ft|
 end
 
 runner = project.targets.find { |t| t.name == 'Runner' }
+runner&.build_configurations&.each { |cfg| apply_dev_simulator_arch!(cfg) }
+
+project.build_configuration_list.build_configurations.each { |cfg| apply_dev_simulator_arch!(cfg) }
 
 # Runner script phases (Firebase config / dev upload guard) come from #220 — do not duplicate on stack.
 
@@ -177,7 +179,7 @@ if ui_target
       pods_ref = pods_runner_ui_tests_xcconfig(project, cfg.name)
       cfg.base_configuration_reference = pods_ref if pods_ref
     end
-    apply_runner_ui_tests_debug_dev_arch!(cfg)
+    apply_dev_simulator_arch!(cfg)
   end
 
   unless ui_target.shell_script_build_phases.any? { |ph| ph.name == 'Patrol framework build order' }

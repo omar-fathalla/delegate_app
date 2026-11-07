@@ -1,4 +1,6 @@
 #include? "../Pods/Target Support Files/Pods-Runner/Pods-Runner.profile-dev.xcconfig"
 #include "Generated.xcconfig"
 #include "Env-dev.xcconfig"
+#include "Dev-simulator-arch.xcconfig"
+FLUTTER_BUILD_MODE = profile
 SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) TASHIL_DEV_FLAVOR

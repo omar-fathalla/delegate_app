@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 # RunnerUITests: lean patrol pod only + reliable @import patrol (see Podfile).
+require_relative 'patrol_dev_simulator_arch'
+
 module PatrolRunnerUiTestsPostInstall
   PATROL_HEADERS = [
     '$(inherited)',
@@ -40,6 +42,7 @@ module PatrolRunnerUiTestsPostInstall
         config.build_settings['OTHER_CFLAGS'] = other_cflags
         config.build_settings['HEADER_SEARCH_PATHS'] = PATROL_HEADERS
         config.build_settings['SWIFT_INCLUDE_PATHS'] = PATROL_SWIFT_INCLUDE_PATHS
+        PatrolDevSimulatorArch.apply_build_settings!(config.build_settings) if PatrolDevSimulatorArch.dev_configuration?(config.name)
       end
 
       ensure_patrol_build_order_script!(ui_target)
