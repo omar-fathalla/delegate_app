@@ -48,7 +48,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
       - name: Build APK (prod, unsigned without key.properties)
-        run: flutter build apk --release --flavor prod
+        run: flutter build apk --release --flavor prod --dart-define=ENV=prod
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -74,12 +74,12 @@ jobs:
         run: |
           cd ios
           pod install
-      - name: Build iOS prod (simulator, no codesign)
-        run: flutter build ios --simulator --release --no-codesign --flavor prod
+      - name: Build iOS prod (device tree, no codesign)
+        run: flutter build ios --release --no-codesign --flavor prod --dart-define=ENV=prod
       - name: Upload iOS build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-prod-release-sim-${{ github.sha }}
-          path: build/ios/iphonesimulator/Runner.app
+          name: ios-prod-release-${{ github.sha }}
+          path: build/ios/iphoneos/Runner.app
           if-no-files-found: error
           retention-days: 14
