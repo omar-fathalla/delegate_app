@@ -35,6 +35,27 @@ cd "$REPO_ROOT"
 SRC_GENERATED="$IOS_ROOT/Runner/GeneratedPluginRegistrant.m"
 GENERATED_XCCONFIG="$IOS_ROOT/Flutter/Generated.xcconfig"
 
+# Simulator device id: Flutter needs a concrete `-d` so it picks the right slice (arm64 vs x86_64)
+# when building `Flutter.framework`; generic simulator + EXCLUDED_ARCHS can leave a stale thin slice
+# and `debug_unpack_ios` fails ("does not contain architectures arm64 x86_64").
+resolve_simulator_device_id() {
+  if [[ -n "${TASHIL_SWITCHING_SIM_UDID:-}" ]]; then
+    printf '%s' "$TASHIL_SWITCHING_SIM_UDID"
+    return 0
+  fi
+  # First booted simulator (matches `xcrun simctl list devices` "Booted" row).
+  local line udid
+  line="$(xcrun simctl list devices available 2>/dev/null | grep '(Booted)' | head -n1 || true)"
+  if [[ -n "$line" ]]; then
+    udid="$(printf '%s' "$line" | sed -n 's/.*(\([^)]*\)).*/\1/p')"
+    if [[ -n "$udid" ]]; then
+      printf '%s' "$udid"
+      return 0
+    fi
+  fi
+  return 1
+}
+
 resolve_flutter_bin() {
   if command -v flutter >/dev/null 2>&1; then
     command -v flutter
@@ -117,24 +138,25 @@ derived_registrant_path_for_configuration() {
   printf '%s' "${ddir}/tashil_registrant/GeneratedPluginRegistrant.m"
 }
 
+SIM_DEVICE_ID="$(resolve_simulator_device_id)" || {
+  echo "test_derived_registrant_switching: no booted iOS Simulator (boot one or set TASHIL_SWITCHING_SIM_UDID)" >&2
+  exit 1
+}
+echo "test_derived_registrant_switching: simulator device: $SIM_DEVICE_ID"
+
 # One flavor: config-only + pod install + full simulator debug build (SwiftPM + Flutter OK).
 flutter_build_sim_flavor() {
   local flavor="$1"
   local env="$2"
   local flutter_bin="$3"
-  local -a excl
-  case "$(uname -m)" in
-    arm64) excl=(-- "EXCLUDED_ARCHS=x86_64") ;;
-    *) excl=(-- "EXCLUDED_ARCHS=arm64") ;;
-  esac
   echo "test_derived_registrant_switching: flutter build ios --config-only ($flavor)"
   (cd "$REPO_ROOT" && "$flutter_bin" build ios --config-only --no-codesign --simulator \
-    --flavor "$flavor" --dart-define="ENV=$env")
+    -d "$SIM_DEVICE_ID" --flavor "$flavor" --dart-define="ENV=$env")
   echo "test_derived_registrant_switching: pod install (after $flavor config-only)"
   (cd "$IOS_ROOT" && pod install)
   echo "test_derived_registrant_switching: flutter build ios --debug --simulator ($flavor)"
   (cd "$REPO_ROOT" && "$flutter_bin" build ios --debug --no-codesign --simulator \
-    --flavor "$flavor" --dart-define="ENV=$env" "${excl[@]}")
+    -d "$SIM_DEVICE_ID" --flavor "$flavor" --dart-define="ENV=$env")
 }
 
 FLUTTER_BIN="$(resolve_flutter_bin)" || {
@@ -147,7 +169,7 @@ echo "test_derived_registrant_switching: using flutter: $FLUTTER_BIN"
 
 echo "test_derived_registrant_switching: initial config-only (dev) + pod for workspace"
 (cd "$REPO_ROOT" && "$FLUTTER_BIN" build ios --config-only --no-codesign --simulator \
-  --flavor dev --dart-define=ENV=dev)
+  -d "$SIM_DEVICE_ID" --flavor dev --dart-define=ENV=dev)
 (cd "$IOS_ROOT" && pod install)
 
 [[ -f "$SRC_GENERATED" ]] || {
