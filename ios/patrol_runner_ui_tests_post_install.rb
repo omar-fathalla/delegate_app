@@ -13,16 +13,19 @@ module PatrolRunnerUiTestsPostInstall
 
   module_function
 
+  # Plugin source map uses umbrella "patrol.h" (on HEADER_SEARCH_PATHS). CocoaPods
+  # Target Support Files/patrol/patrol.modulemap references patrol-umbrella.h, which
+  # is not visible during RunnerUITests ScanDependencies → @import patrol fails.
+  PATROL_SOURCE_MODULEMAP = '${PODS_ROOT}/../.symlinks/plugins/patrol/darwin/patrol/Sources/patrol/include/module.modulemap'.freeze
+
   def patrol_module_map_flag(pods_root)
-    generated = File.join(pods_root, 'Target Support Files/patrol/patrol.modulemap')
-    if File.exist?(generated)
-      return %(-fmodule-map-file="${PODS_ROOT}/Target Support Files/patrol/patrol.modulemap")
-    end
-
     symlink = File.expand_path('../.symlinks/plugins/patrol/darwin/patrol/Sources/patrol/include/module.modulemap', pods_root)
-    return nil unless File.exist?(symlink)
+    return %(-fmodule-map-file="#{PATROL_SOURCE_MODULEMAP}") if File.exist?(symlink)
 
-    %(-fmodule-map-file="${PODS_ROOT}/../.symlinks/plugins/patrol/darwin/patrol/Sources/patrol/include/module.modulemap")
+    generated = File.join(pods_root, 'Target Support Files/patrol/patrol.modulemap')
+    return %(-fmodule-map-file="${PODS_ROOT}/Target Support Files/patrol/patrol.modulemap") if File.exist?(generated)
+
+    nil
   end
 
   def apply!(installer)
