@@ -13,54 +13,34 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IOS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+STRIP_SCRIPT="$IOS_ROOT/scripts/strip_dev_crashlytics_plugin_registration.sh"
 
 TMP_BASE="$(mktemp -d)"
-cleanup() {
-  rm -rf "$TMP_BASE"
-  if [[ -L "$IOS_ROOT/Runner/GeneratedPluginRegistrant.m" ]]; then
-    rm -f "$IOS_ROOT/Runner/GeneratedPluginRegistrant.m"
-  fi
-}
-trap cleanup EXIT
+trap 'rm -rf "$TMP_BASE"' EXIT
 
-# Minimal generated registrant: include Crashlytics registration so prod path validates.
-RUNNER_TMP="$TMP_BASE/Runner"
-mkdir -p "$RUNNER_TMP"
-SRC_FIXTURE="$RUNNER_TMP/GeneratedPluginRegistrant.m"
-cat >"$SRC_FIXTURE" <<'OBJC'
-// Fixture for path isolation test (not a full Flutter output).
-@import Flutter;
-@import UIKit;
+# Minimal fake `ios/` tree — never touches the repo’s Runner/ (Flutter may have generated .m).
+FAKE_IOS="$TMP_BASE/fake_ios"
+mkdir -p "$FAKE_IOS/Runner"
+cat >"$FAKE_IOS/Runner/GeneratedPluginRegistrant.m" <<'OBJC'
+// Fixture for path isolation test (not full Flutter output).
 #import "GeneratedPluginRegistrant.h"
 
 @implementation GeneratedPluginRegistrant
 
-+ (void)registerWithRegistry:(NSObject<FlutterPluginRegistry>*)registry {
++ (void)registerWithRegistry:(id)registry {
 #if canImport(firebase_crashlytics)
   [FLTFirebaseCrashlyticsPlugin registerWithRegistrar:[registry registrarForPlugin:@"FLTFirebaseCrashlyticsPlugin"]];
 #endif
-  // Other plugins omitted
 }
 
 @end
 OBJC
 
-if [[ -e "$IOS_ROOT/Runner/GeneratedPluginRegistrant.m" && ! -L "$IOS_ROOT/Runner/GeneratedPluginRegistrant.m" ]]; then
-  echo "test_derived_registrant_path_isolation: REFUSE (real GeneratedPluginRegistrant.m present; use flutter first or a temp Runner)" >&2
-  exit 1
-fi
-mkdir -p "$IOS_ROOT/Runner"
-ln -sf "$SRC_FIXTURE" "$IOS_ROOT/Runner/GeneratedPluginRegistrant.m"
-
 run_strip() {
   local cfg="$1"
   local ddir="$2"
   mkdir -p "$ddir"
-  (cd "$IOS_ROOT" && \
-    SRCROOT="$IOS_ROOT" \
-    DERIVED_FILE_DIR="$ddir" \
-    CONFIGURATION="$cfg" \
-    /bin/sh "$IOS_ROOT/scripts/strip_dev_crashlytics_plugin_registration.sh")
+  SRCROOT="$FAKE_IOS" DERIVED_FILE_DIR="$ddir" CONFIGURATION="$cfg" /bin/sh "$STRIP_SCRIPT"
 }
 
 DD_DEV="$TMP_BASE/dev_dfd"
