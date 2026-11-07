@@ -21,6 +21,8 @@ describe("delegate_requests: payment is server-only", () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
       await db.doc("users/sup").set({role: "supervisor", organizationUID: "o1", companyUID: "c1"});
+      await db.doc("users/hr1").set({role: "hr", organizationUID: "o1", companyUID: "c1"});
+      await db.doc("users/admin1").set({role: "admin", organizationUID: "o1", companyUID: "c1"});
       await db.doc("users/sa").set({role: "super-admin"});
       await db.doc("users/tech").set({role: "technical_support"});
       await db.doc("delegate_requests/pending").set({
@@ -37,9 +39,10 @@ describe("delegate_requests: payment is server-only", () => {
   });
   const as = (uid) => env.authenticatedContext(uid).firestore();
 
-  test("supervisor creates a pending renewal (app payload)", async () => {
-    await assertSucceeds(as("sup").doc("delegate_requests/new1").set({
+  test("HR creates a pending renewal (Mohamed policy: HR or company admin)", async () => {
+    await assertSucceeds(as("hr1").doc("delegate_requests/new1").set({
       requestType: "renewal", status: "pending", paymentStatus: "pending", paymentMethod: "paymob",
+      supervisorUid: "hr1",
       coveredDelegateUids: ["a", "b"], items: [{uid: "a", fee: 416.67}, {uid: "b", fee: 416.67}],
       amountDue: 833.34, periodCode: "2027_H1", companyUID: "c1",
     }));
@@ -67,8 +70,10 @@ describe("delegate_requests: payment is server-only", () => {
     await assertSucceeds(as("sa").doc("delegate_requests/legacy2").set({requestType: "delete_delegate", status: "pending"}));
   });
 
-  test("a delegate's own (web) self-request without payment fields still works", async () => {
-    await assertSucceeds(as("webuid").doc("delegate_requests/webuid").set({delegateUid: "webuid", status: "pending"}));
-    await assertFails(as("webuid").doc("delegate_requests/webuid").set({delegateUid: "webuid", paymentStatus: "paid"}));
+  test("delegate self cannot mark paid; staff legacy create without subscription fields still works", async () => {
+    await assertFails(as("webuid").doc("delegate_requests/webuid").set({delegateUid: "webuid", status: "pending"}));
+    await assertSucceeds(as("admin1").doc("delegate_requests/legacy3").set({
+      requestType: "new_delegate", status: "pending", supervisorUid: "admin1", companyUID: "c1",
+    }));
   });
 });
