@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
 
@@ -21,54 +22,38 @@ Finder devLoginScreenSemanticsFinder() {
   return find.bySemanticsIdentifier('tashil_login_submit');
 }
 
-/// Phone field leading icon — present on mobile [LoginScreen], not on splash stall UI.
-Finder devLoginPhoneFieldIconFinder() {
-  return find.byIcon(Icons.phone_android_rounded);
-}
-
-bool _loginScreenHitTestable(WidgetTester tester) {
-  for (final finder in [
-    devLoginScreenSemanticsFinder(),
-    devLoginPhoneFieldIconFinder(),
-  ]) {
-    final elements = finder.evaluate();
-    for (final element in elements) {
-      final render = element.renderObject;
-      if (render == null || !render.attached) continue;
-      if (render is! RenderBox || !render.hasSize) continue;
-      if (render.size.isEmpty) continue;
-      return true;
-    }
+bool _loginSubmitHitTestable(WidgetTester tester) {
+  final elements = devLoginScreenSemanticsFinder().evaluate();
+  for (final element in elements) {
+    final render = element.renderObject;
+    if (render == null || !render.attached) continue;
+    if (render is! RenderBox || !render.hasSize) continue;
+    if (render.size.isEmpty) continue;
+    return true;
   }
   return false;
 }
 
 /// Waits for splash / auto-login to finish, taps [splash_sign_in] when the stall UI
-/// appears, then asserts the dev delegate login screen is visible.
+/// appears, then asserts the dev delegate login screen is visible via [tashil_login_submit].
 Future<void> waitForDevLoginScreenAfterSplash(PatrolIntegrationTester $) async {
   final splashSignIn = find.byKey(const Key('splash_sign_in'));
   final deadline = DateTime.now().add(smokeReachLoginDeadline);
 
   while (DateTime.now().isBefore(deadline)) {
     await $.tester.pump(smokeSplashPollInterval);
-    if (_loginScreenHitTestable($.tester)) return;
+    if (_loginSubmitHitTestable($.tester)) return;
 
     if (splashSignIn.evaluate().isNotEmpty) {
       await $.tester.tap(splashSignIn);
       for (var i = 0; i < smokePostSignInPumpIterations; i++) {
         await $.tester.pump(smokePostSignInPumpStep);
-        if (_loginScreenHitTestable($.tester)) return;
+        if (_loginSubmitHitTestable($.tester)) return;
       }
     }
   }
 
-  final semantics = $(devLoginScreenSemanticsFinder());
-  if (semantics.exists) {
-    await semantics.waitUntilVisible(timeout: smokeLoginVisibleTimeout);
-    return;
-  }
-
-  await $(devLoginPhoneFieldIconFinder()).waitUntilVisible(
+  await $(devLoginScreenSemanticsFinder()).waitUntilVisible(
     timeout: smokeLoginVisibleTimeout,
   );
 }

@@ -80,7 +80,8 @@ android {
             manifestPlaceholders["GOOGLE_MAPS_ANDROID_API_KEY"] =
                 loadDevMapsAndroidKey().orEmpty()
             testInstrumentationRunner = "pl.leancode.patrol.PatrolJUnitRunner"
-            testInstrumentationRunnerArguments["clearPackageData"] = "true"
+            // Patrol dev smoke: keep app data between runs (clearPackageData breaks re-login state).
+            testInstrumentationRunnerArguments["clearPackageData"] = "false"
         }
     }
 

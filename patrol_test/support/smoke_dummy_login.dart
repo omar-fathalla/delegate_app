@@ -72,11 +72,8 @@ Future<void> submitDevDummyLogin(
   await $.tester.pump(smokePostLoginPumpStep);
 
   final submit = devLoginSubmitSemanticsFinder();
-  if ($.tester.any(submit)) {
-    await $.tester.tap(submit);
-  } else {
-    await $.tester.testTextInput.receiveAction(TextInputAction.done);
-  }
+  expect($.tester.any(submit), isTrue, reason: 'tashil_login_submit must be visible');
+  await $.tester.tap(submit);
   await $.tester.pump(smokePostLoginPumpStep);
 
   await dismissIosSavePasswordIfVisible($);
