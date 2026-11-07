@@ -713,12 +713,15 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
     try {
       final now = DateTime.now();
 
-      // 1. Update Request status
-      await _firestore.collection('delegate_requests').doc(request.id).update({
+      // 1. Request status. For new_delegate / add_organization the approval is
+      // written in the same WriteBatch as the delegate activation (r4 F2):
+      // either both land or the request stays pending.
+      final requestRef = _firestore.collection('delegate_requests').doc(request.id);
+      final requestApproval = <String, dynamic>{
         'status': 'approved',
         'reviewedBy': reviewerName,
         'reviewedAt': now.toIso8601String(),
-      });
+      };
 
       final targetDelegateUid = (request.existingDelegateUid != null &&
               request.existingDelegateUid!.trim().isNotEmpty)
@@ -727,6 +730,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
 
       // Special handling for delete_delegate request
       if (request.requestType == 'delete_delegate') {
+        await requestRef.update(requestApproval);
         // A. Delete from organizations subcollections
         if (request.companyUID.isNotEmpty) {
           final orgsSnap = await _firestore.collection('organizations').get();
@@ -878,6 +882,131 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
+      // 2c. Provision delegate record to active in company branch (target organization)
+      final allKnownOrgs = <String>{
+        request.organizationName.trim(),
+        if (request.currentOrganizationName != null &&
+            request.currentOrganizationName!.trim().isNotEmpty)
+          request.currentOrganizationName!.trim(),
+      }.where((s) => s.isNotEmpty).toList();
+
+      final originOrgName = (request.currentOrganizationName != null &&
+              request.currentOrganizationName!.trim().isNotEmpty)
+          ? request.currentOrganizationName!.trim()
+          : request.organizationName.trim();
+
+      final smartPosition = formatSmartPosition(
+        allOrgs: allKnownOrgs,
+        currentOrgName: request.organizationName,
+        originOrgName: originOrgName,
+      );
+
+      final isExternal = originOrgName.toLowerCase() != request.organizationName.toLowerCase();
+
+      final targetDelegateData = Map<String, dynamic>.from(delegateData);
+      targetDelegateData['position'] = smartPosition;
+      targetDelegateData['originOrganizationName'] = originOrgName;
+      targetDelegateData['isExternal'] = isExternal;
+      targetDelegateData['registeredVia'] = 'mobile_app';
+      if (allKnownOrgs.length > 1) {
+        targetDelegateData['allOrganizationNames'] = allKnownOrgs;
+      }
+
+      targetDelegateData['approvedRequestId'] = request.id;
+
+      final targetRef = _firestore
+          .collection('organizations')
+          .doc(request.organizationUID)
+          .collection('companies')
+          .doc(request.companyUID)
+          .collection('delegates')
+          .doc(targetDelegateUid);
+
+      // Supervisor's own organization (2d for add_organization, 2e copy for
+      // new_delegate). Read before the batch.
+      String? supOrg;
+      String supOrgName = '';
+      try {
+        final supDoc = await _firestore.collection('users').doc(request.supervisorUid).get();
+        supOrg = supDoc.data()?['organizationUID'] as String?;
+        supOrgName = supDoc.data()?['organizationName'] as String? ?? '';
+      } catch (_) {}
+      final hasSupOrg = supOrg != null && supOrg.isNotEmpty && supOrg != request.organizationUID;
+
+      Map<String, dynamic>? supDelegateData;
+      DocumentReference<Map<String, dynamic>>? supRef;
+      if (request.requestType != 'add_organization' && hasSupOrg) {
+        supDelegateData = Map<String, dynamic>.from(delegateData);
+        supDelegateData['organizationUID'] = supOrg;
+        if (supOrgName.isNotEmpty) {
+          supDelegateData['organizationName'] = supOrgName;
+        }
+        supDelegateData['position'] = formatSmartPosition(
+          allOrgs: allKnownOrgs,
+          currentOrgName: supOrgName,
+          originOrgName: originOrgName,
+        );
+        supDelegateData['originOrganizationName'] = originOrgName;
+        supDelegateData['isExternal'] = originOrgName.toLowerCase() != supOrgName.toLowerCase();
+        supDelegateData['registeredVia'] = 'mobile_app';
+        if (allKnownOrgs.length > 1) {
+          supDelegateData['allOrganizationNames'] = allKnownOrgs;
+        }
+        supDelegateData['approvedRequestId'] = request.id;
+        supRef = _firestore
+            .collection('organizations')
+            .doc(supOrg)
+            .collection('companies')
+            .doc(request.companyUID)
+            .collection('delegates')
+            .doc(targetDelegateUid);
+      }
+
+      // 2c/2e. One WriteBatch (same for super-admin and technical support):
+      // request -> approved, plus each delegate doc either created in full or,
+      // if it already exists as 'pending', activated with a status-only write
+      // (status + pending->approved document flips). Profile fields follow
+      // after the commit as a plain merge.
+      final batch = _firestore.batch();
+      batch.update(requestRef, requestApproval);
+      final followUps = <DocumentReference<Map<String, dynamic>>, Map<String, dynamic>>{};
+      Future<void> addActivation(
+        DocumentReference<Map<String, dynamic>> ref,
+        Map<String, dynamic> fullData,
+      ) async {
+        final snap = await ref.get();
+        if (!snap.exists) {
+          batch.set(ref, fullData);
+          return;
+        }
+        final existing = snap.data() ?? const <String, dynamic>{};
+        if (existing['status'] == 'pending') {
+          batch.update(ref, buildStatusOnlyActivation(
+            existingDocuments: existing['documents'],
+            reviewerName: reviewerName,
+            reviewedAtIso: now.toIso8601String(),
+            approvedRequestId: request.id,
+          ));
+          followUps[ref] = profileMergeFields(fullData);
+        } else {
+          batch.set(ref, fullData, SetOptions(merge: true));
+        }
+      }
+
+      await addActivation(targetRef, targetDelegateData);
+      if (supRef != null && supDelegateData != null) {
+        await addActivation(supRef, supDelegateData);
+      }
+      try {
+        await batch.commit();
+      } on FirebaseException catch (e) {
+        // Atomic: nothing was written, the request is still pending.
+        if (e.code == 'permission-denied') {
+          return const Left(ServerFailure(approvalBatchDeniedMessage));
+        }
+        rethrow;
+      }
+
       // 2a. Ensure the company exists under the target organization
       try {
         await _firestore
@@ -921,121 +1050,70 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         // Log non-blocking auxiliary error
       }
 
-      // 2c. Provision delegate record to active in company branch (target organization)
-      final allKnownOrgs = <String>{
-        request.organizationName.trim(),
-        if (request.currentOrganizationName != null &&
-            request.currentOrganizationName!.trim().isNotEmpty)
-          request.currentOrganizationName!.trim(),
-      }.where((s) => s.isNotEmpty).toList();
-
-      final originOrgName = (request.currentOrganizationName != null &&
-              request.currentOrganizationName!.trim().isNotEmpty)
-          ? request.currentOrganizationName!.trim()
-          : request.organizationName.trim();
-
-      final smartPosition = formatSmartPosition(
-        allOrgs: allKnownOrgs,
-        currentOrgName: request.organizationName,
-        originOrgName: originOrgName,
-      );
-
-      final isExternal = originOrgName.toLowerCase() != request.organizationName.toLowerCase();
-
-      final targetDelegateData = Map<String, dynamic>.from(delegateData);
-      targetDelegateData['position'] = smartPosition;
-      targetDelegateData['originOrganizationName'] = originOrgName;
-      targetDelegateData['isExternal'] = isExternal;
-      targetDelegateData['registeredVia'] = 'mobile_app';
-      if (allKnownOrgs.length > 1) {
-        targetDelegateData['allOrganizationNames'] = allKnownOrgs;
-      }
-
-      await _firestore
-          .collection('organizations')
-          .doc(request.organizationUID)
-          .collection('companies')
-          .doc(request.companyUID)
-          .collection('delegates')
-          .doc(targetDelegateUid)
-          .set(targetDelegateData, SetOptions(merge: true));
-
       // 2d. If add_organization: ensure original organization document maintains its own organizationUID/Name and updates allOrganizationNames
-      if (request.requestType == 'add_organization') {
+      if (request.requestType == 'add_organization' && hasSupOrg) {
         try {
-          final supDoc = await _firestore.collection('users').doc(request.supervisorUid).get();
-          final supOrg = supDoc.data()?['organizationUID'] as String?;
-          final supOrgName = supDoc.data()?['organizationName'] as String? ?? '';
-          if (supOrg != null && supOrg.isNotEmpty && supOrg != request.organizationUID) {
-            final origSmartPos = formatSmartPosition(
-              allOrgs: allKnownOrgs,
-              currentOrgName: supOrgName.isNotEmpty ? supOrgName : request.currentOrganizationName,
-              originOrgName: originOrgName,
-            );
-            await _firestore
-                .collection('organizations')
-                .doc(supOrg)
-                .collection('companies')
-                .doc(request.companyUID)
-                .collection('delegates')
-                .doc(targetDelegateUid)
-                .update({
-              'position': origSmartPos,
-              'allOrganizationNames': FieldValue.arrayUnion([request.organizationName]),
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-          }
-        } catch (_) {}
-      } else {
-        // 2e. For new_delegate requests: if supervisor belongs to a different primary organization, provision in supervisor's branch using supervisor's own organizationUID
-        try {
-          final supDoc = await _firestore.collection('users').doc(request.supervisorUid).get();
-          final supOrg = supDoc.data()?['organizationUID'] as String?;
-          final supOrgName = supDoc.data()?['organizationName'] as String? ?? '';
-          if (supOrg != null && supOrg.isNotEmpty && supOrg != request.organizationUID) {
-            final supDelegateData = Map<String, dynamic>.from(delegateData);
-            supDelegateData['organizationUID'] = supOrg;
-            if (supOrgName.isNotEmpty) {
-              supDelegateData['organizationName'] = supOrgName;
-            }
-            final supSmartPos = formatSmartPosition(
-              allOrgs: allKnownOrgs,
-              currentOrgName: supOrgName,
-              originOrgName: originOrgName,
-            );
-            supDelegateData['position'] = supSmartPos;
-            supDelegateData['originOrganizationName'] = originOrgName;
-            supDelegateData['isExternal'] = originOrgName.toLowerCase() != supOrgName.toLowerCase();
-            supDelegateData['registeredVia'] = 'mobile_app';
-            if (allKnownOrgs.length > 1) {
-              supDelegateData['allOrganizationNames'] = allKnownOrgs;
-            }
-            await _firestore
-                .collection('organizations')
-                .doc(supOrg)
-                .collection('companies')
-                .doc(request.companyUID)
-                .collection('delegates')
-                .doc(targetDelegateUid)
-                .set(supDelegateData, SetOptions(merge: true));
-          }
+          final origSmartPos = formatSmartPosition(
+            allOrgs: allKnownOrgs,
+            currentOrgName: supOrgName.isNotEmpty ? supOrgName : request.currentOrganizationName,
+            originOrgName: originOrgName,
+          );
+          await _firestore
+              .collection('organizations')
+              .doc(supOrg)
+              .collection('companies')
+              .doc(request.companyUID)
+              .collection('delegates')
+              .doc(targetDelegateUid)
+              .update({
+            'position': origSmartPos,
+            'allOrganizationNames': FieldValue.arrayUnion([request.organizationName]),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
         } catch (_) {}
       }
 
-      // 3. Also ensure user record exists for mobile login with all organization names
-      await _firestore.collection('users').doc(targetDelegateUid).set({
-        'uid': targetDelegateUid,
-        if (delegatePublicId.isNotEmpty) 'delegatePublicId': delegatePublicId,
-        'fullName': request.fullName,
-        'phoneNumber': request.phoneNumber,
-        'phone': request.phoneNumber,
-        'role': 'delegate',
-        'organizationUID': request.organizationUID,
-        'companyUID': request.companyUID,
-        'organizationNames': FieldValue.arrayUnion(allKnownOrgs),
-        'status': 'active',
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      // 3. Profile merges (status-only activations) and the users/{uid}
+      // record the delegate logs in with. These run after the batch, so a
+      // failure is surfaced with a retry instead of being swallowed (the
+      // request is already approved, so approving again is not possible).
+      Future<void> criticalFollowUps() async {
+        for (final e in followUps.entries) {
+          await e.key.set(e.value, SetOptions(merge: true));
+        }
+        await _firestore.collection('users').doc(targetDelegateUid).set({
+          'uid': targetDelegateUid,
+          if (delegatePublicId.isNotEmpty) 'delegatePublicId': delegatePublicId,
+          'fullName': request.fullName,
+          'phoneNumber': request.phoneNumber,
+          'phone': request.phoneNumber,
+          'role': 'delegate',
+          'organizationUID': request.organizationUID,
+          'companyUID': request.companyUID,
+          'organizationNames': FieldValue.arrayUnion(allKnownOrgs),
+          'status': 'active',
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
+      Failure? followUpFailure;
+      try {
+        await criticalFollowUps();
+      } catch (e) {
+        debugPrint('approveSubscriptionRequest follow-up failed: $e');
+        followUpFailure = ApprovalFollowUpFailure(
+          'تم اعتماد الطلب وتفعيل المندوب، لكن تعذّر إكمال بيانات حسابه. اضغط "إعادة المحاولة".',
+          retry: () async {
+            try {
+              await criticalFollowUps();
+              return const Right(null);
+            } catch (e) {
+              debugPrint('approveSubscriptionRequest follow-up retry failed: $e');
+              return const Left(ServerFailure('تعذّر إكمال بيانات حساب المندوب، حاول مرة أخرى.'));
+            }
+          },
+        );
+      }
 
       // 3a. Sync delegatePublicId to any existing delegate records across other organizations
       if (delegatePublicId.isNotEmpty) {
@@ -1103,6 +1181,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         // Log non-blocking auxiliary error
       }
 
+      if (followUpFailure != null) return Left(followUpFailure);
       return const Right(null);
     } catch (e) {
       return Left(ServerFailure('فشل اعتماد طلب المندوب: $e'));
@@ -1357,3 +1436,58 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
     }
   }
 }
+
+/// Shown when the approval batch is denied. Nothing was written. Known causes:
+/// an old app build approving in separate writes, a request that is no longer
+/// pending, or (technical support) more than 4 pending documents to approve
+/// on one delegate doc, or 4 with extra entries on each of two docs, exceeds Firestore's
+/// 1000-expression rules limit (see techFlipOk in firestore.rules).
+const approvalBatchDeniedMessage =
+    'تعذّر اعتماد الطلب ولم يُحفظ أي تغيير. تأكد أن الطلب ما زال قيد المراجعة. '
+    'إذا كان على المندوب مستندات كثيرة قيد المراجعة فيعتمده السوبر أدمن.';
+
+/// r4 F4: status-only activation payload for an existing 'pending' delegate
+/// doc. Same list size and order; each 'pending' entry flips to 'approved'
+/// with only documentStatus / reviewedBy / reviewedAt changed.
+@visibleForTesting
+Map<String, dynamic> buildStatusOnlyActivation({
+  required dynamic existingDocuments,
+  required String reviewerName,
+  required String reviewedAtIso,
+  required String approvedRequestId,
+}) {
+  final out = <String, dynamic>{
+    'status': 'active',
+    'reviewedBy': reviewerName,
+    'reviewedAt': reviewedAtIso,
+    'approvedRequestId': approvedRequestId,
+    'updatedAt': FieldValue.serverTimestamp(),
+  };
+  if (existingDocuments is List) {
+    out['documents'] = existingDocuments.map((e) {
+      if (e is Map && e['documentStatus'] == 'pending') {
+        return <String, dynamic>{
+          ...Map<String, dynamic>.from(e),
+          'documentStatus': 'approved',
+          'reviewedBy': reviewerName,
+          'reviewedAt': reviewedAtIso,
+        };
+      }
+      return e;
+    }).toList();
+  }
+  return out;
+}
+
+/// Profile / subscription fields written after the approval batch commits.
+/// Never status, documents, the request binding, or document URLs.
+@visibleForTesting
+Map<String, dynamic> profileMergeFields(Map<String, dynamic> full) {
+  const excluded = {
+    'status', 'documents', 'approvedRequestId', 'profileImageUrl',
+    'personalPhotoURL', 'photoURL', 'nationalIdFrontUrl', 'nationalIdBackUrl',
+    'receiptImageUrl',
+  };
+  return Map<String, dynamic>.from(full)..removeWhere((k, _) => excluded.contains(k));
+}
+

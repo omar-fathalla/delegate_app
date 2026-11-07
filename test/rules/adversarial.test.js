@@ -114,9 +114,11 @@ describe("adversarial", ()=>{
     await rec("delegate changes own nationalityID","deny",updateDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{nationalityID:"OTHER"}));
     await rec("delegate changes own phoneNumber","deny",updateDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{phoneNumber:"01099999999"}));
     await rec("delegate adds nationalId alt key","deny",updateDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{nationalId:"OTHER"}));
-    await rec("delegate full-map write same phone/NID","allow",setDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{phoneNumber:"01011111111",nationalityID:"NID-PLACEHOLDER",organizationUID:"o1",companyUID:"c1",status:"active",name:"a",photoURL:"u1"}));
+    await rec("delegate full-map write same phone/NID","allow",setDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{phoneNumber:"01011111111",nationalityID:"NID-PLACEHOLDER",organizationUID:"o1",companyUID:"c1",status:"active",name:"a",photoURL:"u1",documents:[{documentKey:"personalPhoto",documentStatus:"pending",documentURL:"u1"}]}));
+    // Docs-pending: a photo/ID URL change without a (pending) documents entry is denied.
+    await rec("delegate full-map write new photoURL without documents","deny",setDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{phoneNumber:"01011111111",nationalityID:"NID-PLACEHOLDER",organizationUID:"o1",companyUID:"c1",status:"active",name:"a",photoURL:"u9"}));
     await rec("delegate self update name (not in allow-list)","deny",updateDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{name:"n2"}));
-    await rec("delegate self update same phone + NID (nested)","allow",updateDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{phoneNumber:"01011111111",nationalityID:"NID-PLACEHOLDER",photoURL:"u3"}));
+    await rec("delegate self update same phone + NID (nested)","allow",updateDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{phoneNumber:"01011111111",nationalityID:"NID-PLACEHOLDER",photoURL:"u3",documents:[{documentKey:"personalPhoto",documentStatus:"pending",documentURL:"u3"}]}));
     await rec("delegate changes own deviceBinding","deny",updateDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1"),{boundDeviceId:"x"}));
     await rec("delegate updates other delegate","deny",updateDoc(doc(dt,"organizations/o1/companies/c1/delegates/d9"),{name:"x"}));
     await rec("ca updates own-company delegate name","allow",updateDoc(doc(as("ca"),"organizations/o1/companies/c1/delegates/d9"),{name:"x"}));
@@ -124,8 +126,10 @@ describe("adversarial", ()=>{
     const D1="organizations/o1/companies/c1/delegates/d1";
     await rec("delegate reLogin ack (session service)","allow",updateDoc(doc(dt,D1),{requireReLogin:false,reLoginCompletedAt:1}));
     await rec("delegate sets requireReLogin true","deny",updateDoc(doc(dt,D1),{requireReLogin:true}));
-    await rec("delegate photo re-upload (user_profile_screen)","allow",setDoc(doc(dt,D1),{profileImageUrl:"u",personalPhotoURL:"u",photoURL:"u",documents:[{documentKey:"personalPhoto",documentURL:"u"}],updatedAt:1},{merge:true}));
-    await rec("delegate ID image re-upload (profile_screen)","allow",setDoc(doc(dt,D1),{nationalIdFrontUrl:"u",nationalIdBackUrl:"u",receiptImageUrl:"u",updatedAt:1},{merge:true}));
+    await rec("delegate photo re-upload (user_profile_screen)","allow",setDoc(doc(dt,D1),{profileImageUrl:"u",personalPhotoURL:"u",photoURL:"u",documents:[{documentKey:"personalPhoto",documentStatus:"pending",documentURL:"u"}],updatedAt:1},{merge:true}));
+    await rec("delegate receipt URL without a pending receipt entry (B2)","deny",setDoc(doc(dt,D1),{receiptImageUrl:"u2",updatedAt:1},{merge:true}));
+    await rec("delegate ID image re-upload (profile_screen)","allow",setDoc(doc(dt,D1),{nationalIdFrontUrl:"u",nationalIdBackUrl:"u",documents:[{documentKey:"nationalityId",documentStatus:"pending",documentURL:"u",secondaryURL:"u"}],updatedAt:1},{merge:true}));
+    await rec("delegate ID image re-upload without documents","deny",setDoc(doc(dt,D1),{nationalIdFrontUrl:"u2",updatedAt:1},{merge:true}));
     for(const [k,v] of [["annualLeaveQuota",99],["isAnnualLeaveEnabled",true],["paymentAmount",0],["receiptCode","x"],["hasPendingUpdate",false],["isDeductedFromCompany",true],["supervisorUid","sup"],["delegatePublicId","x"],["originOrganizationUID","o2"],["isExternal",true],["role","supervisor"],["status","active2"]])
       await rec("delegate self sets "+k,"deny",updateDoc(doc(dt,D1),{[k]:v}));
     // REGRESSION budget: company staff updating a nested delegate.

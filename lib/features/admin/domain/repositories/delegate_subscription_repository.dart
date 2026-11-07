@@ -80,3 +80,10 @@ abstract class DelegateSubscriptionRepository {
     required String reviewerName,
   });
 }
+
+/// The approval batch committed, but a follow-up write (profile merge or
+/// users/{uid}) failed. [retry] re-runs only those idempotent writes.
+class ApprovalFollowUpFailure extends Failure {
+  const ApprovalFollowUpFailure(super.message, {required this.retry});
+  final Future<Either<Failure, void>> Function() retry;
+}

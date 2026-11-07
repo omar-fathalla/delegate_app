@@ -300,7 +300,266 @@ service cloud.firestore {
         'updatedAt', 'requireReLogin', 'reLoginCompletedAt',
         'profileImageUrl', 'personalPhotoURL', 'photoURL',
         'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'
-      ]) && request.resource.data.get('requireReLogin', false) == false;
+      ]) && request.resource.data.get('requireReLogin', false) == false
+        && delegateDocsOk() && delegateUrlsWithDocs();
+    }
+
+    // Docs-pending (Mohamed 2026-11-04): a delegate (re)upload is written as
+    // pending; only staff approve. An approved entry is allowed only when the
+    // identical entry (same documentKey, URLs and every other field) already
+    // exists anywhere in the old list: matching is by value, not index, so
+    // removing an earlier entry does not break a later approved one. Unknown
+    // keys can never be approved (the app parses unknown keys as personalPhoto).
+    function knownDocKeys() {
+      return ['personalPhoto', 'nationalityId', 'authorizationLetter', 'insuranceLetter',
+        'healthCertificate', 'paymentReceipt', 'electronicPaymentReceipt',
+        'electronic_payment_receipt'];
+    }
+
+    function docIsApproved(e) {
+      return e.get('documentStatus', '') is string
+        && e.get('documentStatus', '').lower() == 'approved';
+    }
+
+    // An entry carried over unchanged always passes (legacy unknown keys and
+    // odd types included). A new or changed entry must have a string
+    // documentStatus and must not be approved. A new approved value is never
+    // `in o`, so unknown keys can never be newly approved.
+    function newDocEntryOk(n, o, i) {
+      return i >= n.size() || n[i] in o
+        || (n[i].get('documentStatus', '') is string && !docIsApproved(n[i]));
+    }
+
+    // True when the write introduces no new 'approved' document entry.
+    function delegateDocsOk() {
+      let n = request.resource.data.get('documents', []);
+      let o = resource.data.get('documents', []);
+      return !changedKeys().hasAny(['documents']) || (
+        n is list && o is list && n.size() <= 8 && o.size() <= 8
+        && newDocEntryOk(n, o, 0) && newDocEntryOk(n, o, 1)
+        && newDocEntryOk(n, o, 2) && newDocEntryOk(n, o, 3)
+        && newDocEntryOk(n, o, 4) && newDocEntryOk(n, o, 5)
+        && newDocEntryOk(n, o, 6) && newDocEntryOk(n, o, 7));
+    }
+
+    // A delegate may change a photo / ID URL only together with `documents`
+    // (kept, not deleted: a URL-only photo would render as approved).
+    // B2: when a delegate sets a photo / ID / receipt URL to a non-empty
+    // value, the new documents list must hold an entry with the matching key,
+    // documentStatus exactly 'pending', and exactly that URL. Removing a URL
+    // (delete / null / '') stays allowed.
+    function pendingUrlAt(n, i, keys, field, url) {
+      return i < n.size() && n[i].get(field, '') == url
+        && n[i].get('documentStatus', '') == 'pending'
+        && n[i].get('documentKey', '') in keys;
+    }
+
+    function urlBacked(keys, field, url) {
+      let n = request.resource.data.get('documents', []);
+      return n is list && (
+        pendingUrlAt(n, 0, keys, field, url) || pendingUrlAt(n, 1, keys, field, url)
+        || pendingUrlAt(n, 2, keys, field, url) || pendingUrlAt(n, 3, keys, field, url)
+        || pendingUrlAt(n, 4, keys, field, url) || pendingUrlAt(n, 5, keys, field, url)
+        || pendingUrlAt(n, 6, keys, field, url) || pendingUrlAt(n, 7, keys, field, url));
+    }
+
+    function urlFieldOk(f, keys, field) {
+      let v = request.resource.data.get(f, null);
+      return !changedKeys().hasAny([f]) || v == null || v == ''
+        || (v is string && urlBacked(keys, field, v));
+    }
+
+    // The three photo fields are scanned once (budget): every changed photo
+    // field must be removed or equal the same value v, and v must be backed.
+    function photoSame(f, v) {
+      let x = request.resource.data.get(f, null);
+      return !changedKeys().hasAny([f]) || x == null || x == '' || x == v;
+    }
+
+    function photoUrlsOk() {
+      let ch = changedKeys();
+      let d = request.resource.data;
+      let v = ch.hasAny(['profileImageUrl']) ? d.get('profileImageUrl', null)
+        : (ch.hasAny(['personalPhotoURL']) ? d.get('personalPhotoURL', null) : d.get('photoURL', null));
+      return !ch.hasAny(['profileImageUrl', 'personalPhotoURL', 'photoURL'])
+        || (photoSame('profileImageUrl', v) && photoSame('personalPhotoURL', v) && photoSame('photoURL', v)
+          && (v == null || v == '' || (v is string && urlBacked(['personalPhoto'], 'documentURL', v))));
+    }
+
+    // ID front / back are checked in ONE scan (budget): the same pending
+    // nationalityId entry must carry every changed, non-empty ID URL.
+    function idAt(n, i, needF, fv, needB, bv) {
+      return i < n.size()
+        && (!needF || n[i].get('documentURL', '') == fv)
+        && (!needB || n[i].get('secondaryURL', '') == bv)
+        && n[i].get('documentStatus', '') == 'pending'
+        && n[i].get('documentKey', '') == 'nationalityId';
+    }
+
+    function idUrlsOk() {
+      let ch = changedKeys();
+      let d = request.resource.data;
+      let fv = d.get('nationalIdFrontUrl', null);
+      let bv = d.get('nationalIdBackUrl', null);
+      let needF = ch.hasAny(['nationalIdFrontUrl']) && fv != null && fv != '';
+      let needB = ch.hasAny(['nationalIdBackUrl']) && bv != null && bv != '';
+      let n = d.get('documents', []);
+      return !(needF || needB) || (n is list && (
+        idAt(n, 0, needF, fv, needB, bv) || idAt(n, 1, needF, fv, needB, bv)
+        || idAt(n, 2, needF, fv, needB, bv) || idAt(n, 3, needF, fv, needB, bv)
+        || idAt(n, 4, needF, fv, needB, bv) || idAt(n, 5, needF, fv, needB, bv)
+        || idAt(n, 6, needF, fv, needB, bv) || idAt(n, 7, needF, fv, needB, bv)));
+    }
+
+    function delegateUrlsWithDocs() {
+      return photoUrlsOk()
+        && idUrlsOk()
+        && urlFieldOk('receiptImageUrl',
+          ['paymentReceipt', 'electronicPaymentReceipt', 'electronic_payment_receipt'], 'documentURL');
+    }
+
+    // S1 (Mohamed): approving a document is super-admin (any company) or
+    // company-admin / admin / supervisor of the SAME company. Other staff may
+    // still write delegate docs but may not introduce 'approved'.
+    // B1: c1 / c2 are plain strings (a two-element list argument errored in
+    // the collection-group match). M1: nobody approves their own doc.
+    // r4 F2/F3/R2: a tech support write that activates a delegate or carries
+    // an approved document must be in the same batch that moves the bound
+    // delegate_requests doc from exactly 'pending' to 'approved' (get vs
+    // getAfter). The request is the doc's approvedRequestId (add_organization)
+    // or the delegate id itself (new_delegate). Path and company/org fields
+    // are bound to the request; the new_delegate copy may also sit under the
+    // supervisor's own organization.
+    function techReqOk(orgId, compId, delegateId) {
+      let d = request.resource.data;
+      let rid = d.get('approvedRequestId', delegateId);
+      let R = /databases/$(database)/documents/delegate_requests/$(rid);
+      let a = getAfter(R).data;
+      let ex = a.get('existingDelegateUid', null);
+      let ty = a.get('requestType', 'new_delegate');
+      return get(R).data.get('status', '') == 'pending'
+        && a.get('status', '') == 'approved'
+        && ty in ['new_delegate', 'add_organization']
+        && ((ty == 'add_organization' && ex is string && ex == delegateId)
+          || (ty == 'new_delegate' && rid == delegateId))
+        && compId == a.get('companyUID', '')
+        && d.get('companyUID', '') == compId
+        && d.get('organizationUID', '') == orgId
+        && (orgId == a.get('organizationUID', '')
+          || (ty == 'new_delegate'
+            && orgId == get(/databases/$(database)/documents/users/$(a.get('supervisorUid', ''))).data.get('organizationUID', '')));
+    }
+
+    function reqAfter(delegateId) {
+      return getAfter(/databases/$(database)/documents/delegate_requests/$(request.resource.data.get('approvedRequestId', delegateId))).data;
+    }
+
+    // r4 F4: by index, an entry is unchanged or flips pending -> approved with
+    // only documentStatus / reviewedBy / reviewedAt changed and the request's URL.
+    // r5 budget: the URL check reads a precomputed key -> URL map (m) instead
+    // of re-reading the request per entry; 4+ flips used to hit the
+    // 1000-expression limit.
+    function flipAt(n, o, i, m) {
+      return i >= n.size() || n[i] == o[i]
+        || (o[i].get('documentStatus', '') == 'pending'
+          && n[i].get('documentStatus', '') == 'approved'
+          && n[i].diff(o[i]).affectedKeys().hasOnly(['documentStatus', 'reviewedBy', 'reviewedAt'])
+          && m.get(n[i].get('documentKey', ''), null) == n[i].get('documentURL', '')
+          && (n[i].get('documentKey', '') != 'nationalityId' || n[i].get('secondaryURL', '') == m['#nidBack']));
+    }
+
+    // Request URL per document key; '#nidBack' is the national ID back URL
+    // (compared as the nationalityId entry's secondaryURL).
+    function reqUrlMap(a) {
+      return {
+        'personalPhoto': a.get('profileImageUrl', ''),
+        'nationalityId': a.get('nationalIdFrontUrl', ''),
+        '#nidBack': a.get('nationalIdBackUrl', ''),
+        'paymentReceipt': a.get('receiptImageUrl', ''),
+        'electronicPaymentReceipt': a.get('receiptImageUrl', ''),
+        'electronic_payment_receipt': a.get('receiptImageUrl', '')
+      };
+    }
+
+    // r4 F4: tech support activation of an existing doc is a status-only write.
+    function techFlipOk(delegateId) {
+      let n = request.resource.data.get('documents', []);
+      let o = resource.data.get('documents', []);
+      let m = reqUrlMap(reqAfter(delegateId));
+      return changedKeys().hasOnly(['status', 'documents', 'updatedAt', 'reviewedBy', 'reviewedAt', 'approvedRequestId'])
+        && resource.data.get('statusReason', '') != 'delete'
+        && (!changedKeys().hasAny(['documents'])
+          || (n is list && o is list && n.size() == o.size() && n.size() <= 8
+            && flipAt(n, o, 0, m) && flipAt(n, o, 1, m) && flipAt(n, o, 2, m) && flipAt(n, o, 3, m)
+            && flipAt(n, o, 4, m) && flipAt(n, o, 5, m) && flipAt(n, o, 6, m) && flipAt(n, o, 7, m)));
+    }
+
+    function staffDocsApproveOk(o1, c1, c2, delegateId) {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let c = u.get('companyUID', '');
+      let st0 = resource.data.get('status', null);
+      let st1 = request.resource.data.get('status', null);
+      let stCh = changedKeys().hasAny(['status']);
+      let approver = request.auth.uid != delegateId && (
+        r in ['super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN']
+        || (c != '' && (c == c1 || c == c2) && r in [
+          'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor']));
+      let tech = r in techRoleList();
+      // H1 (a) + r4: tech support activates only 'pending' -> 'active', as a
+      // status-only write batched with the request approval.
+      let techSignup = tech && st0 == 'pending' && st1 == 'active';
+      return !(tech && stCh && st1 is string && st1.lower() == 'active' && !techSignup)
+        && !(stCh && st1 == 'pending' && !approver)
+        && ((techSignup && techFlipOk(delegateId) && techReqOk(o1, c1, delegateId))
+          || (!techSignup && (delegateDocsOk() || approver)));
+    }
+
+    // r4: tech support may create a delegate that is active or carries an
+    // approved document only inside the request-approval batch (techReqOk),
+    // with the request's URLs, name and national id.
+    function techCreateOk(orgId, compId, delegateId) {
+      let r = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '');
+      let d = request.resource.data;
+      let n = d.get('documents', []);
+      let act = d.get('status', '') is string && d.get('status', '').lower() == 'active';
+      return !(r in techRoleList())
+        || (!act && n is list && n.size() <= 8
+          && (n.size() <= 0 || !docIsApproved(n[0])) && (n.size() <= 1 || !docIsApproved(n[1]))
+          && (n.size() <= 2 || !docIsApproved(n[2])) && (n.size() <= 3 || !docIsApproved(n[3]))
+          && (n.size() <= 4 || !docIsApproved(n[4])) && (n.size() <= 5 || !docIsApproved(n[5]))
+          && (n.size() <= 6 || !docIsApproved(n[6])) && (n.size() <= 7 || !docIsApproved(n[7])))
+        || (techCreateBound(delegateId) && techReqOk(orgId, compId, delegateId));
+    }
+
+    function techCreateBound(delegateId) {
+      let d = request.resource.data;
+      let n = d.get('documents', []);
+      let a = reqAfter(delegateId);
+      let m = reqUrlMap(a);
+      return d.get('status', '') == 'active'
+        && [d.get('fullName', ''), d.get('nationalId', ''), d.get('profileImageUrl', ''),
+            // r5: phone and the other top-level URLs are bound too (absent is
+            // ok for the ones the app does not write).
+            d.get('phoneNumber', ''), d.get('nationalIdFrontUrl', ''), d.get('nationalIdBackUrl', ''),
+            d.get('receiptImageUrl', m['paymentReceipt']), d.get('personalPhotoURL', m['personalPhoto']),
+            d.get('photoURL', m['personalPhoto'])]
+          == [a.get('fullName', ''), a.get('nationalId', ''), m['personalPhoto'],
+            a.get('phoneNumber', ''), m['nationalityId'], m['#nidBack'],
+            m['paymentReceipt'], m['personalPhoto'], m['personalPhoto']]
+        && n is list && n.size() <= 8
+        && (n.size() <= 0 || entryOk(n[0], m)) && (n.size() <= 1 || entryOk(n[1], m))
+        && (n.size() <= 2 || entryOk(n[2], m)) && (n.size() <= 3 || entryOk(n[3], m))
+        && (n.size() <= 4 || entryOk(n[4], m)) && (n.size() <= 5 || entryOk(n[5], m))
+        && (n.size() <= 6 || entryOk(n[6], m)) && (n.size() <= 7 || entryOk(n[7], m));
+    }
+
+    // r5 budget: an approved entry written by tech support must carry the
+    // request's URL for its key (m = reqUrlMap of the request).
+    function entryOk(e, m) {
+      return !docIsApproved(e)
+        || (m.get(e.get('documentKey', ''), null) == e.get('documentURL', '')
+          && (e.get('documentKey', '') != 'nationalityId' || e.get('secondaryURL', '') == m['#nidBack']));
     }
 
     // Budget-flat staff check for delegate docs: one users/{uid} get, literal
@@ -532,6 +791,49 @@ service cloud.firestore {
         && usersDeleteOk(userRole(), callerOrg(), callerCompany(), resource.data);
     }
 
+    // r5: one users/{uid} get and literal role lists (budget: the four role
+    // helpers cost ~80 expressions, shared with the delegate writes of the
+    // approval batch). Super-admin, org-admin, company-admin / supervisor and
+    // HR update freely (unchanged).
+    // r4 F1 + H1 (a): tech support only reviews: status/review fields,
+    // approve only from exactly 'pending', never into 'pending', and never a
+    // request it created or supervises. Delete requests included (Q3).
+    // r5: a tech approval of new_delegate / add_organization must leave the
+    // target delegate doc (request org/company, id = request id or
+    // existingDelegateUid) 'active' in the same batch, so an old build that
+    // approves the request in its own write is denied instead of leaving an
+    // approved request with no delegate.
+    function requestStaffUpdateOk(requestId) {
+      let r = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '');
+      return signedIn() && (r in [
+          'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
+          'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
+          'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'human_resources']
+        || (r in techRoleList() && techRequestReviewOk(requestId)));
+    }
+
+    function techRequestReviewOk(requestId) {
+      let d = request.resource.data;
+      let st = d.get('status', '');
+      let ty = d.get('requestType', 'new_delegate');
+      return changedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason', 'updatedAt'])
+        && resource.data.get('supervisorUid', '') != request.auth.uid
+        && resource.data.get('createdBy', '') != request.auth.uid
+        && !(changedKeys().hasAny(['status']) && st == 'pending')
+        && !(st == 'approved' && resource.data.get('status', '') != 'pending')
+        && (st != 'approved' || !(ty in ['new_delegate', 'add_organization'])
+          || getAfter(/databases/$(database)/documents/organizations/$(d.get('organizationUID', ''))/companies/$(d.get('companyUID', ''))/delegates/$(ty == 'add_organization' ? d.get('existingDelegateUid', '') : requestId)).data.get('status', '') == 'active');
+    }
+
+    // r5 budget: true for a technical support caller writing a delegate doc
+    // at organizations/{o}/companies/{c}/delegates/{id}. The collection-group
+    // delegates match defers those writes to the nested match.
+    function techOnNestedDelegate() {
+      return request.path[3] == 'organizations' && request.path[5] == 'companies'
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in techRoleList();
+    }
+
     function techRoleList() {
       return ['technical_support', 'technical-support', 'technicalSupport', 'technicalsupport', 'tech_support', 'techsupport'];
     }
@@ -669,11 +971,12 @@ service cloud.firestore {
 
         match /delegates/{delegateId} {
           allow read: if signedIn() && canReadNestedDelegate(orgId, compId, delegateId);
-          allow create: if canManageNestedDelegate(orgId, compId) && deviceBindingAbsent();
+          allow create: if canManageNestedDelegate(orgId, compId) && deviceBindingAbsent() && techCreateOk(orgId, compId, delegateId);
           allow update: if delegateOwns(delegateId)
             ? delegateFieldsSafe()
             : (deviceBindingUntouched() && signedIn()
-              && staffManagesDelegate([orgId], [compId], true));
+              && staffManagesDelegate([orgId], [compId], true)
+              && staffDocsApproveOk(orgId, compId, compId, delegateId));
           allow delete: if canManageNestedDelegate(orgId, compId);
         }
 
@@ -793,16 +1096,25 @@ service cloud.firestore {
 
     match /{path=**}/delegates/{delegateId} {
       allow read: if signedIn() && canReadDelegate();
-      allow create: if signedIn() && deviceBindingAbsent() && (
+      // r5 budget: like update below, a tech support create of a nested
+      // organizations/{o}/companies/{c}/delegates doc is decided by the
+      // nested match alone (techCreateOk there is bound to the path).
+      allow create: if signedIn() && !techOnNestedDelegate() && deviceBindingAbsent() && (
         isGlobalStaff() ||
         (isOrgScopedStaff() && incomingOrgScoped()) ||
         (isCompanyScopedStaff() && incomingCompanyScoped())
-      );
-      allow update: if signedIn() && (delegateOwns(delegateId)
+      ) && techCreateOk(request.resource.data.get('organizationUID', ''), request.resource.data.get('companyUID', ''), delegateId);
+      // r5 budget: a tech support write to a nested
+      // organizations/{o}/companies/{c}/delegates doc is decided by the nested
+      // match alone (same checks, bound to the path), so the approval batch
+      // does not spend the 1000-expression budget twice on one doc.
+      allow update: if signedIn() && !techOnNestedDelegate()
+        && (delegateOwns(delegateId)
         ? delegateFieldsSafe()
         : (deviceBindingUntouched() && staffManagesDelegate(
             [resource.data.get('organizationUID', ''), resource.data.get('organizationId', '')],
-            [resource.data.get('companyUID', ''), resource.data.get('companyId', '')], false)));
+            [resource.data.get('companyUID', ''), resource.data.get('companyId', '')], false)
+          && staffDocsApproveOk(resource.data.get('organizationUID', ''), resource.data.get('companyUID', ''), resource.data.get('companyId', ''), delegateId)));
       allow delete: if signedIn() && canManageDelegate();
     }
 
@@ -1065,6 +1377,8 @@ service cloud.firestore {
 
     match /sent_notifications/{docId} {
       allow read: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin();
+      // The app's log payload carries senderUid (no supervisorUid); the
+      // r4 delegate_requests F1 clause does not apply here (r5 B-r4-1).
       allow create: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR();
       allow update, delete: if isSuperAdmin() || isOrgAdmin();
     }
@@ -1128,8 +1442,23 @@ service cloud.firestore {
         || resource.id == request.auth.uid
         || delegateOwns(resource.data.delegateUid)
       );
-      allow create, update: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR()
-        || (signedIn() && request.auth.uid == requestId);
+      // Docs-pending: requests are created by staff only (supervisor flow).
+      // The approved delegate's uid equals the request id, so the self path
+      // is an allow-list of the upload fields and can never approve documents
+      // or change status.
+      // r4 F1: tech support no longer creates requests; every other creator
+      // must name itself as supervisorUid (all app flows pass the signed-in
+      // user). Super-admin is exempt.
+      allow create: if isSuperAdmin()
+        || ((isOrgAdmin() || isCompanyAdmin() || isHR())
+          && request.resource.data.get('supervisorUid', '') == request.auth.uid);
+      // Self clause first: the staff role helpers are expensive and would
+      // otherwise eat the 1000-expression budget before the docs checks.
+      allow update: if (signedIn() && request.auth.uid == requestId
+          && changedKeys().hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
+            'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'])
+          && delegateDocsOk() && delegateUrlsWithDocs())
+        || requestStaffUpdateOk(requestId);
       allow delete: if isSuperAdmin() || isOrgAdmin();
     }
 
