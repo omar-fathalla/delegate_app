@@ -1,4 +1,5 @@
 import 'package:delegate_app/core/config/app_env.dart';
+import 'package:delegate_app/core/services/crashlytics_service.dart';
 import 'package:delegate_app/firebase_options.dart' as prod;
 import 'package:delegate_app/firebase_options_dev.dart' as dev;
 import 'package:flutter/foundation.dart';
@@ -26,6 +27,39 @@ void main() {
     expect(dev.DefaultFirebaseOptions.android.projectId, 'tashil-dev');
   });
 
+  test('dev options never point at production', () {
+    for (final o in [
+      dev.DefaultFirebaseOptions.web,
+      dev.DefaultFirebaseOptions.android,
+      dev.DefaultFirebaseOptions.ios,
+    ]) {
+      expect(o.projectId, 'tashil-dev');
+      expect(o.appId, isNot(contains('564223619997')));
+      expect(o.storageBucket, isNot(contains('practice-firebase-72df1')));
+    }
+  });
+
+  test('verifyFirebaseProject fails closed on a project mismatch', () {
+    expect(
+      () => AppEnv.verifyFirebaseProjectFor('dev', 'tashil-dev'),
+      returnsNormally,
+    );
+    expect(
+      () => AppEnv.verifyFirebaseProjectFor('dev', 'practice-firebase-72df1'),
+      throwsStateError,
+    );
+    expect(
+      () => AppEnv.verifyFirebaseProjectFor('prod', 'tashil-dev'),
+      throwsStateError,
+    );
+    expect(AppEnv.expectedProjectId, 'practice-firebase-72df1');
+  });
+
+  test('Crashlytics is enabled only for prod builds', () {
+    // Tests run with the default ENV (prod).
+    expect(CrashlyticsService.enabledForEnv, isTrue);
+  });
+
   test('unknown ENV fails instead of falling back', () {
     expect(() => AppEnv.optionsFor('staging'), throwsUnsupportedError);
   });
@@ -42,14 +76,27 @@ void main() {
       );
     });
 
-    test('dev on iOS throws', () {
+    test('dev on iOS is allowed (dev flavor)', () {
       expect(
         () => AppEnv.ensureDevSupported(
           isWeb: false,
           platform: TargetPlatform.iOS,
         ),
-        throwsUnsupportedError,
+        returnsNormally,
       );
+    });
+
+    test('dev on macOS/Windows/Linux still fails closed', () {
+      for (final p in [
+        TargetPlatform.macOS,
+        TargetPlatform.windows,
+        TargetPlatform.linux,
+      ]) {
+        expect(
+          () => AppEnv.ensureDevSupported(isWeb: false, platform: p),
+          throwsUnsupportedError,
+        );
+      }
     });
 
     test('dev on web is allowed', () {
@@ -69,12 +116,13 @@ void main() {
       expect(o.appId, '1:582609039627:android:40c38c45d1bdb99add720e');
     });
 
-    test('optionsFor dev throws with iOS platform override', () {
+    test('optionsFor dev on iOS uses the tashil-dev iOS app', () {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-      expect(
-        () => AppEnv.optionsFor('dev', isWeb: false),
-        throwsUnsupportedError,
-      );
+      final o = AppEnv.optionsFor('dev', isWeb: false);
+      expect(o.projectId, 'tashil-dev');
+      expect(o.appId, '1:582609039627:ios:0a788355f5bc4886dd720e');
+      expect(o.iosBundleId, 'com.tashil.delegate.dev');
+      expect(o.messagingSenderId, isNot('564223619997'));
     });
 
     test('optionsFor prod on Android still works', () {

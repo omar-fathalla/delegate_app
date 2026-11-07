@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
+import 'package:delegate_app/core/widgets/tashil_maestro_dev_semantics.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
@@ -859,6 +860,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               value: phone,
               colorScheme: colorScheme,
               theme: theme,
+              maestroValueIdentifier: 'tashil_profile_phone_value',
               onEdit: () => _showEditInfoSheet(
                 context,
                 fieldType: 'phone',
@@ -951,6 +953,29 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
 
   // ─── Info Row Widget ────────────────────────────────────────────
+  Widget _buildInfoValueText({
+    required String value,
+    required ThemeData theme,
+    required ColorScheme colorScheme,
+    String? maestroValueIdentifier,
+  }) {
+    final text = Text(
+      value,
+      style: theme.textTheme.bodyLarge?.copyWith(
+        fontWeight: FontWeight.w600,
+        color: colorScheme.onSurface,
+      ),
+    );
+    if (maestroValueIdentifier == null) {
+      return text;
+    }
+    return tashilMaestroDevSemantics(
+      identifier: maestroValueIdentifier,
+      label: value,
+      child: text,
+    );
+  }
+
   Widget _buildInfoRow({
     required IconData icon,
     required String label,
@@ -959,6 +984,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     required ThemeData theme,
     VoidCallback? onEdit,
     bool showDivider = true,
+    String? maestroValueIdentifier,
   }) {
     return Column(
       children: [
@@ -988,12 +1014,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      value,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurface,
-                      ),
+                    _buildInfoValueText(
+                      value: value,
+                      theme: theme,
+                      colorScheme: colorScheme,
+                      maestroValueIdentifier: maestroValueIdentifier,
                     ),
                   ],
                 ),

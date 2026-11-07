@@ -88,3 +88,6 @@ functions/backfill-report*.json
 
 # Local perf probe artifacts (screenshots may contain PII)
 real_test/
+
+# tashil-dev iOS plist (never commit; see ios/config/README.md)
+ios/config/dev/GoogleService-Info.plist

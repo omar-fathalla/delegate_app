@@ -14,6 +14,7 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
 import 'package:delegate_app/core/widgets/device_lock_dialog.dart';
+import 'package:delegate_app/core/widgets/tashil_maestro_dev_semantics.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -471,7 +472,10 @@ class _LoginScreenState extends State<LoginScreen>
                                       // Login Button
                                       SizedBox(
                                         width: double.infinity,
-                                        child: FilledButton(
+                                        child: tashilMaestroDevSemantics(
+                                          identifier: 'tashil_login_submit',
+                                          button: true,
+                                          child: FilledButton(
                                           onPressed: state is AuthLoading
                                               ? null
                                               : () => _submitLogin(context),
@@ -517,6 +521,7 @@ class _LoginScreenState extends State<LoginScreen>
                                                         FontWeight.w700,
                                                   ),
                                                 ),
+                                        ),
                                         ),
                                       ),
                                     ],

@@ -1,0 +1,6 @@
+// Tashil prod flavor (Firebase project practice-firebase-72df1, bundle com.tashil.delegate).
+// Values are byte-for-byte what ios/Runner/Info.plist had before flavors.
+APP_ENV = prod
+APP_DISPLAY_NAME = Tashil Employee
+APP_URL_SCHEME = com.googleusercontent.apps.564223619997-pqijfvngv5iahj5sua9h2ai11jb3r9en
+GMS_API_KEY = AIzaSyAi6ryBU40avvR0X6xwk7DAeyvNlrYhpgc

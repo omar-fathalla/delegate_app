@@ -86,6 +86,15 @@ jobs:
       - name: Build web
         run: flutter build web --release
 
+  ios-dev-config-check:
+    name: iOS dev config (static)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static checks (scripts, pbxproj, firebase_config.sh)
+        run: bash scripts/ios_dev_config_check.sh
+
   functions:
     name: Functions lint & test
     runs-on: ubuntu-latest

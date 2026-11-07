@@ -23,10 +23,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for ios - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return ios;
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -64,5 +61,16 @@ class DefaultFirebaseOptions {
     messagingSenderId: '582609039627',
     projectId: 'tashil-dev',
     storageBucket: 'tashil-dev.firebasestorage.app',
+  );
+
+  /// tashil-dev iOS app "Tashil Dev iOS" (com.tashil.delegate.dev).
+  /// Same values as ios/config/dev/GoogleService-Info.plist.
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyCoDm9iwK-cRJ4Sj5Xsy1s_Jq4362c9LK8',
+    appId: '1:582609039627:ios:0a788355f5bc4886dd720e',
+    messagingSenderId: '582609039627',
+    projectId: 'tashil-dev',
+    storageBucket: 'tashil-dev.firebasestorage.app',
+    iosBundleId: 'com.tashil.delegate.dev',
   );
 }

@@ -8,6 +8,12 @@ project 'Runner', {
   'Debug' => :debug,
   'Profile' => :release,
   'Release' => :release,
+  'Debug-dev' => :debug,
+  'Profile-dev' => :release,
+  'Release-dev' => :release,
+  'Debug-prod' => :debug,
+  'Profile-prod' => :release,
+  'Release-prod' => :release,
 }
 
 def flutter_root
@@ -27,6 +33,38 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 
 flutter_ios_podfile_setup
 
+def tashil_pod_env_for_scripts
+  {
+    'SRCROOT' => File.expand_path(__dir__),
+    'CONFIGURATION' => ENV['CONFIGURATION'],
+    'APP_ENV' => ENV['APP_ENV'],
+    'DART_DEFINES' => ENV['DART_DEFINES'],
+    'PRODUCT_BUNDLE_IDENTIFIER' => ENV['PRODUCT_BUNDLE_IDENTIFIER'],
+  }
+end
+
+def tashil_dev_flutter_build?
+  script = File.expand_path('scripts/tashil_is_dev_build.sh', __dir__)
+  system(tashil_pod_env_for_scripts, '/bin/sh', script)
+end
+
+def tashil_strip_dev_crashlytics_if_needed!
+  wrapper = File.expand_path('scripts/tashil_strip_dev_crashlytics_if_dev.sh', __dir__)
+  return unless File.exist?(wrapper)
+  return unless tashil_dev_flutter_build?
+
+  success = system(tashil_pod_env_for_scripts, '/bin/sh', wrapper)
+  raise '[Tashil] tashil_strip_dev_crashlytics_if_dev.sh failed during pod install' unless success
+end
+
+# Before CocoaPods resolves dependencies (including SPM integration from Flutter ephemeral).
+pre_install do |_installer|
+  tashil_strip_dev_crashlytics_if_needed!
+end
+
+# When pod install runs for dev, strip may exist before target hooks run.
+tashil_strip_dev_crashlytics_if_needed!
+
 target 'Runner' do
   use_frameworks!
 
@@ -45,5 +83,13 @@ post_install do |installer|
       config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
       config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = ''
     end
+  end
+
+  tashil_strip_dev_crashlytics_if_needed!
+
+  pod_strip = File.expand_path('scripts/tashil_strip_crashlytics_from_dev_pod_support.sh', __dir__)
+  if File.exist?(pod_strip)
+    success = system('/bin/sh', pod_strip, File.expand_path(__dir__))
+    raise '[Tashil] tashil_strip_crashlytics_from_dev_pod_support.sh failed during pod install' unless success
   end
 end

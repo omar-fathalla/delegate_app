@@ -129,6 +129,7 @@ void main() {
   late MockAttendanceRepository mockAttendanceRepository;
 
   setUp(() {
+    AttendanceBloc.clearCache();
     mockAttendanceRepository = MockAttendanceRepository();
     sl.allowReassignment = true;
 
@@ -286,6 +287,9 @@ void main() {
         documents: const [],
       );
 
+      await tester.binding.setSurfaceSize(const Size(800, 2400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('ar'),
@@ -293,12 +297,15 @@ void main() {
           supportedLocales: AppLocalizations.supportedLocales,
           home: AttendanceScreen(
             delegate: multiChainDelegate,
-            viewOnly: true,
+            viewOnly: false,
           ),
         ),
       );
       await tester.pumpAndSettle();
-      await tester.pump(const Duration(seconds: 3));
+      // viewOnly:false schedules SyncRequested + follow-up HistoryRequested
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 2));
       await tester.pumpAndSettle();
 
       // Clean branch names without redundant 'جملة ماركت - ' prefix
