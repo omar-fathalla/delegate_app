@@ -1,0 +1,104 @@
+name: PR User Test builds
+
+# PR head SHA: review builds + downloadable artifacts (no secrets, no Play/App Store upload).
+#
+# Android artifact naming (read before User Test):
+# - Build: `flutter build apk --release --flavor prod` (prod applicationId, release optimizations).
+# - CI has no `android/key.properties` → `build.gradle.kts` falls back to **debug** `signingConfig` for release.
+# - Output is **APK Signing Scheme v2** with the **debug/upload debug keystore**, NOT an unsigned APK and NOT a store release cert.
+# - Artifact prefix: `android-prod-flavor-release-debugsigned-<PR_HEAD_SHA>`.
+#
+# iOS artifact:
+# - `flutter build ios --release --no-codesign --flavor prod` → unsigned `Runner.app` (iphoneos tree).
+# - Artifact prefix: `ios-prod-flavor-release-nocodesign-<PR_HEAD_SHA>`.
+on:
+  pull_request:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-user-test-${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+jobs:
+  signing-surface-guard:
+    name: Signing & entitlements (no drift)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Entitlements unchanged vs base branch
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          git diff --exit-code "$BASE" "$HEAD" -- \
+            ios/Runner/Runner.entitlements \
+            ios/Runner/Runner-dev.entitlements \
+            ios/Flutter/Env-prod.xcconfig \
+            ios/Flutter/Env-dev.xcconfig
+
+  android-prod-release:
+    name: Android prod flavor (release, debug-signed CI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.5"
+          channel: stable
+          cache: true
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Build APK (prod flavor release; debug cert without key.properties)
+        run: flutter build apk --release --flavor prod --dart-define=ENV=prod
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-prod-flavor-release-debugsigned-${{ env.PR_HEAD_SHA }}
+          path: build/app/outputs/flutter-apk/app-prod-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  ios-prod-release:
+    name: iOS prod flavor (release, no codesign)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.5"
+          channel: stable
+          cache: true
+      - name: Install dependencies
+        run: flutter pub get
+      - name: CocoaPods
+        run: |
+          cd ios
+          pod install
+      - name: Build iOS prod (device tree, no codesign)
+        run: flutter build ios --release --no-codesign --flavor prod --dart-define=ENV=prod
+      - name: Upload iOS build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-prod-flavor-release-nocodesign-${{ env.PR_HEAD_SHA }}
+          path: build/ios/iphoneos/Runner.app
+          if-no-files-found: error
+          retention-days: 14

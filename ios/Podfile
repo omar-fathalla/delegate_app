@@ -4,6 +4,9 @@ platform :ios, '15.0'
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
+# Native Firebase iOS SDK version for FlutterFire CocoaPods resolution (firebase_core 4.15.2 → 12.19.3).
+$FirebaseSDKVersion = '12.19.3'
+
 project 'Runner', {
   'Debug' => :debug,
   'Profile' => :release,
