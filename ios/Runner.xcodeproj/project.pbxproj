@@ -311,6 +311,7 @@
 				D55EEA4F621F20E9FE9B17FD /* Frameworks */,
 				901AE5BE25CE383F74251D6E /* Resources */,
 				27DB1444C722639062CBC950 /* [CP] Embed Pods Frameworks */,
+				F3A8C92E1B4D5E6F708192A3 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -492,6 +493,23 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		F3A8C92E1B4D5E6F708192A3 /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-RunnerUITests/Pods-RunnerUITests-resources-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-RunnerUITests/Pods-RunnerUITests-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-RunnerUITests/Pods-RunnerUITests-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		27DB1444C722639062CBC950 /* [CP] Embed Pods Frameworks */ = {
@@ -839,12 +857,19 @@
 					"${PODS_CONFIGURATION_BUILD_DIR}/patrol/patrol.framework/Headers",
 				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+					"@executable_path/Frameworks",
+					"@loader_path/../Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=\"${PODS_ROOT}/../.symlinks/plugins/patrol/darwin/patrol/Sources/patrol/include/module.modulemap\"",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.tashil.delegate.RunnerUITests;
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				PRODUCT_NAME = RunnerUITests;
 				SDKROOT = iphoneos;
 				SWIFT_INCLUDE_PATHS = "$(inherited) ${PODS_CONFIGURATION_BUILD_DIR}/patrol";
@@ -1091,12 +1116,19 @@
 					"${PODS_CONFIGURATION_BUILD_DIR}/patrol/patrol.framework/Headers",
 				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+					"@executable_path/Frameworks",
+					"@loader_path/../Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=\"${PODS_ROOT}/../.symlinks/plugins/patrol/darwin/patrol/Sources/patrol/include/module.modulemap\"",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.tashil.delegate.RunnerUITests;
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				PRODUCT_NAME = RunnerUITests;
 				SDKROOT = iphoneos;
 				SWIFT_INCLUDE_PATHS = "$(inherited) ${PODS_CONFIGURATION_BUILD_DIR}/patrol";
@@ -1198,12 +1230,19 @@
 					"${PODS_CONFIGURATION_BUILD_DIR}/patrol/patrol.framework/Headers",
 				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+					"@executable_path/Frameworks",
+					"@loader_path/../Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=\"${PODS_ROOT}/../.symlinks/plugins/patrol/darwin/patrol/Sources/patrol/include/module.modulemap\"",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.tashil.delegate.RunnerUITests;
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				PRODUCT_NAME = RunnerUITests;
 				SDKROOT = iphoneos;
 				SWIFT_INCLUDE_PATHS = "$(inherited) ${PODS_CONFIGURATION_BUILD_DIR}/patrol";
@@ -1536,12 +1575,19 @@
 					"${PODS_CONFIGURATION_BUILD_DIR}/patrol/patrol.framework/Headers",
 				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+					"@executable_path/Frameworks",
+					"@loader_path/../Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=\"${PODS_ROOT}/../.symlinks/plugins/patrol/darwin/patrol/Sources/patrol/include/module.modulemap\"",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.tashil.delegate.RunnerUITests;
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				PRODUCT_NAME = RunnerUITests;
 				SDKROOT = iphoneos;
 				SWIFT_INCLUDE_PATHS = "$(inherited) ${PODS_CONFIGURATION_BUILD_DIR}/patrol";
@@ -1625,12 +1671,19 @@
 					"${PODS_CONFIGURATION_BUILD_DIR}/patrol/patrol.framework/Headers",
 				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+					"@executable_path/Frameworks",
+					"@loader_path/../Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=\"${PODS_ROOT}/../.symlinks/plugins/patrol/darwin/patrol/Sources/patrol/include/module.modulemap\"",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.tashil.delegate.RunnerUITests;
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				PRODUCT_NAME = RunnerUITests;
 				SDKROOT = iphoneos;
 				SWIFT_INCLUDE_PATHS = "$(inherited) ${PODS_CONFIGURATION_BUILD_DIR}/patrol";
@@ -1714,6 +1767,12 @@
 					"${PODS_CONFIGURATION_BUILD_DIR}/patrol/patrol.framework/Headers",
 				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+					"@executable_path/Frameworks",
+					"@loader_path/../Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
 				"ONLY_ACTIVE_ARCH[sdk=iphonesimulator*]" = YES;
 				OTHER_CFLAGS = (
@@ -1750,6 +1809,12 @@
 					"${PODS_CONFIGURATION_BUILD_DIR}/patrol/patrol.framework/Headers",
 				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+					"@executable_path/Frameworks",
+					"@loader_path/../Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
 				"ONLY_ACTIVE_ARCH[sdk=iphonesimulator*]" = YES;
 				OTHER_CFLAGS = (
@@ -1832,6 +1897,12 @@
 					"${PODS_CONFIGURATION_BUILD_DIR}/patrol/patrol.framework/Headers",
 				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+					"@executable_path/Frameworks",
+					"@loader_path/../Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
 				"ONLY_ACTIVE_ARCH[sdk=iphonesimulator*]" = YES;
 				OTHER_CFLAGS = (
@@ -1996,12 +2067,19 @@
 					"${PODS_CONFIGURATION_BUILD_DIR}/patrol/patrol.framework/Headers",
 				);
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/Frameworks",
+					"@executable_path/Frameworks",
+					"@loader_path/../Frameworks",
+				);
 				MARKETING_VERSION = 1.0;
 				OTHER_CFLAGS = (
 					"$(inherited)",
 					"-fmodule-map-file=\"${PODS_ROOT}/../.symlinks/plugins/patrol/darwin/patrol/Sources/patrol/include/module.modulemap\"",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.tashil.delegate.RunnerUITests;
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				PRODUCT_NAME = RunnerUITests;
 				SDKROOT = iphoneos;
 				SWIFT_INCLUDE_PATHS = "$(inherited) ${PODS_CONFIGURATION_BUILD_DIR}/patrol";

@@ -75,7 +75,8 @@ target 'Runner' do
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 
   target 'RunnerUITests' do
-    inherit! :search_paths
+    # UI test bundles must not inherit Runner CocoaPods search paths (Firebase → FBLPromises
+    # is linked but not embedded → dlopen @rpath failure). Patrol pod only.
     pod 'patrol', :path => '.symlinks/plugins/patrol/darwin'
   end
   target 'RunnerTests' do

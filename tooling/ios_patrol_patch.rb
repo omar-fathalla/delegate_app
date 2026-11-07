@@ -167,6 +167,12 @@ PATROL_HEADER_SEARCH_PATHS = [
   '${PODS_CONFIGURATION_BUILD_DIR}/patrol/patrol.framework/Headers',
 ].freeze
 PATROL_SWIFT_INCLUDE_PATHS = ['$(inherited)', '${PODS_CONFIGURATION_BUILD_DIR}/patrol'].freeze
+UI_TESTS_LD_RUNPATH_SEARCH_PATHS = [
+  '$(inherited)',
+  '@loader_path/Frameworks',
+  '@executable_path/Frameworks',
+  '@loader_path/../Frameworks',
+].freeze
 
 ui_target = project.targets.find { |t| t.name == 'RunnerUITests' }
 if ui_target
@@ -175,11 +181,29 @@ if ui_target
     cfg.build_settings['OTHER_CFLAGS'] = PATROL_OTHER_CFLAGS
     cfg.build_settings['HEADER_SEARCH_PATHS'] = PATROL_HEADER_SEARCH_PATHS
     cfg.build_settings['SWIFT_INCLUDE_PATHS'] = PATROL_SWIFT_INCLUDE_PATHS
+    cfg.build_settings['LD_RUNPATH_SEARCH_PATHS'] = UI_TESTS_LD_RUNPATH_SEARCH_PATHS
+    cfg.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES'
     if %w[Debug-dev Release-dev Profile-dev].include?(cfg.name)
       pods_ref = pods_runner_ui_tests_xcconfig(project, cfg.name)
       cfg.base_configuration_reference = pods_ref if pods_ref
     end
     apply_dev_simulator_arch!(cfg)
+  end
+
+  unless ui_target.shell_script_build_phases.any? { |ph| ph.name == '[CP] Copy Pods Resources' }
+    copy_phase = ui_target.new_shell_script_build_phase('[CP] Copy Pods Resources')
+    copy_phase.input_file_list_paths = [
+      '${PODS_ROOT}/Target Support Files/Pods-RunnerUITests/Pods-RunnerUITests-resources-${CONFIGURATION}-input-files.xcfilelist',
+    ]
+    copy_phase.output_file_list_paths = [
+      '${PODS_ROOT}/Target Support Files/Pods-RunnerUITests/Pods-RunnerUITests-resources-${CONFIGURATION}-output-files.xcfilelist',
+    ]
+    copy_phase.shell_script = "\"${PODS_ROOT}/Target Support Files/Pods-RunnerUITests/Pods-RunnerUITests-resources.sh\"\n"
+    copy_phase.show_env_vars_in_log = '0'
+    embed_idx = ui_target.build_phases.index do |bp|
+      bp.is_a?(Xcodeproj::Project::Object::PBXShellScriptBuildPhase) && bp.name == '[CP] Embed Pods Frameworks'
+    end
+    ui_target.build_phases.insert(embed_idx + 1, copy_phase) if embed_idx
   end
 
   unless ui_target.shell_script_build_phases.any? { |ph| ph.name == 'Patrol framework build order' }

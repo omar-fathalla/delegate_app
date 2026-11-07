@@ -10,6 +10,13 @@ module PatrolRunnerUiTestsPostInstall
     '${PODS_CONFIGURATION_BUILD_DIR}/patrol/patrol.framework/Headers',
   ].freeze
   PATROL_SWIFT_INCLUDE_PATHS = ['$(inherited)', '${PODS_CONFIGURATION_BUILD_DIR}/patrol'].freeze
+  # XCTest bundle load: embedded pod frameworks (patrol, CocoaAsyncSocket), not inherited Runner Firebase deps.
+  UI_TESTS_LD_RUNPATH_SEARCH_PATHS = [
+    '$(inherited)',
+    '@loader_path/Frameworks',
+    '@executable_path/Frameworks',
+    '@loader_path/../Frameworks',
+  ].freeze
 
   module_function
 
@@ -45,14 +52,35 @@ module PatrolRunnerUiTestsPostInstall
         config.build_settings['OTHER_CFLAGS'] = other_cflags
         config.build_settings['HEADER_SEARCH_PATHS'] = PATROL_HEADERS
         config.build_settings['SWIFT_INCLUDE_PATHS'] = PATROL_SWIFT_INCLUDE_PATHS
+        config.build_settings['LD_RUNPATH_SEARCH_PATHS'] = UI_TESTS_LD_RUNPATH_SEARCH_PATHS
+        config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'YES'
         PatrolDevSimulatorArch.apply_build_settings!(config.build_settings) if PatrolDevSimulatorArch.dev_configuration?(config.name)
       end
 
+      ensure_copy_pods_resources_build_phase!(ui_target)
       ensure_patrol_build_order_script!(ui_target)
       add_remote_target_dependency(user_project, ui_target, pods_project, patrol_target) if patrol_target
 
       user_project.save
     end
+  end
+
+  def ensure_copy_pods_resources_build_phase!(ui_target)
+    return if ui_target.shell_script_build_phases.any? { |ph| ph.name == '[CP] Copy Pods Resources' }
+
+    phase = ui_target.new_shell_script_build_phase('[CP] Copy Pods Resources')
+    phase.input_file_list_paths = [
+      '${PODS_ROOT}/Target Support Files/Pods-RunnerUITests/Pods-RunnerUITests-resources-${CONFIGURATION}-input-files.xcfilelist',
+    ]
+    phase.output_file_list_paths = [
+      '${PODS_ROOT}/Target Support Files/Pods-RunnerUITests/Pods-RunnerUITests-resources-${CONFIGURATION}-output-files.xcfilelist',
+    ]
+    phase.shell_script = "\"${PODS_ROOT}/Target Support Files/Pods-RunnerUITests/Pods-RunnerUITests-resources.sh\"\n"
+    phase.show_env_vars_in_log = '0'
+    embed_idx = ui_target.build_phases.index do |bp|
+      bp.is_a?(Xcodeproj::Project::Object::PBXShellScriptBuildPhase) && bp.name == '[CP] Embed Pods Frameworks'
+    end
+    ui_target.build_phases.insert(embed_idx + 1, phase) if embed_idx
   end
 
   def ensure_patrol_build_order_script!(ui_target)
