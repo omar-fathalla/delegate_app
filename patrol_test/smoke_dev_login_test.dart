@@ -3,32 +3,22 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
 
-import 'support/smoke_login_wait.dart';
+import 'support/smoke_dev_credentials.dart';
+import 'support/smoke_dummy_login.dart';
 
 void main() {
   patrolTest(
-    'dev flavor: splash stall sign in login screen visible',
+    'dev flavor: tashil-dev dummy login and supervisor role',
     ($) async {
       await bootstrapDelegateAppForPatrol();
       await $.pumpWidget(const MyApp());
 
       expect(Firebase.app().options.projectId, 'tashil-dev');
 
-      await waitForDevLoginScreenAfterSplash($);
-
-      final semantics = devLoginScreenSemanticsFinder();
-      if ($.tester.any(semantics)) {
-        await $(semantics).waitUntilVisible(
-          timeout: smokeLoginVisibleTimeout,
-        );
-        expect($(semantics), findsOneWidget);
-        return;
-      }
-
-      final phoneIcon = devLoginPhoneFieldIconFinder();
-      await $(phoneIcon).waitUntilVisible(timeout: smokeLoginVisibleTimeout);
-      expect($(phoneIcon), findsOneWidget);
+      final creds = SmokeDevPatrolCredentials.fromEnvironment();
+      await submitDevDummyLogin($, creds);
+      await verifyDevLoggedInRole($, creds);
     },
-    timeout: const Timeout(Duration(minutes: 3)),
+    timeout: const Timeout(Duration(minutes: 5)),
   );
 }

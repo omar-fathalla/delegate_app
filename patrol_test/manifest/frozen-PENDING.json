@@ -1,0 +1,28 @@
+{
+  "git_commit": "PENDING_FULL_SHA",
+  "git_short": "PENDING",
+  "capture_status": "pending_mac",
+  "bundle_id": "com.tashil.delegate.dev",
+  "firebase_project_id": "tashil-dev",
+  "artifacts": {
+    "runner_app": {
+      "path": null,
+      "sha256": {
+        "Runner": null,
+        "Info.plist": null,
+        "GoogleService-Info.plist": null
+      }
+    },
+    "runner_ui_tests": {
+      "path": null,
+      "sha256": {
+        "bundle": null,
+        "RunnerUITests": null
+      }
+    },
+    "xctestrun": {
+      "path": null,
+      "sha256": null
+    }
+  }
+}
