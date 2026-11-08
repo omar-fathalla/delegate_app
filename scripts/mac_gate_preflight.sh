@@ -57,18 +57,11 @@ if ! xcrun simctl get_app_container "$SIM_UDID" "$DEV_BUNDLE" data >/dev/null 2>
   fail "Tashil Dev ($DEV_BUNDLE) not installed on $SIM_UDID — build/install dev flavor first"
 fi
 
-info "launching Tashil Dev (terminate first to avoid SpringBoard foreground)"
-xcrun simctl terminate "$SIM_UDID" "$DEV_BUNDLE" >/dev/null 2>&1 || true
-xcrun simctl launch "$SIM_UDID" "$DEV_BUNDLE" >/dev/null || fail "simctl launch failed"
-
-sleep 5
-
-mkdir -p "$MEDIA_DIR"
-xcrun simctl io "$SIM_UDID" screenshot "$SHOT_PATH" || fail "screenshot failed"
-
-if [[ ! -s "$SHOT_PATH" ]]; then
-  fail "screenshot missing or empty: $SHOT_PATH"
-fi
+export TASHIL_SIM_UDID="$SIM_UDID"
+export TASHIL_PROJECT_STORE="$PROJECT_STORE"
+export TASHIL_PROJECT_STORE_MEDIA="$MEDIA_DIR"
+bash "$ROOT/scripts/capture-dev-login-roles-screenshot.sh" || fail "login-roles capture failed"
+SHOT_PATH="$MEDIA_DIR/dev-login-roles-${GIT_SHA}.png"
 
 # Best-effort: ensure our bundle is the foreground app (not Home/SpringBoard).
 front="$(xcrun simctl spawn "$SIM_UDID" launchctl print system 2>/dev/null | grep -i "$DEV_BUNDLE" | head -1 || true)"

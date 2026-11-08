@@ -2,9 +2,13 @@
 
 Run on **`fathalla-mac`** before Maestro / Patrol / screenshot attestation. Linux CI does **not** execute device steps; it runs the static guards wired in `.github/workflows/ci.yml`.
 
-## Script
+## Scripts
 
 ```bash
+# Login-roles artifact only (Maestro or simctl)
+bash scripts/capture-dev-login-roles-screenshot.sh
+
+# Full preflight (sim + install check + capture + shutdown)
 bash scripts/mac_gate_preflight.sh
 ```
 

@@ -1,0 +1,11 @@
+appId: com.tashil.delegate.dev
+---
+# Gate artifact: login screen with مندوب + موظف إداري (no credentials entered).
+- launchApp:
+    clearState: true
+    clearKeychain: true
+
+- runFlow:
+    file: ../subflows/wait-for-login-screen.yaml
+
+- takeScreenshot: dev-login-roles

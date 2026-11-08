@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Fail if any Maestro flow/subflow YAML lacks appId before the document separator.
-# Subflows referenced via runFlow must carry their own appId (Maestro does not inherit).
+# Fail if any Maestro YAML under maestro/ lacks appId before the document separator.
+# Every file invoked via runFlow (including logout-via-menu) must declare its own config.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -25,11 +25,9 @@ check_yaml() {
   fi
 }
 
-shopt -s nullglob
-yaml_files=(maestro/flows/*.yaml maestro/subflows/*.yaml)
-shopt -u nullglob
+mapfile -t yaml_files < <(find maestro -type f -name '*.yaml' | sort)
 
-[[ "${#yaml_files[@]}" -gt 0 ]] || fail "no Maestro YAML files under maestro/flows or maestro/subflows"
+[[ "${#yaml_files[@]}" -gt 0 ]] || fail "no Maestro YAML files under maestro/"
 
 for f in "${yaml_files[@]}"; do
   check_yaml "$f"

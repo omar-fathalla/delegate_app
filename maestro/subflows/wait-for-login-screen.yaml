@@ -1,0 +1,12 @@
+appId: com.tashil.delegate.dev
+---
+# M3 splash can hide login fields — wait for role row before typing.
+- extendedWaitUntil:
+    visible: "مندوب"
+    timeout: 120000
+- extendedWaitUntil:
+    visible: "موظف إداري"
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "رقم الجوال"
+    timeout: 30000
