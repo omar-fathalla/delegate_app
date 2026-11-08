@@ -1,0 +1,29 @@
+# Staff supervisor login (**موظف إداري**). Secrets via -e TASHIL_MAESTRO_DEV_SECRET only.
+
+- assertVisible: "رقم الجوال"
+
+- tapOn: "موظف إداري"
+
+- tapOn: "رقم الجوال"
+- inputText: ${TASHIL_MAESTRO_DEV_PHONE}
+
+- tapOn: "كلمة المرور"
+- inputText: ${TASHIL_MAESTRO_DEV_SECRET}
+
+- pressKey: Enter
+
+- runFlow:
+    when:
+      visible: "تسجيل الدخول"
+    commands:
+      - tapOn: "تسجيل الدخول"
+
+- runFlow:
+    file: dismiss-ios-save-password.yaml
+
+- extendedWaitUntil:
+    notVisible: "تسجيل الدخول"
+    timeout: 120000
+
+- assertVisible:
+    id: "tashil_main_menu_button"

@@ -1,34 +1,36 @@
-# Patrol iOS dev smoke (PR #218)
+# Patrol (Flutter + native integration)
 
-## Command (Mac)
+Patrol covers **OS dialogs**, **location / check-in**, **push notification UI**, **`offlineSyncTask` timing**, and **background/foreground** on dev flavor builds. **Black-box login journeys** (both roles, nav, logout) are **Maestro-only** — see `maestro/README.md`.
 
-Use a **concrete simulator UDID** so the run phase targets the right device (Mohamed default: iPhone 17 `8CD21E86-592A-4ED5-9F41-BF90CB9796C6`):
+Login helpers under `patrol_test/support/` are **setup only** (`patrol_dev_session.dart`, `submitDevDummyLogin`, `submitDevDelegateDummyLogin`). Do not assert profile/role journeys here.
+
+## Command (Mac / emulator)
 
 ```bash
 export PATROL_DEV_SECRET='<from Project store internal/tashil-dev-test-accounts.txt>'
 
 patrol test \
-  -t patrol_test/smoke_dev_login_test.dart \
+  -t patrol_test/integration_native_permissions_test.dart \
+  -t patrol_test/integration_location_checkin_test.dart \
+  -t patrol_test/integration_push_notification_test.dart \
+  -t patrol_test/integration_offline_sync_lifecycle_test.dart \
   --flavor dev \
   --dart-define=ENV=dev \
-  --dart-define=PATROL_DEV_SECRET="$PATROL_DEV_SECRET" \
-  -d 8CD21E86-592A-4ED5-9F41-BF90CB9796C6
+  --dart-define=PATROL_DEV_SECRET="$PATROL_DEV_SECRET"
 ```
 
-Optional: `--dart-define=PATROL_DEV_PHONE=01500000002` (default staff supervisor), `--dart-define=PATROL_DEV_ROLE_LABEL='مشرف الشركة (Company Admin)'` to override the profile badge.
+Delegate tests default `PATROL_DEV_PHONE=01500000003` when you pass `--dart-define=PATROL_DEV_PHONE=01500000003` for location files only, or run `-t` per file with role-specific defines.
 
-`patrol_cli` still invokes `xcodebuild build-for-testing` with `-destination generic/platform=iOS Simulator` (upstream behavior). This repo pins **arm64-only** simulator builds for all `*-dev` configurations via `ios/Flutter/Dev-simulator-arch.xcconfig` and `pod install` so Runner and Pods do not link an **x86_64** slice against arm64-only Flutter simulator artifacts.
+## Split vs Maestro
 
-Override the sim with `PATROL_IOS_SIM_UDID` if needed (same value as `-d`).
+| Concern | Tool |
+| --- | --- |
+| Login both roles, menu, profile/settings, logout | Maestro `maestro/flows/dev-*-navigation-logout.yaml` |
+| Location / notification / camera OS prompts | Patrol `integration_native_permissions_test.dart` |
+| Live tracking / check-in path | Patrol `integration_location_checkin_test.dart` |
+| Notification shade / FCM handling | Patrol `integration_push_notification_test.dart` |
+| `offlineSyncTask` delay + app background/foreground | Patrol `integration_offline_sync_lifecycle_test.dart` |
 
-## Smoke assertions
+## iOS notes
 
-1. `Firebase.app().options.projectId` is **`tashil-dev`**.
-2. M3 dummy login on the dev **staff** supervisor (`01500000002`): tap **موظف إداري** (`group_item_LoginMode.staff`), then `login_phone` + `login_staff_password` (same fields as Maestro).
-3. Post-login: `tashil_main_menu_button` → **الملف الشخصي** → phone visible + role badge **`مشرف الشركة (Company Admin)`** for `01500000002` (overridable).
-
-Helpers live under `patrol_test/support/` only — no `lib/` edits.
-
-## Frozen manifest
-
-After a green `build-for-testing`, run `./scripts/patrol_ios_dev_freeze_manifest.sh <shortsha>` on Mac; see `patrol_test/manifest/README.md`.
+Same arm64 sim pin and frozen manifest workflow as before; see `patrol_test/manifest/README.md`.

@@ -1,46 +1,32 @@
-# Maestro (iOS dev flavor)
+# Maestro (tashil-dev black-box journeys)
 
-Manual **tashil-dev** UI flows for PR #215 User Test. **No secrets in this tree.**
+Maestro covers **installed dev builds** (`com.tashil.delegate.dev`): login, navigation, profile/settings, logout, and session persist. **No native OS permission dialogs** — those live under `patrol_test/` (Patrol).
 
 ## Prerequisites
 
-- Debug-dev sim build installed: `com.tashil.delegate.dev`
+- Debug-dev build on device or simulator
 - [Maestro CLI](https://maestro.mobile.dev/) on `PATH`
-- Dev test credentials from the coordinator Project store (`internal/tashil-dev-test-accounts.txt`) — **never commit or paste passwords**
+- Staff password from Project store (`internal/tashil-dev-test-accounts.txt`) — **never commit**
 
-## Supervisor identity + persist
+## User journeys (both login modes)
 
-Matches Mac flow `maestro-pr215-supervisor-identity-persist-9fd9d0d` (see `internal/pr215-hold-9fd9d0d-consolidated-user-test-attestation.md`).
+| Flow | Role segment | Accounts |
+| --- | --- | --- |
+| `flows/dev-staff-navigation-logout.yaml` | **موظف إداري** | Default phone `01500000002` |
+| `flows/dev-delegate-navigation-logout.yaml` | **مندوب** | Phone `01500000003` + fake national ID (env) |
+| `flows/pr215-supervisor-identity-persist.yaml` | Staff + relaunch persist | Same as staff smoke |
 
 ```bash
-export TASHIL_MAESTRO_DEV_PHONE=01500000002
-export TASHIL_MAESTRO_DEV_SECRET='<from store doc only>'
+export TASHIL_MAESTRO_DEV_SECRET='<from store>'
 # optional: export MAESTRO_DEVICE_ID=<sim UDID>
-
-bash maestro/run-pr215-supervisor-identity-persist.sh
+bash maestro/run-dev-user-journeys.sh
 ```
 
-The runner passes Maestro `-e TASHIL_MAESTRO_DEV_PHONE=…` and `-e TASHIL_MAESTRO_DEV_SECRET=…` so flow `${…}` substitution works (export alone is not enough on some Maestro versions).
+Pass `-e` variables explicitly (some Maestro versions ignore shell export alone). See `maestro/env.example`.
 
-Direct CLI (equivalent):
+## Semantics (ENV=dev only)
 
-```bash
-maestro test -e TASHIL_MAESTRO_DEV_PHONE=01500000002 \
-  -e TASHIL_MAESTRO_DEV_SECRET='<from store>' \
-  maestro/flows/pr215-supervisor-identity-persist.yaml
-```
+- `tashil_main_menu_button` — header menu
+- `tashil_profile_phone_value` — profile phone row (staff flows)
 
-See `maestro/env.example` for variable names only (no secrets in repo).
-
-Environment:
-
-| Variable | Required | Notes |
-|----------|----------|--------|
-| `TASHIL_MAESTRO_DEV_SECRET` | yes | Staff password / national ID for the dev account (second login field) |
-| `TASHIL_MAESTRO_DEV_PHONE` | no | Defaults to `01500000002` |
-| `MAESTRO_DEVICE_ID` | no | Passed to `maestro test --device` |
-| `TASHIL_MAESTRO_LOG` | no | Default `maestro/logs/supervisor-identity-persist.log` (gitignored) |
-
-M3 login (supervisor flow): tap segment **موظف إداري**, fill **رقم الجوال** + **كلمة المرور**, submit **تسجيل الدخول** (`ValueKey('login_submit')` in app). Delegate smoke uses segment **مندوب** + national ID field instead.
-
-Semantics ids (ENV=dev only): `tashil_main_menu_button`, `tashil_profile_phone_value`.
+Patrol integration tests reuse login helpers in `patrol_test/support/` for **setup only**; journey assertions stay in Maestro YAML here.

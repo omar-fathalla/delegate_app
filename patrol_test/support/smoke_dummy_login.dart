@@ -82,7 +82,53 @@ Future<void> submitDevDummyLogin(
   );
 }
 
-/// Opens profile from the main menu and asserts phone + role badge text.
+/// Delegate (**مندوب**) login — setup only; no post-login journey assertions.
+Future<void> submitDevDelegateDummyLogin(
+  PatrolIntegrationTester $,
+  SmokeDevPatrolCredentials creds,
+) async {
+  expect(
+    creds.hasDelegateNationalId,
+    isTrue,
+    reason: 'Set PATROL_DEV_NATIONAL_ID for delegate Patrol setup',
+  );
+
+  await waitForDevLoginScreenAfterSplash($);
+  await waitForDevLoginFormFieldsReady($);
+
+  final phoneField = devLoginPhoneFieldFinder();
+  final nationalIdField = devLoginDelegateNationalIdFieldFinder();
+  expect(phoneField, findsOneWidget);
+  expect(nationalIdField, findsOneWidget);
+
+  await $.tester.tap(phoneField);
+  await $.tester.pump(smokePostLoginPumpStep);
+  await $.tester.enterText(phoneField, creds.phone);
+  await $.tester.pump(smokePostLoginPumpStep);
+
+  await $.tester.tap(nationalIdField);
+  await $.tester.pump(smokePostLoginPumpStep);
+  await $.tester.enterText(nationalIdField, creds.nationalId);
+  await $.tester.pump(smokePostLoginPumpStep);
+
+  final submit = devLoginSubmitFinder();
+  await $(submit).scrollTo();
+  await $.tester.tap(submit);
+  await $.tester.pump(smokePostLoginPumpStep);
+
+  await dismissIosSavePasswordIfVisible($);
+
+  await _pumpUntil(
+    $,
+    () => $.tester.any(devMainMenuButtonFinder()),
+    deadline: smokePostLoginDeadline,
+  );
+  await $(devMainMenuButtonFinder()).waitUntilVisible(
+    timeout: smokeLoginFieldTimeout,
+  );
+}
+
+/// Maestro-only journey assertion (profile phone + role). Patrol setup must not call this.
 Future<void> verifyDevLoggedInRole(
   PatrolIntegrationTester $,
   SmokeDevPatrolCredentials creds,
