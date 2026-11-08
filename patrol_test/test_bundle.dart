@@ -13,7 +13,14 @@ import 'package:patrol/src/platform/mobile/patrol_runtime_ports.dart';
 import 'package:test_api/src/backend/invoker.dart';
 
 // START: GENERATED TEST IMPORTS
-import 'smoke_dev_login_test.dart' as smoke_dev_login_test;
+import 'integration_location_checkin_test.dart'
+    as integration_location_checkin_test;
+import 'integration_native_permissions_test.dart'
+    as integration_native_permissions_test;
+import 'integration_offline_sync_lifecycle_test.dart'
+    as integration_offline_sync_lifecycle_test;
+import 'integration_push_notification_test.dart'
+    as integration_push_notification_test;
 // END: GENERATED TEST IMPORTS
 
 Future<void> main() async {
@@ -105,7 +112,22 @@ Future<void> main() async {
   });
 
 // START: GENERATED TEST GROUPS
-  group('smoke_dev_login_test', smoke_dev_login_test.main);
+  group(
+    'integration_location_checkin_test',
+    integration_location_checkin_test.main,
+  );
+  group(
+    'integration_native_permissions_test',
+    integration_native_permissions_test.main,
+  );
+  group(
+    'integration_offline_sync_lifecycle_test',
+    integration_offline_sync_lifecycle_test.main,
+  );
+  group(
+    'integration_push_notification_test',
+    integration_push_notification_test.main,
+  );
 // END: GENERATED TEST GROUPS
 
   if (constants.testDiscoveryEnabled) {

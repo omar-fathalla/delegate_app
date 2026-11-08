@@ -1,0 +1,37 @@
+appId: com.tashil.delegate.dev
+---
+# Maestro — staff (**موظف إداري**) journey: login, main nav, profile, settings, logout.
+# No OS permission dialogs (Patrol owns those).
+
+- launchApp:
+    clearState: true
+    clearKeychain: true
+
+- runFlow:
+    file: ../subflows/login-staff.yaml
+
+- assertVisible: "الرئيسية"
+
+- tapOn:
+    id: "tashil_main_menu_button"
+- tapOn: "الملف الشخصي"
+
+- extendedWaitUntil:
+    visible:
+      id: "tashil_profile_phone_value"
+    timeout: 60000
+- assertVisible:
+    id: "tashil_profile_phone_value"
+
+- back
+
+- tapOn:
+    id: "tashil_main_menu_button"
+- tapOn: "الإعدادات"
+
+- extendedWaitUntil:
+    visible: "الإعدادات"
+    timeout: 60000
+
+- runFlow:
+    file: ../subflows/logout-via-menu.yaml

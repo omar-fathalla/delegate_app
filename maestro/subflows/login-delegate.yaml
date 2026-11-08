@@ -1,0 +1,29 @@
+# Delegate login (**مندوب**): phone + fake national ID (dev doc only; not a password).
+
+- assertVisible: "رقم الجوال"
+
+- tapOn: "مندوب"
+
+- tapOn: "رقم الجوال"
+- inputText: ${TASHIL_MAESTRO_DEV_DELEGATE_PHONE}
+
+- tapOn: "الرقم القومي"
+- inputText: ${TASHIL_MAESTRO_DEV_DELEGATE_NATIONAL_ID}
+
+- pressKey: Enter
+
+- runFlow:
+    when:
+      visible: "تسجيل الدخول"
+    commands:
+      - tapOn: "تسجيل الدخول"
+
+- runFlow:
+    file: dismiss-ios-save-password.yaml
+
+- extendedWaitUntil:
+    notVisible: "تسجيل الدخول"
+    timeout: 120000
+
+- assertVisible:
+    id: "tashil_main_menu_button"

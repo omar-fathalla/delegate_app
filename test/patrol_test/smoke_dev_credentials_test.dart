@@ -6,7 +6,7 @@ void main() {
   test('staff supervisor phone maps to profile company-admin badge', () {
     expect(
       SmokeDevPatrolCredentials.expectedProfileRoleLabelForPatrolPhone(
-        SmokeDevPatrolCredentials.defaultPhone,
+        SmokeDevPatrolCredentials.defaultStaffPhone,
       ),
       SmokeDevPatrolCredentials.staffSupervisorProfileRoleLabel,
     );
@@ -27,11 +27,18 @@ void main() {
 
   test('fromEnvironment without secret has hasSecret false', () {
     final creds = SmokeDevPatrolCredentials.fromEnvironment();
-    expect(creds.phone, SmokeDevPatrolCredentials.defaultPhone);
+    expect(creds.phone, SmokeDevPatrolCredentials.defaultStaffPhone);
     expect(
       creds.expectedRoleLabel,
       SmokeDevPatrolCredentials.staffSupervisorProfileRoleLabel,
     );
     expect(creds.hasSecret, isFalse);
+  });
+
+  test('delegateFromEnvironment exposes fake national ID default', () {
+    final creds = SmokeDevPatrolCredentials.delegateFromEnvironment();
+    expect(creds.phone, SmokeDevPatrolCredentials.defaultDelegatePhone);
+    expect(creds.nationalId, SmokeDevPatrolCredentials.defaultDelegateNationalId);
+    expect(creds.hasDelegateNationalId, isTrue);
   });
 }

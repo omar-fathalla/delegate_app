@@ -1,0 +1,14 @@
+# Opens header menu → logout → confirms M3 modal. Lands on login screen.
+
+- tapOn:
+    id: "tashil_main_menu_button"
+
+- tapOn: "تسجيل الخروج"
+
+- assertVisible: "تسجيل الخروج"
+
+- tapOn: "تسجيل الخروج"
+
+- extendedWaitUntil:
+    visible: "رقم الجوال"
+    timeout: 90000

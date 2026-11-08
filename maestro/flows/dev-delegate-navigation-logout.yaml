@@ -1,0 +1,33 @@
+appId: com.tashil.delegate.dev
+---
+# Maestro — delegate (**مندوب**) journey: login, home tab, profile, settings, logout.
+
+- launchApp:
+    clearState: true
+    clearKeychain: true
+
+- runFlow:
+    file: ../subflows/login-delegate.yaml
+
+- assertVisible: "الرئيسية"
+
+- tapOn:
+    id: "tashil_main_menu_button"
+- tapOn: "الملف الشخصي"
+
+- extendedWaitUntil:
+    visible: "الملف الشخصي"
+    timeout: 60000
+
+- back
+
+- tapOn:
+    id: "tashil_main_menu_button"
+- tapOn: "الإعدادات"
+
+- extendedWaitUntil:
+    visible: "الإعدادات"
+    timeout: 60000
+
+- runFlow:
+    file: ../subflows/logout-via-menu.yaml
