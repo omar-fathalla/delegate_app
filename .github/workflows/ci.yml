@@ -3,6 +3,7 @@ name: CI
 # PR checks for Tashil App. No secrets, no deploys, read-only token.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [dev, main]
   push:
     branches: [dev]
@@ -11,12 +12,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   analyze:
     name: Analyze
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -34,6 +36,7 @@ jobs:
 
   test:
     name: Test
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -50,6 +53,7 @@ jobs:
 
   p0-scripts:
     name: P0 scripts (emulators)
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -72,6 +76,7 @@ jobs:
 
   build-web:
     name: Build web (release)
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -88,6 +93,7 @@ jobs:
 
   ios-dev-config-check:
     name: iOS dev config (static)
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -97,6 +103,7 @@ jobs:
 
   functions:
     name: Functions lint & test
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -125,6 +132,7 @@ jobs:
 
   rules:
     name: Firestore rules & delegate login e2e (emulators)
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
