@@ -60,6 +60,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.44.5"
@@ -68,7 +69,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
       - name: Build APK (prod flavor release; debug cert without key.properties)
-        run: flutter build apk --release --flavor prod --dart-define=ENV=prod
+        run: bash scripts/ci_gradle_flutter_apk.sh -- --release --flavor prod --dart-define=ENV=prod
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:

@@ -1,3 +1,5 @@
+appId: com.tashil.delegate.dev
+---
 # Opens header menu → logout → confirms M3 modal. Lands on login screen.
 
 - tapOn:
