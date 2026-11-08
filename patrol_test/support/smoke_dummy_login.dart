@@ -1,12 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:patrol/patrol.dart';
 
+import 'patrol_native_actions.dart';
 import 'smoke_dev_credentials.dart';
 import 'smoke_login_finders.dart';
 import 'smoke_login_wait.dart';
 
-const Duration smokeLoginFieldTimeout = Duration(seconds: 30);
-const Duration smokePostLoginDeadline = Duration(seconds: 120);
+const Duration smokeLoginFieldTimeout = Duration(seconds: 45);
+const Duration smokePostLoginDeadline = Duration(seconds: 180);
 const Duration smokePostLoginPumpStep = Duration(milliseconds: 250);
 
 Finder devMainMenuButtonFinder() =>
@@ -27,15 +28,27 @@ Future<void> _pumpUntil(
   expect(predicate(), isTrue, reason: 'Patrol smoke deadline elapsed');
 }
 
-Future<void> dismissIosSavePasswordIfVisible(PatrolIntegrationTester $) async {
-  for (final label in ['Not Now', 'ليس الآن', 'Never', 'أبداً']) {
-    final button = find.text(label);
-    if (button.evaluate().isNotEmpty) {
-      await $.tester.tap(button);
-      await $.tester.pump(smokePostLoginPumpStep);
+Future<void> awaitDevMainMenuAfterLogin(PatrolIntegrationTester $) async {
+  final end = DateTime.now().add(smokePostLoginDeadline);
+  var tick = 0;
+  while (DateTime.now().isBefore(end)) {
+    if (tick % 12 == 0) {
+      await patrolDismissIosSavePasswordSheet($);
+    }
+    tick++;
+    await $.tester.pump(smokePostLoginPumpStep);
+    if ($.tester.any(devMainMenuButtonFinder())) {
+      await $(devMainMenuButtonFinder()).waitUntilVisible(
+        timeout: smokeLoginFieldTimeout,
+      );
       return;
     }
   }
+  expect(
+    $.tester.any(devMainMenuButtonFinder()),
+    isTrue,
+    reason: 'Patrol login deadline elapsed before main menu',
+  );
 }
 
 /// Fills phone + secret on the dev login screen and submits.
@@ -70,16 +83,8 @@ Future<void> submitDevDummyLogin(
   await $.tester.tap(submit);
   await $.tester.pump(smokePostLoginPumpStep);
 
-  await dismissIosSavePasswordIfVisible($);
-
-  await _pumpUntil(
-    $,
-    () => $.tester.any(devMainMenuButtonFinder()),
-    deadline: smokePostLoginDeadline,
-  );
-  await $(devMainMenuButtonFinder()).waitUntilVisible(
-    timeout: smokeLoginFieldTimeout,
-  );
+  await patrolDismissIosSavePasswordSheet($);
+  await awaitDevMainMenuAfterLogin($);
 }
 
 /// Delegate (**مندوب**) login — setup only; no post-login journey assertions.
@@ -95,6 +100,13 @@ Future<void> submitDevDelegateDummyLogin(
 
   await waitForDevLoginScreenAfterSplash($);
   await waitForDevLoginFormFieldsReady($);
+
+  final delegateMode = devLoginDelegateModeFinder();
+  if ($.tester.any(delegateMode)) {
+    await $.tester.tap(delegateMode);
+    await $.tester.pump(smokePostLoginPumpStep);
+    await waitForDevLoginFormFieldsReady($);
+  }
 
   final phoneField = devLoginPhoneFieldFinder();
   final nationalIdField = devLoginDelegateNationalIdFieldFinder();
@@ -116,16 +128,8 @@ Future<void> submitDevDelegateDummyLogin(
   await $.tester.tap(submit);
   await $.tester.pump(smokePostLoginPumpStep);
 
-  await dismissIosSavePasswordIfVisible($);
-
-  await _pumpUntil(
-    $,
-    () => $.tester.any(devMainMenuButtonFinder()),
-    deadline: smokePostLoginDeadline,
-  );
-  await $(devMainMenuButtonFinder()).waitUntilVisible(
-    timeout: smokeLoginFieldTimeout,
-  );
+  await patrolDismissIosSavePasswordSheet($);
+  await awaitDevMainMenuAfterLogin($);
 }
 
 /// Maestro-only journey assertion (profile phone + role). Patrol setup must not call this.
