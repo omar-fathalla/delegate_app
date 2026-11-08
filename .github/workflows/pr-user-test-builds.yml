@@ -71,8 +71,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
       - name: Warm Gradle wrapper distribution
-        working-directory: android
-        run: ./gradlew --version
+        run: bash scripts/ci_warm_gradle_distribution.sh
       - name: Build APK (prod flavor release; debug cert without key.properties)
         run: bash scripts/ci_gradle_flutter_apk.sh -- --release --flavor prod --dart-define=ENV=prod
       - name: Upload APK artifact
