@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build a Flutter APK with one automatic retry on Gradle/network flakes (504, timeouts).
+# Build a Flutter APK with retries on Gradle wrapper/distribution network flakes (504, timeouts).
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
@@ -15,10 +15,14 @@ else
   exit 1
 fi
 
-_NETWORK_FLAKE_RE='(504|Gateway Time-out|gateway timeout|timed out|timeout|download failed|Could not (GET|HEAD)|Connection reset|Broken pipe|UNAVAILABLE|Service Unavailable)'
+# Match transient download/CDN issues only — not compile or dependency resolution failures.
+_NETWORK_FLAKE_RE='(504|502|503|Gateway Time-out|gateway timeout|timed out|timeout|download failed|gradle-distributions|distributionUrl|Could not (GET|HEAD)|Connection reset|Broken pipe|UNAVAILABLE|Service Unavailable|SSLHandshakeException|Remote host terminated)'
+
+_MAX_ATTEMPTS=4
+_BACKOFF_SECS=(15 45 90)
 
 attempt=1
-while [[ "$attempt" -le 2 ]]; do
+while [[ "$attempt" -le "$_MAX_ATTEMPTS" ]]; do
   set +e
   out="$(flutter build apk "$@" 2>&1)"
   code=$?
@@ -28,10 +32,12 @@ while [[ "$attempt" -le 2 ]]; do
     exit 0
   fi
   echo "$out" >&2
-  if [[ "$attempt" -eq 2 ]] || ! echo "$out" | grep -Eqi "$_NETWORK_FLAKE_RE"; then
+  if [[ "$attempt" -eq "$_MAX_ATTEMPTS" ]] || ! echo "$out" | grep -Eqi "$_NETWORK_FLAKE_RE"; then
     exit "$code"
   fi
-  echo "ci_gradle_flutter_apk: network/Gradle flake detected; retrying once..." >&2
-  sleep 15
+  sleep_idx=$((attempt - 1))
+  sleep_secs="${_BACKOFF_SECS[$sleep_idx]:-${_BACKOFF_SECS[-1]}}"
+  echo "ci_gradle_flutter_apk: network/Gradle flake detected (attempt ${attempt}/${_MAX_ATTEMPTS}); retrying in ${sleep_secs}s..." >&2
+  sleep "$sleep_secs"
   attempt=$((attempt + 1))
 done
