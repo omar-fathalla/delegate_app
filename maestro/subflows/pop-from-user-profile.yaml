@@ -1,0 +1,28 @@
+appId: com.tashil.delegate.dev
+---
+# GoRouter /user-profile: Maestro `back` does not pop the AppBar leading control on iOS.
+- runFlow:
+    when:
+      visible:
+        id: "tashil_profile_phone_value"
+    commands:
+      - tapOn:
+          text: "Back"
+          optional: true
+          retryTapIfNoChange: false
+      - tapOn:
+          text: "رجوع"
+          optional: true
+          retryTapIfNoChange: false
+      - tapOn:
+          point: "6%,9%"
+          optional: true
+          retryTapIfNoChange: false
+      - swipe:
+          start: "2%,50%"
+          end: "45%,50%"
+
+- extendedWaitUntil:
+    notVisible:
+      id: "tashil_profile_phone_value"
+    timeout: 60000

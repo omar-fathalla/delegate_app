@@ -31,9 +31,12 @@ Future<void> _pumpUntil(
 Future<void> awaitDevMainMenuAfterLogin(PatrolIntegrationTester $) async {
   final end = DateTime.now().add(smokePostLoginDeadline);
   var tick = 0;
+  var savePasswordDismissPasses = 0;
+  const maxSavePasswordDismissPasses = 8;
   while (DateTime.now().isBefore(end)) {
-    if (tick % 12 == 0) {
+    if (tick % 24 == 0 && savePasswordDismissPasses < maxSavePasswordDismissPasses) {
       await patrolDismissIosSavePasswordSheet($);
+      savePasswordDismissPasses++;
     }
     tick++;
     await $.tester.pump(smokePostLoginPumpStep);
@@ -128,6 +131,8 @@ Future<void> submitDevDelegateDummyLogin(
   await $.tester.tap(submit);
   await $.tester.pump(smokePostLoginPumpStep);
 
+  await patrolDismissIosSavePasswordSheet($);
+  await $.tester.pump(const Duration(milliseconds: 800));
   await patrolDismissIosSavePasswordSheet($);
   await awaitDevMainMenuAfterLogin($);
 }
