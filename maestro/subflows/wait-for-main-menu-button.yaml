@@ -1,0 +1,17 @@
+appId: com.tashil.delegate.dev
+---
+# After route pop (e.g. profile), header menu can be off-screen or mid-transition.
+- scrollUntilVisible:
+    element:
+      id: "tashil_main_menu_button"
+    direction: DOWN
+    timeout: 90000
+    centerElement: true
+
+- extendedWaitUntil:
+    visible:
+      id: "tashil_main_menu_button"
+    timeout: 30000
+
+- assertVisible:
+    id: "tashil_main_menu_button"

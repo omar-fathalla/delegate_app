@@ -28,6 +28,9 @@ appId: com.tashil.delegate.dev
 
 - back
 
+- runFlow:
+    file: ../subflows/wait-for-main-menu-button.yaml
+
 - tapOn:
     id: "tashil_main_menu_button"
 - tapOn: "الإعدادات"

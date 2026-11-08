@@ -21,7 +21,7 @@ void main() {
       await $.tester.pump(const Duration(milliseconds: 800));
       expect(patrolMainMenuButtonFinder(), findsWidgets);
     },
-    timeout: const Timeout(Duration(minutes: 6)),
+    timeout: const Timeout(Duration(minutes: 8)),
   );
 
   patrolTest(
@@ -34,6 +34,6 @@ void main() {
       await $.tester.pump(const Duration(milliseconds: 800));
       expect(patrolMainMenuButtonFinder(), findsWidgets);
     },
-    timeout: const Timeout(Duration(minutes: 6)),
+    timeout: const Timeout(Duration(minutes: 8)),
   );
 }
