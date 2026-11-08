@@ -47,10 +47,7 @@ Future<void> submitDevDummyLogin(
 
   await waitForDevLoginScreenAfterSplash($);
 
-  final staffMode = devLoginStaffModeFinder();
-  expect(staffMode, findsOneWidget);
-  await $.tester.tap(staffMode);
-  await $.tester.pump(smokePostLoginPumpStep);
+  await tapDevLoginStaffModeAndWaitForFields($);
 
   final phoneField = devLoginPhoneFieldFinder();
   final secretField = devLoginStaffPasswordFieldFinder();

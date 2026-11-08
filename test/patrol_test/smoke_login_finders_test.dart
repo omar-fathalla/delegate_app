@@ -17,4 +17,11 @@ void main() {
       'login_submit',
     ], containsAll(['login_phone', 'login_staff_password', 'login_submit']));
   });
+
+  test('delegate vs staff field keys are mutually exclusive second fields', () {
+    expect(
+      const ['login_national_id'],
+      isNot(contains('login_staff_password')),
+    );
+  });
 }
