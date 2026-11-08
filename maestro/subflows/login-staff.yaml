@@ -1,3 +1,5 @@
+appId: com.tashil.delegate.dev
+---
 # Staff supervisor login (**موظف إداري**). Secrets via -e TASHIL_MAESTRO_DEV_SECRET only.
 
 - assertVisible: "رقم الجوال"

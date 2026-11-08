@@ -1,3 +1,5 @@
+appId: com.tashil.delegate.dev
+---
 # Delegate login (**مندوب**): phone + fake national ID (dev doc only; not a password).
 
 - assertVisible: "رقم الجوال"
