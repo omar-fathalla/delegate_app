@@ -6,7 +6,7 @@ import 'support/patrol_native_actions.dart';
 
 void main() {
   patrolTest(
-    'dev: background/foreground keeps session (Workmanager offlineSyncTask registered)',
+    'dev: background-foreground keeps session (Workmanager offlineSyncTask registered)',
     ($) async {
       await patrolSetupLoggedInStaff($);
 
