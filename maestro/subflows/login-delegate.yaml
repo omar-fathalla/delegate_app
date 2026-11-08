@@ -2,7 +2,8 @@ appId: com.tashil.delegate.dev
 ---
 # Delegate login (**مندوب**): phone + fake national ID (dev doc only; not a password).
 
-- assertVisible: "رقم الجوال"
+- runFlow:
+    file: wait-for-login-screen.yaml
 
 - tapOn: "مندوب"
 
@@ -21,7 +22,7 @@ appId: com.tashil.delegate.dev
       - tapOn: "تسجيل الدخول"
 
 - runFlow:
-    file: dismiss-ios-save-password.yaml
+    file: ./dismiss-ios-save-password.yaml
 
 - extendedWaitUntil:
     notVisible: "تسجيل الدخول"

@@ -2,7 +2,8 @@ appId: com.tashil.delegate.dev
 ---
 # Staff supervisor login (**موظف إداري**). Secrets via -e TASHIL_MAESTRO_DEV_SECRET only.
 
-- assertVisible: "رقم الجوال"
+- runFlow:
+    file: wait-for-login-screen.yaml
 
 - tapOn: "موظف إداري"
 
@@ -21,7 +22,7 @@ appId: com.tashil.delegate.dev
       - tapOn: "تسجيل الدخول"
 
 - runFlow:
-    file: dismiss-ios-save-password.yaml
+    file: ./dismiss-ios-save-password.yaml
 
 - extendedWaitUntil:
     notVisible: "تسجيل الدخول"

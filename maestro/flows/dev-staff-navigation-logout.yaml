@@ -10,7 +10,10 @@ appId: com.tashil.delegate.dev
 - runFlow:
     file: ../subflows/login-staff.yaml
 
-- assertVisible: "الرئيسية"
+- extendedWaitUntil:
+    visible:
+      id: "tashil_main_menu_button"
+    timeout: 120000
 
 - tapOn:
     id: "tashil_main_menu_button"
