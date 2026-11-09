@@ -1525,19 +1525,43 @@ service cloud.firestore {
       let wasPaid = before.get('paymentStatus', '') == 'paid';
       return (incoming.get('paymentStatus', '') != 'paid' || wasPaid)
         && incoming.get('paymob', null) == before.get('paymob', null)
+        && incoming.get('applyState', '') == before.get('applyState', '')
+        && incoming.get('paymentError', null) == before.get('paymentError', null)
+        && incoming.get('needsReview', false) == before.get('needsReview', false)
         && (!wasPaid || !incoming.diff(before).affectedKeys().hasAny([
           'paymentStatus', 'paymob', 'paidAt', 'amountPaid', 'amountDue',
-          'coveredDelegateUids', 'items', 'periodCode', 'requestType', 'applyState'
+          'coveredDelegateUids', 'items', 'periodCode', 'requestType', 'applyState',
+          'paymentError', 'needsReview', 'paymentMethod'
         ]));
     }
 
+      // Subscription Phase 0: no cross-tenant reads. One users/{uid} read (budget).
+    function delegateRequestReadOk() {
+      let d = resource.data;
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let org = u.get('organizationUID', '');
+      let co = u.get('companyUID', '');
+      let docOrg = d.get('organizationUID', d.get('organizationId', ''));
+      let docCo = d.get('companyUID', d.get('companyId', ''));
+      return r in [
+          'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
+          'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport',
+          'tech_support', 'techsupport']
+        || (r in [
+          'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin']
+          && org != '' && docOrg == org)
+        || (r in [
+          'company-admin', 'company_admin', 'companyadmin', 'admin',
+          'supervisor', 'company_supervisor', 'hr', 'company-hr', 'company_hr', 'human_resources']
+          && org != '' && co != '' && docOrg == org && docCo == co)
+        || d.get('supervisorUid', '') == request.auth.uid
+        || d.get('delegateUid', '') == request.auth.uid
+        || resource.id == request.auth.uid;
+    }
+
     match /delegate_requests/{requestId} {
-      allow read: if signedIn() && (
-        isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR()
-        || resource.data.delegateUid == request.auth.uid
-        || resource.id == request.auth.uid
-        || delegateOwns(resource.data.delegateUid)
-      );
+      allow read: if signedIn() && delegateRequestReadOk();
       // Docs-pending: requests are created by staff only (supervisor flow).
       // The approved delegate's uid equals the request id, so the self path
       // is an allow-list of the upload fields and can never approve documents

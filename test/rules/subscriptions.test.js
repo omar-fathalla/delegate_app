@@ -21,10 +21,15 @@ describe("delegate_requests: payment is server-only", () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
       await db.doc("users/sup").set({role: "supervisor", organizationUID: "o1", companyUID: "c1"});
+      await db.doc("users/sup2").set({role: "supervisor", organizationUID: "o2", companyUID: "c2"});
       await db.doc("users/hr1").set({role: "hr", organizationUID: "o1", companyUID: "c1"});
+      await db.doc("users/hr2").set({role: "hr", organizationUID: "o2", companyUID: "c2"});
       await db.doc("users/admin1").set({role: "admin", organizationUID: "o1", companyUID: "c1"});
+      await db.doc("users/oa1").set({role: "organization-admin", organizationUID: "o1"});
+      await db.doc("users/oa2").set({role: "organization-admin", organizationUID: "o2"});
       await db.doc("users/sa").set({role: "super-admin"});
       await db.doc("users/tech").set({role: "technical_support"});
+      await db.doc("users/d1").set({role: "delegate", organizationUID: "o1", companyUID: "c1", uid: "d1"});
       await db.doc("delegate_requests/pending").set({
         requestType: "renewal", status: "pending", paymentStatus: "pending",
         coveredDelegateUids: ["a"], amountDue: 416.67, periodCode: "2027_H1",
@@ -35,6 +40,15 @@ describe("delegate_requests: payment is server-only", () => {
         paymob: {transactionId: "tx"},
       });
       await db.doc("delegate_requests/legacy").set({requestType: "new_delegate", status: "pending"});
+      await db.doc("delegate_requests/scoped").set({
+        requestType: "renewal", status: "pending", organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
+      });
+      await db.doc("delegate_requests/other-co").set({
+        requestType: "renewal", status: "pending", organizationUID: "o2", companyUID: "c2", supervisorUid: "sup2",
+      });
+      await db.doc("delegate_requests/self-d").set({
+        requestType: "new_delegate", status: "pending", delegateUid: "d1", organizationUID: "o1", companyUID: "c1",
+      });
     });
   });
   const as = (uid) => env.authenticatedContext(uid).firestore();
@@ -68,6 +82,24 @@ describe("delegate_requests: payment is server-only", () => {
     await assertSucceeds(as("sa").doc("delegate_requests/legacy").update({status: "approved", reviewedBy: "SA"}));
     await assertSucceeds(as("tech").doc("delegate_requests/legacy").update({status: "rejected", rejectionReason: "r"}));
     await assertSucceeds(as("sa").doc("delegate_requests/legacy2").set({requestType: "delete_delegate", status: "pending"}));
+  });
+
+  test("delegate_requests reads: scoped staff, owners, global staff", async () => {
+    await assertSucceeds(as("sup").doc("delegate_requests/scoped").get());
+    await assertSucceeds(as("hr1").doc("delegate_requests/scoped").get());
+    await assertFails(as("sup2").doc("delegate_requests/scoped").get());
+    await assertFails(as("hr2").doc("delegate_requests/scoped").get());
+    await assertSucceeds(as("oa1").doc("delegate_requests/scoped").get());
+    await assertFails(as("oa2").doc("delegate_requests/scoped").get());
+    await assertSucceeds(as("tech").doc("delegate_requests/other-co").get());
+    await assertSucceeds(as("d1").doc("delegate_requests/self-d").get());
+    await assertFails(as("d1").doc("delegate_requests/scoped").get());
+  });
+
+  test("clients cannot set applyState or payment error flags", async () => {
+    await assertFails(as("hr1").doc("delegate_requests/pending").update({applyState: "applied"}));
+    await assertFails(as("sa").doc("delegate_requests/pending").update({needsReview: true}));
+    await assertFails(as("sup").doc("delegate_requests/pending").update({paymentError: "x"}));
   });
 
   test("delegate self cannot mark paid; staff legacy create without subscription fields still works", async () => {
