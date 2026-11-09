@@ -1,25 +1,30 @@
-# Prod-only staff password callables (recovery blocker)
+# Staff password callables (recovered from prod)
 
-These functions are deployed on `practice-firebase-72df1` but are **not** in this repository:
+Recovered from prod `practice-firebase-72df1` via sanitized source archive (2026-11-09). Codebase: `tashil-mobile-notifications`, Node.js 22, gen1, `us-central1`.
 
-- `completeStaffPasswordSetup`
-- `requestStaffPasswordReset`
-- `sendStaffPasswordSetupEmail`
+## Exports (`functions/src/index.ts`)
 
-## Recovery steps (Mohamed / Engineering)
+- `sendStaffPasswordSetupEmail` — admin-only; queues branded setup/forgot mail via `mail` collection
+- `requestStaffPasswordReset` — public; phone lookup, anti-enumeration `{ ok: true }`
+- `completeStaffPasswordSetup` — public; token + password or token check
+
+## Source modules
+
+- `staff_password_email.ts` — callables
+- `password_setup_token_logic.ts` — 7-day hashed setup tokens (`password_setup_tokens`)
+- `password_email_template.ts` — RTL HTML/text templates
+
+## Optional environment variables (names only)
+
+| Name | Purpose |
+|------|---------|
+| `PASSWORD_EMAIL_LOGO_URL` | Hosted logo PNG in email HTML |
+| `PASSWORD_ACTION_PAGE_URL` | Custom handler page URL for setup links (default in code: `DEFAULT_ACTION_PAGE_URL`) |
+
+Firebase-injected names also referenced in prod metadata: `FIREBASE_CONFIG`, `GCLOUD_PROJECT`, `EVENTARC_CLOUD_EVENT_SOURCE`.
+
+## Targeted deploy (never blanket functions deploy on shared project)
 
 ```bash
-gcloud functions describe completeStaffPasswordSetup \
-  --project=practice-firebase-72df1 --region=us-central1
-# Download source from the returned sourceArchiveUrl or Cloud Console → function → Source.
-
-firebase functions:config:get --project=practice-firebase-72df1  # if legacy config used
+firebase deploy --only functions:tashil-mobile-notifications:sendStaffPasswordSetupEmail,functions:tashil-mobile-notifications:requestStaffPasswordReset,functions:tashil-mobile-notifications:completeStaffPasswordSetup --project <project>
 ```
-
-Add recovered TypeScript under `functions/src/`, export from `functions/src/index.ts`, and add emulator/e2e tests before any targeted deploy.
-
-## Why Phase 0 did not add stubs
-
-A stub export that does not match prod behavior would break the web staff password flow. This agent environment had **no** Firebase login and the in-repo Play Console service account lacks `cloudfunctions.functions.get` on prod (403).
-
-Do **not** run `firebase deploy --only functions:tashil-mobile-notifications` without these three exports until source is merged.

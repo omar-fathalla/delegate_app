@@ -34,7 +34,7 @@ Deploy in this order so clients never hit missing indexes or rules that reject l
    firebase deploy --only functions:tashil-mobile-notifications:createStaffUser,functions:tashil-mobile-notifications:resendStaffSetupLink,functions:tashil-mobile-notifications:claimInvite,functions:tashil-mobile-notifications:delegateLoginV2,functions:tashil-mobile-notifications:confirmDelegateOtp,functions:tashil-mobile-notifications:staffPhoneLookup,functions:tashil-mobile-notifications:onTaskCreated,functions:tashil-mobile-notifications:onTaskUpdated,functions:tashil-mobile-notifications:onPhotoPermissionCreated,functions:tashil-mobile-notifications:onPhotoPermissionUpdated,functions:tashil-mobile-notifications:onNotificationCreated \
      --project practice-firebase-72df1
    ```
-   **Blocker (Phase 0):** prod also runs `completeStaffPasswordSetup`, `requestStaffPasswordReset`, and `sendStaffPasswordSetupEmail`, which are not yet in this repository. Do not run a codebase-wide functions deploy until those exports are recovered from prod source and reviewed; otherwise Firebase will delete the live endpoints.
+   Include staff password callables in the targeted list (see `functions/src/STAFF_PASSWORD_FUNCTIONS_RECOVERY.md`).
 
 4. **Storage rules** (only if this PR changes `storage.rules`)
    ```bash
@@ -115,8 +115,6 @@ Run `npm run test:rules:interim` to prove interim hardening still matches the 44
 - **Delegates** can read only their own request doc, not staff queues.
 - **Client-side payment marking:** Paymob webhook + Admin SDK must be live before enforcing paid renewals.
 - **Collection group `requests` queries** using `ttlAt` or `status`+`updatedAt` fail until indexes finish building.
-- **Staff password callables** missing from repo: web/mobile flows that call the three prod-only functions remain dependent on prod binaries until source is recovered.
-
 ## Contacts
 
 - Deploy approval: Mohamed  
