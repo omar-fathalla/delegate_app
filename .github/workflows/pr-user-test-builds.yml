@@ -56,11 +56,35 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+      # Hosted ubuntu fills during assembleProdRelease (ENOSPC at packageProdRelease).
+      # Keep NDK 28.2.13676358 (AGP needs it); drop other preinstalled NDKs/system-images.
+      # Dropped setup-gradle@v4: PR runs were cache-read-only + cache miss, so it only
+      # initialized empty ~/.gradle and burned disk; last green Android jobs had no setup-gradle.
+      - name: Free disk on hosted ubuntu
+        run: |
+          echo "Before cleanup:" && df -h /
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /opt/ghc \
+            /usr/local/.ghcup \
+            /usr/share/swift \
+            /usr/local/share/boost \
+            /usr/local/lib/android/sdk/system-images || true
+          if [ -d /usr/local/lib/android/sdk/ndk ]; then
+            for d in /usr/local/lib/android/sdk/ndk/*; do
+              [ -e "$d" ] || continue
+              case "$(basename "$d")" in
+                28.2.13676358) echo "Keeping NDK $d" ;;
+                *) echo "Removing NDK $d"; sudo rm -rf "$d" ;;
+              esac
+            done
+          fi
+          sudo docker system prune -af || true
+          echo "After cleanup:" && df -h /
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
-      - uses: gradle/actions/setup-gradle@v4
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.44.5"

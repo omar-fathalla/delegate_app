@@ -502,6 +502,11 @@ export {confirmDelegateOtp} from "./confirm_delegate_otp";
 export {staffPhoneLookup} from "./staff_phone_lookup";
 
 export {createStaffUser, resendStaffSetupLink, claimInvite} from "./staff_accounts";
+export {
+  sendStaffPasswordSetupEmail,
+  requestStaffPasswordReset,
+  completeStaffPasswordSetup,
+} from "./staff_password_email";
 
 // Delegate subscriptions: period-end suspension (daily, Cairo time). Paymob
 // hooks (quoteSubscriptionRequest / applyVerifiedSubscriptionPayment) are
