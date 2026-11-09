@@ -9,6 +9,8 @@ import 'package:delegate_app/features/attendance/data/datasources/attendance_off
 import 'package:delegate_app/features/attendance/domain/attendance_action_messages.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'package:delegate_app/core/attendance/attendance_branch_ref.dart';
+import 'package:delegate_app/core/attendance/attendance_branch_resolve.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geolocator/geolocator.dart';
@@ -38,22 +40,28 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   Future<void> _verifyGeofence({
     required double userLat,
     required double userLong,
-    required String branchName,
+    required AttendanceBranchRef branchRef,
     required bool isCheckIn,
   }) async {
-    final branchData = await remoteDataSource.getBranchByName(branchName.trim());
-    if (branchData == null) {
+    final resolved = await remoteDataSource.resolveBranch(
+      branchId: branchRef.branchId,
+      organizationUID: branchRef.branchOrganizationUID,
+      branchName: branchRef.branchName,
+    );
+    if (resolved == null) {
       throw const ServerFailure(
         'لم يتم العثور على بيانات الفرع. يرجى التأكد من الرمز.',
       );
     }
 
-    // Model handles data structure variations (nested vs top-level)
-    final branch = BranchModel.fromMap(branchData);
+    final branch = branchModelFromResolvedMap(
+      resolved.data,
+      documentId: resolved.documentId,
+    );
 
     if (branch.latitude == 0.0 && branch.longitude == 0.0) {
       throw ServerFailure(
-        'بيانات إحداثيات الفرع ($branchName) غير مكتملة في النظام. يرجى إبلاغ الإدارة.',
+        'بيانات إحداثيات الفرع (${branchRef.branchName}) غير مكتملة في النظام. يرجى إبلاغ الإدارة.',
       );
     }
 
@@ -85,6 +93,8 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     required String organizationId,
     required String deviceInfo,
     String? branchName,
+    String? branchId,
+    String? branchOrganizationUID,
     String? delegateName,
     String? phoneNumber,
     String? companyName,
@@ -100,7 +110,12 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         await _verifyGeofence(
           userLat: lat,
           userLong: long,
-          branchName: branchName,
+          branchRef: AttendanceBranchRef(
+            branchId: branchId,
+            branchOrganizationUID:
+                (branchOrganizationUID ?? organizationId).trim(),
+            branchName: branchName,
+          ),
           isCheckIn: true,
         );
       }
@@ -113,6 +128,8 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         organizationId: organizationId,
         deviceInfo: deviceInfo,
         branchName: branchName,
+        branchId: branchId,
+        branchOrganizationUID: branchOrganizationUID,
         delegateName: delegateName,
         phoneNumber: phoneNumber,
         companyName: companyName,
@@ -147,11 +164,18 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
             userId,
             organizationId,
           );
-          if (activeAttendance != null && activeAttendance.branchName != null) {
+          if (activeAttendance != null &&
+              activeAttendance.branchName != null &&
+              activeAttendance.branchName!.trim().isNotEmpty) {
             await _verifyGeofence(
               userLat: lat,
               userLong: long,
-              branchName: activeAttendance.branchName!,
+              branchRef: AttendanceBranchRef.fromAttendanceLog({
+                'branchId': activeAttendance.branchId,
+                'branchOrganizationUID': activeAttendance.branchOrganizationUID,
+                'organizationId': organizationId,
+                'branchName': activeAttendance.branchName,
+              }),
               isCheckIn: false,
             );
           }
@@ -340,6 +364,8 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
     required double latitude,
     required double longitude,
     required double geofenceRadius,
+    String? branchId,
+    String? organizationUID,
   }) async {
     try {
       if (!await _hasConnection()) {
@@ -350,6 +376,8 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
         latitude: latitude,
         longitude: longitude,
         geofenceRadius: geofenceRadius,
+        branchId: branchId,
+        organizationUID: organizationUID,
       );
       return const Right(null);
     } on Failure catch (e) {

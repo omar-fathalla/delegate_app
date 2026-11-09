@@ -1,3 +1,5 @@
+import 'package:delegate_app/core/attendance/attendance_branch_ref.dart';
+import 'package:delegate_app/core/attendance/attendance_branch_resolve.dart';
 import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
 import 'package:delegate_app/features/attendance/domain/attendance_action_messages.dart';
@@ -26,6 +28,8 @@ abstract class AttendanceRemoteDataSource {
     required String organizationId,
     required String deviceInfo,
     String? branchName,
+    String? branchId,
+    String? branchOrganizationUID,
     String? delegateName,
     String? phoneNumber,
     String? companyName,
@@ -87,8 +91,15 @@ abstract class AttendanceRemoteDataSource {
   /// Syncs an offline queue of attendance actions to Firestore.
   Future<void> syncOfflineQueue(List<Map<String, dynamic>> queue);
 
-  /// Fetches branch details by name.
+  /// Fetches branch details by name (legacy; prefer [resolveBranch]).
   Future<Map<String, dynamic>?> getBranchByName(String branchName);
+
+  /// Resolves a branch by id and/or name scoped to an organization.
+  Future<ResolvedBranchDocument?> resolveBranch({
+    String? branchId,
+    String? organizationUID,
+    String? branchName,
+  });
 
   /// Saves or updates a branch with its geofence data.
   Future<void> saveBranch({
@@ -96,6 +107,8 @@ abstract class AttendanceRemoteDataSource {
     required double latitude,
     required double longitude,
     required double geofenceRadius,
+    String? branchId,
+    String? organizationUID,
   });
 }
 
@@ -119,6 +132,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     required String organizationId,
     required String deviceInfo,
     String? branchName,
+    String? branchId,
+    String? branchOrganizationUID,
     String? delegateName,
     String? phoneNumber,
     String? companyName,
@@ -154,7 +169,19 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             existingActive.checkInTime.day == trustedNow.day;
 
         if (isSameDay) {
-          if (existingActive.branchName == branchName) {
+          final activeRef = AttendanceBranchRef.fromAttendanceLog({
+            'branchId': existingActive.branchId,
+            'branchOrganizationUID': existingActive.branchOrganizationUID,
+            'organizationId': existingActive.organizationId,
+            'branchName': existingActive.branchName,
+          });
+          final incomingRef = AttendanceBranchRef(
+            branchId: branchId,
+            branchOrganizationUID:
+                (branchOrganizationUID ?? organizationId).trim(),
+            branchName: branchName ?? '',
+          );
+          if (attendanceSameBranch(activeRef, incomingRef)) {
             throw const ServerFailure(
               'أنت مسجل حضور بالفعل في هذا الفرع وما زالت الجلسة جارية.',
             );
@@ -176,6 +203,11 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             'location': {'latitude': lat, 'longitude': long},
             'deviceInfo': deviceInfo,
             'branchName': branchName,
+            if (branchId != null && branchId.trim().isNotEmpty)
+              'branchId': branchId.trim(),
+            if ((branchOrganizationUID ?? organizationId).trim().isNotEmpty)
+              'branchOrganizationUID':
+                  (branchOrganizationUID ?? organizationId).trim(),
           };
       // Fix3: denormalize display fields so marketing cards skip N+1 profile reads.
       final trimmedName = delegateName?.trim();
@@ -234,7 +266,12 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           userId: userId,
           companyId: companyId,
           organizationId: organizationId,
-          branchName: branchName,
+          branchRef: AttendanceBranchRef(
+            branchId: branchId,
+            branchOrganizationUID:
+                (branchOrganizationUID ?? organizationId).trim(),
+            branchName: branchName ?? '',
+          ),
           lat: lat,
           long: long,
           time: currentTime,
@@ -249,6 +286,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         latitude: lat,
         longitude: long,
         branchName: branchName,
+        branchId: branchId,
+        branchOrganizationUID: branchOrganizationUID ?? organizationId,
       );
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في تسجيل الحضور. حاول مرة أخرى.');
@@ -313,6 +352,9 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'location': {'latitude': lat, 'longitude': long},
         'relatedCheckInId': attendanceId,
         if (lastData['branchName'] != null) 'branchName': lastData['branchName'],
+        if (lastData['branchId'] != null) 'branchId': lastData['branchId'],
+        if (lastData['branchOrganizationUID'] != null)
+          'branchOrganizationUID': lastData['branchOrganizationUID'],
       });
       batch.update(checkInRef, {
         'checkOutTime': FieldValue.serverTimestamp(),
@@ -330,10 +372,22 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
 
       // Auto-resolve any orphaned unclosed check-in for the same user and branch today
       try {
-        final orphanedSnaps = await _attendanceCollection(organizationId)
+        final lastBranchId = lastData['branchId']?.toString().trim();
+        Query<Map<String, dynamic>> orphanQuery = _attendanceCollection(
+          organizationId,
+        )
             .where('delegateId', isEqualTo: userId)
-            .where('type', isEqualTo: 'check_in')
-            .where('branchName', isEqualTo: lastData['branchName'])
+            .where('type', isEqualTo: 'check_in');
+        if (lastBranchId != null && lastBranchId.isNotEmpty) {
+          orphanQuery = orphanQuery.where('branchId', isEqualTo: lastBranchId);
+        } else if (lastData['branchName'] != null) {
+          orphanQuery = orphanQuery.where(
+            'branchName',
+            isEqualTo: lastData['branchName'],
+          );
+        }
+
+        final orphanedSnaps = await orphanQuery
             .limit(5)
             .get()
             .timeout(const Duration(seconds: 4));
@@ -359,6 +413,9 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
                 'location': {'latitude': lat, 'longitude': long},
                 'relatedCheckInId': doc.id,
                 if (lastData['branchName'] != null) 'branchName': lastData['branchName'],
+                if (lastData['branchId'] != null) 'branchId': lastData['branchId'],
+                if (lastData['branchOrganizationUID'] != null)
+                  'branchOrganizationUID': lastData['branchOrganizationUID'],
                 'autoClosedDuplicate': true,
               });
               orphanBatch.update(doc.reference, {
@@ -799,6 +856,9 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           longitude:
               (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0,
           branchName: data['branchName'],
+          branchId: data['branchId'] as String?,
+          branchOrganizationUID: (data['branchOrganizationUID'] as String?) ??
+              data['organizationId'] as String?,
         );
       }
 
@@ -863,6 +923,9 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       latitude: (data['location']?['latitude'] as num?)?.toDouble() ?? 0.0,
       longitude: (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0,
       branchName: data['branchName'],
+      branchId: data['branchId'] as String?,
+      branchOrganizationUID: (data['branchOrganizationUID'] as String?) ??
+          data['organizationId'] as String?,
     );
   }
 
@@ -940,6 +1003,10 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
               longitude:
                   (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0,
               branchName: data['branchName'],
+              branchId: data['branchId'] as String?,
+              branchOrganizationUID:
+                  (data['branchOrganizationUID'] as String?) ??
+                  data['organizationId'] as String?,
             );
           }
           return null;
@@ -968,6 +1035,12 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         }
         if (action['branchName'] != null) {
           data['branchName'] = action['branchName'];
+        }
+        if (action['branchId'] != null) {
+          data['branchId'] = action['branchId'];
+        }
+        if (action['branchOrganizationUID'] != null) {
+          data['branchOrganizationUID'] = action['branchOrganizationUID'];
         }
         if (action['relatedCheckInId'] != null) {
           data['relatedCheckInId'] = action['relatedCheckInId'];
@@ -1014,33 +1087,92 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
   }
 
   @override
-  Future<Map<String, dynamic>?> getBranchByName(String branchName) async {
+  Future<ResolvedBranchDocument?> resolveBranch({
+    String? branchId,
+    String? organizationUID,
+    String? branchName,
+  }) async {
     try {
-      final querySnapshot = await firestore
-          .collection('branches')
-          .where('branchName', isEqualTo: branchName.trim())
-          .limit(1)
-          .getResilient(
-            timeout: const Duration(seconds: 5),
-            forceServer: true,
-          );
+      final trimmedId = branchId?.trim() ?? '';
+      final trimmedOrg = organizationUID?.trim() ?? '';
+      final trimmedName = branchName?.trim() ?? '';
 
-      if (querySnapshot.docs.isEmpty) {
-        final groupSnap = await firestore
-            .collectionGroup('branches')
-            .where('branchName', isEqualTo: branchName.trim())
+      if (trimmedId.isNotEmpty) {
+        if (trimmedOrg.isNotEmpty) {
+          final nestedRef = firestore
+              .collection('organizations')
+              .doc(trimmedOrg)
+              .collection('branches')
+              .doc(trimmedId);
+          final nestedSnap = await nestedRef
+              .get(const GetOptions(source: Source.server))
+              .timeout(const Duration(seconds: 5));
+          if (nestedSnap.exists && nestedSnap.data() != null) {
+            return ResolvedBranchDocument(
+              documentId: nestedSnap.id,
+              data: {
+                ...nestedSnap.data()!,
+                'organizationUID': trimmedOrg,
+              },
+            );
+          }
+        }
+
+        final rootDoc = await firestore
+            .collection('branches')
+            .doc(trimmedId)
+            .get(const GetOptions(source: Source.server))
+            .timeout(const Duration(seconds: 5));
+        if (rootDoc.exists && rootDoc.data() != null) {
+          final data = rootDoc.data()!;
+          if (trimmedOrg.isNotEmpty) {
+            final docOrg = (data['organizationUID'] ?? data['organizationId'])
+                ?.toString()
+                .trim();
+            if (docOrg != null && docOrg.isNotEmpty && docOrg != trimmedOrg) {
+              return null;
+            }
+          }
+          return ResolvedBranchDocument(documentId: rootDoc.id, data: data);
+        }
+      }
+
+      if (trimmedName.isNotEmpty && trimmedOrg.isNotEmpty) {
+        final scopedSnap = await firestore
+            .collection('branches')
+            .where('branchName', isEqualTo: trimmedName)
+            .where('organizationUID', isEqualTo: trimmedOrg)
             .limit(1)
             .getResilient(
               timeout: const Duration(seconds: 5),
               forceServer: true,
             );
-        if (groupSnap.docs.isNotEmpty) {
-          return groupSnap.docs.first.data();
+        if (scopedSnap.docs.isNotEmpty) {
+          final doc = scopedSnap.docs.first;
+          return ResolvedBranchDocument(documentId: doc.id, data: doc.data());
         }
-        return null;
+
+        final nestedSnap = await firestore
+            .collection('organizations')
+            .doc(trimmedOrg)
+            .collection('branches')
+            .where('branchName', isEqualTo: trimmedName)
+            .limit(1)
+            .get(const GetOptions(source: Source.server))
+            .timeout(const Duration(seconds: 5));
+        if (nestedSnap.docs.isNotEmpty) {
+          final doc = nestedSnap.docs.first;
+          return ResolvedBranchDocument(
+            documentId: doc.id,
+            data: {
+              ...doc.data(),
+              'organizationUID': trimmedOrg,
+            },
+          );
+        }
       }
 
-      return querySnapshot.docs.first.data();
+      return null;
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في جلب بيانات الفرع. يرجى المحاولة مرة أخرى.');
     } on TimeoutException {
@@ -1051,39 +1183,64 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
   }
 
   @override
+  Future<Map<String, dynamic>?> getBranchByName(String branchName) async {
+    final resolved = await resolveBranch(branchName: branchName);
+    return resolved?.data;
+  }
+
+  @override
   Future<void> saveBranch({
     required String branchName,
     required double latitude,
     required double longitude,
     required double geofenceRadius,
+    String? branchId,
+    String? organizationUID,
   }) async {
     try {
-      final querySnapshot = await firestore
-          .collection('branches')
-          .where('branchName', isEqualTo: branchName)
-          .limit(1)
-          .getResilient(
-            timeout: const Duration(seconds: 5),
-            forceServer: true,
-          );
-
+      final trimmedId = branchId?.trim() ?? '';
+      final trimmedOrg = organizationUID?.trim() ?? '';
       final Map<String, dynamic> data = {
         'branchName': branchName,
         'location': {'latitude': latitude, 'longitude': longitude},
         'geofenceRadius': geofenceRadius,
         'updatedAt': FieldValue.serverTimestamp(),
+        if (trimmedOrg.isNotEmpty) 'organizationUID': trimmedOrg,
       };
 
-      if (querySnapshot.docs.isEmpty) {
+      if (trimmedId.isNotEmpty) {
         await firestore
             .collection('branches')
-            .add(data)
+            .doc(trimmedId)
+            .set(data, SetOptions(merge: true))
             .timeout(const Duration(seconds: 15));
-      } else {
-        await querySnapshot.docs.first.reference
-            .update(data)
-            .timeout(const Duration(seconds: 15));
+        BranchesSessionCache.invalidate();
+        return;
       }
+
+      if (trimmedOrg.isNotEmpty) {
+        final querySnapshot = await firestore
+            .collection('branches')
+            .where('branchName', isEqualTo: branchName)
+            .where('organizationUID', isEqualTo: trimmedOrg)
+            .limit(1)
+            .getResilient(
+              timeout: const Duration(seconds: 5),
+              forceServer: true,
+            );
+        if (querySnapshot.docs.isNotEmpty) {
+          await querySnapshot.docs.first.reference
+              .update(data)
+              .timeout(const Duration(seconds: 15));
+          BranchesSessionCache.invalidate();
+          return;
+        }
+      }
+
+      await firestore
+          .collection('branches')
+          .add(data)
+          .timeout(const Duration(seconds: 15));
       BranchesSessionCache.invalidate();
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في حفظ بيانات الفرع.');
@@ -1217,7 +1374,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     required String userId,
     required String companyId,
     required String organizationId,
-    required String? branchName,
+    required AttendanceBranchRef branchRef,
     required double lat,
     required double long,
     required DateTime time,
@@ -1274,33 +1431,45 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         );
       }
 
-      double branchLat = lat;
-      double branchLng = long;
+      double branchLat = 0.0;
+      double branchLng = 0.0;
       double geofenceRadius = 100.0;
-      String branchId = '';
+      String resolvedBranchId = branchRef.branchId ?? '';
 
-      if (branchName != null && branchName.trim().isNotEmpty) {
-        try {
-          final branchQuery = await firestore
-              .collection('branches')
-              .where('branchName', isEqualTo: branchName.trim())
-              .limit(1)
-              .get();
-          if (branchQuery.docs.isNotEmpty) {
-            final bDoc = branchQuery.docs.first;
-            final bData = bDoc.data();
-            branchId = bDoc.id;
-            branchLat = (bData['latitude'] as num?)?.toDouble() ?? lat;
-            branchLng = (bData['longitude'] as num?)?.toDouble() ?? long;
-            geofenceRadius =
-                (bData['geofenceRadius'] as num?)?.toDouble() ?? 100.0;
+      try {
+        final resolved = await resolveBranch(
+          branchId: branchRef.branchId,
+          organizationUID: branchRef.branchOrganizationUID,
+          branchName: branchRef.branchName,
+        );
+        if (resolved != null) {
+          resolvedBranchId = resolved.documentId;
+          final bData = resolved.data;
+          final loc = bData['location'];
+          if (loc is Map) {
+            branchLat = (loc['latitude'] as num?)?.toDouble() ??
+                (loc['lat'] as num?)?.toDouble() ??
+                0.0;
+            branchLng = (loc['longitude'] as num?)?.toDouble() ??
+                (loc['lng'] as num?)?.toDouble() ??
+                0.0;
           }
-        } catch (e, st) {
-          debugPrint(
-            'AttendanceTrackingSync: failed loading branch on check-in: $e\n$st',
-          );
+          branchLat = branchLat != 0.0
+              ? branchLat
+              : (bData['latitude'] as num?)?.toDouble() ?? 0.0;
+          branchLng = branchLng != 0.0
+              ? branchLng
+              : (bData['longitude'] as num?)?.toDouble() ?? 0.0;
+          geofenceRadius =
+              (bData['geofenceRadius'] as num?)?.toDouble() ?? 100.0;
         }
+      } catch (e, st) {
+        debugPrint(
+          'AttendanceTrackingSync: failed loading branch on check-in: $e\n$st',
+        );
       }
+
+      final branchName = branchRef.branchName;
 
       // احتساب المسافة الدقيقة عن الفرع ونسبة البطارية الحقيقية
       final exactDist =
@@ -1324,8 +1493,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'companyUID': companyId,
         'organizationId': organizationId,
         'organizationUID': organizationId,
-        'branchId': branchId,
-        'branchName': branchName ?? 'الفرع الميداني',
+        'branchId': resolvedBranchId,
+        'branchName': branchName.isNotEmpty ? branchName : 'الفرع الميداني',
         'branchLat': branchLat,
         'branchLng': branchLng,
         'geofenceRadius': geofenceRadius,

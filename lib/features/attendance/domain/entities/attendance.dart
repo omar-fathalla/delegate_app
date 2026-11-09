@@ -11,6 +11,8 @@ class Attendance extends Equatable {
   final double? longitude;
   final String? imageUrl;
   final String? branchName;
+  final String? branchId;
+  final String? branchOrganizationUID;
   final bool isSynced;
   final DateTime? localCheckInTime;
   final DateTime? localCheckOutTime;
@@ -27,6 +29,8 @@ class Attendance extends Equatable {
     this.longitude,
     this.imageUrl,
     this.branchName,
+    this.branchId,
+    this.branchOrganizationUID,
     this.isSynced = true,
     this.localCheckInTime,
     this.localCheckOutTime,
@@ -61,6 +65,8 @@ class Attendance extends Equatable {
     longitude,
     imageUrl,
     branchName,
+    branchId,
+    branchOrganizationUID,
     isSynced,
     localCheckInTime,
     localCheckOutTime,

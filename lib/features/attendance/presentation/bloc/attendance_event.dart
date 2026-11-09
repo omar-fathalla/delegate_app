@@ -15,6 +15,8 @@ class CheckInRequested extends AttendanceEvent {
   final double lat;
   final double long;
   final String? branchName;
+  final String? branchId;
+  final String? branchOrganizationUID;
   final String? delegateName;
   final String? phoneNumber;
   final String? companyName;
@@ -28,6 +30,8 @@ class CheckInRequested extends AttendanceEvent {
     required this.lat,
     required this.long,
     this.branchName,
+    this.branchId,
+    this.branchOrganizationUID,
     this.delegateName,
     this.phoneNumber,
     this.companyName,
@@ -43,6 +47,8 @@ class CheckInRequested extends AttendanceEvent {
     lat,
     long,
     branchName,
+    branchId,
+    branchOrganizationUID,
     delegateName,
     phoneNumber,
     companyName,
@@ -126,6 +132,8 @@ class CheckOutAndCheckInRequested extends AttendanceEvent {
   final double lat;
   final double long;
   final String? branchName;
+  final String? branchId;
+  final String? branchOrganizationUID;
   final String? delegateName;
   final String? phoneNumber;
   final String? companyName;
@@ -140,6 +148,8 @@ class CheckOutAndCheckInRequested extends AttendanceEvent {
     required this.lat,
     required this.long,
     this.branchName,
+    this.branchId,
+    this.branchOrganizationUID,
     this.delegateName,
     this.phoneNumber,
     this.companyName,
@@ -156,6 +166,8 @@ class CheckOutAndCheckInRequested extends AttendanceEvent {
     lat,
     long,
     branchName,
+    branchId,
+    branchOrganizationUID,
     delegateName,
     phoneNumber,
     companyName,

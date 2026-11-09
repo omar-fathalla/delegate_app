@@ -11,6 +11,7 @@ import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/tashil_icon_button.dart';
+import 'package:delegate_app/core/attendance/attendance_branch_resolve.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
@@ -177,11 +178,7 @@ class _HRDelegateAttendanceDetailScreenState
         final Map<String, Branch> bMap = {};
         for (final doc in branchesSnap.docs) {
           final b = BranchModel.fromFirestore(doc);
-          final name = b.branchName.trim();
-          if (name.isNotEmpty) {
-            bMap[name.toLowerCase()] = b;
-          }
-          bMap[doc.id.toLowerCase().trim()] = b;
+          registerBranchInLookupMap(bMap, b);
         }
         _branchesByName = bMap;
       }
@@ -387,16 +384,11 @@ class _HRDelegateAttendanceDetailScreenState
       bool? isInside;
 
       if (inLat != null && inLng != null && branchName != 'غير محدد') {
-        final cleanBranch = branchName.toLowerCase().trim();
-        Branch? matchedBranch = _branchesByName[cleanBranch];
-        if (matchedBranch == null) {
-          for (final entry in _branchesByName.entries) {
-            if (entry.key.contains(cleanBranch) || cleanBranch.contains(entry.key)) {
-              matchedBranch = entry.value;
-              break;
-            }
-          }
-        }
+        final matchedBranch = lookupBranchForAttendanceLog(
+          branchesByName: _branchesByName,
+          log: checkInData,
+          fallbackBranchName: branchName,
+        );
         if (matchedBranch != null &&
             matchedBranch.latitude != 0.0 &&
             matchedBranch.longitude != 0.0) {
