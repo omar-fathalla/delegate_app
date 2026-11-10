@@ -55,8 +55,13 @@ abstract class DelegateSubscriptionRepository {
     required String reason,
   });
 
-  /// Checks whether a 5-digit receipt code is already used across the system
-  Future<Either<Failure, bool>> isReceiptCodeUsed(String receiptCode);
+  /// Checks whether a 5-digit receipt code is already used in the same
+  /// organization and company (staff list queries must include both filters).
+  Future<Either<Failure, bool>> isReceiptCodeUsed(
+    String receiptCode, {
+    required String organizationUID,
+    required String companyUID,
+  });
 
   /// Streams subscription requests filtered by status or organization/company
   Stream<List<DelegateSubscriptionRequest>> getSubscriptionRequestsStream({

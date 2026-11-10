@@ -142,14 +142,14 @@ void main() {
   group('SubscriptionRenewalRepository', () {
     test('lists only this company\'s app-added delegates suspended for expiry', () async {
       final repo = SubscriptionRenewalRepository(firestore: await seed(), clock: () => feb2027);
-      final list = (await repo.loadRenewableDelegates('c1')).getOrElse(() => []);
+      final list = (await repo.loadRenewableDelegates(companyUID: 'c1', organizationUID: 'o1')).getOrElse(() => []);
       expect(list.map((d) => d.uid), ['a', 'b', 'c']);
     });
 
     test('partial renewal: one request, one payment, only the selected delegates', () async {
       final db = await seed();
       final repo = SubscriptionRenewalRepository(firestore: db, clock: () => feb2027);
-      final list = (await repo.loadRenewableDelegates('c1')).getOrElse(() => []);
+      final list = (await repo.loadRenewableDelegates(companyUID: 'c1', organizationUID: 'o1')).getOrElse(() => []);
       final s = supervisor();
       final id = (await repo.submitRenewal(
         supervisorUid: s.uid,
@@ -175,7 +175,7 @@ void main() {
       expect((await db.doc('organizations/o1/companies/c1/delegates/a').get()).data()!['status'], 'suspended');
 
       // a and b are now awaiting payment; c can still be renewed later.
-      final again = (await repo.loadRenewableDelegates('c1')).getOrElse(() => []);
+      final again = (await repo.loadRenewableDelegates(companyUID: 'c1', organizationUID: 'o1')).getOrElse(() => []);
       expect(again.where((d) => d.isAwaitingPayment).map((d) => d.uid), ['a', 'b']);
       final dup = await repo.submitRenewal(
         supervisorUid: s.uid,
@@ -191,7 +191,7 @@ void main() {
 
       // A failed payment frees them for a new attempt.
       await db.doc('delegate_requests/$id').update({'paymentStatus': 'failed'});
-      final afterFail = (await repo.loadRenewableDelegates('c1')).getOrElse(() => []);
+      final afterFail = (await repo.loadRenewableDelegates(companyUID: 'c1', organizationUID: 'o1')).getOrElse(() => []);
       expect(afterFail.where((d) => d.isAwaitingPayment), isEmpty);
     });
 

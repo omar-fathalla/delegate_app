@@ -19,18 +19,28 @@ class SubscriptionRenewalRepository {
 
   CollectionReference<Map<String, dynamic>> get _requests => _firestore.collection('delegate_requests');
 
-  /// Suspended (subscription expired) app-added delegates of [companyUID].
-  Future<Either<Failure, List<RenewableDelegate>>> loadRenewableDelegates(String companyUID) async {
+  /// Suspended (subscription expired) app-added delegates of [organizationUID] + [companyUID].
+  Future<Either<Failure, List<RenewableDelegate>>> loadRenewableDelegates({
+    required String companyUID,
+    required String organizationUID,
+  }) async {
     if (companyUID.trim().isEmpty) {
       return const Left(ServerFailure('لا توجد شركة مرتبطة بحسابك.'));
     }
+    if (organizationUID.trim().isEmpty) {
+      return const Left(ServerFailure('لا توجد منظمة مرتبطة بحسابك.'));
+    }
     try {
       final regs = await _requests
+          .where('organizationUID', isEqualTo: organizationUID)
           .where('companyUID', isEqualTo: companyUID)
           .where('requestType', isEqualTo: kRequestTypeNewDelegate)
           .where('status', isEqualTo: 'approved')
           .get();
-      final pending = await _pendingRenewalsByUid(companyUID);
+      final pending = await _pendingRenewalsByUid(
+        companyUID: companyUID,
+        organizationUID: organizationUID,
+      );
       final out = <RenewableDelegate>[];
       for (final reg in regs.docs) {
         final r = reg.data();
@@ -66,9 +76,13 @@ class SubscriptionRenewalRepository {
   }
 
   /// uid -> id of an open (unpaid, not failed) renewal for the current period.
-  Future<Map<String, String>> _pendingRenewalsByUid(String companyUID) async {
+  Future<Map<String, String>> _pendingRenewalsByUid({
+    required String companyUID,
+    required String organizationUID,
+  }) async {
     final period = SubscriptionCycleHelper.getCycleCode(_clock());
     final snap = await _requests
+        .where('organizationUID', isEqualTo: organizationUID)
         .where('companyUID', isEqualTo: companyUID)
         .where('requestType', isEqualTo: kRequestTypeRenewal)
         .where('status', isEqualTo: 'pending')
