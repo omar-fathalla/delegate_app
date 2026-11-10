@@ -508,20 +508,28 @@ service cloud.firestore {
       let tech = r in techRoleList();
       // H1 (a) + r4: tech support activates only 'pending' -> 'active', as a
       // status-only write batched with the request approval.
-      let techSignup = tech && st0 == 'pending' && st1 == 'active';
-      // Company-level roles may still review documents, but must not flip
-      // the delegate to active/approved (anti-fraud: no self-activation).
-      // The check lives on the non-tech branch so the tech approval batch
-      // stays under the 1000-expression budget. Org-admin (web activate)
-      // and super-admin remain allowed.
-      return !(tech && stCh && st1 is string && st1.lower() == 'active' && !techSignup)
-        && !(stCh && st1 == 'pending' && !approver)
+      // Exact plus Title-Case only (no lower(): 4-flip budget). Unbatched
+      // pending/Pending -> active/Active still requires the request batch.
+      let techSignup = tech && (st0 == 'pending' || st0 == 'Pending')
+        && (st1 == 'active' || st1 == 'Active');
+      // Mohamed 2026-11-10 14:00 Cairo: only super-admin and technical
+      // support may activate, reactivate, suspend, or deactivate. The
+      // account-status check stays on the non-techSignup branch so the
+      // request-approval batch (4 document flips) stays under budget.
+      let saOrTech = r in [
+        'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN']
+        || tech;
+      // Exact plus Title-Case only (no lower(): 1000-expression budget).
+      let accountCh = stCh && st1 is string && (
+        st1 == 'active' || st1 == 'Active'
+        || st1 == 'approved' || st1 == 'Approved'
+        || st1 == 'suspended' || st1 == 'Suspended'
+        || st1 == 'inactive' || st1 == 'Inactive'
+        || st1 == 'deactivated' || st1 == 'Deactivated');
+      return !(stCh && st1 == 'pending' && !approver)
         && ((techSignup && techFlipOk(delegateId) && techReqOk(o1, c1, delegateId))
           || (!techSignup && (delegateDocsOk() || approver)
-            && !(stCh && st1 is string && st1.lower() in ['active', 'approved']
-              && !(r in [
-                'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
-                'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin']))));
+            && (!accountCh || saOrTech)));
     }
 
     // r4: tech support may create a delegate that is active or carries an
@@ -579,9 +587,9 @@ service cloud.firestore {
     // is kept for callers that still want an org pin, but nested writes pass
     // false so a second chain is reachable). Name/phone/photo/ID images are
     // only editable by company admin/supervisor. National ID is never a
-    // direct edit by company/org/marketing staff except on a pending /
-    // action_required signup record (web create-request resubmit). Super-admin
-    // and tech support are unchanged (approval batches / Admin SDK).
+    // direct client edit by company/org/marketing staff, including on
+    // pending / action_required records (Mohamed 2026-11-10). Super-admin
+    // and tech support remain unrestricted (approval batches / Admin SDK).
     function companyEditorRole(r) {
       return r in [
         'company-admin', 'company_admin', 'companyadmin', 'admin',
@@ -597,9 +605,9 @@ service cloud.firestore {
         'nationalIdFrontUrl', 'nationalIdBackUrl'];
     }
     function staffProfileFieldsOk(r) {
-      let st = resource.data.get('status', '');
-      let pending = st is string && st.lower() in ['pending', 'action_required'];
-      return (!changedKeys().hasAny(identityFieldKeys()) || (companyEditorRole(r) && pending))
+      // Mohamed 2026-11-10 14:00 Cairo: only super-admin / tech may change
+      // or correct nationalId, including on pending / action_required records.
+      return !changedKeys().hasAny(identityFieldKeys())
         && (!changedKeys().hasAny(profileEditKeys()) || companyEditorRole(r));
     }
     function staffManagesDelegate(orgId, compId, companyNeedsOrg) {
@@ -621,7 +629,12 @@ service cloud.firestore {
           'accountant', 'accounting', 'account_admin',
           'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
           'branches-marketing-manager', 'branchesmarketingmanager']
-          && staffProfileFieldsOk(r));
+          && staffProfileFieldsOk(r)
+          && !changedKeys().hasAny([
+            'reviewedBy', 'reviewedAt', 'reviewedByName', 'rejectionReason',
+            'approvedRequestId', 'approvedBy', 'approvedByName', 'approvedAt',
+            'paymentStatus', 'paymentMethod', 'amountDue', 'amountPaid', 'paidAt',
+            'organizationUID', 'organizationId', 'companyUID', 'companyId']));
     }
 
     function deviceBindingKeys() {
@@ -847,6 +860,9 @@ service cloud.firestore {
     // may not change status (except cancel), approval, payment, national ID,
     // or org/company ids. Only super-admin / technical support may approve
     // or otherwise change status. One users/{uid} get (expression budget).
+    // Supervisors may change only profile fields (name, phone, photos, ID
+    // images, documents, updatedAt). nationalId / status / approval / payment
+    // / company and organization ids stay blocked.
     function requestStaffUpdateOk(requestId) {
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
       let r = u.get('role', '');
@@ -890,12 +906,12 @@ service cloud.firestore {
           || getAfter(/databases/$(database)/documents/organizations/$(d.get('organizationUID', ''))/companies/$(d.get('companyUID', ''))/delegates/$(ty == 'add_organization' ? d.get('existingDelegateUid', '') : requestId)).data.get('status', '') == 'active');
     }
 
-    // r5 budget: true for a technical support caller writing a delegate doc
-    // at organizations/{o}/companies/{c}/delegates/{id}. The collection-group
-    // delegates match defers those writes to the nested match.
-    function techOnNestedDelegate() {
-      return request.path[3] == 'organizations' && request.path[5] == 'companies'
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in techRoleList();
+    // True for a write to organizations/{o}/companies/{c}/delegates/{id}.
+    // The collection-group delegates match defers those writes to the nested
+    // match so the 1000-expression budget is not spent twice, for every role
+    // (not only technical support).
+    function onNestedDelegate() {
+      return request.path[3] == 'organizations' && request.path[5] == 'companies';
     }
 
     function techRoleList() {
@@ -1062,9 +1078,18 @@ service cloud.firestore {
           // is authorized without a companyUID query constraint. The
           // collection-group rule below covers cross-chain / org / global reads.
           allow read: if signedIn() && callerCompany() != '' && callerCompany() == compId;
-          allow create, update: if signedIn() && (
+          allow create: if signedIn() && (
             canManageNestedDelegate(orgId, compId)
             || (delegateInOrg(orgId) && delegateInCompany(compId))
+          );
+          // Mohamed 2026-11-10: only super-admin / tech may approve or reject.
+          // Other staff may still update non-status fields (dates, branches,
+          // supervisor enable) on a request they manage.
+          allow update: if signedIn() && (
+            isGlobalStaff()
+            || (!changedKeys().hasAny(['status'])
+              && (canManageNestedDelegate(orgId, compId)
+                || (delegateInOrg(orgId) && delegateInCompany(compId))))
           );
           allow delete: if canManageNestedDelegate(orgId, compId);
 
@@ -1236,26 +1261,23 @@ service cloud.firestore {
 
     match /{path=**}/delegates/{delegateId} {
       allow read: if signedIn() && canReadDelegate();
-      // r5 budget: like update below, a tech support create of a nested
-      // organizations/{o}/companies/{c}/delegates doc is decided by the
-      // nested match alone (techCreateOk there is bound to the path).
-      allow create: if signedIn() && !techOnNestedDelegate() && deviceBindingAbsent() && (
+      // r5 budget: a nested organizations/{o}/companies/{c}/delegates
+      // create is decided by the nested match alone.
+      allow create: if signedIn() && !onNestedDelegate() && deviceBindingAbsent() && (
         isGlobalStaff() ||
         (isOrgScopedStaff() && incomingOrgScoped()) ||
         (isCompanyScopedStaff() && incomingCompanyScoped())
       ) && techCreateOk(request.resource.data.get('organizationUID', ''), request.resource.data.get('companyUID', ''), delegateId);
-      // r5 budget: a tech support write to a nested
-      // organizations/{o}/companies/{c}/delegates doc is decided by the nested
-      // match alone (same checks, bound to the path), so the approval batch
-      // does not spend the 1000-expression budget twice on one doc.
-      allow update: if signedIn() && !techOnNestedDelegate()
+      // r5 budget: a nested organizations/{o}/companies/{c}/delegates
+      // update is decided by the nested match alone, for every role.
+      allow update: if signedIn() && !onNestedDelegate()
         && (delegateOwns(delegateId)
         ? delegateFieldsSafe()
         : (deviceBindingUntouched() && staffManagesDelegate(
             [resource.data.get('organizationUID', ''), resource.data.get('organizationId', '')],
             [resource.data.get('companyUID', ''), resource.data.get('companyId', '')], false)
           && staffDocsApproveOk(resource.data.get('organizationUID', ''), resource.data.get('companyUID', ''), resource.data.get('companyId', ''), delegateId)));
-      allow delete: if signedIn() && canManageDelegate();
+      allow delete: if signedIn() && !onNestedDelegate() && canManageDelegate();
     }
 
     match /{path=**}/companies/{companyId} {
@@ -1276,7 +1298,7 @@ service cloud.firestore {
         || isGlobalStaff()
         || (isDelegate() && resource.data.get('organizationUID', '') == claimString('orgId'))
       );
-      allow create, update: if signedIn() && (
+      allow create: if signedIn() && (
         isGlobalStaff()
         || (isCompanyScopedStaff() && incomingCompanyScoped())
         || (isOrgScopedStaff() && incomingOrgScoped())
@@ -1284,6 +1306,16 @@ service cloud.firestore {
           delegateInOrg(request.resource.data.organizationUID)
           || delegateOwns(request.resource.data.delegateUid)
         ))
+      );
+      allow update: if signedIn() && (
+        isGlobalStaff()
+        || (!changedKeys().hasAny(['status'])
+          && ((isCompanyScopedStaff() && incomingCompanyScoped())
+            || (isOrgScopedStaff() && incomingOrgScoped())
+            || (isDelegate() && (
+              delegateInOrg(request.resource.data.organizationUID)
+              || delegateOwns(request.resource.data.delegateUid)
+            ))))
       );
       allow delete: if isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped());
     }
@@ -1705,6 +1737,26 @@ service cloud.firestore {
     }
 
     // ==================== MOBILE: SECURITY AND DEVICES ====================
+
+    // Append-only supervisor/admin profile-edit audit. Company staff can
+    // create a record for their own company and read it, but cannot change
+    // or delete it. Super-admin / tech may read globally. Admin-SDK writes
+    // from editDelegateProfile bypass these rules.
+    match /delegate_profile_audit_logs/{logId} {
+      allow read: if signedIn() && (
+        isGlobalStaff()
+        || (isCompanyScopedStaff()
+          && resource.data.get('companyUID', '') == callerCompany())
+      );
+      allow create: if signedIn() && (
+        isGlobalStaff()
+        || ((isCompanyAdmin() || isHR())
+          && incomingCompanyScoped()
+          && request.resource.data.get('actorUid', '') == request.auth.uid
+          && request.resource.data.get('companyUID', '') == callerCompany())
+      );
+      allow update, delete: if false;
+    }
 
     match /security_audit_logs/{logId} {
       allow read: if signedIn() && (

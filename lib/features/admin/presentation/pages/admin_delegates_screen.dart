@@ -15,6 +15,7 @@ import 'package:delegate_app/core/services/session_management_service.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/link_delegate_to_org_sheet.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/delete_delegate_request_sheet.dart';
+import 'package:delegate_app/features/admin/presentation/pages/edit_delegate_profile_screen.dart';
 
 class AdminDelegatesScreen extends StatelessWidget {
   final Delegate adminDelegate;
@@ -62,15 +63,37 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
     try {
       final snap =
           await FirebaseFirestore.instance.collection('organizations').get();
-      if (mounted) {
-        setState(() {
-          _availableOrganizations = snap.docs.map((d) {
+      final companyUID = widget.adminDelegate.companyUID;
+      final List<Map<String, String>> orgs = [];
+      if (companyUID.isEmpty) {
+        orgs.addAll(snap.docs.map((d) {
+          final name = formatChainDisplayName(
+            d.data()['name']?.toString() ?? d.id,
+          );
+          return {'id': d.id, 'name': name};
+        }));
+      } else {
+        final checks = await Future.wait(snap.docs.map((d) async {
+          try {
+            final cDoc = await FirebaseFirestore.instance
+                .collection('organizations')
+                .doc(d.id)
+                .collection('companies')
+                .doc(companyUID)
+                .get();
+            if (!cDoc.exists) return null;
             final name = formatChainDisplayName(
               d.data()['name']?.toString() ?? d.id,
             );
             return {'id': d.id, 'name': name};
-          }).toList();
-        });
+          } catch (_) {
+            return null;
+          }
+        }));
+        orgs.addAll(checks.whereType<Map<String, String>>());
+      }
+      if (mounted) {
+        setState(() => _availableOrganizations = orgs);
       }
     } catch (_) {}
   }
@@ -1366,6 +1389,13 @@ class _CompactDelegateTile extends StatelessWidget {
         adminDelegate?.position == DelegatePosition.supervisor;
     final isFathalla = _isFathallaDelegate(delegate);
     final canRequestDelete = isSupervisor && !isFathalla;
+    final canEditProfile = isSupervisor &&
+        adminDelegate != null &&
+        adminDelegate!.companyUID.isNotEmpty &&
+        adminDelegate!.companyUID == delegate.companyUID &&
+        (delegate.status == DelegateStatus.active ||
+            delegate.status == DelegateStatus.approved ||
+            delegate.status == DelegateStatus.pending);
 
     final isDark = theme.brightness == Brightness.dark;
     final goldBg = const Color(0xFFB8860B).withValues(alpha: isDark ? 0.28 : 0.12);
@@ -1424,6 +1454,38 @@ class _CompactDelegateTile extends StatelessWidget {
           )
         : null;
 
+    final editBtn = canEditProfile
+        ? _buildActionPill(
+            context: context,
+            icon: const Icon(Icons.edit_rounded),
+            label: 'تعديل البيانات',
+            backgroundColor: theme.colorScheme.primary.withValues(
+              alpha: isDark ? 0.22 : 0.10,
+            ),
+            borderColor: theme.colorScheme.primary.withValues(alpha: 0.4),
+            foregroundColor: isDark
+                ? theme.colorScheme.primary
+                : theme.colorScheme.primary,
+            tooltip: 'تعديل الاسم أو الموبايل أو الصور',
+            height: 30,
+            width: 104,
+            fontSize: 10.5,
+            onPressed: () async {
+              final result = await Navigator.of(context).push<bool>(
+                MaterialPageRoute(
+                  builder: (_) => EditDelegateProfileScreen(
+                    supervisor: adminDelegate!,
+                    delegate: delegate,
+                  ),
+                ),
+              );
+              if (result == true) {
+                onRefresh?.call();
+              }
+            },
+          )
+        : null;
+
     // 3. Force Logout Button (SuperAdmin only)
     final logoutBtn = isSuperAdmin
         ? _buildActionPill(
@@ -1443,31 +1505,23 @@ class _CompactDelegateTile extends StatelessWidget {
           )
         : null;
 
-    if (canRequestDelete && deleteRequestBtn != null) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          linkOrgBtn,
+    final extras = <Widget>[
+      ?editBtn,
+      if (canRequestDelete) ?deleteRequestBtn,
+      if (isSuperAdmin) ?logoutBtn,
+    ];
+    if (extras.isEmpty) return linkOrgBtn;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        linkOrgBtn,
+        for (final extra in extras) ...[
           const SizedBox(height: 5),
-          deleteRequestBtn,
+          extra,
         ],
-      );
-    }
-
-    if (isSuperAdmin && logoutBtn != null) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          linkOrgBtn,
-          const SizedBox(height: 5),
-          logoutBtn,
-        ],
-      );
-    }
-
-    return linkOrgBtn;
+      ],
+    );
   }
 
   Color _getStatusColor(BuildContext context, DelegateStatus status) {

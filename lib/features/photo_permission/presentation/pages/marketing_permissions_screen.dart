@@ -42,9 +42,9 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
   bool get _isTechnicalSupport =>
       widget.marketingDelegate.role == UserRole.technicalSupport;
 
+  // Mohamed 2026-11-10: only super-admin and technical support may
+  // approve or reject photo permissions.
   bool get _canApproveOrReject =>
-      widget.marketingDelegate.role == UserRole.marketingPromotion ||
-      widget.marketingDelegate.role == UserRole.branchesMarketingManager ||
       widget.marketingDelegate.role == UserRole.technicalSupport ||
       widget.marketingDelegate.role == UserRole.superAdmin;
 

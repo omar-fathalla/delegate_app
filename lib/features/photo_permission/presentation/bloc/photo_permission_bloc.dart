@@ -5,6 +5,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:equatable/equatable.dart';
 import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/services/sync_manager.dart';
 import 'package:delegate_app/features/photo_permission/data/datasources/photo_offline_datasource.dart';
 import 'package:delegate_app/features/photo_permission/data/models/captured_photo_model.dart';
@@ -109,6 +110,13 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     } catch (_) {}
   }
 
+  static Future<void> _clearDiskCache(String storageKey) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(storageKey);
+    } catch (_) {}
+  }
+
   final RequestPhotoPermission requestPhotoPermission;
   final ApprovePhotoPermission approvePhotoPermission;
   final TogglePhotoPermission togglePhotoPermission;
@@ -184,6 +192,17 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     );
   }
 
+
+  bool _isSecurityFailure(Failure failure) {
+    final m = failure.message.toLowerCase();
+    return failure is AuthFailure ||
+        m.contains('permission-denied') ||
+        m.contains('unauthenticated') ||
+        failure.message.contains('صلاحيات') ||
+        failure.message.contains('غير مصرح') ||
+        failure.message.contains('غير مصرّح');
+  }
+
   Future<void> _onLoadPermissions(
     LoadPermissionsRequested event,
     Emitter<PhotoPermissionState> emit,
@@ -222,7 +241,9 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     );
     await result.fold(
       (failure) async {
-        if (!hasEmittedCache) {
+        if (_isSecurityFailure(failure) || !hasEmittedCache) {
+          _permissionsCache.remove(cacheKey);
+          await _clearDiskCache(storageKey);
           emit(PhotoPermissionError(message: failure.message));
         }
       },
@@ -276,7 +297,9 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     );
     await result.fold(
       (failure) async {
-        if (!hasEmittedCache) {
+        if (_isSecurityFailure(failure) || !hasEmittedCache) {
+          _ongoingCache.remove(cacheKey);
+          await _clearDiskCache(storageKey);
           emit(PhotoPermissionError(message: failure.message));
         }
       },

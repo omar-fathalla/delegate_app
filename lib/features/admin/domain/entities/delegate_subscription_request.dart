@@ -128,6 +128,7 @@ class DelegateSubscriptionRequest extends Equatable {
   final String fullName;
   final String phoneNumber;
   final String nationalId;
+  final String proposedNationalId;
   final String profileImageUrl;
   final String nationalIdFrontUrl;
   final String nationalIdBackUrl;
@@ -168,6 +169,7 @@ class DelegateSubscriptionRequest extends Equatable {
     required this.fullName,
     required this.phoneNumber,
     required this.nationalId,
+    this.proposedNationalId = '',
     required this.profileImageUrl,
     required this.nationalIdFrontUrl,
     required this.nationalIdBackUrl,
@@ -214,6 +216,7 @@ class DelegateSubscriptionRequest extends Equatable {
       'fullName': fullName,
       'phoneNumber': phoneNumber,
       'nationalId': nationalId,
+      'proposedNationalId': proposedNationalId,
       'profileImageUrl': profileImageUrl,
       'nationalIdFrontUrl': nationalIdFrontUrl,
       'nationalIdBackUrl': nationalIdBackUrl,
@@ -262,6 +265,7 @@ class DelegateSubscriptionRequest extends Equatable {
     SubscriptionRequestStatus parseStatus(dynamic val) {
       if (val == 'approved') return SubscriptionRequestStatus.approved;
       if (val == 'rejected') return SubscriptionRequestStatus.rejected;
+      // action_required is still an open request; show it with the pending queue.
       return SubscriptionRequestStatus.pending;
     }
 
@@ -293,6 +297,7 @@ class DelegateSubscriptionRequest extends Equatable {
               .trim(),
       phoneNumber: map['phoneNumber'] ?? '',
       nationalId: map['nationalId'] ?? '',
+      proposedNationalId: map['proposedNationalId'] ?? '',
       profileImageUrl: map['profileImageUrl'] ?? '',
       nationalIdFrontUrl: map['nationalIdFrontUrl'] ?? '',
       nationalIdBackUrl: map['nationalIdBackUrl'] ?? '',
@@ -341,6 +346,7 @@ class DelegateSubscriptionRequest extends Equatable {
     String? fullName,
     String? phoneNumber,
     String? nationalId,
+    String? proposedNationalId,
     String? profileImageUrl,
     String? nationalIdFrontUrl,
     String? nationalIdBackUrl,
@@ -379,6 +385,7 @@ class DelegateSubscriptionRequest extends Equatable {
       fullName: fullName ?? this.fullName,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       nationalId: nationalId ?? this.nationalId,
+      proposedNationalId: proposedNationalId ?? this.proposedNationalId,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       nationalIdFrontUrl: nationalIdFrontUrl ?? this.nationalIdFrontUrl,
       nationalIdBackUrl: nationalIdBackUrl ?? this.nationalIdBackUrl,
@@ -410,6 +417,7 @@ class DelegateSubscriptionRequest extends Equatable {
   bool get isAddOrganizationRequest => requestType == 'add_organization';
   bool get isNewDelegateRequest => requestType == 'new_delegate';
   bool get isRenewalRequest => requestType == kRequestTypeRenewal;
+  bool get isNationalIdUpdateRequest => requestType == 'update_national_id';
 
   /// Staff may activate a new delegate only when the subscription is settled.
   bool get isPaymentSettled =>
@@ -425,6 +433,7 @@ class DelegateSubscriptionRequest extends Equatable {
         organizationUID,
         phoneNumber,
         nationalId,
+        proposedNationalId,
         paymentMethod,
         receiptCode,
         subscriptionCycle,

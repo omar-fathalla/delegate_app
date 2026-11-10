@@ -67,3 +67,33 @@ test("phoneQueryVariants include local, +20, and 20 forms", () => {
   assert.ok(v.includes("01000000022"));
   assert.ok(v.includes("201000000022") || v.includes("+201000000022"));
 });
+
+test("action_required is an open request status", () => {
+  assert.ok(L.isOpenRequestStatus("action_required"));
+});
+
+test("isSameDelegateRecord matches id, uid, and request pointers", () => {
+  assert.ok(L.isSameDelegateRecord({uid: "d1"}, "x", "d1"));
+  assert.ok(L.isSameDelegateRecord({}, "d1", "d1"));
+  assert.ok(L.isSameDelegateRecord({existingDelegateUid: "d1"}, "req", "d1"));
+  assert.ok(!L.isSameDelegateRecord({uid: "d2"}, "x", "d1"));
+  assert.ok(!L.isSameDelegateRecord({uid: "d1"}, "d1", ""));
+});
+
+test("phoneQueryVariants match stored dashes and spaces (L-1)", () => {
+  const v = L.phoneQueryVariants("01000000073");
+  assert.ok(v.includes("010-0000-0073"), v.join(","));
+  assert.ok(v.includes("0100 000 0073"), v.join(","));
+});
+
+test("phoneQueryVariants include +20 spaced form (L-1)", () => {
+  const v = L.phoneQueryVariants("01000000044");
+  assert.ok(v.includes("+20 100 000 0044"), v.join(","));
+});
+
+test("isValidEgyptianNationalId requires 14 digits", () => {
+  assert.ok(L.isValidEgyptianNationalId("29901010101011"));
+  assert.ok(!L.isValidEgyptianNationalId("123"));
+  assert.ok(!L.isValidEgyptianNationalId("abc' OR 1=1"));
+  assert.ok(L.isValidEgyptianNationalId(L.normalizeIdDigits("٢٩٩٠١٠١٠١٠١٠١١")));
+});

@@ -100,9 +100,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
             }
           }
         }
-        return Left(ServerFailure(
-          'تعذر التحقق من تسجيل المندوب. حاول مرة أخرى.',
-        ));
+        return Left(ServerFailure(_duplicateCheckErrorMessage(e)));
       }
 
       // 0b. Payment method & receipt validation
@@ -1469,6 +1467,26 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       return '$basePosition ($origin + $otherCount سلاسل)';
     }
   }
+}
+
+String _duplicateCheckErrorMessage(FirebaseFunctionsException e) {
+  final code = e.code;
+  final message = (e.message ?? '').toLowerCase();
+  if (code == 'failed-precondition' && message.contains('org-admin-no-company')) {
+    // Matches the web: org-admins review requests; company staff register
+    // delegates. Do not silently allow an org-admin to register.
+    return 'مسؤول السلسلة لا يسجّل المندوب مباشرة. سجّل المندوب من حساب مشرف أو أدمن الشركة.';
+  }
+  if (code == 'invalid-argument' && message.contains('nationalid-format')) {
+    return 'الرقم القومي يجب أن يكون 14 رقماً.';
+  }
+  if (code == 'invalid-argument' && message.contains('companyuid')) {
+    return 'اختر الشركة أولاً ثم أعد المحاولة.';
+  }
+  if (code == 'resource-exhausted') {
+    return 'تم تجاوز عدد محاولات التحقق. حاول مرة أخرى بعد قليل.';
+  }
+  return 'تعذر التحقق من تسجيل المندوب. حاول مرة أخرى.';
 }
 
 /// Shown when the approval batch is denied. Nothing was written. Known causes:

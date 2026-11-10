@@ -111,10 +111,42 @@ describe("qa hold supervisor reads and edit policy", () => {
     await assertFails(updateDoc(doc(as("hr"), "organizations/o1/companies/c1/delegates/d1"), patch));
   });
 
-  test("company admin may correct nationalId on a pending signup record", () =>
-    assertSucceeds(updateDoc(doc(as("adm"), "organizations/o1/companies/c1/delegates/pending1"), {
+  test("no company or org staff can change nationalId even on a pending signup record", async () => {
+    const patch = {nationalId: "27701010101011", nationalityID: "27701010101011", updatedAt: "t"};
+    await assertFails(updateDoc(doc(as("adm"), "organizations/o1/companies/c1/delegates/pending1"), patch));
+    await assertFails(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/pending1"), patch));
+    await assertFails(updateDoc(doc(as("org"), "organizations/o1/companies/c1/delegates/pending1"), patch));
+  });
+
+  test("super-admin and tech may correct nationalId on a pending signup record", async () => {
+    await assertSucceeds(updateDoc(doc(as("sa"), "organizations/o1/companies/c1/delegates/pending1"), {
       nationalId: "27701010101011", nationalityID: "27701010101011", updatedAt: "t",
-    })));
+    }));
+    // reset via a second tech write after re-seeding is unnecessary; just
+    // confirm tech can also write identity fields on another pending-like patch
+    await assertSucceeds(updateDoc(doc(as("ts"), "organizations/o1/companies/c1/delegates/pending1"), {
+      nationalId: "26601010101011", nationalityID: "26601010101011", updatedAt: "t",
+    }));
+  });
+
+  test("only super-admin and tech may activate or suspend a delegate", async () => {
+    await assertFails(updateDoc(doc(as("org"), "organizations/o1/companies/c1/delegates/pending1"), {status: "active", updatedAt: "t"}));
+    await assertFails(updateDoc(doc(as("adm"), "organizations/o1/companies/c1/delegates/pending1"), {status: "active", updatedAt: "t"}));
+    await assertFails(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {status: "suspended", updatedAt: "t"}));
+    await assertFails(updateDoc(doc(as("hr"), "organizations/o1/companies/c1/delegates/d1"), {status: "suspended", updatedAt: "t"}));
+    await assertSucceeds(updateDoc(doc(as("sa"), "organizations/o1/companies/c1/delegates/d1"), {status: "suspended", updatedAt: "t"}));
+    await assertSucceeds(updateDoc(doc(as("ts"), "organizations/o1/companies/c1/delegates/d1"), {status: "active", updatedAt: "t"}));
+  });
+
+  test("only super-admin and tech may approve or reject a photo permission", async () => {
+    const path = "organizations/o1/companies/c1/photo_permissions/p1";
+    await assertFails(updateDoc(doc(as("sup"), path), {status: "approved", updatedAt: "t"}));
+    await assertFails(updateDoc(doc(as("adm"), path), {status: "rejected", updatedAt: "t"}));
+    await assertFails(updateDoc(doc(as("org"), path), {status: "approved", updatedAt: "t"}));
+    await assertFails(updateDoc(doc(as("mkt"), path), {status: "approved", updatedAt: "t"}));
+    await assertSucceeds(updateDoc(doc(as("sa"), path), {status: "approved", updatedAt: "t"}));
+    await assertSucceeds(updateDoc(doc(as("ts"), "organizations/o2/companies/c1/photo_permissions/p2"), {status: "rejected", updatedAt: "t"}));
+  });
 
   test("supervisor can collection-group list photo_permissions by companyUID", async () => {
     const snap = await assertSucceeds(getDocs(query(

@@ -9,6 +9,8 @@ import 'package:delegate_app/features/admin/domain/entities/delegate_subscriptio
 import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
+import 'package:delegate_app/features/admin/data/repositories/delegate_profile_edit_repository.dart';
+import 'package:delegate_app/features/admin/presentation/pages/edit_delegate_profile_screen.dart';
 import 'super_admin_subscription_financial_report_screen.dart';
 
 class DelegateSubscriptionRequestsPage extends StatefulWidget {
@@ -483,7 +485,91 @@ class _DelegateSubscriptionRequestsPageState
     );
   }
 
+
+  Future<void> _handleNationalIdReview(
+    DelegateSubscriptionRequest request, {
+    required bool approve,
+  }) async {
+    final reasonController = TextEditingController();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(
+          approve ? 'اعتماد تعديل الرقم القومي' : 'رفض تعديل الرقم القومي',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              approve
+                  ? 'اعتماد تغيير الرقم القومي للمندوب "${request.fullName}" من ${request.nationalId} إلى ${request.proposedNationalId}؟ سيتم التحديث في كل سجلات الشركة بعد التحقق من عدم التكرار.'
+                  : 'رفض طلب تعديل الرقم القومي للمندوب "${request.fullName}" (المقترح: ${request.proposedNationalId}).',
+            ),
+            if (!approve) ...[
+              const SizedBox(height: 10),
+              TextField(
+                controller: reasonController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  hintText: 'اكتب سبب الرفض هنا...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: approve ? Colors.green : Colors.red,
+            ),
+            onPressed: () {
+              if (!approve && reasonController.text.trim().isEmpty) {
+                AppSnackBar.showError(ctx, 'يرجى إدخال سبب الرفض');
+                return;
+              }
+              Navigator.pop(ctx, true);
+            },
+            child: Text(approve ? 'اعتماد التعديل' : 'تأكيد الرفض'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    try {
+      await DelegateProfileEditRepository().reviewNationalIdUpdate(
+        requestId: request.id,
+        approve: approve,
+        rejectionReason: approve ? null : reasonController.text.trim(),
+      );
+      if (!mounted) return;
+      AppSnackBar.showSuccess(
+        context,
+        approve
+            ? 'تم اعتماد الرقم القومي الجديد وتحديثه في كل السلاسل.'
+            : 'تم رفض طلب تعديل الرقم القومي.',
+      );
+    } on DelegateProfileEditException catch (e) {
+      if (!mounted) return;
+      AppSnackBar.showError(context, e.message);
+    } catch (_) {
+      if (!mounted) return;
+      AppSnackBar.showError(context, 'تعذر إتمام المراجعة. حاول مرة أخرى.');
+    }
+  }
+
   Future<void> _handleApprove(DelegateSubscriptionRequest request) async {
+    if (request.isNationalIdUpdateRequest) {
+      await _handleNationalIdReview(request, approve: true);
+      return;
+    }
     final isDelete = request.requestType == 'delete_delegate';
 
     final confirm = await showDialog<bool>(
@@ -594,6 +680,10 @@ class _DelegateSubscriptionRequestsPageState
   }
 
   Future<void> _handleReject(DelegateSubscriptionRequest request) async {
+    if (request.isNationalIdUpdateRequest) {
+      await _handleNationalIdReview(request, approve: false);
+      return;
+    }
     final isDelete = request.requestType == 'delete_delegate';
     final reasonController = TextEditingController();
     final confirm = await showDialog<bool>(
@@ -672,6 +762,22 @@ class _DelegateSubscriptionRequestsPageState
       ),
     );
   }
+}
+
+bool _canSupervisorEditRequest(Delegate admin, DelegateSubscriptionRequest request) {
+  final isEditor = admin.role == UserRole.admin ||
+      admin.position == DelegatePosition.supervisor;
+  if (!isEditor) return false;
+  if (admin.companyUID.isEmpty || admin.companyUID != request.companyUID) {
+    return false;
+  }
+  if (request.requestType == 'delete_delegate' ||
+      request.isRenewalRequest ||
+      request.requestType == 'add_organization' ||
+      request.isNationalIdUpdateRequest) {
+    return false;
+  }
+  return request.status == SubscriptionRequestStatus.pending;
 }
 
 class _SubscriptionRequestCard extends StatelessWidget {
@@ -883,6 +989,34 @@ class _SubscriptionRequestCard extends StatelessWidget {
                               child: Text(
                                 'طلب تجديد (${request.items.length} مندوب) • ${request.paymentStatus.arabicLabel} • يُعتمد تلقائياً بعد الدفع',
                                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else if (request.isNationalIdUpdateRequest) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: colorScheme.secondaryContainer.withValues(alpha: 0.45),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: colorScheme.secondary.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.badge_outlined, size: 16, color: colorScheme.secondary),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'طلب تعديل الرقم القومي: ${request.nationalId} ➔ ${request.proposedNationalId}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.onSurface,
+                                ),
                               ),
                             ),
                           ],
@@ -1329,7 +1463,9 @@ class _SubscriptionRequestCard extends StatelessWidget {
                                 label: Text(
                                   request.requestType == 'delete_delegate'
                                       ? 'اعتماد الحذف النهائي'
-                                      : 'اعتماد وتفعيل',
+                                      : request.isNationalIdUpdateRequest
+                                          ? 'اعتماد تعديل الرقم القومي'
+                                          : 'اعتماد وتفعيل',
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                 ),
                               ),
@@ -1348,7 +1484,9 @@ class _SubscriptionRequestCard extends StatelessWidget {
                                 label: Text(
                                   request.requestType == 'delete_delegate'
                                       ? 'رفض طلب الحذف'
-                                      : 'رفض الطلب',
+                                      : request.isNationalIdUpdateRequest
+                                          ? 'رفض تعديل الرقم القومي'
+                                          : 'رفض الطلب',
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                 ),
                               ),
@@ -1380,6 +1518,26 @@ class _SubscriptionRequestCard extends StatelessWidget {
                             ],
                           ),
                         ),
+                      if (_canSupervisorEditRequest(currentAdmin, request)) ...[
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final result = await Navigator.of(context).push<bool>(
+                              MaterialPageRoute(
+                                builder: (_) => EditDelegateProfileScreen(
+                                  supervisor: currentAdmin,
+                                  request: request,
+                                ),
+                              ),
+                            );
+                            if (result == true) {
+                              // stream rebuilds the list
+                            }
+                          },
+                          icon: const Icon(Icons.edit_rounded, size: 16),
+                          label: const Text('تعديل بيانات الطلب'),
+                        ),
+                      ],
                     ] else if (request.status == SubscriptionRequestStatus.approved) ...[
                       const SizedBox(height: 8),
                       Container(
@@ -1411,7 +1569,9 @@ class _SubscriptionRequestCard extends StatelessWidget {
                               child: Text(
                                 request.requestType == 'delete_delegate'
                                     ? 'تم تنفيذ الحذف النهائي للمندوب بنجاح${request.reviewedBy != null ? " (${request.reviewedBy})" : ""}!'
-                                    : 'تم اعتماد وتفعيل المندوب بنجاح${request.reviewedBy != null ? " (${request.reviewedBy})" : ""}!',
+                                    : request.isNationalIdUpdateRequest
+                                        ? 'تم اعتماد الرقم القومي الجديد${request.reviewedBy != null ? " (${request.reviewedBy})" : ""}'
+                                        : 'تم اعتماد وتفعيل المندوب بنجاح${request.reviewedBy != null ? " (${request.reviewedBy})" : ""}!',
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   color: request.requestType == 'delete_delegate'
