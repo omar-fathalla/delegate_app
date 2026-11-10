@@ -56,10 +56,9 @@ abstract class DelegateSubscriptionRepository {
   });
 
   /// Checks whether a 5-digit receipt code is already used in the same
-  /// organization and company (staff list queries must include both filters).
+  /// company (the company is the tenant; any chain/organization under it).
   Future<Either<Failure, bool>> isReceiptCodeUsed(
     String receiptCode, {
-    required String organizationUID,
     required String companyUID,
   });
 

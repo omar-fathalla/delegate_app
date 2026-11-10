@@ -66,7 +66,6 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       // Check existing requests with same national ID
       final existingById = await _firestore
           .collection('delegate_requests')
-          .where('organizationUID', isEqualTo: organizationUID)
           .where('companyUID', isEqualTo: companyUID)
           .where('nationalId', isEqualTo: cleanNationalId)
           .get();
@@ -88,7 +87,6 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       // Check existing requests with same phone number
       final existingByPhone = await _firestore
           .collection('delegate_requests')
-          .where('organizationUID', isEqualTo: organizationUID)
           .where('companyUID', isEqualTo: companyUID)
           .where('phoneNumber', isEqualTo: cleanPhone)
           .get();
@@ -137,7 +135,6 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         }
         final checkUsed = await isReceiptCodeUsed(
           cleanCode,
-          organizationUID: organizationUID,
           companyUID: companyUID,
         );
         final isUsed = checkUsed.fold((_) => false, (used) => used);
@@ -576,7 +573,6 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       // 1. Check if a pending delete request already exists for this delegate
       final existingPending = await _firestore
           .collection('delegate_requests')
-          .where('organizationUID', isEqualTo: delegate.organizationUID)
           .where('companyUID', isEqualTo: delegate.companyUID)
           .where('existingDelegateUid', isEqualTo: delegate.uid)
           .where('requestType', isEqualTo: 'delete_delegate')
@@ -657,7 +653,6 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
   @override
   Future<Either<Failure, bool>> isReceiptCodeUsed(
     String receiptCode, {
-    required String organizationUID,
     required String companyUID,
   }) async {
     try {
@@ -681,7 +676,6 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       try {
         final reqSnap = await _firestore
             .collection('delegate_requests')
-            .where('organizationUID', isEqualTo: organizationUID)
             .where('companyUID', isEqualTo: companyUID)
             .where('receiptCode', isEqualTo: cleanCode)
             .get();

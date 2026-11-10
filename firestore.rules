@@ -1535,7 +1535,11 @@ service cloud.firestore {
         ]));
     }
 
-      // Subscription Phase 0: no cross-tenant reads. One users/{uid} read (budget).
+      // Subscription Phase 0: the company is the tenant for company staff
+      // (admin / supervisor / HR). They may read and list requests for any
+      // organization/chain under their companyUID. Org-admin stays org-scoped.
+      // Super-admin and technical support remain global. Cross-company denied.
+      // One users/{uid} read (budget).
     function delegateRequestReadOk() {
       let d = resource.data;
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
@@ -1554,7 +1558,7 @@ service cloud.firestore {
         || (r in [
           'company-admin', 'company_admin', 'companyadmin', 'admin',
           'supervisor', 'company_supervisor', 'hr', 'company-hr', 'company_hr', 'human_resources']
-          && org != '' && co != '' && docOrg == org && docCo == co)
+          && co != '' && docCo == co)
         || d.get('supervisorUid', '') == request.auth.uid
         || d.get('delegateUid', '') == request.auth.uid
         || resource.id == request.auth.uid;
