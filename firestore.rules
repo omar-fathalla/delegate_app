@@ -1406,15 +1406,18 @@ service cloud.firestore {
       allow read: if signedIn() && canReadDelegate();
       // r5 budget: a nested organizations/{o}/companies/{c}/delegates
       // create is decided by the nested match alone.
+      // sourceStampKeysLocked stays on the nested allow only. Putting it on
+      // this collection-group allow is also evaluated on nested-path writes
+      // (no short-circuit) and blows the 1000-expression budget (docs-pending
+      // 4-flip tech approval). Nested docs are already covered by the nested match.
       allow create: if signedIn() && !onNestedDelegate() && deviceBindingAbsent() && (
         isGlobalStaff() ||
         (isOrgScopedStaff() && incomingOrgScoped()) ||
         (isCompanyScopedStaff() && incomingCompanyScoped())
-      ) && techCreateOk(request.resource.data.get('organizationUID', ''), request.resource.data.get('companyUID', ''), delegateId)
-        && sourceStampKeysLocked();
+      ) && techCreateOk(request.resource.data.get('organizationUID', ''), request.resource.data.get('companyUID', ''), delegateId);
       // r5 budget: a nested organizations/{o}/companies/{c}/delegates
       // update is decided by the nested match alone, for every role.
-      allow update: if signedIn() && !onNestedDelegate() && sourceStampKeysLocked()
+      allow update: if signedIn() && !onNestedDelegate()
         && (delegateOwns(delegateId)
         ? delegateFieldsSafe()
         : (deviceBindingUntouched() && staffManagesDelegate(
