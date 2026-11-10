@@ -25,6 +25,9 @@ import {
   supervisorReviewAlertDoc,
   uniqueRecipientIds,
   valueOf,
+  PRIVILEGED_ALERT_ROLE_VALUES,
+  reviewTargetMatchesSubmission,
+  usersProfileSyncPatch,
 } from "./delegate_profile_edit_logic";
 
 function asUpdate(patch: Record<string, unknown>): FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData> {
@@ -160,8 +163,7 @@ async function notifyPrivileged(
   let recipientIds: string[] = [];
   try {
     const users = await db.collection("users").where("role", "in", [
-      "super-admin", "super_admin", "superAdmin",
-      "technicalSupport", "technical-support", "technical_support",
+      ...PRIVILEGED_ALERT_ROLE_VALUES,
     ]).get();
     recipientIds = uniqueRecipientIds(users.docs.map((d) => d.id));
   } catch (err) {
@@ -312,6 +314,17 @@ export const editDelegateProfile = functions
       batch.update(t.ref, asUpdate(patch));
     }
     writeAudits(batch, db, audits);
+    const userSync = usersProfileSyncPatch(fields);
+    if (userSync && collected.delegateUid) {
+      const userRef = db.collection("users").doc(collected.delegateUid);
+      const userSnap = await userRef.get();
+      if (userSnap.exists) {
+        batch.update(userRef, asUpdate({
+          ...userSync,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }));
+      }
+    }
     await batch.commit();
 
     if (shouldAlertAdmins(keys)) {
@@ -446,6 +459,25 @@ export const submitNationalIdUpdate = functions
       delegateUid: collected.delegateUid,
     });
 
+    await db.collection(AUDIT).doc().set({
+      ...auditDoc({
+        actorUid: caller.uid,
+        actorName: caller.name,
+        actorRole: caller.role,
+        field: "nationalId",
+        oldValue: currentId,
+        newValue: newNationalId,
+        delegateUid: collected.delegateUid,
+        delegateName: collected.displayName || collected.delegateUid,
+        companyUID,
+        companyName: collected.companyName || String(src.companyName || ""),
+        organizationUID: collected.organizationUID || String(src.organizationUID || src.organizationId || ""),
+        source: "national_id_submission",
+        requestId: docRef.id,
+      }),
+      at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
     return {ok: true, requestId: docRef.id};
   });
 
@@ -575,14 +607,50 @@ export const reviewNationalIdUpdate = functions
       // All transactional reads must complete before any write. A second
       // pending or leftover request plus the live delegate would otherwise
       // throw INTERNAL (read-after-write) mid-loop.
+      const freshUid = String(freshData.existingDelegateUid || "").trim();
+      const freshCompany = String(freshData.companyUID || "").trim();
+      const freshProposed = String(freshData.proposedNationalId || "").trim();
+      if (freshUid !== delegateUid || freshCompany !== companyUID || freshProposed !== newId) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "بيانات الطلب لم تعد مطابقة لما تم تقديمه.",
+        );
+      }
+
       const targets = collected ? collected.targets : [];
       const liveSnaps: FirebaseFirestore.DocumentSnapshot[] = [];
       for (const t of targets) {
         if (t.kind === "request" && t.ref.id === requestId) continue;
         liveSnaps.push(await tx.get(t.ref));
       }
+      const matchingDelegates: FirebaseFirestore.DocumentSnapshot[] = [];
       for (const live of liveSnaps) {
-        if (!live.exists) continue;
+        const check = reviewTargetMatchesSubmission({
+          requestDelegateUid: delegateUid,
+          requestCompanyUID: companyUID,
+          liveExists: live.exists,
+          livePath: live.ref.path,
+          liveData: live.exists ? (live.data() || {}) : undefined,
+        });
+        if (check === "ok") {
+          matchingDelegates.push(live);
+          continue;
+        }
+        const isDelegateDoc = live.ref.path.includes("/delegates/");
+        if (isDelegateDoc) {
+          const msg = check === "inactive"
+            ? "المندوب المستهدف لم يعد نشطاً."
+            : "المندوب المستهدف لا يطابق الطلب المقدَّم.";
+          throw new functions.https.HttpsError("failed-precondition", msg);
+        }
+      }
+      if (!matchingDelegates.length) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "تعذر التحقق من المندوب المستهدف على الخادم.",
+        );
+      }
+      for (const live of matchingDelegates) {
         tx.update(live.ref, asUpdate({
           nationalId: newId,
           nationalityID: newId,
@@ -634,7 +702,7 @@ export const reviewNationalIdUpdate = functions
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
-      return {ok: true, status: "approved" as const, updated: targets.length};
+      return {ok: true, status: "approved" as const, updated: matchingDelegates.length};
     });
     return result;
   });

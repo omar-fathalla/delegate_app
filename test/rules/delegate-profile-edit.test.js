@@ -16,6 +16,8 @@ const USERS = {
   sup2: {role: "supervisor", organizationUID: "o1", companyUID: "c2"},
   adm: {role: "admin", organizationUID: "o1", companyUID: "c1"},
   d1: {role: "delegate", organizationUID: "o1", companyUID: "c1"},
+  mkt: {role: "marketing_promotion", organizationUID: "o1"},
+  oa: {role: "organization-admin", organizationUID: "o1"},
 };
 const NESTED = "organizations/o1/companies/c1/delegates/d1";
 const REQ = "delegate_requests/r1";
@@ -209,5 +211,56 @@ describe("supervisor delegate profile edit rules", () => {
     await assertFails(updateDoc(doc(as("sup"), path), {isSupervisorEnabled: true}));
     await assertFails(updateDoc(doc(as("adm"), path), {isSupervisorEnabled: true}));
     await assertSucceeds(updateDoc(doc(as("sa"), path), {status: "approved"}));
+  });
+
+  test("pending update_national_id requests are immutable to clients (N-1)", async () => {
+    const path = "delegate_requests/nid-locked";
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(path).set({
+        requestType: "update_national_id",
+        actionType: "update_national_id",
+        status: "pending",
+        companyUID: "c1",
+        organizationUID: "o1",
+        existingDelegateUid: "d1",
+        delegateUid: "d1",
+        proposedNationalId: "29001010100022",
+        notes: "original",
+      });
+    });
+    await assertFails(updateDoc(doc(as("sup"), path), {existingDelegateUid: "dsusp"}));
+    await assertFails(updateDoc(doc(as("adm"), path), {delegateUid: "dsusp"}));
+    await assertFails(updateDoc(doc(as("sup"), path), {proposedNationalId: "29001010100033"}));
+    await assertFails(updateDoc(doc(as("sup"), path), {status: "cancelled"}));
+    await assertFails(updateDoc(doc(as("sup"), path), {notes: "retarget"}));
+    await assertFails(updateDoc(doc(as("sa"), path), {status: "approved"}));
+    await assertFails(updateDoc(doc(as("ts"), path), {status: "rejected"}));
+  });
+
+  test("marketing and org-admin may edit photo-permission dates and branches but not the toggle (N-2)", async () => {
+    const path = "organizations/o1/companies/c1/photo_permissions/pp2";
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(path).set({
+        status: "approved",
+        companyUID: "c1",
+        organizationUID: "o1",
+        delegateUid: "d1",
+        isSupervisorEnabled: true,
+        startDate: "2026-01-01",
+        endDate: "2026-02-01",
+        branchIds: ["b1"],
+        branchNames: ["فرع 1"],
+      });
+    });
+    const schedule = {startDate: "2026-01-10", endDate: "2026-03-01", updatedAt: "t"};
+    const branches = {branchIds: ["b1", "b2"], branchNames: ["فرع 1", "فرع 2"], updatedAt: "t"};
+    // "mkt" is marketing without companyUID; "org" if present, else use marketing + org-admin users from this file.
+    await assertSucceeds(updateDoc(doc(as("mkt"), path), schedule));
+    await assertSucceeds(updateDoc(doc(as("mkt"), path), branches));
+    await assertFails(updateDoc(doc(as("mkt"), path), {isSupervisorEnabled: false}));
+    await assertFails(updateDoc(doc(as("mkt"), path), {status: "rejected"}));
+    await assertSucceeds(updateDoc(doc(as("oa"), path), {startDate: "2026-01-15", endDate: "2026-04-01", updatedAt: "t2"}));
+    await assertFails(updateDoc(doc(as("oa"), path), {isSupervisorEnabled: false}));
+    await assertFails(updateDoc(doc(as("sup"), path), {startDate: "2026-01-20", endDate: "2026-05-01", updatedAt: "t3"}));
   });
 });

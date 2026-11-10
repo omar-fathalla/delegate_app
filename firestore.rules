@@ -1089,14 +1089,25 @@ service cloud.firestore {
             canManageNestedDelegate(orgId, compId)
             || (delegateInOrg(orgId) && delegateInCompany(compId))
           );
-          // Company and org staff cannot update photo permissions, including
-          // non-status fields (dates, branches, supervisor enable). Only
-          // super-admin / technical support may update. Delegates may still
-          // change non-status fields on their own company's request.
+          // Approving or toggling isSupervisorEnabled is super-admin / tech
+          // only (Mohamed 2026-11-10 14:00). Branch and date edits are not
+          // approval: marketing and org-admin may change those fields in
+          // their own org (and company, when they have one). Delegates may
+          // still change non-status fields on their own company's request.
           allow update: if signedIn() && (
             isGlobalStaff()
             || (!changedKeys().hasAny(['status'])
               && delegateInOrg(orgId) && delegateInCompany(compId))
+            || (
+              (isOrgScopedStaff() || isBranchesMarketing())
+              && callerOrg() == orgId
+              && (callerCompany() == '' || callerCompany() == compId)
+              && !changedKeys().hasAny([
+                'status', 'isSupervisorEnabled', 'approvedBy', 'approvedAt',
+                'rejectedBy', 'rejectedAt', 'reviewedBy', 'reviewedAt'])
+              && changedKeys().hasOnly([
+                'startDate', 'endDate', 'branchIds', 'branchNames', 'updatedAt'])
+            )
           );
           allow delete: if canManageNestedDelegate(orgId, compId);
 
@@ -1314,9 +1325,10 @@ service cloud.firestore {
           || delegateOwns(request.resource.data.delegateUid)
         ))
       );
-      // Company and org staff cannot update photo permissions (including
-      // non-status fields). Only super-admin / technical support may update.
-      // Delegates may still change non-status fields on their own request.
+      // Same policy as the nested match: SA/tech may update anything;
+      // marketing / org-admin may edit dates and branches in their scope;
+      // company staff cannot toggle or approve; delegates may change
+      // non-status fields on their own request.
       allow update: if signedIn() && (
         isGlobalStaff()
         || (!changedKeys().hasAny(['status'])
@@ -1324,6 +1336,16 @@ service cloud.firestore {
             delegateInOrg(request.resource.data.organizationUID)
             || delegateOwns(request.resource.data.delegateUid)
           ))
+        || (
+          (isOrgScopedStaff() || isBranchesMarketing())
+          && orgScoped()
+          && (callerCompany() == '' || companyScoped())
+          && !changedKeys().hasAny([
+            'status', 'isSupervisorEnabled', 'approvedBy', 'approvedAt',
+            'rejectedBy', 'rejectedAt', 'reviewedBy', 'reviewedAt'])
+          && changedKeys().hasOnly([
+            'startDate', 'endDate', 'branchIds', 'branchNames', 'updatedAt'])
+        )
       );
       allow delete: if isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped());
     }
@@ -1708,9 +1730,11 @@ service cloud.firestore {
         && subscriptionPaymentUntouched();
       // Self clause first: the staff role helpers are expensive and would
       // otherwise eat the 1000-expression budget before the docs checks.
-      // proposedNationalId is owned by the submit/review callables. Clients
-      // cannot change it, and cannot convert another request into
-      // update_national_id.
+      // update_national_id requests are immutable after create: clients
+      // cannot change existingDelegateUid, delegateUid, proposedNationalId,
+      // status, or any other field. Review fields are written only by
+      // reviewNationalIdUpdate (Admin SDK). Clients also cannot convert
+      // another request into update_national_id.
       allow update: if ((signedIn() && request.auth.uid == requestId
           && changedKeys().hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
             'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'])
@@ -1721,6 +1745,11 @@ service cloud.firestore {
           || request.resource.data.get('requestType', '') != 'update_national_id')
         && (resource.data.get('actionType', '') == 'update_national_id'
           || request.resource.data.get('actionType', '') != 'update_national_id')
+        // N-1: once created, an update_national_id request is immutable to
+        // clients (including existingDelegateUid, delegateUid, status, notes).
+        // Only Admin SDK review/submit callables write review fields.
+        && resource.data.get('requestType', '') != 'update_national_id'
+        && resource.data.get('actionType', '') != 'update_national_id'
         && subscriptionPaymentUntouched();
       allow delete: if isSuperAdmin() || isOrgAdmin();
     }

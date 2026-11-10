@@ -104,6 +104,61 @@ test("isAllowedImageUrl accepts storage URLs/paths and rejects javascript (LOW)"
   assert.ok(!L.isAllowedImageUrl("http://example.com/x.jpg"));
   assert.ok(!L.isAllowedImageUrl("delegate_documents/other/x.jpg", "d1"));
   assert.throws(() => L.assertImageFields({personalPhotoURL: "javascript:alert(1)"}), /invalid-image-url/);
+  assert.ok(L.isAllowedImageUrl("https://firebasestorage.googleapis.com/v0/b/tashil-dev.firebasestorage.app/o/x"));
+  assert.ok(L.isAllowedImageUrl("https://firebasestorage.googleapis.com/v0/b/practice-firebase-72df1.appspot.com/o/x"));
+  assert.ok(L.isAllowedImageUrl("https://practice-firebase-72df1.firebasestorage.app/v0/b/practice-firebase-72df1.firebasestorage.app/o/x")
+    || L.isAllowedImageUrl("https://tashil-dev.firebasestorage.app/o/x"));
+  assert.ok(L.isAllowedImageUrl("https://tashil-dev.firebasestorage.app/o/x"));
+  assert.ok(!L.isAllowedImageUrl("https://evil.appspot.com/x.png"));
+  assert.ok(!L.isAllowedImageUrl("https://firebasestorage.googleapis.com/v0/b/evil.appspot.com/o/x"));
+  assert.ok(!L.isAllowedImageUrl("https://storage.googleapis.com/evil.appspot.com/x"));
+  assert.ok(!L.isAllowedImageUrl("https://attacker.firebasestorage.app/o/x"));
+});
+
+test("reviewTargetMatchesSubmission verifies the submitted delegate (N-1)", () => {
+  const path = "organizations/o1/companies/c1/delegates/d1";
+  const ok = {uid: "d1", companyUID: "c1", status: "active"};
+  assert.equal(L.reviewTargetMatchesSubmission({
+    requestDelegateUid: "d1", requestCompanyUID: "c1",
+    liveExists: true, livePath: path, liveData: ok,
+  }), "ok");
+  assert.equal(L.reviewTargetMatchesSubmission({
+    requestDelegateUid: "d1", requestCompanyUID: "c1",
+    liveExists: true, livePath: path, liveData: {uid: "dsusp", companyUID: "c1", status: "active"},
+  }), "mismatch");
+  assert.equal(L.reviewTargetMatchesSubmission({
+    requestDelegateUid: "d1", requestCompanyUID: "c1",
+    liveExists: true, livePath: "organizations/o1/companies/c2/delegates/d1",
+    liveData: {uid: "d1", companyUID: "c1", status: "active"},
+  }), "mismatch");
+  assert.equal(L.reviewTargetMatchesSubmission({
+    requestDelegateUid: "d1", requestCompanyUID: "c1",
+    liveExists: true, livePath: path, liveData: {uid: "d1", companyUID: "c1", status: "suspended"},
+  }), "inactive");
+  assert.equal(L.reviewTargetMatchesSubmission({
+    requestDelegateUid: "d1", requestCompanyUID: "c1",
+    liveExists: false, livePath: path,
+  }), "missing");
+});
+
+test("usersProfileSyncPatch copies name, phone and photo (N-5)", () => {
+  const patch = L.usersProfileSyncPatch({
+    fullName: "محمد علي حسن",
+    phoneNumber: "01012345678",
+    personalPhotoURL: "https://tashil-dev.firebasestorage.app/o/p.jpg",
+  });
+  assert.equal(patch.fullName, "محمد علي حسن");
+  assert.equal(patch.phoneNumber, "01012345678");
+  assert.equal(patch.phone, "01012345678");
+  assert.equal(patch.personalPhotoURL, "https://tashil-dev.firebasestorage.app/o/p.jpg");
+  assert.equal(L.usersProfileSyncPatch({}), null);
+});
+
+test("privileged alert role list includes compacted spellings (N-4)", () => {
+  assert.ok(L.PRIVILEGED_ALERT_ROLE_VALUES.includes("superadmin"));
+  assert.ok(L.PRIVILEGED_ALERT_ROLE_VALUES.includes("technicalsupport"));
+  assert.ok(L.PRIVILEGED_ALERT_ROLE_VALUES.includes("super-admin"));
+  assert.ok(L.PRIVILEGED_ALERT_ROLE_VALUES.includes("technical_support"));
 });
 
 test("privilegedAlertDoc writes one recipient and no phoneNumber (M-7)", () => {

@@ -70,8 +70,62 @@ service firebase.storage {
     }
 
     // ==================== DELEGATE REGISTRATION & SUBSCRIPTION DOCUMENTS ====================
-    match /delegate_documents/{allPaths=**} {
-      allow read, write: if isAuthenticated();
+    // P-1: only the delegate, their company staff, and super-admin / tech.
+    // Registration uploads to delegate_documents/{requestId} *before* the
+    // request doc exists, so company staff may also access a folder that
+    // has no users/{id} or delegate_requests/{id} doc yet. The catch-all
+    // below must not OR this path back open.
+    function storageUser() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+    function storageRole() {
+      return request.auth != null && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        ? storageUser().get('role', '')
+        : '';
+    }
+    function storageIsGlobal() {
+      return storageRole() in [
+        'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
+        'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport',
+        'tech_support', 'techsupport'
+      ];
+    }
+    function storageCallerCompany() {
+      return request.auth != null && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        ? storageUser().get('companyUID', '')
+        : '';
+    }
+    function storageIsCompanyStaff() {
+      return storageCallerCompany() != '' && storageRole() in [
+        'company-admin', 'company_admin', 'companyadmin', 'admin',
+        'supervisor', 'company_supervisor',
+        'hr', 'company-hr', 'company_hr', 'human_resources'
+      ];
+    }
+    function storageFolderCompany(delegateUid) {
+      return firestore.exists(/databases/(default)/documents/delegate_requests/$(delegateUid))
+        ? firestore.get(/databases/(default)/documents/delegate_requests/$(delegateUid)).data.get('companyUID', '')
+        : (firestore.exists(/databases/(default)/documents/users/$(delegateUid))
+          ? firestore.get(/databases/(default)/documents/users/$(delegateUid)).data.get('companyUID', '')
+          : '');
+    }
+    function storageFolderUnresolved(delegateUid) {
+      return !firestore.exists(/databases/(default)/documents/delegate_requests/$(delegateUid))
+        && !firestore.exists(/databases/(default)/documents/users/$(delegateUid));
+    }
+    function canAccessDelegateDocuments(delegateUid) {
+      return isAuthenticated() && (
+        request.auth.uid == delegateUid
+        || storageIsGlobal()
+        || (storageIsCompanyStaff() && (
+          storageFolderCompany(delegateUid) == storageCallerCompany()
+          || (storageFolderCompany(delegateUid) == '' && storageFolderUnresolved(delegateUid))
+        ))
+      );
+    }
+
+    match /delegate_documents/{delegateUid}/{allPaths=**} {
+      allow read, write: if canAccessDelegateDocuments(delegateUid);
     }
 
     match /delegate_subscription_receipts/{allPaths=**} {
@@ -96,7 +150,12 @@ service firebase.storage {
     }
 
     // ==================== FALLBACK FOR ALL OTHER AUTHENTICATED PATHS ====================
-    match /{allPaths=**} {
+    // Do not match delegate_documents: Storage ORs overlapping matches, so a
+    // catch-all here would undo the tighter rule above.
+    match /{firstSegment}/{rest=**} {
+      allow read, write: if isAuthenticated() && firstSegment != 'delegate_documents';
+    }
+    match /{singleFile} {
       allow read, write: if isAuthenticated();
     }
   }

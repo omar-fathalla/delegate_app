@@ -52,6 +52,25 @@ export function isSameDelegateRecord(
     || String(data.delegateUid || "").trim() === ex;
 }
 
+/**
+ * Honor excludeDelegateUid only for a hit in the caller's company.
+ * A client-supplied id must not hide another company's duplicate (L-7).
+ */
+export function isExcludableDelegateRecord(
+  data: {
+    uid?: unknown; existingDelegateUid?: unknown; delegateUid?: unknown;
+    companyUID?: unknown; companyId?: unknown;
+  },
+  docId: string,
+  excludeUid: string | undefined,
+  callerCompanyUID: string,
+): boolean {
+  if (!isSameDelegateRecord(data, docId, excludeUid)) return false;
+  const hitCo = String(data.companyUID || data.companyId || "").trim();
+  const caller = String(callerCompanyUID || "").trim();
+  return !!caller && hitCo === caller;
+}
+
 export function isExistingDelegateStatus(status: unknown): boolean {
   const s = String(status || "").toLowerCase();
   return s !== "inactive";
