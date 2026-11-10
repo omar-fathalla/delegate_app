@@ -572,12 +572,18 @@ export const reviewNationalIdUpdate = functions
         return {ok: true, status: "rejected" as const, updated: 0};
       }
 
+      // All transactional reads must complete before any write. A second
+      // pending or leftover request plus the live delegate would otherwise
+      // throw INTERNAL (read-after-write) mid-loop.
       const targets = collected ? collected.targets : [];
+      const liveSnaps: FirebaseFirestore.DocumentSnapshot[] = [];
       for (const t of targets) {
         if (t.kind === "request" && t.ref.id === requestId) continue;
-        const live = await tx.get(t.ref);
+        liveSnaps.push(await tx.get(t.ref));
+      }
+      for (const live of liveSnaps) {
         if (!live.exists) continue;
-        tx.update(t.ref, asUpdate({
+        tx.update(live.ref, asUpdate({
           nationalId: newId,
           nationalityID: newId,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
