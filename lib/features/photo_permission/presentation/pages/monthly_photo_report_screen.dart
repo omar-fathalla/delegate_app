@@ -2,6 +2,7 @@ import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/material.dart';
+import 'package:delegate_app/features/photo_permission/presentation/photo_reports_refresh.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -107,6 +108,19 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
     }
 
     _loadPhotos();
+    PhotoReportsRefresh.tick.addListener(_onReportsRefreshRequested);
+  }
+
+  void _onReportsRefreshRequested() {
+    if (!mounted) return;
+    _reloadQueued = false;
+    _loadPhotos();
+  }
+
+  @override
+  void dispose() {
+    PhotoReportsRefresh.tick.removeListener(_onReportsRefreshRequested);
+    super.dispose();
   }
 
   bool get _canDeletePhoto {

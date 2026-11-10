@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/services/firestore_session_subscriptions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -32,6 +33,9 @@ class _DelegateLeavesAndRequestsScreenState
   int _currentRemainingBalance = 21;
   final Set<String> _expandedDocIds = {};
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userSub;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _leaveSub;
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _leaveDocs = const [];
+  bool _leaveLoaded = false;
 
   @override
   void initState() {
@@ -41,9 +45,14 @@ class _DelegateLeavesAndRequestsScreenState
         ? widget.delegate.annualLeaveQuota
         : 21;
     _listenToDelegateStatus();
+    _listenToLeaveRequests();
   }
 
+  String get _userSubKey => 'leaves.users.${widget.delegate.uid}';
+  String get _leaveSubKey => 'leaves.leave_requests.${widget.delegate.uid}';
+
   void _listenToDelegateStatus() {
+    _userSub?.cancel();
     _userSub = FirebaseFirestore.instance
         .collection('users')
         .doc(widget.delegate.uid)
@@ -63,11 +72,31 @@ class _DelegateLeavesAndRequestsScreenState
         }
       }
     });
+    FirestoreSessionSubscriptions.instance.register(_userSubKey, _userSub!);
+  }
+
+  void _listenToLeaveRequests() {
+    _leaveSub?.cancel();
+    _leaveSub = FirebaseFirestore.instance
+        .collection('leave_requests')
+        .where('companyUID', isEqualTo: widget.delegate.companyUID)
+        .where('delegateUid', isEqualTo: widget.delegate.uid)
+        .snapshots()
+        .listen((snap) {
+      if (!mounted) return;
+      setState(() {
+        _leaveDocs = snap.docs;
+        _leaveLoaded = true;
+      });
+    });
+    FirestoreSessionSubscriptions.instance.register(_leaveSubKey, _leaveSub!);
   }
 
   @override
   void dispose() {
+    // Best-effort; AuthBloc also cancelAll() before signOut.
     _userSub?.cancel();
+    _leaveSub?.cancel();
     super.dispose();
   }
 
@@ -76,12 +105,6 @@ class _DelegateLeavesAndRequestsScreenState
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-
-    // الاستعلام المزدوج الصارم: يفلتر بـ companyUID و delegateUid
-    final Query<Map<String, dynamic>> query = FirebaseFirestore.instance
-        .collection('leave_requests')
-        .where('companyUID', isEqualTo: widget.delegate.companyUID)
-        .where('delegateUid', isEqualTo: widget.delegate.uid);
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
@@ -119,7 +142,10 @@ class _DelegateLeavesAndRequestsScreenState
                 IconButton(
                   icon: const Icon(Symbols.refresh_rounded),
                   tooltip: AppLocalizations.of(context)!.refreshAction,
-                  onPressed: () => setState(() {}),
+                  onPressed: () {
+                    _listenToLeaveRequests();
+                    _listenToDelegateStatus();
+                  },
                 ),
                 const SizedBox(width: 8),
               ],
@@ -130,15 +156,13 @@ class _DelegateLeavesAndRequestsScreenState
         icon: Symbols.add_rounded,
         label: AppLocalizations.of(context)!.newRequest,
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: query.snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting &&
-              !snapshot.hasData) {
+      body: Builder(
+        builder: (context) {
+          if (!_leaveLoaded) {
             return const Center(child: M3DelayedLoading());
           }
 
-          final docs = snapshot.data?.docs ?? [];
+          final docs = _leaveDocs;
           final allLeaves = docs.map((d) {
             final data = d.data();
             return {

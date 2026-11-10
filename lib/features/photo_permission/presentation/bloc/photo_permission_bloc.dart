@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:bloc/bloc.dart';
+import 'package:delegate_app/features/photo_permission/presentation/photo_reports_refresh.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:equatable/equatable.dart';
 import 'package:get_it/get_it.dart';
@@ -715,6 +716,9 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
         uploadedCount: processedCount,
         isOffline: offlineCount > 0,
       ));
+      // Camera and reports use separate factory blocs; notify the
+      // reports tab so it reloads even if it missed this state.
+      PhotoReportsRefresh.request();
     } else {
       emit(const PhotoPermissionError(message: 'فشل في رفع وحفظ الصور، يرجى المحاولة مرة أخرى.'));
     }

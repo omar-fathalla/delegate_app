@@ -1,5 +1,6 @@
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/widgets/app_loading_indicator.dart';
@@ -111,7 +112,11 @@ class _LogoutModalContentState extends State<_LogoutModalContent> {
       }
 
       if (!mounted) return;
-      Navigator.of(context).pop();
+      // Replacing the stack with /login — do not pop(). After the auth
+      // listener (or this go) already moved to login, a pop would hit
+      // go_router's "popped the last page off of the stack" and leave
+      // a black screen (M31 ce97cb3).
+      context.go('/login');
       widget.onLoggedOut?.call();
     } catch (e) {
       debugPrint('Logout: Unexpected error: $e');

@@ -238,6 +238,32 @@ describe("firestore tightened rules", () => {
     await assertFails(db.doc("organizations/o2/companies/c9/delegates/other").get());
   });
 
+  test("staff token without a delegateId claim cannot read a delegate doc with no uid field", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.doc("organizations/o1/companies/c2/delegates/no-uid").set({
+        phoneNumber: "01000000000",
+        organizationUID: "o1",
+        companyUID: "c2",
+        role: "delegate",
+        status: "active",
+      });
+      await db.doc("organizations/o1/companies/c1/delegates/no-uid-own").set({
+        phoneNumber: "01000000001",
+        organizationUID: "o1",
+        companyUID: "c1",
+        role: "delegate",
+        status: "active",
+      });
+    });
+    const companyAdmin = dbFor("comp"); // c1 admin, no delegateId claim
+    await assertFails(companyAdmin.doc("organizations/o1/companies/c2/delegates/no-uid").get());
+    // Own-company read still works via company scope, not ownsDelegateId.
+    await assertSucceeds(companyAdmin.doc("organizations/o1/companies/c1/delegates/no-uid-own").get());
+    const otherCompanyAdmin = dbFor("comp2");
+    await assertFails(otherCompanyAdmin.doc("organizations/o1/companies/c1/delegates/no-uid-own").get());
+  });
+
   test("hr and legacy company_hr can read only their company's attendance", async () => {
     for (const uid of ["hr", "hrlegacy"]) {
       const db = dbFor(uid);
