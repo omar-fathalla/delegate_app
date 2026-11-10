@@ -678,6 +678,18 @@ describe("docs-pending round 2", () => {
       await seed("delegate_requests/a1", AREQ);
       await ok(batchApprove(as("ts"), "a1", AP, D, true));
     });
+    test("ALLOW ts add_org batch that heals request nationalId to the created doc ID", async () => {
+      await seed("delegate_requests/a1", {...AREQ, nationalId: "11111111111111", nationalityID: "11111111111111"});
+      await ok(batchApprove(as("ts"), "a1", AP, {...D, nationalId: "29901010101011", nationalityID: "29901010101011"}, true, {
+        nationalId: "29901010101011", nationalityID: "29901010101011",
+      }));
+    });
+    test("DENY ts add_org batch that writes a nationalId different from the created doc", async () => {
+      await seed("delegate_requests/a1", {...AREQ, nationalId: "11111111111111", nationalityID: "11111111111111"});
+      await no(batchApprove(as("ts"), "a1", AP, {...D, nationalId: "29901010101011", nationalityID: "29901010101011"}, true, {
+        nationalId: "28801010101011", nationalityID: "28801010101011",
+      }));
+    });
     test("DENY ts add_org without approvedRequestId", async () => {
       await seed("delegate_requests/a1", AREQ);
       const {approvedRequestId: _x, ...noId} = D;

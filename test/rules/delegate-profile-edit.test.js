@@ -390,4 +390,78 @@ describe("supervisor delegate profile edit rules", () => {
     }));
     await assertFails(updateDoc(doc(as("bmmCamel"), path), {isSupervisorEnabled: false}));
   });
+
+  test("marketing-promotion review rejects invalid status values (UT F5)", async () => {
+    const path = "organizations/o1/companies/c1/photo_permissions/pp-status";
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(path).set({
+        status: "approved",
+        companyUID: "c1",
+        organizationUID: "o1",
+        delegateUid: "d1",
+        isSupervisorEnabled: true,
+        startDate: "2026-01-01",
+        endDate: "2026-02-01",
+      });
+    });
+    await assertFails(updateDoc(doc(as("mktPromo"), path), {status: "pending", updatedAt: "t"}));
+    await assertFails(updateDoc(doc(as("mktPromo"), path), {status: "cancelled", updatedAt: "t"}));
+    await assertFails(updateDoc(doc(as("mktPromo"), path), {status: "foobar", updatedAt: "t"}));
+    await assertSucceeds(updateDoc(doc(as("mktPromo"), path), {status: "rejected", updatedAt: "t"}));
+  });
+
+  test("photo-permission delete is review-scoped (UT F2)", async () => {
+    const own = "organizations/o1/companies/c1/photo_permissions/pp-del-c1";
+    const otherCo = "organizations/o1/companies/c2/photo_permissions/pp-del-c2";
+    const otherOrg = "organizations/o2/companies/c9/photo_permissions/pp-del-o2";
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const base = {
+        status: "approved",
+        delegateUid: "d1",
+        isSupervisorEnabled: true,
+        startDate: "2026-01-01",
+        endDate: "2026-02-01",
+      };
+      await ctx.firestore().doc(own).set({...base, companyUID: "c1", organizationUID: "o1"});
+      await ctx.firestore().doc(otherCo).set({...base, companyUID: "c2", organizationUID: "o1"});
+      await ctx.firestore().doc(otherOrg).set({...base, companyUID: "c9", organizationUID: "o2"});
+    });
+    // Company-bound marketing-promotion cannot delete another company in its org.
+    await assertFails(deleteDoc(doc(as("mktPromoCo"), otherCo)));
+    await assertSucceeds(deleteDoc(doc(as("mktPromoCo"), own)));
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(own).set({
+        status: "approved", companyUID: "c1", organizationUID: "o1",
+        delegateUid: "d1", isSupervisorEnabled: true,
+        startDate: "2026-01-01", endDate: "2026-02-01",
+      });
+    });
+    // Review-scoped: org-only marketing-promotion can delete any company in its org.
+    await assertSucceeds(deleteDoc(doc(as("mktPromo"), own)));
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(own).set({
+        status: "approved", companyUID: "c1", organizationUID: "o1",
+        delegateUid: "d1", isSupervisorEnabled: true,
+        startDate: "2026-01-01", endDate: "2026-02-01",
+      });
+    });
+    await assertSucceeds(deleteDoc(doc(as("mktPromo"), otherCo)));
+    await assertFails(deleteDoc(doc(as("mktPromo"), otherOrg)));
+    // Plain marketing, org-admin, branches-marketing, supervisor, delegate cannot delete.
+    await assertFails(deleteDoc(doc(as("mkt"), own)));
+    await assertFails(deleteDoc(doc(as("oa"), own)));
+    await assertFails(deleteDoc(doc(as("bmm"), own)));
+    await assertFails(deleteDoc(doc(as("sup"), own)));
+    await assertFails(deleteDoc(doc(as("d1"), own)));
+    // Super-admin and tech still can.
+    await assertSucceeds(deleteDoc(doc(as("sa"), own)));
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(own).set({
+        status: "approved", companyUID: "c1", organizationUID: "o1",
+        delegateUid: "d1", isSupervisorEnabled: true,
+        startDate: "2026-01-01", endDate: "2026-02-01",
+      });
+    });
+    await assertSucceeds(deleteDoc(doc(as("ts"), own)));
+  });
 });

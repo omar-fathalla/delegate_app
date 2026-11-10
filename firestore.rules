@@ -905,13 +905,26 @@ service cloud.firestore {
       let d = request.resource.data;
       let st = d.get('status', '');
       let ty = d.get('requestType', 'new_delegate');
-      return changedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason', 'updatedAt'])
+      let created = getAfter(/databases/$(database)/documents/organizations/$(d.get('organizationUID', ''))/companies/$(d.get('companyUID', ''))/delegates/$(ty == 'add_organization' ? d.get('existingDelegateUid', '') : requestId));
+      let reviewKeysOnly = changedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason', 'updatedAt']);
+      // Add-org approval may also write nationalId/nationalityID when those
+      // values equal the national ID on the created (live) delegate doc in
+      // the same batch. Any other ID is denied.
+      let addOrgLiveIdHeal = ty == 'add_organization'
+        && st == 'approved'
+        && changedKeys().hasOnly([
+          'status', 'reviewedBy', 'reviewedAt', 'rejectionReason', 'updatedAt',
+          'nationalId', 'nationalityID'])
+        && d.get('nationalId', '') != ''
+        && d.get('nationalId', '') == d.get('nationalityID', '')
+        && d.get('nationalId', '') == created.data.get('nationalId', '');
+      return (reviewKeysOnly || addOrgLiveIdHeal)
         && resource.data.get('supervisorUid', '') != request.auth.uid
         && resource.data.get('createdBy', '') != request.auth.uid
         && !(changedKeys().hasAny(['status']) && st == 'pending')
         && !(st == 'approved' && resource.data.get('status', '') != 'pending')
         && (st != 'approved' || !(ty in ['new_delegate', 'add_organization'])
-          || getAfter(/databases/$(database)/documents/organizations/$(d.get('organizationUID', ''))/companies/$(d.get('companyUID', ''))/delegates/$(ty == 'add_organization' ? d.get('existingDelegateUid', '') : requestId)).data.get('status', '') == 'active');
+          || created.data.get('status', '') == 'active');
     }
 
     // True for a write to organizations/{o}/companies/{c}/delegates/{id}.
@@ -989,9 +1002,26 @@ service cloud.firestore {
         && (co == '' || co == compId);
     }
 
+    function photoReviewStatusOk() {
+      return !changedKeys().hasAny(['status'])
+        || request.resource.data.get('status', '') in ['approved', 'rejected'];
+    }
+
     function photoPromotionReviewOnNested(orgId, compId) {
       return photoReviewKeysOnly()
+        && photoReviewStatusOk()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && photoPromotionReviewFromUser(
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data,
+          orgId, compId);
+    }
+
+    // Delete is a review action (Mohamed 2026-11-10 22:14 + UT F2): only
+    // super-admin, technical support, and marketing-promotion, with the
+    // same org / company scope as approve. Marketing, org-admin and
+    // branches-marketing may not delete.
+    function photoPromotionDeleteOnNested(orgId, compId) {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && photoPromotionReviewFromUser(
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data,
           orgId, compId);
@@ -1181,7 +1211,7 @@ service cloud.firestore {
             || photoPromotionReviewOnNested(orgId, compId)
             || isGlobalStaff()
           );
-          allow delete: if canManageNestedDelegate(orgId, compId);
+          allow delete: if isGlobalStaff() || photoPromotionDeleteOnNested(orgId, compId);
 
           match /captured_photos/{photoId} {
             allow create: if signedIn() && (
@@ -1402,7 +1432,12 @@ service cloud.firestore {
       // collection-group update rules are OR'd and would re-evaluate
       // role helpers, pushing a branches-marketing user with a
       // companyUID over the 1000-expression budget (N-2/L-3).
-      allow delete: if isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped());
+      // Nested photo_permissions deletes are decided only by the
+      // path-scoped match (review-scoped). A collection-group delete
+      // for org-scoped staff was OR'd with the nested rule and let
+      // company-bound marketing-promotion delete another company in
+      // its org (UT F2). Keep only isGlobalStaff() here.
+      allow delete: if isGlobalStaff();
     }
 
     match /{path=**}/captured_photos/{photoId} {

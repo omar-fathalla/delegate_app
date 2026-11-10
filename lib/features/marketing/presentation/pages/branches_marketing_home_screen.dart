@@ -538,23 +538,9 @@ class _BranchesMarketingHomeScreenState
     final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
-        // ── المهمة 1: الموافقة على أذونات التصوير ──
-        _buildExecutiveDutyCard(
-          context: context,
-          icon: Icons.verified_user_rounded,
-          iconColor: colorScheme.tertiary,
-          badgeText: isArabic ? 'مهمة أساسية' : 'Core Duty',
-          title: isArabic
-              ? 'الموافقة على أذونات التصوير'
-              : 'Approve Photo Permissions',
-          description: isArabic
-              ? 'مراجعة طلبات تصاريح التصوير المرفوعة لشركات المعروضات واعتمادها أو رفضها فورياً مع تتبع سريانها.'
-              : 'Review and approve/reject marketing photo permissions for vendor delegates with live validity tracking.',
-          actionButtonText: isArabic ? 'اعتماد الأذونات' : 'Review & Approve',
-          onTap: () => widget.onNavigateTab(1),
-        ),
-
-        const SizedBox(height: 12),
+        // Branches-marketing cannot approve photo permissions (22:14 policy).
+        // The "اعتماد الأذونات" home button is hidden (UT F6). The list
+        // remains reachable from the photo-permissions tab for date edits.
 
         // ── المهمة 2: متابعة تسويق الفروع ──
         _buildExecutiveDutyCard(
