@@ -2840,6 +2840,12 @@ abstract class AppLocalizations {
   /// **'You can\'t {action} while outside the branch ({distance}). Please be inside the branch.'**
   String attCannotActOutside(Object action, Object distance);
 
+  /// No description provided for @attCannotActOutsideNoDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'You can\'t {action} while outside the branch. Please be inside the branch.'**
+  String attCannotActOutsideNoDistance(Object action);
+
   /// No description provided for @attCheckingInAt.
   ///
   /// In en, this message translates to:

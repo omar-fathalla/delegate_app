@@ -11,6 +11,10 @@ void main() {
     expect(AppEnv.isDev, isFalse);
   });
 
+  test('GIT_SHA is a compile-time fromEnvironment string', () {
+    expect(AppEnv.gitSha, isA<String>());
+  });
+
   test('prod uses the production Firebase project', () {
     expect(
       AppEnv.optionsFor('prod').projectId,

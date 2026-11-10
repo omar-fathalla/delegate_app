@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:delegate_app/core/config/app_env.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -752,6 +753,20 @@ class _LoginScreenState extends State<LoginScreen>
         color: colorScheme.onSurfaceVariant,
         isArabic: isArabic,
       ),
+      if (AppEnv.isDev)
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            'GIT_SHA=${AppEnv.gitSha.isEmpty ? 'unset' : AppEnv.gitSha}',
+            key: const ValueKey('login_git_sha'),
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontSize: 10,
+              height: 1.2,
+            ),
+          ),
+        ),
     ];
   }
 

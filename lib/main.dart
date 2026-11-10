@@ -88,6 +88,7 @@ Future<void> bootstrapDelegateAppForPatrol() async {
   ]);
 
   if (AppEnv.isDev) {
+    debugPrint('GIT_SHA=${AppEnv.gitSha}');
     AppEnv.verifyFirebaseProject(Firebase.app().options.projectId);
   }
 
