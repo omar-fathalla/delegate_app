@@ -1048,7 +1048,13 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       } on FirebaseException catch (e) {
         // Atomic: nothing was written, the request is still pending.
         if (e.code == 'permission-denied') {
-          final message = request.isAddOrganizationRequest
+          final requestId = request.nationalId.trim();
+          final liveId = nationalId.trim();
+          final staleAddOrgId = request.isAddOrganizationRequest
+              && requestId.isNotEmpty
+              && liveId.isNotEmpty
+              && requestId != liveId;
+          final message = staleAddOrgId
               ? addOrgStaleIdDeniedMessage
               : approvalBatchDeniedMessage;
           return Left(ServerFailure(message));

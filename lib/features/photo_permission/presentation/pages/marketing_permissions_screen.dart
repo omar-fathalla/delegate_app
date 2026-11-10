@@ -76,6 +76,10 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
   bool _canReview(PhotoPermission permission) =>
       _canApproveOrReject && _isPermissionInScope(permission);
 
+  // Delete is a review action: SA / tech / marketing-promotion, in scope.
+  // Hidden for marketing, org-admin, and branches-marketing.
+  bool _canDeleteFor(PhotoPermission permission) => _canReview(permission);
+
   String get _approverText {
     final approverName = widget.marketingDelegate.fullName.isNotEmpty
         ? widget.marketingDelegate.fullName
@@ -2194,7 +2198,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                                 minimumSize: const Size(36, 36),
                               ),
                             ),
-                            if (_isSuperAdmin || _isTechnicalSupport) ...[
+                            if (_canDeleteFor(permission)) ...[
                               const SizedBox(width: 6),
                               IconButton(
                                 onPressed: () => _confirmDeletePermission(context, permission),
@@ -2566,7 +2570,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                                 minimumSize: const Size(36, 36),
                               ),
                             ),
-                            if (_isPromotionUser || _isTechnicalSupport || _isSuperAdmin) ...[
+                            if (_canDeleteFor(permission)) ...[
                               const SizedBox(width: 6),
                               IconButton(
                                 onPressed: () => _confirmDeletePermission(context, permission),
