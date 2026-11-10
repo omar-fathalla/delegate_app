@@ -213,4 +213,28 @@ describe("delegate_requests: payment is server-only", () => {
     await assertSucceeds(col("sa").where("nationalId", "==", "29101010100011").get());
   });
 
+
+  test("company staff can create in their company and cannot create in another company", async () => {
+    await assertSucceeds(as("admin1").doc("delegate_requests/create-same-co").set({
+      requestType: "new_delegate", status: "pending", supervisorUid: "admin1",
+      companyUID: "c1", organizationUID: "o3",
+    }));
+    await assertSucceeds(as("hr1").doc("delegate_requests/create-same-co-hr").set({
+      requestType: "new_delegate", status: "pending", supervisorUid: "hr1",
+      companyUID: "c1", organizationUID: "o1",
+    }));
+    await assertFails(as("admin1").doc("delegate_requests/create-other-co").set({
+      requestType: "new_delegate", status: "pending", supervisorUid: "admin1",
+      companyUID: "c2", organizationUID: "o2",
+    }));
+    await assertFails(as("hr1").doc("delegate_requests/create-other-co-hr").set({
+      requestType: "new_delegate", status: "pending", supervisorUid: "hr1",
+      companyUID: "c2",
+    }));
+    await assertFails(as("sup").doc("delegate_requests/create-missing-co").set({
+      requestType: "new_delegate", status: "pending", supervisorUid: "sup",
+      organizationUID: "o1",
+    }));
+  });
+
 });
