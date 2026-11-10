@@ -11,6 +11,7 @@ import {
 } from "./delegate_login_logic";
 import {isStaffRole, pickStaffProfile, publicStaffProfile, PublicStaffProfile} from "./staff_phone_lookup_logic";
 import {buildPasswordEmail, canSendStaffInvite, DEFAULT_ACTION_PAGE_URL, DEFAULT_LOGO_URL, PasswordEmailVariant} from "./password_email_template";
+import {resolveCallerRole, staffCreateAllowed} from "./staff_password_email_logic";
 import {
   buildSetupLink,
   hashSetupToken,
@@ -99,7 +100,14 @@ export const sendStaffPasswordSetupEmail = functions
     if (!context.auth || context.auth.token.firebase?.sign_in_provider === "anonymous") {
       throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
     }
-    const callerRole = await callerRoleOf(context.auth.uid, context.auth.token.email);
+    if (!staffCreateAllowed(process.env)) {
+      throw new functions.https.HttpsError("failed-precondition", "Staff create is disabled.");
+    }
+    const callerRole = await callerRoleOf(
+      context.auth.uid,
+      context.auth.token.email,
+      context.auth.token.email_verified === true,
+    );
     if (!canSendStaffInvite(callerRole)) {
       throw new functions.https.HttpsError("permission-denied", "Not allowed.");
     }
@@ -128,16 +136,18 @@ export const sendStaffPasswordSetupEmail = functions
     return {ok: true};
   });
 
-async function callerRoleOf(uid: string, email?: string): Promise<string> {
+async function callerRoleOf(uid: string, email: string | undefined, emailVerified: boolean): Promise<string> {
   const db = admin.firestore();
-  const byId = await db.collection("users").doc(uid).get();
-  if (byId.exists) return String(byId.data()?.role || "");
-  if (email) {
-    const q = await db.collection("users").where("email", "==", email).limit(5).get();
-    const roles = q.docs.map((d) => String(d.data().role || ""));
-    return roles.find((r) => canSendStaffInvite(r)) || roles[0] || "";
-  }
-  return "";
+  return resolveCallerRole(uid, email, emailVerified, {
+    getRoleByUid: async (id) => {
+      const byId = await db.collection("users").doc(id).get();
+      return byId.exists ? String(byId.data()?.role || "") : null;
+    },
+    getRolesByEmail: async (addr) => {
+      const q = await db.collection("users").where("email", "==", addr).limit(5).get();
+      return q.docs.map((d) => String(d.data().role || ""));
+    },
+  });
 }
 
 /**

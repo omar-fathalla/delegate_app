@@ -24,17 +24,12 @@ Deploy in this order so clients never hit missing indexes or rules that reject l
    firebase deploy --only firestore:rules --project practice-firebase-72df1
    ```
 
-3. **Cloud Functions** (codebase `tashil-mobile-notifications` only — never blanket `firebase deploy --only functions`)
+3. **Cloud Functions** — targeted deploys only. Never `firebase deploy --only functions` and never `functions:tashil-mobile-notifications` (those deploy the whole codebase, including `suspendExpiredSubscriptions`). Never include `suspendExpiredSubscriptions` until Mohamed signs off subscription billing. Always pass `--project`.
    ```bash
-   firebase deploy --only functions:tashil-mobile-notifications \
+   firebase deploy --only functions:tashil-mobile-notifications:createStaffUser,functions:tashil-mobile-notifications:resendStaffSetupLink,functions:tashil-mobile-notifications:claimInvite,functions:tashil-mobile-notifications:delegateLoginV2,functions:tashil-mobile-notifications:confirmDelegateOtp,functions:tashil-mobile-notifications:staffPhoneLookup,functions:tashil-mobile-notifications:onTaskCreated,functions:tashil-mobile-notifications:onTaskUpdated,functions:tashil-mobile-notifications:onPhotoPermissionCreated,functions:tashil-mobile-notifications:onPhotoPermissionUpdated,functions:tashil-mobile-notifications:onNotificationCreated,functions:tashil-mobile-notifications:sendStaffPasswordSetupEmail,functions:tashil-mobile-notifications:requestStaffPasswordReset,functions:tashil-mobile-notifications:completeStaffPasswordSetup \
      --project practice-firebase-72df1
    ```
-   **Exclude** `suspendExpiredSubscriptions` until subscription billing is fully signed off:
-   ```bash
-   firebase deploy --only functions:tashil-mobile-notifications:createStaffUser,functions:tashil-mobile-notifications:resendStaffSetupLink,functions:tashil-mobile-notifications:claimInvite,functions:tashil-mobile-notifications:delegateLoginV2,functions:tashil-mobile-notifications:confirmDelegateOtp,functions:tashil-mobile-notifications:staffPhoneLookup,functions:tashil-mobile-notifications:onTaskCreated,functions:tashil-mobile-notifications:onTaskUpdated,functions:tashil-mobile-notifications:onPhotoPermissionCreated,functions:tashil-mobile-notifications:onPhotoPermissionUpdated,functions:tashil-mobile-notifications:onNotificationCreated \
-     --project practice-firebase-72df1
-   ```
-   Include staff password callables in the targeted list (see `functions/src/STAFF_PASSWORD_FUNCTIONS_RECOVERY.md`).
+   The list names every Phase 0 function, including the three staff password callables (`sendStaffPasswordSetupEmail`, `requestStaffPasswordReset`, `completeStaffPasswordSetup`). See `functions/src/STAFF_PASSWORD_FUNCTIONS_RECOVERY.md`.
 
 4. **Storage rules** (only if this PR changes `storage.rules`)
    ```bash
@@ -44,8 +39,12 @@ Deploy in this order so clients never hit missing indexes or rules that reject l
 ## tashil-dev validation (this PR)
 
 ```bash
-firebase deploy --only firestore:rules,firestore:indexes --project tashil-dev
-# Functions: same targeted list as prod, on tashil-dev, still excluding suspendExpiredSubscriptions
+firebase deploy --only firestore:rules --project tashil-dev
+firebase deploy --only firestore:indexes --project tashil-dev
+# Functions: the same named list as prod (including the 3 password callables).
+# Never deploy suspendExpiredSubscriptions. Always pass --project.
+firebase deploy --only functions:tashil-mobile-notifications:createStaffUser,functions:tashil-mobile-notifications:resendStaffSetupLink,functions:tashil-mobile-notifications:claimInvite,functions:tashil-mobile-notifications:delegateLoginV2,functions:tashil-mobile-notifications:confirmDelegateOtp,functions:tashil-mobile-notifications:staffPhoneLookup,functions:tashil-mobile-notifications:onTaskCreated,functions:tashil-mobile-notifications:onTaskUpdated,functions:tashil-mobile-notifications:onPhotoPermissionCreated,functions:tashil-mobile-notifications:onPhotoPermissionUpdated,functions:tashil-mobile-notifications:onNotificationCreated,functions:tashil-mobile-notifications:sendStaffPasswordSetupEmail,functions:tashil-mobile-notifications:requestStaffPasswordReset,functions:tashil-mobile-notifications:completeStaffPasswordSetup \
+  --project tashil-dev
 npm run test:rules:subs
 npm run test:rules:docs
 npm --prefix functions test
@@ -77,7 +76,12 @@ Index deploys are additive; rollback is usually **not** required. If a new compo
 
 ### Functions
 
-Re-deploy the previous function bundle from the last known good git tag, or restore individual functions from GCP console revisions. Never delete unrelated functions in the shared GCP project.
+Re-deploy the previous revision of each named function from the last known good git tag (same targeted `--only` list as deploy, including the 3 password callables), or restore individual functions from GCP console revisions. Always pass `--project practice-firebase-72df1`. Never `firebase deploy --only functions` or `functions:tashil-mobile-notifications`. Never deploy or roll back via `suspendExpiredSubscriptions`. Never delete unrelated functions in the shared GCP project.
+
+```bash
+firebase deploy --only functions:tashil-mobile-notifications:createStaffUser,functions:tashil-mobile-notifications:resendStaffSetupLink,functions:tashil-mobile-notifications:claimInvite,functions:tashil-mobile-notifications:delegateLoginV2,functions:tashil-mobile-notifications:confirmDelegateOtp,functions:tashil-mobile-notifications:staffPhoneLookup,functions:tashil-mobile-notifications:onTaskCreated,functions:tashil-mobile-notifications:onTaskUpdated,functions:tashil-mobile-notifications:onPhotoPermissionCreated,functions:tashil-mobile-notifications:onPhotoPermissionUpdated,functions:tashil-mobile-notifications:onNotificationCreated,functions:tashil-mobile-notifications:sendStaffPasswordSetupEmail,functions:tashil-mobile-notifications:requestStaffPasswordReset,functions:tashil-mobile-notifications:completeStaffPasswordSetup \
+  --project practice-firebase-72df1
+```
 
 ## Rules summary (Phase 0 delta vs prod `44ad81d0`)
 

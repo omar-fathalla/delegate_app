@@ -93,12 +93,18 @@ class _DelegateSubscriptionRequestsPageState
       body: StreamBuilder<List<DelegateSubscriptionRequest>>(
         stream: repo.getSubscriptionRequestsStream(
           statusFilter: null,
-          companyUID: widget.currentAdmin.role == UserRole.admin
-              ? widget.currentAdmin.companyUID
-              : null,
-          organizationUID: widget.currentAdmin.role == UserRole.organizationAdmin
-              ? widget.currentAdmin.organizationUID
-              : null,
+          companyUID: (widget.currentAdmin.role == UserRole.superAdmin ||
+                  widget.currentAdmin.role == UserRole.technicalSupport)
+              ? null
+              : (widget.currentAdmin.companyUID.isNotEmpty
+                  ? widget.currentAdmin.companyUID
+                  : null),
+          organizationUID: (widget.currentAdmin.role == UserRole.superAdmin ||
+                  widget.currentAdmin.role == UserRole.technicalSupport)
+              ? null
+              : (widget.currentAdmin.organizationUID.isNotEmpty
+                  ? widget.currentAdmin.organizationUID
+                  : null),
         ),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {

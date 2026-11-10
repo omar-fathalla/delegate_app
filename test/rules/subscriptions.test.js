@@ -49,6 +49,24 @@ describe("delegate_requests: payment is server-only", () => {
       await db.doc("delegate_requests/self-d").set({
         requestType: "new_delegate", status: "pending", delegateUid: "d1", organizationUID: "o1", companyUID: "c1",
       });
+      await db.doc("delegate_requests/nid-c1").set({
+        requestType: "new_delegate", status: "pending", nationalId: "29101010100011",
+        phoneNumber: "01011111111", receiptCode: "12345", existingDelegateUid: "d1",
+        organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
+      });
+      await db.doc("delegate_requests/nid-c2").set({
+        requestType: "new_delegate", status: "pending", nationalId: "29101010100011",
+        phoneNumber: "01011111111", receiptCode: "12345", existingDelegateUid: "d1",
+        organizationUID: "o2", companyUID: "c2", supervisorUid: "sup2",
+      });
+      await db.doc("delegate_requests/del-c1").set({
+        requestType: "delete_delegate", status: "pending", existingDelegateUid: "d1",
+        organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
+      });
+      await db.doc("delegate_requests/new-approved-c1").set({
+        requestType: "new_delegate", status: "approved",
+        organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
+      });
     });
   });
   const as = (uid) => env.authenticatedContext(uid).firestore();
@@ -108,4 +126,58 @@ describe("delegate_requests: payment is server-only", () => {
       requestType: "new_delegate", status: "pending", supervisorUid: "admin1", companyUID: "c1",
     }));
   });
+
+  test("staff list query shapes require organizationUID and companyUID", async () => {
+    const col = (uid) => as(uid).collection("delegate_requests");
+    const orgCo = (q, org, co) => q.where("organizationUID", "==", org).where("companyUID", "==", co);
+
+    // Each staff list shape used by the app (nationalId, phone, pending delete,
+    // receipt code, pending queue, approved new-delegate, pending renewal).
+    await assertSucceeds(orgCo(col("sup").where("nationalId", "==", "29101010100011"), "o1", "c1").get());
+    await assertSucceeds(orgCo(col("hr1").where("phoneNumber", "==", "01011111111"), "o1", "c1").get());
+    await assertSucceeds(orgCo(
+      col("admin1").where("existingDelegateUid", "==", "d1").where("requestType", "==", "delete_delegate").where("status", "==", "pending"),
+      "o1", "c1",
+    ).get());
+    await assertSucceeds(orgCo(col("sup").where("receiptCode", "==", "12345"), "o1", "c1").get());
+    await assertSucceeds(orgCo(col("hr1").where("status", "==", "pending"), "o1", "c1").get());
+    await assertSucceeds(orgCo(
+      col("admin1").where("requestType", "==", "new_delegate").where("status", "==", "approved"),
+      "o1", "c1",
+    ).get());
+    await assertSucceeds(orgCo(
+      col("sup").where("requestType", "==", "renewal").where("status", "==", "pending"),
+      "o1", "c1",
+    ).get());
+
+    // Missing org or company (the broken client shapes) is denied for company staff.
+    await assertFails(col("sup").where("nationalId", "==", "29101010100011").get());
+    await assertFails(col("sup").where("phoneNumber", "==", "01011111111").get());
+    await assertFails(col("sup").where("receiptCode", "==", "12345").get());
+    await assertFails(col("sup").where("companyUID", "==", "c1").where("status", "==", "pending").get());
+    await assertFails(col("sup").where("organizationUID", "==", "o1").where("status", "==", "pending").get());
+    await assertFails(col("sup").where("existingDelegateUid", "==", "d1").where("requestType", "==", "delete_delegate").where("status", "==", "pending").get());
+    await assertFails(col("sup").where("companyUID", "==", "c1").where("requestType", "==", "new_delegate").where("status", "==", "approved").get());
+    await assertFails(col("sup").where("companyUID", "==", "c1").where("requestType", "==", "renewal").where("status", "==", "pending").get());
+  });
+
+  test("cross-company staff list reads stay denied even with org+company filters", async () => {
+    const col = (uid) => as(uid).collection("delegate_requests");
+    // Supervisor / HR of c1 cannot list c2 by supplying the other company's filters.
+    await assertFails(
+      col("sup").where("organizationUID", "==", "o2").where("companyUID", "==", "c2").where("nationalId", "==", "29101010100011").get(),
+    );
+    await assertFails(
+      col("hr1").where("organizationUID", "==", "o2").where("companyUID", "==", "c2").where("status", "==", "pending").get(),
+    );
+    await assertFails(
+      col("admin1").where("organizationUID", "==", "o2").where("companyUID", "==", "c2").where("receiptCode", "==", "12345").get(),
+    );
+    // Org-admin of o1 cannot list o2.
+    await assertFails(col("oa1").where("organizationUID", "==", "o2").get());
+    await assertSucceeds(col("oa1").where("organizationUID", "==", "o1").get());
+    // Global staff may list without company filters.
+    await assertSucceeds(col("tech").where("status", "==", "pending").get());
+  });
+
 });

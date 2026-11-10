@@ -178,7 +178,11 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
     if (_paymentMethod == SubscriptionPaymentMethod.branchReceipt) {
       final code = _receiptCodeController.text.trim();
       final repo = sl<DelegateSubscriptionRepository>();
-      final checkResult = await repo.isReceiptCodeUsed(code);
+      final checkResult = await repo.isReceiptCodeUsed(
+        code,
+        organizationUID: _selectedOrgUID ?? widget.supervisor.organizationUID,
+        companyUID: widget.supervisor.companyUID,
+      );
       final isUsed = checkResult.fold((_) => false, (used) => used);
       if (isUsed) {
         if (!mounted) return;
