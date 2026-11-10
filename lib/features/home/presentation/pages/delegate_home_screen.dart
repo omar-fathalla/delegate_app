@@ -216,8 +216,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         }
       } catch (_) {}
 
-      // 2. Query the users collection for company admins/supervisors (cross-organization query by companyUID)
+      // 2. Query the users collection for company admins/supervisors.
+      // Delegates must not list company users (rules deny it; M31 f7dbcf37).
       try {
+        if (widget.delegate.role != UserRole.delegate) {
         final userRoles = [
           'company-admin',
           'company_admin',
@@ -260,6 +262,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             }
           }
         }
+        } // skip company-users list for delegates
       } catch (_) {}
 
       // 3. Query delegates subcollection for supervisors

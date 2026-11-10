@@ -2283,17 +2283,21 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
     final branchToUse = _matchedBranch ?? _nearestBranch;
     if (!_isInsideGeofence || branchToUse == null) {
-      final nearestName = (_nearestBranch?.branchName ?? '').trim();
-      final distStr = _distanceToNearest != null
+      final nearestName = BranchDisplayCache.instance
+          .displayName((_nearestBranch ?? _matchedBranch)?.branchName)
+          .trim();
+      final distStr = (_distanceToNearest != null && _distanceToNearest!.isFinite)
           ? l10n.distanceMeters(_distanceToNearest!.toInt())
-          : nearestName;
+          : '';
       final action = isCheckedIn ? l10n.attActionCheckOut : l10n.attActionCheckIn;
-      AppSnackBar.showError(
-        parentContext,
-        distStr.isEmpty
-            ? l10n.attCannotActOutsideNoDistance(action)
-            : l10n.attCannotActOutside(action, distStr),
-      );
+      final message = nearestName.isNotEmpty && distStr.isNotEmpty
+          ? l10n.attCannotActOutsideAtBranch(action, nearestName, distStr)
+          : nearestName.isNotEmpty
+              ? l10n.attCannotActOutsideBranchOnly(action, nearestName)
+              : distStr.isNotEmpty
+                  ? l10n.attCannotActOutside(action, distStr)
+                  : l10n.attCannotActOutsideNoDistance(action);
+      AppSnackBar.showError(parentContext, message);
       return;
     }
 

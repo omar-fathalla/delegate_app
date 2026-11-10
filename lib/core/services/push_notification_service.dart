@@ -131,27 +131,30 @@ class PushNotificationService {
       await _tokenRefreshSub?.cancel();
       _tokenRefreshSub = null;
     } catch (_) {}
-    try {
-      await _messaging
-          .unsubscribeFromTopic('app_updates')
-          .timeout(const Duration(seconds: 2));
-    } catch (e) {
-      debugPrint('FCM: unsubscribeFromTopic error: $e');
-    }
-    try {
-      await _messaging.deleteToken().timeout(const Duration(seconds: 2));
-    } catch (e) {
-      debugPrint('FCM: deleteToken error: $e');
-    }
+    // Delete the Firestore token doc first, while still signed in. A 2s
+    // timeout on this write (or on the whole cleanup) left a stale doc
+    // (M31 f7dbcf37 TimeoutException).
     try {
       await _firestore
           .collection('fcm_tokens')
           .doc(delegateUid)
           .delete()
-          .timeout(const Duration(seconds: 2));
+          .timeout(const Duration(seconds: 10));
       debugPrint('FCM: Token cleared for $delegateUid');
     } catch (e) {
       debugPrint('FCM: Error clearing token: $e');
+    }
+    try {
+      await _messaging
+          .unsubscribeFromTopic('app_updates')
+          .timeout(const Duration(seconds: 3));
+    } catch (e) {
+      debugPrint('FCM: unsubscribeFromTopic error: $e');
+    }
+    try {
+      await _messaging.deleteToken().timeout(const Duration(seconds: 3));
+    } catch (e) {
+      debugPrint('FCM: deleteToken error: $e');
     }
   }
 

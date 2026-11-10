@@ -1622,6 +1622,21 @@
       "action": {}
     }
   },
+  "attCannotActOutsideAtBranch": "You can't {action} while outside {branch} ({distance}). Please be inside the branch.",
+  "@attCannotActOutsideAtBranch": {
+    "placeholders": {
+      "action": {},
+      "branch": {},
+      "distance": {}
+    }
+  },
+  "attCannotActOutsideBranchOnly": "You can't {action} while outside {branch}. Please be inside the branch.",
+  "@attCannotActOutsideBranchOnly": {
+    "placeholders": {
+      "action": {},
+      "branch": {}
+    }
+  },
   "attCheckingInAt": "Checking in at {branchName}…",
   "@attCheckingInAt": {
     "placeholders": {

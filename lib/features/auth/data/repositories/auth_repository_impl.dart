@@ -159,7 +159,7 @@ class AuthRepositoryImpl implements AuthRepository {
     // and leaves a stale token (M31 3ff8e5d logout).
     if (uid.isNotEmpty && cleanup != null) {
       try {
-        await cleanup(uid).timeout(const Duration(seconds: 2));
+        await cleanup(uid).timeout(const Duration(seconds: 15));
       } catch (_) {}
     }
     try {

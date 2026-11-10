@@ -1428,6 +1428,8 @@
   "attEnsureGps": "تأكد من تشغيل GPS وانتظر حتى يُحدَّد موقعك.",
   "attCannotActOutside": "لا يمكنك {action} وأنت خارج نطاق الفرع ({distance}). كن داخل الفرع.",
   "attCannotActOutsideNoDistance": "لا يمكنك {action} وأنت خارج نطاق الفرع. كن داخل الفرع.",
+  "attCannotActOutsideAtBranch": "لا يمكنك {action} وأنت خارج نطاق {branch} ({distance}). كن داخل الفرع.",
+  "attCannotActOutsideBranchOnly": "لا يمكنك {action} وأنت خارج نطاق {branch}. كن داخل الفرع.",
   "attCheckingInAt": "تسجيل الحضور في {branchName}...",
   "locationServicesOff": "خدمات الموقع متوقفة. فعّلها.",
   "locationPermissionDenied2": "تم رفض إذن الوصول للموقع",
