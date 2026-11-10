@@ -19,9 +19,11 @@ on:
 permissions:
   contents: read
 
+# Shared with the CI workflow so heavy Mac jobs do not interleave on
+# the single tashil-delegate-mac runner. See ci.yml.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: tashil-delegate-mac-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
 
 env:
   PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -30,7 +32,7 @@ jobs:
   signing-surface-guard:
     name: Signing & entitlements (no drift)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -50,7 +52,7 @@ jobs:
   android-prod-release:
     name: Android prod flavor (release, debug-signed CI)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -61,6 +63,7 @@ jobs:
       # Dropped setup-gradle@v4: PR runs were cache-read-only + cache miss, so it only
       # initialized empty ~/.gradle and burned disk; last green Android jobs had no setup-gradle.
       - name: Free disk on hosted ubuntu
+        if: runner.os == 'Linux'
         run: |
           echo "Before cleanup:" && df -h /
           sudo rm -rf \
@@ -89,7 +92,9 @@ jobs:
         with:
           flutter-version: "3.44.5"
           channel: stable
-          cache: true
+          # Self-hosted tashil-delegate-mac already has the SDK locally.
+          # Uploading it to the GitHub Actions cache stalls the post-step.
+          cache: false
       - name: Install dependencies
         run: flutter pub get
       - name: Build APK (prod flavor release; debug cert without key.properties)
@@ -105,7 +110,7 @@ jobs:
   ios-prod-release:
     name: iOS prod flavor (release, no codesign)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: macos-latest
+    runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -115,7 +120,9 @@ jobs:
         with:
           flutter-version: "3.44.5"
           channel: stable
-          cache: true
+          # Self-hosted tashil-delegate-mac already has the SDK locally.
+          # Uploading it to the GitHub Actions cache stalls the post-step.
+          cache: false
       - name: Install dependencies
         run: flutter pub get
       - name: CocoaPods

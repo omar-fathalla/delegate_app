@@ -1,6 +1,11 @@
 name: CI
 
 # PR checks for Tashil App. No secrets, no deploys, read-only token.
+# Permanent self-hosted runner: tashil-delegate-mac
+# (labels: self-hosted, macOS, ARM64, delegate-app).
+# Mohamed 2026-11-10 14:26 Cairo: stop using GitHub-hosted Actions for
+# non-release CI; the Mac stays on 24/7. Do not change release workflows
+# (android-release.yml, deploy-ios.yml) or the tashil-ci / tashil-mac runners.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -11,15 +16,18 @@ on:
 permissions:
   contents: read
 
+# Shared with PR User Test builds so both workflows take the single
+# tashil-delegate-mac runner one at a time instead of interleaving jobs.
+# cancel-in-progress is false so CI and User Test do not cancel each other.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: tashil-delegate-mac-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   analyze:
     name: Analyze
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -27,7 +35,10 @@ jobs:
         with:
           flutter-version: '3.44.5'
           channel: stable
-          cache: true
+          # Self-hosted tashil-delegate-mac already has the SDK in the
+          # runner tool cache. GitHub Actions cache upload of the Flutter
+          # SDK stalled the Analyze post-step for 10+ minutes.
+          cache: false
       - name: Install dependencies
         run: flutter pub get
       # Fails only on errors; warnings/infos are reported but don't fail the job.
@@ -37,7 +48,7 @@ jobs:
   test:
     name: Test
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +56,10 @@ jobs:
         with:
           flutter-version: '3.44.5'
           channel: stable
-          cache: true
+          # Self-hosted tashil-delegate-mac already has the SDK in the
+          # runner tool cache. GitHub Actions cache upload of the Flutter
+          # SDK stalled the Analyze post-step for 10+ minutes.
+          cache: false
       - name: Install dependencies
         run: flutter pub get
       - name: Test
@@ -54,7 +68,7 @@ jobs:
   p0-scripts:
     name: P0 scripts (emulators)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 15
     defaults:
       run:
@@ -77,7 +91,7 @@ jobs:
   build-web:
     name: Build web (release)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -85,7 +99,10 @@ jobs:
         with:
           flutter-version: '3.44.5'
           channel: stable
-          cache: true
+          # Self-hosted tashil-delegate-mac already has the SDK in the
+          # runner tool cache. GitHub Actions cache upload of the Flutter
+          # SDK stalled the Analyze post-step for 10+ minutes.
+          cache: false
       - name: Install dependencies
         run: flutter pub get
       - name: Build web
@@ -94,10 +111,14 @@ jobs:
   ios-dev-config-check:
     name: iOS dev config (static)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      # macOS system python3 is 3.9; Homebrew 3.12 is on this runner.
+      # The self-test is also 3.9-safe (Optional[int], not int | None).
+      - name: Prefer Homebrew Python
+        run: echo /opt/homebrew/bin >> "$GITHUB_PATH"
       - name: Static checks (scripts, pbxproj, firebase_config.sh)
         run: bash scripts/ios_dev_config_check.sh
       - name: Maestro flow header guard
@@ -108,7 +129,7 @@ jobs:
   functions:
     name: Functions lint & test
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 15
     defaults:
       run:
@@ -137,7 +158,7 @@ jobs:
   rules:
     name: Firestore rules & delegate login e2e (emulators)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -153,7 +174,7 @@ jobs:
       - name: Install functions deps
         run: npm --prefix functions ci
       - name: Rules tests
-        run: npm run test:rules && npm run test:rules:interim && npm run test:rules:p0 && npm run test:rules:adv && npm run test:rules:docs && npm run test:rules:subs && npm run test:rules:qa-hold
+        run: npm run test:rules && npm run test:rules:interim && npm run test:rules:p0 && npm run test:rules:adv && npm run test:rules:docs && npm run test:rules:subs && npm run test:rules:qa-hold && npm run test:rules:profile
       - name: Subscriptions e2e (suspension job + Paymob hook on emulator)
         run: npm run test:e2e:subscriptions
       - name: Delegate login e2e (delegateLoginV2 -> custom token -> 1.14.3 query)
