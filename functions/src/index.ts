@@ -507,6 +507,7 @@ export {
   requestStaffPasswordReset,
   completeStaffPasswordSetup,
 } from "./staff_password_email";
+export {checkDelegateDuplicate} from "./check_delegate_duplicate";
 
 // Delegate subscriptions: period-end suspension (daily, Cairo time). Paymob
 // hooks (quoteSubscriptionRequest / applyVerifiedSubscriptionPayment) are

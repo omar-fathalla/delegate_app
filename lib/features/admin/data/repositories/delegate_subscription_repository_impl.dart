@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:dartz/dartz.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:delegate_app/core/error/failures.dart';
+import 'package:delegate_app/features/admin/domain/services/delegate_duplicate.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
@@ -13,12 +15,18 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionRepository {
   final FirebaseFirestore _firestore;
   final FirebaseStorage _storage;
+  final FirebaseFunctions? _functionsOverride;
 
   DelegateSubscriptionRepositoryImpl({
     FirebaseFirestore? firestore,
     FirebaseStorage? storage,
+    FirebaseFunctions? functions,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _storage = storage ?? FirebaseStorage.instance;
+        _storage = storage ?? FirebaseStorage.instance,
+        _functionsOverride = functions;
+
+  FirebaseFunctions get _functions =>
+      _functionsOverride ?? FirebaseFunctions.instanceFor(region: 'us-central1');
 
   @override
   Future<Either<Failure, String>> submitSubscriptionRequest({
@@ -59,69 +67,42 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       final paymentStatus =
           isFree ? SubscriptionPaymentStatus.waived : SubscriptionPaymentStatus.pending;
 
-      // 0. Duplicate prevention: Check if a request already exists with the same nationalId or phoneNumber
+      // 0. Global uniqueness: a delegate can belong to one company only.
+      // Clients cannot query other companies, so this is enforced by the
+      // Admin-SDK callable checkDelegateDuplicate (pending requests and
+      // existing delegates, national ID and phone).
       final cleanNationalId = nationalId.trim();
       final cleanPhone = phoneNumber.trim();
-
-      // Check existing requests with same national ID
-      final existingById = await _firestore
-          .collection('delegate_requests')
-          .where('companyUID', isEqualTo: companyUID)
-          .where('nationalId', isEqualTo: cleanNationalId)
-          .get();
-
-      for (final doc in existingById.docs) {
-        final data = doc.data();
-        final status = data['status'] as String?;
-        if (status == 'pending') {
-          return const Left(ServerFailure(
-            'يوجد طلب تسجيل معلق بالفعل لهذا المندوب بنفس الرقم القومي، بانتظار مراجعة واعتماد الإدارة.',
-          ));
-        } else if (status == 'approved') {
-          return const Left(ServerFailure(
-            'هذا المندوب مسجل ومعتمد بالفعل في النظام بنفس الرقم القومي.',
-          ));
-        }
-      }
-
-      // Check existing requests with same phone number
-      final existingByPhone = await _firestore
-          .collection('delegate_requests')
-          .where('companyUID', isEqualTo: companyUID)
-          .where('phoneNumber', isEqualTo: cleanPhone)
-          .get();
-
-      for (final doc in existingByPhone.docs) {
-        final data = doc.data();
-        final status = data['status'] as String?;
-        if (status == 'pending') {
-          return Left(ServerFailure(
-            'يوجد طلب تسجيل معلق بالفعل مسجل برقم الهاتف ($cleanPhone)، بانتظار مراجعة واعتماد الإدارة.',
-          ));
-        } else if (status == 'approved') {
-          return Left(ServerFailure(
-            'رقم الهاتف ($cleanPhone) مسجل بالفعل لمندوب معتمد في النظام.',
-          ));
-        }
-      }
-
-      // Check if phone number already belongs to an existing active delegate
       try {
-        final existingDelegateByPhone = await _firestore
-            .collectionGroup('delegates')
-            .where('phoneNumber', isEqualTo: cleanPhone)
-            .limit(1)
-            .get();
-        if (existingDelegateByPhone.docs.isNotEmpty) {
-          final delData = existingDelegateByPhone.docs.first.data();
-          if (delData['status'] != 'inactive') {
-            return Left(ServerFailure(
-              'رقم الهاتف ($cleanPhone) مسجل ومستخدم بالفعل لمندوب حالي في النظام.',
-            ));
+        final callable = _functions.httpsCallable('checkDelegateDuplicate');
+        final result = await callable.call({
+          'nationalId': cleanNationalId,
+          'phoneNumber': cleanPhone,
+          'companyUID': companyUID,
+        });
+        final raw = result.data;
+        final data = raw is Map ? Map<dynamic, dynamic>.from(raw) : <dynamic, dynamic>{};
+        final duplicate = DelegateDuplicateResult.fromMap(data);
+        final message = duplicate.message();
+        if (message != null) {
+          return Left(ServerFailure(message));
+        }
+      } on FirebaseFunctionsException catch (e) {
+        if (e.code == 'already-exists' || e.code == 'failed-precondition') {
+          final details = e.details;
+          if (details is Map) {
+            final duplicate = DelegateDuplicateResult.fromMap(
+              Map<dynamic, dynamic>.from(details),
+            );
+            final message = duplicate.message();
+            if (message != null) {
+              return Left(ServerFailure(message));
+            }
           }
         }
-      } catch (_) {
-        // Fallback gracefully if collectionGroup rules restrict supervisor access
+        return Left(ServerFailure(
+          'تعذر التحقق من تسجيل المندوب. حاول مرة أخرى.',
+        ));
       }
 
       // 0b. Payment method & receipt validation
