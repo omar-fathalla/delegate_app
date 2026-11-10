@@ -82,7 +82,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         }
       }
 
-      if (docSnap == null && targetPhone != null && targetPhone.isNotEmpty) {
+      // Delegates have no staff users doc; listing users by phone/email is
+      // denied (M31 f7dbcf37) and is not needed for own-profile display.
+      final isDelegateProfile = _delegate?.role == UserRole.delegate;
+      if (!isDelegateProfile &&
+          docSnap == null && targetPhone != null && targetPhone.isNotEmpty) {
         final query = await firestore
             .collection('users')
             .where('phoneNumber', isEqualTo: targetPhone)
@@ -105,7 +109,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         }
       }
 
-      if (docSnap == null && targetEmail != null && targetEmail.isNotEmpty) {
+      if (!isDelegateProfile &&
+          docSnap == null && targetEmail != null && targetEmail.isNotEmpty) {
         final queryEmail = await firestore
             .collection('users')
             .where('email', isEqualTo: targetEmail)
@@ -1175,15 +1180,17 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
       }
 
       // 2. Query users collection by phone / email to ensure complete sync
+      // Skip for delegates: users-list queries are unprovable and denied.
       final phone = widget.firestoreData?['phoneNumber'] ?? widget.delegate?.phoneNumber;
       final email = widget.firestoreData?['email'] ?? widget.delegate?.email;
 
       final queryDocs = <DocumentReference>[];
-      if (phone != null && phone.isNotEmpty) {
+      final isDelegateUpdate = widget.delegate?.role == UserRole.delegate;
+      if (!isDelegateUpdate && phone != null && phone.isNotEmpty) {
         final q = await db.collection('users').where('phoneNumber', isEqualTo: phone).get();
         queryDocs.addAll(q.docs.map((d) => d.reference));
       }
-      if (email != null && email.isNotEmpty) {
+      if (!isDelegateUpdate && email != null && email.isNotEmpty) {
         final q = await db.collection('users').where('email', isEqualTo: email).get();
         queryDocs.addAll(q.docs.map((d) => d.reference));
       }

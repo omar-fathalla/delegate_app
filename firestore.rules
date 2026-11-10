@@ -163,8 +163,12 @@ service cloud.firestore {
     }
 
     // Own-id paths that skip isDelegate() (attendance / leave by uid).
+    // id must be non-empty: get(field, '') would otherwise make
+    // claimString('delegateId') == '' true for any staff token
+    // without that claim (company-admin could read another
+    // company's delegate; M31 #247 / 14ffd87 regression).
     function ownsDelegateId(id) {
-      return signedIn() && delegateOtpOk() && (
+      return signedIn() && delegateOtpOk() && id is string && id != '' && (
         id == request.auth.uid ||
         claimString('delegateId') == id ||
         claimListHas('delegateIds', id)
@@ -2054,7 +2058,8 @@ service cloud.firestore {
     // TrustedTimeService writes a serverTimestamp probe, then reads it
     // back. Signed-in clients may only touch this one doc and the probe field.
     match /_system_metadata/{docId} {
-      allow get, create, update: if signedIn()
+      allow get: if signedIn() && docId == 'time_probe';
+      allow create, update: if signedIn()
         && docId == 'time_probe'
         && request.resource.data.keys().hasOnly(['probe']);
       allow delete: if false;

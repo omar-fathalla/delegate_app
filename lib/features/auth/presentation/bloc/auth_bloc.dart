@@ -387,11 +387,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     _explicitLogout = true;
-    emit(AuthLoading());
+    // Emit first so Home / profile listeners are cancelled, then drop
+    // the FCM token while still signed in, then signOut (M31 f7dbcf37).
+    emit(const AuthUnauthenticated(fromLogout: true));
+    await Future<void>.delayed(const Duration(milliseconds: 400));
     try {
       await logoutUseCase(LogoutParams(userId: event.userId));
     } catch (_) {}
-    emit(const AuthUnauthenticated(fromLogout: true));
   }
 
   Future<void> _onOrganizationSelected(

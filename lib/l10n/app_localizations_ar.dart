@@ -1527,6 +1527,20 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String attCannotActOutsideAtBranch(
+    Object action,
+    Object branch,
+    Object distance,
+  ) {
+    return 'لا يمكنك $action وأنت خارج نطاق $branch ($distance). كن داخل الفرع.';
+  }
+
+  @override
+  String attCannotActOutsideBranchOnly(Object action, Object branch) {
+    return 'لا يمكنك $action وأنت خارج نطاق $branch. كن داخل الفرع.';
+  }
+
+  @override
   String attCheckingInAt(Object branchName) {
     return 'تسجيل الحضور في $branchName...';
   }

@@ -75,6 +75,9 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
   late DateTime _selectedMonth;
   GroupMode _currentGroupMode = GroupMode.byDate;
   int _slideDirection = 0; // -1 for previous (left to right), +1 for next (right to left)
+  List<CapturedPhoto> _cachedPhotos = const [];
+  bool _hasLoadedPhotos = false;
+  bool _reloadQueued = false;
 
   DateTime get _now {
     try {
@@ -531,7 +534,15 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
       backgroundColor: colorScheme.surfaceContainerLowest,
       body: BlocConsumer<PhotoPermissionBloc, PhotoPermissionState>(
         listener: (context, state) {
-          if (state is PhotoPermissionActionSuccess) {
+          if (state is CapturedPhotosLoaded) {
+            setState(() {
+              _cachedPhotos = state.photos;
+              _hasLoadedPhotos = true;
+              _reloadQueued = false;
+            });
+          } else if (state is PhotoBatchUploadSuccess) {
+            _loadPhotos();
+          } else if (state is PhotoPermissionActionSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
@@ -551,12 +562,24 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
           }
         },
         builder: (context, state) {
-          if (state is PhotoPermissionLoading) {
+          if (state is PhotoPermissionLoading && !_hasLoadedPhotos) {
             return const Center(child: M3DelayedLoading());
           }
 
-          if (state is CapturedPhotosLoaded) {
-            final allPhotos = state.photos;
+          if (state is CapturedPhotosLoaded || _hasLoadedPhotos) {
+            // After a successful upload the shared bloc often moves to
+            // OngoingPermissionsLoaded, which used to hide the list and
+            // leave the November count at 0 (M31 f7dbcf37). Keep the last
+            // loaded photos and refresh on upload success.
+            final allPhotos = state is CapturedPhotosLoaded
+                ? state.photos
+                : _cachedPhotos;
+            if (state is OngoingPermissionsLoaded && !_reloadQueued) {
+              _reloadQueued = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) _loadPhotos();
+              });
+            }
 
             // Filter photos for the selected month
             final filteredPhotos = allPhotos.where((photo) {

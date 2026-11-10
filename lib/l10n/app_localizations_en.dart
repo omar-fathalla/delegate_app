@@ -1528,6 +1528,20 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String attCannotActOutsideAtBranch(
+    Object action,
+    Object branch,
+    Object distance,
+  ) {
+    return 'You can\'t $action while outside $branch ($distance). Please be inside the branch.';
+  }
+
+  @override
+  String attCannotActOutsideBranchOnly(Object action, Object branch) {
+    return 'You can\'t $action while outside $branch. Please be inside the branch.';
+  }
+
+  @override
   String attCheckingInAt(Object branchName) {
     return 'Checking in at $branchName…';
   }

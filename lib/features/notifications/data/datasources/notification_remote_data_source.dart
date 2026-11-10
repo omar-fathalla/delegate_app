@@ -85,6 +85,29 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
     }
 
     try {
+      // Delegates may only issue queries the rules can prove from the
+      // auth uid / phones claim. Broadcasts and phone-format variants
+      // are unprovable and were emptying the bell with PERMISSION_DENIED
+      // (M31 f7dbcf37).
+      final bool delegateOnly = (userRole == null ||
+              userRole.toLowerCase() == 'delegate' ||
+              userRole.toLowerCase().endsWith('_delegate')) &&
+          !(userRole ?? '').toLowerCase().contains('admin') &&
+          !(userRole ?? '').toLowerCase().contains('supervisor') &&
+          !(userRole ?? '').toLowerCase().contains('support') &&
+          !(userRole ?? '').toLowerCase().contains('marketing') &&
+          !(userRole ?? '').toLowerCase().contains('hr');
+
+      if (delegateOnly) {
+        final queries = <Future<QuerySnapshot>>[
+          _collection.where('delegateUid', isEqualTo: delegateUid).limit(50).get(),
+        ];
+        final snaps = await queryAllSettled(queries);
+        for (final snap in snaps) {
+          addDocs(snap.docs);
+        }
+        // Skip broadcast / variant queries below.
+      } else {
       // 1. Initial parallel queries (UID, broadcast 'all', phone tag)
       final initialQueries = await queryAllSettled([
         _collection.where('delegateUid', isEqualTo: delegateUid).limit(50).get(),
@@ -260,6 +283,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
           addDocs(snap.docs);
         }
       }
+      } // staff/admin query path
     } catch (_) {}
 
     // Filter out notifications deleted by this user (Soft Delete) and role-restricted notifications
