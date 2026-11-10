@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:delegate_app/features/notifications/data/models/notification_model.dart';
+import 'package:delegate_app/features/notifications/domain/notification_account_cutoff.dart';
 
 abstract class NotificationRemoteDataSource {
   Future<List<NotificationModel>> getNotifications(
@@ -72,7 +73,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
     final Set<String> docIds = {};
     final List<QueryDocumentSnapshot> docs = [];
     String normalizedRole = userRole?.toLowerCase() ?? '';
-    DateTime? userCreatedAt = accountCreatedAt;
+    DateTime? storedAccountCreatedAt;
 
     void addDocs(List<QueryDocumentSnapshot> newDocs) {
       for (final doc in newDocs) {
@@ -141,13 +142,13 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
           if (normalizedRole.isEmpty && r != null && r.isNotEmpty) {
             normalizedRole = r.toLowerCase();
           }
-          userCreatedAt ??= (userData?['createdAt'] as Timestamp?)?.toDate();
+          storedAccountCreatedAt ??= (userData?['createdAt'] as Timestamp?)?.toDate();
           if (p != null && p.isNotEmpty) phonesToCheck.add(p);
         }
       } catch (_) {}
 
       // Fallback lookup from delegates collection if companyId or createdAt is still missing
-      if (userCompanyId == null || userCreatedAt == null) {
+      if (userCompanyId == null || storedAccountCreatedAt == null) {
         try {
           final delSnap = await firestore
               .collectionGroup('delegates')
@@ -160,7 +161,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
             if (normalizedRole.isEmpty) {
               normalizedRole = (delData['role']?.toString() ?? 'delegate').toLowerCase();
             }
-            userCreatedAt ??= (delData['createdAt'] as Timestamp?)?.toDate();
+            storedAccountCreatedAt ??= (delData['createdAt'] as Timestamp?)?.toDate();
           }
         } catch (_) {}
       }
@@ -304,14 +305,17 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
         return false;
       }
 
-      // Exclude historical notifications created BEFORE the user/delegate account was created
-      final effectiveCreatedAt = accountCreatedAt ?? userCreatedAt;
-      if (effectiveCreatedAt != null) {
-        final notifTime = (data['createdAt'] as Timestamp?)?.toDate();
-        if (notifTime != null &&
-            notifTime.isBefore(effectiveCreatedAt.subtract(const Duration(minutes: 5)))) {
-          return false;
-        }
+      // Hide only notifications that predate the persisted account.
+      // Do not use the current login time (staff Delegate.createdAt was
+      // DateTime.now()), or NID request alerts disappear after re-login.
+      final notifTime = (data['createdAt'] as Timestamp?)?.toDate();
+      if (notifTime != null &&
+          shouldHideNotificationForAccountAge(
+            notificationCreatedAt: notifTime,
+            storedAccountCreatedAt: storedAccountCreatedAt,
+            sessionCreatedAt: accountCreatedAt,
+          )) {
+        return false;
       }
 
       return true;

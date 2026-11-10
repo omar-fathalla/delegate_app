@@ -53,7 +53,7 @@ class NotificationModel extends NotificationEntity {
     if (r.contains('branch') || r == 'branches_marketing' || r == 'branches_marketing_manager') {
       return 'مسؤول تسويق الفروع';
     }
-    if (r == 'marketing_promotion' || r == 'promotion_marketing') return 'مسؤول تسويق العروض';
+    if (r == 'marketing_promotion' || r == 'marketingpromotion' || r == 'promotion_marketing' || r == 'promotionmarketing') return 'مسؤول تسويق العروض';
     if (r.contains('market')) return 'مسؤول التسويق';
     if (r.contains('support') || r.contains('tech')) return 'الدعم الفني';
     if (r == 'company_admin' || r == 'admin') return 'مشرف الشركة';

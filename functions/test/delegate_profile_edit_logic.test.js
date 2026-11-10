@@ -193,6 +193,23 @@ test("classifyReviewTarget syncs open add_organization requests (N-9)", () => {
       existingDelegateUid: "d1", companyUID: "c1",
     },
   }), "skip");
+  assert.equal(L.classifyReviewTarget({
+    requestDelegateUid: "d1", requestCompanyUID: "c1", nidRequestId: "nid1",
+    liveExists: true, livePath: "delegate_requests/d1",
+    liveData: {
+      requestType: "new", status: "approved",
+      existingDelegateUid: "d1", uid: "d1", companyUID: "c1",
+      nationalId: "29901010101011",
+    },
+  }), "open_request");
+  assert.equal(L.classifyReviewTarget({
+    requestDelegateUid: "d1", requestCompanyUID: "c1", nidRequestId: "nid1",
+    liveExists: true, livePath: "delegate_requests/d1-rej",
+    liveData: {
+      requestType: "new", status: "rejected",
+      existingDelegateUid: "d1", companyUID: "c1",
+    },
+  }), "skip");
 });
 
 test("usersProfileSyncPatch copies name, phone and photo (N-5)", () => {

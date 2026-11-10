@@ -623,6 +623,7 @@ class _DelegateSubscriptionRequestsPageState
       request: request,
       reviewerUid: widget.currentAdmin.uid,
       reviewerName: widget.currentAdmin.fullName,
+      reviewerRole: widget.currentAdmin.role.name,
     );
 
     if (!mounted) return;
