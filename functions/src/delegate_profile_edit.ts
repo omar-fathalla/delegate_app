@@ -26,7 +26,7 @@ import {
   uniqueRecipientIds,
   valueOf,
   PRIVILEGED_ALERT_ROLE_VALUES,
-  reviewTargetMatchesSubmission,
+  classifyReviewTarget,
   usersProfileSyncPatch,
 } from "./delegate_profile_edit_logic";
 
@@ -597,6 +597,7 @@ export const reviewNationalIdUpdate = functions
               requestId,
               targetDelegateUid: delegateUid,
               rejectionReason,
+              reviewerRole: caller.role,
             }),
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
           });
@@ -624,21 +625,26 @@ export const reviewNationalIdUpdate = functions
         liveSnaps.push(await tx.get(t.ref));
       }
       const matchingDelegates: FirebaseFirestore.DocumentSnapshot[] = [];
+      const openRequests: FirebaseFirestore.DocumentSnapshot[] = [];
       for (const live of liveSnaps) {
-        const check = reviewTargetMatchesSubmission({
+        const kind = classifyReviewTarget({
           requestDelegateUid: delegateUid,
           requestCompanyUID: companyUID,
+          nidRequestId: requestId,
           liveExists: live.exists,
           livePath: live.ref.path,
           liveData: live.exists ? (live.data() || {}) : undefined,
         });
-        if (check === "ok") {
+        if (kind === "matching_delegate") {
           matchingDelegates.push(live);
           continue;
         }
-        const isDelegateDoc = live.ref.path.includes("/delegates/");
-        if (isDelegateDoc) {
-          const msg = check === "inactive"
+        if (kind === "open_request") {
+          openRequests.push(live);
+          continue;
+        }
+        if (kind === "delegate_inactive" || kind === "delegate_mismatch") {
+          const msg = kind === "delegate_inactive"
             ? "المندوب المستهدف لم يعد نشطاً."
             : "المندوب المستهدف لا يطابق الطلب المقدَّم.";
           throw new functions.https.HttpsError("failed-precondition", msg);
@@ -650,7 +656,7 @@ export const reviewNationalIdUpdate = functions
           "تعذر التحقق من المندوب المستهدف على الخادم.",
         );
       }
-      for (const live of matchingDelegates) {
+      for (const live of [...matchingDelegates, ...openRequests]) {
         tx.update(live.ref, asUpdate({
           nationalId: newId,
           nationalityID: newId,
@@ -698,11 +704,12 @@ export const reviewNationalIdUpdate = functions
             organizationUID,
             requestId,
             targetDelegateUid: delegateUid,
+            reviewerRole: caller.role,
           }),
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
-      return {ok: true, status: "approved" as const, updated: matchingDelegates.length};
+      return {ok: true, status: "approved" as const, updated: matchingDelegates.length + openRequests.length};
     });
     return result;
   });

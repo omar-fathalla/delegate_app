@@ -1233,10 +1233,14 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
               ),
             );
             _loadData();
-          } else if (state is PhotoPermissionError) {
+          } else if (state is PhotoPermissionError ||
+              state is PhotoPermissionActionFailure) {
+            final message = state is PhotoPermissionError
+                ? state.message
+                : (state as PhotoPermissionActionFailure).message;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.message),
+                content: Text(message),
                 backgroundColor: colorScheme.error,
                 behavior: SnackBarBehavior.floating,
               ),

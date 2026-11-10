@@ -141,6 +141,60 @@ test("reviewTargetMatchesSubmission verifies the submitted delegate (N-1)", () =
   }), "missing");
 });
 
+
+test("classifyReviewTarget syncs open add_organization requests (N-9)", () => {
+  const delPath = "organizations/o1/companies/c1/delegates/d1";
+  const del = {uid: "d1", companyUID: "c1", status: "active"};
+  assert.equal(L.classifyReviewTarget({
+    requestDelegateUid: "d1", requestCompanyUID: "c1", nidRequestId: "nid1",
+    liveExists: true, livePath: delPath, liveData: del,
+  }), "matching_delegate");
+  assert.equal(L.classifyReviewTarget({
+    requestDelegateUid: "d1", requestCompanyUID: "c1", nidRequestId: "nid1",
+    liveExists: true, livePath: delPath, liveData: {...del, status: "suspended"},
+  }), "delegate_inactive");
+  assert.equal(L.classifyReviewTarget({
+    requestDelegateUid: "d1", requestCompanyUID: "c1", nidRequestId: "nid1",
+    liveExists: true, livePath: "delegate_requests/add1",
+    liveData: {
+      requestType: "add_organization", status: "pending",
+      existingDelegateUid: "d1", companyUID: "c1", nationalId: "29901010101011",
+    },
+  }), "open_request");
+  assert.equal(L.classifyReviewTarget({
+    requestDelegateUid: "d1", requestCompanyUID: "c1", nidRequestId: "nid1",
+    liveExists: true, livePath: "delegate_requests/nid1",
+    liveData: {
+      requestType: "update_national_id", status: "pending",
+      existingDelegateUid: "d1", companyUID: "c1",
+    },
+  }), "skip");
+  assert.equal(L.classifyReviewTarget({
+    requestDelegateUid: "d1", requestCompanyUID: "c1", nidRequestId: "nid1",
+    liveExists: true, livePath: "delegate_requests/add-other",
+    liveData: {
+      requestType: "add_organization", status: "pending",
+      existingDelegateUid: "d2", companyUID: "c1",
+    },
+  }), "skip");
+  assert.equal(L.classifyReviewTarget({
+    requestDelegateUid: "d1", requestCompanyUID: "c1", nidRequestId: "nid1",
+    liveExists: true, livePath: "delegate_requests/add-c2",
+    liveData: {
+      requestType: "add_organization", status: "pending",
+      existingDelegateUid: "d1", companyUID: "c2",
+    },
+  }), "skip");
+  assert.equal(L.classifyReviewTarget({
+    requestDelegateUid: "d1", requestCompanyUID: "c1", nidRequestId: "nid1",
+    liveExists: true, livePath: "delegate_requests/add-done",
+    liveData: {
+      requestType: "add_organization", status: "approved",
+      existingDelegateUid: "d1", companyUID: "c1",
+    },
+  }), "skip");
+});
+
 test("usersProfileSyncPatch copies name, phone and photo (N-5)", () => {
   const patch = L.usersProfileSyncPatch({
     fullName: "محمد علي حسن",
@@ -184,6 +238,7 @@ test("supervisorReviewAlertDoc covers approve and reject (M-8)", () => {
     supervisorUid: "sup1",
     approved: true,
     reviewerName: "إدارة",
+    reviewerRole: "super-admin",
     delegateName: "مندوب",
     companyUID: "c1",
     organizationUID: "o1",
@@ -192,11 +247,13 @@ test("supervisorReviewAlertDoc covers approve and reject (M-8)", () => {
   });
   assert.strictEqual(ok.delegateUid, "sup1");
   assert.strictEqual(ok.type, "delegate_national_id_review");
+  assert.strictEqual(ok.senderRole, "super-admin");
   assert.ok(!Object.prototype.hasOwnProperty.call(ok, "phoneNumber"));
   const no = L.supervisorReviewAlertDoc({
     supervisorUid: "sup1",
     approved: false,
     reviewerName: "دعم",
+    reviewerRole: "technical_support",
     delegateName: "مندوب",
     companyUID: "c1",
     organizationUID: "o1",
@@ -206,6 +263,7 @@ test("supervisorReviewAlertDoc covers approve and reject (M-8)", () => {
   });
   assert.match(no.title, /رفض/);
   assert.match(no.body, /غير واضح/);
+  assert.strictEqual(no.senderRole, "technical_support");
 });
 
 test("auditDoc accepts a national_id_rejection source (M-8)", () => {

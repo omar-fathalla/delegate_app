@@ -833,14 +833,23 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         return const Right(null);
       }
 
+      // N-9: add_organization must use the live national ID, not a stale
+      // copy left on the request after a later NID approval.
+      final nationalId = request.isAddOrganizationRequest
+          ? await _currentNationalIdForDelegate(
+              targetDelegateUid,
+              fallback: request.nationalId,
+            )
+          : request.nationalId;
+
       final delegatePublicId = await _resolveOrAllocateDelegatePublicId(
         delegateUid: targetDelegateUid,
-        nationalId: request.nationalId,
+        nationalId: nationalId,
       );
 
-      final city = _extractCityFromNationalId(request.nationalId);
-      final birthDate = _extractBirthDateFromNationalId(request.nationalId);
-      final gender = _extractGenderFromNationalId(request.nationalId);
+      final city = _extractCityFromNationalId(nationalId);
+      final birthDate = _extractBirthDateFromNationalId(nationalId);
+      final gender = _extractGenderFromNationalId(nationalId);
 
       // 2. Update delegate record to active in company branch
       final delegateData = {
@@ -851,8 +860,8 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         'thirdName': request.thirdName,
         'fullName': request.fullName,
         'phoneNumber': request.phoneNumber,
-        'nationalId': request.nationalId,
-        'nationalityID': request.nationalId,
+        'nationalId': nationalId,
+        'nationalityID': nationalId,
         if (city.isNotEmpty) 'city': city,
         if (birthDate != null) 'birthDate': Timestamp.fromDate(birthDate),
         if (gender != null && gender.isNotEmpty) 'gender': gender,
@@ -1289,7 +1298,33 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
   }
 
   /// Resolve an existing delegatePublicId across chains or allocate a new atomic sequence from /counters/delegates
+  /// Re-read the live delegate national ID so approving an add-organization
+  /// request cannot write a stale ID after a later NID approval (N-9).
+  Future<String> _currentNationalIdForDelegate(
+    String delegateUid, {
+    required String fallback,
+  }) async {
+    final uid = delegateUid.trim();
+    if (uid.isEmpty) return fallback;
+    try {
+      final snap = await _firestore
+          .collectionGroup('delegates')
+          .where('uid', isEqualTo: uid)
+          .limit(5)
+          .get();
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final id = (data['nationalId'] ?? data['nationalityID'] ?? '')
+            .toString()
+            .trim();
+        if (id.isNotEmpty) return id;
+      }
+    } catch (_) {}
+    return fallback;
+  }
+
   Future<String> _resolveOrAllocateDelegatePublicId({
+
     required String delegateUid,
     required String nationalId,
   }) async {
