@@ -621,7 +621,12 @@ service cloud.firestore {
           'accountant', 'accounting', 'account_admin',
           'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
           'branches-marketing-manager', 'branchesmarketingmanager']
-          && staffProfileFieldsOk(r));
+          && staffProfileFieldsOk(r)
+          && !changedKeys().hasAny([
+            'reviewedBy', 'reviewedAt', 'reviewedByName', 'rejectionReason',
+            'approvedRequestId', 'approvedBy', 'approvedByName', 'approvedAt',
+            'paymentStatus', 'paymentMethod', 'amountDue', 'amountPaid', 'paidAt',
+            'organizationUID', 'organizationId', 'companyUID', 'companyId']));
     }
 
     function deviceBindingKeys() {
@@ -847,6 +852,9 @@ service cloud.firestore {
     // may not change status (except cancel), approval, payment, national ID,
     // or org/company ids. Only super-admin / technical support may approve
     // or otherwise change status. One users/{uid} get (expression budget).
+    // Supervisors may change only profile fields (name, phone, photos, ID
+    // images, documents, updatedAt). nationalId / status / approval / payment
+    // / company and organization ids stay blocked.
     function requestStaffUpdateOk(requestId) {
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
       let r = u.get('role', '');
@@ -1705,6 +1713,26 @@ service cloud.firestore {
     }
 
     // ==================== MOBILE: SECURITY AND DEVICES ====================
+
+    // Append-only supervisor/admin profile-edit audit. Company staff can
+    // create a record for their own company and read it, but cannot change
+    // or delete it. Super-admin / tech may read globally. Admin-SDK writes
+    // from editDelegateProfile bypass these rules.
+    match /delegate_profile_audit_logs/{logId} {
+      allow read: if signedIn() && (
+        isGlobalStaff()
+        || (isCompanyScopedStaff()
+          && resource.data.get('companyUID', '') == callerCompany())
+      );
+      allow create: if signedIn() && (
+        isGlobalStaff()
+        || ((isCompanyAdmin() || isHR())
+          && incomingCompanyScoped()
+          && request.resource.data.get('actorUid', '') == request.auth.uid
+          && request.resource.data.get('companyUID', '') == callerCompany())
+      );
+      allow update, delete: if false;
+    }
 
     match /security_audit_logs/{logId} {
       allow read: if signedIn() && (

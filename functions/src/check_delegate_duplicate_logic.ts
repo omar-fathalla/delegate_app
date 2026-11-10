@@ -30,7 +30,21 @@ export function normalizeIdDigits(raw: string): string {
 
 export function isOpenRequestStatus(status: unknown): boolean {
   const s = String(status || "").toLowerCase();
-  return s === "pending" || s === "approved";
+  return s === "pending" || s === "action_required" || s === "approved";
+}
+
+/** True when a request or delegate document is the same person as excludeUid. */
+export function isSameDelegateRecord(
+  data: {uid?: unknown; existingDelegateUid?: unknown; delegateUid?: unknown},
+  docId: string,
+  excludeUid?: string,
+): boolean {
+  const ex = String(excludeUid || "").trim();
+  if (!ex) return false;
+  return docId === ex
+    || String(data.uid || "").trim() === ex
+    || String(data.existingDelegateUid || "").trim() === ex
+    || String(data.delegateUid || "").trim() === ex;
 }
 
 export function isExistingDelegateStatus(status: unknown): boolean {

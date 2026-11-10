@@ -6,6 +6,7 @@ import {
   isExistingDelegateStatus,
   isOpenRequestStatus,
   normalizeEgyptianPhone,
+  isSameDelegateRecord,
   normalizeIdDigits,
   phoneQueryVariants,
   publicDuplicateResult,
@@ -87,6 +88,8 @@ export const checkDelegateDuplicate = functions
     const nationalId = normalizeIdDigits(typeof payload.nationalId === "string" ? payload.nationalId : "");
     const phoneNumber = normalizeIdDigits(typeof payload.phoneNumber === "string" ? payload.phoneNumber : "");
     const companyUID = typeof payload.companyUID === "string" ? payload.companyUID.trim() : "";
+    const excludeDelegateUid = typeof payload.excludeDelegateUid === "string"
+      ? payload.excludeDelegateUid.trim() : "";
     if (!nationalId && !phoneNumber) {
       throw new functions.https.HttpsError("invalid-argument", "nationalId or phoneNumber is required.");
     }
@@ -136,6 +139,7 @@ export const checkDelegateDuplicate = functions
     const scanRequests = async (field: "nationalId" | "nationalityID" | "phoneNumber", value: string, kind: DuplicateHit["field"]) => {
       const snap = await db.collection("delegate_requests").where(field, "==", value).get();
       for (const doc of snap.docs) {
+        if (isSameDelegateRecord(doc.data(), doc.id, excludeDelegateUid)) continue;
         if (!isOpenRequestStatus(doc.data().status)) continue;
         addHit(doc.data(), kind);
       }
@@ -144,6 +148,7 @@ export const checkDelegateDuplicate = functions
     const scanDelegates = async (field: "nationalId" | "nationalityID" | "phoneNumber", value: string, kind: DuplicateHit["field"]) => {
       const snap = await db.collectionGroup("delegates").where(field, "==", value).get();
       for (const doc of snap.docs) {
+        if (isSameDelegateRecord(doc.data(), doc.id, excludeDelegateUid)) continue;
         if (!isExistingDelegateStatus(doc.data().status)) continue;
         addHit(doc.data(), kind);
       }

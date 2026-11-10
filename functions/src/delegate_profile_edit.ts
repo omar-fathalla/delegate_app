@@ -1,0 +1,611 @@
+import * as admin from "firebase-admin";
+import * as functions from "firebase-functions";
+import {
+  decideDuplicate,
+  DuplicateHit,
+  isExistingDelegateStatus,
+  isOpenRequestStatus,
+  isSameDelegateRecord,
+  normalizeIdDigits,
+  publicDuplicateResult,
+} from "./check_delegate_duplicate_logic";
+import {
+  applyProfileFields,
+  auditDoc,
+  fieldArabicLabel,
+  isEditableDelegateStatus,
+  isEditableRequestStatus,
+  isEditorRole,
+  isReviewerRole,
+  ProfileEditInput,
+  sanitizeProfileEdit,
+  shouldAlertAdmins,
+  valueOf,
+} from "./delegate_profile_edit_logic";
+
+function asUpdate(patch: Record<string, unknown>): FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData> {
+  return patch as FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData>;
+}
+
+const REGION = "us-central1";
+const AUDIT = "delegate_profile_audit_logs";
+
+function requireAuth(context: functions.https.CallableContext): string {
+  if (!context.auth || context.auth.token.firebase?.sign_in_provider === "anonymous") {
+    throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
+  }
+  return context.auth.uid;
+}
+
+async function loadCaller(db: FirebaseFirestore.Firestore, uid: string) {
+  const snap = await db.collection("users").doc(uid).get();
+  const data = snap.data() || {};
+  return {
+    uid,
+    role: String(data.role || ""),
+    name: String(data.fullName || data.displayName || data.name || "").trim(),
+    companyUID: String(data.companyUID || data.companyId || "").trim(),
+    organizationUID: String(data.organizationUID || data.organizationId || "").trim(),
+  };
+}
+
+function companyOf(data: FirebaseFirestore.DocumentData): {uid: string; name: string} {
+  return {
+    uid: String(data.companyUID || data.companyId || "").trim(),
+    name: String(data.companyName || data.company_name || "").trim(),
+  };
+}
+
+async function findDuplicate(
+  db: FirebaseFirestore.Firestore,
+  opts: {nationalId?: string; phoneNumber?: string; companyUID: string; excludeDelegateUid?: string},
+) {
+  const hits: DuplicateHit[] = [];
+  const seen = new Set<string>();
+  const addHit = (hit: DuplicateHit) => {
+    if (!hit.companyUID) return;
+    const key = `${hit.companyUID}|${hit.field}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    hits.push(hit);
+  };
+  const scan = async (
+    collection: "requests" | "delegates",
+    field: "nationalId" | "nationalityID" | "phoneNumber",
+    value: string,
+    kind: DuplicateHit["field"],
+  ) => {
+    const snap = collection === "requests"
+      ? await db.collection("delegate_requests").where(field, "==", value).get()
+      : await db.collectionGroup("delegates").where(field, "==", value).get();
+    for (const doc of snap.docs) {
+      if (isSameDelegateRecord(doc.data(), doc.id, opts.excludeDelegateUid)) continue;
+      if (collection === "requests" && !isOpenRequestStatus(doc.data().status)) continue;
+      if (collection === "delegates" && !isExistingDelegateStatus(doc.data().status)) continue;
+      const co = companyOf(doc.data());
+      addHit({companyUID: co.uid, companyName: co.name, field: kind});
+    }
+  };
+  if (opts.nationalId) {
+    await scan("requests", "nationalId", opts.nationalId, "nationalId");
+    await scan("requests", "nationalityID", opts.nationalId, "nationalId");
+    await scan("delegates", "nationalId", opts.nationalId, "nationalId");
+    await scan("delegates", "nationalityID", opts.nationalId, "nationalId");
+  }
+  if (opts.phoneNumber) {
+    await scan("requests", "phoneNumber", opts.phoneNumber, "phoneNumber");
+    await scan("delegates", "phoneNumber", opts.phoneNumber, "phoneNumber");
+  }
+  return publicDuplicateResult(decideDuplicate(opts.companyUID, hits));
+}
+
+function throwIfDuplicate(result: {duplicate: boolean; reason?: string; companyName?: string}, kind: "phone" | "nationalId") {
+  if (!result.duplicate) return;
+  if (result.reason === "another_company") {
+    const name = result.companyName || "";
+    const msg = kind === "phone"
+      ? (name
+        ? `رقم الموبايل مسجل بالفعل في شركة: ${name}. يرجى حذفه منها أولاً.`
+        : "رقم الموبايل مسجل بالفعل في شركة أخرى. يرجى حذفه منها أولاً.")
+      : (name
+        ? `مسجل بالفعل في شركة: ${name}. يرجى حذفه منها أولاً.`
+        : "الرقم القومي مسجل بالفعل في شركة أخرى. يرجى حذفه منها أولاً.");
+    throw new functions.https.HttpsError("already-exists", msg, result);
+  }
+  const msg = kind === "phone"
+    ? "رقم الموبايل مسجل بالفعل لمندوب أو طلب آخر في شركتك."
+    : "الرقم القومي مسجل بالفعل لمندوب أو طلب آخر في شركتك.";
+  throw new functions.https.HttpsError("already-exists", msg, result);
+}
+
+interface Target {
+  kind: "delegate" | "request";
+  ref: FirebaseFirestore.DocumentReference;
+  data: FirebaseFirestore.DocumentData;
+}
+
+async function collectTargets(
+  db: FirebaseFirestore.Firestore,
+  opts: {companyUID: string; delegateUid?: string; requestId?: string},
+): Promise<{targets: Target[]; delegateUid: string; companyName: string; organizationUID: string; displayName: string}> {
+  const targets: Target[] = [];
+  const seen = new Set<string>();
+  const add = (kind: Target["kind"], snap: FirebaseFirestore.DocumentSnapshot) => {
+    if (!snap.exists) return;
+    const data = snap.data() || {};
+    const co = String(data.companyUID || data.companyId || "").trim();
+    if (co && co !== opts.companyUID) return;
+    if (seen.has(snap.ref.path)) return;
+    seen.add(snap.ref.path);
+    targets.push({kind, ref: snap.ref, data});
+  };
+
+  let delegateUid = String(opts.delegateUid || "").trim();
+  const requestId = String(opts.requestId || "").trim();
+  let companyName = "";
+  let organizationUID = "";
+  let displayName = "";
+
+  if (requestId) {
+    const req = await db.collection("delegate_requests").doc(requestId).get();
+    if (!req.exists) {
+      throw new functions.https.HttpsError("not-found", "الطلب غير موجود.");
+    }
+    add("request", req);
+    const data = req.data() || {};
+    if (!delegateUid) {
+      delegateUid = String(data.existingDelegateUid || data.delegateUid || data.uid || req.id).trim();
+    }
+    companyName = String(data.companyName || "").trim();
+    organizationUID = String(data.organizationUID || data.organizationId || "").trim();
+    displayName = String(data.fullName || "").trim();
+  }
+
+  if (delegateUid) {
+    const byUid = await db.collectionGroup("delegates").where("uid", "==", delegateUid).get();
+    for (const doc of byUid.docs) add("delegate", doc);
+    const reqs = await db.collection("delegate_requests")
+      .where("existingDelegateUid", "==", delegateUid).get();
+    for (const doc of reqs.docs) add("request", doc);
+    const reqs2 = await db.collection("delegate_requests")
+      .where("delegateUid", "==", delegateUid).get();
+    for (const doc of reqs2.docs) add("request", doc);
+    const selfReq = await db.collection("delegate_requests").doc(delegateUid).get();
+    if (selfReq.exists) add("request", selfReq);
+  }
+
+  if (!targets.length) {
+    throw new functions.https.HttpsError("not-found", "لم يتم العثور على المندوب.");
+  }
+
+  // Prefer a live delegate doc for metadata
+  const live = targets.find((t) => t.kind === "delegate") || targets[0];
+  companyName = companyName || String(live.data.companyName || "").trim();
+  organizationUID = organizationUID
+    || String(live.data.organizationUID || live.data.organizationId || "").trim();
+  displayName = displayName || String(live.data.fullName || "").trim();
+  if (!delegateUid) {
+    delegateUid = String(live.data.uid || live.data.existingDelegateUid || live.ref.id).trim();
+  }
+  return {targets, delegateUid, companyName, organizationUID, displayName};
+}
+
+async function notifyPrivileged(
+  db: FirebaseFirestore.Firestore,
+  opts: {
+    title: string;
+    body: string;
+    type: string;
+    senderName: string;
+    senderRole: string;
+    companyUID: string;
+    organizationUID: string;
+    requestId?: string;
+    delegateUid?: string;
+  },
+) {
+  const roleKeys = [
+    "super-admin", "superAdmin", "role_super_admin",
+    "technicalSupport", "technical-support", "role_technical_support",
+  ];
+  const batch = db.batch();
+  try {
+    const users = await db.collection("users").where("role", "in", [
+      "super-admin", "super_admin", "superAdmin",
+      "technicalSupport", "technical-support", "technical_support",
+    ]).get();
+    for (const doc of users.docs) {
+      const phone = (doc.data().phoneNumber || doc.data().phone || "").toString();
+      const ref = db.collection("notifications").doc();
+      batch.set(ref, {
+        delegateUid: doc.id,
+        ...(phone ? {phoneNumber: phone} : {}),
+        title: opts.title,
+        body: opts.body,
+        type: opts.type,
+        senderName: opts.senderName,
+        senderRole: opts.senderRole,
+        companyUID: opts.companyUID,
+        organizationId: opts.organizationUID,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        isRead: false,
+        targetRoles: ["superAdmin", "technicalSupport"],
+        ...(opts.requestId ? {requestId: opts.requestId} : {}),
+        ...(opts.delegateUid ? {targetDelegateUid: opts.delegateUid} : {}),
+      });
+    }
+  } catch (err) {
+    functions.logger.warn("privileged user query failed, writing role keys only", err);
+  }
+  for (const roleKey of roleKeys) {
+    const ref = db.collection("notifications").doc();
+    batch.set(ref, {
+      delegateUid: roleKey,
+      title: opts.title,
+      body: opts.body,
+      type: opts.type,
+      senderName: opts.senderName,
+      senderRole: opts.senderRole,
+      companyUID: opts.companyUID,
+      organizationId: opts.organizationUID,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      isRead: false,
+      targetRoles: ["superAdmin", "technicalSupport"],
+      ...(opts.requestId ? {requestId: opts.requestId} : {}),
+      ...(opts.delegateUid ? {targetDelegateUid: opts.delegateUid} : {}),
+    });
+  }
+  await batch.commit();
+}
+
+function writeAudits(
+  batch: FirebaseFirestore.WriteBatch,
+  db: FirebaseFirestore.Firestore,
+  drafts: ReturnType<typeof auditDoc>[],
+) {
+  for (const rec of drafts) {
+    const ref = db.collection(AUDIT).doc();
+    batch.set(ref, {
+      ...rec,
+      at: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+}
+
+/**
+ * editDelegateProfile (company supervisor / company-admin)
+ * Input: { companyUID, delegateUid?, requestId?, fullName?, phoneNumber?,
+ *          personalPhotoURL?, nationalIdFrontUrl?, nationalIdBackUrl? }
+ * Updates live delegate docs in every chain of the company and keeps open
+ * delegate_requests in sync. Phone changes go through the duplicate check.
+ */
+export const editDelegateProfile = functions
+  .region(REGION)
+  .runWith({timeoutSeconds: 60, memory: "256MB"})
+  .https.onCall(async (data: unknown, context) => {
+    const uid = requireAuth(context);
+    const db = admin.firestore();
+    const caller = await loadCaller(db, uid);
+    if (!isEditorRole(caller.role)) {
+      throw new functions.https.HttpsError("permission-denied", "غير مسموح.");
+    }
+    const payload = data && typeof data === "object" ? data as Record<string, unknown> : {};
+    const companyUID = typeof payload.companyUID === "string" ? payload.companyUID.trim() : "";
+    if (!companyUID) {
+      throw new functions.https.HttpsError("invalid-argument", "companyUID مطلوب.");
+    }
+    if (caller.companyUID && caller.companyUID !== companyUID) {
+      throw new functions.https.HttpsError("permission-denied", "غير مسموح.");
+    }
+    const {fields, keys} = sanitizeProfileEdit(payload as ProfileEditInput);
+    if (!keys.length) {
+      throw new functions.https.HttpsError("invalid-argument", "لا توجد حقول للتعديل.");
+    }
+    const delegateUidIn = typeof payload.delegateUid === "string" ? payload.delegateUid.trim() : "";
+    const requestIdIn = typeof payload.requestId === "string" ? payload.requestId.trim() : "";
+    if (!delegateUidIn && !requestIdIn) {
+      throw new functions.https.HttpsError("invalid-argument", "delegateUid أو requestId مطلوب.");
+    }
+
+    const collected = await collectTargets(db, {
+      companyUID,
+      delegateUid: delegateUidIn,
+      requestId: requestIdIn,
+    });
+
+    const editable: Target[] = [];
+    for (const t of collected.targets) {
+      const st = t.data.status;
+      if (t.kind === "request") {
+        if (String(t.ref.id) === requestIdIn && !isEditableRequestStatus(st)) {
+          throw new functions.https.HttpsError(
+            "failed-precondition",
+            "يمكن تعديل الطلبات المعلقة أو التي تحتاج إجراء فقط.",
+          );
+        }
+        if (isEditableRequestStatus(st)) editable.push(t);
+      } else if (isEditableDelegateStatus(st)) {
+        editable.push(t);
+      }
+    }
+    if (!editable.length) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "لا توجد سجلات قابلة للتعديل لهذه الحالة.",
+      );
+    }
+
+    if (fields.phoneNumber) {
+      const phone = normalizeIdDigits(fields.phoneNumber);
+      fields.phoneNumber = phone;
+      const dup = await findDuplicate(db, {
+        phoneNumber: phone,
+        companyUID,
+        excludeDelegateUid: collected.delegateUid,
+      });
+      throwIfDuplicate(dup, "phone");
+    }
+
+    const before = editable[0].data as Record<string, unknown>;
+    const audits = keys.map((field) => auditDoc({
+      actorUid: caller.uid,
+      actorName: caller.name,
+      actorRole: caller.role,
+      field,
+      oldValue: valueOf(before, field),
+      newValue: String(fields[field] || ""),
+      delegateUid: collected.delegateUid,
+      delegateName: String(fields.fullName || collected.displayName || ""),
+      companyUID,
+      companyName: collected.companyName,
+      organizationUID: collected.organizationUID,
+      source: "direct_edit",
+      requestId: requestIdIn || undefined,
+    }));
+
+    const batch = db.batch();
+    for (const t of editable) {
+      const patch = applyProfileFields(t.data as Record<string, unknown>, fields);
+      patch.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+      batch.update(t.ref, asUpdate(patch));
+    }
+    writeAudits(batch, db, audits);
+    await batch.commit();
+
+    if (shouldAlertAdmins(keys)) {
+      const changed = keys
+        .filter((k) => k === "fullName" || k === "nationalIdFrontUrl" || k === "nationalIdBackUrl")
+        .map(fieldArabicLabel)
+        .join("، ");
+      const who = collected.displayName || collected.delegateUid;
+      await notifyPrivileged(db, {
+        title: "تعديل بيانات مندوب",
+        body: `عدّل المشرف ${caller.name || caller.uid} ${changed} للمندوب ${who}.`,
+        type: "delegate_profile_edit",
+        senderName: caller.name,
+        senderRole: caller.role,
+        companyUID,
+        organizationUID: collected.organizationUID,
+        requestId: requestIdIn || undefined,
+        delegateUid: collected.delegateUid,
+      });
+    }
+
+    return {ok: true, updated: editable.length, fields: keys};
+  });
+
+/**
+ * submitNationalIdUpdate (company supervisor / company-admin)
+ * Creates a pending delegate_requests doc of type update_national_id.
+ * Approval is super-admin / technical support only.
+ */
+export const submitNationalIdUpdate = functions
+  .region(REGION)
+  .runWith({timeoutSeconds: 30, memory: "256MB"})
+  .https.onCall(async (data: unknown, context) => {
+    const uid = requireAuth(context);
+    const db = admin.firestore();
+    const caller = await loadCaller(db, uid);
+    if (!isEditorRole(caller.role)) {
+      throw new functions.https.HttpsError("permission-denied", "غير مسموح.");
+    }
+    const payload = data && typeof data === "object" ? data as Record<string, unknown> : {};
+    const companyUID = typeof payload.companyUID === "string" ? payload.companyUID.trim() : "";
+    const newNationalId = normalizeIdDigits(
+      typeof payload.newNationalId === "string" ? payload.newNationalId : "",
+    );
+    const delegateUidIn = typeof payload.delegateUid === "string" ? payload.delegateUid.trim() : "";
+    const requestIdIn = typeof payload.requestId === "string" ? payload.requestId.trim() : "";
+    if (!companyUID || !newNationalId) {
+      throw new functions.https.HttpsError("invalid-argument", "companyUID والرقم القومي الجديد مطلوبان.");
+    }
+    if (newNationalId.length !== 14) {
+      throw new functions.https.HttpsError("invalid-argument", "الرقم القومي يجب أن يكون 14 رقمًا.");
+    }
+    if (caller.companyUID && caller.companyUID !== companyUID) {
+      throw new functions.https.HttpsError("permission-denied", "غير مسموح.");
+    }
+    if (!delegateUidIn && !requestIdIn) {
+      throw new functions.https.HttpsError("invalid-argument", "delegateUid أو requestId مطلوب.");
+    }
+
+    const collected = await collectTargets(db, {
+      companyUID,
+      delegateUid: delegateUidIn,
+      requestId: requestIdIn,
+    });
+    const currentId = valueOf(collected.targets[0].data as Record<string, unknown>, "nationalId");
+    if (currentId && currentId === newNationalId) {
+      throw new functions.https.HttpsError("failed-precondition", "الرقم القومي مطابق للقيمة الحالية.");
+    }
+
+    const existing = await db.collection("delegate_requests")
+      .where("companyUID", "==", companyUID)
+      .where("existingDelegateUid", "==", collected.delegateUid)
+      .where("requestType", "==", "update_national_id")
+      .where("status", "==", "pending")
+      .limit(1)
+      .get();
+    if (!existing.empty) {
+      throw new functions.https.HttpsError(
+        "already-exists",
+        "يوجد طلب تعديل رقم قومي معلّق بالفعل وبانتظار الاعتماد.",
+      );
+    }
+
+    const dup = await findDuplicate(db, {
+      nationalId: newNationalId,
+      companyUID,
+      excludeDelegateUid: collected.delegateUid,
+    });
+    throwIfDuplicate(dup, "nationalId");
+
+    const src = collected.targets[0].data;
+    const docRef = db.collection("delegate_requests").doc();
+    await docRef.set({
+      id: docRef.id,
+      requestType: "update_national_id",
+      actionType: "update_national_id",
+      status: "pending",
+      paymentStatus: "not_required",
+      paymentMethod: "free_promotion",
+      supervisorUid: caller.uid,
+      supervisorName: caller.name,
+      companyUID,
+      companyName: collected.companyName || String(src.companyName || ""),
+      organizationUID: collected.organizationUID || String(src.organizationUID || src.organizationId || ""),
+      organizationName: String(src.organizationName || ""),
+      existingDelegateUid: collected.delegateUid,
+      fullName: collected.displayName,
+      firstName: String(src.firstName || ""),
+      secondName: String(src.secondName || src.middleName || ""),
+      thirdName: String(src.thirdName || src.lastName || ""),
+      phoneNumber: String(src.phoneNumber || ""),
+      nationalId: currentId,
+      proposedNationalId: newNationalId,
+      profileImageUrl: String(src.profileImageUrl || src.personalPhotoURL || ""),
+      nationalIdFrontUrl: String(src.nationalIdFrontUrl || ""),
+      nationalIdBackUrl: String(src.nationalIdBackUrl || ""),
+      fee: 0,
+      remainingMonths: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await notifyPrivileged(db, {
+      title: "طلب تعديل الرقم القومي",
+      body: `طلب المشرف ${caller.name || caller.uid} تعديل الرقم القومي للمندوب ${collected.displayName || collected.delegateUid}.`,
+      type: "delegate_national_id_request",
+      senderName: caller.name,
+      senderRole: caller.role,
+      companyUID,
+      organizationUID: collected.organizationUID,
+      requestId: docRef.id,
+      delegateUid: collected.delegateUid,
+    });
+
+    return {ok: true, requestId: docRef.id};
+  });
+
+/**
+ * reviewNationalIdUpdate (super-admin / technical support only)
+ * Input: { requestId, approve: boolean, rejectionReason? }
+ * On approve, updates nationalId and nationalityID on every chain after a
+ * duplicate check, and writes an audit record.
+ */
+export const reviewNationalIdUpdate = functions
+  .region(REGION)
+  .runWith({timeoutSeconds: 60, memory: "256MB"})
+  .https.onCall(async (data: unknown, context) => {
+    const uid = requireAuth(context);
+    const db = admin.firestore();
+    const caller = await loadCaller(db, uid);
+    if (!isReviewerRole(caller.role)) {
+      throw new functions.https.HttpsError("permission-denied", "الاعتماد متاح للإدارة العليا والدعم الفني فقط.");
+    }
+    const payload = data && typeof data === "object" ? data as Record<string, unknown> : {};
+    const requestId = typeof payload.requestId === "string" ? payload.requestId.trim() : "";
+    const approve = payload.approve === true;
+    const rejectionReason = typeof payload.rejectionReason === "string" ? payload.rejectionReason.trim() : "";
+    if (!requestId) {
+      throw new functions.https.HttpsError("invalid-argument", "requestId مطلوب.");
+    }
+    const req = await db.collection("delegate_requests").doc(requestId).get();
+    if (!req.exists) {
+      throw new functions.https.HttpsError("not-found", "الطلب غير موجود.");
+    }
+    const request = req.data() || {};
+    if (String(request.requestType || request.actionType || "") !== "update_national_id") {
+      throw new functions.https.HttpsError("failed-precondition", "هذا الطلب ليس طلب تعديل رقم قومي.");
+    }
+    if (String(request.status || "") !== "pending") {
+      throw new functions.https.HttpsError("failed-precondition", "تمت مراجعة هذا الطلب مسبقاً.");
+    }
+    if (!approve) {
+      await req.ref.update({
+        status: "rejected",
+        reviewedBy: uid,
+        reviewedByName: caller.name,
+        reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+        rejectionReason,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return {ok: true, status: "rejected"};
+    }
+
+    const companyUID = String(request.companyUID || "").trim();
+    const newId = normalizeIdDigits(String(request.proposedNationalId || ""));
+    const delegateUid = String(request.existingDelegateUid || "").trim();
+    if (!newId || !companyUID || !delegateUid) {
+      throw new functions.https.HttpsError("failed-precondition", "بيانات الطلب غير مكتملة.");
+    }
+    const dup = await findDuplicate(db, {
+      nationalId: newId,
+      companyUID,
+      excludeDelegateUid: delegateUid,
+    });
+    throwIfDuplicate(dup, "nationalId");
+
+    const collected = await collectTargets(db, {companyUID, delegateUid, requestId});
+    const oldId = valueOf(collected.targets[0].data as Record<string, unknown>, "nationalId");
+    const batch = db.batch();
+    for (const t of collected.targets) {
+      if (t.kind === "request" && t.ref.id === requestId) continue;
+      // Keep every live delegate and every request of this person in sync.
+      const patch: Record<string, unknown> = {
+        nationalId: newId,
+        nationalityID: newId,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      batch.update(t.ref, asUpdate(patch));
+    }
+    batch.update(req.ref, {
+      status: "approved",
+      nationalId: newId,
+      nationalityID: newId,
+      reviewedBy: uid,
+      reviewedByName: caller.name,
+      reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+      approvedBy: uid,
+      approvedByName: caller.name,
+      approvedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    writeAudits(batch, db, [auditDoc({
+      actorUid: caller.uid,
+      actorName: caller.name,
+      actorRole: caller.role,
+      field: "nationalId",
+      oldValue: oldId,
+      newValue: newId,
+      delegateUid,
+      delegateName: String(request.fullName || collected.displayName || ""),
+      companyUID,
+      companyName: String(request.companyName || collected.companyName || ""),
+      organizationUID: String(request.organizationUID || collected.organizationUID || ""),
+      source: "national_id_approval",
+      requestId,
+    })]);
+    await batch.commit();
+    return {ok: true, status: "approved", updated: collected.targets.length};
+  });

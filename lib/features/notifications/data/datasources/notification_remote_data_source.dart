@@ -253,7 +253,9 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
       final type = data['type']?.toString();
 
       // Delegate subscription requests are strictly restricted ONLY to Super Admin and Technical Support
-      if (type == 'delegate_subscription_request') {
+      if (type == 'delegate_subscription_request' ||
+          type == 'delegate_profile_edit' ||
+          type == 'delegate_national_id_request') {
         final isPrivileged = normalizedRole.contains('super') ||
             normalizedRole.contains('technical') ||
             normalizedRole.contains('support') ||

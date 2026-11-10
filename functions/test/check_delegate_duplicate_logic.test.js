@@ -67,3 +67,15 @@ test("phoneQueryVariants include local, +20, and 20 forms", () => {
   assert.ok(v.includes("01000000022"));
   assert.ok(v.includes("201000000022") || v.includes("+201000000022"));
 });
+
+test("action_required is an open request status", () => {
+  assert.ok(L.isOpenRequestStatus("action_required"));
+});
+
+test("isSameDelegateRecord matches id, uid, and request pointers", () => {
+  assert.ok(L.isSameDelegateRecord({uid: "d1"}, "x", "d1"));
+  assert.ok(L.isSameDelegateRecord({}, "d1", "d1"));
+  assert.ok(L.isSameDelegateRecord({existingDelegateUid: "d1"}, "req", "d1"));
+  assert.ok(!L.isSameDelegateRecord({uid: "d2"}, "x", "d1"));
+  assert.ok(!L.isSameDelegateRecord({uid: "d1"}, "d1", ""));
+});
