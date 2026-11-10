@@ -19,24 +19,40 @@ on:
 permissions:
   contents: read
 
+# Shared with the CI workflow so heavy Mac jobs do not interleave on
+# the single tashil-delegate-mac runner. See ci.yml.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: tashil-delegate-mac-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
 
+# Listener inherited fathalla's PATH (unreadable Android platform-tools).
+# Set a clean base PATH so checkout/git do not EACCES that directory.
 env:
+  PATH: /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+  LANG: en_US.UTF-8
+  LC_ALL: en_US.UTF-8
   PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
 jobs:
   signing-surface-guard:
     name: Signing & entitlements (no drift)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+      - name: Sanitize PATH for delegate-ci
+        # Listener was started with fathalla's PATH, which includes
+        # /Users/fathalla/Library/Android/sdk/platform-tools (EACCES for this user).
+        run: |
+          CLEAN="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+          echo "PATH=$CLEAN" >> "$GITHUB_ENV"
+          echo "LANG=en_US.UTF-8" >> "$GITHUB_ENV"
+          echo "LC_ALL=en_US.UTF-8" >> "$GITHUB_ENV"
+
       - name: Entitlements unchanged vs base branch
         run: |
           BASE="${{ github.event.pull_request.base.sha }}"
@@ -50,17 +66,27 @@ jobs:
   android-prod-release:
     name: Android prod flavor (release, debug-signed CI)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+      - name: Sanitize PATH for delegate-ci
+        # Listener was started with fathalla's PATH, which includes
+        # /Users/fathalla/Library/Android/sdk/platform-tools (EACCES for this user).
+        run: |
+          CLEAN="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+          echo "PATH=$CLEAN" >> "$GITHUB_ENV"
+          echo "LANG=en_US.UTF-8" >> "$GITHUB_ENV"
+          echo "LC_ALL=en_US.UTF-8" >> "$GITHUB_ENV"
+
       # Hosted ubuntu fills during assembleProdRelease (ENOSPC at packageProdRelease).
       # Keep NDK 28.2.13676358 (AGP needs it); drop other preinstalled NDKs/system-images.
       # Dropped setup-gradle@v4: PR runs were cache-read-only + cache miss, so it only
       # initialized empty ~/.gradle and burned disk; last green Android jobs had no setup-gradle.
       - name: Free disk on hosted ubuntu
+        if: runner.os == 'Linux'
         run: |
           echo "Before cleanup:" && df -h /
           sudo rm -rf \
@@ -85,11 +111,21 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      # delegate-ci has no Android SDK, and must not use another user's
+      # /Users/fathalla/Library/Android/sdk (permission denied).
+      # v3 defaults include the obsolete `tools` package, which sdkmanager
+      # 16.x no longer ships (exit 1 after licenses were accepted).
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0 ndk;28.2.13676358'
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.44.5"
           channel: stable
-          cache: true
+          # Self-hosted tashil-delegate-mac already has the SDK locally.
+          # Uploading it to the GitHub Actions cache stalls the post-step.
+          cache: false
       - name: Install dependencies
         run: flutter pub get
       - name: Build APK (prod flavor release; debug cert without key.properties)
@@ -105,25 +141,76 @@ jobs:
   ios-prod-release:
     name: iOS prod flavor (release, no codesign)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: macos-latest
+    runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+      - name: Sanitize PATH for delegate-ci
+        # Listener was started with fathalla's PATH, which includes
+        # /Users/fathalla/Library/Android/sdk/platform-tools (EACCES for this user).
+        run: |
+          CLEAN="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+          echo "PATH=$CLEAN" >> "$GITHUB_ENV"
+          echo "LANG=en_US.UTF-8" >> "$GITHUB_ENV"
+          echo "LC_ALL=en_US.UTF-8" >> "$GITHUB_ENV"
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.44.5"
           channel: stable
-          cache: true
+          # Self-hosted tashil-delegate-mac already has the SDK locally.
+          # Uploading it to the GitHub Actions cache stalls the post-step.
+          cache: false
       - name: Install dependencies
         run: flutter pub get
+      - name: Xcode probe (delegate-ci, no sudo)
+        run: |
+          echo "USER=$(id -un) HOME=$HOME"
+          xcodebuild -version
+          set +e
+          xcodebuild -checkFirstLaunchStatus
+          echo "checkFirstLaunchStatus=$?"
+          xcodebuild -license check
+          echo "license_check=$?"
+          set -e
+          ls -ld "$HOME/Library/Developer/Xcode/DerivedData" || echo "no DerivedData yet"
       - name: CocoaPods
         run: |
           cd ios
           pod install
       - name: Build iOS prod (device tree, no codesign)
-        run: flutter build ios --release --no-codesign --flavor prod --dart-define=ENV=prod
+        run: |
+          # Do not change signing. Flutter 3.44 may auto-add plugin SPM even
+          # when google_maps_flutter_ios / printing do not support it, which on
+          # Xcode 27.2 has failed this job in 7.5s with exit 255.
+          flutter config --no-enable-swift-package-manager || true
+          mkdir -p "$RUNNER_TEMP/DerivedData"
+          # flutter-action's cached engine on this runner has empty
+          # Flutter.framework dirs (nlink=2, mode 700, no Flutter.h). That
+          # made xcodebuild report Flutter.h not found / earlier exit 255.
+          # Repair as delegate-ci, no sudo; do not touch other users' SDKs.
+          FLUTTER_ROOT="$(dirname "$(dirname "$(which flutter)")")"
+          FW="$FLUTTER_ROOT/bin/cache/artifacts/engine/ios-release/Flutter.xcframework/ios-arm64/Flutter.framework/Headers/Flutter.h"
+          if [ ! -f "$FW" ]; then
+            echo "Empty/missing Flutter.framework headers; re-precache iOS engine"
+            rm -rf               "$FLUTTER_ROOT/bin/cache/artifacts/engine/ios"               "$FLUTTER_ROOT/bin/cache/artifacts/engine/ios-profile"               "$FLUTTER_ROOT/bin/cache/artifacts/engine/ios-release"
+            flutter precache --ios
+            if [ ! -f "$FW" ]; then
+              echo "flutter precache --ios did not restore $FW"
+              ls -la "$(dirname "$(dirname "$FW")")" || true
+              exit 1
+            fi
+          fi
+          if flutter build ios --release --no-codesign --flavor prod --dart-define=ENV=prod; then
+            exit 0
+          fi
+          echo "----- flutter/ios build failed; collecting logs -----"
+          find "$HOME/Library/Developer/Xcode/DerivedData" "$RUNNER_TEMP" "$GITHUB_WORKSPACE/build"             -name 'build-state.json' -o -name '*.xcresult' -o -name 'flutter_*.log'             2>/dev/null | head -50
+          # Print last xcodebuild diagnostics if present (no secrets expected).
+          find /var/folders -name 'flutter_ios_build_temp_dir*' -type d 2>/dev/null | head
+          exit 1
       - name: Upload iOS build artifact
         uses: actions/upload-artifact@v4
         with:

@@ -23,6 +23,7 @@ validate_appdelegate_file() {
 import re
 import sys
 from pathlib import Path
+from typing import Optional
 
 
 def strip_swift_comments(source: str) -> str:
@@ -86,7 +87,7 @@ def extract_did_finish_launching_body(source: str) -> str:
     return source[body_start : i - 1]
 
 
-def find_offline_sync_registration(body: str, task_id: str) -> int | None:
+def find_offline_sync_registration(body: str, task_id: str) -> Optional[int]:
     pattern = re.compile(
         r"WorkmanagerPlugin\.registerPeriodicTask\s*\(\s*"
         r"[\s\S]*?"
