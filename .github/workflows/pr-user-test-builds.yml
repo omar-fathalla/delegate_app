@@ -25,6 +25,13 @@ concurrency:
   group: tashil-delegate-mac-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
+# Listener inherited fathalla's PATH (unreadable Android platform-tools).
+# Set a clean base PATH so checkout/git do not EACCES that directory.
+env:
+  PATH: /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+  LANG: en_US.UTF-8
+  LC_ALL: en_US.UTF-8
+
 env:
   PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
@@ -108,8 +115,12 @@ jobs:
           java-version: "21"
       # delegate-ci has no Android SDK, and must not use another user's
       # /Users/fathalla/Library/Android/sdk (permission denied).
+      # v3 defaults include the obsolete `tools` package, which sdkmanager
+      # 16.x no longer ships (exit 1 after licenses were accepted).
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0 ndk;28.2.13676358'
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.44.5"
@@ -178,6 +189,22 @@ jobs:
           # Xcode 27.2 has failed this job in 7.5s with exit 255.
           flutter config --no-enable-swift-package-manager || true
           mkdir -p "$RUNNER_TEMP/DerivedData"
+          # flutter-action's cached engine on this runner has empty
+          # Flutter.framework dirs (nlink=2, mode 700, no Flutter.h). That
+          # made xcodebuild report Flutter.h not found / earlier exit 255.
+          # Repair as delegate-ci, no sudo; do not touch other users' SDKs.
+          FLUTTER_ROOT="$(dirname "$(dirname "$(which flutter)")")"
+          FW="$FLUTTER_ROOT/bin/cache/artifacts/engine/ios-release/Flutter.xcframework/ios-arm64/Flutter.framework/Headers/Flutter.h"
+          if [ ! -f "$FW" ]; then
+            echo "Empty/missing Flutter.framework headers; re-precache iOS engine"
+            rm -rf               "$FLUTTER_ROOT/bin/cache/artifacts/engine/ios"               "$FLUTTER_ROOT/bin/cache/artifacts/engine/ios-profile"               "$FLUTTER_ROOT/bin/cache/artifacts/engine/ios-release"
+            flutter precache --ios
+            if [ ! -f "$FW" ]; then
+              echo "flutter precache --ios did not restore $FW"
+              ls -la "$(dirname "$(dirname "$FW")")" || true
+              exit 1
+            fi
+          fi
           if flutter build ios --release --no-codesign --flavor prod --dart-define=ENV=prod; then
             exit 0
           fi
