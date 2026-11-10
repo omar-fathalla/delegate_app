@@ -73,22 +73,41 @@ async function loadEvidence(uid: string, self: ChainEvidence): Promise<{
   }
 
   let webCreates: WebCreateEvidence[] = [];
+  const mapWeb = (d: FirebaseFirestore.DocumentData, org = "", company = ""): WebCreateEvidence => ({
+    targetDelegateId: str(d.targetDelegateId) || uid,
+    organizationUID: str(d.organizationUID) || org,
+    companyUID: str(d.companyUID) || company,
+  });
   try {
     const web = await db.collectionGroup("requests")
       .where("targetDelegateId", "==", uid)
       .where("actionType", "==", "create")
       .limit(10)
       .get();
-    webCreates = web.docs.map((doc) => {
-      const d = doc.data();
-      return {
-        targetDelegateId: str(d.targetDelegateId) || uid,
-        organizationUID: str(d.organizationUID),
-        companyUID: str(d.companyUID),
-      };
-    });
+    webCreates = web.docs.map((doc) => mapWeb(doc.data() || {}));
   } catch (e) {
     functions.logger.warn("stampDelegateSource web requests query failed", {uid, message: String(e)});
+    const seen = new Set<string>();
+    for (const c of chainDocs) {
+      const org = str(c.organizationUID);
+      const company = str(c.companyUID);
+      if (!org || !company || seen.has(`${org}/${company}`)) continue;
+      seen.add(`${org}/${company}`);
+      try {
+        const snap = await db.collection(`organizations/${org}/companies/${company}/requests`)
+          .where("actionType", "==", "create")
+          .limit(50)
+          .get();
+        for (const doc of snap.docs) {
+          const d = doc.data() || {};
+          if (str(d.targetDelegateId) === uid) webCreates.push(mapWeb(d, org, company));
+        }
+      } catch (e2) {
+        functions.logger.warn("stampDelegateSource nested web requests query failed", {
+          org, company, message: String(e2),
+        });
+      }
+    }
   }
 
   let supervisorOrgId = "";

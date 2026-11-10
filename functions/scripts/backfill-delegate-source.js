@@ -149,10 +149,60 @@ async function loadRequest(db, uid, cache) {
   return ev;
 }
 
-async function loadWebCreates(db, uids) {
+function addWebCreate(byUid, d, fallbackOrg, fallbackCompany) {
+  const id = str(d.targetDelegateId);
+  if (!id) return;
+  const list = byUid.get(id) || [];
+  list.push({
+    targetDelegateId: id,
+    organizationUID: str(d.organizationUID) || fallbackOrg || "",
+    companyUID: str(d.companyUID) || fallbackCompany || "",
+  });
+  byUid.set(id, list);
+}
+
+// Path-based fallback: web creates live at
+// organizations/{org}/companies/{company}/requests. This does not need
+// the collection-group composite index.
+async function loadWebCreatesFromNestedPaths(db, docs, uidSet) {
+  const byUid = new Map();
+  const seen = new Set();
+  const pairs = [];
+  for (const doc of docs) {
+    const ev = chainFromDoc(doc);
+    const org = ev.organizationUID;
+    const company = ev.companyUID;
+    if (!org || !company) continue;
+    const key = `${org}/${company}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    pairs.push({org, company});
+  }
+  let ok = 0;
+  let lastError = "";
+  for (const {org, company} of pairs) {
+    try {
+      const snap = await db.collection(`organizations/${org}/companies/${company}/requests`)
+        .where("actionType", "==", "create")
+        .get();
+      ok++;
+      for (const doc of snap.docs) {
+        const d = doc.data() || {};
+        const id = str(d.targetDelegateId);
+        if (id && uidSet.has(id)) addWebCreate(byUid, d, org, company);
+      }
+    } catch (e) {
+      lastError = e.message;
+      console.warn(`web requests nested query failed at ${org}/${company}:`, e.message);
+    }
+  }
+  return {byUid, pairs: pairs.length, ok, lastError};
+}
+
+async function loadWebCreates(db, uids, docs) {
   const byUid = new Map();
   const unique = [...new Set(uids)];
-  // Collection-group query may require an index. Fall back per-uid or skip.
+  const uidSet = new Set(unique);
   try {
     for (let i = 0; i < unique.length; i += 10) {
       const batch = unique.slice(i, i + 10);
@@ -161,22 +211,20 @@ async function loadWebCreates(db, uids) {
         .where("targetDelegateId", "in", batch)
         .get();
       for (const doc of snap.docs) {
-        const d = doc.data() || {};
-        const id = str(d.targetDelegateId);
-        if (!id) continue;
-        const list = byUid.get(id) || [];
-        list.push({
-          targetDelegateId: id,
-          organizationUID: str(d.organizationUID),
-          companyUID: str(d.companyUID),
-        });
-        byUid.set(id, list);
+        addWebCreate(byUid, doc.data() || {});
       }
     }
-    return {byUid, webQueryOk: true};
+    return {byUid, webQueryOk: true, webQueryMode: "collection-group"};
   } catch (e) {
     console.warn("web requests collection-group query failed (missing index?):", e.message);
-    return {byUid, webQueryOk: false, webQueryError: e.message};
+    const fallback = await loadWebCreatesFromNestedPaths(db, docs, uidSet);
+    const used = fallback.ok > 0;
+    return {
+      byUid: fallback.byUid,
+      webQueryOk: used,
+      webQueryMode: used ? "nested-path-fallback" : "failed",
+      webQueryError: e.message + (fallback.lastError ? `; fallback: ${fallback.lastError}` : ""),
+    };
   }
 }
 
@@ -240,7 +288,7 @@ async function runBackfill(db, L, args) {
   for (const uid of uids) {
     await loadRequest(db, uid, reqCache);
   }
-  const {byUid: webByUid, webQueryOk, webQueryError} = await loadWebCreates(db, uids);
+  const {byUid: webByUid, webQueryOk, webQueryError, webQueryMode} = await loadWebCreates(db, uids, docs);
   const addOrgUids = await loadAddOrgRequests(db, uids);
   const supIds = [];
   for (const ev of reqCache.values()) {
@@ -314,6 +362,7 @@ async function runBackfill(db, L, args) {
     runId,
     at: new Date().toISOString(),
     webQueryOk: webQueryOk !== false,
+    webQueryMode: webQueryMode || null,
     webQueryError: webQueryError || null,
     counts: {
       docs: counts.docs,

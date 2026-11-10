@@ -39,3 +39,13 @@ node scripts/backfill-delegate-source.js --project tashil-dev --revert --rollbac
 ```
 
 `--revert` without `--apply` is a revert dry-run.
+
+## Web `requests` lookup
+
+The script first tries a collection-group query on `requests`
+(`actionType` + `targetDelegateId`). That composite index is not
+required for this PR and is not created automatically. If the query
+fails, it falls back to
+`organizations/{org}/companies/{company}/requests` for each company
+already seen on a delegate doc (single-field `actionType`, filtered in
+memory). The report records `webQueryOk` and `webQueryMode`.
