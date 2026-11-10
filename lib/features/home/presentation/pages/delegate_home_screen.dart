@@ -3,10 +3,12 @@ import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/photo_permission/presentation/widgets/sync_status_banner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/services/firestore_session_subscriptions.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -53,6 +55,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
   int _approvedLeavesThisMonth = 0;
 
   List<Attendance> _recentSessions = [];
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userSub;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _leaveSub;
+  DocumentSnapshot<Map<String, dynamic>>? _userDoc;
+  int _pendingLeaveCount = 0;
   static final Map<String, String> _orgNamesCache = {
     'PiioBFgxaHAeuRdjlDgj': 'فتح الله ماركت',
     '5DE6702w6hFwycJfZyqM': 'جملة ماركت',
@@ -72,6 +78,49 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     _fetchSupervisors();
     _loadAttendanceData();
     _loadRecentActivity();
+    _listenToUserDoc();
+    _listenToLeaveRequests();
+  }
+
+  String get _userSubKey => 'home.users.${widget.delegate.uid}';
+  String get _leaveSubKey => 'home.leave_requests.${widget.delegate.uid}';
+
+  void _listenToUserDoc() {
+    _userSub?.cancel();
+    _userSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.delegate.uid)
+        .snapshots()
+        .listen((doc) {
+      if (!mounted) return;
+      setState(() => _userDoc = doc);
+    });
+    FirestoreSessionSubscriptions.instance.register(_userSubKey, _userSub!);
+  }
+
+  void _listenToLeaveRequests() {
+    _leaveSub?.cancel();
+    _leaveSub = FirebaseFirestore.instance
+        .collection('leave_requests')
+        .where('companyUID', isEqualTo: widget.delegate.companyUID)
+        .where('delegateUid', isEqualTo: widget.delegate.uid)
+        .snapshots()
+        .listen((snap) {
+      if (!mounted) return;
+      var pending = 0;
+      for (final doc in snap.docs) {
+        if (doc.data()['status'] == 'pending') pending++;
+      }
+      setState(() => _pendingLeaveCount = pending);
+    });
+    FirestoreSessionSubscriptions.instance.register(_leaveSubKey, _leaveSub!);
+  }
+
+  @override
+  void dispose() {
+    _userSub?.cancel();
+    _leaveSub?.cancel();
+    super.dispose();
   }
 
   @override
@@ -536,13 +585,9 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       ),
                     ),
                     const SizedBox(height: 6),
-                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                      stream: FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(widget.delegate.uid)
-                          .snapshots(),
-                      builder: (context, snapshot) {
-                        final userData = snapshot.data?.data();
+                    Builder(
+                      builder: (context) {
+                        final userData = _userDoc?.data();
                         final positionLabel = widget.delegate.position ==
                                     DelegatePosition.promoter ||
                                 widget.delegate.role ==
@@ -1846,23 +1891,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection('leave_requests')
-          .where('companyUID', isEqualTo: widget.delegate.companyUID)
-          .where('delegateUid', isEqualTo: widget.delegate.uid)
-          .snapshots(),
-      builder: (context, snapshot) {
-        final docs = snapshot.data?.docs ?? [];
-        int pendingCount = 0;
-        for (final doc in docs) {
-          final data = doc.data();
-          if (data['status'] == 'pending') {
-            pendingCount++;
-          }
-        }
-
-        return Card(
+    final pendingCount = _pendingLeaveCount;
+    return Card(
           elevation: 0,
           margin: EdgeInsets.zero,
           color: colorScheme.surfaceContainer,
@@ -1955,8 +1985,5 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             ),
           ),
         );
-      },
-    );
   }
 }
-

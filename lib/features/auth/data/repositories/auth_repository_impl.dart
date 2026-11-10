@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dartz/dartz.dart';
+import 'package:delegate_app/core/services/firestore_session_subscriptions.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_remote_data_source.dart';
@@ -153,6 +154,9 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<Either<Failure, void>> logout({String? userId}) async {
     final uid = userId?.trim() ?? '';
+    try {
+      await FirestoreSessionSubscriptions.instance.cancelAll();
+    } catch (_) {}
     final cleanup = clearPushRegistration;
     // Delete fcm_tokens/{uid} while still signed in. The rules require
     // signedIn(), so a parallel/post sign-out delete is PERMISSION_DENIED

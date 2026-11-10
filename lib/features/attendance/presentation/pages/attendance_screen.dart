@@ -16,6 +16,7 @@ import 'package:delegate_app/features/attendance/presentation/widgets/early_chec
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
+import 'package:delegate_app/features/attendance/domain/geofence_helpers.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
@@ -2115,7 +2116,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     setState(() => _isLoadingBranches = true);
     try {
       final orgId = widget.delegate.organizationUID;
-      final branchesList = <Branch>[];
+      final nested = <Branch>[];
+      final root = <Branch>[];
 
       // 1. Fetch from organizations/{orgId}/branches
       try {
@@ -2125,23 +2127,30 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             .collection('branches')
             .get();
         for (final doc in snap.docs) {
-          final data = doc.data();
-          branchesList.add(BranchModel.fromMap({...data, 'id': doc.id}));
+          nested.add(BranchModel.fromMap(doc.data(), id: doc.id));
         }
       } catch (_) {}
 
-      // 2. Fetch from root branches where organizationUID == orgId
-      if (branchesList.isEmpty) {
-        try {
-          final snap = await FirebaseFirestore.instance
-              .collection('branches')
-              .where('organizationUID', isEqualTo: orgId)
-              .get();
-          for (final doc in snap.docs) {
-            final data = doc.data();
-            branchesList.add(BranchModel.fromMap({...data, 'id': doc.id}));
-          }
-        } catch (_) {}
+      // 2. Always also fetch root branches. A stub nested doc (name
+      // only, no coordinates) must not hide the geo-enabled root
+      // branches (M31 ce97cb3: outside message had no name/distance).
+      try {
+        final snap = await FirebaseFirestore.instance
+            .collection('branches')
+            .where('organizationUID', isEqualTo: orgId)
+            .get();
+        for (final doc in snap.docs) {
+          root.add(BranchModel.fromMap(doc.data(), id: doc.id));
+        }
+      } catch (_) {}
+
+      final branchesList = mergeOrgBranches(nested, root);
+      for (final b in branchesList) {
+        BranchDisplayCache.instance.registerFromMap({
+          'branchName': b.branchName,
+          'displayNameAr': b.branchName,
+          'organizationUID': b.organizationUID ?? orgId,
+        }, docId: b.id);
       }
 
       if (mounted) {
@@ -2290,13 +2299,19 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           ? l10n.distanceMeters(_distanceToNearest!.toInt())
           : '';
       final action = isCheckedIn ? l10n.attActionCheckOut : l10n.attActionCheckIn;
-      final message = nearestName.isNotEmpty && distStr.isNotEmpty
-          ? l10n.attCannotActOutsideAtBranch(action, nearestName, distStr)
-          : nearestName.isNotEmpty
-              ? l10n.attCannotActOutsideBranchOnly(action, nearestName)
-              : distStr.isNotEmpty
-                  ? l10n.attCannotActOutside(action, distStr)
-                  : l10n.attCannotActOutsideNoDistance(action);
+      final message = switch (classifyGeofenceOutside(
+        branchName: nearestName,
+        distanceMeters: _distanceToNearest,
+      )) {
+        GeofenceOutsideKind.atBranch =>
+          l10n.attCannotActOutsideAtBranch(action, nearestName, distStr),
+        GeofenceOutsideKind.branchOnly =>
+          l10n.attCannotActOutsideBranchOnly(action, nearestName),
+        GeofenceOutsideKind.distanceOnly =>
+          l10n.attCannotActOutside(action, distStr),
+        GeofenceOutsideKind.noDetails =>
+          l10n.attCannotActOutsideNoDistance(action),
+      };
       AppSnackBar.showError(parentContext, message);
       return;
     }

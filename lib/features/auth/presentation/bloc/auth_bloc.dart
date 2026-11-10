@@ -11,6 +11,7 @@ import 'package:delegate_app/core/services/session_management_service.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/auth/domain/delegate_login_validator.dart';
 import 'package:delegate_app/features/auth/domain/delegate_otp_config.dart';
+import 'package:delegate_app/core/services/firestore_session_subscriptions.dart';
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/logout.dart';
@@ -387,9 +388,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     _explicitLogout = true;
-    // Emit first so Home / profile listeners are cancelled, then drop
-    // the FCM token while still signed in, then signOut (M31 f7dbcf37).
+    // Emit first so widgets stop rendering signed-in streams, cancel
+    // registered Firestore listeners *before* signOut (M31 ce97cb3:
+    // leave_requests + users/{uid} were still denied ~3s after logout
+    // when we relied on dispose alone), then drop the FCM token while
+    // still signed in, then signOut.
     emit(const AuthUnauthenticated(fromLogout: true));
+    try {
+      await FirestoreSessionSubscriptions.instance.cancelAll();
+    } catch (_) {}
     await Future<void>.delayed(const Duration(milliseconds: 400));
     try {
       await logoutUseCase(LogoutParams(userId: event.userId));

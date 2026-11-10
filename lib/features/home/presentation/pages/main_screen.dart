@@ -7,6 +7,7 @@ import 'package:delegate_app/features/home/presentation/pages/delegate_home_scre
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/features/photo_permission/presentation/pages/monthly_photo_report_screen.dart';
+import 'package:delegate_app/features/photo_permission/presentation/photo_reports_refresh.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/auth/domain/repositories/auth_repository.dart';
@@ -238,6 +239,7 @@ class _MainScreenState extends State<MainScreen> {
                 _currentIndex = index;
                 _initializedTabs.add(index); // Mark tab as visited
               });
+              if (index == 3) PhotoReportsRefresh.request();
             },
             destinations: [
               M3NavDestination(icon: Symbols.home_rounded, label: l10n.home),
