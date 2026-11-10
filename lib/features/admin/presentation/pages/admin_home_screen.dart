@@ -153,8 +153,8 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
           );
           result.fold(
             (_) {},
-            (delegates) {
-              for (final d in delegates) {
+            (page) {
+              for (final d in page.delegates) {
                 if (d.organizationName.isNotEmpty) {
                   final norm = _normalizeOrgName(d.organizationName, isArabic);
                   if (norm.isNotEmpty) collected.add(norm);

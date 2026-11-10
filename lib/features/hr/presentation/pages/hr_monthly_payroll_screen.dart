@@ -225,7 +225,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
 
       delegatesRes.fold(
         (failure) => _errorMessage = failure.message,
-        (delegates) => _companyDelegates = delegates,
+        (page) => _companyDelegates = page.delegates,
       );
 
       if (_companyDelegates.isEmpty) {
