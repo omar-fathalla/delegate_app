@@ -592,7 +592,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       status: DelegateStatus.approved,
       delegatePublicId: '',
       allReceiptCodes: const [],
-      createdAt: DateTime.now(),
+      createdAt: _readCreatedAt(userData) ?? DateTime.fromMillisecondsSinceEpoch(0),
       createdBy: 'system_admin',
       hasPendingUpdate: false,
       isDeductedFromCompany: false,
@@ -605,6 +605,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       role: mappedRole,
       email: adminEmail,
     );
+  }
+
+  static DateTime? _readCreatedAt(Map<String, dynamic> data) {
+    final value = data['createdAt'] ?? data['created_at'];
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String && value.trim().isNotEmpty) {
+      return DateTime.tryParse(value.trim());
+    }
+    return null;
   }
 
   static String _stringField(Map<String, dynamic> data, List<String> keys) {

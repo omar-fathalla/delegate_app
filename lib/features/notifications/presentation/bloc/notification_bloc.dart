@@ -10,6 +10,7 @@ import 'package:delegate_app/features/notifications/domain/usecases/get_unread_c
 import 'package:delegate_app/features/notifications/domain/usecases/mark_all_notifications_read.dart';
 import 'package:delegate_app/features/notifications/domain/usecases/mark_notification_read.dart';
 import 'package:equatable/equatable.dart';
+import 'package:delegate_app/features/notifications/domain/notification_account_cutoff.dart';
 
 part 'notification_event.dart';
 part 'notification_state.dart';
@@ -75,12 +76,12 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
               return !isAttendance;
             }).toList();
           }
-          if (createdAt != null) {
-            final cutoff = createdAt.subtract(const Duration(minutes: 5));
-            cachedList = cachedList
-                .where((n) => !n.createdAt.isBefore(cutoff))
-                .toList();
-          }
+          cachedList = cachedList
+              .where((n) => !shouldHideNotificationForAccountAge(
+                    notificationCreatedAt: n.createdAt,
+                    sessionCreatedAt: createdAt,
+                  ))
+              .toList();
 
           if (cachedList.isNotEmpty) {
             emit(

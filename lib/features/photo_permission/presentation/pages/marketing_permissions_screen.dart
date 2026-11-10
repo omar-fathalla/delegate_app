@@ -43,11 +43,12 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
   bool get _isTechnicalSupport =>
       widget.marketingDelegate.role == UserRole.technicalSupport;
 
-  // Mohamed 2026-11-10: only super-admin and technical support may
-  // approve or reject photo permissions.
+  // Mohamed 2026-11-10 22:14: super-admin, technical support, and
+  // marketing-promotion (تسويق العروض) may approve, reject, and toggle.
   bool get _canApproveOrReject =>
       widget.marketingDelegate.role == UserRole.technicalSupport ||
-      widget.marketingDelegate.role == UserRole.superAdmin;
+      widget.marketingDelegate.role == UserRole.superAdmin ||
+      widget.marketingDelegate.role == UserRole.marketingPromotion;
 
   bool get _canEditDates =>
       widget.marketingDelegate.role == UserRole.marketingPromotion ||
@@ -56,6 +57,24 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       widget.marketingDelegate.role == UserRole.branchesMarketingManager ||
       widget.marketingDelegate.role == UserRole.technicalSupport ||
       widget.marketingDelegate.role == UserRole.superAdmin;
+
+  /// Marketing-promotion is org-scoped, and company-scoped when the
+  /// account has a companyUID. Hide edit/approve actions outside that scope.
+  bool _isPermissionInScope(PhotoPermission permission) {
+    if (_isSuperAdmin || _isTechnicalSupport) return true;
+    final org = widget.marketingDelegate.organizationUID;
+    final company = widget.marketingDelegate.companyUID;
+    if (org.isEmpty && company.isEmpty) return false;
+    if (org.isNotEmpty && permission.organizationUID != org) return false;
+    if (company.isNotEmpty && permission.companyUID != company) return false;
+    return true;
+  }
+
+  bool _canEditDatesFor(PhotoPermission permission) =>
+      _canEditDates && _isPermissionInScope(permission);
+
+  bool _canReview(PhotoPermission permission) =>
+      _canApproveOrReject && _isPermissionInScope(permission);
 
   String get _approverText {
     final approverName = widget.marketingDelegate.fullName.isNotEmpty
@@ -2102,7 +2121,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                     const Divider(height: 18),
                     // سطر التواريخ وتعديل المدة
                     InkWell(
-                      onTap: _canEditDates ? () => _showEditDatesDialog(context, permission) : null,
+                      onTap: _canEditDatesFor(permission) ? () => _showEditDatesDialog(context, permission) : null,
                       borderRadius: BorderRadius.circular(8),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 2),
@@ -2119,7 +2138,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                               '($daysCount يوم)',
                               style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11.5),
                             ),
-                            if (_canEditDates) ...[
+                            if (_canEditDatesFor(permission)) ...[
                               const Spacer(),
                               Icon(Icons.edit_calendar_rounded, size: 16, color: colorScheme.primary),
                             ],
@@ -2190,7 +2209,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                             ],
                           ],
                         ),
-                        if (_canApproveOrReject)
+                        if (_canReview(permission))
                           Row(
                             children: [
                               OutlinedButton.icon(
@@ -2315,6 +2334,9 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildStatusBadge(permission),
+                      if (permission.status.toLowerCase() == 'approved' &&
+                          _canReview(permission))
+                        _buildEnableToggle(context, permission, theme.colorScheme),
                       const SizedBox(width: 4),
                       AnimatedRotation(
                         turns: isExpanded ? 0.5 : 0.0,
@@ -2419,7 +2441,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                     const Divider(height: 18),
                     // سطر التواريخ وتعديل المدة
                     InkWell(
-                      onTap: _canEditDates ? () => _showEditDatesDialog(context, permission) : null,
+                      onTap: _canEditDatesFor(permission) ? () => _showEditDatesDialog(context, permission) : null,
                       borderRadius: BorderRadius.circular(8),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 2),
@@ -2436,7 +2458,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                               '($daysCount يوم)',
                               style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11.5),
                             ),
-                            if (_canEditDates) ...[
+                            if (_canEditDatesFor(permission)) ...[
                               const Spacer(),
                               Icon(Icons.edit_calendar_rounded, size: 16, color: colorScheme.primary),
                             ],
@@ -2475,7 +2497,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                         ),
                       ),
                     ),
-                    if (permission.status.toLowerCase() == 'pending' && _canApproveOrReject) ...[
+                    if (permission.status.toLowerCase() == 'pending' && _canReview(permission)) ...[
                       const Divider(height: 16),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
@@ -2591,6 +2613,43 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildEnableToggle(
+    BuildContext context,
+    PhotoPermission permission,
+    ColorScheme colorScheme,
+  ) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          permission.isSupervisorEnabled ? 'مفعّل' : 'معطّل',
+          style: TextStyle(
+            fontSize: 10.5,
+            color: permission.isSupervisorEnabled
+                ? colorScheme.primary
+                : colorScheme.onSurfaceVariant,
+          ),
+        ),
+        Transform.scale(
+          scale: 0.75,
+          child: Switch(
+            value: permission.isSupervisorEnabled,
+            onChanged: (val) {
+              context.read<PhotoPermissionBloc>().add(
+                    TogglePermissionRequested(
+                      organizationUID: permission.organizationUID,
+                      companyUID: permission.companyUID,
+                      permissionId: permission.uid,
+                      isEnabled: val,
+                    ),
+                  );
+            },
+          ),
+        ),
+      ],
     );
   }
 

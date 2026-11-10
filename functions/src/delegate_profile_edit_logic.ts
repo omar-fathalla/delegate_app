@@ -487,7 +487,11 @@ export function classifyReviewTarget(opts: {
   const reqType = String(data.requestType || data.actionType || "");
   if (reqType === "update_national_id") return "skip";
   const st = String(data.status || "").toLowerCase();
-  if (st && st !== "pending" && st !== "open") return "skip";
+  const isSelfRegistration = reqType === "new" || reqType === "new_delegate"
+    || reqType === "newDelegate";
+  const isOpen = !st || st === "pending" || st === "open";
+  const isApprovedRegistration = st === "approved" && isSelfRegistration;
+  if (!isOpen && !isApprovedRegistration) return "skip";
   const wantUid = String(opts.requestDelegateUid || "").trim();
   const wantCo = String(opts.requestCompanyUID || "").trim();
   if (!wantUid || !wantCo) return "skip";

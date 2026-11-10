@@ -16,12 +16,15 @@ const USERS = {
   sup2: {role: "supervisor", organizationUID: "o1", companyUID: "c2"},
   adm: {role: "admin", organizationUID: "o1", companyUID: "c1"},
   d1: {role: "delegate", organizationUID: "o1", companyUID: "c1"},
-  mkt: {role: "marketing_promotion", organizationUID: "o1"},
+  mkt: {role: "marketing", organizationUID: "o1"},
   mktCo: {role: "marketing", organizationUID: "o1", companyUID: "c1"},
   oa: {role: "organization-admin", organizationUID: "o1"},
   bmm: {role: "branches_marketing", organizationUID: "o1", companyUID: "c1"},
   bmmMgr: {role: "branches_marketing_manager", organizationUID: "o1", companyUID: "c1"},
   bmmOther: {role: "branches_marketing", organizationUID: "o1", companyUID: "c2"},
+  bmmCamel: {role: "branchesMarketingManager", organizationUID: "o1", companyUID: "c1"},
+  mktPromo: {role: "marketing_promotion", organizationUID: "o1"},
+  mktPromoCo: {role: "marketingPromotion", organizationUID: "o1", companyUID: "c1"},
 };
 const NESTED = "organizations/o1/companies/c1/delegates/d1";
 const REQ = "delegate_requests/r1";
@@ -293,5 +296,98 @@ describe("supervisor delegate profile edit rules", () => {
     await assertFails(updateDoc(doc(as("bmm"), path), {isSupervisorEnabled: false}));
     await assertFails(updateDoc(doc(as("bmm"), path), {status: "rejected"}));
     await assertFails(updateDoc(doc(as("bmmOther"), path), schedule));
+  });
+
+  test("delegates cannot update company photo-permission fields (MEDIUM 2)", async () => {
+    const path = "organizations/o1/companies/c1/photo_permissions/pp-dlg";
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(path).set({
+        status: "approved",
+        companyUID: "c1",
+        organizationUID: "o1",
+        delegateUid: "d1",
+        isSupervisorEnabled: true,
+        startDate: "2026-01-01",
+        endDate: "2026-02-01",
+      });
+    });
+    await assertFails(updateDoc(doc(as("d1"), path), {isSupervisorEnabled: false}));
+    await assertFails(updateDoc(doc(as("d1"), path), {startDate: "2026-01-15", updatedAt: "t"}));
+    await assertFails(updateDoc(doc(as("d1"), path), {delegateUid: "hack", companyUID: "c2"}));
+    await assertFails(updateDoc(doc(as("d1"), path), {status: "rejected"}));
+  });
+
+  test("marketing-promotion may approve, toggle and edit dates in its org (22:14 policy)", async () => {
+    const path = "organizations/o1/companies/c1/photo_permissions/pp-promo";
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(path).set({
+        status: "pending",
+        companyUID: "c1",
+        organizationUID: "o1",
+        delegateUid: "d1",
+        isSupervisorEnabled: true,
+        startDate: "2026-01-01",
+        endDate: "2026-02-01",
+      });
+    });
+    await assertSucceeds(updateDoc(doc(as("mktPromo"), path), {
+      status: "approved", approvedBy: "promo", updatedAt: "t",
+    }));
+    await assertSucceeds(updateDoc(doc(as("mktPromo"), path), {
+      isSupervisorEnabled: false, updatedAt: "t2",
+    }));
+    await assertSucceeds(updateDoc(doc(as("mktPromo"), path), {
+      startDate: "2026-01-20", endDate: "2026-04-01", updatedAt: "t3",
+    }));
+    await assertSucceeds(updateDoc(doc(as("mktPromoCo"), path), {
+      status: "rejected", updatedAt: "t4",
+    }));
+    // plain marketing, org-admin, branches-marketing, supervisor still cannot approve/toggle
+    await assertFails(updateDoc(doc(as("mkt"), path), {status: "approved", updatedAt: "t5"}));
+    await assertFails(updateDoc(doc(as("mkt"), path), {isSupervisorEnabled: true}));
+    await assertFails(updateDoc(doc(as("oa"), path), {status: "approved"}));
+    await assertFails(updateDoc(doc(as("bmm"), path), {isSupervisorEnabled: true}));
+    await assertFails(updateDoc(doc(as("sup"), path), {status: "approved"}));
+    // Scope: company-bound marketing-promotion cannot review another company;
+    // org-only marketing-promotion can review any company in its org, not another org.
+    const otherCo = "organizations/o1/companies/c2/photo_permissions/pp-promo-c2";
+    const otherOrg = "organizations/o2/companies/c9/photo_permissions/pp-promo-o2";
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const docBase = {
+        status: "pending",
+        delegateUid: "d1",
+        isSupervisorEnabled: true,
+        startDate: "2026-01-01",
+        endDate: "2026-02-01",
+      };
+      await ctx.firestore().doc(otherCo).set({
+        ...docBase, companyUID: "c2", organizationUID: "o1",
+      });
+      await ctx.firestore().doc(otherOrg).set({
+        ...docBase, companyUID: "c9", organizationUID: "o2",
+      });
+    });
+    await assertFails(updateDoc(doc(as("mktPromoCo"), otherCo), {status: "approved", updatedAt: "t6"}));
+    await assertSucceeds(updateDoc(doc(as("mktPromo"), otherCo), {status: "approved", updatedAt: "t7"}));
+    await assertFails(updateDoc(doc(as("mktPromo"), otherOrg), {status: "approved", updatedAt: "t8"}));
+  });
+
+  test("branchesMarketingManager camelCase can edit dates but not toggle (LOW e)", async () => {
+    const path = "organizations/o1/companies/c1/photo_permissions/pp-camel";
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(path).set({
+        status: "approved",
+        companyUID: "c1",
+        organizationUID: "o1",
+        delegateUid: "d1",
+        isSupervisorEnabled: true,
+        startDate: "2026-01-01",
+        endDate: "2026-02-01",
+      });
+    });
+    await assertSucceeds(updateDoc(doc(as("bmmCamel"), path), {
+      startDate: "2026-01-18", endDate: "2026-03-01", updatedAt: "t",
+    }));
+    await assertFails(updateDoc(doc(as("bmmCamel"), path), {isSupervisorEnabled: false}));
   });
 });

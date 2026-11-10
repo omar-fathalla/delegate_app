@@ -95,6 +95,8 @@ void main() {
       expect(NotificationModel.formatSenderRoleArabic('super-admin'), 'سوبر أدمن');
       expect(NotificationModel.formatSenderRoleArabic('organizationAdmin'), 'مسؤول المنظمة');
       expect(NotificationModel.formatSenderRoleArabic('branchesMarketingManager'), 'مسؤول تسويق الفروع');
+      expect(NotificationModel.formatSenderRoleArabic('marketingPromotion'), 'مسؤول تسويق العروض');
+      expect(NotificationModel.formatSenderRoleArabic('marketing_promotion'), 'مسؤول تسويق العروض');
       expect(NotificationModel.formatSenderRoleArabic('technicalSupport'), 'الدعم الفني');
       expect(NotificationModel.formatSenderRoleArabic('technical_support'), 'الدعم الفني');
       expect(NotificationModel.formatSenderRoleArabic('supervisor'), 'مشرف الشركة');

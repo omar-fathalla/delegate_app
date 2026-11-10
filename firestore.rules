@@ -109,7 +109,8 @@ service cloud.firestore {
     function isBranchesMarketing() {
       return roleIs([
         'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
-        'branches-marketing-manager', 'branchesmarketingmanager'
+        'branches-marketing-manager', 'branchesmarketingmanager',
+        'branchesMarketingManager'
       ]);
     }
 
@@ -692,7 +693,7 @@ service cloud.firestore {
         || (staffRole() in [
           'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
           'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
-          'branches_marketing_manager'
+          'branches_marketing_manager', 'branchesMarketingManager'
         ] && resource.data.companyUID == callerCompany())
       );
     }
@@ -727,7 +728,7 @@ service cloud.firestore {
         || (callerCompany() != '' && callerCompany() == compId && staffRole() in [
           'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
           'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
-          'branches_marketing_manager'
+          'branches_marketing_manager', 'branchesMarketingManager'
         ])
         || (callerOrg() == orgId && staffRole() in [
           'organization-admin', 'organization_admin', 'marketing', 'marketing_promotion'
@@ -936,7 +937,8 @@ service cloud.firestore {
         'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion',
         'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
         'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
-        'branches-marketing-manager', 'branchesmarketingmanager'
+        'branches-marketing-manager', 'branchesmarketingmanager',
+        'branchesMarketingManager'
       ];
     }
 
@@ -955,6 +957,42 @@ service cloud.firestore {
       return photoScheduleKeysOnly()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && photoScheduleStaffFromUser(
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data,
+          orgId, compId);
+    }
+
+    // Mohamed 2026-11-10 22:14: marketing-promotion may approve, reject,
+    // and toggle isSupervisorEnabled, scoped like their date edits:
+    // own org, and own company when they have a companyUID.
+    function photoPromotionReviewerRole(role) {
+      return role in [
+        'marketing_promotion', 'marketingpromotion', 'marketingPromotion'
+      ];
+    }
+
+    function photoReviewKeysOnly() {
+      return changedKeys().hasOnly([
+        'status', 'isSupervisorEnabled', 'approvedBy', 'approvedAt',
+        'rejectedBy', 'rejectedAt', 'reviewedBy', 'reviewedAt',
+        'rejectionReason', 'approvedByName',
+        'startDate', 'endDate', 'branchIds', 'branchNames', 'updatedAt']);
+    }
+
+    function photoPromotionReviewFromUser(u, orgId, compId) {
+      let role = u.keys().hasAll(['role']) && u.role is string ? u.role : '';
+      let org = u.keys().hasAll(['organizationUID']) && u.organizationUID is string
+        ? u.organizationUID : '';
+      let co = u.keys().hasAll(['companyUID']) && u.companyUID is string
+        ? u.companyUID : '';
+      return photoPromotionReviewerRole(role)
+        && org != '' && org == orgId
+        && (co == '' || co == compId);
+    }
+
+    function photoPromotionReviewOnNested(orgId, compId) {
+      return photoReviewKeysOnly()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && photoPromotionReviewFromUser(
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data,
           orgId, compId);
     }
@@ -1128,20 +1166,20 @@ service cloud.firestore {
             canManageNestedDelegate(orgId, compId)
             || (delegateInOrg(orgId) && delegateInCompany(compId))
           );
-          // Approving or toggling isSupervisorEnabled is super-admin / tech
-          // only (Mohamed 2026-11-10 14:00). Branch and date edits are not
-          // approval: marketing, marketing-promotion, org-admin and
-          // branches-marketing may change those fields in their own org
-          // (and company, when they have one). The schedule-edit clause
-          // is first and uses a single users/{uid} get() so a
-          // branches-marketing user with a companyUID stays under the
-          // 1000-expression budget. Delegates may still change non-status
-          // fields on their own company's request.
+          // Approving or toggling isSupervisorEnabled is super-admin,
+          // technical support, or marketing-promotion (Mohamed 2026-11-10
+          // 22:14), with marketing-promotion scoped to their org and to
+          // their company when they have a companyUID. Date/branch edits
+          // stay available to marketing, marketing-promotion, org-admin
+          // and branches-marketing in that same scope. Delegates may
+          // create a request but cannot update the permission doc.
+          // Schedule-edit and promotion-review each use one users/{uid}
+          // get() so a branches-marketing user with a companyUID stays
+          // under the 1000-expression budget (N-2/L-3).
           allow update: if signedIn() && (
             photoScheduleEditOnNested(orgId, compId)
+            || photoPromotionReviewOnNested(orgId, compId)
             || isGlobalStaff()
-            || (!changedKeys().hasAny(['status'])
-              && delegateInOrg(orgId) && delegateInCompany(compId))
           );
           allow delete: if canManageNestedDelegate(orgId, compId);
 

@@ -74,6 +74,7 @@ abstract class DelegateSubscriptionRepository {
     required DelegateSubscriptionRequest request,
     required String reviewerUid,
     required String reviewerName,
+    String? reviewerRole,
   });
 
   /// Rejects a subscription request with a stated reason

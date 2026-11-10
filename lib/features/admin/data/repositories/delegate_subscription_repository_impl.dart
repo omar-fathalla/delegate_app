@@ -722,6 +722,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
     required DelegateSubscriptionRequest request,
     required String reviewerUid,
     required String reviewerName,
+    String? reviewerRole,
   }) async {
     try {
       final now = DateTime.now();
@@ -821,7 +822,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
                 'تمت الموافقة على طلب حذف المندوب ${request.fullName} وحذفه نهائياً من المنظومة.',
             'type': 'delegate_deleted',
             'senderName': reviewerName,
-            'senderRole': 'superAdmin',
+            'senderRole': _senderRoleForReviewer(reviewerRole),
             'createdAt': FieldValue.serverTimestamp(),
             'isRead': false,
           });
@@ -841,6 +842,10 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
               fallback: request.nationalId,
             )
           : request.nationalId;
+      if (request.isAddOrganizationRequest && nationalId.trim().isNotEmpty) {
+        requestApproval['nationalId'] = nationalId;
+        requestApproval['nationalityID'] = nationalId;
+      }
 
       final delegatePublicId = await _resolveOrAllocateDelegatePublicId(
         delegateUid: targetDelegateUid,
@@ -1043,7 +1048,10 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       } on FirebaseException catch (e) {
         // Atomic: nothing was written, the request is still pending.
         if (e.code == 'permission-denied') {
-          return const Left(ServerFailure(approvalBatchDeniedMessage));
+          final message = request.isAddOrganizationRequest
+              ? addOrgStaleIdDeniedMessage
+              : approvalBatchDeniedMessage;
+          return Left(ServerFailure(message));
         }
         rethrow;
       }
@@ -1189,6 +1197,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       // 4. Send notification to supervisor and delegate
       try {
         final isAddOrg = request.requestType == 'add_organization';
+        final senderRole = _senderRoleForReviewer(reviewerRole);
         await _firestore.collection('notifications').add({
           'delegateUid': request.supervisorUid,
           'title': isAddOrg
@@ -1198,8 +1207,8 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
               ? 'تمت الموافقة على إضافة المندوب ${request.fullName} إلى ${request.organizationName}، وأصبح بإمكانه التبديل إليها وتسجيل حضوره.'
               : 'تمت الموافقة على اشتراك المندوب ${request.fullName} في ${request.organizationName}، وأصبح حسابه نشطاً الآن.',
           'type': 'subscription_approved',
-          'senderName': 'الإدارة العامة',
-          'senderRole': 'superAdmin',
+          'senderName': reviewerName.isNotEmpty ? reviewerName : 'الإدارة العامة',
+          'senderRole': senderRole,
           'createdAt': FieldValue.serverTimestamp(),
           'isRead': false,
         });
@@ -1212,8 +1221,8 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
             'body':
                 'تمت إضافة سلسلة ${request.organizationName} إلى حسابك بنجاح! يمكنك الآن التبديل إليها وتسجيل حضورك وانصرافك.',
             'type': 'organization_added',
-            'senderName': 'الإدارة العامة',
-            'senderRole': 'superAdmin',
+            'senderName': reviewerName.isNotEmpty ? reviewerName : 'الإدارة العامة',
+            'senderRole': senderRole,
             'createdAt': FieldValue.serverTimestamp(),
             'isRead': false,
           });
@@ -1300,6 +1309,20 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
   /// Resolve an existing delegatePublicId across chains or allocate a new atomic sequence from /counters/delegates
   /// Re-read the live delegate national ID so approving an add-organization
   /// request cannot write a stale ID after a later NID approval (N-9).
+  String _senderRoleForReviewer(String? role) {
+    final r = (role ?? '').trim();
+    if (r.isEmpty) return 'superAdmin';
+    final n = r.toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+    if (n.contains('technical') || n.contains('support') || n.contains('tech')) {
+      return 'technicalSupport';
+    }
+    if (n.contains('marketing_promotion') || n.contains('marketingpromotion') || n == 'marketingpromotion') {
+      return 'marketingPromotion';
+    }
+    if (n.contains('super')) return 'superAdmin';
+    return r;
+  }
+
   Future<String> _currentNationalIdForDelegate(
     String delegateUid, {
     required String fallback,
@@ -1532,6 +1555,10 @@ String _duplicateCheckErrorMessage(FirebaseFunctionsException e) {
 const approvalBatchDeniedMessage =
     'تعذّر اعتماد الطلب ولم يُحفظ أي تغيير. تأكد أن الطلب ما زال قيد المراجعة. '
     'إذا كان على المندوب مستندات كثيرة قيد المراجعة فيعتمده السوبر أدمن.';
+
+const addOrgStaleIdDeniedMessage =
+    'تعذّر اعتماد طلب إضافة السلسلة لأن الرقم القومي على الطلب لا يطابق الرقم الحالي للمندوب. '
+    'أعد المحاولة بعد تحديث الرقم، أو اعتمده من حساب سوبر أدمن.';
 
 /// r4 F4: status-only activation payload for an existing 'pending' delegate
 /// doc. Same list size and order; each 'pending' entry flips to 'approved'
