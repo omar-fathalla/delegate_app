@@ -544,6 +544,11 @@ void main() {
   });
 
   group('LogoutRequested', () {
+    // Logout emits AuthUnauthenticated(fromLogout: true) first (no AuthLoading)
+    // so the UI can leave signed-in streams before signOut. The use case runs
+    // after a 400ms delay, so these tests wait long enough to observe it.
+    const logoutWait = Duration(milliseconds: 600);
+
     blocTest<AuthBloc, AuthState>(
       'emits logged-out and passes the user id to the logout use case',
       build: () {
@@ -553,8 +558,8 @@ void main() {
         return authBloc;
       },
       act: (bloc) => bloc.add(const LogoutRequested(userId: 'uid-1')),
+      wait: logoutWait,
       expect: () => [
-        AuthLoading(),
         const AuthUnauthenticated(fromLogout: true),
       ],
       verify: (_) {
@@ -572,8 +577,8 @@ void main() {
         return authBloc;
       },
       act: (bloc) => bloc.add(const LogoutRequested(userId: 'uid-1')),
+      wait: logoutWait,
       expect: () => [
-        AuthLoading(),
         const AuthUnauthenticated(fromLogout: true),
       ],
     );
@@ -597,8 +602,8 @@ void main() {
         bloc.add(CheckAutoLoginRequested());
         bloc.add(const AnonymousSessionDetected());
       },
+      wait: logoutWait,
       expect: () => [
-        AuthLoading(),
         const AuthUnauthenticated(fromLogout: true),
       ],
       verify: (_) {
