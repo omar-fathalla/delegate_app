@@ -25,7 +25,12 @@ check_yaml() {
   fi
 }
 
-mapfile -t yaml_files < <(find maestro -type f -name '*.yaml' | sort)
+# mapfile is bash 4+; macOS /bin/bash is 3.2 on tashil-delegate-mac.
+yaml_files=()
+while IFS= read -r _f; do
+  yaml_files+=("$_f")
+done < <(find maestro -type f -name '*.yaml' | sort)
+
 
 [[ "${#yaml_files[@]}" -gt 0 ]] || fail "no Maestro YAML files under maestro/"
 
