@@ -134,3 +134,34 @@ export function phoneQueryVariants(raw: string): string[] {
   out.add(normalizeIdDigits(raw).replace(/[^\d+]/g, ""));
   return [...out].filter(Boolean);
 }
+
+/** Local Egyptian mobile: 01 followed by 9 digits, after normalization. */
+export function isValidEgyptianPhone(raw: string): boolean {
+  return /^01[0-9]{9}$/.test(normalizeEgyptianPhone(raw));
+}
+
+/** Map a stored request/delegate doc to a uniqueness hit, including legacy docs. */
+export function duplicateHitFromDoc(
+  data: {
+    companyUID?: unknown;
+    companyId?: unknown;
+    companyName?: unknown;
+    company_name?: unknown;
+    organizationUID?: unknown;
+    organizationId?: unknown;
+  },
+  kind: DuplicateField,
+): DuplicateHit {
+  const uid = String(data.companyUID || data.companyId || "").trim();
+  const name = String(data.companyName || data.company_name || "").trim();
+  if (!uid) {
+    const org = String(data.organizationUID || data.organizationId || "").trim();
+    return {
+      companyUID: `__legacy__:${org || "unknown"}`,
+      companyName: name || "شركة غير محددة",
+      field: kind,
+    };
+  }
+  return {companyUID: uid, companyName: name, field: kind};
+}
+

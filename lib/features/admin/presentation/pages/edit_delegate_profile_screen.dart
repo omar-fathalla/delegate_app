@@ -1,4 +1,3 @@
-import 'dart:io';
 
 import 'package:delegate_app/core/widgets/app_photo_image.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
@@ -35,9 +34,12 @@ class _EditDelegateProfileScreenState extends State<EditDelegateProfileScreen> {
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
 
-  File? _personalPhoto;
-  File? _idFront;
-  File? _idBack;
+  XFile? _personalPhoto;
+  Uint8List? _personalPhotoBytes;
+  XFile? _idFront;
+  Uint8List? _idFrontBytes;
+  XFile? _idBack;
+  Uint8List? _idBackBytes;
   bool _saving = false;
 
   String get _fullName =>
@@ -116,14 +118,17 @@ class _EditDelegateProfileScreenState extends State<EditDelegateProfileScreen> {
     );
   }
 
-  Future<void> _pick(void Function(File file) assign) async {
+  Future<void> _pick({
+    required void Function(XFile file, Uint8List bytes) assign,
+  }) async {
     final picked = await _picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 85,
     );
-    if (picked != null) {
-      setState(() => assign(File(picked.path)));
-    }
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    setState(() => assign(picked, bytes));
   }
 
   Future<void> _save() async {
@@ -144,43 +149,28 @@ class _EditDelegateProfileScreenState extends State<EditDelegateProfileScreen> {
     setState(() => _saving = true);
     final repo = DelegateProfileEditRepository();
     try {
-      final id = (_delegateUid.isNotEmpty ? _delegateUid : _requestId) ?? 'unknown';
-      String? photoUrl;
-      String? frontUrl;
-      String? backUrl;
-      if (_personalPhoto != null) {
-        photoUrl = await repo.uploadImage(
-          delegateUid: id,
-          kind: 'profile',
-          file: _personalPhoto!,
-        );
-      }
-      if (_idFront != null) {
-        frontUrl = await repo.uploadImage(
-          delegateUid: id,
-          kind: 'national_id_front',
-          file: _idFront!,
-        );
-      }
-      if (_idBack != null) {
-        backUrl = await repo.uploadImage(
-          delegateUid: id,
-          kind: 'national_id_back',
-          file: _idBack!,
-        );
-      }
-      await repo.editProfile(
+      final result = await repo.saveProfile(
         companyUID: _companyUID,
         delegateUid: _delegateUid.isNotEmpty ? _delegateUid : null,
         requestId: _requestId,
         fullName: nameChanged ? name : null,
         phoneNumber: phoneChanged ? phone : null,
-        personalPhotoURL: photoUrl,
-        nationalIdFrontUrl: frontUrl,
-        nationalIdBackUrl: backUrl,
+        personalPhoto: _personalPhoto,
+        idFront: _idFront,
+        idBack: _idBack,
       );
       if (!mounted) return;
-      AppSnackBar.showSuccess(context, 'تم حفظ تعديلات المندوب في كل السلاسل.');
+      if (result.imagesFailed) {
+        AppSnackBar.showError(
+          context,
+          result.message ?? 'تعذر رفع الصور. حاول مرة أخرى.',
+        );
+        return;
+      }
+      AppSnackBar.showSuccess(
+        context,
+        result.message ?? 'تم حفظ تعديلات المندوب في كل السلاسل.',
+      );
       Navigator.of(context).pop(true);
     } on DelegateProfileEditException catch (e) {
       if (!mounted) return;
@@ -261,30 +251,48 @@ class _EditDelegateProfileScreenState extends State<EditDelegateProfileScreen> {
                 title: 'الصورة الشخصية',
                 subtitle: 'اختيار صورة جديدة يستبدل الصورة الحالية مباشرة',
                 icon: Icons.person_rounded,
-                file: _personalPhoto,
+                bytes: _personalPhotoBytes,
                 existingUrl: _photoUrl,
-                onPick: () => _pick((f) => _personalPhoto = f),
-                onRemove: () => setState(() => _personalPhoto = null),
+                onPick: () => _pick(assign: (f, b) {
+                  _personalPhoto = f;
+                  _personalPhotoBytes = b;
+                }),
+                onRemove: () => setState(() {
+                  _personalPhoto = null;
+                  _personalPhotoBytes = null;
+                }),
               ),
               const SizedBox(height: 12),
               _ImageRow(
                 title: 'صورة البطاقة الأمامية',
                 subtitle: 'وجه بطاقة الرقم القومي',
                 icon: Icons.badge_outlined,
-                file: _idFront,
+                bytes: _idFrontBytes,
                 existingUrl: _frontUrl,
-                onPick: () => _pick((f) => _idFront = f),
-                onRemove: () => setState(() => _idFront = null),
+                onPick: () => _pick(assign: (f, b) {
+                  _idFront = f;
+                  _idFrontBytes = b;
+                }),
+                onRemove: () => setState(() {
+                  _idFront = null;
+                  _idFrontBytes = null;
+                }),
               ),
               const SizedBox(height: 12),
               _ImageRow(
                 title: 'صورة البطاقة الخلفية',
                 subtitle: 'ظهر بطاقة الرقم القومي',
                 icon: Icons.flip_rounded,
-                file: _idBack,
+                bytes: _idBackBytes,
                 existingUrl: _backUrl,
-                onPick: () => _pick((f) => _idBack = f),
-                onRemove: () => setState(() => _idBack = null),
+                onPick: () => _pick(assign: (f, b) {
+                  _idBack = f;
+                  _idBackBytes = b;
+                }),
+                onRemove: () => setState(() {
+                  _idBack = null;
+                  _idBackBytes = null;
+                }),
               ),
               const SizedBox(height: 20),
               Card(
@@ -326,20 +334,25 @@ class _EditDelegateProfileScreenState extends State<EditDelegateProfileScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              FilledButton.icon(
-                onPressed: _saving ? null : _save,
-                icon: _saving
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.save_rounded),
-                label: Text(_saving ? 'جاري الحفظ...' : 'حفظ التعديلات'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: FilledButton.icon(
+                  onPressed: _saving ? null : _save,
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save_rounded),
+                  label: Text(_saving ? 'جاري الحفظ...' : 'حفظ التعديلات'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    minimumSize: const Size(0, 44),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
@@ -355,7 +368,7 @@ class _ImageRow extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
-  final File? file;
+  final Uint8List? bytes;
   final String existingUrl;
   final VoidCallback onPick;
   final VoidCallback onRemove;
@@ -364,7 +377,7 @@ class _ImageRow extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.icon,
-    required this.file,
+    required this.bytes,
     required this.existingUrl,
     required this.onPick,
     required this.onRemove,
@@ -374,10 +387,10 @@ class _ImageRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     Widget preview;
-    if (file != null) {
+    if (bytes != null) {
       preview = ClipRRect(
         borderRadius: BorderRadius.circular(10),
-        child: Image.file(file!, width: 54, height: 54, fit: BoxFit.cover),
+        child: Image.memory(bytes!, width: 54, height: 54, fit: BoxFit.cover),
       );
     } else if (existingUrl.isNotEmpty) {
       preview = ClipRRect(
@@ -414,7 +427,7 @@ class _ImageRow extends StatelessWidget {
             ],
           ),
         ),
-        if (file != null)
+        if (bytes != null)
           IconButton(
             icon: Icon(Icons.close_rounded, color: colorScheme.error, size: 20),
             onPressed: onRemove,

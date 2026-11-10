@@ -1011,7 +1011,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'طلب تعديل الرقم القومي: ${request.nationalId} ➔ ${request.proposedNationalId}',
+                                'طلب تعديل الرقم القومي: ${request.nationalId} إلى ${request.proposedNationalId}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,

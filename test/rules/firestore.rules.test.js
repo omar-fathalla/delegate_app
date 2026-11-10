@@ -478,7 +478,7 @@ describe("firestore tightened rules", () => {
         status: "suspended",
       }),
     );
-    await assertSucceeds(
+    await assertFails(
       companyAdmin.doc("organizations/o1/companies/c1/delegates/del-1").update({
         fullName: "Updated Name",
       }),

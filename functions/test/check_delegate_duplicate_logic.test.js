@@ -97,3 +97,30 @@ test("isValidEgyptianNationalId requires 14 digits", () => {
   assert.ok(!L.isValidEgyptianNationalId("abc' OR 1=1"));
   assert.ok(L.isValidEgyptianNationalId(L.normalizeIdDigits("٢٩٩٠١٠١٠١٠١٠١١")));
 });
+
+test("isValidEgyptianPhone accepts normalized 01xxxxxxxxx and rejects junk", () => {
+  assert.ok(L.isValidEgyptianPhone("01000000022"));
+  assert.ok(L.isValidEgyptianPhone("+201000000022"));
+  assert.ok(L.isValidEgyptianPhone("010-0000-0022"));
+  assert.ok(!L.isValidEgyptianPhone("abc"));
+  assert.ok(!L.isValidEgyptianPhone("12345"));
+  assert.ok(!L.isValidEgyptianPhone(""));
+});
+
+test("duplicateHitFromDoc treats missing companyUID as a legacy other-company hit", () => {
+  const hit = L.duplicateHitFromDoc({organizationUID: "o9", fullName: "قديم"}, "phoneNumber");
+  assert.strictEqual(hit.companyUID, "__legacy__:o9");
+  assert.strictEqual(hit.companyName, "شركة غير محددة");
+  assert.strictEqual(hit.field, "phoneNumber");
+  const named = L.duplicateHitFromDoc({companyUID: "c1", companyName: "شركة 1"}, "nationalId");
+  assert.strictEqual(named.companyUID, "c1");
+  assert.strictEqual(named.companyName, "شركة 1");
+});
+
+test("isValidEgyptianNationalId enforces ^[0-9]{14}$ (M-5)", () => {
+  assert.ok(L.isValidEgyptianNationalId("29001010100011"));
+  assert.ok(!L.isValidEgyptianNationalId("2900101010001a"));
+  assert.ok(!L.isValidEgyptianNationalId("2900-101010012"));
+  assert.ok(!L.isValidEgyptianNationalId("٢٩٠٠١٠١٠١٠٠٠١١"));
+  assert.ok(!L.isValidEgyptianNationalId("2900101010001"));
+});
