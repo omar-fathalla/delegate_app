@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:delegate_app/features/notifications/data/models/notification_model.dart';
 
 abstract class NotificationRemoteDataSource {
@@ -30,6 +31,27 @@ abstract class NotificationRemoteDataSource {
     String userUid, {
     String? phoneNumber,
   });
+}
+
+/// Runs notification queries independently so one permission-denied or
+/// failed query cannot drop the rest (N-3). The historical
+/// `delegateUid == phone_<uid>` query is denied for supervisors by the
+/// 1000-expression budget and used to empty the whole bell.
+@visibleForTesting
+Future<List<QuerySnapshot<T>>> queryAllSettled<T>(
+  List<Future<QuerySnapshot<T>>> queries,
+) async {
+  if (queries.isEmpty) return const [];
+  final results = await Future.wait(
+    queries.map((query) async {
+      try {
+        return await query;
+      } catch (_) {
+        return null;
+      }
+    }),
+  );
+  return results.whereType<QuerySnapshot<T>>().toList();
 }
 
 class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
@@ -63,7 +85,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
 
     try {
       // 1. Initial parallel queries (UID, broadcast 'all', phone tag)
-      final initialQueries = await Future.wait([
+      final initialQueries = await queryAllSettled([
         _collection.where('delegateUid', isEqualTo: delegateUid).limit(50).get(),
         _collection.where('delegateUid', isEqualTo: 'all').limit(30).get(),
         _collection.where('delegateUid', isEqualTo: 'phone_$delegateUid').limit(30).get(),
@@ -98,7 +120,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
                     data['mobile']) as String?;
             if (p != null && p.isNotEmpty) phonesToCheck.add(p);
           }
-          final adminSnaps = await Future.wait(adminQueries);
+          final adminSnaps = await queryAllSettled(adminQueries);
           for (final snap in adminSnaps) {
             addDocs(snap.docs);
           }
@@ -206,7 +228,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
       }
 
       if (roleQueries.isNotEmpty) {
-        final roleSnaps = await Future.wait(roleQueries);
+        final roleSnaps = await queryAllSettled(roleQueries);
         for (final snap in roleSnaps) {
           addDocs(snap.docs);
         }
@@ -232,7 +254,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
       }
 
       if (phoneQueries.isNotEmpty) {
-        final phoneSnaps = await Future.wait(phoneQueries);
+        final phoneSnaps = await queryAllSettled(phoneQueries);
         for (final snap in phoneSnaps) {
           addDocs(snap.docs);
         }

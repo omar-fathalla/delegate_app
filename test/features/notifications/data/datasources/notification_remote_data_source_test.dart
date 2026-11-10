@@ -134,4 +134,19 @@ void main() {
       verify(() => mockWriteBatch.commit()).called(1);
     });
   });
+
+  group('queryAllSettled', () {
+    test('keeps successful results when one query fails (N-3)', () async {
+      final ok = MockQuerySnapshot<Map<String, dynamic>>();
+      final results = await queryAllSettled<Map<String, dynamic>>([
+        Future.value(ok),
+        Future<QuerySnapshot<Map<String, dynamic>>>.error(
+          Exception('permission-denied'),
+        ),
+        Future.value(ok),
+      ]);
+      expect(results, hasLength(2));
+      expect(results, everyElement(same(ok)));
+    });
+  });
 }

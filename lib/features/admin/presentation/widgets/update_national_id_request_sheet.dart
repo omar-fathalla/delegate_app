@@ -153,14 +153,22 @@ class _UpdateNationalIdRequestSheetState
                 },
               ),
               const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _submitting ? null : _submit,
-                child: Text(_submitting ? 'جاري الإرسال...' : 'إرسال الطلب للاعتماد'),
-              ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: _submitting ? null : () => Navigator.pop(context, false),
-                child: const Text('إلغاء'),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: _submitting ? null : () => Navigator.pop(context, false),
+                      child: const Text('إلغاء'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _submitting ? null : _submit,
+                      child: Text(_submitting ? 'جاري الإرسال...' : 'إرسال الطلب للاعتماد'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

@@ -650,7 +650,7 @@ class _SupervisorPermissionsScreenState extends State<SupervisorPermissionsScree
                             ),
                           ),
                         ),
-                        if (isApproved && widget.supervisorDelegate.role == UserRole.marketingPromotion) ...[
+                        if (isApproved && (widget.supervisorDelegate.role == UserRole.superAdmin || widget.supervisorDelegate.role == UserRole.technicalSupport)) ...[
                           const SizedBox(width: 6),
                           Row(
                             mainAxisSize: MainAxisSize.min,

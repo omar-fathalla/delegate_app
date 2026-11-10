@@ -124,3 +124,12 @@ test("isValidEgyptianNationalId enforces ^[0-9]{14}$ (M-5)", () => {
   assert.ok(!L.isValidEgyptianNationalId("٢٩٠٠١٠١٠١٠٠٠١١"));
   assert.ok(!L.isValidEgyptianNationalId("2900101010001"));
 });
+
+test("isExcludableDelegateRecord only skips same-company hits (L-7)", () => {
+  const own = {uid: "d1", companyUID: "c1"};
+  const other = {uid: "d1", companyUID: "c2"};
+  assert.ok(L.isExcludableDelegateRecord(own, "x", "d1", "c1"));
+  assert.ok(!L.isExcludableDelegateRecord(other, "x", "d1", "c1"));
+  assert.ok(!L.isExcludableDelegateRecord(own, "x", "d1", ""));
+  assert.ok(!L.isExcludableDelegateRecord(own, "x", "d2", "c1"));
+});

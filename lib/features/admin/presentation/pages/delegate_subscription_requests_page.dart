@@ -885,6 +885,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isWide = MediaQuery.sizeOf(context).width >= 768;
     final dateStr = DateFormat('yyyy/MM/dd • hh:mm a').format(request.createdAt);
 
     final Color statusColor;
@@ -1442,8 +1443,12 @@ class _SubscriptionRequestCard extends StatelessWidget {
                       if (currentAdmin.role == UserRole.superAdmin ||
                           currentAdmin.role == UserRole.technicalSupport)
                         Row(
+                          mainAxisAlignment: isWide
+                              ? MainAxisAlignment.end
+                              : MainAxisAlignment.start,
                           children: [
-                            Expanded(
+                            Flexible(
+                              fit: isWide ? FlexFit.loose : FlexFit.tight,
                               child: FilledButton.icon(
                                 style: FilledButton.styleFrom(
                                   backgroundColor: request.requestType == 'delete_delegate'
@@ -1471,7 +1476,8 @@ class _SubscriptionRequestCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Expanded(
+                            Flexible(
+                              fit: isWide ? FlexFit.loose : FlexFit.tight,
                               child: OutlinedButton.icon(
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: colorScheme.error,

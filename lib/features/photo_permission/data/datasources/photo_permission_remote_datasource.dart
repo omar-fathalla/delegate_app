@@ -257,12 +257,27 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     required String organizationUID,
     required String companyUID,
   }) {
-    if (companyUID.isEmpty) {
+    if (companyUID.isEmpty && organizationUID.isEmpty) {
       return firestore
           .collectionGroup('photo_permissions')
           .orderBy('createdAt', descending: true)
           .limit(100)
           .snapshots(includeMetadataChanges: true)
+          .map((snapshot) {
+        final docs = snapshot.docs
+            .map((doc) => PhotoPermissionModel.fromFirestore(doc))
+            .toList();
+        docs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return docs;
+      });
+    } else if (companyUID.isEmpty) {
+      return firestore
+          .collectionGroup('photo_permissions')
+          .where('organizationUID', isEqualTo: organizationUID)
+          .snapshots(includeMetadataChanges: true)
+          .handleError((Object e, StackTrace st) {
+            Error.throwWithStackTrace(e, st);
+          })
           .map((snapshot) {
         final docs = snapshot.docs
             .map((doc) => PhotoPermissionModel.fromFirestore(doc))
@@ -296,9 +311,8 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     required String companyUID,
   }) async {
     try {
-      if (companyUID.isEmpty) {
-        // Marketing user fetching for all companies across organizations
-        // We limit to the latest 100 to prevent Out Of Memory crashes on Android
+      if (companyUID.isEmpty && organizationUID.isEmpty) {
+        // Global staff: latest 100 across every organization.
         final snapshot = await firestore
             .collectionGroup('photo_permissions')
             .orderBy('createdAt', descending: true)
@@ -308,8 +322,19 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
         final docs = snapshot.docs
             .map((doc) => PhotoPermissionModel.fromFirestore(doc))
             .toList();
-        
-        // Sort in memory by createdAt descending
+        docs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return docs;
+      } else if (companyUID.isEmpty) {
+        // Marketing / org-admin: constrain to their organization so the
+        // collection-group query is authorized (N-2 spinner).
+        final snapshot = await firestore
+            .collectionGroup('photo_permissions')
+            .where('organizationUID', isEqualTo: organizationUID)
+            .getResilient();
+
+        final docs = snapshot.docs
+            .map((doc) => PhotoPermissionModel.fromFirestore(doc))
+            .toList();
         docs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         return docs;
       } else {

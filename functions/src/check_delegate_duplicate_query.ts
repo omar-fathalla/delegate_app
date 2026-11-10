@@ -7,7 +7,7 @@ import {
   duplicateHitFromDoc,
   isExistingDelegateStatus,
   isOpenRequestStatus,
-  isSameDelegateRecord,
+  isExcludableDelegateRecord,
   normalizeEgyptianPhone,
   phoneQueryVariants,
   publicDuplicateResult,
@@ -41,7 +41,7 @@ export async function findDuplicateDecision(
   ) => {
     const snap = await db.collection("delegate_requests").where(field, "==", value).get();
     for (const doc of snap.docs) {
-      if (isSameDelegateRecord(doc.data(), doc.id, opts.excludeDelegateUid)) continue;
+      if (isExcludableDelegateRecord(doc.data(), doc.id, opts.excludeDelegateUid, opts.companyUID)) continue;
       if (!isOpenRequestStatus(doc.data().status)) continue;
       addHit(doc.data(), kind);
     }
@@ -54,7 +54,7 @@ export async function findDuplicateDecision(
   ) => {
     const snap = await db.collectionGroup("delegates").where(field, "==", value).get();
     for (const doc of snap.docs) {
-      if (isSameDelegateRecord(doc.data(), doc.id, opts.excludeDelegateUid)) continue;
+      if (isExcludableDelegateRecord(doc.data(), doc.id, opts.excludeDelegateUid, opts.companyUID)) continue;
       if (!isExistingDelegateStatus(doc.data().status)) continue;
       addHit(doc.data(), kind);
     }

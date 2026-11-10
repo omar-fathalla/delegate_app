@@ -8,6 +8,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import '../bloc/photo_permission_bloc.dart';
 import '../../domain/entities/photo_permission.dart';
+import '../../domain/photo_permission_query_scope.dart';
 import '../../domain/entities/photo_permission_departments.dart';
 import 'captured_photos_view_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -50,6 +51,8 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
 
   bool get _canEditDates =>
       widget.marketingDelegate.role == UserRole.marketingPromotion ||
+      widget.marketingDelegate.role == UserRole.marketing ||
+      widget.marketingDelegate.role == UserRole.organizationAdmin ||
       widget.marketingDelegate.role == UserRole.branchesMarketingManager ||
       widget.marketingDelegate.role == UserRole.technicalSupport ||
       widget.marketingDelegate.role == UserRole.superAdmin;
@@ -1030,12 +1033,22 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
     });
   }
 
+  PhotoPermissionQueryScope get _queryScope => PhotoPermissionQueryScope.forRole(
+        role: widget.marketingDelegate.role,
+        organizationUID: widget.marketingDelegate.organizationUID,
+        companyUID: widget.marketingDelegate.companyUID,
+      );
+
   void _loadData() {
-    // جلب كافة أذونات التصوير عبر النظام بالكامل لفرع التسويق بدون التقييد بالمنظمة
+    final scope = _queryScope;
+    if (!scope.shouldQuery) {
+      setState(() {});
+      return;
+    }
     context.read<PhotoPermissionBloc>().add(
-          const LoadPermissionsRequested(
-            organizationUID: '', // فارغة لعدم التقييد بأي منظمة
-            companyUID: '',      // فارغة لعدم التقييد بأي شركة
+          LoadPermissionsRequested(
+            organizationUID: scope.organizationUID,
+            companyUID: scope.companyUID,
           ),
         );
   }
@@ -1196,9 +1209,11 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         buildWhen: (previous, current) =>
             current is PhotoPermissionsLoaded ||
             current is OngoingPermissionsLoaded ||
+            current is PhotoPermissionError ||
             (current is PhotoPermissionLoading &&
                 previous is! PhotoPermissionsLoaded &&
-                previous is! OngoingPermissionsLoaded),
+                previous is! OngoingPermissionsLoaded &&
+                previous is! PhotoPermissionError),
         listener: (context, state) {
           if (state is PermissionActionSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1615,6 +1630,15 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       return const Center(child: CircularProgressIndicator());
     }
 
+    if (state is PhotoPermissionError || !_queryScope.shouldQuery) {
+      return _buildPermissionsLoadError(
+        Theme.of(context),
+        state is PhotoPermissionError
+            ? state.message
+            : 'لا يمكن عرض أذونات التصوير بدون منظمة أو شركة مرتبطة بالحساب.',
+      );
+    }
+
     if (state is PhotoPermissionsLoaded) {
       // فلترة الطلبات المعلقة فقط
       var pendingPermissions = state.permissions.where((p) => p.status == 'pending').toList();
@@ -1659,6 +1683,15 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
   Widget _buildOngoingTab(BuildContext context, PhotoPermissionState state, ThemeData theme) {
     if (state is PhotoPermissionLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (state is PhotoPermissionError || !_queryScope.shouldQuery) {
+      return _buildPermissionsLoadError(
+        Theme.of(context),
+        state is PhotoPermissionError
+            ? state.message
+            : 'لا يمكن عرض أذونات التصوير بدون منظمة أو شركة مرتبطة بالحساب.',
+      );
     }
 
     if (state is OngoingPermissionsLoaded || state is PhotoPermissionsLoaded) {
@@ -2631,5 +2664,32 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       );
     }
     return badge;
+  }
+
+  Widget _buildPermissionsLoadError(ThemeData theme, String message) {
+    final colorScheme = theme.colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline_rounded, size: 40, color: colorScheme.error),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _loadData,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('إعادة المحاولة'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

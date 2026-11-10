@@ -160,7 +160,7 @@ export interface AuditRecordDraft {
   companyUID: string;
   companyName: string;
   organizationUID: string;
-  source: "direct_edit" | "national_id_approval" | "national_id_rejection";
+  source: "direct_edit" | "national_id_approval" | "national_id_rejection" | "national_id_submission";
   requestId?: string;
 }
 
@@ -303,12 +303,21 @@ export function isPatchableTarget(
   return true;
 }
 
-const STORAGE_HOSTS = new Set([
-  "firebasestorage.googleapis.com",
-  "storage.googleapis.com",
-]);
+/** Default buckets for tashil-dev and prod only (not any *.appspot.com host). */
+export const ALLOWED_STORAGE_BUCKETS = [
+  "tashil-dev.appspot.com",
+  "tashil-dev.firebasestorage.app",
+  "practice-firebase-72df1.appspot.com",
+  "practice-firebase-72df1.firebasestorage.app",
+] as const;
 
-/** https Firebase Storage URLs, or delegate_documents/{uid}/... paths. */
+export function isAllowedStorageBucket(bucketOrHost: string): boolean {
+  return (ALLOWED_STORAGE_BUCKETS as readonly string[]).includes(
+    String(bucketOrHost || "").toLowerCase(),
+  );
+}
+
+/** https default-bucket Storage URLs, or delegate_documents/{uid}/... paths. */
 export function isAllowedImageUrl(url: string, delegateUid?: string): boolean {
   const v = String(url || "").trim();
   if (!v) return false;
@@ -325,10 +334,15 @@ export function isAllowedImageUrl(url: string, delegateUid?: string): boolean {
     const u = new URL(v);
     if (u.protocol !== "https:") return false;
     const host = u.hostname.toLowerCase();
-    if (STORAGE_HOSTS.has(host)) return true;
-    if (host === "firebasestorage.app" || host.endsWith(".firebasestorage.app")) return true;
-    if (host.endsWith(".appspot.com")) return true;
-    return false;
+    if (host === "firebasestorage.googleapis.com") {
+      const m = u.pathname.match(/^\/v0\/b\/([^/]+)\//);
+      return !!(m && isAllowedStorageBucket(decodeURIComponent(m[1])));
+    }
+    if (host === "storage.googleapis.com") {
+      const seg = u.pathname.split("/").filter(Boolean)[0] || "";
+      return isAllowedStorageBucket(decodeURIComponent(seg));
+    }
+    return isAllowedStorageBucket(host);
   } catch {
     return false;
   }
@@ -391,6 +405,63 @@ export function uniqueRecipientIds(ids: string[]): string[] {
   }
   return out;
 }
+
+/** Role spellings that must receive privileged SA/tech alerts (N-4). */
+export const PRIVILEGED_ALERT_ROLE_VALUES = [
+  "super-admin", "super_admin", "superAdmin", "superadmin",
+  "technicalSupport", "technical-support", "technical_support", "technicalsupport",
+] as const;
+
+export type ReviewTargetCheck = "ok" | "missing" | "mismatch" | "inactive";
+
+/**
+ * Re-read the live delegate and confirm it is the person named on the
+ * submitted request, in the same company, and still active.
+ */
+export function reviewTargetMatchesSubmission(opts: {
+  requestDelegateUid: string;
+  requestCompanyUID: string;
+  liveExists: boolean;
+  livePath: string;
+  liveData?: {uid?: unknown; companyUID?: unknown; companyId?: unknown; status?: unknown};
+}): ReviewTargetCheck {
+  if (!opts.liveExists || !opts.liveData) return "missing";
+  const wantUid = String(opts.requestDelegateUid || "").trim();
+  const wantCo = String(opts.requestCompanyUID || "").trim();
+  if (!wantUid || !wantCo) return "mismatch";
+  const data = opts.liveData;
+  const pathId = opts.livePath.split("/").filter(Boolean).pop() || "";
+  const liveUid = String(data.uid || "").trim() || pathId;
+  const liveCo = String(data.companyUID || data.companyId || "").trim();
+  if (liveUid !== wantUid || liveCo !== wantCo) return "mismatch";
+  if (!isPatchableTarget(wantCo, data, opts.livePath)) return "mismatch";
+  const st = String(data.status || "").toLowerCase();
+  if (st && st !== "active" && st !== "approved") return "inactive";
+  return "ok";
+}
+
+/** Patch for users/{delegateUid} so login/wallet lookups stay in sync (N-5). */
+export function usersProfileSyncPatch(fields: ProfileEditInput): Record<string, string> | null {
+  const patch: Record<string, string> = {};
+  if (fields.fullName) {
+    const parts = splitFullName(fields.fullName);
+    patch.fullName = fields.fullName;
+    if (parts.firstName) patch.firstName = parts.firstName;
+    if (parts.secondName) patch.secondName = parts.secondName;
+    if (parts.thirdName) patch.thirdName = parts.thirdName;
+  }
+  if (fields.phoneNumber) {
+    patch.phoneNumber = fields.phoneNumber;
+    patch.phone = fields.phoneNumber;
+  }
+  if (fields.personalPhotoURL) {
+    patch.personalPhotoURL = fields.personalPhotoURL;
+    patch.profileImageUrl = fields.personalPhotoURL;
+    patch.photoURL = fields.personalPhotoURL;
+  }
+  return Object.keys(patch).length ? patch : null;
+}
+
 
 export function supervisorReviewAlertDoc(opts: {
   supervisorUid: string;
