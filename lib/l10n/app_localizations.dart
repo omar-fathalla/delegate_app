@@ -2471,8 +2471,8 @@ abstract class AppLocalizations {
   /// No description provided for @noSupervisorForCompany.
   ///
   /// In en, this message translates to:
-  /// **'No supervisor registered for this company yet\n(Company ID: {companyUID})'**
-  String noSupervisorForCompany(Object companyUID);
+  /// **'No supervisor registered for this company yet'**
+  String get noSupervisorForCompany;
 
   /// No description provided for @pendingCountBadge.
   ///

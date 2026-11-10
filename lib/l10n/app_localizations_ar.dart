@@ -1289,7 +1289,8 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String companySupervisorWithName(Object companyName) {
-    return 'مشرف الشركة ($companyName)';
+    final name = companyName.toString().trim();
+    return name.isEmpty ? 'مشرف الشركة' : 'مشرف الشركة ($name)';
   }
 
   @override
@@ -1298,9 +1299,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String noSupervisorForCompany(Object companyUID) {
-    return 'لا يوجد مشرف مسجّل لهذه الشركة حاليًا\n(Company ID: $companyUID)';
-  }
+  String get noSupervisorForCompany => 'لا يوجد مشرف مسجّل لهذه الشركة حاليًا';
 
   @override
   String pendingCountBadge(Object count) {
@@ -1520,7 +1519,11 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String attCannotActOutside(Object action, Object distance) {
-    return 'لا يمكنك $action وأنت خارج نطاق الفرع ($distance). كن داخل الفرع.';
+    final d = distance.toString().trim();
+    if (d.isEmpty) {
+      return 'لا يمكنك $action وأنت خارج نطاق الفرع. كن داخل الفرع.';
+    }
+    return 'لا يمكنك $action وأنت خارج نطاق الفرع ($d). كن داخل الفرع.';
   }
 
   @override

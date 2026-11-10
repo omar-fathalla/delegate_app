@@ -154,13 +154,18 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<Either<Failure, void>> logout({String? userId}) async {
     final uid = userId?.trim() ?? '';
     final cleanup = clearPushRegistration;
+    // Delete fcm_tokens/{uid} while still signed in. The rules require
+    // signedIn(), so a parallel/post sign-out delete is PERMISSION_DENIED
+    // and leaves a stale token (M31 3ff8e5d logout).
+    if (uid.isNotEmpty && cleanup != null) {
+      try {
+        await cleanup(uid).timeout(const Duration(seconds: 2));
+      } catch (_) {}
+    }
     try {
-      await Future.wait<void>([
-        remoteDataSource.signOut(),
-        if (uid.isNotEmpty && cleanup != null) cleanup(uid),
-      ]).timeout(const Duration(seconds: 2));
+      await remoteDataSource.signOut().timeout(const Duration(seconds: 2));
     } catch (_) {
-      // Offline sign-out or a slow token delete must not keep the session.
+      // Offline sign-out must not keep the session.
     }
     try {
       await localDataSource.clearCachedData();

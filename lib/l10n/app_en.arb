@@ -1462,12 +1462,8 @@
       "error": {}
     }
   },
-  "noSupervisorForCompany": "No supervisor registered for this company yet\n(Company ID: {companyUID})",
-  "@noSupervisorForCompany": {
-    "placeholders": {
-      "companyUID": {}
-    }
-  },
+  "noSupervisorForCompany": "No supervisor registered for this company yet",
+  "@noSupervisorForCompany": {},
   "pendingCountBadge": "{count} pending",
   "@pendingCountBadge": {
     "placeholders": {

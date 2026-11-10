@@ -10,6 +10,7 @@
     "test:e2e:subscriptions": "npm --prefix functions run build && npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-tashil-subs \"node --test --test-concurrency=1 test/e2e/subscriptions.e2e.test.js\"",
     "test:rules:qa-hold": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-qa-hold-reads \"node --test test/rules/qa-hold-reads.test.js\"",
     "test:rules:profile": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-profile-edit \"node --test test/rules/delegate-profile-edit.test.js\"",
+    "test:rules:m31": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-m31-delegate-own-reads \"node --test test/rules/m31-delegate-own-reads.test.js\"",
     "test:rules:subs": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-tashil-subs-rules \"node --test test/rules/subscriptions.test.js\""
   },
   "devDependencies": {
