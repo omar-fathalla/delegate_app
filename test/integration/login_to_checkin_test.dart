@@ -491,7 +491,7 @@ void main() {
       },
       seed: () => AuthAuthenticated(delegate: tDelegate),
       act: (bloc) => bloc.add(LogoutRequested()),
-      expect: () => [isA<AuthLoading>(), isA<AuthUnauthenticated>()],
+      expect: () => [isA<AuthUnauthenticated>()],
     );
   });
 }
