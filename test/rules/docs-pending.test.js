@@ -152,6 +152,19 @@ describe("docs-pending rules", () => {
         ...BASE, uid: "z", companyUID: "c2", documents: [{...PHOTO, documentStatus: "pending"}]}));
       await assertSucceeds(updateDoc(doc(as("sa"), "organizations/o1/companies/c2/delegates/z"), {documents: [PHOTO]}));
     });
+    // Anti-fraud: company-level roles must not flip a delegate to active/approved.
+    // The previous rule allowed a same-company supervisor/admin to set status
+    // via the approver shortcut (staffDocsApproveOk).
+    for (const who of ["ca", "adm", "sup", "hr"]) {
+      test(`DENY ${who} sets pending delegate status to active`, () =>
+        assertFails(updateDoc(doc(as(who), pendPath), {status: "active"})));
+      test(`DENY ${who} sets pending delegate status to approved`, () =>
+        assertFails(updateDoc(doc(as(who), pendPath), {status: "approved"})));
+    }
+    test("DENY company supervisor activates while also approving documents", () =>
+      assertFails(updateDoc(doc(as("sup"), pendPath), {...approveData, status: "active"})));
+    test("ALLOW org-admin sets status to active without changing documents", () =>
+      assertSucceeds(updateDoc(doc(as("oa"), pendPath), {status: "active"})));
   });
 
   describe("delegate_requests self lock", () => {
@@ -164,7 +177,11 @@ describe("docs-pending rules", () => {
     test("ALLOW delegate removes profileImageUrl", () => assertSucceeds(updateDoc(doc(del(), p), {profileImageUrl: "", updatedAt: "t"})));
     test("ALLOW delegate re-upload as pending", () => assertSucceeds(updateDoc(doc(del(), p),
       {documents: [{...PHOTO, documentURL: "p1", documentStatus: "pending"}], profileImageUrl: "p1", updatedAt: "t"})));
-    test("ALLOW company staff review update", () => assertSucceeds(updateDoc(doc(as("sup"), p), {status: "approved", reviewedBy: "s"})));
+    test("DENY company staff approve or change request status", () => assertFails(updateDoc(doc(as("sup"), p), {status: "approved", reviewedBy: "s"})));
+    test("ALLOW company staff non-sensitive request edit in their company", () => assertSucceeds(updateDoc(doc(as("sup"), p), {firstName: "Edited", updatedAt: "t"})));
+    test("DENY company staff change nationalId or companyUID", () => assertFails(updateDoc(doc(as("sup"), p), {nationalId: "x", companyUID: "c9"})));
+    test("DENY company staff of another company edit the request", () => assertFails(updateDoc(doc(as("sup2"), p), {firstName: "x"})));
+    test("ALLOW company staff cancel an unpaid/pending request", () => assertSucceeds(updateDoc(doc(as("sup"), p), {status: "cancelled"})));
   });
 });
 
