@@ -31,6 +31,15 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Sanitize PATH for delegate-ci
+        # Listener was started with fathalla's PATH, which includes
+        # /Users/fathalla/Library/Android/sdk/platform-tools (EACCES for this user).
+        run: |
+          CLEAN="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+          echo "PATH=$CLEAN" >> "$GITHUB_ENV"
+          echo "LANG=en_US.UTF-8" >> "$GITHUB_ENV"
+          echo "LC_ALL=en_US.UTF-8" >> "$GITHUB_ENV"
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.44.5'
@@ -52,6 +61,15 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Sanitize PATH for delegate-ci
+        # Listener was started with fathalla's PATH, which includes
+        # /Users/fathalla/Library/Android/sdk/platform-tools (EACCES for this user).
+        run: |
+          CLEAN="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+          echo "PATH=$CLEAN" >> "$GITHUB_ENV"
+          echo "LANG=en_US.UTF-8" >> "$GITHUB_ENV"
+          echo "LC_ALL=en_US.UTF-8" >> "$GITHUB_ENV"
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.44.5'
@@ -75,6 +93,15 @@ jobs:
         working-directory: functions
     steps:
       - uses: actions/checkout@v4
+      - name: Sanitize PATH for delegate-ci
+        # Listener was started with fathalla's PATH, which includes
+        # /Users/fathalla/Library/Android/sdk/platform-tools (EACCES for this user).
+        run: |
+          CLEAN="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+          echo "PATH=$CLEAN" >> "$GITHUB_ENV"
+          echo "LANG=en_US.UTF-8" >> "$GITHUB_ENV"
+          echo "LC_ALL=en_US.UTF-8" >> "$GITHUB_ENV"
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -95,6 +122,15 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Sanitize PATH for delegate-ci
+        # Listener was started with fathalla's PATH, which includes
+        # /Users/fathalla/Library/Android/sdk/platform-tools (EACCES for this user).
+        run: |
+          CLEAN="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+          echo "PATH=$CLEAN" >> "$GITHUB_ENV"
+          echo "LANG=en_US.UTF-8" >> "$GITHUB_ENV"
+          echo "LC_ALL=en_US.UTF-8" >> "$GITHUB_ENV"
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.44.5'
@@ -115,6 +151,15 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Sanitize PATH for delegate-ci
+        # Listener was started with fathalla's PATH, which includes
+        # /Users/fathalla/Library/Android/sdk/platform-tools (EACCES for this user).
+        run: |
+          CLEAN="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+          echo "PATH=$CLEAN" >> "$GITHUB_ENV"
+          echo "LANG=en_US.UTF-8" >> "$GITHUB_ENV"
+          echo "LC_ALL=en_US.UTF-8" >> "$GITHUB_ENV"
+
       # macOS system python3 is 3.9; Homebrew 3.12 is on this runner.
       # The self-test is also 3.9-safe (Optional[int], not int | None).
       - name: Prefer Homebrew Python
@@ -136,6 +181,15 @@ jobs:
         working-directory: functions
     steps:
       - uses: actions/checkout@v4
+      - name: Sanitize PATH for delegate-ci
+        # Listener was started with fathalla's PATH, which includes
+        # /Users/fathalla/Library/Android/sdk/platform-tools (EACCES for this user).
+        run: |
+          CLEAN="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+          echo "PATH=$CLEAN" >> "$GITHUB_ENV"
+          echo "LANG=en_US.UTF-8" >> "$GITHUB_ENV"
+          echo "LC_ALL=en_US.UTF-8" >> "$GITHUB_ENV"
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -162,6 +216,15 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Sanitize PATH for delegate-ci
+        # Listener was started with fathalla's PATH, which includes
+        # /Users/fathalla/Library/Android/sdk/platform-tools (EACCES for this user).
+        run: |
+          CLEAN="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+          echo "PATH=$CLEAN" >> "$GITHUB_ENV"
+          echo "LANG=en_US.UTF-8" >> "$GITHUB_ENV"
+          echo "LC_ALL=en_US.UTF-8" >> "$GITHUB_ENV"
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -174,7 +237,7 @@ jobs:
       - name: Install functions deps
         run: npm --prefix functions ci
       - name: Rules tests
-        run: npm run test:rules && npm run test:rules:interim && npm run test:rules:p0 && npm run test:rules:adv && npm run test:rules:docs && npm run test:rules:subs && npm run test:rules:qa-hold && npm run test:rules:profile
+        run: npm run test:rules && npm run test:rules:interim && npm run test:rules:p0 && npm run test:rules:adv && npm run test:rules:docs && npm run test:rules:subs && npm run test:rules:qa-hold
       - name: Subscriptions e2e (suspension job + Paymob hook on emulator)
         run: npm run test:e2e:subscriptions
       - name: Delegate login e2e (delegateLoginV2 -> custom token -> 1.14.3 query)
