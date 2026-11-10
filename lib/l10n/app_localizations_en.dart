@@ -1288,7 +1288,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String companySupervisorWithName(Object companyName) {
-    return 'Company supervisor ($companyName)';
+    final name = companyName.toString().trim();
+    return name.isEmpty ? 'Company supervisor' : 'Company supervisor ($name)';
   }
 
   @override
@@ -1297,9 +1298,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String noSupervisorForCompany(Object companyUID) {
-    return 'No supervisor registered for this company yet\n(Company ID: $companyUID)';
-  }
+  String get noSupervisorForCompany =>
+      'No supervisor registered for this company yet';
 
   @override
   String pendingCountBadge(Object count) {
@@ -1520,7 +1520,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String attCannotActOutside(Object action, Object distance) {
-    return 'You can\'t $action while outside the branch ($distance). Please be inside the branch.';
+    final d = distance.toString().trim();
+    if (d.isEmpty) {
+      return 'You can\'t $action while outside the branch. Please be inside the branch.';
+    }
+    return 'You can\'t $action while outside the branch ($d). Please be inside the branch.';
   }
 
   @override

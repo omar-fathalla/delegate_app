@@ -682,6 +682,9 @@ service cloud.firestore {
           && request.auth.token.delegateIds is list
           && resource.id in request.auth.token.delegateIds)
         || resource.id == request.auth.uid
+        // Field uid (not document id) so a collection-group query
+        // where uid==auth.uid / delegateId is provable. Own data only.
+        || ownsDelegateId(resource.data.get('uid', ''))
         || staffRole() in [
           'super-admin', 'super_admin', 'superadmin', 'superAdmin',
           'technical_support', 'technical-support', 'technicalSupport'
@@ -814,6 +817,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if signedIn() && (
         request.auth.uid == userId ||
+        ownsDelegateId(userId) ||
         isGlobalStaff() ||
         (isOrgScopedStaff() && orgScoped()) ||
         (isCompanyScopedStaff() && companyScoped())
@@ -1441,8 +1445,12 @@ service cloud.firestore {
     }
 
     match /{path=**}/captured_photos/{photoId} {
+      // Own-id first so a collection-group query where delegateUID==uid
+      // is provable without an organizationUID constraint. Still own data only.
       allow read: if signedIn() && (
-        isGlobalStaff() || orgScoped() || companyScoped() || delegateInOrg(resource.data.organizationUID)
+        ownsDelegateId(resource.data.get('delegateUID', ''))
+        || delegateOwns(resource.data.get('delegateUID', ''))
+        || isGlobalStaff() || orgScoped() || companyScoped() || delegateInOrg(resource.data.organizationUID)
       );
       allow create: if signedIn() && (
         isGlobalStaff()
@@ -1633,18 +1641,29 @@ service cloud.firestore {
       ];
     }
 
+    // Own-data path is a tiny function so list queries stay under the
+    // 1000-expression cap (M31 3ff8e5d). Staff/broadcast stay in
+    // canReadNotification and are a separate allow so the evaluator
+    // does not fold them into the delegate query budget.
+    function canReadOwnNotification() {
+      return signedIn() && !isPrivilegedStaffAlert() && (
+        ownsDelegateId(resource.data.get('delegateUid', ''))
+        || ownsDelegateId(resource.data.get('userId', ''))
+        || delegateOwns(resource.data.get('delegateUid', ''))
+        || (isDelegate() && claimListHas('phones', resource.data.get('phoneNumber', '')))
+        || (isDelegate() && claimListHas('phones', resource.data.get('delegateUid', '')))
+      );
+    }
+
     function canReadNotification() {
       return signedIn() && (
         isGlobalStaff()
         || (
         !isPrivilegedStaffAlert() && (
-        ownsDelegateId(resource.data.delegateUid)
-        || ownsDelegateId(resource.data.userId)
-        || delegateOwns(resource.data.delegateUid)
-        || resource.data.delegateUid == 'all'
-        || resource.data.delegateUid == 'delegates'
-        || (isDelegate() && resource.data.delegateUid == 'delegates_' + callerCompany())
-        || (isDelegate() && resource.data.delegateUid == 'company_' + callerCompany())
+        resource.data.get('delegateUid', '') == 'all'
+        || resource.data.get('delegateUid', '') == 'delegates'
+        || (isDelegate() && resource.data.get('delegateUid', '') == 'delegates_' + callerCompany())
+        || (isDelegate() && resource.data.get('delegateUid', '') == 'company_' + callerCompany())
         || (isCompanyScopedStaff() && resource.data.delegateUid == 'company_' + callerCompany())
         || (isCompanyScopedStaff() && resource.data.delegateUid == 'supervisor_' + callerCompany())
         || (isCompanyScopedStaff() && resource.data.delegateUid == 'all_company_supervisors' && companyScoped())
@@ -1677,9 +1696,10 @@ service cloud.firestore {
     }
 
     match /notifications/{notificationId} {
+      allow read: if canReadOwnNotification();
       allow read: if canReadNotification();
       allow create: if canCreateNotification();
-      allow update: if canReadNotification() && (
+      allow update: if (canReadOwnNotification() || canReadNotification()) && (
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']) ||
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']) ||
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedBy']) ||
@@ -1979,13 +1999,14 @@ service cloud.firestore {
     }
 
     match /leave_requests/{requestId} {
+      // Own-id first so a delegateUid==uid list stays under the
+      // 1000-expression budget and is provable without companyUID.
       allow read: if signedIn() && (
-        isGlobalStaff()
+        ownsDelegateId(resource.data.delegateUid)
+        || delegateOwns(resource.data.delegateUid)
+        || isGlobalStaff()
         || (isCompanyScopedStaff() && companyScoped())
         || (isOrgScopedStaff() && orgScoped())
-        || (companyScoped() && (ownsDelegateId(resource.data.delegateUid) || delegateOwns(resource.data.delegateUid)))
-        || ownsDelegateId(resource.data.delegateUid)
-        || delegateOwns(resource.data.delegateUid)
       );
       allow create: if signedIn() && (
         ownsDelegateId(request.resource.data.delegateUid)
@@ -2028,6 +2049,15 @@ service cloud.firestore {
     // (config/delegate_auth.otpEnforcementEnabled). Clients cannot touch it.
     match /config/{docId} {
       allow read, write: if false;
+    }
+
+    // TrustedTimeService writes a serverTimestamp probe, then reads it
+    // back. Signed-in clients may only touch this one doc and the probe field.
+    match /_system_metadata/{docId} {
+      allow get, create, update: if signedIn()
+        && docId == 'time_probe'
+        && request.resource.data.keys().hasOnly(['probe']);
+      allow delete: if false;
     }
 
     // ==================== DEFAULT DENY ====================

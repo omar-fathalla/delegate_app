@@ -1358,7 +1358,7 @@
   "homeRequestsSubtitle": "قدّم طلبات الإجازة والأعذار وتابع رصيدك",
   "companySupervisorWithName": "مشرف الشركة ({companyName})",
   "errorWithMessage": "خطأ: {error}",
-  "noSupervisorForCompany": "لا يوجد مشرف مسجّل لهذه الشركة حاليًا\n(Company ID: {companyUID})",
+  "noSupervisorForCompany": "لا يوجد مشرف مسجّل لهذه الشركة حاليًا",
   "pendingCountBadge": "{count} قيد المراجعة",
   "orgMarketing": "إدارة التسويق",
   "orgAdminPanel": "الإدارة",

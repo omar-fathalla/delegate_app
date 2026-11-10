@@ -885,7 +885,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   Text(
                     _supervisorError != null
                         ? AppLocalizations.of(context)!.errorWithMessage(_supervisorError ?? '')
-                        : AppLocalizations.of(context)!.noSupervisorForCompany(widget.delegate.companyUID),
+                        : AppLocalizations.of(context)!.noSupervisorForCompany,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,

@@ -539,60 +539,16 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     }
   }
 
-  /// Resolves every delegateId under which this person's logs may be stored
-  /// (own uid, national ID, phone, and other delegate docs sharing them).
+  /// Attendance `whereIn` may only contain owned UIDs. National ID and
+  /// phone are not valid `delegateId` values for the security rules, and
+  /// a collection-group scan by those fields is not query-provable
+  /// without a matching claim (M31 3ff8e5d).
   Future<List<String>> _resolveHistoryIdentifiers(
     String userId, {
     String? nationalityID,
     String? phoneNumber,
   }) async {
-    final Set<String> identifiers = {userId};
-
-    if (nationalityID != null && nationalityID.trim().isNotEmpty) {
-      final cleanNat = nationalityID.trim();
-      identifiers.add(cleanNat);
-
-      // Resolve any other delegate UIDs registered under this National ID
-      try {
-        final natSnap = await firestore
-            .collectionGroup('delegates')
-            .where('nationalityID', isEqualTo: cleanNat)
-            .limit(10)
-            .getResilient(
-              timeout: const Duration(seconds: 4),
-              forceServer: true,
-            );
-        for (final doc in natSnap.docs) {
-          identifiers.add(doc.id);
-        }
-      } catch (_) {}
-    }
-
-    if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
-      final cleanPhone = phoneNumber.trim();
-      final normalizedPhone = _normalizePhone(cleanPhone);
-      identifiers.add(cleanPhone);
-      if (normalizedPhone.isNotEmpty) {
-        identifiers.add(normalizedPhone);
-      }
-
-      // Resolve any other delegate UIDs registered under this phone number
-      try {
-        final phoneSnap = await firestore
-            .collectionGroup('delegates')
-            .where('phoneNumber', isEqualTo: normalizedPhone)
-            .limit(10)
-            .getResilient(
-              timeout: const Duration(seconds: 4),
-              forceServer: true,
-            );
-        for (final doc in phoneSnap.docs) {
-          identifiers.add(doc.id);
-        }
-      } catch (_) {}
-    }
-
-    return identifiers.where((id) => id.isNotEmpty).take(30).toList();
+    return {userId}.where((id) => id.isNotEmpty).take(30).toList();
   }
 
   @override
@@ -648,17 +604,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     int limit = 6,
   }) async {
     try {
-      final Set<String> identifiers = {userId};
-      if (nationalityID != null && nationalityID.trim().isNotEmpty) {
-        identifiers.add(nationalityID.trim());
-      }
-      if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
-        final cleanPhone = phoneNumber.trim();
-        identifiers.add(cleanPhone);
-        final normalized = _normalizePhone(cleanPhone);
-        if (normalized.isNotEmpty) identifiers.add(normalized);
-      }
-      final queryList = identifiers.where((id) => id.isNotEmpty).take(30).toList();
+      // Only owned UIDs. NID/phone in the same whereIn is rejected by rules.
+      final queryList = await _resolveHistoryIdentifiers(userId);
 
       final querySnapshot = await firestore
           .collection(kAttendanceCollection)
