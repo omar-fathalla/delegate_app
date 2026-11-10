@@ -60,8 +60,8 @@ describe("supervisor delegate profile edit rules", () => {
   test("other-company supervisor cannot read the delegate", () =>
     assertFails(getDoc(doc(as("sup2"), NESTED))));
 
-  test("supervisor may update name, phone, and ID images on own-company delegate", () =>
-    assertSucceeds(updateDoc(doc(as("sup"), NESTED), {
+  test("supervisor cannot update name, phone, or ID images directly (M-1)", () =>
+    assertFails(updateDoc(doc(as("sup"), NESTED), {
       fullName: "اسم جديد",
       firstName: "اسم",
       lastName: "جديد",
@@ -85,8 +85,8 @@ describe("supervisor delegate profile edit rules", () => {
   test("supervisor cannot change companyUID or organizationUID", () =>
     assertFails(updateDoc(doc(as("sup"), NESTED), {companyUID: "c2", updatedAt: "t"})));
 
-  test("supervisor may update profile fields on a pending request", () =>
-    assertSucceeds(updateDoc(doc(as("sup"), REQ), {fullName: "اسم جديد", phoneNumber: "01999001003"})));
+  test("supervisor cannot update profile fields on a pending request directly (M-1)", () =>
+    assertFails(updateDoc(doc(as("sup"), REQ), {fullName: "اسم جديد", phoneNumber: "01999001003"})));
 
   test("supervisor cannot change nationalId on a pending request", () =>
     assertFails(updateDoc(doc(as("sup"), REQ), {nationalId: "28801010101011"})));
@@ -109,8 +109,8 @@ describe("supervisor delegate profile edit rules", () => {
     source: "direct_edit",
   };
 
-  test("supervisor can create an audit record for their company", () =>
-    assertSucceeds(setDoc(doc(as("sup"), "delegate_profile_audit_logs/a1"), audit)));
+  test("clients cannot create audit records (LOW, server-only)", () =>
+    assertFails(setDoc(doc(as("sup"), "delegate_profile_audit_logs/a1"), audit)));
 
   test("supervisor cannot create an audit record for another company", () =>
     assertFails(setDoc(doc(as("sup"), "delegate_profile_audit_logs/a2"), {...audit, companyUID: "c2"})));
@@ -131,5 +131,83 @@ describe("supervisor delegate profile edit rules", () => {
     });
     await assertSucceeds(getDoc(doc(as("sup"), "delegate_profile_audit_logs/a4")));
     await assertFails(getDoc(doc(as("sup2"), "delegate_profile_audit_logs/a4")));
+  });
+
+  test("super-admin may still edit name directly via rules", () =>
+    assertSucceeds(updateDoc(doc(as("sa"), NESTED), {fullName: "اسم الإدارة", updatedAt: "t"})));
+
+  test("clients cannot create update_national_id requests (M-4)", async () => {
+    const payload = {
+      requestType: "update_national_id",
+      actionType: "update_national_id",
+      status: "pending",
+      supervisorUid: "sup",
+      organizationUID: "o1",
+      companyUID: "c1",
+      existingDelegateUid: "d1",
+      proposedNationalId: "29001010100022",
+      nationalId: "29901010101011",
+    };
+    await assertFails(setDoc(doc(as("sup"), "delegate_requests/nid1"), payload));
+    await assertFails(setDoc(doc(as("adm"), "delegate_requests/nid2"), payload));
+    await assertFails(setDoc(doc(as("sa"), "delegate_requests/nid3"), payload));
+  });
+
+  test("clients cannot change proposedNationalId (M-4)", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("delegate_requests/nidp").set({
+        requestType: "update_national_id",
+        status: "pending",
+        supervisorUid: "sup",
+        organizationUID: "o1",
+        companyUID: "c1",
+        existingDelegateUid: "d1",
+        proposedNationalId: "29001010100022",
+        nationalId: "29901010101011",
+      });
+    });
+    await assertFails(updateDoc(doc(as("sup"), "delegate_requests/nidp"), {
+      proposedNationalId: "29001010100033",
+    }));
+    await assertFails(updateDoc(doc(as("sa"), "delegate_requests/nidp"), {
+      proposedNationalId: "29001010100033",
+    }));
+  });
+
+  test("company staff cannot read privileged admin alerts (M-7)", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("notifications/alert1").set({
+        delegateUid: "sa",
+        type: "delegate_profile_edit",
+        title: "تعديل",
+        body: "تنبيه",
+        companyUID: "c1",
+        organizationId: "o1",
+        isRead: false,
+      });
+    });
+    await assertFails(getDoc(doc(as("sup"), "notifications/alert1")));
+    await assertFails(getDoc(doc(as("adm"), "notifications/alert1")));
+    await assertSucceeds(getDoc(doc(as("sa"), "notifications/alert1")));
+    await assertSucceeds(getDoc(doc(as("ts"), "notifications/alert1")));
+  });
+
+  test("super-admin and tech cannot be forged as audit writers by clients (LOW)", () =>
+    assertFails(setDoc(doc(as("sa"), "delegate_profile_audit_logs/forged"), audit)));
+
+  test("company staff cannot update non-status photo-permission fields (LOW)", async () => {
+    const path = "organizations/o1/companies/c1/photo_permissions/pp1";
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(path).set({
+        status: "pending",
+        companyUID: "c1",
+        organizationUID: "o1",
+        delegateUid: "d1",
+        isSupervisorEnabled: false,
+      });
+    });
+    await assertFails(updateDoc(doc(as("sup"), path), {isSupervisorEnabled: true}));
+    await assertFails(updateDoc(doc(as("adm"), path), {isSupervisorEnabled: true}));
+    await assertSucceeds(updateDoc(doc(as("sa"), path), {status: "approved"}));
   });
 });

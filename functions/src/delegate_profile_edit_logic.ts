@@ -160,7 +160,7 @@ export interface AuditRecordDraft {
   companyUID: string;
   companyName: string;
   organizationUID: string;
-  source: "direct_edit" | "national_id_approval";
+  source: "direct_edit" | "national_id_approval" | "national_id_rejection";
   requestId?: string;
 }
 
@@ -268,3 +268,160 @@ export function valueOf(data: Record<string, unknown>, field: ProfileEditField |
   }
   return String(data[field] || "");
 }
+
+export type CompanyScopeResult = "ok" | "missing-company" | "mismatch";
+
+/** Editors must have a companyUID and it must match the target company. */
+export function companyScopeDecision(
+  callerCompanyUID: string,
+  targetCompanyUID: string,
+): CompanyScopeResult {
+  if (!String(callerCompanyUID || "").trim()) return "missing-company";
+  if (String(callerCompanyUID).trim() !== String(targetCompanyUID || "").trim()) {
+    return "mismatch";
+  }
+  return "ok";
+}
+
+/**
+ * Never patch a legacy no-companyUID record, or a doc sitting under
+ * another company's organizations/{o}/companies/{other}/ path.
+ */
+export function isPatchableTarget(
+  companyUID: string,
+  data: {companyUID?: unknown; companyId?: unknown},
+  path: string,
+): boolean {
+  const co = String(data.companyUID || data.companyId || "").trim();
+  if (!co || co !== companyUID) return false;
+  const parts = path.split("/").filter(Boolean);
+  const idx = parts.indexOf("companies");
+  if (idx >= 0 && parts.length > idx + 1) {
+    const pathCompany = parts[idx + 1];
+    if (pathCompany && pathCompany !== companyUID) return false;
+  }
+  return true;
+}
+
+const STORAGE_HOSTS = new Set([
+  "firebasestorage.googleapis.com",
+  "storage.googleapis.com",
+]);
+
+/** https Firebase Storage URLs, or delegate_documents/{uid}/... paths. */
+export function isAllowedImageUrl(url: string, delegateUid?: string): boolean {
+  const v = String(url || "").trim();
+  if (!v) return false;
+  if (/^(javascript|data|vbscript|http):/i.test(v)) return false;
+  if (v.startsWith("delegate_documents/")) {
+    if (v.includes("..") || v.includes("//")) return false;
+    if (delegateUid) {
+      return v.startsWith(`delegate_documents/${delegateUid}/`)
+        && v.slice(`delegate_documents/${delegateUid}/`.length).length > 0;
+    }
+    return /^delegate_documents\/[^/]+\/[^/]+/.test(v);
+  }
+  try {
+    const u = new URL(v);
+    if (u.protocol !== "https:") return false;
+    const host = u.hostname.toLowerCase();
+    if (STORAGE_HOSTS.has(host)) return true;
+    if (host === "firebasestorage.app" || host.endsWith(".firebasestorage.app")) return true;
+    if (host.endsWith(".appspot.com")) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export function assertImageFields(fields: ProfileEditInput, delegateUid?: string): void {
+  const keys: Array<keyof ProfileEditInput> = [
+    "personalPhotoURL", "nationalIdFrontUrl", "nationalIdBackUrl",
+  ];
+  for (const key of keys) {
+    const value = fields[key];
+    if (value && !isAllowedImageUrl(value, delegateUid)) {
+      throw new Error("invalid-image-url");
+    }
+  }
+}
+
+export const PRIVILEGED_ALERT_TYPES = [
+  "delegate_profile_edit",
+  "delegate_national_id_request",
+] as const;
+
+/** One alert payload per recipient. No phone numbers. */
+export function privilegedAlertDoc(opts: {
+  recipientUid: string;
+  title: string;
+  body: string;
+  type: string;
+  senderName: string;
+  senderRole: string;
+  companyUID: string;
+  organizationUID: string;
+  requestId?: string;
+  targetDelegateUid?: string;
+}): Record<string, unknown> {
+  return {
+    delegateUid: opts.recipientUid,
+    title: opts.title,
+    body: opts.body,
+    type: opts.type,
+    senderName: opts.senderName,
+    senderRole: opts.senderRole,
+    companyUID: opts.companyUID,
+    organizationId: opts.organizationUID,
+    isRead: false,
+    targetRoles: ["superAdmin", "technicalSupport"],
+    ...(opts.requestId ? {requestId: opts.requestId} : {}),
+    ...(opts.targetDelegateUid ? {targetDelegateUid: opts.targetDelegateUid} : {}),
+  };
+}
+
+export function uniqueRecipientIds(ids: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const id of ids) {
+    const v = String(id || "").trim();
+    if (!v || seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+  }
+  return out;
+}
+
+export function supervisorReviewAlertDoc(opts: {
+  supervisorUid: string;
+  approved: boolean;
+  reviewerName: string;
+  delegateName: string;
+  companyUID: string;
+  organizationUID: string;
+  requestId: string;
+  targetDelegateUid: string;
+  rejectionReason?: string;
+}): Record<string, unknown> {
+  const approved = opts.approved;
+  const who = opts.delegateName || opts.targetDelegateUid;
+  const reason = (opts.rejectionReason || "").trim();
+  return {
+    delegateUid: opts.supervisorUid,
+    title: approved ? "تم اعتماد طلب تعديل الرقم القومي" : "تم رفض طلب تعديل الرقم القومي",
+    body: approved
+      ? `تم اعتماد طلب تعديل الرقم القومي للمندوب ${who} بواسطة ${opts.reviewerName}.`
+      : (reason
+        ? `تم رفض طلب تعديل الرقم القومي للمندوب ${who} بواسطة ${opts.reviewerName}. السبب: ${reason}`
+        : `تم رفض طلب تعديل الرقم القومي للمندوب ${who} بواسطة ${opts.reviewerName}.`),
+    type: "delegate_national_id_review",
+    senderName: opts.reviewerName,
+    senderRole: "reviewer",
+    companyUID: opts.companyUID,
+    organizationId: opts.organizationUID,
+    isRead: false,
+    requestId: opts.requestId,
+    targetDelegateUid: opts.targetDelegateUid,
+  };
+}
+

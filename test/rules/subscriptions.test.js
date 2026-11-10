@@ -245,9 +245,11 @@ describe("delegate_requests: payment is server-only", () => {
   test("requestStaffUpdateOk is company-scoped and blocks approval fields", async () => {
     // Same-company staff may still cancel an unpaid renewal (app cancelRenewal).
     await assertSucceeds(as("sup").doc("delegate_requests/pending").update({status: "cancelled"}));
-    // They may edit non-sensitive fields on a request in their company,
-    // including another chain of the same company.
-    await assertSucceeds(as("hr1").doc("delegate_requests/nid-c1-other-chain").update({firstName: "N"}));
+    // Name / phone / images go through editDelegateProfile only (M-1).
+    await assertFails(as("hr1").doc("delegate_requests/nid-c1-other-chain").update({firstName: "N"}));
+    // Non-profile metadata remains editable in their company, including
+    // another chain of the same company.
+    await assertSucceeds(as("hr1").doc("delegate_requests/nid-c1-other-chain").update({updatedAt: "t"}));
     // Cross-company updates are denied.
     await assertFails(as("sup2").doc("delegate_requests/scoped").update({firstName: "x"}));
     await assertFails(as("oa2").doc("delegate_requests/scoped").update({firstName: "x"}));
@@ -258,8 +260,9 @@ describe("delegate_requests: payment is server-only", () => {
     await assertFails(as("hr1").doc("delegate_requests/scoped").update({nationalId: "000"}));
     await assertFails(as("oa1").doc("delegate_requests/scoped").update({companyUID: "c9"}));
     await assertFails(as("oa1").doc("delegate_requests/scoped").update({status: "approved"}));
-    // Org-admin may edit non-sensitive fields in their org, and cancel.
-    await assertSucceeds(as("oa1").doc("delegate_requests/scoped").update({firstName: "OrgEdit"}));
+    // Org-admin cannot change profile fields either; they may still cancel.
+    await assertFails(as("oa1").doc("delegate_requests/scoped").update({firstName: "OrgEdit"}));
+    await assertSucceeds(as("oa1").doc("delegate_requests/scoped").update({updatedAt: "t"}));
     await assertSucceeds(as("oa1").doc("delegate_requests/del-c1").update({status: "cancelled"}));
     // Only super-admin / technical support may approve or reject.
     await assertSucceeds(as("sa").doc("delegate_requests/legacy").update({status: "approved", reviewedBy: "SA"}));

@@ -86,11 +86,11 @@ describe("qa hold supervisor reads and edit policy", () => {
   test("company admin can list the same company on another chain", () =>
     assertSucceeds(getDocs(collection(as("adm"), "organizations/o2/companies/c1/delegates"))));
 
-  test("supervisor and admin may edit name and phone on an active delegate", async () => {
-    await assertSucceeds(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
+  test("supervisor and admin cannot edit name and phone directly (M-1)", async () => {
+    await assertFails(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
       fullName: "اسم جديد", phoneNumber: "01000000099", updatedAt: "t",
     }));
-    await assertSucceeds(updateDoc(doc(as("adm"), "organizations/o2/companies/c1/delegates/d1"), {
+    await assertFails(updateDoc(doc(as("adm"), "organizations/o2/companies/c1/delegates/d1"), {
       fullName: "اسم آخر", updatedAt: "t",
     }));
   });

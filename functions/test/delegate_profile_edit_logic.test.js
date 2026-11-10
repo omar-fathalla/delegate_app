@@ -83,3 +83,92 @@ test("auditDoc is limited to actor, field, values, and identifiers", () => {
     "newValue", "oldValue", "organizationUID", "source",
   ]);
 });
+
+test("companyScopeDecision requires a caller companyUID (M-2)", () => {
+  assert.strictEqual(L.companyScopeDecision("", "c1"), "missing-company");
+  assert.strictEqual(L.companyScopeDecision("c2", "c1"), "mismatch");
+  assert.strictEqual(L.companyScopeDecision("c1", "c1"), "ok");
+});
+
+test("isPatchableTarget skips legacy and other-company paths (M-3)", () => {
+  assert.ok(L.isPatchableTarget("c1", {companyUID: "c1"}, "organizations/o1/companies/c1/delegates/d1"));
+  assert.ok(!L.isPatchableTarget("c1", {}, "organizations/o3/companies/c2/delegates/d1"));
+  assert.ok(!L.isPatchableTarget("c1", {companyUID: "c1"}, "organizations/o3/companies/c2/delegates/d1"));
+  assert.ok(!L.isPatchableTarget("c1", {companyUID: "c2"}, "organizations/o1/companies/c1/delegates/d1"));
+});
+
+test("isAllowedImageUrl accepts storage URLs/paths and rejects javascript (LOW)", () => {
+  assert.ok(L.isAllowedImageUrl("https://firebasestorage.googleapis.com/v0/b/tashil-dev.appspot.com/o/x"));
+  assert.ok(L.isAllowedImageUrl("delegate_documents/d1/profile_1.jpg", "d1"));
+  assert.ok(!L.isAllowedImageUrl("javascript:alert(1)"));
+  assert.ok(!L.isAllowedImageUrl("http://example.com/x.jpg"));
+  assert.ok(!L.isAllowedImageUrl("delegate_documents/other/x.jpg", "d1"));
+  assert.throws(() => L.assertImageFields({personalPhotoURL: "javascript:alert(1)"}), /invalid-image-url/);
+});
+
+test("privilegedAlertDoc writes one recipient and no phoneNumber (M-7)", () => {
+  const rec = L.privilegedAlertDoc({
+    recipientUid: "sa1",
+    title: "تعديل",
+    body: "جسم",
+    type: "delegate_profile_edit",
+    senderName: "مشرف",
+    senderRole: "supervisor",
+    companyUID: "c1",
+    organizationUID: "o1",
+    targetDelegateUid: "d1",
+  });
+  assert.strictEqual(rec.delegateUid, "sa1");
+  assert.strictEqual(rec.targetDelegateUid, "d1");
+  assert.ok(!Object.prototype.hasOwnProperty.call(rec, "phoneNumber"));
+  assert.deepStrictEqual(L.uniqueRecipientIds(["sa1", "sa1", "ts1", ""]), ["sa1", "ts1"]);
+});
+
+test("supervisorReviewAlertDoc covers approve and reject (M-8)", () => {
+  const ok = L.supervisorReviewAlertDoc({
+    supervisorUid: "sup1",
+    approved: true,
+    reviewerName: "إدارة",
+    delegateName: "مندوب",
+    companyUID: "c1",
+    organizationUID: "o1",
+    requestId: "r1",
+    targetDelegateUid: "d1",
+  });
+  assert.strictEqual(ok.delegateUid, "sup1");
+  assert.strictEqual(ok.type, "delegate_national_id_review");
+  assert.ok(!Object.prototype.hasOwnProperty.call(ok, "phoneNumber"));
+  const no = L.supervisorReviewAlertDoc({
+    supervisorUid: "sup1",
+    approved: false,
+    reviewerName: "دعم",
+    delegateName: "مندوب",
+    companyUID: "c1",
+    organizationUID: "o1",
+    requestId: "r1",
+    targetDelegateUid: "d1",
+    rejectionReason: "غير واضح",
+  });
+  assert.match(no.title, /رفض/);
+  assert.match(no.body, /غير واضح/);
+});
+
+test("auditDoc accepts a national_id_rejection source (M-8)", () => {
+  const rec = L.auditDoc({
+    actorUid: "sa",
+    actorName: "إدارة",
+    actorRole: "super-admin",
+    field: "nationalId",
+    oldValue: "29001010100011",
+    newValue: "29001010100022",
+    delegateUid: "d1",
+    delegateName: "مندوب",
+    companyUID: "c1",
+    companyName: "شركة",
+    organizationUID: "o1",
+    source: "national_id_rejection",
+    requestId: "r1",
+  });
+  assert.strictEqual(rec.source, "national_id_rejection");
+  assert.strictEqual(rec.requestId, "r1");
+});

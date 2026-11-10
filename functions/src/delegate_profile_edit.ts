@@ -1,25 +1,29 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import {
-  decideDuplicate,
-  DuplicateHit,
-  isExistingDelegateStatus,
-  isOpenRequestStatus,
-  isSameDelegateRecord,
+  isValidEgyptianNationalId,
+  isValidEgyptianPhone,
+  normalizeEgyptianPhone,
   normalizeIdDigits,
-  publicDuplicateResult,
 } from "./check_delegate_duplicate_logic";
+import {findDuplicatePublic} from "./check_delegate_duplicate_query";
 import {
   applyProfileFields,
+  assertImageFields,
   auditDoc,
+  companyScopeDecision,
   fieldArabicLabel,
   isEditableDelegateStatus,
   isEditableRequestStatus,
   isEditorRole,
+  isPatchableTarget,
   isReviewerRole,
+  privilegedAlertDoc,
   ProfileEditInput,
   sanitizeProfileEdit,
   shouldAlertAdmins,
+  supervisorReviewAlertDoc,
+  uniqueRecipientIds,
   valueOf,
 } from "./delegate_profile_edit_logic";
 
@@ -47,56 +51,6 @@ async function loadCaller(db: FirebaseFirestore.Firestore, uid: string) {
     companyUID: String(data.companyUID || data.companyId || "").trim(),
     organizationUID: String(data.organizationUID || data.organizationId || "").trim(),
   };
-}
-
-function companyOf(data: FirebaseFirestore.DocumentData): {uid: string; name: string} {
-  return {
-    uid: String(data.companyUID || data.companyId || "").trim(),
-    name: String(data.companyName || data.company_name || "").trim(),
-  };
-}
-
-async function findDuplicate(
-  db: FirebaseFirestore.Firestore,
-  opts: {nationalId?: string; phoneNumber?: string; companyUID: string; excludeDelegateUid?: string},
-) {
-  const hits: DuplicateHit[] = [];
-  const seen = new Set<string>();
-  const addHit = (hit: DuplicateHit) => {
-    if (!hit.companyUID) return;
-    const key = `${hit.companyUID}|${hit.field}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    hits.push(hit);
-  };
-  const scan = async (
-    collection: "requests" | "delegates",
-    field: "nationalId" | "nationalityID" | "phoneNumber",
-    value: string,
-    kind: DuplicateHit["field"],
-  ) => {
-    const snap = collection === "requests"
-      ? await db.collection("delegate_requests").where(field, "==", value).get()
-      : await db.collectionGroup("delegates").where(field, "==", value).get();
-    for (const doc of snap.docs) {
-      if (isSameDelegateRecord(doc.data(), doc.id, opts.excludeDelegateUid)) continue;
-      if (collection === "requests" && !isOpenRequestStatus(doc.data().status)) continue;
-      if (collection === "delegates" && !isExistingDelegateStatus(doc.data().status)) continue;
-      const co = companyOf(doc.data());
-      addHit({companyUID: co.uid, companyName: co.name, field: kind});
-    }
-  };
-  if (opts.nationalId) {
-    await scan("requests", "nationalId", opts.nationalId, "nationalId");
-    await scan("requests", "nationalityID", opts.nationalId, "nationalId");
-    await scan("delegates", "nationalId", opts.nationalId, "nationalId");
-    await scan("delegates", "nationalityID", opts.nationalId, "nationalId");
-  }
-  if (opts.phoneNumber) {
-    await scan("requests", "phoneNumber", opts.phoneNumber, "phoneNumber");
-    await scan("delegates", "phoneNumber", opts.phoneNumber, "phoneNumber");
-  }
-  return publicDuplicateResult(decideDuplicate(opts.companyUID, hits));
 }
 
 function throwIfDuplicate(result: {duplicate: boolean; reason?: string; companyName?: string}, kind: "phone" | "nationalId") {
@@ -133,8 +87,7 @@ async function collectTargets(
   const add = (kind: Target["kind"], snap: FirebaseFirestore.DocumentSnapshot) => {
     if (!snap.exists) return;
     const data = snap.data() || {};
-    const co = String(data.companyUID || data.companyId || "").trim();
-    if (co && co !== opts.companyUID) return;
+    if (!isPatchableTarget(opts.companyUID, data, snap.ref.path)) return;
     if (seen.has(snap.ref.path)) return;
     seen.add(snap.ref.path);
     targets.push({kind, ref: snap.ref, data});
@@ -204,55 +157,35 @@ async function notifyPrivileged(
     delegateUid?: string;
   },
 ) {
-  const roleKeys = [
-    "super-admin", "superAdmin", "role_super_admin",
-    "technicalSupport", "technical-support", "role_technical_support",
-  ];
-  const batch = db.batch();
+  let recipientIds: string[] = [];
   try {
     const users = await db.collection("users").where("role", "in", [
       "super-admin", "super_admin", "superAdmin",
       "technicalSupport", "technical-support", "technical_support",
     ]).get();
-    for (const doc of users.docs) {
-      const phone = (doc.data().phoneNumber || doc.data().phone || "").toString();
-      const ref = db.collection("notifications").doc();
-      batch.set(ref, {
-        delegateUid: doc.id,
-        ...(phone ? {phoneNumber: phone} : {}),
+    recipientIds = uniqueRecipientIds(users.docs.map((d) => d.id));
+  } catch (err) {
+    functions.logger.warn("privileged user query failed; skipping alerts", err);
+    return;
+  }
+  if (!recipientIds.length) return;
+  const batch = db.batch();
+  for (const recipientUid of recipientIds) {
+    const ref = db.collection("notifications").doc();
+    batch.set(ref, {
+      ...privilegedAlertDoc({
+        recipientUid,
         title: opts.title,
         body: opts.body,
         type: opts.type,
         senderName: opts.senderName,
         senderRole: opts.senderRole,
         companyUID: opts.companyUID,
-        organizationId: opts.organizationUID,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        isRead: false,
-        targetRoles: ["superAdmin", "technicalSupport"],
-        ...(opts.requestId ? {requestId: opts.requestId} : {}),
-        ...(opts.delegateUid ? {targetDelegateUid: opts.delegateUid} : {}),
-      });
-    }
-  } catch (err) {
-    functions.logger.warn("privileged user query failed, writing role keys only", err);
-  }
-  for (const roleKey of roleKeys) {
-    const ref = db.collection("notifications").doc();
-    batch.set(ref, {
-      delegateUid: roleKey,
-      title: opts.title,
-      body: opts.body,
-      type: opts.type,
-      senderName: opts.senderName,
-      senderRole: opts.senderRole,
-      companyUID: opts.companyUID,
-      organizationId: opts.organizationUID,
+        organizationUID: opts.organizationUID,
+        requestId: opts.requestId,
+        targetDelegateUid: opts.delegateUid,
+      }),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      isRead: false,
-      targetRoles: ["superAdmin", "technicalSupport"],
-      ...(opts.requestId ? {requestId: opts.requestId} : {}),
-      ...(opts.delegateUid ? {targetDelegateUid: opts.delegateUid} : {}),
     });
   }
   await batch.commit();
@@ -294,7 +227,8 @@ export const editDelegateProfile = functions
     if (!companyUID) {
       throw new functions.https.HttpsError("invalid-argument", "companyUID مطلوب.");
     }
-    if (caller.companyUID && caller.companyUID !== companyUID) {
+    const scope = companyScopeDecision(caller.companyUID, companyUID);
+    if (scope !== "ok") {
       throw new functions.https.HttpsError("permission-denied", "غير مسموح.");
     }
     const {fields, keys} = sanitizeProfileEdit(payload as ProfileEditInput);
@@ -312,6 +246,11 @@ export const editDelegateProfile = functions
       delegateUid: delegateUidIn,
       requestId: requestIdIn,
     });
+    try {
+      assertImageFields(fields, collected.delegateUid);
+    } catch (err) {
+      throw new functions.https.HttpsError("invalid-argument", "رابط الصورة غير صالح.");
+    }
 
     const editable: Target[] = [];
     for (const t of collected.targets) {
@@ -336,9 +275,12 @@ export const editDelegateProfile = functions
     }
 
     if (fields.phoneNumber) {
-      const phone = normalizeIdDigits(fields.phoneNumber);
+      if (!isValidEgyptianPhone(fields.phoneNumber)) {
+        throw new functions.https.HttpsError("invalid-argument", "رقم الموبايل غير صالح.");
+      }
+      const phone = normalizeEgyptianPhone(fields.phoneNumber);
       fields.phoneNumber = phone;
-      const dup = await findDuplicate(db, {
+      const dup = await findDuplicatePublic(db, {
         phoneNumber: phone,
         companyUID,
         excludeDelegateUid: collected.delegateUid,
@@ -419,10 +361,10 @@ export const submitNationalIdUpdate = functions
     if (!companyUID || !newNationalId) {
       throw new functions.https.HttpsError("invalid-argument", "companyUID والرقم القومي الجديد مطلوبان.");
     }
-    if (newNationalId.length !== 14) {
+    if (!isValidEgyptianNationalId(newNationalId)) {
       throw new functions.https.HttpsError("invalid-argument", "الرقم القومي يجب أن يكون 14 رقمًا.");
     }
-    if (caller.companyUID && caller.companyUID !== companyUID) {
+    if (companyScopeDecision(caller.companyUID, companyUID) !== "ok") {
       throw new functions.https.HttpsError("permission-denied", "غير مسموح.");
     }
     if (!delegateUidIn && !requestIdIn) {
@@ -453,7 +395,7 @@ export const submitNationalIdUpdate = functions
       );
     }
 
-    const dup = await findDuplicate(db, {
+    const dup = await findDuplicatePublic(db, {
       nationalId: newNationalId,
       companyUID,
       excludeDelegateUid: collected.delegateUid,
@@ -530,7 +472,8 @@ export const reviewNationalIdUpdate = functions
     if (!requestId) {
       throw new functions.https.HttpsError("invalid-argument", "requestId مطلوب.");
     }
-    const req = await db.collection("delegate_requests").doc(requestId).get();
+    const reqRef = db.collection("delegate_requests").doc(requestId);
+    const req = await reqRef.get();
     if (!req.exists) {
       throw new functions.https.HttpsError("not-found", "الطلب غير موجود.");
     }
@@ -541,71 +484,151 @@ export const reviewNationalIdUpdate = functions
     if (String(request.status || "") !== "pending") {
       throw new functions.https.HttpsError("failed-precondition", "تمت مراجعة هذا الطلب مسبقاً.");
     }
-    if (!approve) {
-      await req.ref.update({
-        status: "rejected",
-        reviewedBy: uid,
-        reviewedByName: caller.name,
-        reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
-        rejectionReason,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-      return {ok: true, status: "rejected"};
-    }
 
     const companyUID = String(request.companyUID || "").trim();
     const newId = normalizeIdDigits(String(request.proposedNationalId || ""));
     const delegateUid = String(request.existingDelegateUid || "").trim();
-    if (!newId || !companyUID || !delegateUid) {
+    const supervisorUid = String(request.supervisorUid || "").trim();
+    if (!companyUID || !delegateUid) {
       throw new functions.https.HttpsError("failed-precondition", "بيانات الطلب غير مكتملة.");
     }
-    const dup = await findDuplicate(db, {
-      nationalId: newId,
-      companyUID,
-      excludeDelegateUid: delegateUid,
-    });
-    throwIfDuplicate(dup, "nationalId");
+    if (!isValidEgyptianNationalId(newId)) {
+      throw new functions.https.HttpsError("invalid-argument", "الرقم القومي يجب أن يكون 14 رقمًا.");
+    }
 
-    const collected = await collectTargets(db, {companyUID, delegateUid, requestId});
-    const oldId = valueOf(collected.targets[0].data as Record<string, unknown>, "nationalId");
-    const batch = db.batch();
-    for (const t of collected.targets) {
-      if (t.kind === "request" && t.ref.id === requestId) continue;
-      // Keep every live delegate and every request of this person in sync.
-      const patch: Record<string, unknown> = {
+    let collected: Awaited<ReturnType<typeof collectTargets>> | undefined;
+    if (approve) {
+      const dup = await findDuplicatePublic(db, {
+        nationalId: newId,
+        companyUID,
+        excludeDelegateUid: delegateUid,
+      });
+      throwIfDuplicate(dup, "nationalId");
+      collected = await collectTargets(db, {companyUID, delegateUid, requestId});
+    }
+
+    const result = await db.runTransaction(async (tx) => {
+      const fresh = await tx.get(reqRef);
+      if (!fresh.exists) {
+        throw new functions.https.HttpsError("not-found", "الطلب غير موجود.");
+      }
+      const freshData = fresh.data() || {};
+      if (String(freshData.status || "") !== "pending") {
+        throw new functions.https.HttpsError("failed-precondition", "تمت مراجعة هذا الطلب مسبقاً.");
+      }
+      const organizationUID = String(
+        freshData.organizationUID || freshData.organizationId ||
+        (collected && collected.organizationUID) || "",
+      ).trim();
+      const companyName = String(freshData.companyName || (collected && collected.companyName) || "").trim();
+      const delegateName = String(freshData.fullName || (collected && collected.displayName) || "").trim();
+      const oldId = collected
+        ? valueOf(collected.targets[0].data as Record<string, unknown>, "nationalId")
+        : String(freshData.nationalId || freshData.nationalityID || "");
+
+      if (!approve) {
+        tx.update(reqRef, {
+          status: "rejected",
+          reviewedBy: uid,
+          reviewedByName: caller.name,
+          reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+          rejectionReason,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        tx.set(db.collection(AUDIT).doc(), {
+          ...auditDoc({
+            actorUid: caller.uid,
+            actorName: caller.name,
+            actorRole: caller.role,
+            field: "nationalId",
+            oldValue: oldId,
+            newValue: newId,
+            delegateUid,
+            delegateName,
+            companyUID,
+            companyName,
+            organizationUID,
+            source: "national_id_rejection",
+            requestId,
+          }),
+          at: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        if (supervisorUid) {
+          tx.set(db.collection("notifications").doc(), {
+            ...supervisorReviewAlertDoc({
+              supervisorUid,
+              approved: false,
+              reviewerName: caller.name || caller.uid,
+              delegateName,
+              companyUID,
+              organizationUID,
+              requestId,
+              targetDelegateUid: delegateUid,
+              rejectionReason,
+            }),
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+        return {ok: true, status: "rejected" as const, updated: 0};
+      }
+
+      const targets = collected ? collected.targets : [];
+      for (const t of targets) {
+        if (t.kind === "request" && t.ref.id === requestId) continue;
+        const live = await tx.get(t.ref);
+        if (!live.exists) continue;
+        tx.update(t.ref, asUpdate({
+          nationalId: newId,
+          nationalityID: newId,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }));
+      }
+      tx.update(reqRef, {
+        status: "approved",
         nationalId: newId,
         nationalityID: newId,
+        reviewedBy: uid,
+        reviewedByName: caller.name,
+        reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+        approvedBy: uid,
+        approvedByName: caller.name,
+        approvedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      };
-      batch.update(t.ref, asUpdate(patch));
-    }
-    batch.update(req.ref, {
-      status: "approved",
-      nationalId: newId,
-      nationalityID: newId,
-      reviewedBy: uid,
-      reviewedByName: caller.name,
-      reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
-      approvedBy: uid,
-      approvedByName: caller.name,
-      approvedAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      tx.set(db.collection(AUDIT).doc(), {
+        ...auditDoc({
+          actorUid: caller.uid,
+          actorName: caller.name,
+          actorRole: caller.role,
+          field: "nationalId",
+          oldValue: oldId,
+          newValue: newId,
+          delegateUid,
+          delegateName,
+          companyUID,
+          companyName,
+          organizationUID,
+          source: "national_id_approval",
+          requestId,
+        }),
+        at: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      if (supervisorUid) {
+        tx.set(db.collection("notifications").doc(), {
+          ...supervisorReviewAlertDoc({
+            supervisorUid,
+            approved: true,
+            reviewerName: caller.name || caller.uid,
+            delegateName,
+            companyUID,
+            organizationUID,
+            requestId,
+            targetDelegateUid: delegateUid,
+          }),
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+      return {ok: true, status: "approved" as const, updated: targets.length};
     });
-    writeAudits(batch, db, [auditDoc({
-      actorUid: caller.uid,
-      actorName: caller.name,
-      actorRole: caller.role,
-      field: "nationalId",
-      oldValue: oldId,
-      newValue: newId,
-      delegateUid,
-      delegateName: String(request.fullName || collected.displayName || ""),
-      companyUID,
-      companyName: String(request.companyName || collected.companyName || ""),
-      organizationUID: String(request.organizationUID || collected.organizationUID || ""),
-      source: "national_id_approval",
-      requestId,
-    })]);
-    await batch.commit();
-    return {ok: true, status: "approved", updated: collected.targets.length};
+    return result;
   });

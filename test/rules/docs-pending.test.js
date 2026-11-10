@@ -178,7 +178,8 @@ describe("docs-pending rules", () => {
     test("ALLOW delegate re-upload as pending", () => assertSucceeds(updateDoc(doc(del(), p),
       {documents: [{...PHOTO, documentURL: "p1", documentStatus: "pending"}], profileImageUrl: "p1", updatedAt: "t"})));
     test("DENY company staff approve or change request status", () => assertFails(updateDoc(doc(as("sup"), p), {status: "approved", reviewedBy: "s"})));
-    test("ALLOW company staff non-sensitive request edit in their company", () => assertSucceeds(updateDoc(doc(as("sup"), p), {firstName: "Edited", updatedAt: "t"})));
+    test("DENY company staff profile-field request edit (M-1)", () => assertFails(updateDoc(doc(as("sup"), p), {firstName: "Edited", updatedAt: "t"})));
+    test("ALLOW company staff non-sensitive request edit in their company", () => assertSucceeds(updateDoc(doc(as("sup"), p), {updatedAt: "t"})));
     test("DENY company staff change nationalId or companyUID", () => assertFails(updateDoc(doc(as("sup"), p), {nationalId: "x", companyUID: "c9"})));
     test("DENY company staff of another company edit the request", () => assertFails(updateDoc(doc(as("sup2"), p), {firstName: "x"})));
     test("ALLOW company staff cancel an unpaid/pending request", () => assertSucceeds(updateDoc(doc(as("sup"), p), {status: "cancelled"})));
@@ -249,8 +250,11 @@ describe("docs-pending round 2", () => {
 
   for (const [label, path] of Object.entries({top: ALL.top, branch: ALL.branch})) {
     describe(`B1 staff on group path (${label})`, () => {
-      for (const w of ["sa", "ca", "sup", "ts"]) {
+      for (const w of ["sa", "ts"]) {
         test(`ALLOW ${w} plain edit (no emulator error)`, () => ok(updateDoc(doc(as(w), path), {fullName: "z"})));
+      }
+      for (const w of ["ca", "sup"]) {
+        test(`DENY ${w} plain name edit (callable-only, M-1)`, () => no(updateDoc(doc(as(w), path), {fullName: "z"})));
       }
       // Mohamed 2026-11-10: only company admin/supervisor may edit name/phone/photo.
       test("DENY hr name edit (company editor policy)", () => no(updateDoc(doc(as("hr"), path), {fullName: "z"})));
@@ -363,8 +367,8 @@ describe("docs-pending round 2", () => {
         const p = path.replace(/sup$/, "sa");
         await seed(p, {...PEND, uid: "sa"}); await no(updateDoc(doc(as("sa"), p), APPROVE));
       });
-      test("ALLOW supervisor edits own name", async () => {
-        await seed(path, {...PEND, uid: "sup"}); await ok(updateDoc(doc(as("sup"), path), {fullName: "me"}));
+      test("DENY supervisor edits own name directly (M-1)", async () => {
+        await seed(path, {...PEND, uid: "sup"}); await no(updateDoc(doc(as("sup"), path), {fullName: "me"}));
       });
       test("ALLOW another same-company approver approves it", async () => {
         await seed(path, {...PEND, uid: "sup"}); await ok(updateDoc(doc(as("ca"), path), APPROVE));

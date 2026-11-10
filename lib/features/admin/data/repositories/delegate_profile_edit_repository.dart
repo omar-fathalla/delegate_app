@@ -1,7 +1,7 @@
-import 'dart:io';
-
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 
 class DelegateProfileEditException implements Exception {
   DelegateProfileEditException(this.message);
@@ -9,6 +9,109 @@ class DelegateProfileEditException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// Strips raw HTTP / callable-code suffixes such as " [409]" from a message.
+@visibleForTesting
+String stripCallableErrorSuffix(String message) {
+  return message.trim().replaceAll(
+    RegExp(r'\s*\[(?:\d{3}|[a-z][a-z0-9-]+)\]\s*$', caseSensitive: false),
+    '',
+  ).trim();
+}
+
+@visibleForTesting
+String callableErrorMessage(
+  FirebaseFunctionsException e, {
+  String fallback = 'تعذر إتمام العملية. حاول مرة أخرى.',
+}) {
+  final message = stripCallableErrorSuffix(e.message ?? '');
+  return message.isNotEmpty ? message : fallback;
+}
+
+class DelegateProfileSaveResult {
+  const DelegateProfileSaveResult({
+    required this.saved,
+    this.imagesFailed = false,
+    this.message,
+  });
+
+  final bool saved;
+  final bool imagesFailed;
+  final String? message;
+}
+
+/// Uploads any picked images, then saves profile fields. A failed image
+/// upload does not drop name/phone changes from the same save.
+@visibleForTesting
+Future<DelegateProfileSaveResult> saveDelegateProfileEdit({
+  required Future<String> Function({
+    required String delegateUid,
+    required String kind,
+    required XFile file,
+  }) upload,
+  required Future<void> Function({
+    String? fullName,
+    String? phoneNumber,
+    String? personalPhotoURL,
+    String? nationalIdFrontUrl,
+    String? nationalIdBackUrl,
+  }) edit,
+  required String delegateUid,
+  String? fullName,
+  String? phoneNumber,
+  XFile? personalPhoto,
+  XFile? idFront,
+  XFile? idBack,
+}) async {
+  String? imageError;
+  Future<String?> tryUpload(XFile? file, String kind) async {
+    if (file == null) return null;
+    try {
+      return await upload(delegateUid: delegateUid, kind: kind, file: file);
+    } on DelegateProfileEditException catch (e) {
+      imageError = e.message;
+      return null;
+    } catch (_) {
+      imageError = 'تعذر رفع الصور. حاول مرة أخرى.';
+      return null;
+    }
+  }
+
+  final photoUrl = await tryUpload(personalPhoto, 'profile');
+  final frontUrl = await tryUpload(idFront, 'national_id_front');
+  final backUrl = await tryUpload(idBack, 'national_id_back');
+
+  final hasText = (fullName != null && fullName.isNotEmpty) ||
+      (phoneNumber != null && phoneNumber.isNotEmpty);
+  final hasUrl = photoUrl != null || frontUrl != null || backUrl != null;
+  if (!hasText && !hasUrl) {
+    throw DelegateProfileEditException(
+      imageError ?? 'لم يتم تغيير أي بيان.',
+    );
+  }
+
+  await edit(
+    fullName: fullName,
+    phoneNumber: phoneNumber,
+    personalPhotoURL: photoUrl,
+    nationalIdFrontUrl: frontUrl,
+    nationalIdBackUrl: backUrl,
+  );
+
+  if (imageError != null) {
+    return DelegateProfileSaveResult(
+      saved: true,
+      imagesFailed: true,
+      message: hasText
+          ? 'تم حفظ الاسم ورقم الموبايل، وتعذر رفع الصور. حاول رفع الصور مرة أخرى.'
+          : imageError,
+    );
+  }
+  return const DelegateProfileSaveResult(
+    saved: true,
+    message: 'تم حفظ تعديلات المندوب في كل السلاسل.',
+  );
 }
 
 class DelegateProfileEditRepository {
@@ -27,13 +130,20 @@ class DelegateProfileEditRepository {
   Future<String> uploadImage({
     required String delegateUid,
     required String kind,
-    required File file,
+    required XFile file,
   }) async {
     final safeKind = kind.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) {
+      throw DelegateProfileEditException('تعذر قراءة الصورة.');
+    }
     final ref = _storage.ref(
       'delegate_documents/$delegateUid/${safeKind}_${DateTime.now().millisecondsSinceEpoch}.jpg',
     );
-    await ref.putFile(file);
+    await ref.putData(
+      bytes,
+      SettableMetadata(contentType: 'image/jpeg'),
+    );
     return ref.getDownloadURL();
   }
 
@@ -61,6 +171,48 @@ class DelegateProfileEditRepository {
       if (nationalIdBackUrl != null && nationalIdBackUrl.isNotEmpty)
         'nationalIdBackUrl': nationalIdBackUrl,
     });
+  }
+
+  Future<DelegateProfileSaveResult> saveProfile({
+    required String companyUID,
+    String? delegateUid,
+    String? requestId,
+    String? fullName,
+    String? phoneNumber,
+    XFile? personalPhoto,
+    XFile? idFront,
+    XFile? idBack,
+  }) {
+    final id = (delegateUid != null && delegateUid.isNotEmpty)
+        ? delegateUid
+        : (requestId ?? 'unknown');
+    return saveDelegateProfileEdit(
+      upload: uploadImage,
+      edit: ({
+        String? fullName,
+        String? phoneNumber,
+        String? personalPhotoURL,
+        String? nationalIdFrontUrl,
+        String? nationalIdBackUrl,
+      }) {
+        return editProfile(
+          companyUID: companyUID,
+          delegateUid: delegateUid,
+          requestId: requestId,
+          fullName: fullName,
+          phoneNumber: phoneNumber,
+          personalPhotoURL: personalPhotoURL,
+          nationalIdFrontUrl: nationalIdFrontUrl,
+          nationalIdBackUrl: nationalIdBackUrl,
+        );
+      },
+      delegateUid: id,
+      fullName: fullName,
+      phoneNumber: phoneNumber,
+      personalPhoto: personalPhoto,
+      idFront: idFront,
+      idBack: idBack,
+    );
   }
 
   Future<String> submitNationalIdUpdate({
@@ -98,10 +250,7 @@ class DelegateProfileEditRepository {
       if (raw is Map) return Map<String, dynamic>.from(raw);
       return {};
     } on FirebaseFunctionsException catch (e) {
-      final message = (e.message ?? '').trim();
-      throw DelegateProfileEditException(
-        message.isNotEmpty ? message : 'تعذر إتمام العملية. حاول مرة أخرى.',
-      );
+      throw DelegateProfileEditException(callableErrorMessage(e));
     } catch (e) {
       throw DelegateProfileEditException('تعذر إتمام العملية. حاول مرة أخرى.');
     }

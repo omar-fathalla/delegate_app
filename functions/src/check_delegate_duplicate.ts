@@ -1,17 +1,10 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import {
-  decideDuplicate,
-  DuplicateHit,
-  isExistingDelegateStatus,
-  isOpenRequestStatus,
-  normalizeEgyptianPhone,
-  isSameDelegateRecord,
   normalizeIdDigits,
   isValidEgyptianNationalId,
-  phoneQueryVariants,
-  publicDuplicateResult,
 } from "./check_delegate_duplicate_logic";
+import {findDuplicatePublic} from "./check_delegate_duplicate_query";
 
 const STAFF_ROLES = new Set([
   "super-admin", "super_admin", "superadmin", "superAdmin",
@@ -35,12 +28,6 @@ function isGlobalStaff(role: string): boolean {
 function isOrgAdmin(role: string): boolean {
   const r = canonicalizeRole(role);
   return r === "organization-admin" || r === "organizationadmin";
-}
-
-function companyOf(data: FirebaseFirestore.DocumentData | undefined): {uid: string; name: string} {
-  const uid = String(data?.companyUID || data?.companyId || "").trim();
-  const name = String(data?.companyName || data?.company_name || "").trim();
-  return {uid, name};
 }
 
 /**
@@ -125,57 +112,5 @@ export const checkDelegateDuplicate = functions
 
     await enforceRateLimit(db, context.auth.uid);
 
-    const hits: DuplicateHit[] = [];
-    const seen = new Set<string>();
-    const addHit = (data: FirebaseFirestore.DocumentData, kind: DuplicateHit["field"]) => {
-      const co = companyOf(data);
-      const org = String(data.organizationUID || data.organizationId || "").trim();
-      let uid = co.uid;
-      let name = co.name;
-      if (!uid) {
-        // User Test L-2: a legacy doc with no companyUID must not be
-        // reported as same_company, even when the org matches.
-        uid = `__legacy__:${org || "unknown"}`;
-        name = name || "شركة غير محددة";
-      }
-      const key = `${uid}|${kind}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      hits.push({companyUID: uid, companyName: name, field: kind});
-    };
-
-    const scanRequests = async (field: "nationalId" | "nationalityID" | "phoneNumber", value: string, kind: DuplicateHit["field"]) => {
-      const snap = await db.collection("delegate_requests").where(field, "==", value).get();
-      for (const doc of snap.docs) {
-        if (isSameDelegateRecord(doc.data(), doc.id, excludeDelegateUid)) continue;
-        if (!isOpenRequestStatus(doc.data().status)) continue;
-        addHit(doc.data(), kind);
-      }
-    };
-
-    const scanDelegates = async (field: "nationalId" | "nationalityID" | "phoneNumber", value: string, kind: DuplicateHit["field"]) => {
-      const snap = await db.collectionGroup("delegates").where(field, "==", value).get();
-      for (const doc of snap.docs) {
-        if (isSameDelegateRecord(doc.data(), doc.id, excludeDelegateUid)) continue;
-        if (!isExistingDelegateStatus(doc.data().status)) continue;
-        addHit(doc.data(), kind);
-      }
-    };
-
-    if (nationalId) {
-      await scanRequests("nationalId", nationalId, "nationalId");
-      await scanRequests("nationalityID", nationalId, "nationalId");
-      await scanDelegates("nationalId", nationalId, "nationalId");
-      await scanDelegates("nationalityID", nationalId, "nationalId");
-    }
-    const phoneLocal = phoneNumber ? normalizeEgyptianPhone(phoneNumber) : "";
-    if (phoneLocal) {
-      const variants = phoneQueryVariants(phoneNumber);
-      for (const v of variants) {
-        await scanRequests("phoneNumber", v, "phoneNumber");
-        await scanDelegates("phoneNumber", v, "phoneNumber");
-      }
-    }
-
-    return publicDuplicateResult(decideDuplicate(companyUID, hits));
+    return findDuplicatePublic(db, {nationalId, phoneNumber, companyUID, excludeDelegateUid});
   });

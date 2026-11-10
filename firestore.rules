@@ -585,8 +585,9 @@ service cloud.firestore {
     // nested helpers).
     // Company staff may act on any chain of their own company (companyNeedsOrg
     // is kept for callers that still want an org pin, but nested writes pass
-    // false so a second chain is reachable). Name/phone/photo/ID images are
-    // only editable by company admin/supervisor. National ID is never a
+    // false so a second chain is reachable). Name, phone, and image URLs are
+    // not direct client writes for company/org staff — those edits go only
+    // through the editDelegateProfile callable. National ID is never a
     // direct client edit by company/org/marketing staff, including on
     // pending / action_required records (Mohamed 2026-11-10). Super-admin
     // and tech support remain unrestricted (approval batches / Admin SDK).
@@ -607,8 +608,10 @@ service cloud.firestore {
     function staffProfileFieldsOk(r) {
       // Mohamed 2026-11-10 14:00 Cairo: only super-admin / tech may change
       // or correct nationalId, including on pending / action_required records.
+      // Name / phone / image URLs: company editors must use editDelegateProfile
+      // (Admin SDK). Direct client writes of those fields are denied here.
       return !changedKeys().hasAny(identityFieldKeys())
-        && (!changedKeys().hasAny(profileEditKeys()) || companyEditorRole(r));
+        && !changedKeys().hasAny(profileEditKeys());
     }
     function staffManagesDelegate(orgId, compId, companyNeedsOrg) {
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
@@ -872,7 +875,11 @@ service cloud.firestore {
           'paymentStatus', 'paymentMethod', 'amountDue', 'amountPaid', 'paidAt',
           'coveredDelegateUids', 'items', 'periodCode', 'paymob', 'applyState',
           'paymentError', 'needsReview', 'receiptCode',
-          'nationalId', 'nationalityID',
+          'nationalId', 'nationalityID', 'proposedNationalId',
+          'fullName', 'firstName', 'secondName', 'thirdName', 'middleName', 'lastName',
+          'phoneNumber', 'phone',
+          'profileImageUrl', 'personalPhotoURL', 'personalPhotoUrl', 'photoURL',
+          'nationalIdFrontUrl', 'nationalIdBackUrl',
           'organizationUID', 'organizationId', 'companyUID', 'companyId'])
         && (!changedKeys().hasAny(['status'])
           || request.resource.data.get('status', '') == 'cancelled');
@@ -1082,14 +1089,14 @@ service cloud.firestore {
             canManageNestedDelegate(orgId, compId)
             || (delegateInOrg(orgId) && delegateInCompany(compId))
           );
-          // Mohamed 2026-11-10: only super-admin / tech may approve or reject.
-          // Other staff may still update non-status fields (dates, branches,
-          // supervisor enable) on a request they manage.
+          // Company and org staff cannot update photo permissions, including
+          // non-status fields (dates, branches, supervisor enable). Only
+          // super-admin / technical support may update. Delegates may still
+          // change non-status fields on their own company's request.
           allow update: if signedIn() && (
             isGlobalStaff()
             || (!changedKeys().hasAny(['status'])
-              && (canManageNestedDelegate(orgId, compId)
-                || (delegateInOrg(orgId) && delegateInCompany(compId))))
+              && delegateInOrg(orgId) && delegateInCompany(compId))
           );
           allow delete: if canManageNestedDelegate(orgId, compId);
 
@@ -1307,15 +1314,16 @@ service cloud.firestore {
           || delegateOwns(request.resource.data.delegateUid)
         ))
       );
+      // Company and org staff cannot update photo permissions (including
+      // non-status fields). Only super-admin / technical support may update.
+      // Delegates may still change non-status fields on their own request.
       allow update: if signedIn() && (
         isGlobalStaff()
         || (!changedKeys().hasAny(['status'])
-          && ((isCompanyScopedStaff() && incomingCompanyScoped())
-            || (isOrgScopedStaff() && incomingOrgScoped())
-            || (isDelegate() && (
-              delegateInOrg(request.resource.data.organizationUID)
-              || delegateOwns(request.resource.data.delegateUid)
-            ))))
+          && isDelegate() && (
+            delegateInOrg(request.resource.data.organizationUID)
+            || delegateOwns(request.resource.data.delegateUid)
+          ))
       );
       allow delete: if isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped());
     }
@@ -1504,10 +1512,21 @@ service cloud.firestore {
       allow read, write: if isStaffWriter();
     }
 
+    // SA/tech profile-edit and national-ID request alerts are not readable
+    // by company or org staff, even when the doc carries their companyUID.
+    function isPrivilegedStaffAlert() {
+      return resource.data.get('type', '') in [
+        'delegate_profile_edit',
+        'delegate_national_id_request'
+      ];
+    }
+
     function canReadNotification() {
       return signedIn() && (
         isGlobalStaff()
-        || ownsDelegateId(resource.data.delegateUid)
+        || (
+        !isPrivilegedStaffAlert() && (
+        ownsDelegateId(resource.data.delegateUid)
         || ownsDelegateId(resource.data.userId)
         || delegateOwns(resource.data.delegateUid)
         || resource.data.delegateUid == 'all'
@@ -1527,6 +1546,7 @@ service cloud.firestore {
         || (isMarketing() && resource.data.delegateUid in ['marketing', 'marketing_promotion', 'marketingPromotion'])
         || (isBranchesMarketing() && resource.data.delegateUid in ['branchesMarketingManager', 'branches_marketing', 'branches-marketing'])
         || (isCompanyAdmin() && resource.data.delegateUid in ['company-admin', 'admin', 'supervisor', 'company_admin'])
+        ))
       );
     }
 
@@ -1675,20 +1695,32 @@ service cloud.firestore {
       // must name itself as supervisorUid (all app flows pass the signed-in
       // user). Super-admin is exempt. Company staff (admin / supervisor / HR)
       // must also set request.companyUID to their own companyUID.
+      // update_national_id requests are created only by submitNationalIdUpdate
+      // (Admin SDK). Clients cannot mint them.
       allow create: if (isSuperAdmin()
         || (isOrgAdmin()
           && request.resource.data.get('supervisorUid', '') == request.auth.uid)
         || ((isCompanyAdmin() || isHR())
           && request.resource.data.get('supervisorUid', '') == request.auth.uid
           && incomingCompanyScoped()))
+        && request.resource.data.get('requestType', '') != 'update_national_id'
+        && request.resource.data.get('actionType', '') != 'update_national_id'
         && subscriptionPaymentUntouched();
       // Self clause first: the staff role helpers are expensive and would
       // otherwise eat the 1000-expression budget before the docs checks.
+      // proposedNationalId is owned by the submit/review callables. Clients
+      // cannot change it, and cannot convert another request into
+      // update_national_id.
       allow update: if ((signedIn() && request.auth.uid == requestId
           && changedKeys().hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
             'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'])
           && delegateDocsOk() && delegateUrlsWithDocs())
         || requestStaffUpdateOk(requestId))
+        && !changedKeys().hasAny(['proposedNationalId'])
+        && (resource.data.get('requestType', '') == 'update_national_id'
+          || request.resource.data.get('requestType', '') != 'update_national_id')
+        && (resource.data.get('actionType', '') == 'update_national_id'
+          || request.resource.data.get('actionType', '') != 'update_national_id')
         && subscriptionPaymentUntouched();
       allow delete: if isSuperAdmin() || isOrgAdmin();
     }
@@ -1738,24 +1770,17 @@ service cloud.firestore {
 
     // ==================== MOBILE: SECURITY AND DEVICES ====================
 
-    // Append-only supervisor/admin profile-edit audit. Company staff can
-    // create a record for their own company and read it, but cannot change
-    // or delete it. Super-admin / tech may read globally. Admin-SDK writes
-    // from editDelegateProfile bypass these rules.
+    // Append-only profile-edit audit. Clients cannot write entries; only
+    // the Admin SDK callables may create them. Company staff may read their
+    // own company's records. Super-admin / tech may read globally.
+    // Entries are immutable.
     match /delegate_profile_audit_logs/{logId} {
       allow read: if signedIn() && (
         isGlobalStaff()
         || (isCompanyScopedStaff()
           && resource.data.get('companyUID', '') == callerCompany())
       );
-      allow create: if signedIn() && (
-        isGlobalStaff()
-        || ((isCompanyAdmin() || isHR())
-          && incomingCompanyScoped()
-          && request.resource.data.get('actorUid', '') == request.auth.uid
-          && request.resource.data.get('companyUID', '') == callerCompany())
-      );
-      allow update, delete: if false;
+      allow create, update, delete: if false;
     }
 
     match /security_audit_logs/{logId} {
