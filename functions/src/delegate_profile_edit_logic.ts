@@ -414,6 +414,13 @@ export const PRIVILEGED_ALERT_ROLE_VALUES = [
 
 export type ReviewTargetCheck = "ok" | "missing" | "mismatch" | "inactive";
 
+export type ReviewTargetClass =
+  | "matching_delegate"
+  | "open_request"
+  | "delegate_mismatch"
+  | "delegate_inactive"
+  | "skip";
+
 /**
  * Re-read the live delegate and confirm it is the person named on the
  * submitted request, in the same company, and still active.
@@ -438,6 +445,58 @@ export function reviewTargetMatchesSubmission(opts: {
   const st = String(data.status || "").toLowerCase();
   if (st && st !== "active" && st !== "approved") return "inactive";
   return "ok";
+}
+
+/**
+ * Classify a collected review target: live delegates stay strictly
+ * verified, but an open same-delegate request (e.g. add_organization)
+ * should still receive the new national ID (N-9).
+ */
+export function classifyReviewTarget(opts: {
+  requestDelegateUid: string;
+  requestCompanyUID: string;
+  nidRequestId?: string;
+  liveExists: boolean;
+  livePath: string;
+  liveData?: {
+    uid?: unknown;
+    companyUID?: unknown;
+    companyId?: unknown;
+    status?: unknown;
+    requestType?: unknown;
+    actionType?: unknown;
+    existingDelegateUid?: unknown;
+    delegateUid?: unknown;
+  };
+}): ReviewTargetClass {
+  const path = opts.livePath || "";
+  if (path.includes("/delegates/")) {
+    const check = reviewTargetMatchesSubmission(opts);
+    if (check === "ok") return "matching_delegate";
+    if (check === "inactive") return "delegate_inactive";
+    if (check === "mismatch") return "delegate_mismatch";
+    return "skip";
+  }
+  if (!/(^|\/)delegate_requests\//.test(path) && !path.startsWith("delegate_requests/")) {
+    return "skip";
+  }
+  if (!opts.liveExists || !opts.liveData) return "skip";
+  const pathId = path.split("/").filter(Boolean).pop() || "";
+  if (opts.nidRequestId && pathId === opts.nidRequestId) return "skip";
+  const data = opts.liveData;
+  const reqType = String(data.requestType || data.actionType || "");
+  if (reqType === "update_national_id") return "skip";
+  const st = String(data.status || "").toLowerCase();
+  if (st && st !== "pending" && st !== "open") return "skip";
+  const wantUid = String(opts.requestDelegateUid || "").trim();
+  const wantCo = String(opts.requestCompanyUID || "").trim();
+  if (!wantUid || !wantCo) return "skip";
+  const liveUid = String(
+    data.existingDelegateUid || data.delegateUid || data.uid || "",
+  ).trim() || pathId;
+  if (liveUid !== wantUid) return "skip";
+  if (!isPatchableTarget(wantCo, data, path)) return "skip";
+  return "open_request";
 }
 
 /** Patch for users/{delegateUid} so login/wallet lookups stay in sync (N-5). */
@@ -473,6 +532,7 @@ export function supervisorReviewAlertDoc(opts: {
   requestId: string;
   targetDelegateUid: string;
   rejectionReason?: string;
+  reviewerRole?: string;
 }): Record<string, unknown> {
   const approved = opts.approved;
   const who = opts.delegateName || opts.targetDelegateUid;
@@ -487,7 +547,7 @@ export function supervisorReviewAlertDoc(opts: {
         : `تم رفض طلب تعديل الرقم القومي للمندوب ${who} بواسطة ${opts.reviewerName}.`),
     type: "delegate_national_id_review",
     senderName: opts.reviewerName,
-    senderRole: "reviewer",
+    senderRole: String(opts.reviewerRole || "").trim() || "super-admin",
     companyUID: opts.companyUID,
     organizationId: opts.organizationUID,
     isRead: false,

@@ -252,7 +252,7 @@ void main() {
     );
 
     blocTest<PhotoPermissionBloc, PhotoPermissionState>(
-      'should emit [PhotoPermissionLoading, PhotoPermissionError] when updating permission dates fails',
+      'should emit [PhotoPermissionLoading, PhotoPermissionActionFailure] when updating permission dates fails',
       build: () {
         when(() => mockUpdatePhotoPermissionDates(any()))
             .thenAnswer((_) async => const Left(ServerFailure('Failed to update dates')));
@@ -269,7 +269,7 @@ void main() {
       ),
       expect: () => [
         PhotoPermissionLoading(),
-        const PhotoPermissionError(message: 'Failed to update dates'),
+        const PhotoPermissionActionFailure(message: 'Failed to update dates'),
       ],
     );
 

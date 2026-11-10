@@ -865,7 +865,7 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
       ),
     );
     result.fold(
-      (failure) => emit(PhotoPermissionError(message: failure.message)),
+      (failure) => emit(PhotoPermissionActionFailure(message: failure.message)),
       (_) {
         _updateCachedPermissionBranches(
           companyUID: event.companyUID,
@@ -893,7 +893,7 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
       ),
     );
     result.fold(
-      (failure) => emit(PhotoPermissionError(message: failure.message)),
+      (failure) => emit(PhotoPermissionActionFailure(message: failure.message)),
       (_) {
         _updateCachedPermissionDates(
           companyUID: event.companyUID,

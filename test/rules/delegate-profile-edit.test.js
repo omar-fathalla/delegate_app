@@ -17,7 +17,11 @@ const USERS = {
   adm: {role: "admin", organizationUID: "o1", companyUID: "c1"},
   d1: {role: "delegate", organizationUID: "o1", companyUID: "c1"},
   mkt: {role: "marketing_promotion", organizationUID: "o1"},
+  mktCo: {role: "marketing", organizationUID: "o1", companyUID: "c1"},
   oa: {role: "organization-admin", organizationUID: "o1"},
+  bmm: {role: "branches_marketing", organizationUID: "o1", companyUID: "c1"},
+  bmmMgr: {role: "branches_marketing_manager", organizationUID: "o1", companyUID: "c1"},
+  bmmOther: {role: "branches_marketing", organizationUID: "o1", companyUID: "c2"},
 };
 const NESTED = "organizations/o1/companies/c1/delegates/d1";
 const REQ = "delegate_requests/r1";
@@ -261,6 +265,33 @@ describe("supervisor delegate profile edit rules", () => {
     await assertFails(updateDoc(doc(as("mkt"), path), {status: "rejected"}));
     await assertSucceeds(updateDoc(doc(as("oa"), path), {startDate: "2026-01-15", endDate: "2026-04-01", updatedAt: "t2"}));
     await assertFails(updateDoc(doc(as("oa"), path), {isSupervisorEnabled: false}));
+    await assertSucceeds(updateDoc(doc(as("mktCo"), path), schedule));
+    await assertFails(updateDoc(doc(as("mktCo"), path), {isSupervisorEnabled: false}));
     await assertFails(updateDoc(doc(as("sup"), path), {startDate: "2026-01-20", endDate: "2026-05-01", updatedAt: "t3"}));
+  });
+
+  test("branches-marketing with companyUID may edit dates and branches in own company (N-2/L-3)", async () => {
+    const path = "organizations/o1/companies/c1/photo_permissions/pp-bmm";
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(path).set({
+        status: "approved",
+        companyUID: "c1",
+        organizationUID: "o1",
+        delegateUid: "d1",
+        isSupervisorEnabled: true,
+        startDate: "2026-01-01",
+        endDate: "2026-02-01",
+        branchIds: ["b1"],
+        branchNames: ["فرع 1"],
+      });
+    });
+    const schedule = {startDate: "2026-01-10", endDate: "2026-03-01", updatedAt: "t"};
+    const branches = {branchIds: ["b1", "b2"], branchNames: ["فرع 1", "فرع 2"], updatedAt: "t"};
+    await assertSucceeds(updateDoc(doc(as("bmm"), path), schedule));
+    await assertSucceeds(updateDoc(doc(as("bmm"), path), branches));
+    await assertSucceeds(updateDoc(doc(as("bmmMgr"), path), {startDate: "2026-01-12", endDate: "2026-03-15", updatedAt: "t2"}));
+    await assertFails(updateDoc(doc(as("bmm"), path), {isSupervisorEnabled: false}));
+    await assertFails(updateDoc(doc(as("bmm"), path), {status: "rejected"}));
+    await assertFails(updateDoc(doc(as("bmmOther"), path), schedule));
   });
 });

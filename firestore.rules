@@ -921,6 +921,45 @@ service cloud.firestore {
       return request.path[3] == 'organizations' && request.path[5] == 'companies';
     }
 
+
+    // Photo-permission schedule edits (dates/branches) for marketing,
+    // marketing-promotion, org-admin, and branches-marketing. One get() of
+    // users/{uid} — no roleIs loop — so a branches-marketing user with a
+    // companyUID stays under the 1000-expression budget (N-2/L-3).
+    function photoScheduleKeysOnly() {
+      return changedKeys().hasOnly([
+        'startDate', 'endDate', 'branchIds', 'branchNames', 'updatedAt']);
+    }
+
+    function photoScheduleStaffRole(role) {
+      return role in [
+        'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion',
+        'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
+        'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+        'branches-marketing-manager', 'branchesmarketingmanager'
+      ];
+    }
+
+    function photoScheduleStaffFromUser(u, orgId, compId) {
+      let role = u.keys().hasAll(['role']) && u.role is string ? u.role : '';
+      let org = u.keys().hasAll(['organizationUID']) && u.organizationUID is string
+        ? u.organizationUID : '';
+      let co = u.keys().hasAll(['companyUID']) && u.companyUID is string
+        ? u.companyUID : '';
+      return photoScheduleStaffRole(role)
+        && org != '' && org == orgId
+        && (co == '' || co == compId);
+    }
+
+    function photoScheduleEditOnNested(orgId, compId) {
+      return photoScheduleKeysOnly()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && photoScheduleStaffFromUser(
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data,
+          orgId, compId);
+    }
+
+
     function techRoleList() {
       return ['technical_support', 'technical-support', 'technicalSupport', 'technicalsupport', 'tech_support', 'techsupport'];
     }
@@ -1091,23 +1130,18 @@ service cloud.firestore {
           );
           // Approving or toggling isSupervisorEnabled is super-admin / tech
           // only (Mohamed 2026-11-10 14:00). Branch and date edits are not
-          // approval: marketing and org-admin may change those fields in
-          // their own org (and company, when they have one). Delegates may
-          // still change non-status fields on their own company's request.
+          // approval: marketing, marketing-promotion, org-admin and
+          // branches-marketing may change those fields in their own org
+          // (and company, when they have one). The schedule-edit clause
+          // is first and uses a single users/{uid} get() so a
+          // branches-marketing user with a companyUID stays under the
+          // 1000-expression budget. Delegates may still change non-status
+          // fields on their own company's request.
           allow update: if signedIn() && (
-            isGlobalStaff()
+            photoScheduleEditOnNested(orgId, compId)
+            || isGlobalStaff()
             || (!changedKeys().hasAny(['status'])
               && delegateInOrg(orgId) && delegateInCompany(compId))
-            || (
-              (isOrgScopedStaff() || isBranchesMarketing())
-              && callerOrg() == orgId
-              && (callerCompany() == '' || callerCompany() == compId)
-              && !changedKeys().hasAny([
-                'status', 'isSupervisorEnabled', 'approvedBy', 'approvedAt',
-                'rejectedBy', 'rejectedAt', 'reviewedBy', 'reviewedAt'])
-              && changedKeys().hasOnly([
-                'startDate', 'endDate', 'branchIds', 'branchNames', 'updatedAt'])
-            )
           );
           allow delete: if canManageNestedDelegate(orgId, compId);
 
@@ -1325,28 +1359,11 @@ service cloud.firestore {
           || delegateOwns(request.resource.data.delegateUid)
         ))
       );
-      // Same policy as the nested match: SA/tech may update anything;
-      // marketing / org-admin may edit dates and branches in their scope;
-      // company staff cannot toggle or approve; delegates may change
-      // non-status fields on their own request.
-      allow update: if signedIn() && (
-        isGlobalStaff()
-        || (!changedKeys().hasAny(['status'])
-          && isDelegate() && (
-            delegateInOrg(request.resource.data.organizationUID)
-            || delegateOwns(request.resource.data.delegateUid)
-          ))
-        || (
-          (isOrgScopedStaff() || isBranchesMarketing())
-          && orgScoped()
-          && (callerCompany() == '' || companyScoped())
-          && !changedKeys().hasAny([
-            'status', 'isSupervisorEnabled', 'approvedBy', 'approvedAt',
-            'rejectedBy', 'rejectedAt', 'reviewedBy', 'reviewedAt'])
-          && changedKeys().hasOnly([
-            'startDate', 'endDate', 'branchIds', 'branchNames', 'updatedAt'])
-        )
-      );
+      // No allow update here. Nested photo_permissions updates are
+      // decided only by the path-scoped match above. Overlapping
+      // collection-group update rules are OR'd and would re-evaluate
+      // role helpers, pushing a branches-marketing user with a
+      // companyUID over the 1000-expression budget (N-2/L-3).
       allow delete: if isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped());
     }
 

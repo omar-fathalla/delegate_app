@@ -92,9 +92,11 @@ void main() {
   group('role mapping & sanitization', () {
     test('should map English role keys to Arabic correctly', () {
       expect(NotificationModel.formatSenderRoleArabic('superAdmin'), 'سوبر أدمن');
+      expect(NotificationModel.formatSenderRoleArabic('super-admin'), 'سوبر أدمن');
       expect(NotificationModel.formatSenderRoleArabic('organizationAdmin'), 'مسؤول المنظمة');
       expect(NotificationModel.formatSenderRoleArabic('branchesMarketingManager'), 'مسؤول تسويق الفروع');
       expect(NotificationModel.formatSenderRoleArabic('technicalSupport'), 'الدعم الفني');
+      expect(NotificationModel.formatSenderRoleArabic('technical_support'), 'الدعم الفني');
       expect(NotificationModel.formatSenderRoleArabic('supervisor'), 'مشرف الشركة');
       expect(NotificationModel.formatSenderRoleArabic('delegate'), 'مندوب');
     });

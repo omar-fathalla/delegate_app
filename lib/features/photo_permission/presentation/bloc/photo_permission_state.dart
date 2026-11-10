@@ -80,6 +80,15 @@ class PhotoPermissionError extends PhotoPermissionState {
   List<Object?> get props => [message];
 }
 
+/// Mutation failure that must not replace an already-loaded list.
+class PhotoPermissionActionFailure extends PhotoPermissionState {
+  final String message;
+  const PhotoPermissionActionFailure({required this.message});
+
+  @override
+  List<Object?> get props => [message];
+}
+
 class PhotoDeleteSuccess extends PhotoPermissionState {}
 
 class PhotoBatchUploadInProgress extends PhotoPermissionState {
