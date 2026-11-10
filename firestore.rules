@@ -519,8 +519,13 @@ service cloud.firestore {
       let saOrTech = r in [
         'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN']
         || tech;
-      let accountCh = stCh && st1 is string && st1.lower() in [
-        'active', 'approved', 'suspended', 'inactive', 'deactivated'];
+      // Exact plus Title-Case only (no lower(): 1000-expression budget).
+      let accountCh = stCh && st1 is string && (
+        st1 == 'active' || st1 == 'Active'
+        || st1 == 'approved' || st1 == 'Approved'
+        || st1 == 'suspended' || st1 == 'Suspended'
+        || st1 == 'inactive' || st1 == 'Inactive'
+        || st1 == 'deactivated' || st1 == 'Deactivated');
       return !(stCh && st1 == 'pending' && !approver)
         && ((techSignup && techFlipOk(delegateId) && techReqOk(o1, c1, delegateId))
           || (!techSignup && (delegateDocsOk() || approver)
@@ -901,12 +906,12 @@ service cloud.firestore {
           || getAfter(/databases/$(database)/documents/organizations/$(d.get('organizationUID', ''))/companies/$(d.get('companyUID', ''))/delegates/$(ty == 'add_organization' ? d.get('existingDelegateUid', '') : requestId)).data.get('status', '') == 'active');
     }
 
-    // r5 budget: true for a technical support caller writing a delegate doc
-    // at organizations/{o}/companies/{c}/delegates/{id}. The collection-group
-    // delegates match defers those writes to the nested match.
-    function techOnNestedDelegate() {
-      return request.path[3] == 'organizations' && request.path[5] == 'companies'
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in techRoleList();
+    // True for a write to organizations/{o}/companies/{c}/delegates/{id}.
+    // The collection-group delegates match defers those writes to the nested
+    // match so the 1000-expression budget is not spent twice, for every role
+    // (not only technical support).
+    function onNestedDelegate() {
+      return request.path[3] == 'organizations' && request.path[5] == 'companies';
     }
 
     function techRoleList() {
@@ -1256,26 +1261,23 @@ service cloud.firestore {
 
     match /{path=**}/delegates/{delegateId} {
       allow read: if signedIn() && canReadDelegate();
-      // r5 budget: like update below, a tech support create of a nested
-      // organizations/{o}/companies/{c}/delegates doc is decided by the
-      // nested match alone (techCreateOk there is bound to the path).
-      allow create: if signedIn() && !techOnNestedDelegate() && deviceBindingAbsent() && (
+      // r5 budget: a nested organizations/{o}/companies/{c}/delegates
+      // create is decided by the nested match alone.
+      allow create: if signedIn() && !onNestedDelegate() && deviceBindingAbsent() && (
         isGlobalStaff() ||
         (isOrgScopedStaff() && incomingOrgScoped()) ||
         (isCompanyScopedStaff() && incomingCompanyScoped())
       ) && techCreateOk(request.resource.data.get('organizationUID', ''), request.resource.data.get('companyUID', ''), delegateId);
-      // r5 budget: a tech support write to a nested
-      // organizations/{o}/companies/{c}/delegates doc is decided by the nested
-      // match alone (same checks, bound to the path), so the approval batch
-      // does not spend the 1000-expression budget twice on one doc.
-      allow update: if signedIn() && !techOnNestedDelegate()
+      // r5 budget: a nested organizations/{o}/companies/{c}/delegates
+      // update is decided by the nested match alone, for every role.
+      allow update: if signedIn() && !onNestedDelegate()
         && (delegateOwns(delegateId)
         ? delegateFieldsSafe()
         : (deviceBindingUntouched() && staffManagesDelegate(
             [resource.data.get('organizationUID', ''), resource.data.get('organizationId', '')],
             [resource.data.get('companyUID', ''), resource.data.get('companyId', '')], false)
           && staffDocsApproveOk(resource.data.get('organizationUID', ''), resource.data.get('companyUID', ''), resource.data.get('companyId', ''), delegateId)));
-      allow delete: if signedIn() && canManageDelegate();
+      allow delete: if signedIn() && !onNestedDelegate() && canManageDelegate();
     }
 
     match /{path=**}/companies/{companyId} {

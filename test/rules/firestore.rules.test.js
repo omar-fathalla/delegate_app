@@ -472,8 +472,19 @@ describe("firestore tightened rules", () => {
         isDeviceLocked: false,
       }),
     );
+    // Mohamed 2026-11-10 14:00: only super-admin / tech may suspend.
+    await assertFails(
+      companyAdmin.doc("organizations/o1/companies/c1/delegates/del-1").update({
+        status: "suspended",
+      }),
+    );
     await assertSucceeds(
       companyAdmin.doc("organizations/o1/companies/c1/delegates/del-1").update({
+        fullName: "Updated Name",
+      }),
+    );
+    await assertSucceeds(
+      dbFor("super").doc("organizations/o1/companies/c1/delegates/del-1").update({
         status: "suspended",
       }),
     );
