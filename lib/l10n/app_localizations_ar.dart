@@ -1289,8 +1289,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String companySupervisorWithName(Object companyName) {
-    final name = companyName.toString().trim();
-    return name.isEmpty ? 'مشرف الشركة' : 'مشرف الشركة ($name)';
+    return 'مشرف الشركة ($companyName)';
   }
 
   @override
@@ -1519,11 +1518,12 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String attCannotActOutside(Object action, Object distance) {
-    final d = distance.toString().trim();
-    if (d.isEmpty) {
-      return 'لا يمكنك $action وأنت خارج نطاق الفرع. كن داخل الفرع.';
-    }
-    return 'لا يمكنك $action وأنت خارج نطاق الفرع ($d). كن داخل الفرع.';
+    return 'لا يمكنك $action وأنت خارج نطاق الفرع ($distance). كن داخل الفرع.';
+  }
+
+  @override
+  String attCannotActOutsideNoDistance(Object action) {
+    return 'لا يمكنك $action وأنت خارج نطاق الفرع. كن داخل الفرع.';
   }
 
   @override

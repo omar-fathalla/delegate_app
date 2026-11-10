@@ -27,6 +27,12 @@ class AppEnv {
 
   static const bool isDev = name == 'dev';
 
+  /// Compile-time git SHA from `--dart-define=GIT_SHA=<full sha>`.
+  /// Empty when the define was not passed. Dev builds show this on the
+  /// login screen and log `GIT_SHA=<sha>` at startup so User Test can
+  /// verify the installed artifact. Production UI never displays it.
+  static const String gitSha = String.fromEnvironment('GIT_SHA');
+
   static const String devProjectId = 'tashil-dev';
   static const String prodProjectId = 'practice-firebase-72df1';
 

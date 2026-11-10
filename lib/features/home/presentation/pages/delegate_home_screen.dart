@@ -851,6 +851,11 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
   Widget _buildEmptySupervisorCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final companyName = widget.delegate.companyName.trim();
+    final supervisorTitle = companyName.isEmpty
+        ? l10n.companySupervisor
+        : l10n.companySupervisorWithName(companyName);
 
     return Card(
       elevation: 0,
@@ -874,7 +879,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    AppLocalizations.of(context)!.companySupervisorWithName(widget.delegate.companyName),
+                    supervisorTitle,
                     style: TextStyle(
                       fontSize: 10,
                       color: colorScheme.onSurfaceVariant,

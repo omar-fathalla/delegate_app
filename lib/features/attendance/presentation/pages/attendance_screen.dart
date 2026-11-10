@@ -2287,9 +2287,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       final distStr = _distanceToNearest != null
           ? l10n.distanceMeters(_distanceToNearest!.toInt())
           : nearestName;
+      final action = isCheckedIn ? l10n.attActionCheckOut : l10n.attActionCheckIn;
       AppSnackBar.showError(
         parentContext,
-        l10n.attCannotActOutside(isCheckedIn ? l10n.attActionCheckOut : l10n.attActionCheckIn, distStr),
+        distStr.isEmpty
+            ? l10n.attCannotActOutsideNoDistance(action)
+            : l10n.attCannotActOutside(action, distStr),
       );
       return;
     }
