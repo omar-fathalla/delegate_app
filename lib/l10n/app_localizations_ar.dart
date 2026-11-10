@@ -2822,4 +2822,28 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get mapRetry => 'إعادة المحاولة';
+
+  @override
+  String get deviceLockTitle => 'تنبيه أمان: الحساب مقترن بجهاز آخر';
+
+  @override
+  String get deviceLockPendingUnbindButton => 'طلب فك ارتباط قيد المراجعة';
+
+  @override
+  String get deviceLockSendUnbindButton => 'إرسال طلب لفك الارتباط';
+
+  @override
+  String get deviceLockSubmitting => 'جاري إرسال الطلب...';
+
+  @override
+  String get deviceLockRequestSent => 'تم إرسال الطلب إلى المشرف';
+
+  @override
+  String get deviceLockCannotIdentifyDelegate =>
+      'تعذر تحديد بيانات المندوب لإرسال الطلب';
+
+  @override
+  String deviceLockSendError(String error) {
+    return 'حدث خطأ أثناء إرسال الطلب: $error';
+  }
 }

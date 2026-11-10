@@ -2821,4 +2821,29 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mapRetry => 'Retry';
+
+  @override
+  String get deviceLockTitle =>
+      'Security alert: this account is bound to another device';
+
+  @override
+  String get deviceLockPendingUnbindButton => 'Unbind request pending review';
+
+  @override
+  String get deviceLockSendUnbindButton => 'Send an unbind request';
+
+  @override
+  String get deviceLockSubmitting => 'Sending request...';
+
+  @override
+  String get deviceLockRequestSent => 'The request was sent to the supervisor';
+
+  @override
+  String get deviceLockCannotIdentifyDelegate =>
+      'Could not identify the delegate to send the request';
+
+  @override
+  String deviceLockSendError(String error) {
+    return 'Could not send the request: $error';
+  }
 }

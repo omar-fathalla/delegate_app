@@ -263,23 +263,34 @@ class DeviceBindingService {
     } catch (_) {}
   }
 
-  /// التحقق مما إذا كان لدى المندوب طلب فك ارتباط معلق حالياً
+  /// التحقق مما إذا كان لدى المندوب طلب فك ارتباط معلق حالياً.
+  /// `delegateLoginV2` auto-upserts a pending doc on a device mismatch.
   static Future<bool> hasPendingUnbindRequest(String delegateUid) async {
     try {
-      final snap = await _firestore
-          .collection('device_unbind_requests')
-          .where('delegateUid', isEqualTo: delegateUid)
-          .where('status', isEqualTo: 'pending')
-          .limit(1)
-          .get();
-      return snap.docs.isNotEmpty;
+      return await _pendingUnbindExists(delegateUid);
     } catch (e) {
       debugPrint('Error checking pending unbind request: $e');
       return false;
     }
   }
 
-  /// إرسال طلب فك ارتباط الجهاز القديم من قبل المندوب
+  static Future<bool> _pendingUnbindExists(String delegateUid) async {
+    final snap = await _firestore
+        .collection('device_unbind_requests')
+        .where('delegateUid', isEqualTo: delegateUid)
+        .where('status', isEqualTo: 'pending')
+        .limit(1)
+        .get();
+    return snap.docs.isNotEmpty;
+  }
+
+  /// إرسال طلب فك ارتباط الجهاز القديم من قبل المندوب.
+  ///
+  /// Idempotent with `delegateLoginV2`: if a pending request already
+  /// exists (including one the server upserted on mismatch), this does
+  /// not create a second document and returns false. If the pending
+  /// lookup fails, it also skips create so a second request cannot be
+  /// written by accident.
   static Future<bool> submitUnbindRequest({
     required Delegate delegate,
     String? currentDeviceModel,
@@ -287,8 +298,12 @@ class DeviceBindingService {
     String? reason,
   }) async {
     try {
-      final isPending = await hasPendingUnbindRequest(delegate.uid);
-      if (isPending) return false;
+      try {
+        if (await _pendingUnbindExists(delegate.uid)) return false;
+      } catch (e) {
+        debugPrint('Error checking pending unbind request before submit: $e');
+        return false;
+      }
 
       String devModel = currentDeviceModel ?? '';
       String devId = currentDeviceId ?? '';
