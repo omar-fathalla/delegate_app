@@ -88,6 +88,10 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      # delegate-ci has no Android SDK, and must not use another user's
+      # /Users/fathalla/Library/Android/sdk (permission denied).
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.44.5"
