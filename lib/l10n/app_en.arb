@@ -2340,5 +2340,38 @@
   "mapRetry": "Retry",
   "@mapRetry": {
     "description": "Map gate retry button"
+  },
+  "deviceLockTitle": "Security alert: this account is bound to another device",
+  "@deviceLockTitle": {
+    "description": "Title of the device-binding security dialog"
+  },
+  "deviceLockPendingUnbindButton": "Unbind request pending review",
+  "@deviceLockPendingUnbindButton": {
+    "description": "Mandatory button when an unbind request is already pending"
+  },
+  "deviceLockSendUnbindButton": "Send an unbind request",
+  "@deviceLockSendUnbindButton": {
+    "description": "Mandatory button to submit a device unbind request"
+  },
+  "deviceLockSubmitting": "Sending request...",
+  "@deviceLockSubmitting": {
+    "description": "Busy label while the unbind request is being sent"
+  },
+  "deviceLockRequestSent": "The request was sent to the supervisor",
+  "@deviceLockRequestSent": {
+    "description": "Confirmation after the unbind request is sent or already pending"
+  },
+  "deviceLockCannotIdentifyDelegate": "Could not identify the delegate to send the request",
+  "@deviceLockCannotIdentifyDelegate": {
+    "description": "Error when the dialog has no delegate to attach the unbind request to"
+  },
+  "deviceLockSendError": "Could not send the request: {error}",
+  "@deviceLockSendError": {
+    "description": "Error snackbar when sending the unbind request fails",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   }
 }

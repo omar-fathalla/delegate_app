@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:delegate_app/core/services/device_binding_service.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
 
 /// نافذة أمان مخصصة عند محاولة الدخول من جهاز غير مطابق لجهاز المندوب المعتمد
 class DeviceLockDialog extends StatefulWidget {
@@ -80,71 +81,73 @@ class _DeviceLockDialogState extends State<DeviceLockDialog> {
     }
   }
 
+  AppLocalizations get _l10n => AppLocalizations.of(context)!;
+
+  void _closeWithSubmittedMessage() {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final message = _l10n.deviceLockRequestSent;
+    Navigator.of(context).pop();
+    scaffoldMessenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: primaryColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        duration: const Duration(seconds: 5),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+    );
+  }
+
   Future<void> _handleSendUnbindRequest() async {
+    // Idempotent with delegateLoginV2, which already upserts a pending
+    // unbind request on a device mismatch. If a request is already filed
+    // (or the dialog was opened from AuthError(device_mismatch) without a
+    // Delegate), just close and confirm — do not create a second doc.
     if (widget.delegate == null) {
+      if (widget.requestAlreadyFiled || _isPending) {
+        _closeWithSubmittedMessage();
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر تحديد بيانات المندوب لإرسال الطلب')),
+        SnackBar(content: Text(_l10n.deviceLockCannotIdentifyDelegate)),
       );
       return;
     }
 
     setState(() => _isSubmitting = true);
     try {
-      final success = await DeviceBindingService.submitUnbindRequest(
+      await DeviceBindingService.submitUnbindRequest(
         delegate: widget.delegate!,
         currentDeviceModel: widget.currentDeviceModel,
       );
-
       if (!mounted) return;
-
-      final scaffoldMessenger = ScaffoldMessenger.of(context);
-      final primaryColor = Theme.of(context).colorScheme.primary;
-
-      // إغلاق النافذة المنبثقة تلقائياً فور إرسال الطلب كما طلب المستخدم
-      Navigator.of(context).pop();
-
-      final message = success
-          ? 'تم إرسال طلب فك الارتباط بنجاح، وسيتم فك الارتباط خلال 5 دقائق لتتمكن من تسجيل الدخول.'
-          : 'طلب فك الارتباط قيد المراجعة لدى الإدارة بالفعل، وسيتم فك الارتباط خلال 5 دقائق.';
-
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(
-                success ? Icons.check_circle_rounded : Icons.hourglass_top_rounded,
-                color: Colors.white,
-                size: 22,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  message,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: primaryColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          duration: const Duration(seconds: 5),
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        ),
-      );
+      _closeWithSubmittedMessage();
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('حدث خطأ أثناء إرسال الطلب: $e'),
+          content: Text(_l10n.deviceLockSendError('$e')),
           backgroundColor: Theme.of(context).colorScheme.error,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -164,7 +167,7 @@ class _DeviceLockDialogState extends State<DeviceLockDialog> {
         : 'جهاز معتمد سابق';
 
     return PopScope(
-      canPop: true,
+      canPop: false,
       child: Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         elevation: 0,
@@ -194,7 +197,7 @@ class _DeviceLockDialogState extends State<DeviceLockDialog> {
 
               // 2. Title
               Text(
-                'تنبيه أمان: الحساب مقترن بجهاز آخر',
+                _l10n.deviceLockTitle,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 18,
@@ -300,50 +303,11 @@ class _DeviceLockDialogState extends State<DeviceLockDialog> {
 
               const SizedBox(height: 18),
 
-              // 5. Action: Send Unbind Request OR Pending Status
+              // 5. Mandatory unbind-request button (not dismissible).
               if (_isChecking)
                 const SizedBox(
                   height: 48,
                   child: Center(child: CircularProgressIndicator.adaptive()),
-                )
-              else if (_isPending)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.hourglass_top_rounded, color: colorScheme.primary, size: 24),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'طلب فك الارتباط قيد المراجعة',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: colorScheme.onPrimaryContainer,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'تم استلام طلبك وبانتظار موافقة الإدارة. سيتم فك الارتباط خلال 5 دقائق لتتمكن من تسجيل الدخول.',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: colorScheme.onPrimaryContainer.withValues(alpha: 0.85),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
                 )
               else
                 SizedBox(
@@ -356,9 +320,18 @@ class _DeviceLockDialogState extends State<DeviceLockDialog> {
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : const Icon(Icons.phonelink_erase_rounded, size: 20),
+                        : Icon(
+                            _isPending
+                                ? Icons.hourglass_top_rounded
+                                : Icons.phonelink_erase_rounded,
+                            size: 20,
+                          ),
                     label: Text(
-                      _isSubmitting ? 'جاري إرسال الطلب...' : 'إرسال طلب لفك الارتباط',
+                      _isSubmitting
+                          ? _l10n.deviceLockSubmitting
+                          : (_isPending
+                              ? _l10n.deviceLockPendingUnbindButton
+                              : _l10n.deviceLockSendUnbindButton),
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                     ),
                     style: FilledButton.styleFrom(
@@ -367,17 +340,6 @@ class _DeviceLockDialogState extends State<DeviceLockDialog> {
                     ),
                   ),
                 ),
-
-              const SizedBox(height: 8),
-
-              // 6. Close Button
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'إغلاق',
-                  style: TextStyle(color: colorScheme.onSurfaceVariant),
-                ),
-              ),
             ],
           ),
         ),

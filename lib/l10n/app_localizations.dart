@@ -5063,6 +5063,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Retry'**
   String get mapRetry;
+
+  /// Title of the device-binding security dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Security alert: this account is bound to another device'**
+  String get deviceLockTitle;
+
+  /// Mandatory button when an unbind request is already pending
+  ///
+  /// In en, this message translates to:
+  /// **'Unbind request pending review'**
+  String get deviceLockPendingUnbindButton;
+
+  /// Mandatory button to submit a device unbind request
+  ///
+  /// In en, this message translates to:
+  /// **'Send an unbind request'**
+  String get deviceLockSendUnbindButton;
+
+  /// Busy label while the unbind request is being sent
+  ///
+  /// In en, this message translates to:
+  /// **'Sending request...'**
+  String get deviceLockSubmitting;
+
+  /// Confirmation after the unbind request is sent or already pending
+  ///
+  /// In en, this message translates to:
+  /// **'The request was sent to the supervisor'**
+  String get deviceLockRequestSent;
+
+  /// Error when the dialog has no delegate to attach the unbind request to
+  ///
+  /// In en, this message translates to:
+  /// **'Could not identify the delegate to send the request'**
+  String get deviceLockCannotIdentifyDelegate;
+
+  /// Error snackbar when sending the unbind request fails
+  ///
+  /// In en, this message translates to:
+  /// **'Could not send the request: {error}'**
+  String deviceLockSendError(String error);
 }
 
 class _AppLocalizationsDelegate

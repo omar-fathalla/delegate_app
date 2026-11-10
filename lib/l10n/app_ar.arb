@@ -1859,5 +1859,38 @@
   "mapRetry": "إعادة المحاولة",
   "@mapRetry": {
     "description": "Map gate retry button"
+  },
+  "deviceLockTitle": "تنبيه أمان: الحساب مقترن بجهاز آخر",
+  "@deviceLockTitle": {
+    "description": "Title of the device-binding security dialog"
+  },
+  "deviceLockPendingUnbindButton": "طلب فك ارتباط قيد المراجعة",
+  "@deviceLockPendingUnbindButton": {
+    "description": "Mandatory button when an unbind request is already pending"
+  },
+  "deviceLockSendUnbindButton": "إرسال طلب لفك الارتباط",
+  "@deviceLockSendUnbindButton": {
+    "description": "Mandatory button to submit a device unbind request"
+  },
+  "deviceLockSubmitting": "جاري إرسال الطلب...",
+  "@deviceLockSubmitting": {
+    "description": "Busy label while the unbind request is being sent"
+  },
+  "deviceLockRequestSent": "تم إرسال الطلب إلى المشرف",
+  "@deviceLockRequestSent": {
+    "description": "Confirmation after the unbind request is sent or already pending"
+  },
+  "deviceLockCannotIdentifyDelegate": "تعذر تحديد بيانات المندوب لإرسال الطلب",
+  "@deviceLockCannotIdentifyDelegate": {
+    "description": "Error when the dialog has no delegate to attach the unbind request to"
+  },
+  "deviceLockSendError": "حدث خطأ أثناء إرسال الطلب: {error}",
+  "@deviceLockSendError": {
+    "description": "Error snackbar when sending the unbind request fails",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
   }
 }
