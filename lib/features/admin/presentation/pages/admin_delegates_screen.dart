@@ -63,15 +63,37 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
     try {
       final snap =
           await FirebaseFirestore.instance.collection('organizations').get();
-      if (mounted) {
-        setState(() {
-          _availableOrganizations = snap.docs.map((d) {
+      final companyUID = widget.adminDelegate.companyUID;
+      final List<Map<String, String>> orgs = [];
+      if (companyUID.isEmpty) {
+        orgs.addAll(snap.docs.map((d) {
+          final name = formatChainDisplayName(
+            d.data()['name']?.toString() ?? d.id,
+          );
+          return {'id': d.id, 'name': name};
+        }));
+      } else {
+        final checks = await Future.wait(snap.docs.map((d) async {
+          try {
+            final cDoc = await FirebaseFirestore.instance
+                .collection('organizations')
+                .doc(d.id)
+                .collection('companies')
+                .doc(companyUID)
+                .get();
+            if (!cDoc.exists) return null;
             final name = formatChainDisplayName(
               d.data()['name']?.toString() ?? d.id,
             );
             return {'id': d.id, 'name': name};
-          }).toList();
-        });
+          } catch (_) {
+            return null;
+          }
+        }));
+        orgs.addAll(checks.whereType<Map<String, String>>());
+      }
+      if (mounted) {
+        setState(() => _availableOrganizations = orgs);
       }
     } catch (_) {}
   }

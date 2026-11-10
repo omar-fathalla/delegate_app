@@ -20,6 +20,11 @@ export interface DuplicateDecision {
 const ARABIC_INDIC = /[\u0660-\u0669]/g;
 const EXTENDED_ARABIC_INDIC = /[\u06F0-\u06F9]/g;
 
+/** Egyptian national ID is 14 digits after Arabic-Indic normalization. */
+export function isValidEgyptianNationalId(nationalId: string): boolean {
+  return /^\d{14}$/.test(nationalId);
+}
+
 export function normalizeIdDigits(raw: string): string {
   return raw
     .trim()
@@ -104,11 +109,27 @@ export function phoneQueryVariants(raw: string): string[] {
   if (!local) return [];
   const out = new Set<string>([local]);
   if (local.startsWith("01") && local.length === 11) {
-    const rest = local.slice(1);
+    const rest = local.slice(1); // 1xxxxxxxxx
+    const nat = local.slice(2); // xxxxxxxxx (no leading 0/1)
     out.add("20" + rest);
     out.add("+20" + rest);
     out.add("0020" + rest);
     out.add(rest);
+    // Stored-side separators (User Test L-1): dashes/spaces must also match.
+    // 010-xxxx-xxxx
+    out.add(local.slice(0, 3) + "-" + local.slice(3, 7) + "-" + local.slice(7));
+    // 0100 xxx xxxx
+    out.add(local.slice(0, 4) + " " + local.slice(4, 7) + " " + local.slice(7));
+    // +20 10x xxx xxxx  and  +20 1xxxxxxxxx
+    out.add("+20 " + rest.slice(0, 3) + " " + rest.slice(3, 6) + " " + rest.slice(6));
+    out.add("+20 " + rest);
+    out.add("20 " + rest);
+    out.add(local.slice(0, 3) + " " + local.slice(3, 7) + " " + local.slice(7));
+    out.add(local.slice(0, 4) + "-" + local.slice(4, 7) + "-" + local.slice(7));
+    if (nat.length === 9) {
+      // +20 10x xxx xxxx when rest is 10 digits starting with 1
+      out.add("+20 " + nat.slice(0, 3) + " " + nat.slice(3, 6) + " " + nat.slice(6));
+    }
   }
   out.add(normalizeIdDigits(raw).replace(/[^\d+]/g, ""));
   return [...out].filter(Boolean);

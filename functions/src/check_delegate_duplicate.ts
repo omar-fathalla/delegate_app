@@ -8,6 +8,7 @@ import {
   normalizeEgyptianPhone,
   isSameDelegateRecord,
   normalizeIdDigits,
+  isValidEgyptianNationalId,
   phoneQueryVariants,
   publicDuplicateResult,
 } from "./check_delegate_duplicate_logic";
@@ -29,6 +30,11 @@ function isGlobalStaff(role: string): boolean {
   const r = canonicalizeRole(role);
   return r === "super-admin" || r === "superadmin" ||
     r === "technical-support" || r === "technicalsupport" || r === "tech-support" || r === "techsupport";
+}
+
+function isOrgAdmin(role: string): boolean {
+  const r = canonicalizeRole(role);
+  return r === "organization-admin" || r === "organizationadmin";
 }
 
 function companyOf(data: FirebaseFirestore.DocumentData | undefined): {uid: string; name: string} {
@@ -93,16 +99,23 @@ export const checkDelegateDuplicate = functions
     if (!nationalId && !phoneNumber) {
       throw new functions.https.HttpsError("invalid-argument", "nationalId or phoneNumber is required.");
     }
+    if (nationalId && !isValidEgyptianNationalId(nationalId)) {
+      throw new functions.https.HttpsError("invalid-argument", "nationalId-format");
+    }
     if (!companyUID) {
       throw new functions.https.HttpsError("invalid-argument", "companyUID is required.");
     }
     const callerCompany = String(caller.companyUID || caller.companyId || "").trim();
-    const callerOrg = String(caller.organizationUID || caller.organizationId || "").trim();
-    // Company staff and org-admins must have a companyUID and may only
-    // check inside that company (no cross-company probing). Super-admin /
-    // tech support may pass any companyUID.
+    // Company staff may only check inside their company. Super-admin / tech
+    // may pass any companyUID. Org-admins on the web only review requests
+    // (they do not register delegates). An org-admin without a companyUID
+    // is rejected with a specific code so the app can show a clear message
+    // instead of the generic «تعذر التحقق».
     if (!isGlobalStaff(role)) {
       if (!callerCompany) {
+        if (isOrgAdmin(role)) {
+          throw new functions.https.HttpsError("failed-precondition", "org-admin-no-company");
+        }
         throw new functions.https.HttpsError("permission-denied", "Not allowed.");
       }
       if (callerCompany !== companyUID) {
@@ -120,15 +133,10 @@ export const checkDelegateDuplicate = functions
       let uid = co.uid;
       let name = co.name;
       if (!uid) {
-        // Legacy docs without companyUID: another company when the org
-        // differs or is missing; same org is treated as same_company.
-        if (org && callerOrg && org === callerOrg) {
-          uid = companyUID;
-          name = name || String(data.companyName || "");
-        } else {
-          uid = `__legacy__:${org || "unknown"}`;
-          name = name || "شركة أخرى";
-        }
+        // User Test L-2: a legacy doc with no companyUID must not be
+        // reported as same_company, even when the org matches.
+        uid = `__legacy__:${org || "unknown"}`;
+        name = name || "شركة غير محددة";
       }
       const key = `${uid}|${kind}`;
       if (seen.has(key)) return;

@@ -5948,6 +5948,28 @@
     },
     {
       "collectionGroup": "photo_permissions",
+      "fieldPath": "companyUID",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "arrayConfig": "CONTAINS",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "photo_permissions",
       "fieldPath": "createdAt",
       "indexes": [
         {
