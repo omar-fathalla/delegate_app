@@ -5,7 +5,9 @@ import {
   DuplicateHit,
   isExistingDelegateStatus,
   isOpenRequestStatus,
+  normalizeEgyptianPhone,
   normalizeIdDigits,
+  phoneQueryVariants,
   publicDuplicateResult,
 } from "./check_delegate_duplicate_logic";
 
@@ -22,12 +24,10 @@ function canonicalizeRole(role: unknown): string {
   return String(role || "").trim().toLowerCase().replace(/_/g, "-");
 }
 
-function isCompanyStaff(role: string): boolean {
+function isGlobalStaff(role: string): boolean {
   const r = canonicalizeRole(role);
-  return [
-    "company-admin", "companyadmin", "admin", "supervisor", "company-supervisor",
-    "hr", "company-hr", "human-resources",
-  ].includes(r);
+  return r === "super-admin" || r === "superadmin" ||
+    r === "technical-support" || r === "technicalsupport" || r === "tech-support" || r === "techsupport";
 }
 
 function companyOf(data: FirebaseFirestore.DocumentData | undefined): {uid: string; name: string} {
@@ -46,6 +46,29 @@ function companyOf(data: FirebaseFirestore.DocumentData | undefined): {uid: stri
  * Deploy by name only (not yet deployed):
  *   firebase deploy --only functions:tashil-mobile-notifications:checkDelegateDuplicate --project <project>
  */
+const RATE_COLLECTION = "duplicate_check_rate_limits";
+const RATE_WINDOW_MS = 10 * 60 * 1000;
+const RATE_MAX = 30;
+
+async function enforceRateLimit(db: FirebaseFirestore.Firestore, uid: string): Promise<void> {
+  const ref = db.collection(RATE_COLLECTION).doc(uid);
+  const now = Date.now();
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.data() || {};
+    const start = typeof data.windowStart === "number" ? data.windowStart : 0;
+    const count = typeof data.count === "number" ? data.count : 0;
+    if (!start || now - start >= RATE_WINDOW_MS) {
+      tx.set(ref, {windowStart: now, count: 1, updatedAt: admin.firestore.FieldValue.serverTimestamp()});
+      return;
+    }
+    if (count >= RATE_MAX) {
+      throw new functions.https.HttpsError("resource-exhausted", "Too many duplicate checks. Try again later.");
+    }
+    tx.update(ref, {count: count + 1, updatedAt: admin.firestore.FieldValue.serverTimestamp()});
+  });
+}
+
 export const checkDelegateDuplicate = functions
   .region("us-central1")
   .runWith({timeoutSeconds: 30, memory: "256MB"})
@@ -71,26 +94,50 @@ export const checkDelegateDuplicate = functions
       throw new functions.https.HttpsError("invalid-argument", "companyUID is required.");
     }
     const callerCompany = String(caller.companyUID || caller.companyId || "").trim();
-    if (isCompanyStaff(role) && callerCompany && callerCompany !== companyUID) {
-      throw new functions.https.HttpsError("permission-denied", "Not allowed.");
+    const callerOrg = String(caller.organizationUID || caller.organizationId || "").trim();
+    // Company staff and org-admins must have a companyUID and may only
+    // check inside that company (no cross-company probing). Super-admin /
+    // tech support may pass any companyUID.
+    if (!isGlobalStaff(role)) {
+      if (!callerCompany) {
+        throw new functions.https.HttpsError("permission-denied", "Not allowed.");
+      }
+      if (callerCompany !== companyUID) {
+        throw new functions.https.HttpsError("permission-denied", "Not allowed.");
+      }
     }
+
+    await enforceRateLimit(db, context.auth.uid);
 
     const hits: DuplicateHit[] = [];
     const seen = new Set<string>();
-    const addHit = (hit: DuplicateHit) => {
-      if (!hit.companyUID) return;
-      const key = `${hit.companyUID}|${hit.field}`;
+    const addHit = (data: FirebaseFirestore.DocumentData, kind: DuplicateHit["field"]) => {
+      const co = companyOf(data);
+      const org = String(data.organizationUID || data.organizationId || "").trim();
+      let uid = co.uid;
+      let name = co.name;
+      if (!uid) {
+        // Legacy docs without companyUID: another company when the org
+        // differs or is missing; same org is treated as same_company.
+        if (org && callerOrg && org === callerOrg) {
+          uid = companyUID;
+          name = name || String(data.companyName || "");
+        } else {
+          uid = `__legacy__:${org || "unknown"}`;
+          name = name || "شركة أخرى";
+        }
+      }
+      const key = `${uid}|${kind}`;
       if (seen.has(key)) return;
       seen.add(key);
-      hits.push(hit);
+      hits.push({companyUID: uid, companyName: name, field: kind});
     };
 
     const scanRequests = async (field: "nationalId" | "nationalityID" | "phoneNumber", value: string, kind: DuplicateHit["field"]) => {
       const snap = await db.collection("delegate_requests").where(field, "==", value).get();
       for (const doc of snap.docs) {
         if (!isOpenRequestStatus(doc.data().status)) continue;
-        const co = companyOf(doc.data());
-        addHit({companyUID: co.uid, companyName: co.name, field: kind});
+        addHit(doc.data(), kind);
       }
     };
 
@@ -98,8 +145,7 @@ export const checkDelegateDuplicate = functions
       const snap = await db.collectionGroup("delegates").where(field, "==", value).get();
       for (const doc of snap.docs) {
         if (!isExistingDelegateStatus(doc.data().status)) continue;
-        const co = companyOf(doc.data());
-        addHit({companyUID: co.uid, companyName: co.name, field: kind});
+        addHit(doc.data(), kind);
       }
     };
 
@@ -109,9 +155,13 @@ export const checkDelegateDuplicate = functions
       await scanDelegates("nationalId", nationalId, "nationalId");
       await scanDelegates("nationalityID", nationalId, "nationalId");
     }
-    if (phoneNumber) {
-      await scanRequests("phoneNumber", phoneNumber, "phoneNumber");
-      await scanDelegates("phoneNumber", phoneNumber, "phoneNumber");
+    const phoneLocal = phoneNumber ? normalizeEgyptianPhone(phoneNumber) : "";
+    if (phoneLocal) {
+      const variants = phoneQueryVariants(phoneNumber);
+      for (const v of variants) {
+        await scanRequests("phoneNumber", v, "phoneNumber");
+        await scanDelegates("phoneNumber", v, "phoneNumber");
+      }
     }
 
     return publicDuplicateResult(decideDuplicate(companyUID, hits));

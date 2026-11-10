@@ -176,10 +176,10 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
           companyUID: widget.hrDelegate.companyUID,
         ),
       );
-      res.fold((_) {}, (list) {
+      res.fold((_) {}, (page) {
         if (mounted) {
           setState(() {
-            _delegatesByUid = {for (final d in list) d.uid: d};
+            _delegatesByUid = {for (final d in page.delegates) d.uid: d};
           });
         }
       });

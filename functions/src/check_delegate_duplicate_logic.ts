@@ -74,3 +74,28 @@ export function publicDuplicateResult(decision: DuplicateDecision): {
   }
   return {duplicate: true, reason: "same_company"};
 }
+
+/** Strip separators and fold +20 / 0020 / 20 prefixes to 01xxxxxxxxx. */
+export function normalizeEgyptianPhone(raw: string): string {
+  let s = normalizeIdDigits(raw).replace(/[^\d]/g, "");
+  if (s.startsWith("0020")) s = s.slice(4);
+  else if (s.startsWith("20") && s.length >= 12) s = s.slice(2);
+  if (s.startsWith("1") && s.length === 10) s = "0" + s;
+  return s;
+}
+
+/** Unique query values covering how phones are stored on legacy docs. */
+export function phoneQueryVariants(raw: string): string[] {
+  const local = normalizeEgyptianPhone(raw);
+  if (!local) return [];
+  const out = new Set<string>([local]);
+  if (local.startsWith("01") && local.length === 11) {
+    const rest = local.slice(1);
+    out.add("20" + rest);
+    out.add("+20" + rest);
+    out.add("0020" + rest);
+    out.add(rest);
+  }
+  out.add(normalizeIdDigits(raw).replace(/[^\d+]/g, ""));
+  return [...out].filter(Boolean);
+}

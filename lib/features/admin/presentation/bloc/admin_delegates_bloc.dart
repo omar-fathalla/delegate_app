@@ -47,10 +47,10 @@ class AdminDelegatesBloc
           emit(AdminDelegatesError(message: failure.message));
         }
       },
-      (delegates) {
-        _delegatesCache[cacheKey] = delegates;
+      (page) {
+        _delegatesCache[cacheKey] = page.delegates;
         _delegatesCacheTime[cacheKey] = DateTime.now();
-        emit(AdminDelegatesLoaded(delegates: delegates));
+        emit(AdminDelegatesLoaded(delegates: page.delegates, warning: page.warning));
       },
     );
   }

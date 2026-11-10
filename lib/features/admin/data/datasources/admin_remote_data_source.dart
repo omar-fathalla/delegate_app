@@ -29,6 +29,7 @@ abstract class AdminRemoteDataSource {
     String organizationUID,
     String companyUID,
   );
+  String? get lastDelegatesWarning;
   Future<int> getTodayCheckedInCount(String organizationId, String companyId);
   Future<int> getTotalCompaniesCount(String organizationId);
 }
@@ -36,6 +37,10 @@ abstract class AdminRemoteDataSource {
 class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
   final FirebaseFirestore firestore;
   final FirebaseFunctions? functions;
+
+  /// Set by [getCompanyDelegates] when some chains failed but others loaded.
+  @override
+  String? lastDelegatesWarning;
 
   AdminRemoteDataSourceImpl({required this.firestore, this.functions});
 
@@ -325,6 +330,7 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
     String organizationUID,
     String companyUID,
   ) async {
+    lastDelegatesWarning = null;
     try {
       final List<DelegateModel> delegatesList = [];
 
@@ -355,30 +361,41 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
             delegatesList.add(DelegateModel.fromJson(data, doc.id));
           }
         } else {
-          // Query all active organizations in parallel via direct paths (no collectionGroup index required)
+          // Query all organizations in parallel via direct paths. A single
+          // denied chain must not fail the whole list.
           final orgsSnap = await firestore.collection('organizations').get();
+          final failedChains = <String>[];
           final futures = orgsSnap.docs.map((orgDoc) async {
             final orgName = orgDoc.data()['name']?.toString() ?? '';
-            final snap = await firestore
-                .collection('organizations')
-                .doc(orgDoc.id)
-                .collection('companies')
-                .doc(companyUID)
-                .collection('delegates')
-                .limit(1000)
-                .get();
-            return snap.docs.map((doc) {
-              final data = Map<String, dynamic>.from(doc.data());
-              if ((data['organizationUID'] as String?)?.isEmpty ?? true) {
-                data['organizationUID'] = orgDoc.id;
-              }
-              if ((data['organizationName'] as String?)?.isEmpty ?? true) {
-                data['organizationName'] = orgName;
-              }
-              return DelegateModel.fromJson(data, doc.id);
-            }).toList();
+            try {
+              final snap = await firestore
+                  .collection('organizations')
+                  .doc(orgDoc.id)
+                  .collection('companies')
+                  .doc(companyUID)
+                  .collection('delegates')
+                  .limit(1000)
+                  .get();
+              return snap.docs.map((doc) {
+                final data = Map<String, dynamic>.from(doc.data());
+                if ((data['organizationUID'] as String?)?.isEmpty ?? true) {
+                  data['organizationUID'] = orgDoc.id;
+                }
+                if ((data['organizationName'] as String?)?.isEmpty ?? true) {
+                  data['organizationName'] = orgName;
+                }
+                return DelegateModel.fromJson(data, doc.id);
+              }).toList();
+            } catch (_) {
+              failedChains.add(orgName.isNotEmpty ? orgName : orgDoc.id);
+              return <DelegateModel>[];
+            }
           });
           final results = await Future.wait(futures);
+          if (failedChains.isNotEmpty) {
+            lastDelegatesWarning =
+                'تعذر تحميل بعض السلاسل (${failedChains.length}). تم عرض المناديب المتاحين.';
+          }
           final Map<String, DelegateModel> unique = {};
           final Map<String, Set<String>> orgNamesByDelegate = {};
           for (final list in results) {
@@ -413,6 +430,9 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
             } else {
               delegatesList.add(entry.value);
             }
+          }
+          if (delegatesList.isEmpty && failedChains.isNotEmpty) {
+            throw ServerFailure('فشل في جلب قائمة المناديب. (خطأ في الصلاحيات)');
           }
         }
       } else if (organizationUID.isNotEmpty && organizationUID != 'all') {
@@ -539,7 +559,8 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في جلب قائمة المناديب.');
     } catch (e) {
-      return [];
+      if (e is Failure) rethrow;
+      throw ServerFailure('فشل في جلب قائمة المناديب.');
     }
   }
 

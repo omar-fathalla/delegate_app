@@ -316,8 +316,8 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
         (failure) {
           _errorMessage = failure.message;
         },
-        (delegates) {
-          _companyDelegates = delegates;
+        (page) {
+          _companyDelegates = page.delegates;
         },
       );
 

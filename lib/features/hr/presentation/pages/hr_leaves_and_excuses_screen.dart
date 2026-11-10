@@ -53,8 +53,8 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
           companyUID: widget.hrDelegate.companyUID,
         ),
       );
-      res.fold((_) {}, (list) {
-        if (mounted) setState(() => _companyDelegates = list);
+      res.fold((_) {}, (page) {
+        if (mounted) setState(() => _companyDelegates = page.delegates);
       });
     } catch (_) {}
   }

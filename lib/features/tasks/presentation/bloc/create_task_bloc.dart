@@ -29,7 +29,7 @@ class CreateTaskBloc extends Bloc<CreateTaskEvent, CreateTaskState> {
 
     result.fold(
       (failure) => emit(CreateTaskError(message: failure.message)),
-      (delegates) => emit(CreateTaskInitial(delegates: delegates)),
+      (page) => emit(CreateTaskInitial(delegates: page.delegates)),
     );
   }
 

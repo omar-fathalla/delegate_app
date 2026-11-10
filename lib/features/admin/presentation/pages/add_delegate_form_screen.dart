@@ -79,26 +79,50 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
   Future<void> _fetchOrganizations() async {
     try {
       final snap = await FirebaseFirestore.instance.collection('organizations').get();
-      final orgs = snap.docs
-          .map((doc) {
+      final companyUID = widget.supervisor.companyUID;
+      final candidates = snap.docs.where((doc) {
+        final data = doc.data();
+        final name = (data['name'] ?? data['title'] ?? doc.id).toString().toLowerCase();
+        final uid = doc.id.toLowerCase();
+        // استبعاد أسواق فتح الله لأن لها آلية تسجيل خاصة عبر الموقع الإلكتروني
+        final isFathalla = name.contains('fathalla') ||
+            name.contains('فتح الله') ||
+            name.contains('فتح_الله') ||
+            uid.contains('fathalla') ||
+            uid.contains('فتح_الله');
+        return !isFathalla;
+      }).toList();
+
+      final List<Map<String, dynamic>> orgs = [];
+      if (companyUID.isEmpty) {
+        orgs.addAll(candidates.map((doc) {
+          final data = doc.data();
+          return {
+            'uid': doc.id,
+            'name': data['name'] ?? data['title'] ?? doc.id,
+          };
+        }));
+      } else {
+        final checks = await Future.wait(candidates.map((doc) async {
+          try {
+            final cDoc = await FirebaseFirestore.instance
+                .collection('organizations')
+                .doc(doc.id)
+                .collection('companies')
+                .doc(companyUID)
+                .get();
+            if (!cDoc.exists) return null;
             final data = doc.data();
             return {
               'uid': doc.id,
               'name': data['name'] ?? data['title'] ?? doc.id,
             };
-          })
-          .where((org) {
-            final name = (org['name'] ?? '').toString().toLowerCase();
-            final uid = (org['uid'] ?? '').toString().toLowerCase();
-            // استبعاد أسواق فتح الله لأن لها آلية تسجيل خاصة عبر الموقع الإلكتروني
-            final isFathalla = name.contains('fathalla') ||
-                name.contains('فتح الله') ||
-                name.contains('فتح_الله') ||
-                uid.contains('fathalla') ||
-                uid.contains('فتح_الله');
-            return !isFathalla;
-          })
-          .toList();
+          } catch (_) {
+            return null;
+          }
+        }));
+        orgs.addAll(checks.whereType<Map<String, dynamic>>());
+      }
 
       if (mounted) {
         setState(() {

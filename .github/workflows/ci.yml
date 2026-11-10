@@ -153,7 +153,7 @@ jobs:
       - name: Install functions deps
         run: npm --prefix functions ci
       - name: Rules tests
-        run: npm run test:rules && npm run test:rules:interim && npm run test:rules:p0 && npm run test:rules:adv && npm run test:rules:docs && npm run test:rules:subs
+        run: npm run test:rules && npm run test:rules:interim && npm run test:rules:p0 && npm run test:rules:adv && npm run test:rules:docs && npm run test:rules:subs && npm run test:rules:qa-hold
       - name: Subscriptions e2e (suspension job + Paymob hook on emulator)
         run: npm run test:e2e:subscriptions
       - name: Delegate login e2e (delegateLoginV2 -> custom token -> 1.14.3 query)

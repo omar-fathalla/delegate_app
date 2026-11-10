@@ -138,13 +138,12 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     String? department,
   }) async {
     try {
-      // التحقق من عدم وجود إذن فعال أو معلق قيد المراجعة لنفس الشركة
+      // Company is the tenant: check every chain so a nested-path list
+      // (historically over the 1000-expression budget) cannot hide an
+      // active or pending permission on another chain.
       final existingDocs = await firestore
-          .collection('organizations')
-          .doc(organizationUID)
-          .collection('companies')
-          .doc(companyUID)
-          .collection('photo_permissions')
+          .collectionGroup('photo_permissions')
+          .where('companyUID', isEqualTo: companyUID)
           .get();
 
       final now = DateTime.now();
@@ -272,13 +271,15 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
         return docs;
       });
     } else {
+      // Company is the tenant: list every chain of this company. The nested
+      // path historically exceeded the 1000-expression list budget.
       return firestore
-          .collection('organizations')
-          .doc(organizationUID)
-          .collection('companies')
-          .doc(companyUID)
-          .collection('photo_permissions')
+          .collectionGroup('photo_permissions')
+          .where('companyUID', isEqualTo: companyUID)
           .snapshots(includeMetadataChanges: true)
+          .handleError((Object e, StackTrace st) {
+            Error.throwWithStackTrace(e, st);
+          })
           .map((snapshot) {
         final docs = snapshot.docs
             .map((doc) => PhotoPermissionModel.fromFirestore(doc))
@@ -312,13 +313,10 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
         docs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         return docs;
       } else {
-        // Supervisor fetching for their specific company
+        // Supervisor fetching for their company across every chain.
         final snapshot = await firestore
-            .collection('organizations')
-            .doc(organizationUID)
-            .collection('companies')
-            .doc(companyUID)
-            .collection('photo_permissions')
+            .collectionGroup('photo_permissions')
+            .where('companyUID', isEqualTo: companyUID)
             .getResilient();
 
         final docs = snapshot.docs

@@ -14,11 +14,12 @@ class AdminDelegatesLoading extends AdminDelegatesState {}
 
 class AdminDelegatesLoaded extends AdminDelegatesState {
   final List<Delegate> delegates;
+  final String? warning;
 
-  const AdminDelegatesLoaded({required this.delegates});
+  const AdminDelegatesLoaded({required this.delegates, this.warning});
 
   @override
-  List<Object?> get props => [delegates];
+  List<Object?> get props => [delegates, warning];
 }
 
 class AdminDelegatesError extends AdminDelegatesState {

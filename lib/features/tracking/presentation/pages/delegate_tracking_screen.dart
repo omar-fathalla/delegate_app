@@ -72,8 +72,8 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
         );
         delegatesResult.fold(
           (_) {},
-          (delegates) {
-            for (final d in delegates) {
+          (page) {
+            for (final d in page.delegates) {
               final rawFull = d.fullName.trim();
               final combined = '${d.firstName} ${d.lastName}'.trim();
               final effective = rawFull.isNotEmpty ? rawFull : combined;
