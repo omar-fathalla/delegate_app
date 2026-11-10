@@ -215,7 +215,7 @@ class AdminRepositoryImpl implements AdminRepository {
   }
 
   @override
-  Future<Either<Failure, List<Delegate>>> getCompanyDelegates(
+  Future<Either<Failure, CompanyDelegatesResult>> getCompanyDelegates(
     String organizationUID,
     String companyUID,
   ) async {
@@ -224,7 +224,10 @@ class AdminRepositoryImpl implements AdminRepository {
         organizationUID,
         companyUID,
       );
-      return Right(delegates);
+      return Right(CompanyDelegatesResult(
+        delegates: delegates,
+        warning: remoteDataSource.lastDelegatesWarning,
+      ));
     } on Failure catch (f) {
       return Left(f);
     } catch (_) {

@@ -8,6 +8,7 @@ import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bl
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_event.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_state.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
+import 'package:delegate_app/features/admin/domain/repositories/admin_repository.dart';
 
 class MockGetCompanyDelegates extends Mock implements GetCompanyDelegates {}
 class FakeGetCompanyDelegatesParams extends Fake implements GetCompanyDelegatesParams {}
@@ -74,7 +75,7 @@ void main() {
     'emits [AdminDelegatesLoading, AdminDelegatesLoaded] when LoadCompanyDelegates succeeds',
     build: () {
       when(() => mockGetCompanyDelegates(any()))
-          .thenAnswer((_) async => Right(tDelegatesList));
+          .thenAnswer((_) async => Right(CompanyDelegatesResult(delegates: tDelegatesList)));
       return bloc;
     },
     act: (bloc) => bloc.add(const LoadCompanyDelegates(

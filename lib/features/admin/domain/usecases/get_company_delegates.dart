@@ -2,17 +2,16 @@ import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/usecases/usecase.dart';
 import 'package:delegate_app/features/admin/domain/repositories/admin_repository.dart';
-import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:equatable/equatable.dart';
 
 class GetCompanyDelegates
-    implements UseCase<List<Delegate>, GetCompanyDelegatesParams> {
+    implements UseCase<CompanyDelegatesResult, GetCompanyDelegatesParams> {
   final AdminRepository repository;
 
   GetCompanyDelegates(this.repository);
 
   @override
-  Future<Either<Failure, List<Delegate>>> call(
+  Future<Either<Failure, CompanyDelegatesResult>> call(
     GetCompanyDelegatesParams params,
   ) async {
     return await repository.getCompanyDelegates(

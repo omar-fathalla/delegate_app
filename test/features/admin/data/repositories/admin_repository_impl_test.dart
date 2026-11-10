@@ -94,6 +94,9 @@ class MockAdminRemoteDataSource implements AdminRemoteDataSource {
   }
 
   @override
+  String? get lastDelegatesWarning => null;
+
+  @override
   Future<int> getTodayCheckedInCount(String organizationId, String companyId) {
     throw UnimplementedError();
   }

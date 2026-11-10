@@ -61,13 +61,13 @@ void main() {
     () async {
       // arrange
       when(() => mockAdminRepository.getCompanyDelegates(any(), any()))
-          .thenAnswer((_) async => Right(tDelegates));
+          .thenAnswer((_) async => Right(CompanyDelegatesResult(delegates: tDelegates)));
       
       // act
       final result = await usecase(tParams);
       
       // assert
-      expect(result, Right(tDelegates));
+      expect(result, Right(CompanyDelegatesResult(delegates: tDelegates)));
       verify(() => mockAdminRepository.getCompanyDelegates(
             tParams.organizationUID,
             tParams.companyUID,

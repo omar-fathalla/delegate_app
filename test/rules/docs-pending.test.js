@@ -249,9 +249,12 @@ describe("docs-pending round 2", () => {
 
   for (const [label, path] of Object.entries({top: ALL.top, branch: ALL.branch})) {
     describe(`B1 staff on group path (${label})`, () => {
-      for (const w of ["sa", "ca", "sup", "hr", "ts"]) {
+      for (const w of ["sa", "ca", "sup", "ts"]) {
         test(`ALLOW ${w} plain edit (no emulator error)`, () => ok(updateDoc(doc(as(w), path), {fullName: "z"})));
       }
+      // Mohamed 2026-11-10: only company admin/supervisor may edit name/phone/photo.
+      test("DENY hr name edit (company editor policy)", () => no(updateDoc(doc(as("hr"), path), {fullName: "z"})));
+      test("ALLOW hr plain non-profile edit (no emulator error)", () => ok(updateDoc(doc(as("hr"), path), {notes: "z"})));
       for (const w of ["sa", "ca", "adm", "sup"]) {
         test(`ALLOW ${w} approves pending entry`, async () => {
           await seed(path, PEND); await ok(updateDoc(doc(as(w), path), APPROVE));

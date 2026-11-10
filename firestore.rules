@@ -575,6 +575,33 @@ service cloud.firestore {
     // role lists, no nested role helpers (REGRESSION: HR on a nested delegate
     // hit the 1000-expression limit because both delegate matches ran the
     // nested helpers).
+    // Company staff may act on any chain of their own company (companyNeedsOrg
+    // is kept for callers that still want an org pin, but nested writes pass
+    // false so a second chain is reachable). Name/phone/photo/ID images are
+    // only editable by company admin/supervisor. National ID is never a
+    // direct edit by company/org/marketing staff except on a pending /
+    // action_required signup record (web create-request resubmit). Super-admin
+    // and tech support are unchanged (approval batches / Admin SDK).
+    function companyEditorRole(r) {
+      return r in [
+        'company-admin', 'company_admin', 'companyadmin', 'admin',
+        'supervisor', 'company_supervisor'];
+    }
+    function identityFieldKeys() {
+      return ['nationalId', 'nationalityID'];
+    }
+    function profileEditKeys() {
+      return ['fullName', 'firstName', 'secondName', 'thirdName', 'middleName', 'lastName',
+        'phoneNumber', 'phone',
+        'profileImageUrl', 'personalPhotoURL', 'personalPhotoUrl', 'photoURL',
+        'nationalIdFrontUrl', 'nationalIdBackUrl'];
+    }
+    function staffProfileFieldsOk(r) {
+      let st = resource.data.get('status', '');
+      let pending = st is string && st.lower() in ['pending', 'action_required'];
+      return (!changedKeys().hasAny(identityFieldKeys()) || (companyEditorRole(r) && pending))
+        && (!changedKeys().hasAny(profileEditKeys()) || companyEditorRole(r));
+    }
     function staffManagesDelegate(orgId, compId, companyNeedsOrg) {
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
       let r = u.get('role', '');
@@ -586,13 +613,15 @@ service cloud.firestore {
           'tech_support', 'techsupport']
         || (o != '' && o in orgId && r in [
           'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
-          'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion'])
+          'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion']
+          && staffProfileFieldsOk(r))
         || (c != '' && c in compId && (!companyNeedsOrg || o in orgId) && r in [
           'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
           'hr', 'company-hr', 'company_hr', 'human_resources',
           'accountant', 'accounting', 'account_admin',
           'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
-          'branches-marketing-manager', 'branchesmarketingmanager']);
+          'branches-marketing-manager', 'branchesmarketingmanager']
+          && staffProfileFieldsOk(r));
     }
 
     function deviceBindingKeys() {
@@ -645,8 +674,9 @@ service cloud.firestore {
           'marketing', 'marketing_promotion'
         ] && resource.data.organizationUID == callerOrg())
         || (staffRole() in [
-          'company-admin', 'company_admin', 'admin', 'hr', 'company-hr',
-          'company_hr', 'accountant', 'branches_marketing', 'branches_marketing_manager'
+          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
+          'branches_marketing_manager'
         ] && resource.data.companyUID == callerCompany())
       );
     }
@@ -660,7 +690,7 @@ service cloud.firestore {
     function canManageNestedDelegate(orgId, compId) {
       return isGlobalStaff()
         || (isOrgScopedStaff() && callerOrg() == orgId)
-        || (isCompanyScopedStaff() && callerOrg() == orgId && callerCompany() == compId);
+        || (isCompanyScopedStaff() && callerCompany() != '' && callerCompany() == compId);
     }
 
     function canReadNestedDelegate(orgId, compId, delegateId) {
@@ -678,9 +708,10 @@ service cloud.firestore {
           'super-admin', 'super_admin', 'superadmin', 'superAdmin',
           'technical_support', 'technical-support', 'technicalSupport'
         ]
-        || (callerOrg() == orgId && callerCompany() == compId && staffRole() in [
-          'company-admin', 'company_admin', 'admin', 'hr', 'company-hr',
-          'company_hr', 'accountant', 'branches_marketing'
+        || (callerCompany() != '' && callerCompany() == compId && staffRole() in [
+          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
+          'branches_marketing_manager'
         ])
         || (callerOrg() == orgId && staffRole() in [
           'organization-admin', 'organization_admin', 'marketing', 'marketing_promotion'
@@ -1008,7 +1039,7 @@ service cloud.firestore {
           allow update: if delegateOwns(delegateId)
             ? delegateFieldsSafe()
             : (deviceBindingUntouched() && signedIn()
-              && staffManagesDelegate([orgId], [compId], true)
+              && staffManagesDelegate([orgId], [compId], false)
               && staffDocsApproveOk(orgId, compId, compId, delegateId));
           allow delete: if canManageNestedDelegate(orgId, compId);
         }
@@ -1027,10 +1058,10 @@ service cloud.firestore {
         }
 
         match /photo_permissions/{permissionId} {
-          allow read: if signedIn() && (
-            isGlobalStaff() || canManageNestedDelegate(orgId, compId)
-            || (delegateInOrg(orgId) && delegateInCompany(compId))
-          );
+          // Path-scoped read (no resource.data) so an unfiltered nested list
+          // is authorized without a companyUID query constraint. The
+          // collection-group rule below covers cross-chain / org / global reads.
+          allow read: if signedIn() && callerCompany() != '' && callerCompany() == compId;
           allow create, update: if signedIn() && (
             canManageNestedDelegate(orgId, compId)
             || (delegateInOrg(orgId) && delegateInCompany(compId))
@@ -1038,10 +1069,6 @@ service cloud.firestore {
           allow delete: if canManageNestedDelegate(orgId, compId);
 
           match /captured_photos/{photoId} {
-            allow read: if signedIn() && (
-              isGlobalStaff() || canManageNestedDelegate(orgId, compId)
-              || (delegateInOrg(orgId) && delegateInCompany(compId))
-            );
             allow create: if signedIn() && (
               canManageNestedDelegate(orgId, compId)
               || (delegateInOrg(orgId) && delegateInCompany(compId))
@@ -1236,9 +1263,18 @@ service cloud.firestore {
       allow write: if isGlobalStaff() || isOrgAdmin() || (isCompanyScopedStaff() && callerCompany() == companyId);
     }
 
+    // Nested photo_permissions / captured_photos have no allow-read of their
+    // own; a list on the chain path is decided only by these collection-group
+    // rules so the 1000-expression budget is not spent twice.
     match /{path=**}/photo_permissions/{permissionId} {
+      // companyUID / organizationUID equality first so a constrained
+      // collection-group query stays well under the 1000-expression budget.
+      // Use get() so an unfiltered list does not evaluation-error on missing fields.
       allow read: if signedIn() && (
-        isGlobalStaff() || orgScoped() || companyScoped() || delegateInOrg(resource.data.organizationUID)
+        companyScoped()
+        || orgScoped()
+        || isGlobalStaff()
+        || (isDelegate() && resource.data.get('organizationUID', '') == claimString('orgId'))
       );
       allow create, update: if signedIn() && (
         isGlobalStaff()

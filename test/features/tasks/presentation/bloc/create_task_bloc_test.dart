@@ -2,6 +2,7 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
+import 'package:delegate_app/features/admin/domain/repositories/admin_repository.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
 import 'package:delegate_app/features/tasks/domain/usecases/create_task.dart';
@@ -80,7 +81,7 @@ void main() {
     'should emit [LoadingDelegates, CreateTaskInitial] when LoadDelegatesRequested is successful',
     build: () {
       when(() => mockGetCompanyDelegates(any()))
-          .thenAnswer((_) async => Right(tDelegates));
+          .thenAnswer((_) async => Right(CompanyDelegatesResult(delegates: tDelegates)));
       return bloc;
     },
     act: (bloc) => bloc.add(const LoadDelegatesRequested(organizationId: 'org1', companyId: 'comp1')),

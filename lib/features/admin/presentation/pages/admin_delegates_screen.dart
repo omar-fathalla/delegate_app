@@ -149,6 +149,7 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
           );
         } else if (state is AdminDelegatesLoaded) {
           final allDelegates = state.delegates;
+          final fetchWarning = state.warning;
 
           // Build dynamic map of organizations from fetched orgs + loaded delegates
           final orgsMap = <String, String>{};
@@ -172,6 +173,27 @@ class _AdminDelegatesViewState extends State<AdminDelegatesView> {
           return Scaffold(
             body: Column(
               children: [
+                if (fetchWarning != null && fetchWarning.isNotEmpty)
+                  MaterialBanner(
+                    content: Text(fetchWarning),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          AdminDelegatesBloc.clearCache();
+                          context.read<AdminDelegatesBloc>().add(
+                            LoadCompanyDelegates(
+                              organizationUID:
+                                  widget.adminDelegate.companyUID.isNotEmpty
+                                      ? ''
+                                      : widget.adminDelegate.organizationUID,
+                              companyUID: widget.adminDelegate.companyUID,
+                            ),
+                          );
+                        },
+                        child: Text(l10n.retry),
+                      ),
+                    ],
+                  ),
                 // ── Search & Filter Bar ──
                 Container(
                   padding: const EdgeInsets.symmetric(

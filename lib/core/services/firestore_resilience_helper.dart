@@ -11,6 +11,12 @@ import 'firestore_client_health.dart';
 class FirestoreResilienceHelper {
   static const Duration defaultTimeout = Duration(seconds: 4);
 
+  /// Cache fallback is for timeouts and offline, not for security denials.
+  static bool isSecurityError(Object e) {
+    return e is FirebaseException &&
+        (e.code == 'permission-denied' || e.code == 'unauthenticated');
+  }
+
   /// On web, Dart `.timeout` does not cancel the underlying JS `get`, so the
   /// old "server get -> on timeout start a cache get" pattern left two watch
   /// targets open on the same query. With many short-lived targets this
@@ -28,6 +34,7 @@ class FirestoreResilienceHelper {
     try {
       return await get(const GetOptions(source: Source.serverAndCache));
     } catch (e) {
+      if (isSecurityError(e)) rethrow;
       if (FirestoreClientHealth.report(e)) rethrow; // dead client: don't retry
       // The first get has settled (failed), so there is no overlap now.
       debugPrint('FirestoreResilienceHelper(web): get failed ($e). Trying cache.');
@@ -51,10 +58,12 @@ class FirestoreResilienceHelper {
             .timeout(timeout);
         return serverSnapshot;
       } catch (e) {
+        if (isSecurityError(e)) rethrow;
         debugPrint('FirestoreResilienceHelper: Server query failed or timed out ($e). Falling back to local cache.');
         try {
           return await query.get(const GetOptions(source: Source.cache));
         } catch (cacheError) {
+          if (isSecurityError(cacheError)) rethrow;
           debugPrint('FirestoreResilienceHelper: Cache query failed ($cacheError). Attempting default serverAndCache.');
           return await query.get(const GetOptions(source: Source.serverAndCache));
         }
@@ -64,6 +73,7 @@ class FirestoreResilienceHelper {
       try {
         return await query.get(const GetOptions(source: Source.serverAndCache)).timeout(timeout);
       } catch (e) {
+        if (isSecurityError(e)) rethrow;
         return await query.get(const GetOptions(source: Source.cache));
       }
     }
@@ -82,10 +92,12 @@ class FirestoreResilienceHelper {
             .get(const GetOptions(source: Source.server))
             .timeout(timeout);
       } catch (e) {
+        if (isSecurityError(e)) rethrow;
         debugPrint('FirestoreResilienceHelper: Server doc query failed ($e). Falling back to local cache.');
         try {
           return await docRef.get(const GetOptions(source: Source.cache));
         } catch (cacheError) {
+          if (isSecurityError(cacheError)) rethrow;
           return await docRef.get(const GetOptions(source: Source.serverAndCache));
         }
       }
@@ -93,6 +105,7 @@ class FirestoreResilienceHelper {
       try {
         return await docRef.get(const GetOptions(source: Source.serverAndCache)).timeout(timeout);
       } catch (e) {
+        if (isSecurityError(e)) rethrow;
         return await docRef.get(const GetOptions(source: Source.cache));
       }
     }

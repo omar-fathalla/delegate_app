@@ -8,6 +8,7 @@
     "test:rules:adv": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-adv \"node --test test/rules/adversarial.test.js\"",
     "test:rules:docs": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-docs-pending \"node --test test/rules/docs-pending.test.js\"",
     "test:e2e:subscriptions": "npm --prefix functions run build && npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-tashil-subs \"node --test --test-concurrency=1 test/e2e/subscriptions.e2e.test.js\"",
+    "test:rules:qa-hold": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-qa-hold-reads \"node --test test/rules/qa-hold-reads.test.js\"",
     "test:rules:subs": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-tashil-subs-rules \"node --test test/rules/subscriptions.test.js\""
   },
   "devDependencies": {
