@@ -180,7 +180,6 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
       final repo = sl<DelegateSubscriptionRepository>();
       final checkResult = await repo.isReceiptCodeUsed(
         code,
-        organizationUID: _selectedOrgUID ?? widget.supervisor.organizationUID,
         companyUID: widget.supervisor.companyUID,
       );
       final isUsed = checkResult.fold((_) => false, (used) => used);

@@ -509,10 +509,19 @@ service cloud.firestore {
       // H1 (a) + r4: tech support activates only 'pending' -> 'active', as a
       // status-only write batched with the request approval.
       let techSignup = tech && st0 == 'pending' && st1 == 'active';
+      // Company-level roles may still review documents, but must not flip
+      // the delegate to active/approved (anti-fraud: no self-activation).
+      // The check lives on the non-tech branch so the tech approval batch
+      // stays under the 1000-expression budget. Org-admin (web activate)
+      // and super-admin remain allowed.
       return !(tech && stCh && st1 is string && st1.lower() == 'active' && !techSignup)
         && !(stCh && st1 == 'pending' && !approver)
         && ((techSignup && techFlipOk(delegateId) && techReqOk(o1, c1, delegateId))
-          || (!techSignup && (delegateDocsOk() || approver)));
+          || (!techSignup && (delegateDocsOk() || approver)
+            && !(stCh && st1 is string && st1.lower() in ['active', 'approved']
+              && !(r in [
+                'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
+                'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin']))));
     }
 
     // r4: tech support may create a delegate that is active or carries an
@@ -803,14 +812,38 @@ service cloud.firestore {
     // existingDelegateUid) 'active' in the same batch, so an old build that
     // approves the request in its own write is denied instead of leaving an
     // approved request with no delegate.
+    // Company/org staff may update only a request in their own tenant, and
+    // may not change status (except cancel), approval, payment, national ID,
+    // or org/company ids. Only super-admin / technical support may approve
+    // or otherwise change status. One users/{uid} get (expression budget).
     function requestStaffUpdateOk(requestId) {
-      let r = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '');
-      return signedIn() && (r in [
-          'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
-          'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
-          'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
-          'hr', 'company-hr', 'company_hr', 'human_resources']
-        || (r in techRoleList() && techRequestReviewOk(requestId)));
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let scopedSafe = !changedKeys().hasAny([
+          'reviewedBy', 'reviewedAt', 'reviewedByName', 'rejectionReason',
+          'approvedRequestId', 'approvedBy', 'approvedByName', 'approvedAt',
+          'paymentStatus', 'paymentMethod', 'amountDue', 'amountPaid', 'paidAt',
+          'coveredDelegateUids', 'items', 'periodCode', 'paymob', 'applyState',
+          'paymentError', 'needsReview', 'receiptCode',
+          'nationalId', 'nationalityID',
+          'organizationUID', 'organizationId', 'companyUID', 'companyId'])
+        && (!changedKeys().hasAny(['status'])
+          || request.resource.data.get('status', '') == 'cancelled');
+      return signedIn() && (
+        r in [
+          'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN']
+        || (r in techRoleList() && techRequestReviewOk(requestId))
+        || (r in [
+            'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
+            'hr', 'company-hr', 'company_hr', 'human_resources']
+          && u.get('companyUID', '') != ''
+          && u.get('companyUID', '') == resource.data.get('companyUID', '')
+          && scopedSafe)
+        || (r in [
+            'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin']
+          && u.get('organizationUID', '') != ''
+          && u.get('organizationUID', '') == resource.data.get('organizationUID', '')
+          && scopedSafe));
     }
 
     function techRequestReviewOk(requestId) {
@@ -1535,7 +1568,11 @@ service cloud.firestore {
         ]));
     }
 
-      // Subscription Phase 0: no cross-tenant reads. One users/{uid} read (budget).
+      // Subscription Phase 0: the company is the tenant for company staff
+      // (admin / supervisor / HR). They may read and list requests for any
+      // organization/chain under their companyUID. Org-admin stays org-scoped.
+      // Super-admin and technical support remain global. Cross-company denied.
+      // One users/{uid} read (budget).
     function delegateRequestReadOk() {
       let d = resource.data;
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
@@ -1554,7 +1591,7 @@ service cloud.firestore {
         || (r in [
           'company-admin', 'company_admin', 'companyadmin', 'admin',
           'supervisor', 'company_supervisor', 'hr', 'company-hr', 'company_hr', 'human_resources']
-          && org != '' && co != '' && docOrg == org && docCo == co)
+          && co != '' && docCo == co)
         || d.get('supervisorUid', '') == request.auth.uid
         || d.get('delegateUid', '') == request.auth.uid
         || resource.id == request.auth.uid;
@@ -1568,10 +1605,14 @@ service cloud.firestore {
       // or change status.
       // r4 F1: tech support no longer creates requests; every other creator
       // must name itself as supervisorUid (all app flows pass the signed-in
-      // user). Super-admin is exempt.
+      // user). Super-admin is exempt. Company staff (admin / supervisor / HR)
+      // must also set request.companyUID to their own companyUID.
       allow create: if (isSuperAdmin()
-        || ((isOrgAdmin() || isCompanyAdmin() || isHR())
-          && request.resource.data.get('supervisorUid', '') == request.auth.uid))
+        || (isOrgAdmin()
+          && request.resource.data.get('supervisorUid', '') == request.auth.uid)
+        || ((isCompanyAdmin() || isHR())
+          && request.resource.data.get('supervisorUid', '') == request.auth.uid
+          && incomingCompanyScoped()))
         && subscriptionPaymentUntouched();
       // Self clause first: the staff role helpers are expensive and would
       // otherwise eat the 1000-expression budget before the docs checks.

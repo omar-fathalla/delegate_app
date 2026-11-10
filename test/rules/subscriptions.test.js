@@ -33,13 +33,18 @@ describe("delegate_requests: payment is server-only", () => {
       await db.doc("delegate_requests/pending").set({
         requestType: "renewal", status: "pending", paymentStatus: "pending",
         coveredDelegateUids: ["a"], amountDue: 416.67, periodCode: "2027_H1",
+        organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
       });
       await db.doc("delegate_requests/paid").set({
         requestType: "renewal", status: "approved", paymentStatus: "paid",
         coveredDelegateUids: ["a"], amountDue: 416.67, periodCode: "2027_H1",
         paymob: {transactionId: "tx"},
+        organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
       });
-      await db.doc("delegate_requests/legacy").set({requestType: "new_delegate", status: "pending"});
+      await db.doc("delegate_requests/legacy").set({
+        requestType: "new_delegate", status: "pending",
+        organizationUID: "o1", companyUID: "c1",
+      });
       await db.doc("delegate_requests/scoped").set({
         requestType: "renewal", status: "pending", organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
       });
@@ -66,6 +71,20 @@ describe("delegate_requests: payment is server-only", () => {
       await db.doc("delegate_requests/new-approved-c1").set({
         requestType: "new_delegate", status: "approved",
         organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
+      });
+      // Same company, another organization/chain (o3 / c1).
+      await db.doc("delegate_requests/nid-c1-other-chain").set({
+        requestType: "new_delegate", status: "pending", nationalId: "29101010100011",
+        phoneNumber: "01011111111", receiptCode: "12345", existingDelegateUid: "d3",
+        organizationUID: "o3", companyUID: "c1", supervisorUid: "sup",
+      });
+      await db.doc("delegate_requests/renewal-c1-other-chain").set({
+        requestType: "renewal", status: "pending",
+        organizationUID: "o3", companyUID: "c1", supervisorUid: "sup",
+      });
+      await db.doc("delegate_requests/new-approved-c1-other-chain").set({
+        requestType: "new_delegate", status: "approved",
+        organizationUID: "o3", companyUID: "c1", supervisorUid: "sup",
       });
     });
   });
@@ -112,6 +131,12 @@ describe("delegate_requests: payment is server-only", () => {
     await assertSucceeds(as("tech").doc("delegate_requests/other-co").get());
     await assertSucceeds(as("d1").doc("delegate_requests/self-d").get());
     await assertFails(as("d1").doc("delegate_requests/scoped").get());
+    // Company staff can get a request in another chain of the same company.
+    await assertSucceeds(as("sup").doc("delegate_requests/nid-c1-other-chain").get());
+    await assertSucceeds(as("hr1").doc("delegate_requests/nid-c1-other-chain").get());
+    await assertSucceeds(as("admin1").doc("delegate_requests/nid-c1-other-chain").get());
+    await assertFails(as("oa1").doc("delegate_requests/nid-c1-other-chain").get());
+    await assertFails(as("sup2").doc("delegate_requests/nid-c1-other-chain").get());
   });
 
   test("clients cannot set applyState or payment error flags", async () => {
@@ -127,57 +152,118 @@ describe("delegate_requests: payment is server-only", () => {
     }));
   });
 
-  test("staff list query shapes require organizationUID and companyUID", async () => {
+  test("company staff list shapes use companyUID only and include other chains", async () => {
     const col = (uid) => as(uid).collection("delegate_requests");
-    const orgCo = (q, org, co) => q.where("organizationUID", "==", org).where("companyUID", "==", co);
+    const byCo = (q, co) => q.where("companyUID", "==", co);
 
-    // Each staff list shape used by the app (nationalId, phone, pending delete,
-    // receipt code, pending queue, approved new-delegate, pending renewal).
-    await assertSucceeds(orgCo(col("sup").where("nationalId", "==", "29101010100011"), "o1", "c1").get());
-    await assertSucceeds(orgCo(col("hr1").where("phoneNumber", "==", "01011111111"), "o1", "c1").get());
-    await assertSucceeds(orgCo(
+    // Each staff list shape (nationalId, phone, pending delete, receipt code,
+    // pending queue, approved new-delegate, pending renewal) — company only.
+    await assertSucceeds(byCo(col("sup").where("nationalId", "==", "29101010100011"), "c1").get());
+    await assertSucceeds(byCo(col("hr1").where("phoneNumber", "==", "01011111111"), "c1").get());
+    await assertSucceeds(byCo(
       col("admin1").where("existingDelegateUid", "==", "d1").where("requestType", "==", "delete_delegate").where("status", "==", "pending"),
-      "o1", "c1",
+      "c1",
     ).get());
-    await assertSucceeds(orgCo(col("sup").where("receiptCode", "==", "12345"), "o1", "c1").get());
-    await assertSucceeds(orgCo(col("hr1").where("status", "==", "pending"), "o1", "c1").get());
-    await assertSucceeds(orgCo(
+    await assertSucceeds(byCo(col("sup").where("receiptCode", "==", "12345"), "c1").get());
+    await assertSucceeds(byCo(col("hr1").where("status", "==", "pending"), "c1").get());
+    await assertSucceeds(byCo(
       col("admin1").where("requestType", "==", "new_delegate").where("status", "==", "approved"),
-      "o1", "c1",
+      "c1",
     ).get());
-    await assertSucceeds(orgCo(
+    await assertSucceeds(byCo(
       col("sup").where("requestType", "==", "renewal").where("status", "==", "pending"),
-      "o1", "c1",
+      "c1",
     ).get());
 
-    // Missing org or company (the broken client shapes) is denied for company staff.
+    // Same-company, other-chain docs are visible via companyUID-only lists.
+    const nid = await byCo(col("sup").where("nationalId", "==", "29101010100011"), "c1").get();
+    const nidIds = nid.docs.map((d) => d.id);
+    if (!nidIds.includes("nid-c1") || !nidIds.includes("nid-c1-other-chain")) {
+      throw new Error("expected both chains of c1 in the nationalId list, got " + nidIds.join(","));
+    }
+    const pending = await byCo(col("hr1").where("status", "==", "pending"), "c1").get();
+    const pendingIds = pending.docs.map((d) => d.id);
+    if (!pendingIds.includes("nid-c1-other-chain") || !pendingIds.includes("renewal-c1-other-chain")) {
+      throw new Error("expected other-chain pending docs, got " + pendingIds.join(","));
+    }
+    await assertSucceeds(byCo(
+      col("admin1").where("requestType", "==", "new_delegate").where("status", "==", "approved"),
+      "c1",
+    ).get());
+
+    // Unscoped lists (no companyUID) stay denied for company staff.
     await assertFails(col("sup").where("nationalId", "==", "29101010100011").get());
     await assertFails(col("sup").where("phoneNumber", "==", "01011111111").get());
     await assertFails(col("sup").where("receiptCode", "==", "12345").get());
-    await assertFails(col("sup").where("companyUID", "==", "c1").where("status", "==", "pending").get());
     await assertFails(col("sup").where("organizationUID", "==", "o1").where("status", "==", "pending").get());
     await assertFails(col("sup").where("existingDelegateUid", "==", "d1").where("requestType", "==", "delete_delegate").where("status", "==", "pending").get());
-    await assertFails(col("sup").where("companyUID", "==", "c1").where("requestType", "==", "new_delegate").where("status", "==", "approved").get());
-    await assertFails(col("sup").where("companyUID", "==", "c1").where("requestType", "==", "renewal").where("status", "==", "pending").get());
   });
 
-  test("cross-company staff list reads stay denied even with org+company filters", async () => {
+  test("cross-company staff list reads stay denied; org-admin and global paths still work", async () => {
     const col = (uid) => as(uid).collection("delegate_requests");
-    // Supervisor / HR of c1 cannot list c2 by supplying the other company's filters.
+    // Company staff of c1 cannot list c2, even with the other company's filters.
+    await assertFails(col("sup").where("companyUID", "==", "c2").where("nationalId", "==", "29101010100011").get());
+    await assertFails(col("hr1").where("companyUID", "==", "c2").where("status", "==", "pending").get());
+    await assertFails(col("admin1").where("companyUID", "==", "c2").where("receiptCode", "==", "12345").get());
     await assertFails(
-      col("sup").where("organizationUID", "==", "o2").where("companyUID", "==", "c2").where("nationalId", "==", "29101010100011").get(),
+      col("sup").where("organizationUID", "==", "o2").where("companyUID", "==", "c2").where("requestType", "==", "renewal").where("status", "==", "pending").get(),
     );
-    await assertFails(
-      col("hr1").where("organizationUID", "==", "o2").where("companyUID", "==", "c2").where("status", "==", "pending").get(),
-    );
-    await assertFails(
-      col("admin1").where("organizationUID", "==", "o2").where("companyUID", "==", "c2").where("receiptCode", "==", "12345").get(),
-    );
-    // Org-admin of o1 cannot list o2.
+    // Org-admin of o1 cannot list o2 or the other chain (o3) of company c1.
     await assertFails(col("oa1").where("organizationUID", "==", "o2").get());
+    await assertFails(col("oa1").where("organizationUID", "==", "o3").get());
     await assertSucceeds(col("oa1").where("organizationUID", "==", "o1").get());
+    await assertSucceeds(col("oa1").where("organizationUID", "==", "o1").where("status", "==", "pending").get());
     // Global staff may list without company filters.
     await assertSucceeds(col("tech").where("status", "==", "pending").get());
+    await assertSucceeds(col("sa").where("nationalId", "==", "29101010100011").get());
+  });
+
+
+  test("company staff can create in their company and cannot create in another company", async () => {
+    await assertSucceeds(as("admin1").doc("delegate_requests/create-same-co").set({
+      requestType: "new_delegate", status: "pending", supervisorUid: "admin1",
+      companyUID: "c1", organizationUID: "o3",
+    }));
+    await assertSucceeds(as("hr1").doc("delegate_requests/create-same-co-hr").set({
+      requestType: "new_delegate", status: "pending", supervisorUid: "hr1",
+      companyUID: "c1", organizationUID: "o1",
+    }));
+    await assertFails(as("admin1").doc("delegate_requests/create-other-co").set({
+      requestType: "new_delegate", status: "pending", supervisorUid: "admin1",
+      companyUID: "c2", organizationUID: "o2",
+    }));
+    await assertFails(as("hr1").doc("delegate_requests/create-other-co-hr").set({
+      requestType: "new_delegate", status: "pending", supervisorUid: "hr1",
+      companyUID: "c2",
+    }));
+    await assertFails(as("sup").doc("delegate_requests/create-missing-co").set({
+      requestType: "new_delegate", status: "pending", supervisorUid: "sup",
+      organizationUID: "o1",
+    }));
+  });
+
+  test("requestStaffUpdateOk is company-scoped and blocks approval fields", async () => {
+    // Same-company staff may still cancel an unpaid renewal (app cancelRenewal).
+    await assertSucceeds(as("sup").doc("delegate_requests/pending").update({status: "cancelled"}));
+    // They may edit non-sensitive fields on a request in their company,
+    // including another chain of the same company.
+    await assertSucceeds(as("hr1").doc("delegate_requests/nid-c1-other-chain").update({firstName: "N"}));
+    // Cross-company updates are denied.
+    await assertFails(as("sup2").doc("delegate_requests/scoped").update({firstName: "x"}));
+    await assertFails(as("oa2").doc("delegate_requests/scoped").update({firstName: "x"}));
+    // Company / org staff cannot approve, reject, or change national ID,
+    // org/company ids, payment, or approval fields.
+    await assertFails(as("sup").doc("delegate_requests/scoped").update({status: "approved", reviewedBy: "s"}));
+    await assertFails(as("admin1").doc("delegate_requests/scoped").update({status: "rejected", rejectionReason: "r"}));
+    await assertFails(as("hr1").doc("delegate_requests/scoped").update({nationalId: "000"}));
+    await assertFails(as("oa1").doc("delegate_requests/scoped").update({companyUID: "c9"}));
+    await assertFails(as("oa1").doc("delegate_requests/scoped").update({status: "approved"}));
+    // Org-admin may edit non-sensitive fields in their org, and cancel.
+    await assertSucceeds(as("oa1").doc("delegate_requests/scoped").update({firstName: "OrgEdit"}));
+    await assertSucceeds(as("oa1").doc("delegate_requests/del-c1").update({status: "cancelled"}));
+    // Only super-admin / technical support may approve or reject.
+    await assertSucceeds(as("sa").doc("delegate_requests/legacy").update({status: "approved", reviewedBy: "SA"}));
+    await assertSucceeds(as("tech").doc("delegate_requests/nid-c1").update({status: "rejected", rejectionReason: "r"}));
   });
 
 });

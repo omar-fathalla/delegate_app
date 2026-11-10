@@ -94,17 +94,17 @@ class _DelegateSubscriptionRequestsPageState
         stream: repo.getSubscriptionRequestsStream(
           statusFilter: null,
           companyUID: (widget.currentAdmin.role == UserRole.superAdmin ||
-                  widget.currentAdmin.role == UserRole.technicalSupport)
+                  widget.currentAdmin.role == UserRole.technicalSupport ||
+                  widget.currentAdmin.role == UserRole.organizationAdmin)
               ? null
               : (widget.currentAdmin.companyUID.isNotEmpty
                   ? widget.currentAdmin.companyUID
                   : null),
-          organizationUID: (widget.currentAdmin.role == UserRole.superAdmin ||
-                  widget.currentAdmin.role == UserRole.technicalSupport)
-              ? null
-              : (widget.currentAdmin.organizationUID.isNotEmpty
+          organizationUID: widget.currentAdmin.role == UserRole.organizationAdmin
+              ? (widget.currentAdmin.organizationUID.isNotEmpty
                   ? widget.currentAdmin.organizationUID
-                  : null),
+                  : null)
+              : null,
         ),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {

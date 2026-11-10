@@ -709,24 +709,54 @@ class _ProfileBody extends StatelessWidget {
         if (reqSnap.exists) {
           await reqRef.delete();
         }
-        if (delegate.nationalityID.isNotEmpty) {
-          final reqById = await firestore
-              .collection('delegate_requests')
-              .where('nationalId', isEqualTo: delegate.nationalityID.trim())
-              .get();
-          for (final doc in reqById.docs) {
-            await doc.reference.delete();
+        // Company is the tenant: company staff list by companyUID (any chain).
+        // Org-admin lists by organizationUID. Never run an unscoped list query.
+        Query<Map<String, dynamic>>? cleanupRequestsQuery() {
+          Query<Map<String, dynamic>> q =
+              firestore.collection('delegate_requests');
+          Delegate? me;
+          try {
+            final state = context.read<AuthBloc>().state;
+            if (state is AuthAuthenticated) me = state.delegate;
+          } catch (_) {}
+          if (me != null &&
+              (me.role == UserRole.superAdmin ||
+                  me.role == UserRole.technicalSupport)) {
+            if (delegate.companyUID.isNotEmpty) {
+              return q.where('companyUID', isEqualTo: delegate.companyUID);
+            }
+            return q;
           }
+          if (me != null && me.role == UserRole.organizationAdmin) {
+            final org = me.organizationUID.isNotEmpty
+                ? me.organizationUID
+                : delegate.organizationUID;
+            if (org.isEmpty) return null;
+            return q.where('organizationUID', isEqualTo: org);
+          }
+          if (delegate.companyUID.isEmpty) return null;
+          return q.where('companyUID', isEqualTo: delegate.companyUID);
         }
-        if (delegate.phoneNumber.isNotEmpty) {
-          final cleanPhone =
-              delegate.phoneNumber.replaceAll(RegExp(r'\s+'), '').trim();
-          final reqByPhone = await firestore
-              .collection('delegate_requests')
-              .where('phoneNumber', isEqualTo: cleanPhone)
-              .get();
-          for (final doc in reqByPhone.docs) {
-            await doc.reference.delete();
+
+        final cleanupQuery = cleanupRequestsQuery();
+        if (cleanupQuery != null) {
+          if (delegate.nationalityID.isNotEmpty) {
+            final reqById = await cleanupQuery
+                .where('nationalId', isEqualTo: delegate.nationalityID.trim())
+                .get();
+            for (final doc in reqById.docs) {
+              await doc.reference.delete();
+            }
+          }
+          if (delegate.phoneNumber.isNotEmpty) {
+            final cleanPhone =
+                delegate.phoneNumber.replaceAll(RegExp(r'\s+'), '').trim();
+            final reqByPhone = await cleanupQuery
+                .where('phoneNumber', isEqualTo: cleanPhone)
+                .get();
+            for (final doc in reqByPhone.docs) {
+              await doc.reference.delete();
+            }
           }
         }
       } catch (_) {}

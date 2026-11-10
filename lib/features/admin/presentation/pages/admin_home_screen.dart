@@ -688,17 +688,17 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
                                   stream: sl<DelegateSubscriptionRepository>().getSubscriptionRequestsStream(
                                     statusFilter: SubscriptionRequestStatus.pending,
                                     companyUID: (adminDelegate.role == UserRole.superAdmin ||
-                                            adminDelegate.role == UserRole.technicalSupport)
+                                            adminDelegate.role == UserRole.technicalSupport ||
+                                            adminDelegate.role == UserRole.organizationAdmin)
                                         ? null
                                         : (adminDelegate.companyUID.isNotEmpty
                                             ? adminDelegate.companyUID
                                             : null),
-                                    organizationUID: (adminDelegate.role == UserRole.superAdmin ||
-                                            adminDelegate.role == UserRole.technicalSupport)
-                                        ? null
-                                        : (adminDelegate.organizationUID.isNotEmpty
+                                    organizationUID: adminDelegate.role == UserRole.organizationAdmin
+                                        ? (adminDelegate.organizationUID.isNotEmpty
                                             ? adminDelegate.organizationUID
-                                            : null),
+                                            : null)
+                                        : null,
                                   ),
                                   builder: (context, snapshot) {
                                     final count = snapshot.data?.length ?? 0;
