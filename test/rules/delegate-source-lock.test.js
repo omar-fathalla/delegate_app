@@ -1,0 +1,84 @@
+/**
+ * Phase 1 item 1: clients cannot set or change delegate source stamps.
+ * Emulator only: npm run test:rules:source
+ */
+const {describe, test, before, after, beforeEach} = require("node:test");
+const {readFileSync} = require("fs");
+const {resolve} = require("path");
+const {initializeTestEnvironment, assertFails, assertSucceeds} = require("@firebase/rules-unit-testing");
+
+const PATH = "organizations/o1/companies/c1/delegates/d1";
+const BASE = {
+  uid: "d1",
+  fullName: "Fake",
+  organizationUID: "o1",
+  companyUID: "c1",
+  status: "active",
+  role: "delegate",
+  phoneNumber: "01011111111",
+};
+
+describe("delegate source stamps are server-only", () => {
+  let env;
+  const as = (uid) => env.authenticatedContext(uid, {firebase: {sign_in_provider: "password"}}).firestore();
+
+  before(async () => {
+    env = await initializeTestEnvironment({
+      projectId: "demo-delegate-source",
+      firestore: {rules: readFileSync(resolve(__dirname, "../../firestore.rules"), "utf8")},
+    });
+  });
+  after(async () => env.cleanup());
+  beforeEach(async () => {
+    await env.clearFirestore();
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.doc("users/sa").set({role: "super-admin"});
+      await db.doc("users/sup").set({role: "supervisor", organizationUID: "o1", companyUID: "c1"});
+      await db.doc("users/d1").set({role: "delegate", organizationUID: "o1", companyUID: "c1", uid: "d1"});
+      await db.doc("organizations/o1").set({name: "Org"});
+      await db.doc("organizations/o1/companies/c1").set({name: "Co"});
+      await db.doc(PATH, BASE);
+      await db.doc("organizations/o1/companies/c1/delegates/stamped").set({
+        ...BASE,
+        uid: "stamped",
+        delegateSource: "web",
+        chainOrigin: "web_request",
+        delegateSourceInferredBy: "backfill",
+        delegateSourceRunId: "dev-test",
+      });
+    });
+  });
+
+  test("client cannot create a delegate with source stamps", async () => {
+    const path = "organizations/o1/companies/c1/delegates/new1";
+    await assertFails(as("sa").doc(path).set({...BASE, uid: "new1", delegateSource: "app"}));
+    await assertFails(as("sa").doc(path).set({...BASE, uid: "new1", chainOrigin: "app_new_delegate"}));
+    await assertFails(as("sup").doc(path).set({
+      ...BASE, uid: "new1", delegateSource: "web", chainOrigin: "web_request",
+    }));
+  });
+
+  test("super-admin can create a delegate without source stamps", async () => {
+    await assertSucceeds(as("sa").doc("organizations/o1/companies/c1/delegates/new2").set({
+      ...BASE, uid: "new2",
+    }));
+  });
+
+  test("client cannot change or clear source stamps", async () => {
+    const ref = as("sa").doc("organizations/o1/companies/c1/delegates/stamped");
+    await assertFails(ref.update({delegateSource: "app"}));
+    await assertFails(ref.update({chainOrigin: "unknown"}));
+    await assertFails(ref.update({delegateSourceInferredBy: "me"}));
+    await assertFails(ref.update({delegateSourceRunId: "hack"}));
+    await assertFails(as("sup").doc("organizations/o1/companies/c1/delegates/stamped").update({
+      delegateSource: "app",
+    }));
+  });
+
+  test("a non-source update on a stamped doc is still allowed for super-admin", async () => {
+    await assertSucceeds(as("sa").doc("organizations/o1/companies/c1/delegates/stamped").update({
+      updatedAt: "t1",
+    }));
+  });
+});

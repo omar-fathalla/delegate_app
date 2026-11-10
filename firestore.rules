@@ -1035,6 +1035,20 @@ service cloud.firestore {
           orgId, compId);
     }
 
+    // Phase 1 item 1: clients cannot set or change source stamps.
+    // The Admin SDK (stampDelegateSource / backfill) bypasses rules.
+    // Do not use these keys in read helpers — keep this off the
+    // company-admin read path another worker is fixing.
+    function sourceStampKeys() {
+      return ['delegateSource', 'chainOrigin', 'delegateSourceInferredBy',
+        'delegateSourceAt', 'delegateSourceRunId'];
+    }
+    function sourceStampKeysLocked() {
+      return request.method == 'create'
+        ? !request.resource.data.keys().hasAny(sourceStampKeys())
+        : !changedKeys().hasAny(sourceStampKeys());
+    }
+
 
     function techRoleList() {
       return ['technical_support', 'technical-support', 'technicalSupport', 'technicalsupport', 'tech_support', 'techsupport'];
@@ -1173,12 +1187,13 @@ service cloud.firestore {
 
         match /delegates/{delegateId} {
           allow read: if signedIn() && canReadNestedDelegate(orgId, compId, delegateId);
-          allow create: if canManageNestedDelegate(orgId, compId) && deviceBindingAbsent() && techCreateOk(orgId, compId, delegateId);
-          allow update: if delegateOwns(delegateId)
+          allow create: if canManageNestedDelegate(orgId, compId) && deviceBindingAbsent() && techCreateOk(orgId, compId, delegateId)
+            && sourceStampKeysLocked();
+          allow update: if sourceStampKeysLocked() && (delegateOwns(delegateId)
             ? delegateFieldsSafe()
             : (deviceBindingUntouched() && signedIn()
               && staffManagesDelegate([orgId], [compId], false)
-              && staffDocsApproveOk(orgId, compId, compId, delegateId));
+              && staffDocsApproveOk(orgId, compId, compId, delegateId)));
           allow delete: if canManageNestedDelegate(orgId, compId);
         }
 
@@ -1395,10 +1410,11 @@ service cloud.firestore {
         isGlobalStaff() ||
         (isOrgScopedStaff() && incomingOrgScoped()) ||
         (isCompanyScopedStaff() && incomingCompanyScoped())
-      ) && techCreateOk(request.resource.data.get('organizationUID', ''), request.resource.data.get('companyUID', ''), delegateId);
+      ) && techCreateOk(request.resource.data.get('organizationUID', ''), request.resource.data.get('companyUID', ''), delegateId)
+        && sourceStampKeysLocked();
       // r5 budget: a nested organizations/{o}/companies/{c}/delegates
       // update is decided by the nested match alone, for every role.
-      allow update: if signedIn() && !onNestedDelegate()
+      allow update: if signedIn() && !onNestedDelegate() && sourceStampKeysLocked()
         && (delegateOwns(delegateId)
         ? delegateFieldsSafe()
         : (deviceBindingUntouched() && staffManagesDelegate(
