@@ -508,20 +508,23 @@ service cloud.firestore {
       let tech = r in techRoleList();
       // H1 (a) + r4: tech support activates only 'pending' -> 'active', as a
       // status-only write batched with the request approval.
-      let techSignup = tech && st0 == 'pending' && st1 == 'active';
-      // Company-level roles may still review documents, but must not flip
-      // the delegate to active/approved (anti-fraud: no self-activation).
-      // The check lives on the non-tech branch so the tech approval batch
-      // stays under the 1000-expression budget. Org-admin (web activate)
-      // and super-admin remain allowed.
-      return !(tech && stCh && st1 is string && st1.lower() == 'active' && !techSignup)
-        && !(stCh && st1 == 'pending' && !approver)
+      // Exact plus Title-Case only (no lower(): 4-flip budget). Unbatched
+      // pending/Pending -> active/Active still requires the request batch.
+      let techSignup = tech && (st0 == 'pending' || st0 == 'Pending')
+        && (st1 == 'active' || st1 == 'Active');
+      // Mohamed 2026-11-10 14:00 Cairo: only super-admin and technical
+      // support may activate, reactivate, suspend, or deactivate. The
+      // account-status check stays on the non-techSignup branch so the
+      // request-approval batch (4 document flips) stays under budget.
+      let saOrTech = r in [
+        'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN']
+        || tech;
+      let accountCh = stCh && st1 is string && st1.lower() in [
+        'active', 'approved', 'suspended', 'inactive', 'deactivated'];
+      return !(stCh && st1 == 'pending' && !approver)
         && ((techSignup && techFlipOk(delegateId) && techReqOk(o1, c1, delegateId))
           || (!techSignup && (delegateDocsOk() || approver)
-            && !(stCh && st1 is string && st1.lower() in ['active', 'approved']
-              && !(r in [
-                'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
-                'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin']))));
+            && (!accountCh || saOrTech)));
     }
 
     // r4: tech support may create a delegate that is active or carries an
@@ -579,9 +582,9 @@ service cloud.firestore {
     // is kept for callers that still want an org pin, but nested writes pass
     // false so a second chain is reachable). Name/phone/photo/ID images are
     // only editable by company admin/supervisor. National ID is never a
-    // direct edit by company/org/marketing staff except on a pending /
-    // action_required signup record (web create-request resubmit). Super-admin
-    // and tech support are unchanged (approval batches / Admin SDK).
+    // direct client edit by company/org/marketing staff, including on
+    // pending / action_required records (Mohamed 2026-11-10). Super-admin
+    // and tech support remain unrestricted (approval batches / Admin SDK).
     function companyEditorRole(r) {
       return r in [
         'company-admin', 'company_admin', 'companyadmin', 'admin',
@@ -597,9 +600,9 @@ service cloud.firestore {
         'nationalIdFrontUrl', 'nationalIdBackUrl'];
     }
     function staffProfileFieldsOk(r) {
-      let st = resource.data.get('status', '');
-      let pending = st is string && st.lower() in ['pending', 'action_required'];
-      return (!changedKeys().hasAny(identityFieldKeys()) || (companyEditorRole(r) && pending))
+      // Mohamed 2026-11-10 14:00 Cairo: only super-admin / tech may change
+      // or correct nationalId, including on pending / action_required records.
+      return !changedKeys().hasAny(identityFieldKeys())
         && (!changedKeys().hasAny(profileEditKeys()) || companyEditorRole(r));
     }
     function staffManagesDelegate(orgId, compId, companyNeedsOrg) {
@@ -1070,9 +1073,18 @@ service cloud.firestore {
           // is authorized without a companyUID query constraint. The
           // collection-group rule below covers cross-chain / org / global reads.
           allow read: if signedIn() && callerCompany() != '' && callerCompany() == compId;
-          allow create, update: if signedIn() && (
+          allow create: if signedIn() && (
             canManageNestedDelegate(orgId, compId)
             || (delegateInOrg(orgId) && delegateInCompany(compId))
+          );
+          // Mohamed 2026-11-10: only super-admin / tech may approve or reject.
+          // Other staff may still update non-status fields (dates, branches,
+          // supervisor enable) on a request they manage.
+          allow update: if signedIn() && (
+            isGlobalStaff()
+            || (!changedKeys().hasAny(['status'])
+              && (canManageNestedDelegate(orgId, compId)
+                || (delegateInOrg(orgId) && delegateInCompany(compId))))
           );
           allow delete: if canManageNestedDelegate(orgId, compId);
 
@@ -1284,7 +1296,7 @@ service cloud.firestore {
         || isGlobalStaff()
         || (isDelegate() && resource.data.get('organizationUID', '') == claimString('orgId'))
       );
-      allow create, update: if signedIn() && (
+      allow create: if signedIn() && (
         isGlobalStaff()
         || (isCompanyScopedStaff() && incomingCompanyScoped())
         || (isOrgScopedStaff() && incomingOrgScoped())
@@ -1292,6 +1304,16 @@ service cloud.firestore {
           delegateInOrg(request.resource.data.organizationUID)
           || delegateOwns(request.resource.data.delegateUid)
         ))
+      );
+      allow update: if signedIn() && (
+        isGlobalStaff()
+        || (!changedKeys().hasAny(['status'])
+          && ((isCompanyScopedStaff() && incomingCompanyScoped())
+            || (isOrgScopedStaff() && incomingOrgScoped())
+            || (isDelegate() && (
+              delegateInOrg(request.resource.data.organizationUID)
+              || delegateOwns(request.resource.data.delegateUid)
+            ))))
       );
       allow delete: if isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped());
     }

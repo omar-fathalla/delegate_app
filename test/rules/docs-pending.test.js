@@ -163,8 +163,8 @@ describe("docs-pending rules", () => {
     }
     test("DENY company supervisor activates while also approving documents", () =>
       assertFails(updateDoc(doc(as("sup"), pendPath), {...approveData, status: "active"})));
-    test("ALLOW org-admin sets status to active without changing documents", () =>
-      assertSucceeds(updateDoc(doc(as("oa"), pendPath), {status: "active"})));
+    test("DENY org-admin sets status to active without changing documents", () =>
+      assertFails(updateDoc(doc(as("oa"), pendPath), {status: "active"})));
   });
 
   describe("delegate_requests self lock", () => {
@@ -394,17 +394,31 @@ describe("docs-pending round 2", () => {
         await seed(path, {...BASE, status: "pending", documents: pendDocs});
         await no(updateDoc(doc(as("ts"), path), {status: "active"}));
       });
-      for (const st of ["suspended", "Active", "inactive", "Pending", "rejected"]) {
+      // Mohamed 2026-11-10: tech may activate/reactivate (status-only).
+      // Document approval in the same write is still denied outside the
+      // request-approval batch. Pending -> active (any case) still requires
+      // the batch (techSignup).
+      for (const st of ["suspended", "Active", "inactive", "rejected"]) {
         test(`DENY ts '${st}' -> active + approve`, async () => {
           await seed(path, {...BASE, status: st, documents: pendDocs});
           await no(updateDoc(doc(as("ts"), path), {status: "active", documents: appr}));
         });
-        test(`DENY ts '${st}' -> active`, async () => {
+        test(`ALLOW ts '${st}' -> active (status-only)`, async () => {
+          await seed(path, {...BASE, status: st, documents: pendDocs});
+          await ok(updateDoc(doc(as("ts"), path), {status: "active"}));
+        });
+      }
+      for (const st of ["Pending", "pending"]) {
+        test(`DENY ts '${st}' -> active + approve (unbatched signup)`, async () => {
+          await seed(path, {...BASE, status: st, documents: pendDocs});
+          await no(updateDoc(doc(as("ts"), path), {status: "active", documents: appr}));
+        });
+        test(`DENY ts '${st}' -> active (unbatched signup)`, async () => {
           await seed(path, {...BASE, status: st, documents: pendDocs});
           await no(updateDoc(doc(as("ts"), path), {status: "active"}));
         });
       }
-      test("DENY ts 'pending' -> 'Active' (capital)", async () => {
+      test("DENY ts 'pending' -> 'Active' (capital, unbatched signup)", async () => {
         await seed(path, {...BASE, status: "pending", documents: pendDocs});
         await no(updateDoc(doc(as("ts"), path), {status: "Active", documents: appr}));
       });
@@ -412,6 +426,11 @@ describe("docs-pending round 2", () => {
         const {status: _s, ...noStatus} = BASE;
         await seed(path, {...noStatus, documents: pendDocs});
         await no(updateDoc(doc(as("ts"), path), {status: "active", documents: appr}));
+      });
+      test("ALLOW ts missing status -> active (status-only)", async () => {
+        const {status: _s, ...noStatus} = BASE;
+        await seed(path, {...noStatus, documents: pendDocs});
+        await ok(updateDoc(doc(as("ts"), path), {status: "active"}));
       });
       test("DENY ts approves re-uploaded doc on an active delegate", async () => {
         await seed(path, {...BASE, documents: pendDocs});
@@ -421,6 +440,11 @@ describe("docs-pending round 2", () => {
         await seed(path, {...BASE, documents: pendDocs});
         await ok(updateDoc(doc(as("ts"), path), {status: "suspended"}));
         await no(updateDoc(doc(as("ts"), path), {status: "active", documents: appr}));
+      });
+      test("ALLOW ts suspend then re-activate status-only (two-step)", async () => {
+        await seed(path, {...BASE, documents: pendDocs});
+        await ok(updateDoc(doc(as("ts"), path), {status: "suspended"}));
+        await ok(updateDoc(doc(as("ts"), path), {status: "active"}));
       });
       test("DENY ts approves docs on a pending delegate without activating", async () => {
         await seed(path, {...BASE, status: "pending", documents: pendDocs});
