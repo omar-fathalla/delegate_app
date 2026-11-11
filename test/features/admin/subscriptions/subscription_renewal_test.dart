@@ -226,7 +226,21 @@ void main() {
         final list = (await repo.loadRenewableDelegates(
           companyUID: 'c1',
         )).getOrElse(() => []);
-        expect(list.map((d) => d.uid), ['a', 'b', 'c']);
+        expect(list.map((d) => d.uid).toSet(), {
+          'a',
+          'b',
+          'c',
+          'active1',
+          'manual',
+        });
+        expect(list.where((d) => d.isSelectable).map((d) => d.uid).toSet(), {
+          'a',
+          'b',
+          'c',
+          'active1',
+          'manual',
+        });
+        expect(list.where((d) => d.isCovered), isEmpty);
       },
     );
 
@@ -262,7 +276,13 @@ void main() {
           companyUID: 'c1',
           organizationUID: 'o1',
         )).getOrElse(() => []);
-        expect(orgAdmin.map((d) => d.uid).toSet(), {'a', 'b', 'c'});
+        expect(orgAdmin.map((d) => d.uid).toSet(), {
+          'a',
+          'b',
+          'c',
+          'active1',
+          'manual',
+        });
         expect(orgAdmin.map((d) => d.uid), isNot(contains('o2d')));
       },
     );
@@ -287,7 +307,7 @@ void main() {
           companyName: s.companyName,
           organizationUID: s.organizationUID,
           organizationName: s.organizationName,
-          delegates: list.where((d) => d.uid != 'c').toList(),
+          delegates: list.where((d) => d.uid == 'a' || d.uid == 'b').toList(),
         )).getOrElse(() => '');
         final data = (await db.doc('delegate_requests/$id').get()).data()!;
         expect(data['requestType'], kRequestTypeRenewal);
@@ -442,18 +462,21 @@ void main() {
               .where((d) => d.periodCode == '2026_H2')
               .map((d) => d.uid)
               .toSet(),
-          {'a', 'b', 'c'},
+          {'a', 'b', 'c', 'active1', 'manual'},
         );
         expect(
           list
-              .where((d) => d.periodCode == '2027_H1')
+              .where((d) => d.periodCode == '2027_H1' && d.isSelectable)
               .map((d) => d.uid)
               .toSet(),
           {'b', 'c', 'active1', 'manual'},
         );
         expect(
-          list.where((d) => d.periodCode == '2027_H1').map((d) => d.uid),
-          isNot(contains('a')),
+          list
+              .where((d) => d.periodCode == '2027_H1' && d.uid == 'a')
+              .single
+              .isCovered,
+          isTrue,
         );
 
         final s = supervisor();
@@ -465,7 +488,7 @@ void main() {
           companyName: s.companyName,
           organizationUID: s.organizationUID,
           organizationName: s.organizationName,
-          delegates: list.where((d) => d.uid == 'active1').toList(),
+          delegates: list.where((d) => d.uid == 'active1' && d.periodCode == '2027_H1').toList(),
         )).getOrElse(() => '');
         expect(id, isNotEmpty);
         final data = (await db.doc('delegate_requests/$id').get()).data()!;
@@ -567,6 +590,59 @@ void main() {
     });
   });
 
+  test('covered delegates are excluded from selection with a reason', () async {
+    final db = await seed();
+    await db.doc('organizations/o1/companies/c1/delegates/c').update({
+      'subscription': {'periodCode': '2027_H1', 'paymentStatus': 'paid'},
+    });
+    final repo = SubscriptionRenewalRepository(
+      firestore: db,
+      clock: () => feb2027,
+    );
+    final list = (await repo.loadRenewableDelegates(
+      companyUID: 'c1',
+    )).getOrElse(() => []);
+    final covered = list.where((d) => d.uid == 'c').single;
+    expect(covered.isCovered, isTrue);
+    expect(covered.isSelectable, isFalse);
+    expect(covered.exclusionReason, 'مغطى بالفعل لهذه الفترة');
+    expect(
+      const RenewalSelection().selectAll(list).isSelected(covered.selectionKey),
+      isFalse,
+    );
+  });
+
+  test('loadPaidRenewals returns one receipt listing the delegates', () async {
+    final db = await seed();
+    final repo = SubscriptionRenewalRepository(
+      firestore: db,
+      clock: () => feb2027,
+    );
+    await db.doc('delegate_requests/paid1').set({
+      'companyUID': 'c1',
+      'organizationUID': 'o1',
+      'requestType': kRequestTypeRenewal,
+      'paymentStatus': 'paid',
+      'periodCode': '2027_H1',
+      'amountPaid': 833.34,
+      'remainingMonths': 5,
+      'companyName': 'يوني',
+      'items': [
+        {'uid': 'a', 'fullName': 'مندوب a', 'fee': 416.67},
+        {'uid': 'b', 'fullName': 'مندوب b', 'fee': 416.67},
+      ],
+      'paymob': {'transactionId': 'tx-1'},
+      'paidAt': '2027-02-10T10:00:00.000Z',
+    });
+    final list = (await repo.loadPaidRenewals(
+      companyUID: 'c1',
+    )).getOrElse(() => []);
+    expect(list, hasLength(1));
+    expect(list.single.delegateCount, 2);
+    expect(list.single.transactionId, 'tx-1');
+    expect(list.single.amount, 833.34);
+  });
+
   group('SubscriptionRenewalScreen', () {
     testWidgets(
       'multi-select, live total, one Paymob checkout for the selection',
@@ -593,7 +669,7 @@ void main() {
         expect(find.byKey(rowKey('a', '2027_H1')), findsOneWidget);
         expect(find.byKey(rowKey('c', '2027_H1')), findsOneWidget);
         expect(find.byKey(rowKey('web1', '2027_H1')), findsNothing);
-        expect(find.byKey(rowKey('manual', '2027_H1')), findsNothing);
+        expect(find.byKey(rowKey('manual', '2027_H1')), findsOneWidget);
 
         String total() =>
             tester.widget<Text>(find.byKey(const Key('renewal_total'))).data!;
@@ -612,7 +688,8 @@ void main() {
 
         await tester.tap(find.byKey(const Key('renewal_select_all')));
         await tester.pump();
-        expect(total(), 'الإجمالي: 1250.01 ج.م');
+        // a, b, c, active1, manual — 5 × 416.67
+        expect(total(), 'الإجمالي: 2083.35 ج.م');
         await tester.tap(find.byKey(const Key('renewal_select_all')));
         await tester.pump();
         expect(total(), 'الإجمالي: 0 ج.م');
@@ -620,6 +697,15 @@ void main() {
         await tester.tap(find.byKey(rowKey('b', '2027_H1')));
         await tester.pump();
         await tester.tap(find.byKey(const Key('renewal_pay_button')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('renewal_confirm_sheet')), findsOneWidget);
+        expect(
+          tester
+              .widget<Text>(find.byKey(const Key('renewal_confirm_summary')))
+              .data,
+          'عدد المناديب: 1 × 416.67 ج.م = 416.67 ج.م',
+        );
+        await tester.tap(find.byKey(const Key('renewal_confirm_pay')));
         await tester.pumpAndSettle();
 
         expect(gateway.started, hasLength(1));
@@ -715,6 +801,9 @@ void main() {
 
         await tester.tap(find.byKey(const Key('renewal_pay_button')));
         await tester.pumpAndSettle();
+        expect(find.byKey(const Key('renewal_confirm_sheet')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('renewal_confirm_pay')));
+        await tester.pumpAndSettle();
         expect(gateway.started, hasLength(1));
         final req =
             (await db.doc('delegate_requests/${gateway.started.single}').get())
@@ -723,6 +812,29 @@ void main() {
         expect(req['amountDue'] ?? req['fee'], 500.0);
       },
     );
+
+    testWidgets('suspended filter hides active delegates', (tester) async {
+      final repo = SubscriptionRenewalRepository(
+        firestore: await seed(),
+        clock: () => feb2027,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SubscriptionRenewalScreen(
+            supervisor: supervisor(),
+            repository: repo,
+            paymentGateway: FakeGateway(),
+            clock: () => feb2027,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(rowKey('active1', '2027_H1')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('renewal_filter_suspended')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(rowKey('a', '2027_H1')), findsOneWidget);
+      expect(find.byKey(rowKey('active1', '2027_H1')), findsNothing);
+    });
   });
 
   test('a uid passed twice (two chains) is charged once', () async {

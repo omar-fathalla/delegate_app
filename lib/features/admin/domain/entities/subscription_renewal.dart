@@ -1,4 +1,5 @@
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
+import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:equatable/equatable.dart';
 
@@ -19,6 +20,14 @@ class RenewableDelegate extends Equatable {
   /// Period this row is for (current or next). Empty in older callers.
   final String periodCode;
 
+  /// Live delegate status / reason (for filters and excluded-row copy).
+  final String status;
+  final String statusReason;
+
+  /// Already paid or waived for [periodCode]; not selectable.
+  final bool isCovered;
+  final String? exclusionReason;
+
   const RenewableDelegate({
     required this.uid,
     required this.fullName,
@@ -27,9 +36,18 @@ class RenewableDelegate extends Equatable {
     this.delegatePublicId,
     this.pendingRenewalRequestId,
     this.periodCode = '',
+    this.status = '',
+    this.statusReason = '',
+    this.isCovered = false,
+    this.exclusionReason,
   });
 
   bool get isAwaitingPayment => pendingRenewalRequestId != null;
+
+  bool get isSelectable => !isAwaitingPayment && !isCovered;
+
+  bool get isSuspendedExpired =>
+      status == 'suspended' && statusReason == kSubscriptionExpiredReason;
 
   /// Unique across both period lists (same uid may appear twice).
   String get selectionKey => periodCode.isEmpty ? uid : '$uid|$periodCode';
@@ -43,6 +61,10 @@ class RenewableDelegate extends Equatable {
     delegatePublicId,
     pendingRenewalRequestId,
     periodCode,
+    status,
+    statusReason,
+    isCovered,
+    exclusionReason,
   ];
 }
 
@@ -69,11 +91,11 @@ class RenewalSelection extends Equatable {
     return RenewalSelection(next);
   }
 
-  /// Selects every delegate that is not already awaiting payment (up to [maxDelegatesPerRenewal]).
+  /// Selects every selectable delegate (up to [maxDelegatesPerRenewal]).
   RenewalSelection selectAll(Iterable<RenewableDelegate> delegates) =>
       RenewalSelection(
         delegates
-            .where((d) => !d.isAwaitingPayment)
+            .where((d) => d.isSelectable)
             .map((d) => d.selectionKey)
             .take(SubscriptionCycleHelper.maxDelegatesPerRenewal)
             .toSet(),
@@ -84,7 +106,7 @@ class RenewalSelection extends Equatable {
   /// Drops uids no longer in the list (e.g. after a reload).
   RenewalSelection retainOnly(Iterable<RenewableDelegate> delegates) {
     final allowed = delegates
-        .where((d) => !d.isAwaitingPayment)
+        .where((d) => d.isSelectable)
         .map((d) => d.selectionKey)
         .toSet();
     return RenewalSelection(selectedUids.intersection(allowed));
@@ -137,3 +159,52 @@ bool canCreateSubscriptionRenewal({
       return false;
   }
 }
+
+/// One paid (or pending) renewal request, for the in-app receipt.
+class RenewalReceipt extends Equatable {
+  final String requestId;
+  final String periodCode;
+  final double amount;
+  final int remainingMonths;
+  final List<RenewalItem> items;
+  final SubscriptionPaymentStatus paymentStatus;
+  final String? transactionId;
+  final String? paidAt;
+  final String companyName;
+  final String organizationName;
+
+  const RenewalReceipt({
+    required this.requestId,
+    required this.periodCode,
+    required this.amount,
+    required this.remainingMonths,
+    required this.items,
+    required this.paymentStatus,
+    this.transactionId,
+    this.paidAt,
+    this.companyName = '',
+    this.organizationName = '',
+  });
+
+  int get delegateCount => items.length;
+
+  @override
+  List<Object?> get props => [
+    requestId,
+    periodCode,
+    amount,
+    remainingMonths,
+    items,
+    paymentStatus,
+    transactionId,
+    paidAt,
+    companyName,
+    organizationName,
+  ];
+}
+
+enum RenewalListFilter { all, suspended, expiringSoon }
+
+/// "قرب ينتهي الاشتراك": last [months] months of the current period (inclusive).
+bool isRenewalExpiringSoon(DateTime now, {int months = 2}) =>
+    SubscriptionCycleHelper.getRemainingMonthsInCycle(now) <= months;
