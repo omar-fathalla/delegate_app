@@ -21,6 +21,7 @@ import {
   MAX_DELEGATES_PER_RENEWAL,
   type AdvanceRenewalConfig,
 } from "./subscription_logic";
+import {holdsMode} from "./holds";
 import {M1_SOURCE, M2_SOURCE, planExpiryHoldWrite, shouldShadowReactivateAfterExpiryClear} from "./subscription_holds";
 
 type Db = admin.firestore.Firestore;
@@ -153,7 +154,7 @@ export async function runSubscriptionSuspension(db: Db, now: Date): Promise<Susp
   const ts = FieldValue.serverTimestamp();
   const writer = new Batcher(db);
   const at = now.toISOString();
-  const mode = process.env.HOLDS_AUTHORITY_MODE; // holdsMode() reads this
+  const mode = holdsMode();
 
   for (const doc of await delegateDocsFor(db, candidates)) {
     const planned = planExpiryHoldWrite({
@@ -811,7 +812,7 @@ export async function applyPaidRequest(db: Db, requestId: string, asOf?: Date): 
     paidAt: data.paidAt ?? null,
   });
   const at = now.toISOString();
-  const mode = process.env.HOLDS_AUTHORITY_MODE;
+  const mode = holdsMode();
   for (const doc of await delegateDocsFor(db, uids)) {
     const uid = str(doc.get("uid")) || doc.ref.id;
     const update: Data = {};

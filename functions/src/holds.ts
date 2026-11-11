@@ -286,37 +286,102 @@ export function isActionableStatus(status: unknown): boolean {
   return s !== "pending" && s !== "rejected";
 }
 
+/**
+ * Legacy-suspended delegates often have no holds map. Infer holds from
+ * statusReason (subscription_expired, admin_suspend, …) before add/remove
+ * so removing admin_suspend cannot reactivate an expired subscription.
+ */
+export function seedHoldsFromLegacyStatus(
+  data: Record<string, unknown>,
+  at: string,
+  by: string,
+): {holds: Holds; seeded: boolean} {
+  const parsed = parseHolds(data.holds);
+  if (hasAnyHold(parsed)) return {holds: parsed, seeded: false};
+  const inferred = inferHoldsFromStatusReason(data.status, data.statusReason, at, by);
+  if (hasAnyHold(inferred)) return {holds: inferred, seeded: true};
+  return {holds: parsed, seeded: false};
+}
+
+/** Revoke refresh tokens when an authoritative write leaves the delegate suspended. */
+export function shouldRevokeRefreshTokens(plan: HoldChangePlan): boolean {
+  return !!plan.ok &&
+    plan.mode === HOLDS_MODE_AUTHORITATIVE &&
+    plan.derivedStatus === "suspended" &&
+    !plan.unchanged;
+}
+
+function basePlan(
+  mode: string,
+  current: Holds,
+  status: unknown,
+  statusVersion: number,
+  extra: Partial<HoldChangePlan> = {},
+): HoldChangePlan {
+  return {
+    ok: true,
+    mode,
+    nextHolds: current,
+    derivedStatus: deriveStatus(status, current),
+    nextStatusReason: statusReasonFromHolds(current),
+    statusVersion,
+    history: {},
+    ...extra,
+  };
+}
+
 export function planHoldChange(input: HoldChangeInput): HoldChangePlan {
   const mode = input.mode === HOLDS_MODE_AUTHORITATIVE ?
     HOLDS_MODE_AUTHORITATIVE : HOLDS_MODE_SHADOW;
-  const current = parseHolds(input.data.holds);
+  const seeded = seedHoldsFromLegacyStatus(input.data, input.at, "legacy");
+  const current = seeded.holds;
   const status = input.data.status;
+  const existingVersion = Number(input.data.statusVersion) || 0;
   if (!isActionableStatus(status)) {
     return {
       ok: false, reason: "status_not_actionable", mode, nextHolds: current,
       derivedStatus: deriveStatus(status, current),
       nextStatusReason: statusReasonFromHolds(current),
-      statusVersion: Number(input.data.statusVersion) || 0,
+      statusVersion: existingVersion,
       history: {},
     };
   }
-  if (input.op === "add" && current[input.hold]) {
-    return {
-      ok: true, unchanged: true, mode, nextHolds: current,
+  // Persist inferred legacy holds even when the requested op is a no-op.
+  const persistSeed = (reason: string, extraHistory: Record<string, unknown> = {}): HoldChangePlan => ({
+    ok: true,
+    reason,
+    unchanged: false,
+    mode,
+    nextHolds: current,
+    derivedStatus: deriveStatus(status, current),
+    nextStatusReason: statusReasonFromHolds(current),
+    statusVersion: existingVersion + 1,
+    history: {
+      from: str(status) || null,
+      to: mode === HOLDS_MODE_AUTHORITATIVE ? deriveStatus(status, current) : (str(status) || null),
       derivedStatus: deriveStatus(status, current),
-      nextStatusReason: statusReasonFromHolds(current),
-      statusVersion: Number(input.data.statusVersion) || 0,
-      history: {},
-    };
+      holdAdded: null,
+      holdRemoved: null,
+      seededLegacyHolds: true,
+      by: input.actor,
+      source: input.source || "setDelegateHold",
+      at: input.at,
+      requestId: input.requestId || null,
+      mode,
+      note: input.note || null,
+      ...extraHistory,
+    },
+  });
+  if (input.op === "add" && current[input.hold]) {
+    if (seeded.seeded) return persistSeed("legacy_holds_seeded");
+    return basePlan(mode, current, status, existingVersion, {unchanged: true});
   }
   if (input.op === "remove" && !current[input.hold]) {
-    return {
-      ok: true, unchanged: true, mode, nextHolds: current,
-      derivedStatus: deriveStatus(status, current),
-      nextStatusReason: statusReasonFromHolds(current),
-      statusVersion: Number(input.data.statusVersion) || 0,
-      history: {},
-    };
+    if (seeded.seeded) return persistSeed("hold_not_present");
+    return basePlan(mode, current, status, existingVersion, {
+      unchanged: true,
+      reason: "hold_not_present",
+    });
   }
   const next: Holds = {...current};
   if (input.op === "add") {

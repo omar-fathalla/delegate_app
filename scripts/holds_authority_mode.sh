@@ -20,7 +20,7 @@ ALLOWED_PROJECT="tashil-dev"
 # Writers that read process.env.HOLDS_AUTHORITY_MODE on tashil-dev.
 # auditDelegateHoldShadow only logs and is left unchanged.
 # suspendExpiredSubscriptions must never be in this list or deployed here.
-ALLOWED_FUNCTIONS=(setDelegateHold startBillingCycle)
+ALLOWED_FUNCTIONS=(setDelegateHold startBillingCycle finalizeSubscriptionRenewalOnStatus)
 BLOCKED_FUNCTIONS=(suspendExpiredSubscriptions)
 REGION="${REGION:-us-central1}"
 GCLOUD="${GCLOUD:-gcloud}"
@@ -128,6 +128,12 @@ patch_mode() {
     fi
   done
   local json token
+  local patch_file resp_file
+  patch_file="$(mktemp "${TMPDIR:-/tmp}/holds-mode-patch.XXXXXX.json")"
+  resp_file="$(mktemp "${TMPDIR:-/tmp}/holds-mode-patch-resp.XXXXXX.json")"
+  chmod 600 "$patch_file" "$resp_file"
+  # shellcheck disable=SC2064
+  trap 'rm -f "$patch_file" "$resp_file"' RETURN
   json="$(api_get "$name")"
   python3 -c '
 import json,sys
@@ -142,13 +148,11 @@ d=json.load(sys.stdin)
 env={k:v for k,v in (d.get("environmentVariables") or {}).items() if k not in RESERVED}
 env["HOLDS_AUTHORITY_MODE"]=value
 json.dump({"environmentVariables": env}, sys.stdout)
-' "$value" <<<"$json" > "/tmp/holds-mode-patch-${name}.json"
+' "$value" <<<"$json" > "$patch_file"
   token="$(gcloud_cmd auth print-access-token)"
   local http_code resp
-  http_code="$(curl -sS -o /tmp/holds-mode-patch-resp-${name}.json -w "%{http_code}"     -H "Authorization: Bearer ${token}"     -H "Content-Type: application/json"     -X PATCH     -d @"/tmp/holds-mode-patch-${name}.json"     "https://cloudfunctions.googleapis.com/v1/projects/${PROJECT}/locations/${REGION}/functions/${name}?updateMask=environmentVariables")"
-  rm -f "/tmp/holds-mode-patch-${name}.json"
-  resp="$(cat /tmp/holds-mode-patch-resp-${name}.json)"
-  rm -f "/tmp/holds-mode-patch-resp-${name}.json"
+  http_code="$(curl -sS -o "$resp_file" -w "%{http_code}"     -H "Authorization: Bearer ${token}"     -H "Content-Type: application/json"     -X PATCH     -d @"$patch_file"     "https://cloudfunctions.googleapis.com/v1/projects/${PROJECT}/locations/${REGION}/functions/${name}?updateMask=environmentVariables")"
+  resp="$(cat "$resp_file")"
   if [[ "$http_code" != "200" && "$http_code" != "201" ]]; then
     echo "PATCH ${name} failed HTTP ${http_code}: $(python3 -c 'import json,sys
 try:

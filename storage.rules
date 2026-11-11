@@ -110,33 +110,54 @@ service firebase.storage {
 
 
     // ==================== FEEDBACK SCREENSHOTS ====================
-    // Path stays flat so existing clients keep working. The app sets
-    // custom metadata userId to the caller's uid. Delegates may create
-    // only when that metadata matches; they may read/update/delete only
-    // their own object. Staff of any company still have full access
-    // (residual, documented: no company segment).
-    // New clients write feedback_{uid}_{timestamp}.jpg. Old clients
-    // keep the flat path and set metadata userId (Flutter SDK).
+    // Flat path kept so existing objects remain addressable. New
+    // delegate creates must be named feedback_{uid}_* (uid then '_').
+    // If userId metadata is present it must equal the caller, on create
+    // and on read/update/delete of an existing object. Metadata is not
+    // required on create (live REST often omits it). Legacy objects
+    // that are not feedback_{otherUid}_* stay readable/updatable/
+    // deletable by the delegate when userId metadata equals the
+    // caller. Staff of any company still have full access (residual:
+    // no company segment). New clients write feedback_{uid}_{ts}.jpg.
     function feedbackNameOwnedByCaller(fileName) {
       return request.auth.uid != ''
         && fileName.matches('feedback_' + request.auth.uid + '_.*');
     }
-    function feedbackOwnedByCaller(fileName) {
-      return feedbackNameOwnedByCaller(fileName)
-        || resource.metadata.get('userId', '') == request.auth.uid;
+    function feedbackNameOwnedByOther(fileName) {
+      return fileName.matches('feedback_.*_.*')
+        && !feedbackNameOwnedByCaller(fileName);
+    }
+    function feedbackMetaOk(userId) {
+      return userId == '' || userId == request.auth.uid;
+    }
+    function feedbackDelegateMayAccess(fileName) {
+      return isDelegateToken()
+        && request.auth.uid != ''
+        && feedbackMetaOk(resource.metadata.get('userId', ''))
+        && (
+          feedbackNameOwnedByCaller(fileName)
+          || (
+            !feedbackNameOwnedByOther(fileName)
+            && resource.metadata.get('userId', '') == request.auth.uid
+          )
+        );
     }
     match /feedback_screenshots/{fileName} {
       // Overwrites must be evaluated against the existing object's
       // owner even if a client upload is classified as create.
       allow read: if isStorageStaff()
-        || (isDelegateToken() && feedbackOwnedByCaller(fileName));
+        || feedbackDelegateMayAccess(fileName);
       allow create, update: if isStorageStaff()
-        || (isDelegateToken()
-          && (feedbackNameOwnedByCaller(fileName)
-            || request.resource.metadata.get('userId', '') == request.auth.uid)
-          && (resource == null || feedbackOwnedByCaller(fileName)));
+        || (
+          isDelegateToken()
+          && feedbackMetaOk(request.resource.metadata.get('userId', ''))
+          && (
+            (resource == null && feedbackNameOwnedByCaller(fileName))
+            || (resource != null && feedbackDelegateMayAccess(fileName))
+          )
+        );
       allow delete: if isStorageStaff()
-        || (isDelegateToken() && feedbackOwnedByCaller(fileName));
+        || feedbackDelegateMayAccess(fileName);
     }
 
     // ==================== PHOTO PERMISSION IMAGES ====================

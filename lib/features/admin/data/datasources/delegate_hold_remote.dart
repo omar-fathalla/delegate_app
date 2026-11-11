@@ -62,6 +62,8 @@ class DelegateHoldRemote {
         return 'حسابك غير نشط.';
       case 'status_not_actionable':
         return 'لا يمكن تغيير حالة هذا المندوب حالياً.';
+      case 'hold_not_present':
+        return 'هذا الإيقاف غير موجود على حساب المندوب.';
       default:
         return 'تعذر إتمام العملية. حاول مرة أخرى.';
     }

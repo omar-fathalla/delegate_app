@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:async';
+import 'package:delegate_app/core/services/firestore_session_subscriptions.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 /// نتيجة فحص صلاحية جلسة المندوب
@@ -41,6 +43,56 @@ class SessionManagementService {
   /// Max wait for each Firestore read below. On timeout the session is
   /// treated as valid (same as any other network error), never logged out.
   static Duration sessionReadTimeout = const Duration(seconds: 5);
+
+  static const heldSessionMessage =
+      'تم إيقاف حسابك. يُرجى التواصل مع المشرف أو الإدارة.';
+
+  /// Treats suspended / rejected (any common spelling) as a held session.
+  static bool isHeldStatus(String? status) {
+    final s = (status ?? '').trim().toLowerCase().replaceAll('-', '_');
+    return s == 'suspended' || s == 'rejected';
+  }
+
+  /// Live listener: signs the delegate out when the document becomes held.
+  /// Registered under [FirestoreSessionSubscriptions] so AuthBloc can cancel
+  /// it before [FirebaseAuth.signOut].
+  static StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+      watchDelegateStatus({
+    required Delegate delegate,
+    required void Function(String reason) onHeld,
+    FirebaseFirestore? firestore,
+  }) {
+    if (delegate.role != UserRole.delegate) return null;
+    final orgId = delegate.organizationUID.trim();
+    final compId = delegate.companyUID.trim();
+    final uid = delegate.uid.trim();
+    if (orgId.isEmpty || compId.isEmpty || uid.isEmpty) return null;
+    final FirebaseFirestore fs;
+    try {
+      fs = firestore ?? FirebaseFirestore.instance;
+    } catch (_) {
+      // Widget/bloc tests have no [DEFAULT] Firebase app.
+      return null;
+    }
+    final sub = fs
+        .collection('organizations')
+        .doc(orgId)
+        .collection('companies')
+        .doc(compId)
+        .collection('delegates')
+        .doc(uid)
+        .snapshots()
+        .listen((snap) {
+      final data = snap.data();
+      if (data == null) return;
+      if (isHeldStatus(data['status']?.toString())) {
+        onHeld(heldSessionMessage);
+      }
+    }, onError: (_) {});
+    FirestoreSessionSubscriptions.instance
+        .register('delegate_hold_$uid', sub);
+    return sub;
+  }
 
   /// فحص صلاحية جلسة المندوب المسجل محلياً
   static Future<SessionVerificationResult> checkSessionStatus({
@@ -95,6 +147,12 @@ class SessionManagementService {
 
         if (delegateDoc.exists && delegateDoc.data() != null) {
           final data = delegateDoc.data()!;
+          if (isHeldStatus(data['status']?.toString())) {
+            return const SessionVerificationResult.invalid(
+              reason: heldSessionMessage,
+            );
+          }
+
           final requireReLogin = data['requireReLogin'] == true;
           if (requireReLogin) {
             final reason = data['forceLogoutReason'] as String? ??

@@ -708,4 +708,65 @@ describe("firestore tightened rules", () => {
       await assertSucceeds(dbFor("super").doc("organizations/o1/tasks/sent").delete());
     });
   });
+
+  test("delegate can create a same-company supervisor leave notification without organizationId", async () => {
+    const delegate = dbFor("del-1", DELEGATE);
+    await assertSucceeds(delegate.collection("notifications").add({
+      delegateUid: "comp",
+      companyUID: "c1",
+      organizationUID: "o1",
+      title: "طلب إجازة",
+      type: "leave_request_submitted",
+      targetRole: "supervisor",
+      isRead: false,
+      createdBy: "del-1",
+    }));
+    // Missing createdBy or a foreign company is denied.
+    await assertFails(delegate.collection("notifications").add({
+      delegateUid: "comp",
+      companyUID: "c1",
+      title: "طلب إجازة",
+      type: "leave_request_submitted",
+      targetRole: "supervisor",
+      isRead: false,
+    }));
+    await assertFails(delegate.collection("notifications").add({
+      delegateUid: "comp",
+      companyUID: "c9",
+      organizationUID: "o2",
+      title: "طلب إجازة",
+      type: "leave_request_submitted",
+      targetRole: "supervisor",
+      isRead: false,
+      createdBy: "del-1",
+    }));
+  });
+
+  test("org-admin can list role-key notification broadcasts", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("notifications/org-broadcast").set({
+        delegateUid: "organizationAdmin",
+        title: "دور",
+        isRead: false,
+      });
+    });
+    const orgAdmin = dbFor("orgadmin");
+    await assertSucceeds(
+      orgAdmin.collection("notifications").where("delegateUid", "==", "organizationAdmin").get(),
+    );
+  });
+
+  test("company admin can create a role-key registration notification with createdBy", async () => {
+    const comp = dbFor("comp");
+    await assertSucceeds(comp.collection("notifications").add({
+      delegateUid: "super-admin",
+      title: "طلب إضافة مندوب جديد",
+      type: "delegate_subscription_request",
+      createdBy: "comp",
+      companyUID: "c1",
+      organizationUID: "o1",
+      isRead: false,
+      targetRoles: ["superAdmin", "technicalSupport"],
+    }));
+  });
 });

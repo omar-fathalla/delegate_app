@@ -58,6 +58,10 @@ package-lock.json
 
 # Local env files
 .env*
+# Checked-in deploy defaults (mode only, no secrets). firebase deploy
+# loads functions/.env then functions/.env.<project>.
+!functions/.env
+!functions/.env.tashil-dev
 
 # Keystore and credentials files
 android/key.properties

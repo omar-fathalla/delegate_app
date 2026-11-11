@@ -406,6 +406,9 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
             'requestId': requestId,
             'senderName': supervisorName,
             'senderRole': 'supervisor',
+            'createdBy': supervisorUid,
+            'companyUID': companyUID,
+            'organizationUID': organizationUID,
             'createdAt': FieldValue.serverTimestamp(),
             'isRead': false,
             'targetRoles': ['superAdmin', 'technicalSupport'],
@@ -430,6 +433,9 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
             'requestId': requestId,
             'senderName': supervisorName,
             'senderRole': 'supervisor',
+            'createdBy': supervisorUid,
+            'companyUID': companyUID,
+            'organizationUID': organizationUID,
             'createdAt': FieldValue.serverTimestamp(),
             'isRead': false,
             'targetRoles': ['superAdmin', 'technicalSupport'],
@@ -438,21 +444,27 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
 
         await batch.commit();
       } catch (e) {
-        // Fallback: write role-targeted notifications
-        for (final roleKey in ['super-admin', 'technicalSupport', 'role_super_admin', 'role_technical_support']) {
-          await _firestore.collection('notifications').add({
-            'delegateUid': roleKey,
-            'title': notifTitle,
-            'body': notifBody,
-            'type': 'delegate_subscription_request',
-            'requestId': requestId,
-            'senderName': supervisorName,
-            'senderRole': 'supervisor',
-            'createdAt': FieldValue.serverTimestamp(),
-            'isRead': false,
-            'targetRoles': ['superAdmin', 'technicalSupport'],
-          });
-        }
+        // Fallback: write role-targeted notifications. Never fail the
+        // already-committed request (form reset depends on Right).
+        try {
+          for (final roleKey in ['super-admin', 'technicalSupport', 'role_super_admin', 'role_technical_support']) {
+            await _firestore.collection('notifications').add({
+              'delegateUid': roleKey,
+              'title': notifTitle,
+              'body': notifBody,
+              'type': 'delegate_subscription_request',
+              'requestId': requestId,
+              'senderName': supervisorName,
+              'senderRole': 'supervisor',
+              'createdBy': supervisorUid,
+              'companyUID': companyUID,
+              'organizationUID': organizationUID,
+              'createdAt': FieldValue.serverTimestamp(),
+              'isRead': false,
+              'targetRoles': ['superAdmin', 'technicalSupport'],
+            });
+          }
+        } catch (_) {}
       }
 
       return Right(requestId);

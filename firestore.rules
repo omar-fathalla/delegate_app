@@ -214,15 +214,15 @@ service cloud.firestore {
 
     function companyScoped() {
       return callerCompany() != '' && (
-        resource.data.companyUID == callerCompany() ||
-        resource.data.companyId == callerCompany()
+        resource.data.get('companyUID', '') == callerCompany() ||
+        resource.data.get('companyId', '') == callerCompany()
       );
     }
 
     function orgScoped() {
       return callerOrg() != '' && (
-        resource.data.organizationUID == callerOrg() ||
-        resource.data.organizationId == callerOrg()
+        resource.data.get('organizationUID', '') == callerOrg() ||
+        resource.data.get('organizationId', '') == callerOrg()
       );
     }
 
@@ -1774,22 +1774,47 @@ service cloud.firestore {
       );
     }
 
+    // Guarded field access so a missing organizationId does not fail the
+    // whole OR (leave submit writes organizationUID + createdBy, and was
+    // denied when organizationId was absent).
+    function dataHasString(d, key) {
+      return d.keys().hasAll([key]) && d[key] is string && d[key] != '';
+    }
+
+    // Delegate may notify a same-company supervisor: createdBy is the
+    // caller and the payload is scoped to a company in the token.
+    function canDelegateCreateNotification() {
+      let d = request.resource.data;
+      return isDelegate()
+        && dataHasString(d, 'createdBy')
+        && d.createdBy == request.auth.uid
+        && (
+          (dataHasString(d, 'companyUID') && delegateInCompany(d.companyUID))
+          || (dataHasString(d, 'companyId') && delegateInCompany(d.companyId))
+        );
+    }
+
     function canCreateNotification() {
       return signedIn() && (
         isGlobalStaff()
         || ((isOrgScopedStaff() || isCompanyScopedStaff()) && (incomingOrgScoped() || incomingCompanyScoped() || request.resource.data.createdBy == request.auth.uid))
-        || (isDelegate() && (
-          request.resource.data.delegateUid == request.auth.uid
-          || delegateOwns(request.resource.data.delegateUid)
-          || delegateInOrg(request.resource.data.organizationId)
-          || delegateInOrg(request.resource.data.organizationUID)
-          || request.resource.data.createdBy == request.auth.uid
-        ))
+        || canDelegateCreateNotification()
       );
+    }
+
+    // Cheap, org-admin-only allow so a list query on
+    // delegateUid == 'organizationAdmin' (etc.) is provable without
+    // folding isPrivilegedStaffAlert into the query, and without
+    // adding every staff roleIs() to the get() budget (M-7).
+    function canReadOrgAdminRoleBroadcast() {
+      return isOrgAdmin() && resource.data.get('delegateUid', '') in [
+        'organizationAdmin', 'organization-admin', 'organization_admin'
+      ];
     }
 
     match /notifications/{notificationId} {
       allow read: if canReadOwnNotification();
+      allow read: if canReadOrgAdminRoleBroadcast();
       allow read: if canReadNotification();
       allow create: if canCreateNotification();
       allow update: if (canReadOwnNotification() || canReadNotification()) && (

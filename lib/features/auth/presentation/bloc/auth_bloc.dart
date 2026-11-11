@@ -78,6 +78,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<LogoutRequested>(_onLogoutRequested);
     on<OrganizationSelected>(_onOrganizationSelected);
     on<AnonymousSessionDetected>(_onAnonymousSessionDetected);
+    on<HeldSessionDetected>(_onHeldSessionDetected);
     on<PhoneOtpVerified>(_onPhoneOtpVerified);
     on<PhoneOtpCancelled>(_onPhoneOtpCancelled);
 
@@ -87,6 +88,42 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         if (isAnonymous) add(const AnonymousSessionDetected());
       }, onError: (_) {});
     }
+  }
+
+  void _startHoldWatch(Delegate delegate) {
+    if (delegate.role != UserRole.delegate) return;
+    try {
+      SessionManagementService.watchDelegateStatus(
+        delegate: delegate,
+        onHeld: (reason) {
+          if (isClosed) return;
+          add(HeldSessionDetected(message: reason));
+        },
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _onHeldSessionDetected(
+    HeldSessionDetected event,
+    Emitter<AuthState> emit,
+  ) async {
+    if (state is AuthUnauthenticated) return;
+    _explicitLogout = true;
+    try {
+      await FirestoreSessionSubscriptions.instance.cancelAll();
+    } catch (_) {}
+    emit(
+      AuthUnauthenticated(
+        message: event.message ?? SessionManagementService.heldSessionMessage,
+        fromLogout: true,
+      ),
+    );
+    try {
+      await logoutUseCase(const LogoutParams());
+    } catch (_) {}
+    try {
+      await signOutAuth?.call();
+    } catch (_) {}
   }
 
   @override
@@ -231,6 +268,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       ).ignore();
 
       emit(AuthAuthenticated(delegate: delegate));
+    _startHoldWatch(delegate);
       return;
     }
 
@@ -316,6 +354,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             ? AuthAuthenticated(delegate: d)
             : const AuthUnauthenticated(),
       );
+      if (d != null) _startHoldWatch(d);
       return;
     }
     if (gen != _autoLoginGen) return;
@@ -323,6 +362,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       await logoutUseCase(const LogoutParams());
     }
     emit(decision.state);
+    final authed = decision.state;
+    if (authed is AuthAuthenticated) _startHoldWatch(authed.delegate);
   }
 
   Future<void> _onAutoLoginCancelled(
@@ -436,6 +477,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     ).ignore();
 
     emit(AuthAuthenticated(delegate: delegate));
+    _startHoldWatch(delegate);
   }
 }
 

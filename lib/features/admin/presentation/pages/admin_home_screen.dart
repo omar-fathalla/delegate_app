@@ -184,7 +184,8 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
                 .get(),
           );
         }
-        if (widget.adminDelegate.companyName.isNotEmpty) {
+        if (widget.adminDelegate.role != UserRole.organizationAdmin &&
+            widget.adminDelegate.companyName.isNotEmpty) {
           queries.add(
             FirebaseFirestore.instance
                 .collection('users')

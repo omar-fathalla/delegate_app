@@ -65,3 +65,12 @@ class OrganizationSelected extends AuthEvent {
   @override
   List<Object> get props => [delegate, rememberMe];
 }
+
+class HeldSessionDetected extends AuthEvent {
+  const HeldSessionDetected({this.message});
+
+  final String? message;
+
+  @override
+  List<Object> get props => [message ?? ''];
+}

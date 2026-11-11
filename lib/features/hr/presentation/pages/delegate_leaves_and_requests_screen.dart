@@ -1407,6 +1407,7 @@ class _DelegateLeavesAndRequestsScreenState
     final reasonCtrl = TextEditingController();
     XFile? pickedAttachment;
     bool isSubmitting = false;
+    String? submittedLeaveId;
 
     await showModalBottomSheet(
       context: context,
@@ -2286,8 +2287,8 @@ class _DelegateLeavesAndRequestsScreenState
                                       try {
                                         String? attachmentUrl;
 
-                                        // رفع المرفق إلى Firebase Storage
-                                        if (pickedAttachment != null) {
+                                        // رفع المرفق إلى Firebase Storage (skip on retry if leave already written)
+                                        if (submittedLeaveId == null && pickedAttachment != null) {
                                           final bytes = await pickedAttachment!.readAsBytes();
                                           final fileName =
                                               '${DateTime.now().millisecondsSinceEpoch}_${pickedAttachment!.name}';
@@ -2308,41 +2309,44 @@ class _DelegateLeavesAndRequestsScreenState
                                           attachmentUrl = await uploadTask.ref.getDownloadURL();
                                         }
 
-                                        // تسجيل الطلب في Firestore
-                                        final docRef = FirebaseFirestore.instance
-                                            .collection('leave_requests')
-                                            .doc();
+                                        if (submittedLeaveId == null) {
+                                          // تسجيل الطلب في Firestore
+                                          final docRef = FirebaseFirestore.instance
+                                              .collection('leave_requests')
+                                              .doc();
 
-                                        final int finalDays = isHourly
-                                            ? 0
-                                            : (endDate.difference(startDate).inDays + 1);
+                                          final int finalDays = isHourly
+                                              ? 0
+                                              : (endDate.difference(startDate).inDays + 1);
 
-                                        await docRef.set({
-                                          'id': docRef.id,
-                                          'delegateUid': widget.delegate.uid,
-                                          'delegateName': widget.delegate.fullName,
-                                          'delegatePhone': widget.delegate.phoneNumber,
-                                          'companyUID': widget.delegate.companyUID,
-                                          'organizationUID': widget.delegate.organizationUID,
-                                          'type': selectedType,
-                                          'isHourly': isHourly,
-                                          'hoursCount': isHourly ? hoursCount : null,
-                                          'fromTime': fromTimeFormatted,
-                                          'toTime': toTimeFormatted,
-                                          'startDate': Timestamp.fromDate(startDate),
-                                          'endDate': Timestamp.fromDate(endDate),
-                                          'daysCount': finalDays,
-                                          'reason': reason,
-                                          'attachmentUrl': attachmentUrl,
-                                          'status': 'pending', // يبدأ دائماً بقيد المراجعة للمندوب
-                                          'createdAt': FieldValue.serverTimestamp(),
-                                          'resolvedAt': null,
-                                          'resolvedBy': null,
-                                          'resolvedByName': null,
-                                          'rejectReason': null,
-                                        });
+                                          await docRef.set({
+                                            'id': docRef.id,
+                                            'delegateUid': widget.delegate.uid,
+                                            'delegateName': widget.delegate.fullName,
+                                            'delegatePhone': widget.delegate.phoneNumber,
+                                            'companyUID': widget.delegate.companyUID,
+                                            'organizationUID': widget.delegate.organizationUID,
+                                            'type': selectedType,
+                                            'isHourly': isHourly,
+                                            'hoursCount': isHourly ? hoursCount : null,
+                                            'fromTime': fromTimeFormatted,
+                                            'toTime': toTimeFormatted,
+                                            'startDate': Timestamp.fromDate(startDate),
+                                            'endDate': Timestamp.fromDate(endDate),
+                                            'daysCount': finalDays,
+                                            'reason': reason,
+                                            'attachmentUrl': attachmentUrl,
+                                            'status': 'pending', // يبدأ دائماً بقيد المراجعة للمندوب
+                                            'createdAt': FieldValue.serverTimestamp(),
+                                            'resolvedAt': null,
+                                            'resolvedBy': null,
+                                            'resolvedByName': null,
+                                            'rejectReason': null,
+                                          });
+                                          submittedLeaveId = docRef.id;
+                                        }
 
-                                        // إرسال إشعار فوري لمشرف الشركة الخاص بالمندوب
+                                        // إشعار المشرف: لا يفشل إرسال الطلب إذا رُفض الإشعار
                                         String notifTitle;
                                         switch (selectedType) {
                                           case 'delay':
@@ -2356,22 +2360,24 @@ class _DelegateLeavesAndRequestsScreenState
                                             break;
                                         }
 
-                                        await FirebaseFirestore.instance
-                                            .collection('notifications')
-                                            .add({
-                                          'delegateUid': widget.delegate.supervisorUid ?? '',
-                                          'companyUID': widget.delegate.companyUID,
-                                          'organizationUID': widget.delegate.organizationUID,
-                                          'title': notifTitle,
-                                          'body':
-                                              'قدم المندوب ${widget.delegate.fullName} طلباً جديداً يحتاج إلى مراجعتك واعتمادك.',
-                                          'type': 'leave_request_submitted',
-                                          'targetRole': 'supervisor',
-                                          'isRead': false,
-                                          'createdAt': FieldValue.serverTimestamp(),
-                                          'createdBy': widget.delegate.uid,
-                                          'senderName': widget.delegate.fullName,
-                                        });
+                                        try {
+                                          await FirebaseFirestore.instance
+                                              .collection('notifications')
+                                              .add({
+                                            'delegateUid': widget.delegate.supervisorUid ?? '',
+                                            'companyUID': widget.delegate.companyUID,
+                                            'organizationUID': widget.delegate.organizationUID,
+                                            'title': notifTitle,
+                                            'body':
+                                                'قدم المندوب ${widget.delegate.fullName} طلباً جديداً يحتاج إلى مراجعتك واعتمادك.',
+                                            'type': 'leave_request_submitted',
+                                            'targetRole': 'supervisor',
+                                            'isRead': false,
+                                            'createdAt': FieldValue.serverTimestamp(),
+                                            'createdBy': widget.delegate.uid,
+                                            'senderName': widget.delegate.fullName,
+                                          });
+                                        } catch (_) {}
 
                                         if (ctx.mounted) Navigator.pop(ctx);
                                         messenger.showSnackBar(
