@@ -516,6 +516,16 @@ describe("firestore tightened rules", () => {
     );
   });
 
+  test("clients cannot read or write billing_cycles", async () => {
+    const orgAdmin = dbFor("orgadmin");
+    const companyAdmin = dbFor("comp");
+    const superAdmin = dbFor("super");
+    await assertFails(orgAdmin.doc("billing_cycles/o1_2027_H1").set({state: "running"}));
+    await assertFails(companyAdmin.doc("billing_cycles/o1_2027_H1").get());
+    await assertFails(superAdmin.doc("billing_cycles/o1_2027_H1").set({state: "done"}));
+    await assertFails(superAdmin.doc("billing_cycles/o1_2027_H1").get());
+  });
+
   test("security logs can be created by the delegate and deleted only inside the company", async () => {
     const delegate = dbFor("del-1", DELEGATE);
     await assertSucceeds(delegate.collection("security_audit_logs").add({

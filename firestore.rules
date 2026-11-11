@@ -2244,6 +2244,13 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Server-only billing-cycle runs written by startBillingCycle.
+    // Clients cannot read or write them. Default-deny would also cover
+    // this path; the named match documents the contract for the web.
+    match /billing_cycles/{runId} {
+      allow read, write: if false;
+    }
+
     // ==================== DEFAULT DENY ====================
     // Rate-limit collections (delegate_login_rate_limits, staff_login_rate_limits)
     // and every other unnamed path fall through to this match.
