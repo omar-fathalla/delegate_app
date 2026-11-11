@@ -7,9 +7,11 @@
  */
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import {FieldValue} from "firebase-admin/firestore";
 import {
   inferChainOrigin,
   inferPersonSource,
+  shouldSkipStamp,
   stampPayload,
   type ChainEvidence,
   type RequestEvidence,
@@ -129,7 +131,7 @@ async function stampIfMissing(
   data: FirebaseFirestore.DocumentData,
   delegateId: string,
 ): Promise<void> {
-  if (str(data.delegateSource)) return;
+  if (shouldSkipStamp(data)) return;
   const self = chainFromDoc(ref.path, delegateId, data);
   const ev = await loadEvidence(self.uid, self);
   const person = inferPersonSource({
@@ -152,7 +154,7 @@ async function stampIfMissing(
   const payload = stampPayload(origin, person, "trigger", "trigger");
   await ref.update({
     ...payload,
-    delegateSourceAt: admin.firestore.FieldValue.serverTimestamp(),
+    delegateSourceAt: FieldValue.serverTimestamp(),
   });
 }
 
@@ -161,7 +163,7 @@ export const stampDelegateSource = functions.firestore
   .onWrite(async (change, context) => {
     if (!change.after.exists) return null;
     const data = change.after.data() || {};
-    if (str(data.delegateSource)) return null;
+    if (shouldSkipStamp(data)) return null;
     try {
       await stampIfMissing(change.after.ref, data, context.params.delegateId);
     } catch (e) {

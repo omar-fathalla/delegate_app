@@ -178,3 +178,11 @@ export function stampPayload(
     delegateSourceRunId: runId,
   };
 }
+
+
+/** True when the trigger must not write a stamp (already set, or a revert is in progress). */
+export function shouldSkipStamp(data: {delegateSource?: unknown; delegateSourceRevertRunId?: unknown}): boolean {
+  const source = typeof data.delegateSource === "string" ? data.delegateSource.trim() : "";
+  const revert = typeof data.delegateSourceRevertRunId === "string" ? data.delegateSourceRevertRunId.trim() : "";
+  return source !== "" || revert !== "";
+}

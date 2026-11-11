@@ -20,7 +20,19 @@ const BASE = {
 
 describe("delegate source stamps are server-only", () => {
   let env;
-  const as = (uid) => env.authenticatedContext(uid, {firebase: {sign_in_provider: "password"}}).firestore();
+  // Role claims are required for delegateOwns / isDelegate (users/{uid}
+  // is not enough). Without them, a self-update falls through to the
+  // staff path and hits the 1000-expression budget.
+  const CLAIMS = {
+    sa: {role: "super-admin"},
+    sup: {role: "supervisor", organizationUID: "o1", companyUID: "c1"},
+    d1: {role: "delegate", organizationUID: "o1", companyUID: "c1"},
+    ts: {role: "technical_support", organizationUID: "o1"},
+  };
+  const as = (uid) => env.authenticatedContext(uid, {
+    firebase: {sign_in_provider: "password"},
+    ...(CLAIMS[uid] || {}),
+  }).firestore();
 
   before(async () => {
     env = await initializeTestEnvironment({
@@ -36,9 +48,10 @@ describe("delegate source stamps are server-only", () => {
       await db.doc("users/sa").set({role: "super-admin"});
       await db.doc("users/sup").set({role: "supervisor", organizationUID: "o1", companyUID: "c1"});
       await db.doc("users/d1").set({role: "delegate", organizationUID: "o1", companyUID: "c1", uid: "d1"});
+      await db.doc("users/ts").set({role: "technical_support", organizationUID: "o1"});
       await db.doc("organizations/o1").set({name: "Org"});
       await db.doc("organizations/o1/companies/c1").set({name: "Co"});
-      await db.doc(PATH, BASE);
+      await db.doc(PATH).set(BASE);
       await db.doc("organizations/o1/companies/c1/delegates/stamped").set({
         ...BASE,
         uid: "stamped",
@@ -80,5 +93,71 @@ describe("delegate source stamps are server-only", () => {
     await assertSucceeds(as("sa").doc("organizations/o1/companies/c1/delegates/stamped").update({
       updatedAt: "t1",
     }));
+  });
+
+  test("delegate self-update may change allow-listed fields but not source stamps", async () => {
+    const ref = as("d1").doc(PATH);
+    await assertSucceeds(ref.update({updatedAt: "t-self"}));
+    await assertFails(ref.update({updatedAt: "t-self", delegateSource: "app"}));
+    await assertFails(ref.update({delegateSourceRevertRunId: "hack"}));
+  });
+
+  test("tech approval (pending → active) cannot write source stamps", async () => {
+    const path = "organizations/o1/companies/c1/delegates/dtech";
+    const docs = [
+      {documentKey: "personalPhoto", documentStatus: "pending", documentURL: "p0"},
+      {documentKey: "nationalityId", documentStatus: "pending", documentURL: "f0", secondaryURL: "b0"},
+    ];
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.doc("users/dtech").set({role: "delegate", organizationUID: "o1", companyUID: "c1", uid: "dtech"});
+      await db.doc(path).set({
+        ...BASE, uid: "dtech", status: "pending",
+        profileImageUrl: "p0", nationalIdFrontUrl: "f0", nationalIdBackUrl: "b0",
+        documents: docs,
+      });
+      await db.doc("delegate_requests/dtech").set({
+        requestType: "new_delegate", status: "pending",
+        supervisorUid: "sup", organizationUID: "o1", companyUID: "c1",
+        profileImageUrl: "p0", nationalIdFrontUrl: "f0", nationalIdBackUrl: "b0",
+        firstName: "Fake", secondName: "T", thirdName: "User",
+        fullName: "Fake T User", nationalId: "x",
+      });
+    });
+    const flipped = docs.map((d) => ({...d, documentStatus: "approved", reviewedBy: "TS", reviewedAt: "t"}));
+    const ts = as("ts");
+    // Request approval + status-only activation in one batch, no source keys.
+    const batchOk = ts.batch();
+    batchOk.update(ts.doc("delegate_requests/dtech"), {status: "approved", reviewedBy: "TS", reviewedAt: "t"});
+    batchOk.update(ts.doc(path), {
+      status: "active", documents: flipped, updatedAt: "t",
+      reviewedBy: "TS", reviewedAt: "t", approvedRequestId: "dtech",
+    });
+    await assertSucceeds(batchOk.commit());
+
+    // Same activation but also setting a source stamp must fail.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.doc(path).set({
+        ...BASE, uid: "dtech", status: "pending",
+        profileImageUrl: "p0", nationalIdFrontUrl: "f0", nationalIdBackUrl: "b0",
+        documents: docs,
+      });
+      await db.doc("delegate_requests/dtech").set({
+        requestType: "new_delegate", status: "pending",
+        supervisorUid: "sup", organizationUID: "o1", companyUID: "c1",
+        profileImageUrl: "p0", nationalIdFrontUrl: "f0", nationalIdBackUrl: "b0",
+        firstName: "Fake", secondName: "T", thirdName: "User",
+        fullName: "Fake T User", nationalId: "x",
+      });
+    });
+    const batchBad = ts.batch();
+    batchBad.update(ts.doc("delegate_requests/dtech"), {status: "approved", reviewedBy: "TS", reviewedAt: "t"});
+    batchBad.update(ts.doc(path), {
+      status: "active", documents: flipped, updatedAt: "t",
+      reviewedBy: "TS", reviewedAt: "t", approvedRequestId: "dtech",
+      delegateSource: "web",
+    });
+    await assertFails(batchBad.commit());
   });
 });

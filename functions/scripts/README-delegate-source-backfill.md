@@ -70,3 +70,24 @@ A tashil-dev dry-run (runId `dev-20261110T224032Z-b4c1ea`, nested
 web-request fallback) found 104 unstamped docs: 4 rule-1 `app` (high)
 and 100 rule-5 `web` (review). Zero rule 4. The 100 review docs stay
 `web`.
+
+## Revert and the live trigger
+
+`--revert --apply` deletes the five source fields. `stampDelegateSource`
+is onWrite and would otherwise re-stamp immediately. The revert write
+also sets `delegateSourceRevertRunId` to the run id; the trigger skips
+any doc that still has that marker (and no `delegateSource`). `--apply`
+clears the marker when it writes the stamp back.
+
+Do not revert on prod without a written go. On tashil-dev, revert is
+safe while this marker is in the deployed trigger.
+
+## Rule 5 review list (required before any prod apply)
+
+A dry-run (and `--apply`) always writes
+
+`delegate-source-rule5-review-<runId>.txt`
+
+with one line per doc: `uid<TAB>path` only — no names, phones, or
+national IDs. This is the list Mohamed reviews before a prod apply
+(rule 5 = no evidence, stamped `web` / `unknown` / `review`).

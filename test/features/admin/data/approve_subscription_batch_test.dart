@@ -163,6 +163,27 @@ void main() {
     expect(m, {'fullName': 'F'});
   });
 
+  test('new_delegate with no prior doc: request approved and delegate created in the same batch', () async {
+    final db = FakeFirebaseFirestore();
+    await db.doc('users/sup').set({'role': 'supervisor', 'organizationUID': 'o1', 'companyUID': 'c1'});
+    await db.doc('delegate_requests/r1').set(_req);
+    final repo = DelegateSubscriptionRepositoryImpl(firestore: db, storage: _MockStorage());
+    final result = await repo.approveSubscriptionRequest(
+      request: DelegateSubscriptionRequest.fromMap(_req, 'r1'),
+      reviewerUid: 'sa',
+      reviewerName: 'SA',
+    );
+    expect(result.isRight(), isTrue);
+    expect((await db.doc('delegate_requests/r1').get()).data()!['status'], 'approved');
+    final d = (await db.doc(_delegatePath).get()).data()!;
+    expect(d['status'], 'active');
+    expect(d['uid'], 'r1');
+    expect(d['registeredVia'], 'mobile_app');
+    expect(d['approvedRequestId'], 'r1');
+    // Same-batch write: a trigger running after commit sees the approved
+    // app request and cannot stamp the new doc as web.
+  });
+
   test('r5: users/{uid} write fails after commit -> surfaced with a working retry', () async {
     final db = _UsersFailFirestore();
     await _seed(db);

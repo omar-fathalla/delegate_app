@@ -195,121 +195,134 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         paymentStatus: paymentStatus,
       );
 
-      // 6. Write request to Firestore
-      await docRef.set(request.toMap());
-
-      // 6b. If branch electronic receipt, record code in used_receipt_codes
-      if (paymentMethod == SubscriptionPaymentMethod.branchReceipt &&
-          receiptCode != null &&
-          receiptCode.trim().isNotEmpty) {
-        try {
-          await _firestore.collection('used_receipt_codes').doc(receiptCode.trim()).set({
-            'receiptCode': receiptCode.trim(),
-            'requestId': requestId,
-            'supervisorUid': supervisorUid,
-            'supervisorName': supervisorName,
-            'companyUID': companyUID,
-            'companyName': companyName,
-            'organizationUID': organizationUID,
-            'organizationName': organizationName,
-            'status': 'reserved',
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-        } catch (_) {}
-      }
-
-      // 7. Create pending delegate placeholder if permissions permit
+      // 6+7. Write the pending request and the pending delegate placeholder
+      // in one batch so stampDelegateSource sees delegate_requests/{uid}
+      // (pending + supervisorUid → rule 2 app) on the first delegate write.
+      // If the supervisor cannot write the nested delegate (cross-org), fall
+      // back to writing the request alone; staff approval creates the doc.
+      final city = _extractCityFromNationalId(cleanNationalId);
+      final birthDate = _extractBirthDateFromNationalId(cleanNationalId);
+      final gender = _extractGenderFromNationalId(cleanNationalId);
+      String? existingPid;
       try {
-        String? existingPid;
-        try {
-          final existingByNat = await _firestore
-              .collectionGroup('delegates')
-              .where('nationalId', isEqualTo: cleanNationalId)
-              .limit(1)
-              .get();
-          if (existingByNat.docs.isNotEmpty) {
-            existingPid = existingByNat.docs.first.data()['delegatePublicId'] as String?;
-          }
-        } catch (_) {}
+        final existingByNat = await _firestore
+            .collectionGroup('delegates')
+            .where('nationalId', isEqualTo: cleanNationalId)
+            .limit(1)
+            .get();
+        if (existingByNat.docs.isNotEmpty) {
+          existingPid = existingByNat.docs.first.data()['delegatePublicId'] as String?;
+        }
+      } catch (_) {}
 
-        final city = _extractCityFromNationalId(cleanNationalId);
-        final birthDate = _extractBirthDateFromNationalId(cleanNationalId);
-        final gender = _extractGenderFromNationalId(cleanNationalId);
-
-        await _firestore
-            .collection('organizations')
-            .doc(organizationUID)
-            .collection('companies')
-            .doc(companyUID)
-            .collection('delegates')
-            .doc(requestId)
-            .set({
-          'uid': requestId,
-          if (existingPid != null && existingPid.trim().isNotEmpty)
-            'delegatePublicId': existingPid.trim(),
-          'firstName': firstName,
-          'secondName': secondName,
-          'thirdName': thirdName,
-          'fullName': fullName,
-          'phoneNumber': phoneNumber,
-          'nationalId': nationalId,
-          'nationalityID': nationalId,
-          if (city.isNotEmpty) 'city': city,
-          if (birthDate != null) 'birthDate': Timestamp.fromDate(birthDate),
-          if (gender != null && gender.isNotEmpty) 'gender': gender,
-          'organizationUID': organizationUID,
-          'organizationName': organizationName,
-          'companyUID': companyUID,
-          'companyName': companyName,
-          'profileImageUrl': profileUrl,
-          'nationalIdFrontUrl': frontUrl,
-          'nationalIdBackUrl': backUrl,
-          'documents': [
-            {
-              'documentKey': 'personalPhoto',
-              'documentStatus': 'pending',
-              'documentURL': profileUrl,
-              'uploadedAt': DateTime.now().toIso8601String(),
-            },
-            {
-              'documentKey': 'nationalityId',
-              'documentStatus': 'pending',
-              'documentURL': frontUrl,
-              'secondaryURL': backUrl,
-              'uploadedAt': DateTime.now().toIso8601String(),
-            },
-            if (receiptUrl != null && receiptUrl.isNotEmpty)
-              {
-                'documentKey': 'paymentReceipt',
-                'documentStatus': 'pending',
-                'documentURL': receiptUrl,
-                'receiptCode': receiptCode,
-                'uploadedAt': DateTime.now().toIso8601String(),
-              },
-          ],
-          'status': 'pending',
-          'position': 'Promoter',
-          'role': 'delegate',
-          'registeredVia': 'mobile_app',
-          'originOrganizationUID': organizationUID,
-          'originOrganizationName': organizationName,
-          'isDeductedFromCompany':
-              paymentMethod == SubscriptionPaymentMethod.companyDeduction,
-          'receiptCode': receiptCode,
-          'subscriptionCycle': cycleCode,
-          'subscription': {
-            'periodCode': cycleCode,
-            'periodStart': SubscriptionCycleHelper.periodStartDay(now),
-            'periodEnd': SubscriptionCycleHelper.periodEndDay(now),
-            'amountDue': calculatedFee,
-            'paymentStatus': paymentStatus.wire,
-            'registrationRequestId': requestId,
+      final pendingDelegateRef = _firestore
+          .collection('organizations')
+          .doc(organizationUID)
+          .collection('companies')
+          .doc(companyUID)
+          .collection('delegates')
+          .doc(requestId);
+      final pendingDelegateData = <String, dynamic>{
+        'uid': requestId,
+        if (existingPid != null && existingPid.trim().isNotEmpty)
+          'delegatePublicId': existingPid.trim(),
+        'firstName': firstName,
+        'secondName': secondName,
+        'thirdName': thirdName,
+        'fullName': fullName,
+        'phoneNumber': phoneNumber,
+        'nationalId': nationalId,
+        'nationalityID': nationalId,
+        if (city.isNotEmpty) 'city': city,
+        if (birthDate != null) 'birthDate': Timestamp.fromDate(birthDate),
+        if (gender != null && gender.isNotEmpty) 'gender': gender,
+        'organizationUID': organizationUID,
+        'organizationName': organizationName,
+        'companyUID': companyUID,
+        'companyName': companyName,
+        'profileImageUrl': profileUrl,
+        'nationalIdFrontUrl': frontUrl,
+        'nationalIdBackUrl': backUrl,
+        'documents': [
+          {
+            'documentKey': 'personalPhoto',
+            'documentStatus': 'pending',
+            'documentURL': profileUrl,
+            'uploadedAt': DateTime.now().toIso8601String(),
           },
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+          {
+            'documentKey': 'nationalityId',
+            'documentStatus': 'pending',
+            'documentURL': frontUrl,
+            'secondaryURL': backUrl,
+            'uploadedAt': DateTime.now().toIso8601String(),
+          },
+          if (receiptUrl != null && receiptUrl.isNotEmpty)
+            {
+              'documentKey': 'paymentReceipt',
+              'documentStatus': 'pending',
+              'documentURL': receiptUrl,
+              'receiptCode': receiptCode,
+              'uploadedAt': DateTime.now().toIso8601String(),
+            },
+        ],
+        'status': 'pending',
+        'position': 'Promoter',
+        'role': 'delegate',
+        'registeredVia': 'mobile_app',
+        'originOrganizationUID': organizationUID,
+        'originOrganizationName': organizationName,
+        'isDeductedFromCompany':
+            paymentMethod == SubscriptionPaymentMethod.companyDeduction,
+        'receiptCode': receiptCode,
+        'subscriptionCycle': cycleCode,
+        'subscription': {
+          'periodCode': cycleCode,
+          'periodStart': SubscriptionCycleHelper.periodStartDay(now),
+          'periodEnd': SubscriptionCycleHelper.periodEndDay(now),
+          'amountDue': calculatedFee,
+          'paymentStatus': paymentStatus.wire,
+          'registrationRequestId': requestId,
+        },
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      final receiptRef = (paymentMethod == SubscriptionPaymentMethod.branchReceipt &&
+              receiptCode != null &&
+              receiptCode.trim().isNotEmpty)
+          ? _firestore.collection('used_receipt_codes').doc(receiptCode.trim())
+          : null;
+      final receiptData = receiptRef == null
+          ? null
+          : <String, dynamic>{
+              'receiptCode': receiptCode!.trim(),
+              'requestId': requestId,
+              'supervisorUid': supervisorUid,
+              'supervisorName': supervisorName,
+              'companyUID': companyUID,
+              'companyName': companyName,
+              'organizationUID': organizationUID,
+              'organizationName': organizationName,
+              'status': 'reserved',
+              'createdAt': FieldValue.serverTimestamp(),
+            };
+
+      try {
+        final submitBatch = _firestore.batch();
+        submitBatch.set(docRef, request.toMap());
+        if (receiptRef != null && receiptData != null) {
+          submitBatch.set(receiptRef, receiptData);
+        }
+        submitBatch.set(pendingDelegateRef, pendingDelegateData);
+        await submitBatch.commit();
       } catch (_) {
-        // Cross-organization submission: The supervisor has submitted the request to delegate_requests,
-        // and the actual delegate document will be officially provisioned upon approval by Super Admin/Tech Support.
+        // Cross-organization: write the request alone so staff can still approve.
+        await docRef.set(request.toMap());
+        if (receiptRef != null && receiptData != null) {
+          try {
+            await receiptRef.set(receiptData);
+          } catch (_) {}
+        }
       }
 
       // 8. Notify Technical Support and Super Admins ONLY (Restricted Targeting)
