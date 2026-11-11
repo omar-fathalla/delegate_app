@@ -613,15 +613,37 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               : (isArabic ? 'طلبات الإجازات والأعذار' : 'Leave Requests'));
 
     Widget buildBadgeIcon(IconData icon, String collection) {
-      if (widget.delegate.companyUID.isEmpty) {
+      if (widget.delegate.companyUID.isEmpty &&
+          widget.delegate.organizationUID.isEmpty) {
+        return Icon(icon, size: 20);
+      }
+      Query<Map<String, dynamic>> badgeQuery = FirebaseFirestore.instance
+          .collection(collection)
+          .where('status', isEqualTo: 'pending');
+      if (widget.delegate.role == UserRole.organizationAdmin) {
+        if (widget.delegate.organizationUID.isEmpty) {
+          return Icon(icon, size: 20);
+        }
+        badgeQuery = badgeQuery.where(
+          'organizationUID',
+          isEqualTo: widget.delegate.organizationUID,
+        );
+        if (widget.delegate.companyUID.isNotEmpty) {
+          badgeQuery = badgeQuery.where(
+            'companyUID',
+            isEqualTo: widget.delegate.companyUID,
+          );
+        }
+      } else if (widget.delegate.companyUID.isNotEmpty) {
+        badgeQuery = badgeQuery.where(
+          'companyUID',
+          isEqualTo: widget.delegate.companyUID,
+        );
+      } else {
         return Icon(icon, size: 20);
       }
       return StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection(collection)
-            .where('companyUID', isEqualTo: widget.delegate.companyUID)
-            .where('status', isEqualTo: 'pending')
-            .snapshots(),
+        stream: badgeQuery.snapshots(),
         builder: (context, snapshot) {
           final count = snapshot.data?.docs.length ?? 0;
           final iconWidget = Icon(icon, size: 20);

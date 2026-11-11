@@ -82,7 +82,10 @@ class PenaltyBloc extends Bloc<PenaltyEvent, PenaltyState> {
     Emitter<PenaltyState> emit,
   ) async {
     emit(PenaltyLoadingState());
-    final result = await getCompanyPenaltiesUseCase(event.companyId);
+    final result = await getCompanyPenaltiesUseCase(
+      event.companyId,
+      organizationId: event.organizationId,
+    );
 
     result.fold(
       (failure) => emit(PenaltyErrorState(failure.message)),

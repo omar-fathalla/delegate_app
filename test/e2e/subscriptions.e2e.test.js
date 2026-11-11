@@ -499,10 +499,10 @@ test("advance renewal: on Jan 1 M1 skips prepaid uids and clears a leftover expi
   assert.ok((res.clearedHolds || 0) >= 1, `clearedHolds=${res.clearedHolds}`);
   const d = (await db.doc(delegatePath("o1", "appAdv1")).get()).data();
   assert.equal(d.holds && d.holds.subscription_expired, undefined);
-  // Shadow: leftover status is unchanged until a current-period payment
-  // (or the authoritative flip). M1 only promotes nextSubscription.
-  assert.equal(d.status, "suspended");
-  assert.equal(d.statusReason, "subscription_expired");
+  // Shadow M1 now matches M2: once the expiry hold is gone and the paid
+  // period is promoted, the leftover expiry status is cleared.
+  assert.equal(d.status, "active");
+  assert.equal(d.statusReason, undefined);
   assert.equal(d.subscription.periodCode, "2027_H1");
   assert.equal(d.nextSubscription, undefined);
   await db.doc("config/subscriptions").delete();
@@ -532,4 +532,67 @@ test("shadow paid renewal reactivates a legacy-suspended delegate when no holds 
   assert.equal(d.subscription.periodCode, "2027_H1");
   assert.equal(d.subscription.paymentStatus, "paid");
 });
+
+test("paid renewal does not reactivate a legacy admin_suspend with no holds map", async () => {
+  await lateAppAdded("d_legacy_admin_nohold");
+  await db.doc(delegatePath("o1", "d_legacy_admin_nohold")).set({
+    uid: "d_legacy_admin_nohold", status: "suspended", companyUID: "c1",
+    statusReason: "admin_suspend",
+  });
+  await renewal("renLegacyAdmin", ["d_legacy_admin_nohold"]);
+  const q = await J.quoteSubscriptionRequest(db, "renLegacyAdmin", FEB_2027);
+  assert.equal(await J.applyVerifiedSubscriptionPayment(db, {
+    requestId: "renLegacyAdmin", paymobTransactionId: "tx-legacy-admin",
+    paymobOrderId: "o-legacy-admin", success: true, amountCents: q.amountCents,
+    currency: "EGP", paidAt: FEB_2027,
+  }), "paid");
+  const d = (await db.doc(delegatePath("o1", "d_legacy_admin_nohold")).get()).data();
+  assert.equal(d.status, "suspended");
+  assert.equal(d.statusReason, "admin_suspend");
+  assert.equal(d.subscription.periodCode, "2027_H1");
+  assert.equal(d.subscription.paymentStatus, "paid");
+});
+
+test("paid renewal does not reactivate a legacy device_unbind suspension with no holds map", async () => {
+  await lateAppAdded("d_legacy_unbind_nohold");
+  await db.doc(delegatePath("o1", "d_legacy_unbind_nohold")).set({
+    uid: "d_legacy_unbind_nohold", status: "suspended", companyUID: "c1",
+    statusReason: "device_unbind",
+  });
+  await renewal("renLegacyUnbind", ["d_legacy_unbind_nohold"]);
+  const q = await J.quoteSubscriptionRequest(db, "renLegacyUnbind", FEB_2027);
+  assert.equal(await J.applyVerifiedSubscriptionPayment(db, {
+    requestId: "renLegacyUnbind", paymobTransactionId: "tx-legacy-unbind",
+    paymobOrderId: "o-legacy-unbind", success: true, amountCents: q.amountCents,
+    currency: "EGP", paidAt: FEB_2027,
+  }), "paid");
+  const d = (await db.doc(delegatePath("o1", "d_legacy_unbind_nohold")).get()).data();
+  assert.equal(d.status, "suspended");
+  assert.equal(d.statusReason, "device_unbind");
+  assert.equal(d.subscription.periodCode, "2027_H1");
+  assert.equal(d.subscription.paymentStatus, "paid");
+});
+
+test("M1 period-start promotion does not reactivate a legacy admin_suspend", async () => {
+  await lateAppAdded("d_m1_legacy_admin");
+  await db.doc("delegate_requests/renM1LegacyAdmin").set({
+    requestType: "renewal", status: "approved", paymentStatus: "paid",
+    supervisorUid: "sup1", companyUID: "c1", organizationUID: "o1",
+    periodCode: "2027_H1", coveredDelegateUids: ["d_m1_legacy_admin"],
+    items: [{uid: "d_m1_legacy_admin", fee: 500}], amountDue: 500,
+  });
+  await db.doc(delegatePath("o1", "d_m1_legacy_admin")).set({
+    uid: "d_m1_legacy_admin", status: "suspended", companyUID: "c1",
+    statusReason: "admin_suspend",
+    subscription: {periodCode: "2026_H2", paymentStatus: "paid", amountDue: 0},
+    nextSubscription: {periodCode: "2027_H1", paymentStatus: "paid", amountDue: 500},
+  });
+  await J.runSubscriptionSuspension(db, new Date(JAN1_2027.getTime() + 3 * 60 * 60 * 1000));
+  const d = (await db.doc(delegatePath("o1", "d_m1_legacy_admin")).get()).data();
+  assert.equal(d.status, "suspended");
+  assert.equal(d.statusReason, "admin_suspend");
+  assert.equal(d.subscription.periodCode, "2027_H1");
+  assert.equal(d.nextSubscription, undefined);
+});
+
 

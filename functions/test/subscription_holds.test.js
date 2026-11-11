@@ -149,3 +149,18 @@ test("M2 without a hold or legacy reason is unchanged", () => {
   assert.equal(r.ok, true);
   assert.equal(r.unchanged, true);
 });
+
+test("legacy non-expiry statusReason blocks shadow reactivation", () => {
+  const fn = S.legacyNonExpirySuspensionBlocksReactivation;
+  const should = S.shouldShadowReactivateAfterExpiryClear;
+  assert.equal(fn({status: "suspended", statusReason: "admin_suspend"}), true);
+  assert.equal(fn({status: "suspended", statusReason: "device_unbind"}), true);
+  assert.equal(fn({status: "suspended", statusReason: "manual"}), true);
+  assert.equal(fn({status: "deleted", statusReason: "subscription_expired"}), true);
+  assert.equal(fn({status: "suspended", statusReason: "subscription_expired"}), false);
+  assert.equal(fn({status: "suspended", statusReason: ""}), false);
+  assert.equal(fn({status: "active"}), false);
+  assert.equal(should({status: "suspended", statusReason: "subscription_expired"}, "active"), true);
+  assert.equal(should({status: "suspended", statusReason: "admin_suspend"}, "active"), false);
+  assert.equal(should({status: "suspended", statusReason: "subscription_expired"}, "suspended"), false);
+});

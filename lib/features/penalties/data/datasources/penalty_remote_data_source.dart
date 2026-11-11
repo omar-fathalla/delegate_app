@@ -11,7 +11,7 @@ import 'package:delegate_app/features/penalties/domain/entities/standard_violati
 
 abstract class PenaltyRemoteDataSource {
   Future<void> createPenalty(PenaltyModel penalty);
-  Future<List<PenaltyModel>> getCompanyPenalties(String companyId);
+  Future<List<PenaltyModel>> getCompanyPenalties(String companyId, {String? organizationId});
   Future<List<PenaltyModel>> getDelegatePenalties({
     required String delegateId,
     String? companyId,
@@ -491,15 +491,26 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
   }
 
   @override
-  Future<List<PenaltyModel>> getCompanyPenalties(String companyId) async {
+  Future<List<PenaltyModel>> getCompanyPenalties(String companyId, {String? organizationId}) async {
     try {
-      final snapshot = await _penaltiesRef
-          .where('companyId', isEqualTo: companyId)
-          .getResilient(forceServer: true);
+      Query<Map<String, dynamic>> query = _penaltiesRef;
+      if (organizationId != null && organizationId.isNotEmpty) {
+        // Org-scoped only (no company composite) so org-admin rules can
+        // prove the list without a new index. Company is filtered below.
+        query = query.where('organizationId', isEqualTo: organizationId);
+      } else if (companyId.isNotEmpty) {
+        query = query.where('companyId', isEqualTo: companyId);
+      }
+      final snapshot = await query.getResilient(forceServer: true);
 
-      final list = snapshot.docs
+      var list = snapshot.docs
           .map((doc) => PenaltyModel.fromFirestore(doc))
           .toList();
+      if (organizationId != null &&
+          organizationId.isNotEmpty &&
+          companyId.isNotEmpty) {
+        list = list.where((p) => p.companyId == companyId).toList();
+      }
       list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       final confidentialTitles = await _getConfidentialRuleTitles();
       return _enrichPenaltiesWithConfidentiality(list, confidentialTitles);

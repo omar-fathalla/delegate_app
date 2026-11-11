@@ -58,6 +58,7 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
   bool? _isReceiptCodeValid;
 
   bool _isSubmitting = false;
+  bool _submitSucceeded = false;
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -152,7 +153,29 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
     }
   }
 
+
+  void _resetFormAfterSuccessfulSubmit() {
+    _formKey.currentState?.reset();
+    _firstNameController.clear();
+    _secondNameController.clear();
+    _thirdNameController.clear();
+    _phoneController.clear();
+    _nationalIdController.clear();
+    _receiptCodeController.clear();
+    _selectedOrgUIDs.clear();
+    _duplicateOrgUIDs = {};
+    _profileImage = null;
+    _nationalIdFront = null;
+    _nationalIdBack = null;
+    _receiptImage = null;
+    _isReceiptCodeValid = null;
+    _paymentMethod = SubscriptionCycleHelper.isFreePromotionActive()
+        ? SubscriptionPaymentMethod.freePromotion
+        : SubscriptionPaymentMethod.companyDeduction;
+  }
+
   Future<void> _submit() async {
+    if (_isSubmitting || _submitSucceeded) return;
     if (!_formKey.currentState!.validate()) {
       AppSnackBar.showError(context, 'يرجى استكمال البيانات المطلوبة وتصحيح الأخطاء.');
       return;
@@ -240,12 +263,16 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
         paymentMethod: SubscriptionPaymentMethod.notRequired,
       );
       if (!mounted) return;
-      setState(() => _isSubmitting = false);
       await result.fold(
         (failure) async {
+          setState(() => _isSubmitting = false);
           AppSnackBar.showError(context, failure.message);
         },
         (requestId) async {
+          setState(() {
+            _submitSucceeded = true;
+            _resetFormAfterSuccessfulSubmit();
+          });
           AppSnackBar.showSuccess(
             context,
             'تم إرسال طلب ربط المندوب الحالي بالسلاسل المتبقية بدون رسوم إضافية. بانتظار اعتماد الإدارة.',
@@ -375,14 +402,18 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
     );
 
     if (!mounted) return;
-    setState(() => _isSubmitting = false);
 
     await result.fold(
       (failure) async {
+        setState(() => _isSubmitting = false);
         AppSnackBar.showError(context, failure.message);
       },
       (requestId) async {
         final isFree = _paymentMethod == SubscriptionPaymentMethod.freePromotion;
+        setState(() {
+          _submitSucceeded = true;
+          _resetFormAfterSuccessfulSubmit();
+        });
         AppSnackBar.showSuccess(
           context,
           isFree
@@ -523,7 +554,7 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
                             ),
                             elevation: 1,
                           ),
-                          onPressed: _isSubmitting ? null : _submit,
+                          onPressed: (_isSubmitting || _submitSucceeded) ? null : _submit,
                           icon: _isSubmitting
                               ? SizedBox(
                                   width: 22,

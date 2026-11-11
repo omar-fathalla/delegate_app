@@ -33,6 +33,14 @@ import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 
+
+/// Org-admin must query only their organization. Company supervisors
+/// keep the company-wide (empty org) path so they can see every chain.
+String _dashboardOrganizationUID(Delegate d) {
+  if (d.role == UserRole.organizationAdmin) return d.organizationUID;
+  return d.companyUID.isNotEmpty ? '' : d.organizationUID;
+}
+
 class AdminHomeScreen extends StatelessWidget {
   final Delegate adminDelegate;
 
@@ -44,9 +52,7 @@ class AdminHomeScreen extends StatelessWidget {
       create: (_) => sl<AdminDashboardBloc>()
         ..add(
           LoadDashboard(
-            organizationUID: adminDelegate.companyUID.isNotEmpty
-                ? ''
-                : adminDelegate.organizationUID,
+            organizationUID: _dashboardOrganizationUID(adminDelegate),
             companyUID: adminDelegate.companyUID,
           ),
         ),
@@ -147,7 +153,7 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
         try {
           final result = await sl<GetCompanyDelegates>()(
             GetCompanyDelegatesParams(
-              organizationUID: '',
+              organizationUID: _dashboardOrganizationUID(widget.adminDelegate),
               companyUID: widget.adminDelegate.companyUID,
             ),
           );
@@ -165,10 +171,12 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
         } catch (_) {}
       }
 
-      // Also query users collection by companyUID and companyName
+      // Also query users collection by companyUID and companyName.
+      // Org-admin cannot list users by company alone (rules require orgScoped).
       try {
         final List<Future<QuerySnapshot<Map<String, dynamic>>>> queries = [];
-        if (widget.adminDelegate.companyUID.isNotEmpty) {
+        if (widget.adminDelegate.role != UserRole.organizationAdmin &&
+            widget.adminDelegate.companyUID.isNotEmpty) {
           queries.add(
             FirebaseFirestore.instance
                 .collection('users')
@@ -198,7 +206,9 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
       } catch (_) {}
 
       // If still only 1 org, check if company is registered in other organizations
-      if (widget.adminDelegate.companyUID.isNotEmpty) {
+      // Org-admin stays on their assigned organization only.
+      if (widget.adminDelegate.role != UserRole.organizationAdmin &&
+          widget.adminDelegate.companyUID.isNotEmpty) {
         try {
           final orgsSnap = await FirebaseFirestore.instance
               .collection('organizations')
@@ -390,9 +400,7 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
         _loadCachedAndFreshOrganizations(forceRefresh: true);
         context.read<AdminDashboardBloc>().add(
           LoadDashboard(
-            organizationUID: adminDelegate.companyUID.isNotEmpty
-                ? ''
-                : adminDelegate.organizationUID,
+            organizationUID: _dashboardOrganizationUID(adminDelegate),
             companyUID: adminDelegate.companyUID,
           ),
         );
@@ -474,9 +482,7 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
                             AdminDashboardBloc.clearCache();
                             context.read<AdminDashboardBloc>().add(
                               LoadDashboard(
-                                organizationUID: adminDelegate.companyUID.isNotEmpty
-                                    ? ''
-                                    : adminDelegate.organizationUID,
+                                organizationUID: _dashboardOrganizationUID(adminDelegate),
                                 companyUID: adminDelegate.companyUID,
                               ),
                             );
@@ -2007,7 +2013,40 @@ class _AttendanceDetailsBottomSheetState
       final Map<String, String> discoveredOrgs = {'all': 'جميع السلاسل'};
 
       // 1. Fetch delegates for the company across organizations resiliently
-      if (widget.adminDelegate.companyUID.isNotEmpty) {
+      // Org-admin: only the assigned organization (rules deny other chains).
+      if (widget.adminDelegate.role == UserRole.organizationAdmin &&
+          widget.adminDelegate.organizationUID.isNotEmpty &&
+          widget.adminDelegate.companyUID.isNotEmpty) {
+        final orgId = widget.adminDelegate.organizationUID;
+        try {
+          final orgDoc = await firestore.collection('organizations').doc(orgId).get();
+          final rawName = (orgDoc.data()?['name'] ?? orgDoc.data()?['title'] ?? orgId).toString();
+          final orgName = _formatChainName(rawName);
+          orgNamesById[orgId] = orgName;
+          discoveredOrgs[orgId] = orgName;
+          final res = await firestore
+              .collection('organizations')
+              .doc(orgId)
+              .collection('companies')
+              .doc(widget.adminDelegate.companyUID)
+              .collection('delegates')
+              .getResilient(timeout: const Duration(seconds: 4), forceServer: false);
+          for (final doc in res.docs) {
+            try {
+              final rawMap = Map<String, dynamic>.from(doc.data());
+              if ((rawMap['organizationUID'] as String?)?.isEmpty ?? true) {
+                rawMap['organizationUID'] = orgId;
+              }
+              if ((rawMap['organizationName'] as String?)?.isEmpty ?? true) {
+                rawMap['organizationName'] = orgName;
+              }
+              delegates.add(DelegateModel.fromJson(rawMap, doc.id).copyWith(
+                organizationName: orgName,
+              ));
+            } catch (_) {}
+          }
+        } catch (_) {}
+      } else if (widget.adminDelegate.companyUID.isNotEmpty) {
         final orgsSnap = await firestore
             .collection('organizations')
             .getResilient(timeout: const Duration(seconds: 4), forceServer: false);
@@ -2111,7 +2150,19 @@ class _AttendanceDetailsBottomSheetState
       // 2. Fetch today's attendance logs resiliently
       Query<Map<String, dynamic>> baseAttendanceQuery =
           firestore.collection(kAttendanceCollection);
-      if (widget.adminDelegate.companyUID.isNotEmpty) {
+      if (widget.adminDelegate.role == UserRole.organizationAdmin &&
+          widget.adminDelegate.organizationUID.isNotEmpty) {
+        baseAttendanceQuery = baseAttendanceQuery.where(
+          'organizationId',
+          isEqualTo: widget.adminDelegate.organizationUID,
+        );
+        if (widget.adminDelegate.companyUID.isNotEmpty) {
+          baseAttendanceQuery = baseAttendanceQuery.where(
+            'companyId',
+            isEqualTo: widget.adminDelegate.companyUID,
+          );
+        }
+      } else if (widget.adminDelegate.companyUID.isNotEmpty) {
         baseAttendanceQuery = baseAttendanceQuery.where(
           'companyId',
           isEqualTo: widget.adminDelegate.companyUID,
