@@ -456,6 +456,32 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
     int? remainingMonths,
   }) async {
     try {
+      if (existingDelegate.companyUID.trim() != companyUID.trim()) {
+        return const Left(ServerFailure(
+          'لا يمكن ربط مندوب من شركة أخرى. الاشتراك واحد داخل الشركة نفسها.',
+        ));
+      }
+      if (existingDelegate.status != DelegateStatus.active) {
+        return const Left(ServerFailure(
+          'لا يمكن ربط المندوب بسلسلة إضافية إلا إذا كان اشتراكه نشطاً. '
+          'المناديب الموقوفون يُجدَّدون مرة واحدة وتسري التغطية على كل السلاسل.',
+        ));
+      }
+      if (existingDelegate.organizationUID.trim() == targetOrganizationUID.trim()) {
+        return const Left(ServerFailure('المندوب مربوط بهذه السلسلة بالفعل.'));
+      }
+      final alreadyOnTarget = await _firestore
+          .collection('organizations')
+          .doc(targetOrganizationUID)
+          .collection('companies')
+          .doc(companyUID)
+          .collection('delegates')
+          .doc(existingDelegate.uid)
+          .get();
+      if (alreadyOnTarget.exists) {
+        return const Left(ServerFailure('المندوب مربوط بهذه السلسلة بالفعل.'));
+      }
+
       final docRef = _firestore.collection('delegate_requests').doc();
       final requestId = docRef.id;
 
@@ -894,6 +920,24 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       final birthDate = _extractBirthDateFromNationalId(nationalId);
       final gender = _extractGenderFromNationalId(nationalId);
 
+      Map<String, dynamic>? inheritedSubscription;
+      if (request.isAddOrganizationRequest) {
+        final source = await _activeSameCompanyDelegateData(
+          uid: targetDelegateUid,
+          companyUID: request.companyUID,
+        );
+        if (source == null) {
+          return const Left(ServerFailure(
+            'لا يمكن اعتماد ربط سلسلة إضافية إلا لمندوب له اشتراك نشط في الشركة. '
+            'التغطية واحدة: جدّد الاشتراك مرة واحدة ثم أضف السلسلة بدون رسوم.',
+          ));
+        }
+        final sub = source['subscription'];
+        if (sub is Map) {
+          inheritedSubscription = Map<String, dynamic>.from(sub);
+        }
+      }
+
       // 2. Update delegate record to active in company branch
       final delegateData = {
         'uid': targetDelegateUid,
@@ -948,7 +992,8 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         'isDeductedFromCompany':
             request.paymentMethod == SubscriptionPaymentMethod.companyDeduction,
         'receiptCode': request.receiptCode,
-        // add_organization keeps the delegate's own subscription (one per delegate).
+        // add_organization copies the existing subscription mirror (one per
+        // delegate, no per-chain fee). new_delegate writes a fresh mirror.
         if (!request.isAddOrganizationRequest)
           'subscription': {
             'periodCode': request.subscriptionCycle,
@@ -963,6 +1008,8 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
             'approvedBy': reviewerName,
             'approvedAt': now.toIso8601String(),
           },
+        if (request.isAddOrganizationRequest && inheritedSubscription != null)
+          'subscription': inheritedSubscription,
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
@@ -1210,7 +1257,9 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
           'organizationUID': request.organizationUID,
           'companyUID': request.companyUID,
           'organizationNames': FieldValue.arrayUnion(allKnownOrgs),
-          'status': 'active',
+          // add_organization must not unsuspend a login: coverage is one
+          // subscription, and we only approve when a chain is already active.
+          if (!request.isAddOrganizationRequest) 'status': 'active',
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       }
@@ -1594,6 +1643,26 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       final otherCount = uniqueOrgs.length - 1;
       return '$basePosition ($origin + $otherCount سلاسل)';
     }
+  }
+
+  /// An already-active same-company chain doc for [uid], if any. Used so
+  /// add_organization can copy the existing subscription and cannot grant
+  /// a free activation to a suspended or unpaid delegate.
+  Future<Map<String, dynamic>?> _activeSameCompanyDelegateData({
+    required String uid,
+    required String companyUID,
+  }) async {
+    final snaps = await _firestore
+        .collectionGroup('delegates')
+        .where('uid', isEqualTo: uid)
+        .get();
+    for (final doc in snaps.docs) {
+      final d = doc.data();
+      if ((d['companyUID'] ?? '').toString() != companyUID) continue;
+      if ((d['status'] ?? '').toString() != 'active') continue;
+      return d;
+    }
+    return null;
   }
 }
 

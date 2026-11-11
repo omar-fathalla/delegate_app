@@ -120,8 +120,19 @@ class SubscriptionRenewalRepository {
       return Left(ServerFailure('يوجد طلب تجديد بانتظار الدفع لكل من: ${awaiting.join('، ')}'));
     }
     try {
+      // One subscription per uid, even if the caller passed the same
+      // delegate once per chain.
+      final unique = <String, RenewableDelegate>{};
+      for (final d in delegates) {
+        if (d.uid.trim().isEmpty) continue;
+        unique.putIfAbsent(d.uid, () => d);
+      }
+      final selected = unique.values.toList();
+      if (selected.isEmpty) {
+        return const Left(ServerFailure('اختر مندوباً واحداً على الأقل للتجديد.'));
+      }
       final fee = SubscriptionCycleHelper.getProratedSubscriptionFee(now, companyUID);
-      final items = delegates.map((d) => RenewalItem(uid: d.uid, fullName: d.fullName, fee: fee)).toList();
+      final items = selected.map((d) => RenewalItem(uid: d.uid, fullName: d.fullName, fee: fee)).toList();
       final total = SubscriptionCycleHelper.totalFor(items.length, now, companyUID);
       final docRef = _requests.doc();
       final request = DelegateSubscriptionRequest(

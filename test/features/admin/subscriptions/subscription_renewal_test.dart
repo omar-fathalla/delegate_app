@@ -15,8 +15,14 @@ import 'package:flutter_test/flutter_test.dart';
 final feb2027 = DateTime.utc(2027, 2, 10, 10);
 final nov2026 = DateTime.utc(2026, 11, 10, 10);
 
-Delegate supervisor() => Delegate(
-      uid: 'sup1',
+Delegate supervisor({
+  String uid = 'sup1',
+  DelegateStatus status = DelegateStatus.active,
+  String organizationUID = 'o1',
+  String companyUID = 'c1',
+}) =>
+    Delegate(
+      uid: uid,
       firstName: 'مشرف',
       middleName: '',
       lastName: '',
@@ -28,11 +34,11 @@ Delegate supervisor() => Delegate(
       gender: DelegateGender.male,
       position: DelegatePosition.supervisor,
       birthDate: DateTime(1990),
-      organizationUID: 'o1',
+      organizationUID: organizationUID,
       organizationName: 'لولو',
-      companyUID: 'c1',
+      companyUID: companyUID,
       companyName: 'يوني',
-      status: DelegateStatus.active,
+      status: status,
       delegatePublicId: '',
       allReceiptCodes: const [],
       createdAt: DateTime(2026),
@@ -341,4 +347,29 @@ void main() {
       expect(find.textContaining('مجاني حتى 31/12/2026'), findsOneWidget);
     });
   });
+
+    test('a uid passed twice (two chains) is charged once', () async {
+      final db = FakeFirebaseFirestore();
+      final repo = SubscriptionRenewalRepository(firestore: db, clock: () => DateTime.utc(2027, 2, 10));
+      const twice = [
+        RenewableDelegate(uid: 'app1', fullName: 'A', phoneNumber: '', organizationName: 'O1'),
+        RenewableDelegate(uid: 'app1', fullName: 'A', phoneNumber: '', organizationName: 'O2'),
+      ];
+      final r = await repo.submitRenewal(
+        supervisorUid: 'sup1',
+        supervisorName: 'S',
+        supervisorPhone: '',
+        companyUID: 'c1',
+        companyName: 'C',
+        organizationUID: 'o1',
+        organizationName: 'O1',
+        delegates: twice,
+      );
+      expect(r.isRight(), isTrue);
+      final id = r.getOrElse(() => '');
+      final m = (await db.doc('delegate_requests/$id').get()).data()!;
+      expect(m['coveredDelegateUids'], ['app1']);
+      expect((m['items'] as List).length, 1);
+      expect(m['fee'], SubscriptionCycleHelper.totalFor(1, DateTime.utc(2027, 2, 10)));
+    });
 }

@@ -281,3 +281,56 @@ test("abandoned pending renewals expire at quote-month end and free their delega
   const q = await J.quoteSubscriptionRequest(db, "renAbandonRetry", FEB_2027);
   assert.equal(q.amountCents, 41667);
 });
+
+
+test("paid add-to-another-chain keeps one subscription across chains", async () => {
+  await lateAppAdded("app8");
+  await db.doc(delegatePath("o1", "app8")).set({
+    uid: "app8", status: "suspended", statusReason: "subscription_expired", companyUID: "c1",
+  });
+  await renewal("renAddChain", ["app8"]);
+  await J.quoteSubscriptionRequest(db, "renAddChain", FEB_2027);
+  assert.equal(await pay("renAddChain", "tx-add-chain", 41667), "paid");
+  assert.equal(await status("o1", "app8"), "active");
+
+  // New chain, no new payment: coverage is still the paid renewal for this uid.
+  await db.doc("delegate_requests/addOrgApp8").set({
+    requestType: "add_organization", status: "approved", supervisorUid: "sup1",
+    companyUID: "c1", organizationUID: "o3", existingDelegateUid: "app8",
+    paymentStatus: "not_required", fee: 0, amountDue: 0, periodCode: "2027_H1",
+  });
+  await db.doc(delegatePath("o3", "app8")).set({
+    uid: "app8", status: "active", companyUID: "c1",
+    subscription: {periodCode: "2027_H1", paymentStatus: "paid", amountDue: 416.67, renewalRequestId: "renAddChain"},
+  });
+
+  const res = await J.runSubscriptionSuspension(db, new Date(Date.UTC(2027, 1, 13, 10)));
+  assert.ok(res.covered >= 1);
+  assert.equal(await status("o1", "app8"), "active");
+  assert.equal(await status("o3", "app8"), "active");
+
+  // A second renewal for the same uid is blocked: one subscription, not per chain.
+  await renewal("renAddChainDup", ["app8"]);
+  await assert.rejects(J.quoteSubscriptionRequest(db, "renAddChainDup", FEB_2027), /already_covered/);
+});
+
+test("adding a chain does not itself grant coverage to an unpaid delegate", async () => {
+  await lateAppAdded("app9");
+  await db.doc(delegatePath("o1", "app9")).set({
+    uid: "app9", status: "suspended", statusReason: "subscription_expired", companyUID: "c1",
+  });
+  await db.doc("delegate_requests/addOrgApp9").set({
+    requestType: "add_organization", status: "approved", supervisorUid: "sup1",
+    companyUID: "c1", organizationUID: "o3", existingDelegateUid: "app9",
+    paymentStatus: "not_required", fee: 0, amountDue: 0, periodCode: "2027_H1",
+  });
+  // Even if a new chain doc were written as active, the daily job treats
+  // coverage per uid from paid/waived requests, not from add_organization.
+  await db.doc(delegatePath("o3", "app9")).set({
+    uid: "app9", status: "active", companyUID: "c1",
+  });
+  const res = await J.runSubscriptionSuspension(db, new Date(Date.UTC(2027, 1, 14, 10)));
+  assert.ok(res.suspendedDocs >= 1); // o3 was written active without coverage
+  assert.equal(await status("o1", "app9"), "suspended");
+  assert.equal(await status("o3", "app9"), "suspended");
+});

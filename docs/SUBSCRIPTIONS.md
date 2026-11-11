@@ -36,6 +36,18 @@ Older requests without `organizationUIDs` are still read as
 `functions/scripts/backfill-organization-uids.js` can fill the list on
 tashil-dev (rollback file required; no prod apply without a written go).
 
+## Paid add-to-another-chain (Phase 1 item 4)
+
+A delegate who already has an **active** subscription can be added to another
+chain of the same company with `requestType: add_organization`. That request
+is never charged (`paymentStatus: not_required`, fee 0), whatever the client
+passes. Approval copies the existing subscription mirror onto the new chain
+doc and is refused if the delegate is not already active in the company, so
+add-to-another-chain cannot be used to unsuspend without paying. Coverage and
+renewal are per uid: one paid (or waived) request covers every chain, the
+renewal list and fee count each uid once, and a verified payment reactivates
+all of that uid's chain docs.
+
 
 Same rules in two places, kept in sync by tests:
 `lib/core/utils/subscription_cycle_helper.dart` (UI) and
