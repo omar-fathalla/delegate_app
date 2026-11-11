@@ -41,6 +41,7 @@ import 'package:delegate_app/features/marketing/presentation/pages/branches_mark
 import 'package:delegate_app/features/marketing/presentation/pages/branch_home_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
 import 'package:delegate_app/features/admin/presentation/pages/subscription_renewal_screen.dart';
+import 'package:delegate_app/features/admin/domain/entities/subscription_renewal.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_session_control_screen.dart';
 import 'package:delegate_app/features/tracking/presentation/pages/delegate_tracking_screen.dart';
@@ -734,7 +735,10 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               icon: Icons.how_to_reg_rounded,
               title: 'طلبات اشتراك واعتماد المناديب',
             ),
-            if (widget.delegate.role == UserRole.admin)
+            if (canCreateSubscriptionRenewal(
+              role: widget.delegate.role,
+              companyUID: widget.delegate.companyUID,
+            ))
               buildPopupItem(
                 value: 'delegate_renewal',
                 icon: Icons.autorenew_rounded,

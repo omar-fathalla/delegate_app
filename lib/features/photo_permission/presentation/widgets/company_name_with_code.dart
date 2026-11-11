@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 
@@ -70,43 +71,12 @@ class CompanyNameWithCode extends StatelessWidget {
       );
     }
 
-    Future<String?> fetchCompanyCode() async {
-      try {
-        if (organizationUID.isNotEmpty && companyUID.isNotEmpty) {
-          final doc = await FirebaseFirestore.instance
-              .collection('organizations')
-              .doc(organizationUID)
-              .collection('companies')
-              .doc(companyUID)
-              .get();
-          if (doc.exists) {
-            final data = doc.data();
-            final code = data?['companyCodeInOrg']?.toString() ??
-                data?['companyCode']?.toString() ??
-                data?['code']?.toString();
-            if (code != null && code.isNotEmpty) return code;
-          }
-        }
-        if (companyUID.isNotEmpty) {
-          final query = await FirebaseFirestore.instance
-              .collectionGroup('companies')
-              .where(FieldPath.documentId, isEqualTo: companyUID)
-              .limit(1)
-              .get();
-          if (query.docs.isNotEmpty) {
-            final data = query.docs.first.data();
-            final code = data['companyCodeInOrg']?.toString() ??
-                data['companyCode']?.toString() ??
-                data['code']?.toString();
-            if (code != null && code.isNotEmpty) return code;
-          }
-        }
-      } catch (_) {}
-      return null;
-    }
-
     return FutureBuilder<String?>(
-      future: fetchCompanyCode(),
+      future: fetchCompanyCode(
+        firestore: FirebaseFirestore.instance,
+        organizationUID: organizationUID,
+        companyUID: companyUID,
+      ),
       builder: (context, snapshot) {
         final code = snapshot.data;
         if (twoLines) {
@@ -125,4 +95,51 @@ class CompanyNameWithCode extends StatelessWidget {
       },
     );
   }
+}
+
+
+String? companyCodeFromData(Map<String, dynamic>? data) {
+  if (data == null) return null;
+  for (final key in const ['companyCodeInOrg', 'companyCode', 'code']) {
+    final code = data[key]?.toString();
+    if (code != null && code.isNotEmpty && code != '0') return code;
+  }
+  return null;
+}
+
+/// Looks up a company's display code. Uses the nested document path when
+/// [organizationUID] is known. Collection-group fallback filters on the
+/// stored `uid` field — never `FieldPath.documentId()` with a bare id
+/// (that throws IllegalArgumentException: odd number of segments).
+@visibleForTesting
+Future<String?> fetchCompanyCode({
+  required FirebaseFirestore firestore,
+  required String organizationUID,
+  required String companyUID,
+}) async {
+  try {
+    if (organizationUID.isNotEmpty && companyUID.isNotEmpty) {
+      final doc = await firestore
+          .collection('organizations')
+          .doc(organizationUID)
+          .collection('companies')
+          .doc(companyUID)
+          .get();
+      if (doc.exists) {
+        final code = companyCodeFromData(doc.data());
+        if (code != null) return code;
+      }
+    }
+    if (companyUID.isNotEmpty) {
+      final query = await firestore
+          .collectionGroup('companies')
+          .where('uid', isEqualTo: companyUID)
+          .limit(1)
+          .get();
+      if (query.docs.isNotEmpty) {
+        return companyCodeFromData(query.docs.first.data());
+      }
+    }
+  } catch (_) {}
+  return null;
 }

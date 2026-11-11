@@ -6,6 +6,7 @@ import 'package:delegate_app/core/widgets/universal_app_header.dart';
 import 'package:delegate_app/core/widgets/app_logout_modal.dart';
 import 'package:delegate_app/features/admin/presentation/pages/anti_fraud_audit_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/subscription_renewal_screen.dart';
+import 'package:delegate_app/features/admin/domain/entities/subscription_renewal.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_device_unbind_requests_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_leaves_and_excuses_screen.dart';
@@ -319,11 +320,15 @@ class _HRMainScreenState extends State<HRMainScreen> {
             color: colorScheme.primary, size: 20),
         title: 'سجل تعديلات الحضور والانصراف',
       ),
-      buildMenuItem(
-        value: 'delegate_renewal',
-        icon: Icon(Icons.autorenew_rounded, color: colorScheme.tertiary, size: 20),
-        title: SubscriptionRenewalScreen.title,
-      ),
+      if (canCreateSubscriptionRenewal(
+        role: widget.delegate.role,
+        companyUID: widget.delegate.companyUID,
+      ))
+        buildMenuItem(
+          value: 'delegate_renewal',
+          icon: Icon(Icons.autorenew_rounded, color: colorScheme.tertiary, size: 20),
+          title: SubscriptionRenewalScreen.title,
+        ),
       const PopupMenuDivider(),
       // Rule: Settings MUST ALWAYS BE THE LAST ITEM in the menu
       buildMenuItem(

@@ -109,6 +109,25 @@ test("quote: partial selection, server-computed total, refuses web or other-comp
   await assert.rejects(J.quoteSubscriptionRequest(db, "ren1", new Date(Date.UTC(2027, 7, 1, 10))), /period_mismatch/);
 });
 
+test("quote is recomputed when the month changes in the same period", async () => {
+  const jan = L.cairoMidnight(2027, 1, 15);
+  await renewal("renStale", ["app1"], {
+    amountDue: L.feeAt(jan),
+    fee: L.feeAt(jan),
+    remainingMonths: 6,
+    items: [{uid: "app1", fullName: "App One", fee: L.feeAt(jan)}],
+  });
+  const q = await J.quoteSubscriptionRequest(db, "renStale", FEB_2027);
+  assert.equal(q.amount, 416.67);
+  assert.equal(q.remainingMonths, 5);
+  const stored = (await db.doc("delegate_requests/renStale").get()).data();
+  assert.equal(stored.amountDue, 416.67);
+  assert.equal(stored.fee, 416.67);
+  assert.equal(stored.remainingMonths, 5);
+  assert.equal(stored.items[0].fee, 416.67);
+  assert.equal(stored.items[0].fullName, "App One");
+});
+
 test("failed payment: nobody is reactivated; retry allowed", async () => {
   assert.equal(await pay("ren1", "tx-fail", 83334, false), "failed");
   const r = (await db.doc("delegate_requests/ren1").get()).data();
