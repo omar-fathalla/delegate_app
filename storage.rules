@@ -145,8 +145,10 @@ service firebase.storage {
         )
       );
     }
-    match /organizations/{orgId}/{allPaths=**} {
-      allow read, write: if canAccessOrganization(orgId);
+    // Must not also match .../companies/{compId}/** or the company
+    // tenant rule above is undone by this OR.
+    match /organizations/{orgId}/{segment}/{rest=**} {
+      allow read, write: if segment != 'companies' && canAccessOrganization(orgId);
     }
 
     // ==================== COMPANY FILES ====================
@@ -216,8 +218,10 @@ service firebase.storage {
     match /staging/requests/{requestId}/{allPaths=**} {
       allow read, write: if canAccessDelegateDocuments(requestId);
     }
-    match /staging/{allPaths=**} {
-      allow read, write: if isStorageStaff();
+    // Storage ORs overlapping matches, so this residual must not
+    // also match staging/requests/{id} or the intent check above is undone.
+    match /staging/{segment}/{rest=**} {
+      allow read, write: if segment != 'requests' && isStorageStaff();
     }
 
     // ==================== GUIDE VIDEOS PATH ====================
