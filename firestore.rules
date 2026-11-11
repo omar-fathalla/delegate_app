@@ -1990,6 +1990,28 @@ service cloud.firestore {
       // organization/chain under their companyUID. Org-admin stays org-scoped.
       // Super-admin and technical support remain global. Cross-company denied.
       // One users/{uid} read (budget).
+    // Written by staff immediately before a Storage upload to
+    // delegate_documents/{id}. Immutable to clients. companyUID is the
+    // tenant key used by Storage rules (one get).
+    match /storage_upload_intents/{intentId} {
+      allow read: if signedIn() && (
+        isGlobalStaff()
+        || ((isCompanyAdmin() || isHR() || isOrgAdmin()) && companyScoped())
+      );
+      allow create: if signedIn()
+        && request.resource.data.keys().hasAll(['companyUID', 'createdBy'])
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.companyUID is string
+        && request.resource.data.companyUID != ''
+        && request.resource.data.createdBy is string
+        && request.resource.data.createdBy != ''
+        && (
+          isGlobalStaff()
+          || ((isCompanyAdmin() || isHR() || isOrgAdmin()) && incomingCompanyScoped())
+        );
+      allow update, delete: if false;
+    }
+
     match /delegate_requests/{requestId} {
       allow read: if signedIn() && delegateRequestReadOk();
       // Docs-pending: requests are created by staff only (supervisor flow).

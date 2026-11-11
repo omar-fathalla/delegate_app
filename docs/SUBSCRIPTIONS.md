@@ -142,15 +142,22 @@ requests stay visible), and the next period is listed separately. One submit
 is one period. This does not flip `HOLDS_AUTHORITY_MODE` and does not change
 who may suspend.
 
-Cloud Storage allows at most two `firestore.get`/`exists` *calls* per
-request (the emulator does not enforce this; function calls are not
-memoized). A tighter staff-only `canAccessDelegateDocuments` that gets
-`users/{caller}` once was tried on live tashil-dev and still denied staff
-uploads to a new registration folder (uid-matched folders without a get,
-and `isAuthenticated` paths, worked). Until a live staff smoke succeeds
-with a get, tashil-dev `delegate_documents` matches prod:
-`allow read, write: if isAuthenticated()`. Prove uploads with
-`scripts/smoke_tashil_dev_storage_upload.js` (never against prod).
+Cloud Storage allows at most two `firestore.get`/`exists` calls per
+request (same-document calls may be cached). `delegate_documents` is not
+`isAuthenticated()`: anonymous tokens are denied, a folder owner may
+access `delegate_documents/{uid}` with zero gets, and company staff / HR
+/ org-admin may access a folder only when `storage_upload_intents/{id}`
+exists and `companyUID` matches the caller (plus one get of
+`users/{caller}`). Super-admin and technical support are global. There is
+no empty-company fallback. The client writes the intent before uploading.
+
+Cross-service IAM is required for those gets: grant
+`roles/firebaserules.firestoreServiceAgent` to
+`service-<PROJECT_NUMBER>@gcp-sa-firebasestorage.iam.gserviceaccount.com`
+(`--project tashil-dev` only unless Mohamed approves prod). Without that
+role, Storage→Firestore gets deny and staff uploads fail. Prove with
+`scripts/smoke_tashil_dev_storage_upload.js` (never against prod): staff
+upload, anonymous deny, cross-company deny.
 
 `startBillingCycle` caps `companyPriors` / `delegatePriors` on the run doc
 at 100 entries and spills the rest to

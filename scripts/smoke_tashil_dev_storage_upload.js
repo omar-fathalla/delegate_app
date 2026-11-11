@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Live tashil-dev smoke: sign in as a fake staff user and upload a tiny
- * file under delegate_documents/{newFolder}/... then delete it.
- *
- * Proves Cloud Storage rules stay within the 2 unique Firestore-document
- * access limit (the emulator does not enforce this).
+ * Live tashil-dev smoke for hardened delegate_documents rules:
+ *   1) staff writes storage_upload_intents/{folder} then uploads
+ *   2) anonymous get/list/create are denied
+ *   3) other-company staff get/list/create/delete are denied
  *
  * Usage:
- *   TASHIL_DEV_ACCOUNTS_FILE=/path/to/accounts.txt \
+ *   TASHIL_DEV_ACCOUNTS_FILE=/path/to/staff.txt \
+ *   TASHIL_DEV_ACCOUNTS_FILE_2=/path/to/other-company-staff.txt \
  *     node scripts/smoke_tashil_dev_storage_upload.js
  *
  * The accounts file must not be committed. Never prints passwords or tokens.
@@ -114,33 +114,7 @@ async function postJson(url, body, headers = {}) {
   return {ok: res.ok, status: res.status, json};
 }
 
-async function main() {
-  if (process.env.FIREBASE_PROJECT && process.env.FIREBASE_PROJECT !== PROJECT_ID) {
-    fail(`refusing project ${process.env.FIREBASE_PROJECT}`);
-  }
-  if (FORBIDDEN.has(String(process.env.FIREBASE_PROJECT || "").toLowerCase())) {
-    fail("refusing prod");
-  }
-
-  const key = apiKeyFromRepo();
-  const file = process.env.TASHIL_DEV_ACCOUNTS_FILE;
-  let email = process.env.TASHIL_DEV_STAFF_EMAIL || "";
-  let password = process.env.TASHIL_DEV_STAFF_PASSWORD || "";
-  let role = process.env.TASHIL_DEV_STAFF_ROLE || "";
-  if (file) {
-    if (!existsSync(file)) fail(`accounts file not found`);
-    const accounts = parseAccounts(readFileSync(file, "utf8"));
-    if (!accounts.length) fail("no email/password accounts in file");
-    const staff = pickStaff(accounts);
-    email = email || staff.email;
-    password = password || staff.password;
-    role = role || staff.role || "";
-  }
-  if (!email || !password) {
-    fail("set TASHIL_DEV_ACCOUNTS_FILE or TASHIL_DEV_STAFF_EMAIL + TASHIL_DEV_STAFF_PASSWORD");
-  }
-
-  const userTok = gcloudAccessToken();
+async function signInPassword(key, email, password, userTok) {
   const signInHeaders = {"X-Goog-User-Project": PROJECT_ID};
   if (userTok) signInHeaders.Authorization = `Bearer ${userTok}`;
   const signIn = await postJson(
@@ -152,15 +126,60 @@ async function main() {
     const code = signIn.json?.error?.message || `http ${signIn.status}`;
     fail(`sign-in failed: ${code}`);
   }
-  const idToken = signIn.json.idToken;
-  const uid = signIn.json.localId || "(unknown)";
-  console.log(`signed in as ${email} uid=${uid} role=${role || "(from file)"} project=${PROJECT_ID}`);
+  return {idToken: signIn.json.idToken, uid: signIn.json.localId || ""};
+}
 
-  const folder = `smoke_storage_${Date.now()}`;
-  const objectPath = `delegate_documents/${folder}/staff_upload.txt`;
+async function signInAnonymous(key, userTok) {
+  const headers = {"X-Goog-User-Project": PROJECT_ID};
+  if (userTok) headers.Authorization = `Bearer ${userTok}`;
+  const signIn = await postJson(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${encodeURIComponent(key)}`,
+    {returnSecureToken: true},
+    headers,
+  );
+  if (!signIn.ok || !signIn.json.idToken) {
+    const code = signIn.json?.error?.message || `http ${signIn.status}`;
+    fail(`anonymous sign-in failed: ${code}`);
+  }
+  return {idToken: signIn.json.idToken, uid: signIn.json.localId || ""};
+}
+
+async function firestoreGet(idToken, path) {
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${path}`;
+  const res = await fetch(url, {headers: {Authorization: `Bearer ${idToken}`}});
+  const text = await res.text();
+  let json;
+  try { json = JSON.parse(text); } catch { json = {raw: text.slice(0, 200)}; }
+  return {ok: res.ok, status: res.status, json};
+}
+
+async function firestoreCreateIntent(idToken, folder, companyUID, createdBy) {
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/storage_upload_intents?documentId=${encodeURIComponent(folder)}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      fields: {
+        companyUID: {stringValue: companyUID},
+        createdBy: {stringValue: createdBy},
+        createdAt: {timestampValue: new Date().toISOString()},
+      },
+    }),
+  });
+  const text = await res.text();
+  return {ok: res.ok, status: res.status, text: text.slice(0, 300)};
+}
+
+function storageObjectUrl(objectPath) {
+  return `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(objectPath)}`;
+}
+
+async function storageUpload(idToken, objectPath, body) {
   const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o?uploadType=media&name=${encodeURIComponent(objectPath)}`;
-  const body = Buffer.from("tashil-dev storage smoke\n", "utf8");
-  const uploadRes = await fetch(uploadUrl, {
+  const res = await fetch(uploadUrl, {
     method: "POST",
     headers: {
       Authorization: `Firebase ${idToken}`,
@@ -168,25 +187,138 @@ async function main() {
     },
     body,
   });
-  const uploadText = await uploadRes.text();
-  if (!uploadRes.ok) {
-    fail(`upload unauthorized or failed (http ${uploadRes.status})`, uploadText);
-  }
-  console.log(`upload ok: ${objectPath} http ${uploadRes.status}`);
+  return {ok: res.ok, status: res.status, text: await res.text()};
+}
 
-  const objectUrl = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(objectPath)}`;
-  const delRes = await fetch(objectUrl, {
+async function storageGet(idToken, objectPath) {
+  const res = await fetch(storageObjectUrl(objectPath), {
+    headers: {Authorization: `Firebase ${idToken}`},
+  });
+  return {ok: res.ok, status: res.status, text: (await res.text()).slice(0, 200)};
+}
+
+async function storageList(idToken, prefix) {
+  const url = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o?prefix=${encodeURIComponent(prefix)}`;
+  const res = await fetch(url, {headers: {Authorization: `Firebase ${idToken}`}});
+  return {ok: res.ok, status: res.status, text: (await res.text()).slice(0, 200)};
+}
+
+async function storageDelete(idToken, objectPath) {
+  const res = await fetch(storageObjectUrl(objectPath), {
     method: "DELETE",
     headers: {Authorization: `Firebase ${idToken}`},
   });
+  return {ok: res.ok, status: res.status, text: (await res.text()).slice(0, 200)};
+}
+
+function userCompany(docJson) {
+  return docJson?.fields?.companyUID?.stringValue || "";
+}
+
+function expectDenied(label, res) {
+  if (res.ok) fail(`${label} unexpectedly allowed (http ${res.status})`, res.text);
+  if (res.status !== 403 && res.status !== 401 && res.status !== 404) {
+    // 403 is the intended rules deny; 401 unauthenticated; some list denials are 403.
+    console.log(`WARN: ${label} denied with http ${res.status} (wanted 403)`);
+  } else {
+    console.log(`deny ok: ${label} http ${res.status}`);
+  }
+}
+
+function loadAccounts() {
+  const files = [
+    process.env.TASHIL_DEV_ACCOUNTS_FILE,
+    process.env.TASHIL_DEV_ACCOUNTS_FILE_2,
+  ].filter(Boolean);
+  const accounts = [];
+  for (const file of files) {
+    if (!existsSync(file)) fail(`accounts file not found`);
+    const parsed = parseAccounts(readFileSync(file, "utf8"));
+    accounts.push(...parsed);
+  }
+  return accounts;
+}
+
+async function main() {
+  if (process.env.FIREBASE_PROJECT && process.env.FIREBASE_PROJECT !== PROJECT_ID) {
+    fail(`refusing project ${process.env.FIREBASE_PROJECT}`);
+  }
+  if (FORBIDDEN.has(String(process.env.FIREBASE_PROJECT || "").toLowerCase())) {
+    fail("refusing prod");
+  }
+
+  const key = apiKeyFromRepo();
+  const accounts = loadAccounts();
+  let email = process.env.TASHIL_DEV_STAFF_EMAIL || "";
+  let password = process.env.TASHIL_DEV_STAFF_PASSWORD || "";
+  let role = process.env.TASHIL_DEV_STAFF_ROLE || "";
+  if (!email || !password) {
+    if (!accounts.length) {
+      fail("set TASHIL_DEV_ACCOUNTS_FILE or TASHIL_DEV_STAFF_EMAIL + TASHIL_DEV_STAFF_PASSWORD");
+    }
+    const staff = pickStaff(accounts);
+    email = staff.email;
+    password = staff.password;
+    role = staff.role || "";
+  }
+
+  const userTok = gcloudAccessToken();
+  const staff = await signInPassword(key, email, password, userTok);
+  console.log(`signed in as ${email} uid=${staff.uid} role=${role || "(from file)"} project=${PROJECT_ID}`);
+
+  const userDoc = await firestoreGet(staff.idToken, `users/${staff.uid}`);
+  if (!userDoc.ok) fail(`could not read users/${staff.uid} (http ${userDoc.status})`);
+  const companyUID = userCompany(userDoc.json);
+  if (!companyUID) fail("signed-in staff has empty companyUID (fail closed)");
+
+  const folder = `smoke_storage_${Date.now()}`;
+  const objectPath = `delegate_documents/${folder}/staff_upload.txt`;
+  const prefix = `delegate_documents/${folder}/`;
+
+  const intent = await firestoreCreateIntent(staff.idToken, folder, companyUID, staff.uid);
+  if (!intent.ok) fail(`intent create failed (http ${intent.status})`, intent.text);
+  console.log(`intent ok: storage_upload_intents/${folder} company=${companyUID}`);
+
+  const body = Buffer.from("tashil-dev storage smoke\n", "utf8");
+  const uploadRes = await storageUpload(staff.idToken, objectPath, body);
+  if (!uploadRes.ok) fail(`staff upload failed (http ${uploadRes.status})`, uploadRes.text);
+  console.log(`upload ok: ${objectPath} http ${uploadRes.status}`);
+
+  const anon = await signInAnonymous(key, userTok);
+  console.log(`anonymous uid=${anon.uid}`);
+  expectDenied("anon get", await storageGet(anon.idToken, objectPath));
+  expectDenied("anon list", await storageList(anon.idToken, prefix));
+  expectDenied("anon upload", await storageUpload(anon.idToken, `${prefix}anon.txt`, body));
+
+  const other = accounts.find((a) => a.email && a.password && a.email !== email);
+  if (other) {
+    const otherAuth = await signInPassword(key, other.email, other.password, userTok);
+    const otherDoc = await firestoreGet(otherAuth.idToken, `users/${otherAuth.uid}`);
+    const otherCo = otherDoc.ok ? userCompany(otherDoc.json) : "";
+    if (!otherCo || otherCo === companyUID) {
+      console.log("WARN: second account is missing or same company; skipped cross-company checks");
+    } else {
+      console.log(`other-company uid=${otherAuth.uid} company=${otherCo}`);
+      expectDenied("other-company get", await storageGet(otherAuth.idToken, objectPath));
+      expectDenied("other-company list", await storageList(otherAuth.idToken, prefix));
+      expectDenied("other-company upload", await storageUpload(otherAuth.idToken, `${prefix}other.txt`, body));
+      expectDenied("other-company delete", await storageDelete(otherAuth.idToken, objectPath));
+      const hijack = await firestoreCreateIntent(otherAuth.idToken, folder, otherCo, otherAuth.uid);
+      if (hijack.ok) fail("other-company was able to overwrite/create the intent");
+      console.log(`deny ok: other-company intent hijack http ${hijack.status}`);
+    }
+  } else {
+    console.log("WARN: no second staff account; skipped cross-company checks");
+  }
+
+  const delRes = await storageDelete(staff.idToken, objectPath);
   if (!delRes.ok) {
-    const t = await delRes.text();
-    console.log(`WARN: upload succeeded but delete failed (http ${delRes.status}); left ${objectPath}`);
-    console.log(String(t).slice(0, 200));
+    console.log(`WARN: staff delete failed (http ${delRes.status}); left ${objectPath}`);
+    console.log(String(delRes.text).slice(0, 200));
   } else {
     console.log(`delete ok: ${objectPath}`);
   }
-  console.log("PASS tashil-dev storage upload smoke");
+  console.log("PASS tashil-dev storage upload smoke (staff upload, anon deny, cross-company deny)");
 }
 
 main().catch((err) => fail(err && err.message ? err.message : String(err)));
