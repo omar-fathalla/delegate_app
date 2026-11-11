@@ -359,6 +359,7 @@ class _PaymentStatusBanner extends StatelessWidget {
     final (icon, color, text) = switch (status) {
       SubscriptionPaymentStatus.paid => (Icons.check_circle_rounded, cs.primary, 'تم الدفع وتفعيل المناديب المحددين.'),
       SubscriptionPaymentStatus.failed => (Icons.error_rounded, cs.error, 'فشل الدفع، ولم يتم تفعيل أي مندوب.'),
+      SubscriptionPaymentStatus.expired => (Icons.timer_off_rounded, Colors.orange.shade800, 'انتهت صلاحية عرض السعر. يمكن إنشاء طلب تجديد جديد.'),
       _ => (Icons.hourglass_top_rounded, cs.tertiary, 'طلب التجديد بانتظار تأكيد الدفع من Paymob.'),
     };
     return Container(
