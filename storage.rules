@@ -116,10 +116,17 @@ service firebase.storage {
     // their own object. Staff of any company still have full access
     // (residual, documented: no company segment).
     match /feedback_screenshots/{fileName} {
-      allow create: if isStorageStaff()
+      // Overwrites must be evaluated against the existing object's
+      // owner even if a client upload is classified as create.
+      allow read: if isStorageStaff()
         || (isDelegateToken()
-          && request.resource.metadata.get('userId', '') == request.auth.uid);
-      allow read, update, delete: if isStorageStaff()
+          && resource.metadata.get('userId', '') == request.auth.uid);
+      allow create, update: if isStorageStaff()
+        || (isDelegateToken()
+          && request.resource.metadata.get('userId', '') == request.auth.uid
+          && (resource == null
+            || resource.metadata.get('userId', '') == request.auth.uid));
+      allow delete: if isStorageStaff()
         || (isDelegateToken()
           && resource.metadata.get('userId', '') == request.auth.uid);
     }
@@ -130,19 +137,33 @@ service firebase.storage {
     // Legacy photo_{timestamp}.jpg has no owner in the name; delegates
     // cannot overwrite or delete those (staff can). Old clients that
     // still upload photo_{timestamp}.jpg can create new objects.
+    function permissionPhotoNameOwnedByCaller(photoId) {
+      return request.auth.uid != ''
+        && photoId.matches('photo_' + request.auth.uid + '_.*');
+    }
+    function permissionPhotoNameOwnedByOther(photoId) {
+      return photoId.matches('photo_.*_.*')
+        && !permissionPhotoNameOwnedByCaller(photoId);
+    }
     function delegateOwnsPermissionPhoto(photoId) {
       return isDelegateToken()
         && request.auth.uid != ''
         && (
-          photoId.matches('photo_' + request.auth.uid + '_.*')
+          permissionPhotoNameOwnedByCaller(photoId)
           || resource.metadata.get('userId', '') == request.auth.uid
           || resource.metadata.get('delegateUid', '') == request.auth.uid
         );
     }
     match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
-      allow read, create: if canAccessCompanyFiles(compId)
+      allow read: if canAccessCompanyFiles(compId)
         || delegateTokenOwnsCompany(compId);
-      allow update, delete: if canAccessCompanyFiles(compId)
+      // Filename photo_{uid}_* is treated as owned by that uid so a
+      // create-classified overwrite cannot steal a colleague's object.
+      allow create, update: if canAccessCompanyFiles(compId)
+        || (delegateTokenOwnsCompany(compId)
+          && !permissionPhotoNameOwnedByOther(photoId)
+          && (resource == null || delegateOwnsPermissionPhoto(photoId)));
+      allow delete: if canAccessCompanyFiles(compId)
         || (delegateTokenOwnsCompany(compId) && delegateOwnsPermissionPhoto(photoId));
     }
 
