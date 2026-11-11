@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/features/admin/data/repositories/delegate_subscription_repository_impl.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -44,6 +45,22 @@ DelegateSubscriptionRequest req({
     );
 
 
+
+Map<String, dynamic> paidSubNow({
+  double amountDue = 416.67,
+  String? renewalRequestId = 'ren-paid',
+}) {
+  final at = DateTime.now().toUtc();
+  return {
+    'periodCode': SubscriptionCycleHelper.getCycleCode(at),
+    'periodStart': SubscriptionCycleHelper.periodStartDay(at),
+    'periodEnd': SubscriptionCycleHelper.periodEndDay(at),
+    'amountDue': amountDue,
+    'paymentStatus': 'paid',
+    if (renewalRequestId != null) 'renewalRequestId': renewalRequestId,
+  };
+}
+
 Future<void> seedPaidAddOrgContext(
   FakeFirebaseFirestore db, {
   String uid = 'sup1',
@@ -57,11 +74,7 @@ Future<void> seedPaidAddOrgContext(
     'status': 'active',
     'companyUID': 'c1',
     'organizationUID': 'o1',
-    'subscription': {
-      'periodCode': '2027_H1',
-      'periodEnd': '2027-06-30',
-      'paymentStatus': 'paid',
-    },
+    'subscription': paidSubNow(renewalRequestId: null),
   });
 }
 
@@ -201,14 +214,7 @@ void main() {
       'companyUID': 'c1',
       'organizationUID': 'o1',
       'fullName': 'Delegate One',
-      'subscription': {
-        'periodCode': '2027_H1',
-        'periodStart': '2027-01-01',
-        'periodEnd': '2027-06-30',
-        'amountDue': 416.67,
-        'paymentStatus': 'paid',
-        'renewalRequestId': 'ren-paid',
-      },
+      'subscription': paidSubNow(),
     });
     final add = DelegateSubscriptionRequest(
       id: 'add1',
@@ -250,7 +256,7 @@ void main() {
     expect(r.isRight(), isTrue);
     final created = (await db.doc('organizations/o2/companies/c1/delegates/$uid').get()).data()!;
     expect(created['status'], 'active');
-    expect(created['subscription']['periodCode'], '2027_H1');
+    expect(created['subscription']['periodCode'], paidSubNow()['periodCode']);
     expect(created['subscription']['paymentStatus'], 'paid');
     expect(created['subscription']['amountDue'], 416.67);
     expect(created['subscription']['renewalRequestId'], 'ren-paid');
@@ -377,14 +383,7 @@ void main() {
       'nationalId': '20000000000099',
       'nationalityID': '20000000000099',
       'phoneNumber': '01000000099',
-      'subscription': {
-        'periodCode': '2027_H1',
-        'periodStart': '2027-01-01',
-        'periodEnd': '2027-06-30',
-        'amountDue': 416.67,
-        'paymentStatus': 'paid',
-        'renewalRequestId': 'ren-exist',
-      },
+      'subscription': paidSubNow(renewalRequestId: 'ren-exist'),
     });
 
     final loaded = await repo.loadCompanyDelegate(

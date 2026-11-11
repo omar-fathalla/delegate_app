@@ -171,9 +171,9 @@ async function mergePriorShards(
     const data = doc.data() as {kind?: string; key?: string; prior?: Record<string, unknown>};
     if (!data.key || !data.prior) continue;
     if (data.kind === "company" && !companyPriors[data.key]) {
-      companyPriors[data.key] = data.prior as typeof companyPriors[string];
+      companyPriors[data.key] = data.prior as unknown as typeof companyPriors[string];
     } else if (data.kind === "delegate" && !delegatePriors[data.key]) {
-      delegatePriors[data.key] = data.prior as typeof delegatePriors[string];
+      delegatePriors[data.key] = data.prior as unknown as typeof delegatePriors[string];
     }
   }
   return {...state, companyPriors, delegatePriors};
