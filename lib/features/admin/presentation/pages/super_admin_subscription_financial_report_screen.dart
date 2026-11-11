@@ -1314,7 +1314,7 @@ class _SuperAdminSubscriptionFinancialReportScreenState
           colorScheme.tertiaryContainer.withValues(alpha: 0.4),
         ),
       SubscriptionPaymentMethod.freePromotion => (
-          'عرض مجاني',
+          'مجاني (سجل 2026)',
           Icons.card_giftcard_rounded,
           const Color(0xFF16A34A),
           const Color(0xFFDCFCE7),
@@ -1519,7 +1519,7 @@ class _SuperAdminSubscriptionFinancialReportScreenState
           SubscriptionPaymentMethod.companyDeduction => 'خصم من حساب الشركة',
           SubscriptionPaymentMethod.instaPay => 'تحويل انستاباي',
           SubscriptionPaymentMethod.branchReceipt => 'إيصال إلكتروني من تسويق الفرع',
-          SubscriptionPaymentMethod.freePromotion => 'عرض ترويجي مجاني',
+          SubscriptionPaymentMethod.freePromotion => 'مجاني (سجل 2026)',
           SubscriptionPaymentMethod.paymob => 'دفع إلكتروني Paymob',
           SubscriptionPaymentMethod.notRequired => 'بدون رسوم',
         };

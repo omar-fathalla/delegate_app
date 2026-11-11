@@ -22,7 +22,7 @@ class SubscriptionRenewalRepository {
     bool? advanceRenewalEnabled,
     int? advanceRenewalDays,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _clock = clock ?? (() => DateTime.now().toUtc()),
+       _clock = clock ?? SubscriptionCycleHelper.currentTime,
        _advanceRenewalEnabled = advanceRenewalEnabled,
        _advanceRenewalDays =
            advanceRenewalDays ??
@@ -67,6 +67,9 @@ class SubscriptionRenewalRepository {
     try {
       final snap = await _firestore.doc('config/subscriptions').get();
       final data = snap.data();
+      SubscriptionCycleHelper.applyConfig(
+        freePromotionLastDay: data?['freePromotionLastDay']?.toString(),
+      );
       if (data != null && data.containsKey('advanceRenewalEnabled')) {
         _resolvedEnabled = data['advanceRenewalEnabled'] == true;
         final n = data['advanceRenewalDays'];

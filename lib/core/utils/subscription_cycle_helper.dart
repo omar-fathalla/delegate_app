@@ -11,6 +11,11 @@ import 'package:delegate_app/core/config/app_env.dart';
 ///
 /// Dates: a UTC [DateTime] is converted to Cairo wall time; a local
 /// (non-UTC) [DateTime] is read as Cairo wall time as-is.
+///
+/// The last free calendar day is mirrored from `config/subscriptions.freePromotionLastDay`
+/// (Functions are authoritative). When that field is missing, [defaultFreePromotionLastDayIso]
+/// is used. "Now" comes from [nowOverride] (the app binds [TrustedTimeService]) or
+/// from an explicit [date] argument — never a raw `DateTime.now()` at the call site.
 class SubscriptionCycleHelper {
   static const double periodFee = 500.0;
   static const int monthsPerPeriod = 6;
@@ -18,8 +23,23 @@ class SubscriptionCycleHelper {
   /// Mohamed policy (PR #212): max delegates per single renewal / Paymob payment.
   static const int maxDelegatesPerRenewal = 100;
 
-  /// Last free day (inclusive), Cairo calendar date.
-  static final DateTime freePromotionLastDay = DateTime(2026, 12, 31);
+  /// Fallback last free day (inclusive), Cairo calendar date, when config is absent.
+  static const String defaultFreePromotionLastDayIso = '2026-12-31';
+
+  static String _freePromotionLastDayIso = defaultFreePromotionLastDayIso;
+
+  /// Last free day (inclusive), Cairo calendar date (from config or the fallback).
+  static DateTime get freePromotionLastDay {
+    final p = _freePromotionLastDayIso.split('-');
+    return DateTime(int.parse(p[0]), int.parse(p[1]), int.parse(p[2]));
+  }
+
+  /// ISO `YYYY-MM-DD` currently in force (config or fallback).
+  static String get freePromotionLastDayIso => _freePromotionLastDayIso;
+
+  /// Optional clock. The app binds this to [TrustedTimeService.now] at startup.
+  /// Widget and unit tests inject a fake clock here instead of `DateTime.now()`.
+  static DateTime Function()? nowOverride;
 
   /// Fake tashil-dev company whose free period is treated as ended.
   /// Honored only when [AppEnv.isDev] is true (ENV=dev). A prod build
@@ -39,8 +59,16 @@ class SubscriptionCycleHelper {
   // ---------------------------------------------------------------- Cairo time
 
   /// Converts [date] (default: now) to Cairo wall time.
+  /// Current instant: test/app override, else device UTC. Callers must not
+  /// pass `DateTime.now()`; omit [date] and let this resolve the clock.
+  static DateTime currentTime([DateTime? date]) {
+    if (date != null) return date;
+    final n = nowOverride?.call();
+    return (n ?? DateTime.now()).toUtc();
+  }
+
   static DateTime cairoTime([DateTime? date]) {
-    final d = date ?? DateTime.now().toUtc();
+    final d = currentTime(date);
     if (!d.isUtc) return d;
     final offset = cairoUtcOffset(d);
     final w = d.add(offset);
@@ -103,6 +131,34 @@ class SubscriptionCycleHelper {
     } else {
       return 'دورة النصف الثاني (${d.year}) • 1 يوليو حتى 31 ديسمبر';
     }
+  }
+
+  /// Short cycle name for use inside sentences (no dates, no bullet).
+  static String getCycleShortTitleArabic([DateTime? date]) {
+    final d = cairoTime(date);
+    return d.month <= 6 ? 'النصف الأول ${d.year}' : 'النصف الثاني ${d.year}';
+  }
+
+  /// Short cycle name for a period code such as `2027_H1`.
+  static String getCycleShortTitleArabicForCode(String code) {
+    final m = RegExp(r'^(\d{4})_H([12])$').firstMatch(code.trim());
+    if (m == null) return getCycleShortTitleArabic();
+    final year = m.group(1)!;
+    return m.group(2) == '1' ? 'النصف الأول $year' : 'النصف الثاني $year';
+  }
+
+  /// Apply `config/subscriptions`. Invalid or missing values fall back to the default.
+  static void applyConfig({String? freePromotionLastDay}) {
+    final d = (freePromotionLastDay ?? '').trim();
+    _freePromotionLastDayIso = RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(d)
+        ? d
+        : defaultFreePromotionLastDayIso;
+  }
+
+  /// Test hook: restore the default last day and clear [nowOverride].
+  static void resetConfigForTest() {
+    _freePromotionLastDayIso = defaultFreePromotionLastDayIso;
+    nowOverride = null;
   }
 
   /// First day of the period (Cairo wall time).

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
+import 'package:delegate_app/core/utils/promo_clock_binding.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/features/admin/data/repositories/subscription_renewal_repository.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
@@ -10,6 +11,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/features/admin/presentation/pages/subscription_renewal_receipt_page.dart';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// «تجديد المناديب»: supervisors, company admins, HR, and org-admins
@@ -43,7 +45,7 @@ class SubscriptionRenewalScreen extends StatefulWidget {
       _SubscriptionRenewalScreenState();
 }
 
-class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
+class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> with WidgetsBindingObserver, PromoClockBinding {
   late final SubscriptionRenewalRepository _repo =
       widget.repository ?? sl<SubscriptionRenewalRepository>();
   late final SubscriptionPaymentGateway _gateway =
@@ -59,7 +61,7 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
   SubscriptionPaymentStatus? _activeStatus;
   StreamSubscription<SubscriptionPaymentStatus>? _statusSub;
 
-  DateTime get _now => (widget.clock ?? () => DateTime.now().toUtc())();
+  DateTime get _now => (widget.clock ?? () => SubscriptionCycleHelper.currentTime())();
 
   String _selectedPeriod(String fallback) {
     final keys = _selection.selectedUids;
@@ -562,7 +564,7 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
                       SubscriptionCycleHelper.maxDelegatesPerRenewal) {
                 AppSnackBar.showError(
                   context,
-                  'الحد الأقصى ${SubscriptionCycleHelper.maxDelegatesPerRenewal} مندوباً في طلب واحد.',
+                  'الحد الأقصى ${SubscriptionCycleHelper.maxDelegatesPerRenewal} مندوبًا في طلب واحد.',
                 );
                 return;
               }
@@ -582,8 +584,32 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
               setState(() => _selection = next);
             },
       title: Text(d.fullName),
-      subtitle: subtitle.isEmpty ? null : Text(subtitle),
-      secondary: Icon(Icons.person_off_rounded, color: cs.error),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (subtitle.isNotEmpty) Text(subtitle),
+          if (d.isSuspendedExpired)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: cs.tertiaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'موقوف لانتهاء الاشتراك',
+                  style: TextStyle(color: cs.onTertiaryContainer, fontSize: 11),
+                ),
+              ),
+            ),
+        ],
+      ),
+      isThreeLine: d.isSuspendedExpired && subtitle.isNotEmpty,
+      secondary: d.isSuspendedExpired
+          ? Icon(Symbols.person_off_rounded, color: cs.onSurfaceVariant, fill: 0)
+          : null,
       controlAffinity: ListTileControlAffinity.leading,
     );
   }
@@ -636,15 +662,18 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
             ),
             FilledButton.icon(
               key: const Key('renewal_pay_button'),
-              style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                iconAlignment: IconAlignment.start,
+              ),
               onPressed: canPay ? _payForSelection : null,
               icon: _submitting
                   ? const SizedBox(
-                      width: 18,
-                      height: 18,
+                      width: 24,
+                      height: 24,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.credit_card_rounded, size: 18),
+                  : const Icon(Symbols.credit_card_rounded, size: 24, fill: 0),
               label: const Text('ادفع عبر Paymob'),
             ),
           ],
@@ -671,20 +700,22 @@ class _PeriodBanner extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final months = SubscriptionCycleHelper.getRemainingMonthsInCycle(now);
     final String text;
+    final short = SubscriptionCycleHelper.getCycleShortTitleArabicForCode(periodCode);
     if (advance) {
-      final title = SubscriptionCycleHelper.getCycleTitleArabic(
-        SubscriptionCycleHelper.getCycleStartDateForCode(periodCode),
-      );
+      // The selected-period isFree flag is false during the advance window,
+      // so use the live promo clock. Drop the 2026 sentence after expiry.
+      final promoNote = SubscriptionCycleHelper.isFreePromotionActive(now)
+          ? ' ولا تُطبَّق مجانية 2026 على تلك الدورة.'
+          : '';
       text =
-          'التجديد المقدَّم مفتوح ل$title. الرسوم كاملة للدورة التالية، '
-          'ولا تُطبَّق مجانية 2026 على تلك الدورة. '
-          'الحد الأقصى ${SubscriptionCycleHelper.maxDelegatesPerRenewal} مندوباً في طلب واحد.';
+          'التجديد المقدَّم مفتوح ل$short. الرسوم 500 ج.م للمندوب عن الدورة الكاملة.$promoNote '
+          'الحد الأقصى ${SubscriptionCycleHelper.maxDelegatesPerRenewal} مندوبًا في طلب واحد.';
     } else if (isFree) {
       text = 'الاشتراك مجاني حتى 31/12/2026، لا حاجة للتجديد الآن.';
     } else {
       text =
-          '${SubscriptionCycleHelper.getCycleTitleArabic(now)} • متبقٍ $months ${months == 1 ? 'شهر' : 'أشهر'}. '
-          'الحد الأقصى ${SubscriptionCycleHelper.maxDelegatesPerRenewal} مندوباً في طلب واحد. '
+          '$short • متبقٍ $months ${months == 1 ? 'شهر' : 'أشهر'}. '
+          'الحد الأقصى ${SubscriptionCycleHelper.maxDelegatesPerRenewal} مندوبًا في طلب واحد. '
           'يمكنك تجديد بعض المناديب الآن والباقي لاحقاً.';
     }
     return Container(

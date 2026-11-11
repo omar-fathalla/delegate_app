@@ -180,3 +180,19 @@ test("advance renewal window and next-period quote", () => {
   assert.equal(currentInPromo.amount, 0);
 });
 
+
+test("parseFreePromotionLastDay reads config or falls back", () => {
+  assert.equal(L.parseFreePromotionLastDay(null), "2026-12-31");
+  assert.equal(L.parseFreePromotionLastDay({}), "2026-12-31");
+  assert.equal(L.parseFreePromotionLastDay({freePromotionLastDay: "2026-11-30"}), "2026-11-30");
+  assert.equal(L.parseFreePromotionLastDay({freePromotionLastDay: "bad"}), "2026-12-31");
+});
+
+test("isFreePromotion honors the configured last day and the Cairo midnight boundary", () => {
+  const justBefore = new Date("2026-12-31T21:59:59.000Z");
+  const exactlyMidnightCairo = new Date("2026-12-31T22:00:00.000Z");
+  assert.equal(L.isFreePromotion(justBefore), true);
+  assert.equal(L.isFreePromotion(exactlyMidnightCairo), false);
+  assert.equal(L.isFreePromotion(new Date("2026-12-01T00:00:00.000Z"), {freePromotionLastDay: "2026-11-30"}), false);
+  assert.equal(L.isFreePromotion(new Date("2026-11-30T21:59:59.000Z"), {freePromotionLastDay: "2026-11-30"}), true);
+});

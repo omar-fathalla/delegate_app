@@ -424,7 +424,7 @@ export const submitNationalIdUpdate = functions
       actionType: "update_national_id",
       status: "pending",
       paymentStatus: "not_required",
-      paymentMethod: "free_promotion",
+      paymentMethod: "not_required",
       supervisorUid: caller.uid,
       supervisorName: caller.name,
       companyUID,

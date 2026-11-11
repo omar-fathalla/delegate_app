@@ -13,6 +13,7 @@ import {
   isRenewalCoverageExpired,
   parsePeriodCode,
   parseAdvanceRenewalConfig,
+  parseFreePromotionLastDay,
   periodOf,
   quoteFor,
   resolvePayablePeriod,
@@ -94,11 +95,15 @@ export async function appAddedDelegateUids(db: Db): Promise<Map<string, Data>> {
 }
 
 /** Uids paid (or waived, for a free period) for `period`. */
-export async function coveredDelegateUids(db: Db, period: Period): Promise<Set<string>> {
+export async function coveredDelegateUids(
+  db: Db,
+  period: Period,
+  lastDay?: string,
+): Promise<Set<string>> {
   const snap = await db.collection(REQUESTS).where("periodCode", "==", period.code).get();
   const out = new Set<string>();
   for (const doc of snap.docs) {
-    if (requestCoversPeriod(doc.data(), period.code)) {
+    if (requestCoversPeriod(doc.data(), period.code, lastDay)) {
       for (const uid of coveredUids(doc.id, doc.data())) out.add(uid);
     }
   }
@@ -142,13 +147,14 @@ export async function runSubscriptionSuspension(db: Db, now: Date): Promise<Susp
     periodCode: period.code, appAdded: 0, covered: 0, candidates: 0,
     suspendedDocs: 0, suspendedUsers: 0, alreadySuspended: 0,
   };
-  if (isFreePromotion(now)) {
+  const publicCfg = await loadPublicSubscriptionConfig(db);
+  if (isFreePromotion(now, {freePromotionLastDay: publicCfg.freePromotionLastDay})) {
     const res = {...base, skipped: "free_promotion" as const};
     console.log(JSON.stringify({event: "subscription_suspension", ...res}));
     return res;
   }
   const appAdded = await appAddedDelegateUids(db);
-  const covered = await coveredDelegateUids(db, period);
+  const covered = await coveredDelegateUids(db, period, publicCfg.freePromotionLastDay);
   const candidates = [...appAdded.keys()].filter((uid) => !covered.has(uid));
   const res: SuspensionResult = {...base, appAdded: appAdded.size, covered: covered.size, candidates: candidates.length};
   const ts = FieldValue.serverTimestamp();
@@ -262,8 +268,8 @@ export async function quoteSubscriptionRequest(db: Db, requestId: string, at: Da
   if (status !== "pending" && status !== "failed") throw new QuoteError("not_payable");
   const type = str(data.requestType || REQUEST_TYPE_NEW);
   if (type !== REQUEST_TYPE_NEW && type !== REQUEST_TYPE_RENEWAL) throw new QuoteError("not_payable");
-  const advanceCfg = await loadAdvanceRenewalConfig(db);
-  const payable = resolvePayablePeriod(at, str(data.periodCode), advanceCfg);
+  const publicCfg = await loadPublicSubscriptionConfig(db);
+  const payable = resolvePayablePeriod(at, str(data.periodCode), publicCfg.advance);
   if (!payable) throw new QuoteError("period_mismatch");
   const uids = coveredUids(requestId, data);
   if (uids.length === 0) throw new QuoteError("no_delegates");
@@ -271,7 +277,11 @@ export async function quoteSubscriptionRequest(db: Db, requestId: string, at: Da
   await assertCreatorScope(db, data);
   if (type === REQUEST_TYPE_RENEWAL) await assertRenewable(db, data, uids);
   const quoteOpts = await loadDevQuoteOptions(db, data);
-  const quote = quoteFor(uids, at, {...quoteOpts, periodCode: payable.code});
+  const quote = quoteFor(uids, at, {
+    ...quoteOpts,
+    periodCode: payable.code,
+    freePromotionLastDay: publicCfg.freePromotionLastDay,
+  });
   if (quote.amountCents <= 0) throw new QuoteError("free_period");
   await db.runTransaction(async (tx) => {
     await assertNotAlreadyCovered(tx, db, requestId, quote.periodCode, uids, at);
@@ -309,10 +319,18 @@ async function loadDevQuoteOptions(db: Db, data: Data): Promise<QuoteOptions> {
   return opts;
 }
 
-async function loadAdvanceRenewalConfig(db: Db): Promise<AdvanceRenewalConfig> {
+async function loadPublicSubscriptionConfig(db: Db): Promise<{
+  advance: AdvanceRenewalConfig;
+  freePromotionLastDay: string;
+}> {
   const snap = await db.doc("config/subscriptions").get();
-  return parseAdvanceRenewalConfig(snap.exists ? (snap.data() as Record<string, unknown>) : null);
+  const raw = snap.exists ? (snap.data() as Record<string, unknown>) : null;
+  return {
+    advance: parseAdvanceRenewalConfig(raw),
+    freePromotionLastDay: parseFreePromotionLastDay(raw),
+  };
 }
+
 
 /**
  * The request creator (users/{supervisorUid}) must belong to the request's

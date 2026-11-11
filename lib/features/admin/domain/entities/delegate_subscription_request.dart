@@ -28,7 +28,7 @@ extension SubscriptionPaymentMethodX on SubscriptionPaymentMethod {
       case SubscriptionPaymentMethod.branchReceipt:
         return 'إيصال إلكتروني من تسويق الفرع';
       case SubscriptionPaymentMethod.freePromotion:
-        return 'عرض ترويجي مجاني (حتى 31/12)';
+        return 'مجاني (سجل 2026)';
       case SubscriptionPaymentMethod.paymob:
         return 'دفع إلكتروني (Paymob)';
       case SubscriptionPaymentMethod.notRequired:
@@ -45,7 +45,7 @@ extension SubscriptionPaymentMethodX on SubscriptionPaymentMethod {
       case SubscriptionPaymentMethod.branchReceipt:
         return 'إيصال إلكتروني';
       case SubscriptionPaymentMethod.freePromotion:
-        return 'عرض مجاني';
+        return 'مجاني (سجل 2026)';
       case SubscriptionPaymentMethod.paymob:
         return 'Paymob';
       case SubscriptionPaymentMethod.notRequired:
@@ -74,7 +74,7 @@ extension SubscriptionPaymentStatusX on SubscriptionPaymentStatus {
         SubscriptionPaymentStatus.pending => 'بانتظار الدفع',
         SubscriptionPaymentStatus.paid => 'مدفوع',
         SubscriptionPaymentStatus.failed => 'فشل الدفع',
-        SubscriptionPaymentStatus.waived => 'مجاني (عرض 2026)',
+        SubscriptionPaymentStatus.waived => 'مجاني (سجل 2026)',
         SubscriptionPaymentStatus.notRequired => 'بدون رسوم',
         SubscriptionPaymentStatus.expired => 'منتهية',
       };
@@ -473,6 +473,11 @@ class DelegateSubscriptionRequest extends Equatable {
       paymentStatus == SubscriptionPaymentStatus.paid ||
       paymentStatus == SubscriptionPaymentStatus.waived ||
       paymentStatus == SubscriptionPaymentStatus.notRequired;
+
+  /// New Paymob registration still waiting for the payment confirmation.
+  bool get isAwaitingPaymobPayment =>
+      paymentMethod == SubscriptionPaymentMethod.paymob &&
+      paymentStatus == SubscriptionPaymentStatus.pending;
 
   @override
   List<Object?> get props => [

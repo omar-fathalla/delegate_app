@@ -6,6 +6,7 @@ import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/core/widgets/tashil_button_group.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
+import 'package:delegate_app/features/admin/presentation/widgets/subscription_request_status_widgets.dart';
 import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
@@ -1113,11 +1114,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
                           ),
                         ),
                         const Spacer(),
-                        _buildStatusBadge(
-                          request.status,
-                          colorScheme,
-                          isDeleteRequest: request.requestType == 'delete_delegate',
-                        ),
+                        SubscriptionRequestStatusBadge(request: request),
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -1269,155 +1266,11 @@ class _SubscriptionRequestCard extends StatelessWidget {
                         children: [
                           // Payment Method & Fee
                           Expanded(
-                            child: Wrap(
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: [
-                                if (request.paymentMethod == SubscriptionPaymentMethod.freePromotion)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFDCFCE7),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: const Color(0xFF86EFAC)),
-                                    ),
-                                    child: const Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.card_giftcard_rounded, size: 13, color: Color(0xFF16A34A)),
-                                        SizedBox(width: 4),
-                                        Text(
-                                          'عرض مجاني (0 ج.م)',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFF15803D),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                else if (request.paymentMethod == SubscriptionPaymentMethod.companyDeduction)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      'خصم شركة',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: colorScheme.onSecondaryContainer,
-                                      ),
-                                    ),
-                                  )
-                                else if (request.paymentMethod == SubscriptionPaymentMethod.instaPay) ...[
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF6B21A8).withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: const Color(0xFF9333EA).withValues(alpha: 0.3)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Image.asset(
-                                          'assets/images/instapay_logo.png',
-                                          width: 14,
-                                          height: 14,
-                                          fit: BoxFit.contain,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        const Text(
-                                          'انستاباي',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFF9333EA),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (request.receiptImageUrl != null)
-                                    IconButton.filledTonal(
-                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                      padding: EdgeInsets.zero,
-                                      tooltip: 'عرض إشعار تحويل انستاباي',
-                                      icon: const Icon(Icons.receipt_long_rounded, size: 16),
-                                      onPressed: () => _showImageDialog(
-                                        context,
-                                        'إشعار تحويل انستاباي - ${request.fullName}',
-                                        request.receiptImageUrl!,
-                                      ),
-                                    ),
-                                ] else ...[
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      'إيصال إلكتروني',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: colorScheme.onPrimaryContainer,
-                                      ),
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: colorScheme.surfaceContainerHighest,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      'كود: ${request.receiptCode ?? "-"}',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ),
-                                  if (request.receiptImageUrl != null)
-                                    IconButton.filledTonal(
-                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                      padding: EdgeInsets.zero,
-                                      tooltip: 'عرض الإيصال الإلكتروني',
-                                      icon: const Icon(Icons.receipt_long_rounded, size: 16),
-                                      onPressed: () => _showImageDialog(
-                                        context,
-                                        'إيصال إلكتروني - كود ${request.receiptCode}',
-                                        request.receiptImageUrl!,
-                                      ),
-                                    ),
-                                ],
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.surfaceContainerHighest,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    '${SubscriptionCycleHelper.formatEgp(request.fee)} ج.م (${request.remainingMonths} ش) • ${request.paymentStatus.arabicLabel}',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            child: SubscriptionRequestPaymentChips(
+                              request: request,
+                              onReceiptTap: (title, url) => _showImageDialog(context, title, url),
                             ),
                           ),
-
                           // Documents viewer buttons (Icon-Only with tooltips)
                           Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1453,90 +1306,14 @@ class _SubscriptionRequestCard extends StatelessWidget {
                     // Row 4: Action Buttons or Status Message
                     if (request.status == SubscriptionRequestStatus.pending) ...[
                       const SizedBox(height: 12),
-                      if (currentAdmin.role == UserRole.superAdmin ||
-                          currentAdmin.role == UserRole.technicalSupport)
-                        Row(
-                          mainAxisAlignment: isWide
-                              ? MainAxisAlignment.end
-                              : MainAxisAlignment.start,
-                          children: [
-                            Flexible(
-                              fit: isWide ? FlexFit.loose : FlexFit.tight,
-                              child: FilledButton.icon(
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: request.requestType == 'delete_delegate'
-                                      ? Colors.red.shade700
-                                      : const Color(0xFF16A34A),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 9),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                onPressed: onApprove,
-                                icon: Icon(
-                                  request.requestType == 'delete_delegate'
-                                      ? Icons.delete_forever_rounded
-                                      : Icons.verified_rounded,
-                                  size: 17,
-                                ),
-                                label: Text(
-                                  request.requestType == 'delete_delegate'
-                                      ? 'اعتماد الحذف النهائي'
-                                      : request.isNationalIdUpdateRequest
-                                          ? 'اعتماد تعديل الرقم القومي'
-                                          : 'اعتماد وتفعيل',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              fit: isWide ? FlexFit.loose : FlexFit.tight,
-                              child: OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: colorScheme.error,
-                                  side: BorderSide(color: colorScheme.error.withValues(alpha: 0.7)),
-                                  padding: const EdgeInsets.symmetric(vertical: 9),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                onPressed: onReject,
-                                icon: const Icon(Icons.cancel_rounded, size: 17),
-                                label: Text(
-                                  request.requestType == 'delete_delegate'
-                                      ? 'رفض طلب الحذف'
-                                      : request.isNationalIdUpdateRequest
-                                          ? 'رفض تعديل الرقم القومي'
-                                          : 'رفض الطلب',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                ),
-                              ),
-                            ),
-                          ],
-                        )
-                      else
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer.withValues(alpha: 0.35),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.hourglass_top_rounded, size: 16, color: colorScheme.primary),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  'الطلب قيد الانتظار وبانتظار المراجعة والاعتماد.',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: colorScheme.primary,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                      SubscriptionRequestPendingActions(
+                        request: request,
+                        role: currentAdmin.role,
+                        isWide: isWide,
+                        onApprove: onApprove,
+                        onReject: onReject,
+                      ),
+
                       if (_canSupervisorEditRequest(currentAdmin, request)) ...[
                         const SizedBox(height: 8),
                         OutlinedButton.icon(
@@ -1643,105 +1420,4 @@ class _SubscriptionRequestCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusBadge(
-    SubscriptionRequestStatus status,
-    ColorScheme colorScheme, {
-    bool isDeleteRequest = false,
-  }) {
-    Color bg;
-    Color fg;
-    String label;
-    IconData icon;
-
-    if (isDeleteRequest) {
-      switch (status) {
-        case SubscriptionRequestStatus.pending:
-          bg = Colors.red.withValues(alpha: 0.12);
-          fg = Colors.red.shade700;
-          label = 'معلق للحذف';
-          icon = Icons.delete_sweep_rounded;
-          break;
-        case SubscriptionRequestStatus.approved:
-          bg = Colors.grey.withValues(alpha: 0.14);
-          fg = Colors.grey.shade700;
-          label = 'تم الحذف';
-          icon = Icons.check_circle_rounded;
-          break;
-        case SubscriptionRequestStatus.rejected:
-          bg = colorScheme.error.withValues(alpha: 0.12);
-          fg = colorScheme.error;
-          label = 'مرفوض';
-          icon = Icons.cancel_rounded;
-          break;
-        case SubscriptionRequestStatus.cancelled:
-          bg = Colors.grey.withValues(alpha: 0.14);
-          fg = Colors.grey.shade700;
-          label = 'ملغى';
-          icon = Icons.block_rounded;
-          break;
-        case SubscriptionRequestStatus.expired:
-          bg = Colors.orange.withValues(alpha: 0.14);
-          fg = Colors.orange.shade800;
-          label = 'منتهٍ';
-          icon = Icons.timer_off_rounded;
-          break;
-      }
-    } else {
-      switch (status) {
-        case SubscriptionRequestStatus.pending:
-          bg = colorScheme.primary.withValues(alpha: 0.12);
-          fg = colorScheme.primary;
-          label = 'قيد الانتظار';
-          icon = Icons.hourglass_top_rounded;
-          break;
-        case SubscriptionRequestStatus.approved:
-          bg = const Color(0xFF16A34A).withValues(alpha: 0.14);
-          fg = const Color(0xFF16A34A);
-          label = 'معتمد';
-          icon = Icons.verified_rounded;
-          break;
-        case SubscriptionRequestStatus.rejected:
-          bg = colorScheme.error.withValues(alpha: 0.12);
-          fg = colorScheme.error;
-          label = 'مرفوض';
-          icon = Icons.cancel_rounded;
-          break;
-        case SubscriptionRequestStatus.cancelled:
-          bg = Colors.grey.withValues(alpha: 0.14);
-          fg = Colors.grey.shade700;
-          label = 'ملغى';
-          icon = Icons.block_rounded;
-          break;
-        case SubscriptionRequestStatus.expired:
-          bg = Colors.orange.withValues(alpha: 0.14);
-          fg = Colors.orange.shade800;
-          label = 'منتهٍ';
-          icon = Icons.timer_off_rounded;
-          break;
-      }
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: fg.withValues(alpha: 0.25),
-          width: 0.8,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: fg),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: fg),
-          ),
-        ],
-      ),
-    );
-  }
 }

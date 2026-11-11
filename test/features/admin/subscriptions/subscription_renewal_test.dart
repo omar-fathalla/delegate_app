@@ -9,6 +9,7 @@ import 'package:delegate_app/features/admin/presentation/pages/subscription_rene
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // 10 Feb 2027 noon Cairo: H1 2027, 5 months left -> 416.67 per delegate.
@@ -115,6 +116,9 @@ class FakeGateway implements SubscriptionPaymentGateway {
 }
 
 void main() {
+  setUp(SubscriptionCycleHelper.resetConfigForTest);
+  tearDown(SubscriptionCycleHelper.resetConfigForTest);
+
   group('RenewalSelection', () {
     const ds = [
       RenewableDelegate(
@@ -877,4 +881,56 @@ void main() {
       SubscriptionCycleHelper.totalFor(1, DateTime.utc(2027, 2, 10)),
     );
   });
+
+  testWidgets('after expiry the pay button is at least 48dp and person_off is not error-colored', (tester) async {
+    final repo = SubscriptionRenewalRepository(
+      firestore: await seed(),
+      clock: () => feb2027,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SubscriptionRenewalScreen(
+          supervisor: supervisor(),
+          repository: repo,
+          paymentGateway: FakeGateway(),
+          clock: () => feb2027,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final btn = tester.getSize(find.byKey(const Key('renewal_pay_button')));
+    expect(btn.height, greaterThanOrEqualTo(48));
+    expect(find.textContaining('مجانية 2026'), findsNothing);
+    expect(find.textContaining('النصف الأول 2027'), findsWidgets);
+    final errorColor = Theme.of(tester.element(find.byType(Scaffold))).colorScheme.error;
+    final personOff = Symbols.person_off_rounded.codePoint;
+    final errorIcons = tester.widgetList<Icon>(find.byType(Icon)).where((i) {
+      return i.icon?.codePoint == personOff && i.color == errorColor;
+    });
+    expect(errorIcons, isEmpty);
+  });
+
+  testWidgets('advance banner keeps the 2026 sentence only while the promo is live', (tester) async {
+    final db = await seed();
+    final dec = DateTime.utc(2026, 12, 15, 10);
+    final repo = SubscriptionRenewalRepository(
+      firestore: db,
+      clock: () => dec,
+      advanceRenewalEnabled: true,
+      advanceRenewalDays: 30,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SubscriptionRenewalScreen(
+          supervisor: supervisor(),
+          repository: repo,
+          paymentGateway: FakeGateway(),
+          clock: () => dec,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('مجانية 2026'), findsOneWidget);
+  });
+
 }
