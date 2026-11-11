@@ -111,3 +111,25 @@ test("free-period bypass is honored only for tashil-dev and a listed company", (
   assert.equal(L.quoteFor(["a"], at, dev).amountCents > 0, true);
   assert.equal(L.quoteFor(["a"], at, prod).amountCents, 0);
 });
+
+test("renewal coverage expires at end of Cairo quote month, or period end if earlier", () => {
+  const feb = mid(2027, 2);
+  const mar1 = L.cairoMidnight(2027, 3, 1);
+  assert.equal(L.endOfCairoMonth(feb).getTime(), mar1.getTime());
+  assert.equal(L.renewalCoverageExpiryAt(feb, "2027_H1").getTime(), mar1.getTime());
+  assert.equal(L.isRenewalCoverageExpired(feb, new Date(mar1.getTime() - 1), "2027_H1"), false);
+  assert.equal(L.isRenewalCoverageExpired(feb, mar1, "2027_H1"), true);
+
+  // 15 June: end of month and H1 period end are the same instant (1 Jul Cairo).
+  const jun = mid(2027, 6);
+  const jul1 = L.cairoMidnight(2027, 7, 1);
+  assert.equal(L.endOfCairoMonth(jun).getTime(), jul1.getTime());
+  assert.equal(L.renewalCoverageExpiryAt(jun, "2027_H1").getTime(), jul1.getTime());
+  assert.equal(L.periodFor(2027, 1).endsAt.getTime(), jul1.getTime());
+  assert.equal(L.isRenewalCoverageExpired(jun, jul1, "2027_H1"), true);
+
+  // Mid-December H2: expiry is 1 Jan of the next year (period end).
+  const dec = mid(2027, 12);
+  const jan1 = L.cairoMidnight(2028, 1, 1);
+  assert.equal(L.renewalCoverageExpiryAt(dec, "2027_H2").getTime(), jan1.getTime());
+});

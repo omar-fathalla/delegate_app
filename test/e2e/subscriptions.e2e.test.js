@@ -243,3 +243,41 @@ test("a uid already on a pending or paid renewal cannot be quoted or charged twi
   const q2 = await J.quoteSubscriptionRequest(db, "renPendC", FEB_2027);
   assert.equal(q2.amountCents, 41667);
 });
+
+test("staff reject sets a terminal payment status and frees the coverage for a new renewal", async () => {
+  await lateAppAdded("app6");
+  await renewal("renReject", ["app6"]);
+  await J.quoteSubscriptionRequest(db, "renReject", FEB_2027);
+  await J.finalizeTerminalRenewal(db, "renReject", "staff_rejected");
+  const rejected = (await db.doc("delegate_requests/renReject").get()).data();
+  assert.equal(rejected.status, "rejected");
+  assert.equal(rejected.paymentStatus, "failed");
+  assert.equal(rejected.paymentError, "staff_rejected");
+  const cov = (await db.doc("subscription_coverage/2027_H1_app6").get()).data();
+  assert.equal(cov.status, "failed");
+
+  await renewal("renRejectRetry", ["app6"]);
+  const q = await J.quoteSubscriptionRequest(db, "renRejectRetry", FEB_2027);
+  assert.equal(q.amountCents, 41667);
+});
+
+test("abandoned pending renewals expire at quote-month end and free their delegates", async () => {
+  await lateAppAdded("app7");
+  const jan = L.cairoMidnight(2027, 1, 15);
+  await renewal("renAbandon", ["app7"]);
+  await J.quoteSubscriptionRequest(db, "renAbandon", jan);
+  const before = (await db.doc("delegate_requests/renAbandon").get()).data();
+  assert.equal(before.paymentStatus, "pending");
+
+  const res = await J.expireAbandonedRenewals(db, FEB_2027);
+  assert.ok(res.expired >= 1);
+  const expired = (await db.doc("delegate_requests/renAbandon").get()).data();
+  assert.equal(expired.paymentStatus, "expired");
+  assert.equal(expired.paymentError, "expired");
+  const cov = (await db.doc("subscription_coverage/2027_H1_app7").get()).data();
+  assert.equal(cov.status, "failed");
+
+  await renewal("renAbandonRetry", ["app7"]);
+  const q = await J.quoteSubscriptionRequest(db, "renAbandonRetry", FEB_2027);
+  assert.equal(q.amountCents, 41667);
+});

@@ -1,7 +1,7 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
-import {runSubscriptionSuspension} from "./subscription_jobs";
-import {TIME_ZONE} from "./subscription_logic";
+import {runSubscriptionSuspension, expireAbandonedRenewals, finalizeTerminalRenewal} from "./subscription_jobs";
+import {REQUEST_TYPE_RENEWAL, TIME_ZONE} from "./subscription_logic";
 
 if (admin.apps.length === 0) admin.initializeApp();
 
@@ -9,6 +9,9 @@ if (admin.apps.length === 0) admin.initializeApp();
  * 00:05 Cairo every day. On 1 Jan / 1 Jul this suspends every app-added
  * delegate without a paid subscription for the new period; on other days it
  * is a cheap re-check (idempotent).
+ *
+ * Not deployed to prod from this change. Do not deploy it together with
+ * expireAbandonedSubscriptionRenewals unless there is a separate written go.
  */
 export const suspendExpiredSubscriptions = functions
   .region("us-central1")
@@ -17,5 +20,54 @@ export const suspendExpiredSubscriptions = functions
   .timeZone(TIME_ZONE)
   .onRun(async () => {
     await runSubscriptionSuspension(admin.firestore(), new Date());
+    return null;
+  });
+
+/**
+ * 00:10 Cairo every day. Expires abandoned pending renewals whose quote is
+ * no longer valid (end of the Cairo month it was quoted in, or the period
+ * end, whichever comes first) and finishes rejected/cancelled renewals
+ * whose paymentStatus is still pending, freeing their coverage.
+ */
+export const expireAbandonedSubscriptionRenewals = functions
+  .region("us-central1")
+  .runWith({timeoutSeconds: 540, memory: "256MB"})
+  .pubsub.schedule("10 0 * * *")
+  .timeZone(TIME_ZONE)
+  .onRun(async () => {
+    const res = await expireAbandonedRenewals(admin.firestore(), new Date());
+    console.log(JSON.stringify({event: "expire_abandoned_renewals", ...res}));
+    return null;
+  });
+
+function str(v: unknown): string {
+  return typeof v === "string" ? v.trim() : "";
+}
+
+/**
+ * When staff reject or cancel a renewal, set paymentStatus to a terminal
+ * state and release coverage so those delegates can be renewed again.
+ */
+export const finalizeSubscriptionRenewalOnStatus = functions
+  .region("us-central1")
+  .firestore.document("delegate_requests/{requestId}")
+  .onUpdate(async (change) => {
+    const before = change.before.data() || {};
+    const after = change.after.data() || {};
+    if (str(after.requestType || after.request_type) !== REQUEST_TYPE_RENEWAL) return null;
+    const status = str(after.status);
+    if (status !== "rejected" && status !== "cancelled") return null;
+    const payment = str(after.paymentStatus);
+    if (payment === "paid" || payment === "expired") return null;
+    if (payment === "failed" && str(after.paymentError) === (status === "rejected" ? "staff_rejected" : "cancelled")) {
+      return null;
+    }
+    const beforeStatus = str(before.status);
+    if (beforeStatus === status && payment !== "pending") return null;
+    await finalizeTerminalRenewal(
+      admin.firestore(),
+      change.after.id,
+      status === "rejected" ? "staff_rejected" : "cancelled",
+    );
     return null;
   });
