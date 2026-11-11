@@ -193,7 +193,7 @@ export const onNotificationCreated = functions.firestore
   .document("notifications/{notificationId}")
   .onCreate(async (snap, context) => {
     const notification = snap.data();
-    const { delegateUid, title, body, organizationId, companyId, type, phoneNumber } = notification;
+    const { delegateUid, title, body, organizationId, companyId, type, phoneNumber, taskId } = notification;
 
     if (!title || !body) return null;
 
@@ -223,6 +223,7 @@ export const onNotificationCreated = functions.firestore
             type: type || "support_broadcast",
             organizationId: organizationId || "",
             companyId: companyId || "",
+            taskId: taskId || "",
           },
         });
         console.log("Successfully sent broadcast push notification to FCM topic 'app_updates'");
@@ -293,6 +294,7 @@ export const onNotificationCreated = functions.firestore
               type: type || "support_alert",
               organizationId: organizationId || "",
               companyId: companyId || "",
+              taskId: taskId || "",
             },
             token: fcmToken,
           });
