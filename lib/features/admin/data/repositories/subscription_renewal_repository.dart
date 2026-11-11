@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dartz/dartz.dart';
+import 'package:delegate_app/core/config/app_env.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
@@ -12,15 +13,43 @@ import 'package:delegate_app/features/admin/domain/entities/subscription_renewal
 class SubscriptionRenewalRepository {
   final FirebaseFirestore _firestore;
   final DateTime Function() _clock;
+  final bool? _advanceRenewalEnabled;
+  final int _advanceRenewalDays;
 
-  SubscriptionRenewalRepository({FirebaseFirestore? firestore, DateTime Function()? clock})
-      : _firestore = firestore ?? FirebaseFirestore.instance,
-        _clock = clock ?? (() => DateTime.now().toUtc());
+  SubscriptionRenewalRepository({
+    FirebaseFirestore? firestore,
+    DateTime Function()? clock,
+    bool? advanceRenewalEnabled,
+    int? advanceRenewalDays,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _clock = clock ?? (() => DateTime.now().toUtc()),
+        _advanceRenewalEnabled = advanceRenewalEnabled,
+        _advanceRenewalDays = advanceRenewalDays ??
+            ((advanceRenewalEnabled ?? AppEnv.isDev)
+                ? SubscriptionCycleHelper.devAdvanceRenewalDays
+                : SubscriptionCycleHelper.defaultAdvanceRenewalDays);
+
+  bool get _advanceFlag => _advanceRenewalEnabled ?? AppEnv.isDev;
+
+  bool isAdvanceRenewalOpen([DateTime? at]) => SubscriptionCycleHelper.isAdvanceRenewalOpen(
+        at ?? _clock(),
+        enabled: _advanceFlag,
+        days: _advanceRenewalDays,
+      );
+
+  String targetPeriodCode([DateTime? at]) => SubscriptionCycleHelper.payableCycleCode(
+        at ?? _clock(),
+        enabled: _advanceFlag,
+        days: _advanceRenewalDays,
+      );
 
   CollectionReference<Map<String, dynamic>> get _requests => _firestore.collection('delegate_requests');
 
-  /// Suspended (subscription expired) app-added delegates of [companyUID]
-  /// across every organization/chain of that company.
+  /// App-added delegates of [companyUID] that can be renewed.
+  ///
+  /// Outside the advance window: only those suspended for expiry.
+  /// During the advance window: every app-added delegate not already
+  /// covered for the next period (including currently active ones).
   Future<Either<Failure, List<RenewableDelegate>>> loadRenewableDelegates({
     required String companyUID,
     String? organizationUID,
@@ -61,7 +90,13 @@ class SubscriptionRenewalRepository {
             .get();
         final d = snap.data();
         if (d == null) continue;
-        if (d['status'] != 'suspended' || d['statusReason'] != kSubscriptionExpiredReason) continue;
+        final now = _clock();
+        final period = targetPeriodCode(now);
+        if (isAdvanceRenewalOpen(now)) {
+          if (_subscriptionCovers(d, period)) continue;
+        } else if (d['status'] != 'suspended' || d['statusReason'] != kSubscriptionExpiredReason) {
+          continue;
+        }
         out.add(RenewableDelegate(
           uid: reg.id,
           fullName: (d['fullName'] ?? r['fullName'] ?? '').toString(),
@@ -78,12 +113,21 @@ class SubscriptionRenewalRepository {
     }
   }
 
-  /// uid -> id of an open (unpaid, not failed) renewal for the current period.
+  bool _subscriptionCovers(Map<String, dynamic> data, String period) {
+    final sub = data['subscription'];
+    if (sub is! Map) return false;
+    final map = Map<String, dynamic>.from(sub);
+    if ((map['periodCode'] ?? '').toString() != period) return false;
+    final status = (map['paymentStatus'] ?? '').toString();
+    return status == 'paid' || status == 'waived';
+  }
+
+  /// uid -> id of an open (unpaid, not failed) renewal for the target period.
   Future<Map<String, String>> _pendingRenewalsByUid({
     required String companyUID,
     String? organizationUID,
   }) async {
-    final period = SubscriptionCycleHelper.getCycleCode(_clock());
+    final period = targetPeriodCode(_clock());
     final org = organizationUID?.trim() ?? '';
     Query<Map<String, dynamic>> pendingQuery = _requests
         .where('companyUID', isEqualTo: companyUID)
@@ -127,9 +171,11 @@ class SubscriptionRenewalRepository {
       ));
     }
     final now = _clock();
-    if (SubscriptionCycleHelper.isFreePromotionActive(now, companyUID)) {
+    final advance = isAdvanceRenewalOpen(now);
+    if (!advance && SubscriptionCycleHelper.isFreePromotionActive(now, companyUID)) {
       return const Left(ServerFailure('لا حاجة للتجديد خلال فترة العرض المجاني (حتى 31/12/2026).'));
     }
+    final period = targetPeriodCode(now);
     final awaiting = delegates.where((d) => d.isAwaitingPayment).map((d) => d.fullName).toList();
     if (awaiting.isNotEmpty) {
       return Left(ServerFailure('يوجد طلب تجديد بانتظار الدفع لكل من: ${awaiting.join('، ')}'));
@@ -146,9 +192,12 @@ class SubscriptionRenewalRepository {
       if (selected.isEmpty) {
         return const Left(ServerFailure('اختر مندوباً واحداً على الأقل للتجديد.'));
       }
-      final fee = SubscriptionCycleHelper.getProratedSubscriptionFee(now, companyUID);
+      final fee = SubscriptionCycleHelper.getFeeForPeriod(period, now, companyUID);
       final items = selected.map((d) => RenewalItem(uid: d.uid, fullName: d.fullName, fee: fee)).toList();
-      final total = SubscriptionCycleHelper.totalFor(items.length, now, companyUID);
+      final total = SubscriptionCycleHelper.roundMoney(fee * items.length);
+      final remaining = period == SubscriptionCycleHelper.getCycleCode(now)
+          ? SubscriptionCycleHelper.getRemainingMonthsInCycle(now)
+          : SubscriptionCycleHelper.monthsPerPeriod;
       final docRef = _requests.doc();
       final request = DelegateSubscriptionRequest(
         id: docRef.id,
@@ -169,11 +218,11 @@ class SubscriptionRenewalRepository {
         nationalIdFrontUrl: '',
         nationalIdBackUrl: '',
         paymentMethod: SubscriptionPaymentMethod.paymob,
-        subscriptionCycle: SubscriptionCycleHelper.getCycleCode(now),
-        cycleStartDate: SubscriptionCycleHelper.getCycleStartDate(now),
-        cycleEndDate: SubscriptionCycleHelper.getCycleEndDate(now),
+        subscriptionCycle: period,
+        cycleStartDate: SubscriptionCycleHelper.getCycleStartDateForCode(period),
+        cycleEndDate: SubscriptionCycleHelper.getCycleEndDateForCode(period),
         fee: total,
-        remainingMonths: SubscriptionCycleHelper.getRemainingMonthsInCycle(now),
+        remainingMonths: remaining,
         status: SubscriptionRequestStatus.pending,
         requestType: kRequestTypeRenewal,
         createdAt: now,
@@ -183,8 +232,8 @@ class SubscriptionRenewalRepository {
       );
       await docRef.set({
         ...request.toMap(),
-        'periodStart': SubscriptionCycleHelper.periodStartDay(now),
-        'periodEnd': SubscriptionCycleHelper.periodEndDay(now),
+        'periodStart': SubscriptionCycleHelper.periodStartDayForCode(period),
+        'periodEnd': SubscriptionCycleHelper.periodEndDayForCode(period),
         'createdAtServer': FieldValue.serverTimestamp(),
       });
       return Right(docRef.id);

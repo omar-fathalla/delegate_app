@@ -71,10 +71,20 @@ class RenewalSelection extends Equatable {
     return RenewalSelection(selectedUids.intersection(allowed));
   }
 
-  double feePerDelegate([DateTime? at]) => SubscriptionCycleHelper.getProratedSubscriptionFee(at);
+  double feePerDelegate([DateTime? at, String? companyUID, String? periodCode]) {
+    if (periodCode != null && periodCode.isNotEmpty) {
+      return SubscriptionCycleHelper.getFeeForPeriod(periodCode, at, companyUID);
+    }
+    return SubscriptionCycleHelper.getProratedSubscriptionFee(at, companyUID);
+  }
 
-  /// Sum of each selected delegate's prorated fee (one Paymob payment).
-  double total([DateTime? at]) => SubscriptionCycleHelper.totalFor(count, at);
+  /// Sum of each selected delegate's fee (one Paymob payment).
+  double total([DateTime? at, String? companyUID, String? periodCode]) {
+    if (periodCode != null && periodCode.isNotEmpty) {
+      return SubscriptionCycleHelper.roundMoney(feePerDelegate(at, companyUID, periodCode) * count);
+    }
+    return SubscriptionCycleHelper.totalFor(count, at, companyUID);
+  }
 
   @override
   List<Object?> get props => [selectedUids.toList()..sort()];

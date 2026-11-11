@@ -107,6 +107,65 @@ export function parsePeriodCode(code: unknown): Period | null {
   return periodFor(Number(m[1]), Number(m[2]) as 1 | 2);
 }
 
+/** The period after [period] (H1 → H2 in the same year, H2 → H1 of the next). */
+export function nextPeriod(period: Period): Period {
+  return period.half === 1 ? periodFor(period.year, 2) : periodFor(period.year + 1, 1);
+}
+
+/** Default length of the advance-renewal window, in Cairo calendar days. */
+export const DEFAULT_ADVANCE_RENEWAL_DAYS = 30;
+/** tashil-dev window so User Test can exercise the path before late December. */
+export const DEV_ADVANCE_RENEWAL_DAYS = 60;
+
+export interface AdvanceRenewalConfig {
+  enabled: boolean;
+  days: number;
+}
+
+export function parseAdvanceRenewalConfig(raw?: Record<string, unknown> | null): AdvanceRenewalConfig {
+  const n = Number(raw?.advanceRenewalDays);
+  const days = Number.isFinite(n) && n >= 1 && n <= 180 ? Math.trunc(n) : DEFAULT_ADVANCE_RENEWAL_DAYS;
+  return {enabled: raw?.advanceRenewalEnabled === true, days};
+}
+
+/**
+ * 00:00 Cairo on the first day of the last `days` calendar days of [period]
+ * (the period end day is included).
+ */
+export function advanceWindowOpensAt(period: Period, days: number): Date {
+  const safe = Math.max(1, Math.min(180, Math.trunc(days) || DEFAULT_ADVANCE_RENEWAL_DAYS));
+  const [y, m, d] = period.endDay.split("-").map(Number);
+  const start = new Date(Date.UTC(y, m - 1, d - (safe - 1)));
+  return cairoMidnight(start.getUTCFullYear(), start.getUTCMonth() + 1, start.getUTCDate());
+}
+
+export function isAdvanceRenewalOpen(
+  at: Date,
+  cfg: AdvanceRenewalConfig,
+  current: Period = periodOf(at),
+): boolean {
+  if (!cfg.enabled) return false;
+  const opens = advanceWindowOpensAt(current, cfg.days);
+  return at.getTime() >= opens.getTime() && at.getTime() < current.endsAt.getTime();
+}
+
+/**
+ * The period a request may be quoted for at `at`. Current period always
+ * qualifies. The next period qualifies only when advance renewal is open.
+ * Returns null on mismatch (caller throws period_mismatch).
+ */
+export function resolvePayablePeriod(
+  at: Date,
+  requestedPeriodCode: string,
+  cfg: AdvanceRenewalConfig,
+): Period | null {
+  const current = periodOf(at);
+  if (requestedPeriodCode === current.code) return current;
+  const next = nextPeriod(current);
+  if (requestedPeriodCode === next.code && isAdvanceRenewalOpen(at, cfg, current)) return next;
+  return null;
+}
+
 /**
  * Exclusive end of the Cairo calendar month containing `at` (00:00 Cairo
  * on the first day of the next month). A quote's fee is constant until then.
@@ -157,6 +216,8 @@ export interface QuoteOptions {
   companyUID?: string;
   bypassCompanyUIDs?: string[];
   companyFreePeriodEnded?: boolean;
+  /** When set, the quote is for this period (advance renewal uses next). */
+  periodCode?: string;
 }
 
 const TASHIL_DEV_PROJECT = "tashil-dev";
@@ -245,12 +306,17 @@ export interface Quote {
 
 /** Authoritative amount for a payable request at `at` (sum of per-delegate prorated fees). */
 export function quoteFor(uids: string[], at: Date, opts?: QuoteOptions): Quote {
-  const fee = feeAt(at, opts);
+  const current = periodOf(at);
+  const period = (opts?.periodCode && parsePeriodCode(opts.periodCode)) || current;
+  // A future period is quoted at its start (full 500, not today's remaining
+  // months, and not zeroed by a free promotion that only covers today).
+  const feeAtInstant = period.code === current.code ? at : period.startsAt;
+  const fee = feeAt(feeAtInstant, opts);
   const items = uids.map((uid) => ({uid, fee}));
   const amount = roundMoney(items.reduce((s, i) => s + i.fee, 0));
   return {
-    periodCode: periodOf(at).code,
-    remainingMonths: remainingMonths(at),
+    periodCode: period.code,
+    remainingMonths: remainingMonths(feeAtInstant),
     items,
     amount,
     amountCents: toCents(amount),

@@ -133,3 +133,50 @@ test("renewal coverage expires at end of Cairo quote month, or period end if ear
   const jan1 = L.cairoMidnight(2028, 1, 1);
   assert.equal(L.renewalCoverageExpiryAt(dec, "2027_H2").getTime(), jan1.getTime());
 });
+
+test("advance renewal window and next-period quote", () => {
+  const cfgOff = L.parseAdvanceRenewalConfig(null);
+  assert.equal(cfgOff.enabled, false);
+  assert.equal(cfgOff.days, L.DEFAULT_ADVANCE_RENEWAL_DAYS);
+
+  const cfg = L.parseAdvanceRenewalConfig({advanceRenewalEnabled: true, advanceRenewalDays: 30});
+  assert.equal(cfg.enabled, true);
+  assert.equal(cfg.days, 30);
+  assert.equal(L.parseAdvanceRenewalConfig({advanceRenewalEnabled: true, advanceRenewalDays: 0}).days, L.DEFAULT_ADVANCE_RENEWAL_DAYS);
+
+  const h2 = L.periodOf(L.cairoMidnight(2026, 11, 11));
+  assert.equal(h2.code, "2026_H2");
+  assert.equal(L.nextPeriod(h2).code, "2027_H1");
+  assert.equal(L.nextPeriod(L.periodFor(2027, 1)).code, "2027_H2");
+
+  const opens30 = L.advanceWindowOpensAt(h2, 30);
+  assert.equal(opens30.getTime(), L.cairoMidnight(2026, 12, 2).getTime());
+  const opens60 = L.advanceWindowOpensAt(h2, 60);
+  assert.equal(opens60.getTime(), L.cairoMidnight(2026, 11, 2).getTime());
+
+  const dec15 = L.cairoMidnight(2026, 12, 15);
+  const nov11 = L.cairoMidnight(2026, 11, 11);
+  const jan1 = L.cairoMidnight(2027, 1, 1);
+  assert.equal(L.isAdvanceRenewalOpen(dec15, cfg, h2), true);
+  assert.equal(L.isAdvanceRenewalOpen(nov11, cfg, h2), false);
+  assert.equal(L.isAdvanceRenewalOpen(nov11, {enabled: true, days: 60}, h2), true);
+  assert.equal(L.isAdvanceRenewalOpen(dec15, cfgOff, h2), false);
+  assert.equal(L.isAdvanceRenewalOpen(jan1, cfg), false);
+
+  assert.equal(L.resolvePayablePeriod(dec15, "2026_H2", cfg).code, "2026_H2");
+  assert.equal(L.resolvePayablePeriod(dec15, "2027_H1", cfg).code, "2027_H1");
+  assert.equal(L.resolvePayablePeriod(dec15, "2027_H1", cfgOff), null);
+  assert.equal(L.resolvePayablePeriod(nov11, "2027_H1", cfg), null);
+  assert.equal(L.resolvePayablePeriod(dec15, "2027_H2", cfg), null);
+
+  const advanceQuote = L.quoteFor(["a"], dec15, {periodCode: "2027_H1"});
+  assert.equal(advanceQuote.periodCode, "2027_H1");
+  assert.equal(advanceQuote.amount, 500);
+  assert.equal(advanceQuote.amountCents, 50000);
+  assert.equal(advanceQuote.remainingMonths, 6);
+
+  const currentInPromo = L.quoteFor(["a"], dec15);
+  assert.equal(currentInPromo.periodCode, "2026_H2");
+  assert.equal(currentInPromo.amount, 0);
+});
+

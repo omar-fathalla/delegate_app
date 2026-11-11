@@ -441,3 +441,66 @@ test("partial-duplicate remaining chains attach to the existing uid with no new 
   await renewal("renExistDup", ["dlgExist"]);
   await assert.rejects(J.quoteSubscriptionRequest(db, "renExistDup", FEB_2027), /already_covered/);
 });
+
+test("advance renewal: next-period quote is 500 and does not clear an expiry hold before Jan 1", async () => {
+  const dec = L.cairoMidnight(2026, 12, 15);
+  await lateAppAdded("appAdv1");
+  await db.doc(delegatePath("o1", "appAdv1")).set({
+    uid: "appAdv1", status: "suspended", companyUID: "c1",
+    statusReason: "subscription_expired",
+    holds: {subscription_expired: {
+      at: "2026-07-01T00:05:00.000Z", by: "system",
+      source: "suspendExpiredSubscriptions", periodCode: "2026_H2",
+    }},
+  });
+  await db.doc("delegate_requests/renAdv1").set({
+    requestType: "renewal", status: "pending", supervisorUid: "sup1", companyUID: "c1",
+    organizationUID: "o1", periodCode: "2027_H1", paymentStatus: "pending",
+    coveredDelegateUids: ["appAdv1"], items: [{uid: "appAdv1", fee: 500}], amountDue: 500,
+  });
+
+  await db.doc("config/subscriptions").set({advanceRenewalEnabled: false, advanceRenewalDays: 30});
+  await assert.rejects(J.quoteSubscriptionRequest(db, "renAdv1", dec), /period_mismatch/);
+
+  await db.doc("config/subscriptions").set({advanceRenewalEnabled: true, advanceRenewalDays: 30});
+  const q = await J.quoteSubscriptionRequest(db, "renAdv1", dec);
+  assert.equal(q.periodCode, "2027_H1");
+  assert.equal(q.amount, 500);
+  assert.equal(q.amountCents, 50000);
+  assert.equal(q.remainingMonths, 6);
+
+  // Current period is still payable during the window (free in Dec 2026).
+  await db.doc("delegate_requests/renAdvCurrent").set({
+    requestType: "renewal", status: "pending", supervisorUid: "sup1", companyUID: "c1",
+    organizationUID: "o1", periodCode: "2026_H2", paymentStatus: "pending",
+    coveredDelegateUids: ["appAdv1"], items: [{uid: "appAdv1", fee: 0}], amountDue: 0,
+  });
+  const current = await J.quoteSubscriptionRequest(db, "renAdvCurrent", dec);
+  assert.equal(current.periodCode, "2026_H2");
+  assert.equal(current.amount, 0);
+  await db.doc("delegate_requests/renAdvCurrent").update({status: "cancelled"});
+
+  assert.equal(await J.applyVerifiedSubscriptionPayment(db, {
+    requestId: "renAdv1", paymobTransactionId: "tx-adv-1", paymobOrderId: "o-adv-1",
+    success: true, amountCents: 50000, currency: "EGP", paidAt: dec,
+  }), "paid");
+  const d = (await db.doc(delegatePath("o1", "appAdv1")).get()).data();
+  assert.equal(d.status, "suspended", "must not reactivate before the paid period starts");
+  assert.equal(d.statusReason, "subscription_expired");
+  assert.ok(d.holds && d.holds.subscription_expired);
+  assert.equal(d.subscription.periodCode, "2027_H1");
+  assert.equal(d.subscription.paymentStatus, "paid");
+});
+
+test("advance renewal: on Jan 1 M1 skips prepaid uids and clears a leftover expiry hold", async () => {
+  const res = await J.runSubscriptionSuspension(db, new Date(JAN1_2027.getTime() + 2 * 60 * 60 * 1000));
+  assert.ok((res.clearedHolds || 0) >= 1, `clearedHolds=${res.clearedHolds}`);
+  const d = (await db.doc(delegatePath("o1", "appAdv1")).get()).data();
+  assert.equal(d.holds && d.holds.subscription_expired, undefined);
+  // Shadow: leftover status is unchanged until the authoritative flip.
+  assert.equal(d.status, "suspended");
+  assert.equal(d.statusReason, "subscription_expired");
+  assert.equal(d.subscription.periodCode, "2027_H1");
+  await db.doc("config/subscriptions").delete();
+});
+

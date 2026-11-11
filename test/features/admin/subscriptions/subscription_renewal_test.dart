@@ -139,6 +139,14 @@ void main() {
       expect(const RenewalSelection().selectAll(ds).total(nov2026), 0);
     });
 
+    test('advance selection uses the next period full fee, not today\'s promo zero', () {
+      const sel = RenewalSelection({'a', 'b'});
+      final dec = DateTime.utc(2026, 12, 15, 10);
+      expect(sel.feePerDelegate(dec, null, '2027_H1'), 500.0);
+      expect(sel.total(dec, null, '2027_H1'), 1000.0);
+      expect(sel.total(dec), 0); // current period still free
+    });
+
     test('selectAll and toggle respect maxDelegatesPerRenewal', () {
       final many = List.generate(
         SubscriptionCycleHelper.maxDelegatesPerRenewal + 5,
@@ -291,6 +299,44 @@ void main() {
       );
     });
 
+    test('advance window lists uncovered app-added delegates and submits the next period at full fee', () async {
+      final db = await seed();
+      await db.doc('organizations/o1/companies/c1/delegates/a').update({
+        'subscription': {'periodCode': '2027_H1', 'paymentStatus': 'paid'},
+      });
+      final dec = DateTime.utc(2026, 12, 15, 10);
+      final repo = SubscriptionRenewalRepository(
+        firestore: db,
+        clock: () => dec,
+        advanceRenewalEnabled: true,
+        advanceRenewalDays: 30,
+      );
+      final list = (await repo.loadRenewableDelegates(companyUID: 'c1')).getOrElse(() => []);
+      expect(list.map((d) => d.uid).toSet(), {'b', 'c', 'active1', 'manual'});
+      expect(list.map((d) => d.uid), isNot(contains('a')));
+
+      final s = supervisor();
+      final id = (await repo.submitRenewal(
+        supervisorUid: s.uid,
+        supervisorName: s.fullName,
+        supervisorPhone: s.phoneNumber,
+        companyUID: s.companyUID,
+        companyName: s.companyName,
+        organizationUID: s.organizationUID,
+        organizationName: s.organizationName,
+        delegates: list.where((d) => d.uid == 'active1').toList(),
+      ))
+          .getOrElse(() => '');
+      expect(id, isNotEmpty);
+      final data = (await db.doc('delegate_requests/$id').get()).data()!;
+      expect(data['periodCode'], '2027_H1');
+      expect(data['periodStart'], '2027-01-01');
+      expect(data['periodEnd'], '2027-06-30');
+      expect(data['amountDue'] ?? data['fee'], 500.0);
+      expect(data['remainingMonths'], 6);
+      expect(data['coveredDelegateUids'], ['active1']);
+    });
+
     test('watchPaymentStatus follows the server-written status', () async {
       final db = FakeFirebaseFirestore();
       await db.doc('delegate_requests/r').set({'paymentStatus': 'pending'});
@@ -376,6 +422,43 @@ void main() {
       await tester.pump();
       expect(tester.widget<FilledButton>(find.byKey(const Key('renewal_pay_button'))).onPressed, isNull);
       expect(find.textContaining('مجاني حتى 31/12/2026'), findsOneWidget);
+    });
+
+    testWidgets('advance window enables pay during the free promotion at the next-period fee', (tester) async {
+      final db = await seed();
+      final gateway = FakeGateway();
+      final dec = DateTime.utc(2026, 12, 15, 10);
+      final repo = SubscriptionRenewalRepository(
+        firestore: db,
+        clock: () => dec,
+        advanceRenewalEnabled: true,
+        advanceRenewalDays: 30,
+      );
+      await tester.pumpWidget(MaterialApp(
+        home: SubscriptionRenewalScreen(
+          supervisor: supervisor(),
+          repository: repo,
+          paymentGateway: gateway,
+          clock: () => dec,
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('renewal_row_active1')), findsOneWidget);
+      expect(find.textContaining('التجديد المقدَّم'), findsOneWidget);
+      expect(find.textContaining('مجاني حتى 31/12/2026'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('renewal_row_active1')));
+      await tester.pump();
+      expect(tester.widget<Text>(find.byKey(const Key('renewal_total'))).data, 'الإجمالي: 500 ج.م');
+      expect(tester.widget<FilledButton>(find.byKey(const Key('renewal_pay_button'))).onPressed, isNotNull);
+
+      await tester.tap(find.byKey(const Key('renewal_pay_button')));
+      await tester.pumpAndSettle();
+      expect(gateway.started, hasLength(1));
+      final req = (await db.doc('delegate_requests/${gateway.started.single}').get()).data()!;
+      expect(req['periodCode'], '2027_H1');
+      expect(req['amountDue'] ?? req['fee'], 500.0);
     });
   });
 
