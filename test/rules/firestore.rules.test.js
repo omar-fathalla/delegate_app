@@ -605,6 +605,46 @@ describe("firestore tightened rules", () => {
     await assertSucceeds(db.collection("attendance_logs").where("companyId", "==", "c1").get());
   });
 
+  test("signed-in clients can read only config/subscriptions", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.doc("config/subscriptions").set({advanceRenewalEnabled: true, advanceRenewalDays: 60});
+      await db.doc("config/delegate_auth").set({otpEnforcementEnabled: false});
+    });
+    const hr = dbFor("hr");
+    await assertSucceeds(hr.doc("config/subscriptions").get());
+    await assertFails(hr.doc("config/subscriptions").set({advanceRenewalEnabled: false}));
+    await assertFails(hr.doc("config/delegate_auth").get());
+    await assertFails(guestDb().doc("config/subscriptions").get());
+  });
+
+  test("HR can list company leave_requests by status", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.doc("leave_requests/l-c1-pending").set({
+        companyUID: "c1",
+        organizationUID: "o1",
+        delegateUid: "del-1",
+        status: "pending",
+      });
+      await db.doc("leave_requests/l-c2-pending").set({
+        companyUID: "c2",
+        organizationUID: "o1",
+        delegateUid: "del-9",
+        status: "pending",
+      });
+    });
+    await assertSucceeds(
+      dbFor("hr").collection("leave_requests").where("companyUID", "==", "c1").where("status", "==", "pending").get(),
+    );
+    await assertFails(
+      dbFor("hr").collection("leave_requests").where("companyUID", "==", "c2").where("status", "==", "pending").get(),
+    );
+    await assertSucceeds(
+      dbFor("comp2").collection("leave_requests").where("companyUID", "==", "c2").where("status", "==", "pending").get(),
+    );
+  });
+
 
   describe("task images and sender-only edit/delete", () => {
     const seedSent = async () => {

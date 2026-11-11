@@ -117,6 +117,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
           .where('status', isEqualTo: 'pending')
           .snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) return icon;
         final count = snapshot.data?.docs.length ?? 0;
         if (count == 0) return icon;
         return Badge(
@@ -142,6 +143,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
           .where('status', isEqualTo: 'pending')
           .snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) return icon;
         final count = snapshot.data?.docs.length ?? 0;
         if (count == 0) return icon;
         return Badge(

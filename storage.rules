@@ -102,16 +102,18 @@ service firebase.storage {
         'hr', 'company-hr', 'company_hr', 'human_resources'
       ];
     }
+    // Cloud Storage allows at most 2 unique Firestore document accesses
+    // per request. A third unique get/exists is denied (the emulator does
+    // not enforce this). We therefore touch only:
+    //   1) users/{caller}   (role + company, via storageUser)
+    //   2) delegate_requests/{delegateUid}  (folder company, if any)
+    // Never look up users/{delegateUid} here. A missing request doc is
+    // treated as an unresolved registration folder so company staff can
+    // upload before the request is created.
     function storageFolderCompany(delegateUid) {
       return firestore.exists(/databases/(default)/documents/delegate_requests/$(delegateUid))
         ? firestore.get(/databases/(default)/documents/delegate_requests/$(delegateUid)).data.get('companyUID', '')
-        : (firestore.exists(/databases/(default)/documents/users/$(delegateUid))
-          ? firestore.get(/databases/(default)/documents/users/$(delegateUid)).data.get('companyUID', '')
-          : '');
-    }
-    function storageFolderUnresolved(delegateUid) {
-      return !firestore.exists(/databases/(default)/documents/delegate_requests/$(delegateUid))
-        && !firestore.exists(/databases/(default)/documents/users/$(delegateUid));
+        : '';
     }
     function canAccessDelegateDocuments(delegateUid) {
       return isAuthenticated() && (
@@ -119,7 +121,7 @@ service firebase.storage {
         || storageIsGlobal()
         || (storageIsCompanyStaff() && (
           storageFolderCompany(delegateUid) == storageCallerCompany()
-          || (storageFolderCompany(delegateUid) == '' && storageFolderUnresolved(delegateUid))
+          || storageFolderCompany(delegateUid) == ''
         ))
       );
     }

@@ -16,6 +16,9 @@ class RenewableDelegate extends Equatable {
   /// Set when the delegate is already in an unpaid renewal (awaiting Paymob).
   final String? pendingRenewalRequestId;
 
+  /// Period this row is for (current or next). Empty in older callers.
+  final String periodCode;
+
   const RenewableDelegate({
     required this.uid,
     required this.fullName,
@@ -23,12 +26,24 @@ class RenewableDelegate extends Equatable {
     required this.organizationName,
     this.delegatePublicId,
     this.pendingRenewalRequestId,
+    this.periodCode = '',
   });
 
   bool get isAwaitingPayment => pendingRenewalRequestId != null;
 
+  /// Unique across both period lists (same uid may appear twice).
+  String get selectionKey => periodCode.isEmpty ? uid : '$uid|$periodCode';
+
   @override
-  List<Object?> get props => [uid, fullName, phoneNumber, organizationName, delegatePublicId, pendingRenewalRequestId];
+  List<Object?> get props => [
+    uid,
+    fullName,
+    phoneNumber,
+    organizationName,
+    delegatePublicId,
+    pendingRenewalRequestId,
+    periodCode,
+  ];
 }
 
 /// UI-agnostic renewal selection: works for the multi-select page today and a
@@ -55,10 +70,11 @@ class RenewalSelection extends Equatable {
   }
 
   /// Selects every delegate that is not already awaiting payment (up to [maxDelegatesPerRenewal]).
-  RenewalSelection selectAll(Iterable<RenewableDelegate> delegates) => RenewalSelection(
+  RenewalSelection selectAll(Iterable<RenewableDelegate> delegates) =>
+      RenewalSelection(
         delegates
             .where((d) => !d.isAwaitingPayment)
-            .map((d) => d.uid)
+            .map((d) => d.selectionKey)
             .take(SubscriptionCycleHelper.maxDelegatesPerRenewal)
             .toSet(),
       );
@@ -67,13 +83,24 @@ class RenewalSelection extends Equatable {
 
   /// Drops uids no longer in the list (e.g. after a reload).
   RenewalSelection retainOnly(Iterable<RenewableDelegate> delegates) {
-    final allowed = delegates.where((d) => !d.isAwaitingPayment).map((d) => d.uid).toSet();
+    final allowed = delegates
+        .where((d) => !d.isAwaitingPayment)
+        .map((d) => d.selectionKey)
+        .toSet();
     return RenewalSelection(selectedUids.intersection(allowed));
   }
 
-  double feePerDelegate([DateTime? at, String? companyUID, String? periodCode]) {
+  double feePerDelegate([
+    DateTime? at,
+    String? companyUID,
+    String? periodCode,
+  ]) {
     if (periodCode != null && periodCode.isNotEmpty) {
-      return SubscriptionCycleHelper.getFeeForPeriod(periodCode, at, companyUID);
+      return SubscriptionCycleHelper.getFeeForPeriod(
+        periodCode,
+        at,
+        companyUID,
+      );
     }
     return SubscriptionCycleHelper.getProratedSubscriptionFee(at, companyUID);
   }
@@ -81,7 +108,9 @@ class RenewalSelection extends Equatable {
   /// Sum of each selected delegate's fee (one Paymob payment).
   double total([DateTime? at, String? companyUID, String? periodCode]) {
     if (periodCode != null && periodCode.isNotEmpty) {
-      return SubscriptionCycleHelper.roundMoney(feePerDelegate(at, companyUID, periodCode) * count);
+      return SubscriptionCycleHelper.roundMoney(
+        feePerDelegate(at, companyUID, periodCode) * count,
+      );
     }
     return SubscriptionCycleHelper.totalFor(count, at, companyUID);
   }
@@ -89,7 +118,6 @@ class RenewalSelection extends Equatable {
   @override
   List<Object?> get props => [selectedUids.toList()..sort()];
 }
-
 
 /// Who may open «تجديد المناديب» and create a renewal (Mohamed, Phase 1 item 2).
 /// Supervisors share [UserRole.admin] with company admins. HR and org-admins

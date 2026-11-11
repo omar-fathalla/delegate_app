@@ -201,15 +201,21 @@ export async function runSubscriptionSuspension(db: Db, now: Date): Promise<Susp
       mode,
       inferLegacyExpiry: true,
     });
-    if (!planned.ok || planned.unchanged) continue;
-    await writer.update(doc.ref, withWriteMeta({...planned.update}, ts));
-    if (planned.plan.history && Object.keys(planned.plan.history).length) {
+    const nextSub = doc.get("nextSubscription") as Data | undefined;
+    const promote = nextSub && str(nextSub.periodCode) === period.code ? {
+      subscription: nextSub,
+      nextSubscription: FieldValue.delete(),
+    } : {};
+    if ((!planned.ok || planned.unchanged) && !Object.keys(promote).length) continue;
+    const update: Data = {...(planned.ok && !planned.unchanged ? planned.update : {}), ...promote};
+    await writer.update(doc.ref, withWriteMeta(update, ts));
+    if (planned.ok && !planned.unchanged && planned.plan.history && Object.keys(planned.plan.history).length) {
       await writer.set(doc.ref.collection("statusHistory").doc(), {
         ...planned.plan.history,
         writtenAt: ts,
       });
     }
-    clearedHolds++;
+    if (planned.ok && !planned.unchanged) clearedHolds++;
   }
   res.clearedHolds = clearedHolds;
   // users/{uid} is mirrored by the holds trigger once it is authoritative.
@@ -798,7 +804,19 @@ export async function applyPaidRequest(db: Db, requestId: string, asOf?: Date): 
   const mode = process.env.HOLDS_AUTHORITY_MODE;
   for (const doc of await delegateDocsFor(db, uids)) {
     const uid = str(doc.get("uid")) || doc.ref.id;
-    const update: Data = {subscription: subscriptionFor(uid)};
+    const update: Data = {};
+    const sub = subscriptionFor(uid);
+    // An advance payment for a future period must not overwrite the
+    // current subscription map. It is stored separately as nextSubscription.
+    if (isRenewal && !clearsExpiryHold) {
+      update.nextSubscription = sub;
+    } else {
+      update.subscription = sub;
+      const existingNext = doc.get("nextSubscription") as Data | undefined;
+      if (existingNext && str(existingNext.periodCode) === period.code) {
+        update.nextSubscription = FieldValue.delete();
+      }
+    }
     // Renewal payment only: remove the expiry hold. Other holds stay.
     // new_delegate payments never reactivate (V1). Future-period
     // (advance) payments write coverage now and leave the hold until
@@ -817,13 +835,26 @@ export async function applyPaidRequest(db: Db, requestId: string, asOf?: Date): 
       });
       if (planned.ok && !planned.unchanged) {
         Object.assign(update, planned.update);
-        reactivated++;
         if (planned.plan.history && Object.keys(planned.plan.history).length) {
           await writer.set(doc.ref.collection("statusHistory").doc(), {
             ...planned.plan.history,
             writtenAt: ts,
           });
         }
+      }
+      // Even in shadow mode: if no holds remain, reactivate like the
+      // legacy path so a paid delegate is not left suspended.
+      if (planned.ok && planned.plan.derivedStatus === "active") {
+        const currentStatus = str(doc.get("status"));
+        if (currentStatus === "suspended" || currentStatus === "") {
+          update.status = "active";
+          update.statusReason = FieldValue.delete();
+          reactivated++;
+        } else if (!planned.unchanged) {
+          reactivated++;
+        }
+      } else if (planned.ok && !planned.unchanged) {
+        reactivated++;
       }
     }
     await writer.update(doc.ref, withWriteMeta(update, ts));
