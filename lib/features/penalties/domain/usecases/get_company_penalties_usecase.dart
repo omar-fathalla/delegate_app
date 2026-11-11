@@ -8,7 +8,13 @@ class GetCompanyPenaltiesUseCase {
 
   GetCompanyPenaltiesUseCase(this.repository);
 
-  Future<Either<Failure, List<PenaltyEntity>>> call(String companyId) async {
-    return await repository.getCompanyPenalties(companyId);
+  Future<Either<Failure, List<PenaltyEntity>>> call(
+    String companyId, {
+    String? organizationId,
+  }) async {
+    return await repository.getCompanyPenalties(
+      companyId,
+      organizationId: organizationId,
+    );
   }
 }

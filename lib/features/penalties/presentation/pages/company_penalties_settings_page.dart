@@ -500,8 +500,16 @@ class _CompanyPenaltiesSettingsPageState
       context.read<PenaltyBloc>().add(LoadDelegatePenaltiesEvent(widget.delegate));
       return;
     }
-    final canViewAll = widget.delegate.role == UserRole.organizationAdmin ||
-        widget.delegate.role == UserRole.superAdmin ||
+    // Org-admin cannot list the whole penalties collection; rules require orgScoped.
+    if (widget.delegate.role == UserRole.organizationAdmin) {
+      final companyId = widget.delegate.companyUID;
+      context.read<PenaltyBloc>().add(LoadCompanyPenaltiesEvent(
+        companyId,
+        organizationId: widget.delegate.organizationUID,
+      ));
+      return;
+    }
+    final canViewAll = widget.delegate.role == UserRole.superAdmin ||
         widget.delegate.role == UserRole.technicalSupport ||
         widget.delegate.role == UserRole.branchesMarketingManager ||
         widget.delegate.role == UserRole.marketing;

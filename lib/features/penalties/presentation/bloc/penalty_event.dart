@@ -26,11 +26,12 @@ class LoadDelegatePenaltiesEvent extends PenaltyEvent {
 
 class LoadCompanyPenaltiesEvent extends PenaltyEvent {
   final String companyId;
+  final String? organizationId;
 
-  const LoadCompanyPenaltiesEvent(this.companyId);
+  const LoadCompanyPenaltiesEvent(this.companyId, {this.organizationId});
 
   @override
-  List<Object?> get props => [companyId];
+  List<Object?> get props => [companyId, organizationId];
 }
 
 class LoadAllPenaltiesEvent extends PenaltyEvent {

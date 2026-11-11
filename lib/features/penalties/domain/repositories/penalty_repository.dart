@@ -7,7 +7,7 @@ import 'package:delegate_app/features/penalties/domain/entities/penalty_rule_ent
 
 abstract class PenaltyRepository {
   Future<Either<Failure, Unit>> createPenalty(PenaltyEntity penalty);
-  Future<Either<Failure, List<PenaltyEntity>>> getCompanyPenalties(String companyId);
+  Future<Either<Failure, List<PenaltyEntity>>> getCompanyPenalties(String companyId, {String? organizationId});
   Future<Either<Failure, List<PenaltyEntity>>> getDelegatePenalties({
     required String delegateId,
     String? companyId,

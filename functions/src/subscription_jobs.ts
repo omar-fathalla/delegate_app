@@ -21,7 +21,7 @@ import {
   MAX_DELEGATES_PER_RENEWAL,
   type AdvanceRenewalConfig,
 } from "./subscription_logic";
-import {M1_SOURCE, M2_SOURCE, planExpiryHoldWrite} from "./subscription_holds";
+import {M1_SOURCE, M2_SOURCE, planExpiryHoldWrite, shouldShadowReactivateAfterExpiryClear} from "./subscription_holds";
 
 type Db = admin.firestore.Firestore;
 type Data = Record<string, unknown>;
@@ -185,7 +185,8 @@ export async function runSubscriptionSuspension(db: Db, now: Date): Promise<Susp
   }
   // Prepaid / already-covered app-added uids: drop a leftover expiry hold
   // (e.g. advance renewal paid in the previous period). Shadow mode still
-  // does not write status or users/{uid}.
+  // does not write users/{uid}, but it does reactivate when no holds remain
+  // (same as M2), unless a legacy non-expiry suspension is present.
   let clearedHolds = 0;
   const coveredList = [...covered];
   for (const doc of await delegateDocsFor(db, coveredList)) {
@@ -208,6 +209,15 @@ export async function runSubscriptionSuspension(db: Db, now: Date): Promise<Susp
     } : {};
     if ((!planned.ok || planned.unchanged) && !Object.keys(promote).length) continue;
     const update: Data = {...(planned.ok && !planned.unchanged ? planned.update : {}), ...promote};
+    // Shadow: same as M2 — a prepaid delegate must not stay suspended
+    // after the expiry hold is cleared and the paid period is promoted.
+    if (planned.ok && shouldShadowReactivateAfterExpiryClear(
+      (doc.data() || {}) as Data,
+      planned.plan.derivedStatus,
+    )) {
+      update.status = "active";
+      update.statusReason = FieldValue.delete();
+    }
     await writer.update(doc.ref, withWriteMeta(update, ts));
     if (planned.ok && !planned.unchanged && planned.plan.history && Object.keys(planned.plan.history).length) {
       await writer.set(doc.ref.collection("statusHistory").doc(), {
@@ -751,7 +761,7 @@ export async function applyVerifiedSubscriptionPayment(db: Db, p: VerifiedPaymen
 /**
  * Writes the paid subscription onto the delegate docs. A paid renewal
  * removes the subscription_expired hold through holds.ts (renewal only;
- * other holds stay). Shadow mode does not write status or statusReason.
+ * other holds stay). Shadow mode does not write users/{uid}; it still reactivates when only an expiry hold (or legacy expiry reason) remains.
  * Re-runnable: call it again for a request whose applyState is not "applied".
  */
 function resolveApplyAsOf(asOf: Date | undefined, data: Data): Date {
@@ -843,16 +853,16 @@ export async function applyPaidRequest(db: Db, requestId: string, asOf?: Date): 
         }
       }
       // Even in shadow mode: if no holds remain, reactivate like the
-      // legacy path so a paid delegate is not left suspended.
-      if (planned.ok && planned.plan.derivedStatus === "active") {
-        const currentStatus = str(doc.get("status"));
-        if (currentStatus === "suspended" || currentStatus === "") {
-          update.status = "active";
-          update.statusReason = FieldValue.delete();
-          reactivated++;
-        } else if (!planned.unchanged) {
-          reactivated++;
-        }
+      // legacy path so a paid delegate is not left suspended. Do not
+      // clear a legacy admin / device-unbind / manual suspension that
+      // has no holds map.
+      if (planned.ok && shouldShadowReactivateAfterExpiryClear(
+        (doc.data() || {}) as Data,
+        planned.plan.derivedStatus,
+      )) {
+        update.status = "active";
+        update.statusReason = FieldValue.delete();
+        reactivated++;
       } else if (planned.ok && !planned.unchanged) {
         reactivated++;
       }

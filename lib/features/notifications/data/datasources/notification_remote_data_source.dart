@@ -98,6 +98,9 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
           !(userRole ?? '').toLowerCase().contains('marketing') &&
           !(userRole ?? '').toLowerCase().contains('hr');
 
+      final bool orgAdminOnly = normalizedRole.contains('organization') &&
+          normalizedRole.contains('admin');
+
       if (delegateOnly) {
         final queries = <Future<QuerySnapshot>>[
           _collection.where('delegateUid', isEqualTo: delegateUid).limit(50).get(),
@@ -107,6 +110,30 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
           addDocs(snap.docs);
         }
         // Skip broadcast / variant queries below.
+      } else if (orgAdminOnly) {
+        // Org-admin list rules require orgScoped(), except role-alias
+        // broadcasts. Unscoped 'all' / company / phone queries are denied
+        // and were flooding /admin/home with PERMISSION_DENIED.
+        final queries = <Future<QuerySnapshot>>[
+          if (organizationId.isNotEmpty)
+            _collection
+                .where('delegateUid', isEqualTo: delegateUid)
+                .where('organizationId', isEqualTo: organizationId)
+                .limit(50)
+                .get()
+          else
+            _collection.where('delegateUid', isEqualTo: delegateUid).limit(50).get(),
+          for (final r in [
+            'organizationAdmin',
+            'organization-admin',
+            'organization_admin',
+          ])
+            _collection.where('delegateUid', isEqualTo: r).limit(30).get(),
+        ];
+        final snaps = await queryAllSettled(queries);
+        for (final snap in snaps) {
+          addDocs(snap.docs);
+        }
       } else {
       // 1. Initial parallel queries (UID, broadcast 'all', phone tag)
       final initialQueries = await queryAllSettled([

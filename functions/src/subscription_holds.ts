@@ -42,6 +42,32 @@ export function serializeHolds(holds: HoldChangePlan["nextHolds"]): Record<strin
  * A legacy M1 write left statusReason=subscription_expired and no holds
  * map. Treat that as an existing expiry hold so a paid renewal can clear it.
  */
+/**
+ * A legacy doc may be status=suspended with statusReason=admin_suspend
+ * or device_unbind (or another non-expiry reason) and no holds map.
+ * A paid renewal must not treat that as "no holds remain".
+ */
+export function legacyNonExpirySuspensionBlocksReactivation(data: Data): boolean {
+  if (str(data.status) === "deleted") return true;
+  const status = str(data.status);
+  if (status !== "suspended" && status !== "") return false;
+  const reason = str(data.statusReason);
+  if (!reason || reason === SUSPEND_REASON) return false;
+  return true;
+}
+
+/**
+ * Shadow M1 (period start) and M2 (current-period payment) both
+ * reactivate when the expiry hold is gone and no legacy non-expiry
+ * suspension remains. Use this so the two paths stay consistent.
+ */
+export function shouldShadowReactivateAfterExpiryClear(data: Data, derivedStatus: string): boolean {
+  if (derivedStatus !== "active") return false;
+  if (legacyNonExpirySuspensionBlocksReactivation(data)) return false;
+  const status = str(data.status);
+  return status === "suspended" || status === "";
+}
+
 export function withLegacyExpiryHold(data: Data, at: string): {data: Data; inferred: boolean} {
   const holds = parseHolds(data.holds);
   if (holds[HOLD_SUBSCRIPTION_EXPIRED]) return {data, inferred: false};

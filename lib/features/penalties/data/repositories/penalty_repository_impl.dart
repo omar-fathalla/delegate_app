@@ -29,10 +29,11 @@ class PenaltyRepositoryImpl implements PenaltyRepository {
 
   @override
   Future<Either<Failure, List<PenaltyEntity>>> getCompanyPenalties(
-    String companyId,
-  ) async {
+    String companyId, {
+    String? organizationId,
+  }) async {
     try {
-      final list = await remoteDataSource.getCompanyPenalties(companyId);
+      final list = await remoteDataSource.getCompanyPenalties(companyId, organizationId: organizationId);
       return Right(list);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
