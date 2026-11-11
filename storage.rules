@@ -153,8 +153,11 @@ service firebase.storage {
       allow read, write: if canAccessWebIdDocs(compId)
         || (isNonAnonymous() && request.auth.uid == delegateUid);
     }
-    match /organizations/{orgId}/companies/{compId}/{allPaths=**} {
-      allow read, write: if canAccessCompanyFiles(compId);
+    // Storage ORs overlapping matches, so this residual must not also
+    // match .../delegates/{uid}/** or canAccessWebIdDocs is undone and
+    // accountant/marketing would regain ID-doc access.
+    match /organizations/{orgId}/companies/{compId}/{segment}/{rest=**} {
+      allow read, write: if segment != 'delegates' && canAccessCompanyFiles(compId);
     }
 
     // ==================== ORGANIZATION FILES ====================
