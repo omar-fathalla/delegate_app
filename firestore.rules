@@ -1076,7 +1076,10 @@ service cloud.firestore {
     // company-admin read path another worker is fixing.
     function sourceStampKeys() {
       return ['delegateSource', 'chainOrigin', 'delegateSourceInferredBy',
-        'delegateSourceAt', 'delegateSourceRunId', 'delegateSourceRevertRunId'];
+        'delegateSourceAt', 'delegateSourceRunId', 'delegateSourceRevertRunId',
+        // Phase 2 item 1: hold authority fields are server-only (Admin SDK).
+        'holds', 'statusVersion', 'holdsAuthorityAt', 'rejectionReason',
+        'holdsBackfillRunId'];
     }
     function sourceStampKeysLocked() {
       return request.method == 'create'

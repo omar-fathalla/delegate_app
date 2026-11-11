@@ -160,4 +160,26 @@ describe("delegate source stamps are server-only", () => {
     });
     await assertFails(batchBad.commit());
   });
+
+  test("client cannot create a delegate with hold authority fields", async () => {
+    const path = "organizations/o1/companies/c1/delegates/new-hold";
+    await assertFails(as("sa").doc(path).set({...BASE, uid: "new-hold", holds: {admin_suspend: {at: "x"}}}));
+    await assertFails(as("sa").doc(path).set({...BASE, uid: "new-hold", statusVersion: 1}));
+    await assertFails(as("sa").doc(path).set({...BASE, uid: "new-hold", rejectionReason: "x"}));
+  });
+
+  test("client cannot write hold authority fields", async () => {
+    const ref = as("sa").doc(PATH);
+    await assertFails(ref.update({holds: {admin_suspend: {at: "x"}}}));
+    await assertFails(ref.update({statusVersion: 1}));
+    await assertFails(ref.update({holdsAuthorityAt: "x"}));
+    await assertFails(ref.update({rejectionReason: "x"}));
+    await assertFails(ref.update({holdsBackfillRunId: "run"}));
+  });
+
+  test("clients cannot write status_audit or statusHistory", async () => {
+    await assertFails(as("sa").doc("status_audit/a1").set({uid: "d1", to: "suspended"}));
+    await assertFails(as("sa").doc(PATH + "/statusHistory/h1").set({from: "active", to: "suspended"}));
+  });
+
 });
