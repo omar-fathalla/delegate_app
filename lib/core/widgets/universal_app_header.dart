@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:delegate_app/core/widgets/app_avatar.dart';
+import 'package:delegate_app/core/widgets/session_user_doc_builder.dart';
 import 'package:delegate_app/core/widgets/tashil_maestro_dev_semantics.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -18,7 +19,8 @@ import 'package:delegate_app/l10n/app_localizations.dart';
 /// 2. اسم المستخدم فوق بخط واضح وعريض
 /// 3. شارة نوع الحساب (الدور) والمنظمة/المنظمات تحت الاسم
 /// 4. زر قائمة همبرجر موحد (3 شروط) على الطرف المقابل
-class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget {
+class UniversalAppHeader extends StatelessWidget
+    implements PreferredSizeWidget {
   final Delegate delegate;
   final String? customTitle;
   final String? customSubtitle;
@@ -184,7 +186,10 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
     return clean;
   }
 
-  String _getActiveOrganizationLabel(Delegate del, Map<String, dynamic>? userData) {
+  String _getActiveOrganizationLabel(
+    Delegate del,
+    Map<String, dynamic>? userData,
+  ) {
     // إظهار المنظمة النشطة الحالية فقط في الهيدر العلوي
     if (del.organizationName.trim().isNotEmpty) {
       return _formatOrgLabel(del.organizationName);
@@ -229,7 +234,8 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
               (doc['documentKey'] == 'personalPhoto' ||
                   doc['key'] == 'personalPhoto' ||
                   doc['type'] == 'personalPhoto')) {
-            final url = doc['documentURL'] as String? ??
+            final url =
+                doc['documentURL'] as String? ??
                 doc['url'] as String? ??
                 doc['downloadUrl'] as String?;
             if (url != null && url.trim().isNotEmpty) {
@@ -252,15 +258,18 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
     } catch (_) {}
 
     // 3. تحقق من الصورة في كائن المندوب
-    if (del.personalPhotoUrl != null && del.personalPhotoUrl!.trim().isNotEmpty) {
+    if (del.personalPhotoUrl != null &&
+        del.personalPhotoUrl!.trim().isNotEmpty) {
       return del.personalPhotoUrl!.trim();
     }
 
     // 4. تحقق من قائمة المستندات في كائن المندوب
     final docPhoto = del.documents
-        .where((d) =>
-            d.documentKey == DocumentKey.personalPhoto &&
-            d.documentURL.isNotEmpty)
+        .where(
+          (d) =>
+              d.documentKey == DocumentKey.personalPhoto &&
+              d.documentURL.isNotEmpty,
+        )
         .firstOrNull
         ?.documentURL;
     if (docPhoto != null && docPhoto.trim().isNotEmpty) {
@@ -287,14 +296,14 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
               onPressed: onBackPressed ?? () => Navigator.of(context).pop(),
             )
           : useDrawer
-              ? Builder(
-                  builder: (ctx) => IconButton(
-                    icon: const Icon(Symbols.menu_rounded),
-                    tooltip: AppLocalizations.of(ctx)?.mainMenu,
-                    onPressed: () => Scaffold.of(ctx).openDrawer(),
-                  ),
-                )
-              : null,
+          ? Builder(
+              builder: (ctx) => IconButton(
+                icon: const Icon(Symbols.menu_rounded),
+                tooltip: AppLocalizations.of(ctx)?.mainMenu,
+                onPressed: () => Scaffold.of(ctx).openDrawer(),
+              ),
+            )
+          : null,
       titleSpacing: showBackButton || useDrawer ? 0 : null,
       shape: Border(
         bottom: BorderSide(
@@ -331,94 +340,96 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
                   ),
               ],
             )
-          : StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-              stream: () {
-                try {
-                  return (firestore ?? FirebaseFirestore.instance)
-                      .collection('users')
-                      .doc(delegate.uid)
-                      .snapshots();
-                } catch (_) {
-                  return const Stream<DocumentSnapshot<Map<String, dynamic>>>.empty();
-                }
-              }(),
+          : SessionUserDocBuilder(
+              uid: delegate.uid,
+              subscriptionKey: 'header.title.users.${delegate.uid}',
+              firestore: firestore,
               builder: (context, snapshot) {
-          final userData = snapshot.data?.data();
+                final userData = snapshot?.data();
 
-          // حل الصورة الحية
-          final photoUrl = _resolvePhotoUrl(delegate, userData);
+                // حل الصورة الحية
+                final photoUrl = _resolvePhotoUrl(delegate, userData);
 
-          // حل الاسم
-          final resolvedName = resolveDisplayName(delegate, userData);
-          final displayName = nameForLocale(resolvedName, resolvedName,
-              isArabic: Localizations.localeOf(context).languageCode == 'ar');
+                // حل الاسم
+                final resolvedName = resolveDisplayName(delegate, userData);
+                final displayName = nameForLocale(
+                  resolvedName,
+                  resolvedName,
+                  isArabic:
+                      Localizations.localeOf(context).languageCode == 'ar',
+                );
 
-          final roleLabel = _getRoleLabel(context, delegate, userData);
-          final activeOrgName = showActiveOrganization
-              ? localizeChainName(_getActiveOrganizationLabel(delegate, userData), AppLocalizations.of(context))
-              : '';
+                final roleLabel = _getRoleLabel(context, delegate, userData);
+                final activeOrgName = showActiveOrganization
+                    ? localizeChainName(
+                        _getActiveOrganizationLabel(delegate, userData),
+                        AppLocalizations.of(context),
+                      )
+                    : '';
 
-          return Row(
-            children: [
-              if (!useDrawer) ...[
-                GestureDetector(
-                  onTap: () => context.push('/user-profile', extra: delegate),
-                  child: AppAvatar(
-                    imageUrl: photoUrl,
-                    fallbackText: displayName.characters.first,
-                    radius: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-              ],
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => context.push('/user-profile', extra: delegate),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        displayName,
-                        style: textTheme.titleSmall?.copyWith(
-                          color: colorScheme.onSurface,
-                          fontWeight: FontWeight.w600,
+                return Row(
+                  children: [
+                    if (!useDrawer) ...[
+                      GestureDetector(
+                        onTap: () =>
+                            context.push('/user-profile', extra: delegate),
+                        child: AppAvatar(
+                          imageUrl: photoUrl,
+                          fallbackText: displayName.characters.first,
+                          radius: 20,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              roleLabel,
-                              style: textTheme.labelSmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () =>
+                            context.push('/user-profile', extra: delegate),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              displayName,
+                              style: textTheme.titleSmall?.copyWith(
+                                color: colorScheme.onSurface,
+                                fontWeight: FontWeight.w600,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          if (activeOrgName.isNotEmpty) ...[
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: _PulsingActiveOrgChip(
-                                organizationName: activeOrgName,
-                              ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    roleLabel,
+                                    style: textTheme.labelSmall?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (activeOrgName.isNotEmpty) ...[
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: _PulsingActiveOrgChip(
+                                      organizationName: activeOrgName,
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ],
-                        ],
+                        ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
+                    ),
+                  ],
+                );
+              },
+            ),
       actions: useDrawer
           ? [
               ...?extraActions,
@@ -426,29 +437,32 @@ class UniversalAppHeader extends StatelessWidget implements PreferredSizeWidget 
                 padding: const EdgeInsetsDirectional.only(end: 8),
                 child: IconButton(
                   tooltip: AppLocalizations.of(context)?.profile,
-                  onPressed: () => context.push('/user-profile', extra: delegate),
+                  onPressed: () =>
+                      context.push('/user-profile', extra: delegate),
                   icon: _HeaderAvatar(delegate: delegate, header: this),
                 ),
               ),
             ]
           : [
-        ...?extraActions,
-        tashilMaestroDevSemantics(
-          identifier: 'tashil_main_menu_button',
-          label: 'القائمة الرئيسية',
-          button: true,
-          child: PopupMenuButton<String>(
-            icon: const Icon(Symbols.menu_rounded),
-            tooltip: AppLocalizations.of(context)?.mainMenu ?? 'القائمة الرئيسية',
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-            onSelected: onMenuSelected,
-            itemBuilder: (_) => menuItems,
-          ),
-        ),
-        const SizedBox(width: 4),
-      ],
+              ...?extraActions,
+              tashilMaestroDevSemantics(
+                identifier: 'tashil_main_menu_button',
+                label: 'القائمة الرئيسية',
+                button: true,
+                child: PopupMenuButton<String>(
+                  icon: const Icon(Symbols.menu_rounded),
+                  tooltip:
+                      AppLocalizations.of(context)?.mainMenu ??
+                      'القائمة الرئيسية',
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  onSelected: onMenuSelected,
+                  itemBuilder: (_) => menuItems,
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
     );
   }
 }
@@ -528,14 +542,14 @@ class _PulsingActiveOrgChipState extends State<_PulsingActiveOrgChip>
                 height: 6,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFF10B981).withValues(
-                    alpha: 0.6 + 0.4 * progress,
-                  ),
+                  color: const Color(
+                    0xFF10B981,
+                  ).withValues(alpha: 0.6 + 0.4 * progress),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF10B981).withValues(
-                        alpha: 0.5 * progress,
-                      ),
+                      color: const Color(
+                        0xFF10B981,
+                      ).withValues(alpha: 0.5 * progress),
                       blurRadius: 4,
                     ),
                   ],
@@ -577,19 +591,12 @@ class _HeaderAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: () {
-        try {
-          return (header.firestore ?? FirebaseFirestore.instance)
-              .collection('users')
-              .doc(delegate.uid)
-              .snapshots();
-        } catch (_) {
-          return const Stream<DocumentSnapshot<Map<String, dynamic>>>.empty();
-        }
-      }(),
+    return SessionUserDocBuilder(
+      uid: delegate.uid,
+      subscriptionKey: 'header.avatar.users.${delegate.uid}',
+      firestore: header.firestore,
       builder: (context, snapshot) {
-        final userData = snapshot.data?.data();
+        final userData = snapshot?.data();
         final name = UniversalAppHeader.resolveDisplayName(delegate, userData);
         return AppAvatar(
           imageUrl: header._resolvePhotoUrl(delegate, userData),
