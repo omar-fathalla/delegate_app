@@ -1649,16 +1649,27 @@ service cloud.firestore {
       return signedIn() && (
         isGlobalStaff()
         || (isCompanyScopedStaff() && companyScoped())
-        // Attendance logs carry organizationId (not organizationUID). A
-        // direct field check lets org-admin landing list queries on
-        // organizationId + companyId + type be proven (L1).
-        || (isOrgScopedStaff() && callerOrg() != ''
-          && resource.data.get('organizationId', '') == callerOrg())
+        || (isOrgScopedStaff() && orgScoped())
         || ownsDelegateId(resource.data.delegateId)
         || ownsDelegateId(resource.data.userId)
         || delegateOwns(resource.data.delegateId)
         || delegateOwns(resource.data.userId)
       );
+    }
+
+    // Split list allows so org-admin landing queries on organizationId
+    // (plus companyId and type=check_in) are provable, and HR company
+    // lists stay under the 1000-expression cap (same pattern as leave_requests).
+    function canReadOrgAdminAttendanceByOrgId() {
+      return isOrgAdmin()
+        && callerOrg() != ''
+        && resource.data.organizationId == callerOrg();
+    }
+    function canReadOwnAttendance() {
+      return ownsDelegateId(resource.data.delegateId)
+        || ownsDelegateId(resource.data.userId)
+        || delegateOwns(resource.data.delegateId)
+        || delegateOwns(resource.data.userId);
     }
 
     function canCreateAttendance() {
@@ -1686,21 +1697,33 @@ service cloud.firestore {
     }
 
     match /attendance_logs/{logId} {
-      allow read: if canReadAttendance();
+      allow read: if signedIn() && isGlobalStaff();
+      allow read: if signedIn() && isCompanyScopedStaff() && companyScoped();
+      allow read: if signedIn() && canReadOrgAdminAttendanceByOrgId();
+      allow read: if signedIn() && isOrgScopedStaff() && orgScoped();
+      allow read: if signedIn() && canReadOwnAttendance();
       allow create: if canCreateAttendance();
       allow update: if canUpdateAttendance();
       allow delete: if false;
     }
 
     match /attendance_logs_testing/{logId} {
-      allow read: if canReadAttendance();
+      allow read: if signedIn() && isGlobalStaff();
+      allow read: if signedIn() && isCompanyScopedStaff() && companyScoped();
+      allow read: if signedIn() && canReadOrgAdminAttendanceByOrgId();
+      allow read: if signedIn() && isOrgScopedStaff() && orgScoped();
+      allow read: if signedIn() && canReadOwnAttendance();
       allow create: if canCreateAttendance();
       allow update: if canUpdateAttendance();
       allow delete: if false;
     }
 
     match /attendance/{attendanceId} {
-      allow read: if canReadAttendance();
+      allow read: if signedIn() && isGlobalStaff();
+      allow read: if signedIn() && isCompanyScopedStaff() && companyScoped();
+      allow read: if signedIn() && canReadOrgAdminAttendanceByOrgId();
+      allow read: if signedIn() && isOrgScopedStaff() && orgScoped();
+      allow read: if signedIn() && canReadOwnAttendance();
       allow create: if canCreateAttendance();
       allow update: if canUpdateAttendance();
       allow delete: if false;
