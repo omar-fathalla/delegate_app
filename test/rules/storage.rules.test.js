@@ -161,7 +161,9 @@ describe("storage.rules", () => {
     await assertSucceeds(uploadBytes(path(hrA, "leave_attachments/coA/dlgA/staff.jpg"), bytes));
     await assertFails(uploadBytes(path(hrB, "leave_attachments/coA/dlgA/staff.jpg"), bytes));
     const ownFb = {customMetadata: {userId: "dlgA"}};
-    await assertSucceeds(uploadBytes(path(dlg, "feedback_screenshots/dlgA-fb.png"), bytes, ownFb));
+    // N2: metadata alone is not enough; the filename must be feedback_{uid}_*.
+    await assertFails(uploadBytes(path(dlg, "feedback_screenshots/dlgA-fb.png"), bytes, ownFb));
+    await assertSucceeds(uploadBytes(path(dlg, "feedback_screenshots/feedback_dlgA_fb.png"), bytes, ownFb));
     // A password session without role=delegate is not a delegate upload.
     // Use a fresh uid so the emulator does not reuse dlgA's custom claims.
     await assertFails(uploadBytes(path(storage("dlgBare"), "feedback_screenshots/no-claim.png"), bytes, {customMetadata: {userId: "dlgBare"}}));
@@ -218,14 +220,68 @@ describe("storage.rules", () => {
     await assertSucceeds(uploadBytes(path(hrA, "feedback_screenshots/staff.png"), bytes, {customMetadata: {userId: "hrA"}}));
     await assertFails(getBytes(path(dlg, "feedback_screenshots/staff.png")));
     await assertFails(uploadBytes(path(dlg, "feedback_screenshots/staff.png"), bytes, own));
-    await assertSucceeds(uploadBytes(path(dlg, "feedback_screenshots/dlgA-own.png"), bytes, own));
-    await assertSucceeds(getBytes(path(dlg, "feedback_screenshots/dlgA-own.png")));
+    // Create now requires feedback_{uid}_*; a random name with own metadata is denied.
+    await assertFails(uploadBytes(path(dlg, "feedback_screenshots/dlgA-own.png"), bytes, own));
+    await assertSucceeds(uploadBytes(path(dlg, "feedback_screenshots/feedback_dlgA_own.png"), bytes, own));
+    await assertSucceeds(getBytes(path(dlg, "feedback_screenshots/feedback_dlgA_own.png")));
     await assertSucceeds(uploadBytes(path(dlg, "feedback_screenshots/feedback_dlgA_named.png"), bytes));
     await assertSucceeds(getBytes(path(dlg, "feedback_screenshots/feedback_dlgA_named.png")));
     await assertFails(getBytes(path(dlgB, "feedback_screenshots/feedback_dlgA_named.png")));
-    await assertFails(getBytes(path(dlgB, "feedback_screenshots/dlgA-own.png")));
-    await assertFails(uploadBytes(path(dlgB, "feedback_screenshots/dlgA-own.png"), bytes, {customMetadata: {userId: "dlgB"}}));
-    await assertSucceeds(getBytes(path(hrA, "feedback_screenshots/dlgA-own.png")));
+    await assertFails(getBytes(path(dlgB, "feedback_screenshots/feedback_dlgA_own.png")));
+    await assertFails(uploadBytes(path(dlgB, "feedback_screenshots/feedback_dlgA_own.png"), bytes, {customMetadata: {userId: "dlgB"}}));
+    await assertSucceeds(getBytes(path(hrA, "feedback_screenshots/feedback_dlgA_own.png")));
+  });
+
+  test("feedback N1/N2 filename and metadata spoofing", async () => {
+    const dlg = delegateTok("dlgA", "coA");
+    const dlgB = delegateTok("dlgB", "coA");
+    const hrA = storage("hrA");
+    const own = {customMetadata: {userId: "dlgA"}};
+    const otherMeta = {customMetadata: {userId: "dlgB"}};
+    // Create: name must be feedback_{uid}_* (uid then '_').
+    await assertFails(uploadBytes(path(dlg, "feedback_screenshots/feedback_dlgA.png"), bytes, own));
+    await assertFails(uploadBytes(path(dlg, "feedback_screenshots/feedback_dlgAx_1.png"), bytes, own));
+    await assertFails(uploadBytes(path(dlg, "feedback_screenshots/feedback_dlgB_x.png"), bytes, own));
+    await assertFails(uploadBytes(path(dlg, "feedback_screenshots/random.png"), bytes, own));
+    // Create: if userId metadata is present it must equal the caller.
+    await assertFails(uploadBytes(path(dlg, "feedback_screenshots/feedback_dlgA_spoofmeta.png"), bytes, otherMeta));
+    await assertSucceeds(uploadBytes(path(dlg, "feedback_screenshots/feedback_dlgA_ok.png"), bytes, own));
+    await assertSucceeds(uploadBytes(path(dlg, "feedback_screenshots/feedback_dlgA_nometa.png"), bytes));
+    // Conflicting metadata on a filename the caller would otherwise own.
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await uploadBytes(
+        ref(ctx.storage(), "feedback_screenshots/feedback_dlgA_conflict.png"),
+        bytes,
+        {customMetadata: {userId: "dlgB"}},
+      );
+      await uploadBytes(
+        ref(ctx.storage(), "feedback_screenshots/legacy_dlgA.png"),
+        bytes,
+        {customMetadata: {userId: "dlgA"}},
+      );
+      await uploadBytes(ref(ctx.storage(), "feedback_screenshots/legacy_none.png"), bytes);
+      await uploadBytes(
+        ref(ctx.storage(), "feedback_screenshots/feedback_dlgB_taggedA.png"),
+        bytes,
+        {customMetadata: {userId: "dlgA"}},
+      );
+    });
+    await assertFails(getBytes(path(dlg, "feedback_screenshots/feedback_dlgA_conflict.png")));
+    await assertFails(getBytes(path(dlgB, "feedback_screenshots/feedback_dlgA_conflict.png")));
+    await assertFails(uploadBytes(path(dlg, "feedback_screenshots/feedback_dlgA_conflict.png"), bytes, own));
+    await assertFails(deleteObject(path(dlg, "feedback_screenshots/feedback_dlgA_conflict.png")));
+    // Legacy object: not feedback_{other}_* and userId == caller → read/update/delete.
+    await assertSucceeds(getBytes(path(dlg, "feedback_screenshots/legacy_dlgA.png")));
+    await assertFails(getBytes(path(dlgB, "feedback_screenshots/legacy_dlgA.png")));
+    await assertSucceeds(uploadBytes(path(dlg, "feedback_screenshots/legacy_dlgA.png"), bytes, own));
+    await assertSucceeds(deleteObject(path(dlg, "feedback_screenshots/legacy_dlgA.png")));
+    await assertFails(getBytes(path(dlg, "feedback_screenshots/legacy_none.png")));
+    // Filename is another uid's; metadata saying caller does not grant access.
+    await assertFails(getBytes(path(dlg, "feedback_screenshots/feedback_dlgB_taggedA.png")));
+    await assertFails(getBytes(path(dlgB, "feedback_screenshots/feedback_dlgB_taggedA.png")));
+    await assertSucceeds(deleteObject(path(dlg, "feedback_screenshots/feedback_dlgA_ok.png")));
+    await assertFails(deleteObject(path(dlgB, "feedback_screenshots/feedback_dlgA_nometa.png")));
+    await assertSucceeds(getBytes(path(hrA, "feedback_screenshots/feedback_dlgA_conflict.png")));
   });
 
   test("penalty evidence is company-scoped for new uploads; legacy stays readable", async () => {
