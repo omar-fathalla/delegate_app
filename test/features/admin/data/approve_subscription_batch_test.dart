@@ -85,11 +85,19 @@ const _req = <String, dynamic>{
   'profileImageUrl': 'p0',
   'nationalIdFrontUrl': 'f0',
   'nationalIdBackUrl': 'b0',
+  'orgCompanyCheck': 'ok',
 };
 
 const _delegatePath = 'organizations/o1/companies/c1/delegates/r1';
 
+Future<void> _seedCompany(FakeFirebaseFirestore db, {Iterable<String> orgs = const ['o1']}) async {
+  for (final org in orgs) {
+    await db.doc('organizations/$org/companies/c1').set({'name': 'C1', 'organizationUID': org});
+  }
+}
+
 Future<void> _seed(FakeFirebaseFirestore db) async {
+  await _seedCompany(db);
   await db.doc('users/sup').set({'role': 'supervisor', 'organizationUID': 'o1', 'companyUID': 'c1'});
   await db.doc('delegate_requests/r1').set(_req);
   await db.doc(_delegatePath).set({
@@ -166,6 +174,7 @@ void main() {
   test('new_delegate with no prior doc: request approved and delegate created in the same batch', () async {
     final db = FakeFirebaseFirestore();
     await db.doc('users/sup').set({'role': 'supervisor', 'organizationUID': 'o1', 'companyUID': 'c1'});
+    await _seedCompany(db);
     await db.doc('delegate_requests/r1').set(_req);
     final repo = DelegateSubscriptionRepositoryImpl(firestore: db, storage: _MockStorage());
     final result = await repo.approveSubscriptionRequest(
@@ -187,6 +196,7 @@ void main() {
   test('new_delegate with two organizationUIDs writes both chain docs in the same batch, one fee', () async {
     final db = FakeFirebaseFirestore();
     await db.doc('users/sup').set({'role': 'supervisor', 'organizationUID': 'o1', 'companyUID': 'c1'});
+    await _seedCompany(db, orgs: ['o1', 'o2']);
     final req = {
       ..._req,
       'organizationUIDs': ['o1', 'o2'],
