@@ -520,3 +520,7 @@ export {
 // library functions for Engineering's Paymob webhook, not deployed endpoints.
 export {stampDelegateSource} from "./stamp_delegate_source";
 export {suspendExpiredSubscriptions} from "./subscription_schedule";
+export {
+  expireAbandonedSubscriptionRenewals,
+  finalizeSubscriptionRenewalOnStatus,
+} from "./subscription_schedule";

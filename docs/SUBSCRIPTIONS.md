@@ -44,7 +44,7 @@ Same rules in two places, kept in sync by tests:
 ## Data
 
 `delegate_requests/{id}` (existing collection), new fields:
-`periodCode`, `amountDue`, `paymentStatus` (`pending|paid|failed|waived|not_required`),
+`periodCode`, `amountDue`, `paymentStatus` (`pending|paid|failed|expired|waived|not_required`),
 `paymob {transactionId, orderId, amountCents, currency, success, paidAt}`,
 `paymentError`, `needsReview`, `applyState`.
 Renewal (`requestType: "renewal"`): `coveredDelegateUids[]`, `items[{uid, fullName, fee}]`,
@@ -70,9 +70,20 @@ request and are never suspended.
   Also checks the creator (`users/{supervisorUid}`): org and a non-empty company
   must match the request (super-admin is exempt). A uid already on another
   pending or paid renewal for the same period is rejected with `already_covered`
-  (transactional claim in `subscription_coverage/{periodCode}_{uid}`). Cancelled
-  or failed requests do not block a retry. A second partial renewal of other
-  (uncovered) uids in the same period still works.
+  (transactional claim in `subscription_coverage/{periodCode}_{uid}`). Cancelled,
+  rejected, failed, or expired requests do not block a retry. A second partial
+  renewal of other (uncovered) uids in the same period still works. The same
+  pending request may be re-quoted (refreshing `quotedAt` and thus expiry).
+- When staff reject (or cancel) a renewal, `finalizeTerminalRenewal` (and the
+  `finalizeSubscriptionRenewalOnStatus` trigger) sets `paymentStatus` to
+  `failed` with `paymentError: staff_rejected` (or `cancelled`) and releases
+  the coverage claim so those delegates can be renewed again.
+- Abandoned pending renewals expire at the earlier of quote validity (end of
+  the Cairo month the quote was computed in, when the prorated fee would
+  change) and the period end. `expireAbandonedSubscriptionRenewals` runs at
+  00:10 Africa/Cairo daily; a quote transaction also lazily finalizes an
+  expired (or rejected/cancelled-but-still-pending) other request so a new
+  renewal can proceed without waiting for the job.
 - `applyVerifiedSubscriptionPayment(db, payment)` → idempotent per Paymob transaction
   (`subscription_payment_events/{txId}`); on success marks the request paid and, for a
   renewal, reactivates only `coveredDelegateUids` that were suspended for expiry. On

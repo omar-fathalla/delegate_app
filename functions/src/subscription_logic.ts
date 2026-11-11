@@ -21,7 +21,7 @@ export const REQUEST_TYPE_NEW = "new_delegate";
 export const REQUEST_TYPE_RENEWAL = "renewal";
 export const REQUEST_TYPE_ADD_ORG = "add_organization";
 
-export type PaymentStatus = "pending" | "paid" | "failed" | "waived" | "not_required";
+export type PaymentStatus = "pending" | "paid" | "failed" | "expired" | "waived" | "not_required";
 
 export interface CairoDate {
   year: number;
@@ -105,6 +105,30 @@ export function parsePeriodCode(code: unknown): Period | null {
   const m = /^(\d{4})_H([12])$/.exec(code.trim());
   if (!m) return null;
   return periodFor(Number(m[1]), Number(m[2]) as 1 | 2);
+}
+
+/**
+ * Exclusive end of the Cairo calendar month containing `at` (00:00 Cairo
+ * on the first day of the next month). A quote's fee is constant until then.
+ */
+export function endOfCairoMonth(at: Date): Date {
+  const d = cairoDate(at);
+  return d.month === 12 ? cairoMidnight(d.year + 1, 1, 1) : cairoMidnight(d.year, d.month + 1, 1);
+}
+
+/**
+ * When this renewal's coverage expires: the earlier of quote validity
+ * (end of the Cairo month the quote was computed in, when the prorated
+ * fee would change) and the end of its subscription period.
+ */
+export function renewalCoverageExpiryAt(quotedAt: Date, periodCode?: string): Date {
+  const quoteEnd = endOfCairoMonth(quotedAt);
+  const period = (periodCode && parsePeriodCode(periodCode)) || periodOf(quotedAt);
+  return quoteEnd.getTime() <= period.endsAt.getTime() ? quoteEnd : period.endsAt;
+}
+
+export function isRenewalCoverageExpired(quotedAt: Date, now: Date, periodCode?: string): boolean {
+  return now.getTime() >= renewalCoverageExpiryAt(quotedAt, periodCode).getTime();
 }
 
 /** Months left in the period including the current month (1..6). */
