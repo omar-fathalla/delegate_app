@@ -6,6 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/admin/domain/services/delegate_duplicate.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
+import 'package:delegate_app/features/admin/domain/entities/chain_selection.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
@@ -37,6 +38,9 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
     required String companyName,
     required String organizationUID,
     required String organizationName,
+    List<String> organizationUIDs = const [],
+    List<String> organizationNames = const [],
+    List<String> skippedDuplicateOrgUIDs = const [],
     required String firstName,
     required String secondName,
     required String thirdName,
@@ -164,6 +168,19 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
 
       final fullName = '$firstName $secondName $thirdName'.trim();
 
+      final resolveOrgs = resolveOrganizationUIDs(
+        organizationUID: organizationUID,
+        organizationUIDs: organizationUIDs,
+      );
+      final nameByUid = <String, String>{
+        organizationUID: organizationName,
+        for (var i = 0; i < organizationUIDs.length && i < organizationNames.length; i++)
+          organizationUIDs[i]: organizationNames[i],
+      };
+      final resolveNames = [
+        for (final id in resolveOrgs) (nameByUid[id] ?? '').trim().isEmpty ? id : nameByUid[id]!.trim(),
+      ];
+
       final request = DelegateSubscriptionRequest(
         id: requestId,
         supervisorUid: supervisorUid,
@@ -173,6 +190,9 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         companyName: companyName,
         organizationUID: organizationUID,
         organizationName: organizationName,
+        organizationUIDs: resolveOrgs,
+        organizationNames: resolveNames,
+        skippedDuplicateOrgUIDs: skippedDuplicateOrgUIDs,
         firstName: firstName,
         secondName: secondName,
         thirdName: thirdName,
@@ -215,14 +235,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         }
       } catch (_) {}
 
-      final pendingDelegateRef = _firestore
-          .collection('organizations')
-          .doc(organizationUID)
-          .collection('companies')
-          .doc(companyUID)
-          .collection('delegates')
-          .doc(requestId);
-      final pendingDelegateData = <String, dynamic>{
+      Map<String, dynamic> pendingDelegateDataFor(String orgId, String orgName) => <String, dynamic>{
         'uid': requestId,
         if (existingPid != null && existingPid.trim().isNotEmpty)
           'delegatePublicId': existingPid.trim(),
@@ -236,8 +249,8 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         if (city.isNotEmpty) 'city': city,
         if (birthDate != null) 'birthDate': Timestamp.fromDate(birthDate),
         if (gender != null && gender.isNotEmpty) 'gender': gender,
-        'organizationUID': organizationUID,
-        'organizationName': organizationName,
+        'organizationUID': orgId,
+        'organizationName': orgName,
         'companyUID': companyUID,
         'companyName': companyName,
         'profileImageUrl': profileUrl,
@@ -272,6 +285,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         'registeredVia': 'mobile_app',
         'originOrganizationUID': organizationUID,
         'originOrganizationName': organizationName,
+        if (resolveNames.length > 1) 'allOrganizationNames': resolveNames,
         'isDeductedFromCompany':
             paymentMethod == SubscriptionPaymentMethod.companyDeduction,
         'receiptCode': receiptCode,
@@ -313,7 +327,18 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         if (receiptRef != null && receiptData != null) {
           submitBatch.set(receiptRef, receiptData);
         }
-        submitBatch.set(pendingDelegateRef, pendingDelegateData);
+        for (var i = 0; i < resolveOrgs.length; i++) {
+          final orgId = resolveOrgs[i];
+          final orgName = resolveNames[i];
+          final pendingRef = _firestore
+              .collection('organizations')
+              .doc(orgId)
+              .collection('companies')
+              .doc(companyUID)
+              .collection('delegates')
+              .doc(requestId);
+          submitBatch.set(pendingRef, pendingDelegateDataFor(orgId, orgName));
+        }
         await submitBatch.commit();
       } catch (_) {
         // Cross-organization: write the request alone so staff can still approve.
@@ -328,7 +353,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       // 8. Notify Technical Support and Super Admins ONLY (Restricted Targeting)
       final notifTitle = 'طلب إضافة مندوب جديد';
       final notifBody =
-          'قام المشرف $supervisorName ($companyName) بطلب تسجيل المندوب $fullName لمنظمة $organizationName';
+          'قام المشرف $supervisorName ($companyName) بطلب تسجيل المندوب $fullName للمنظمات ${resolveNames.join("، ")}';
 
       try {
         final targetUsersSnap = await _firestore
@@ -942,11 +967,13 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       };
 
       // 2c. Provision delegate record to active in company branch (target organization)
+      final orgUidsEarly = request.resolvedOrganizationUIDs;
       final allKnownOrgs = <String>{
         request.organizationName.trim(),
         if (request.currentOrganizationName != null &&
             request.currentOrganizationName!.trim().isNotEmpty)
           request.currentOrganizationName!.trim(),
+        for (final id in orgUidsEarly) request.nameForOrganization(id).trim(),
       }.where((s) => s.isNotEmpty).toList();
 
       final originOrgName = (request.currentOrganizationName != null &&
@@ -973,24 +1000,25 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
 
       targetDelegateData['approvedRequestId'] = request.id;
 
-      final targetRef = _firestore
-          .collection('organizations')
-          .doc(request.organizationUID)
-          .collection('companies')
-          .doc(request.companyUID)
-          .collection('delegates')
-          .doc(targetDelegateUid);
+      final orgUids = request.resolvedOrganizationUIDs;
+      final orgNames = [for (final id in orgUids) request.nameForOrganization(id)];
+      if (allKnownOrgs.length > 1) {
+        targetDelegateData['allOrganizationNames'] = allKnownOrgs;
+      }
 
       // Supervisor's own organization (2d for add_organization, 2e copy for
-      // new_delegate). Read before the batch.
+      // new_delegate). Read before the batch. Skip the copy when that org
+      // is already in organizationUIDs.
       String? supOrg;
       String supOrgName = '';
       try {
         final supDoc = await _firestore.collection('users').doc(request.supervisorUid).get();
         supOrg = supDoc.data()?['organizationUID'] as String?;
-        supOrgName = supDoc.data()?['organizationName'] as String? ?? '';
+        supOrgName = (supDoc.data()?['organizationName'] as String?) ?? '';
       } catch (_) {}
-      final hasSupOrg = supOrg != null && supOrg.isNotEmpty && supOrg != request.organizationUID;
+      final hasSupOrg = supOrg != null &&
+          supOrg.isNotEmpty &&
+          !orgUids.contains(supOrg);
 
       Map<String, dynamic>? supDelegateData;
       DocumentReference<Map<String, dynamic>>? supRef;
@@ -1052,7 +1080,30 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         }
       }
 
-      await addActivation(targetRef, targetDelegateData);
+      for (var i = 0; i < orgUids.length; i++) {
+        final orgId = orgUids[i];
+        final orgName = orgNames[i];
+        final data = Map<String, dynamic>.from(targetDelegateData);
+        data['organizationUID'] = orgId;
+        data['organizationName'] = orgName;
+        data['position'] = formatSmartPosition(
+          allOrgs: allKnownOrgs,
+          currentOrgName: orgName,
+          originOrgName: originOrgName,
+        );
+        data['isExternal'] = originOrgName.toLowerCase() != orgName.toLowerCase();
+        if (allKnownOrgs.length > 1) {
+          data['allOrganizationNames'] = allKnownOrgs;
+        }
+        final ref = _firestore
+            .collection('organizations')
+            .doc(orgId)
+            .collection('companies')
+            .doc(request.companyUID)
+            .collection('delegates')
+            .doc(targetDelegateUid);
+        await addActivation(ref, data);
+      }
       if (supRef != null && supDelegateData != null) {
         await addActivation(supRef, supDelegateData);
       }

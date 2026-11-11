@@ -5105,6 +5105,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not send the request: {error}'**
   String deviceLockSendError(String error);
+
+  /// Label for the multi-select chain picker on the add-delegate form
+  ///
+  /// In en, this message translates to:
+  /// **'Target organization / retail chain'**
+  String get chainPickerTitle;
+
+  /// Select or deselect every chain in the add-delegate picker
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get chainPickerSelectAll;
+
+  /// Explains that multi-chain registration is one subscription with no per-chain fee
+  ///
+  /// In en, this message translates to:
+  /// **'One request, one approval, and one subscription. There is no per-chain fee.'**
+  String get chainPickerOneSubscriptionNote;
+
+  /// Error when the supervisor submits without selecting a chain
+  ///
+  /// In en, this message translates to:
+  /// **'Please select at least one chain.'**
+  String get chainPickerRequired;
 }
 
 class _AppLocalizationsDelegate

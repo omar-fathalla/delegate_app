@@ -4,6 +4,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:delegate_app/features/admin/data/chain_duplicate_lookup.dart';
+import 'package:delegate_app/features/admin/domain/entities/chain_selection.dart';
+import 'package:delegate_app/features/admin/presentation/widgets/chain_multi_select.dart';
+import 'package:delegate_app/l10n/app_localizations.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
@@ -36,8 +41,8 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
 
   // Organizations
   List<Map<String, dynamic>> _organizations = [];
-  String? _selectedOrgUID;
-  String? _selectedOrgName;
+  final Set<String> _selectedOrgUIDs = {};
+  Set<String> _duplicateOrgUIDs = {};
   bool _isLoadingOrgs = true;
 
   // Uploaded Files
@@ -127,10 +132,6 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
       if (mounted) {
         setState(() {
           _organizations = orgs;
-          if (_organizations.isNotEmpty) {
-            _selectedOrgUID = _organizations.first['uid'];
-            _selectedOrgName = _organizations.first['name'];
-          }
           _isLoadingOrgs = false;
         });
       }
@@ -157,10 +158,44 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
       return;
     }
 
-    if (_selectedOrgUID == null || _selectedOrgUID!.isEmpty) {
-      AppSnackBar.showError(context, 'يرجى اختيار المنظمة / السلسلة التجارية المستهدفة.');
+    final l10n = AppLocalizations.of(context);
+    final chainOptions = _organizations
+        .map((o) => ChainOption(uid: o['uid'] as String, name: o['name'] as String))
+        .toList();
+    if (_selectedOrgUIDs.isEmpty) {
+      AppSnackBar.showError(context, l10n?.chainPickerRequired ?? 'يرجى اختيار سلسلة واحدة على الأقل.');
       return;
     }
+
+    final duplicates = await findDuplicateChainUids(
+      firestore: FirebaseFirestore.instance,
+      companyUID: widget.supervisor.companyUID,
+      nationalId: _nationalIdController.text.trim(),
+      phoneNumber: _phoneController.text.trim(),
+      organizationUIDs: _selectedOrgUIDs,
+    );
+    if (!mounted) return;
+    final selection = partitionSelectedChains(
+      all: chainOptions,
+      selectedUids: _selectedOrgUIDs,
+      duplicateUids: duplicates,
+    );
+    if (mounted) {
+      setState(() => _duplicateOrgUIDs = duplicates);
+    }
+    if (selection.warningAr != null && mounted) {
+      if (!selection.canSubmit) {
+        AppSnackBar.showError(context, selection.warningAr!);
+        return;
+      }
+      AppSnackBar.showInfo(context, selection.warningAr!);
+    }
+    if (!selection.canSubmit) {
+      AppSnackBar.showError(context, l10n?.chainPickerRequired ?? 'يرجى اختيار سلسلة واحدة على الأقل.');
+      return;
+    }
+    final selectedOrgUID = selection.primaryUid!;
+    final selectedOrgName = selection.primaryName!;
 
     if (_profileImage == null) {
       AppSnackBar.showError(context, 'يرجى رفع الصورة الشخصية للمندوب.');
@@ -231,8 +266,11 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
       supervisorPhone: widget.supervisor.phoneNumber,
       companyUID: widget.supervisor.companyUID,
       companyName: widget.supervisor.companyName,
-      organizationUID: _selectedOrgUID!,
-      organizationName: _selectedOrgName ?? _selectedOrgUID!,
+      organizationUID: selectedOrgUID,
+      organizationName: selectedOrgName,
+      organizationUIDs: selection.keptUids,
+      organizationNames: selection.keptNames,
+      skippedDuplicateOrgUIDs: selection.skippedUids,
       firstName: _firstNameController.text.trim(),
       secondName: _secondNameController.text.trim(),
       thirdName: _thirdNameController.text.trim(),
@@ -502,81 +540,19 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
   }
 
   Widget _buildOrganizationSelector(ColorScheme colorScheme) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.corporate_fare_rounded, size: 18, color: colorScheme.primary),
-                const SizedBox(width: 8),
-                const Text(
-                  'المنظمة / السلسلة التجارية المستهدفة',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedOrgUID,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: colorScheme.onSurface,
-              ),
-              decoration: InputDecoration(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                filled: true,
-                fillColor: colorScheme.surfaceContainerLowest,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: colorScheme.primary,
-                    width: 1.5,
-                  ),
-                ),
-              ),
-              items: _organizations.map((org) {
-                return DropdownMenuItem<String>(
-                  value: org['uid'] as String,
-                  child: Text(org['name'] as String),
-                );
-              }).toList(),
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() {
-                    _selectedOrgUID = val;
-                    final found = _organizations.firstWhere(
-                      (o) => o['uid'] == val,
-                      orElse: () => {'name': val},
-                    );
-                    _selectedOrgName = found['name'];
-                  });
-                }
-              },
-            ),
-          ],
-        ),
-      ),
+    final chains = _organizations
+        .map((o) => ChainOption(uid: o['uid'] as String, name: o['name'] as String))
+        .toList();
+    return ChainMultiSelect(
+      chains: chains,
+      selectedUids: _selectedOrgUIDs,
+      duplicateUids: _duplicateOrgUIDs,
+      onChanged: (next) => setState(() {
+        _selectedOrgUIDs
+          ..clear()
+          ..addAll(next);
+        _duplicateOrgUIDs = {};
+      }),
     );
   }
 

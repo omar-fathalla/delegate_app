@@ -1892,5 +1892,21 @@
         "type": "String"
       }
     }
+  },
+  "chainPickerTitle": "المنظمة / السلسلة التجارية المستهدفة",
+  "@chainPickerTitle": {
+    "description": "Label for the multi-select chain picker on the add-delegate form"
+  },
+  "chainPickerSelectAll": "اختيار الكل",
+  "@chainPickerSelectAll": {
+    "description": "Select or deselect every chain in the add-delegate picker"
+  },
+  "chainPickerOneSubscriptionNote": "طلب واحد، موافقة واحدة، واشتراك واحد. لا تُحتسب رسوم لكل سلسلة.",
+  "@chainPickerOneSubscriptionNote": {
+    "description": "Explains that multi-chain registration is one subscription with no per-chain fee"
+  },
+  "chainPickerRequired": "يرجى اختيار سلسلة واحدة على الأقل.",
+  "@chainPickerRequired": {
+    "description": "Error when the supervisor submits without selecting a chain"
   }
 }
