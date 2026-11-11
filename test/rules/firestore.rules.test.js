@@ -769,4 +769,129 @@ describe("firestore tightened rules", () => {
       targetRoles: ["superAdmin", "technicalSupport"],
     }));
   });
+
+  test("org-admin can list penalties by organizationId", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("penalties/p-org-o1").set({
+        companyId: "c1",
+        organizationId: "o1",
+        organizationUID: "o1",
+        targetDelegateId: "del-1",
+      });
+      await ctx.firestore().doc("penalties/p-org-o2").set({
+        companyId: "c9",
+        organizationId: "o2",
+        organizationUID: "o2",
+        targetDelegateId: "other",
+      });
+    });
+    const orgAdmin = dbFor("orgadmin");
+    const org2 = dbFor("org2");
+    const hr = dbFor("hr");
+    await assertSucceeds(
+      orgAdmin.collection("penalties").where("organizationId", "==", "o1").get(),
+    );
+    await assertFails(
+      orgAdmin.collection("penalties").where("organizationId", "==", "o2").get(),
+    );
+    await assertFails(
+      org2.collection("penalties").where("organizationId", "==", "o1").get(),
+    );
+    await assertFails(
+      hr.collection("penalties").where("organizationId", "==", "o1").get(),
+    );
+  });
+
+  test("org-admin L1 landing: attendance_logs check_in queries by org and company", async () => {
+    const start = new Date("2026-11-11T00:00:00.000Z");
+    const mid = new Date("2026-11-11T08:00:00.000Z");
+    const end = new Date("2026-11-12T00:00:00.000Z");
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("attendance_logs/l1-checkin").set({
+        delegateId: "del-1",
+        organizationId: "o1",
+        companyId: "c1",
+        type: "check_in",
+        timestamp: mid,
+      });
+      await ctx.firestore().doc("attendance_logs/l2-checkin").set({
+        delegateId: "other",
+        organizationId: "o2",
+        companyId: "c9",
+        type: "check_in",
+        timestamp: mid,
+      });
+    });
+    const orgAdmin = dbFor("orgadmin");
+    const org2 = dbFor("org2");
+    const hr = dbFor("hr");
+    // Exact app queries from getTodayCheckedInCount: primary (with
+    // timestamp bounds) and the fallback (type only).
+    await assertSucceeds(
+      orgAdmin.collection("attendance_logs")
+        .where("organizationId", "==", "o1")
+        .where("companyId", "==", "c1")
+        .where("type", "==", "check_in")
+        .where("timestamp", ">=", start)
+        .where("timestamp", "<", end)
+        .get(),
+    );
+    await assertSucceeds(
+      orgAdmin.collection("attendance_logs")
+        .where("organizationId", "==", "o1")
+        .where("companyId", "==", "c1")
+        .where("type", "==", "check_in")
+        .get(),
+    );
+    await assertFails(
+      orgAdmin.collection("attendance_logs")
+        .where("organizationId", "==", "o2")
+        .where("companyId", "==", "c9")
+        .where("type", "==", "check_in")
+        .get(),
+    );
+    await assertFails(
+      org2.collection("attendance_logs")
+        .where("organizationId", "==", "o1")
+        .where("companyId", "==", "c1")
+        .where("type", "==", "check_in")
+        .get(),
+    );
+    // HR is company-scoped; the same companyId constraint is already
+    // allowed, so extra organizationId + type filters must also succeed.
+    await assertSucceeds(
+      hr.collection("attendance_logs")
+        .where("organizationId", "==", "o1")
+        .where("companyId", "==", "c1")
+        .where("type", "==", "check_in")
+        .get(),
+    );
+    // HR must not list another company's attendance via the org+type query.
+    await assertFails(
+      hr.collection("attendance_logs")
+        .where("organizationId", "==", "o2")
+        .where("companyId", "==", "c9")
+        .where("type", "==", "check_in")
+        .get(),
+    );
+  });
+
+
+  test("delegate can notify company supervisors when supervisorUid is empty", async () => {
+    const delegate = dbFor("del-1", DELEGATE);
+    await assertSucceeds(delegate.collection("notifications").add({
+      delegateUid: "supervisor_c1",
+      companyUID: "c1",
+      organizationUID: "o1",
+      title: "طلب إجازة",
+      type: "leave_request_submitted",
+      targetRole: "supervisor",
+      isRead: false,
+      createdBy: "del-1",
+    }));
+    const comp = dbFor("comp");
+    await assertSucceeds(
+      comp.collection("notifications").where("delegateUid", "==", "supervisor_c1").get(),
+    );
+  });
 });

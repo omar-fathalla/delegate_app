@@ -132,8 +132,10 @@ patch_mode() {
   patch_file="$(mktemp "${TMPDIR:-/tmp}/holds-mode-patch.XXXXXX.json")"
   resp_file="$(mktemp "${TMPDIR:-/tmp}/holds-mode-patch-resp.XXXXXX.json")"
   chmod 600 "$patch_file" "$resp_file"
+  # Clear the RETURN trap after it runs so later functions (status_all)
+  # do not re-fire it once these locals are out of scope (set -u).
   # shellcheck disable=SC2064
-  trap 'rm -f "$patch_file" "$resp_file"' RETURN
+  trap 'rm -f "${patch_file:-}" "${resp_file:-}"; trap - RETURN' RETURN
   json="$(api_get "$name")"
   python3 -c '
 import json,sys

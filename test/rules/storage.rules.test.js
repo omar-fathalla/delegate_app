@@ -323,6 +323,47 @@ describe("storage.rules", () => {
     await assertFails(uploadBytes(path(hrB, owned), bytes));
   });
 
+  test("N1-r permission photo uid is exact, not a prefix", async () => {
+    const dlg = delegateTok("dlgA", "coA");
+    const dlgA2 = delegateTok("dlgA_2", "coA");
+    const colliding = "organizations/o1/companies/coA/permissions/p1/photo_dlgA_2_99.jpg";
+    const ownA = "organizations/o1/companies/coA/permissions/p1/photo_dlgA_99.jpg";
+    const metaA2 = {customMetadata: {userId: "dlgA_2", delegateUid: "dlgA_2"}};
+    const metaA = {customMetadata: {userId: "dlgA", delegateUid: "dlgA"}};
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await uploadBytes(ref(ctx.storage(), colliding), bytes, metaA2);
+    });
+    // dlgA must not create, overwrite, or delete photo_dlgA_2_*.
+    await assertFails(uploadBytes(path(dlg, colliding), bytes, metaA));
+    await assertFails(deleteObject(path(dlg, colliding)));
+    await assertSucceeds(uploadBytes(path(dlg, ownA), bytes, metaA));
+    await assertSucceeds(uploadBytes(path(dlgA2, colliding), bytes, metaA2));
+    await assertSucceeds(deleteObject(path(dlgA2, colliding)));
+    await assertSucceeds(deleteObject(path(dlg, ownA)));
+  });
+
+  test("held delegate cannot write leave, feedback, or permission photos", async () => {
+    const heldTok = delegateTok("dlgHeld", "coA", {orgId: "o1"});
+    const activeTok = delegateTok("dlgA", "coA", {orgId: "o1"});
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "organizations/o1/companies/coA/delegates/dlgHeld"), {
+        uid: "dlgHeld", companyUID: "coA", organizationUID: "o1",
+        status: "suspended", statusReason: "admin_suspend",
+        holds: {admin_suspend: {at: "2026-11-11"}},
+      });
+    });
+    const fb = "feedback_screenshots/feedback_dlgHeld_1.jpg";
+    const leave = "leave_attachments/coA/dlgHeld/sick.jpg";
+    const photo = "organizations/o1/companies/coA/permissions/p1/photo_dlgHeld_1.jpg";
+    const meta = {customMetadata: {userId: "dlgHeld", delegateUid: "dlgHeld"}};
+    await assertFails(uploadBytes(path(heldTok, fb), bytes, meta));
+    await assertFails(uploadBytes(path(heldTok, leave), bytes));
+    await assertFails(uploadBytes(path(heldTok, photo), bytes, meta));
+    await assertSucceeds(uploadBytes(path(activeTok, "feedback_screenshots/feedback_dlgA_heldcheck.jpg"), bytes));
+    await assertSucceeds(uploadBytes(path(activeTok, "leave_attachments/coA/dlgA/heldcheck.jpg"), bytes));
+  });
+
 });
 
 // Keep a named export so node --test counts the file even if helpers grow.

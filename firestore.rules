@@ -1657,6 +1657,21 @@ service cloud.firestore {
       );
     }
 
+    // Minimal expressions (raw get, no callerOrg/isOrgAdmin) so this
+    // separate allow stays under the path budget and the organizationId
+    // list used by getTodayCheckedInCount is provable (L1).
+    function canReadOrgAdminAttendanceByOrgId() {
+      return request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in [
+          'organization-admin', 'organization_admin', 'organizationadmin',
+          'organizationAdmin'
+        ]
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationUID is string
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationUID != ''
+        && resource.data.organizationId
+          == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationUID;
+    }
+
     function canCreateAttendance() {
       return signedIn() && (
         isGlobalStaff()
@@ -1682,6 +1697,7 @@ service cloud.firestore {
     }
 
     match /attendance_logs/{logId} {
+      allow read: if canReadOrgAdminAttendanceByOrgId();
       allow read: if canReadAttendance();
       allow create: if canCreateAttendance();
       allow update: if canUpdateAttendance();
@@ -1783,6 +1799,8 @@ service cloud.firestore {
 
     // Delegate may notify a same-company supervisor: createdBy is the
     // caller and the payload is scoped to a company in the token.
+    // A held-account get() is not applied here: it blows the 1000-expression
+    // budget. Storage writes and the app status listener cover M3 instead.
     function canDelegateCreateNotification() {
       let d = request.resource.data;
       return isDelegate()
@@ -1812,9 +1830,19 @@ service cloud.firestore {
       ];
     }
 
+    // Cheap allow so a list query on delegateUid == 'supervisor_' +
+    // company is provable for company admins and supervisors (I2 leave
+    // fallback). Folding this into canReadNotification hits the cap.
+    function canReadCompanySupervisorBroadcast() {
+      return isCompanyAdmin()
+        && callerCompany() != ''
+        && resource.data.delegateUid == 'supervisor_' + callerCompany();
+    }
+
     match /notifications/{notificationId} {
       allow read: if canReadOwnNotification();
       allow read: if canReadOrgAdminRoleBroadcast();
+      allow read: if canReadCompanySupervisorBroadcast();
       allow read: if canReadNotification();
       allow create: if canCreateNotification();
       allow update: if (canReadOwnNotification() || canReadNotification()) && (
@@ -1865,7 +1893,17 @@ service cloud.firestore {
       );
     }
 
+    // Cheap, org-admin-only allow so a list query on
+    // organizationId == callerOrg() is provable without the
+    // organizationUID/organizationId OR inside orgScoped().
+    function canReadOrgAdminPenaltyByOrgId() {
+      return isOrgAdmin()
+        && callerOrg() != ''
+        && resource.data.organizationId == callerOrg();
+    }
+
     match /penalties/{penaltyId} {
+      allow read: if signedIn() && canReadOrgAdminPenaltyByOrgId();
       allow read: if signedIn() && (
         isGlobalStaff()
         || (isCompanyScopedStaff() && companyScoped())
