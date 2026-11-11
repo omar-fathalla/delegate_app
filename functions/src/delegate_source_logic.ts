@@ -113,6 +113,8 @@ export function inferPersonSource(input: {
   if (input.chainDocs.some((c) => str(c.registeredVia) === "mobile_app")) {
     return {uid, source: "app", rule: 4, confidence: "low"};
   }
+  // Safest default (plan §5.4 rule 5 / Mohamed): keep web unless evidence
+  // says app. Listed for manual review; does not drive suspension in Phase 1.
   return {uid, source: "web", rule: 5, confidence: "review"};
 }
 
