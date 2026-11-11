@@ -1980,9 +1980,18 @@ service cloud.firestore {
         && d.get('supervisorUid', '') == request.auth.uid
         && co != ''
         && incomingCo == co;
+      // F2: a client-chosen request id must not squat a folder that
+      // already has an intent for another company.
+      let intentPath = /databases/$(database)/documents/storage_upload_intents/$(requestId);
+      let reservedCo = exists(intentPath)
+        ? get(intentPath).data.get('companyUID', '')
+        : '';
+      let requestCo = d.get('companyUID', '') != ''
+        ? d.get('companyUID', '') : d.get('companyId', '');
       return signedIn() && (isSa || isOa || isCoStaff)
         && d.get('requestType', '') != 'update_national_id'
         && d.get('actionType', '') != 'update_national_id'
+        && (reservedCo == '' || reservedCo == requestCo)
         && subscriptionPaymentCreateOk()
         && requestOrganizationUIDsOk()
         && requestPrimaryOrgBelongsToCompany();
@@ -2005,11 +2014,12 @@ service cloud.firestore {
       return callerCompany() != '' && resource.data.companyUID == callerCompany();
     }
     match /storage_upload_intents/{intentId} {
+      // Missing and other-company docs both deny, so a 404 vs 403
+      // cannot leak whether another company's folder exists.
+      // The app uses the callable and no longer get()s a missing intent.
       allow read: if signedIn() && (
         isGlobalStaff()
-        || ((isCompanyAdmin() || isHR() || isOrgAdmin()) && (
-          resource == null || intentCompanyScoped()
-        ))
+        || ((isCompanyAdmin() || isHR() || isOrgAdmin()) && resource != null && intentCompanyScoped())
       );
       allow create, update, delete: if false;
     }

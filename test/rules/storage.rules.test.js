@@ -129,6 +129,25 @@ describe("storage.rules", () => {
     await assertFails(uploadBytes(path(hrB, "companies/coA/logo.png"), bytes));
   });
 
+  test("other-company staff and delegates cannot use leftover private paths", async () => {
+    const hrB = storage("hrB");
+    const dlg = storage("dlgA");
+    const hrA = storage("hrA");
+    // Delegates are out of staff-only paths (penalties, leave, feedback, public write).
+    await assertFails(uploadBytes(path(dlg, "penalties/p1.jpg"), bytes));
+    await assertFails(uploadBytes(path(dlg, "leave_attachments/l1.jpg"), bytes));
+    await assertFails(uploadBytes(path(dlg, "feedback_screenshots/f1.png"), bytes));
+    await assertFails(uploadBytes(path(dlg, "public/write.txt"), bytes));
+    // Tenant-scoped paths: other-company staff denied; same-company staff allowed.
+    await assertFails(uploadBytes(path(hrB, "delegates/folderA/x.jpg"), bytes));
+    await assertFails(uploadBytes(path(hrB, "organizations/o1/companies/coA/delegates/folderA/id.jpg"), bytes));
+    await assertFails(uploadBytes(path(hrB, "staging/requests/folderA/id.jpg"), bytes));
+    await assertFails(uploadBytes(path(hrB, "companies/coA/logo.png"), bytes));
+    await assertSucceeds(uploadBytes(path(hrA, "organizations/o1/companies/coA/delegates/folderA/id.jpg"), bytes));
+    await assertSucceeds(uploadBytes(path(hrA, "penalties/p1.jpg"), bytes));
+    await assertFails(uploadBytes(path(dlg, "penalties/owned.jpg"), bytes));
+  });
+
   test("unauthenticated is denied on private paths; public remains world-readable", async () => {
     const store = env.unauthenticatedContext().storage();
     await assertFails(uploadBytes(path(store, "delegate_documents/folderA/x.jpg"), bytes));

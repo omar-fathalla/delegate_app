@@ -34,7 +34,17 @@ export function normalizeFolderId(raw: unknown): string {
 }
 
 export function isValidFolderId(id: string): boolean {
-  return id.length > 0 && !id.includes("/") && id.length <= 256;
+  // Firestore document ids cannot be "." or ".." or contain "/".
+  return id.length > 0
+    && id.length <= 256
+    && id !== "."
+    && id !== ".."
+    && !id.includes("/");
+}
+
+export function isInactiveStatus(value: unknown): boolean {
+  const s = typeof value === "string" ? value.trim().toLowerCase().replace(/-/g, "_") : "";
+  return s === "inactive" || s === "disabled" || s === "suspended" || s === "deleted";
 }
 
 export function staffKind(role: unknown): "global" | "company" | "none" {

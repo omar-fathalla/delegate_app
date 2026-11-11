@@ -10,6 +10,7 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import {
   decideEnsureIntent,
+  isInactiveStatus,
   isValidFolderId,
   normalizeFolderId,
   resolveOwningCompany,
@@ -73,6 +74,18 @@ export const ensureStorageUploadIntent = functions
     const userSnap = await db.collection("users").doc(ctx.auth.uid).get();
     if (!userSnap.exists) fail("permission-denied", "caller_not_staff");
     const user = (userSnap.data() || {}) as Record<string, unknown>;
+    const authUser = await admin.auth().getUser(ctx.auth.uid);
+    if (authUser.disabled || user.isActive === false || isInactiveStatus(user.status)) {
+      fail("permission-denied", "caller_inactive");
+    }
+    const orgId = str(user.organizationUID) || str(user.organizationId);
+    if (orgId) {
+      const org = await db.collection("organizations").doc(orgId).get();
+      const od = (org.data() || {}) as Record<string, unknown>;
+      if (org.exists && (od.isActive === false || isInactiveStatus(od.status))) {
+        fail("permission-denied", "org_inactive");
+      }
+    }
 
     const hits = await loadHits(db, folderId);
     const resolved = resolveOwningCompany(hits);
