@@ -54,6 +54,7 @@ describe("storage.rules", () => {
       await setDoc(doc(db, "users/hrB"), {role: "hr", companyUID: "coB", organizationUID: "o2"});
       await setDoc(doc(db, "users/supA"), {role: "admin", companyUID: "coA", organizationUID: "o1"});
       await setDoc(doc(db, "users/dlgA"), {role: "delegate", companyUID: "coA", uid: "dlgA"});
+      await setDoc(doc(db, "users/dlgBare"), {role: "delegate", companyUID: "coA", uid: "dlgBare"});
       await setDoc(doc(db, "users/accA"), {role: "accountant", companyUID: "coA", organizationUID: "o1"});
       await setDoc(doc(db, "users/mkA"), {role: "marketing", companyUID: "coA", organizationUID: "o1"});
       await setDoc(doc(db, "storage_upload_intents/folderA"), {companyUID: "coA", createdBy: "callable"});
@@ -156,8 +157,9 @@ describe("storage.rules", () => {
     await assertSucceeds(uploadBytes(path(hrA, "leave_attachments/coA/dlgA/staff.jpg"), bytes));
     await assertFails(uploadBytes(path(hrB, "leave_attachments/coA/dlgA/staff.jpg"), bytes));
     await assertSucceeds(uploadBytes(path(dlg, "feedback_screenshots/dlgA-fb.png"), bytes));
-    // A token without role=delegate is not a delegate upload.
-    await assertFails(uploadBytes(path(storage("dlgA"), "feedback_screenshots/no-claim.png"), bytes));
+    // A password session without role=delegate is not a delegate upload.
+    // Use a fresh uid so the emulator does not reuse dlgA's custom claims.
+    await assertFails(uploadBytes(path(storage("dlgBare"), "feedback_screenshots/no-claim.png"), bytes));
     await assertFails(uploadBytes(path(storage("accA"), "organizations/o1/companies/coA/delegates/folderA/id.jpg"), bytes));
     await assertFails(uploadBytes(path(storage("mkA"), "organizations/o1/companies/coA/delegates/folderA/id.jpg"), bytes));
   });
