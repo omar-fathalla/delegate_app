@@ -464,9 +464,29 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
           'لا يمكن ربط مندوب من شركة أخرى. الاشتراك واحد داخل الشركة نفسها.',
         ));
       }
-      if (existingDelegate.status != DelegateStatus.active) {
+      if (existingDelegate.status == DelegateStatus.pending ||
+          existingDelegate.status == DelegateStatus.rejected) {
         return const Left(ServerFailure(
-          'لا يمكن ربط المندوب بسلسلة إضافية إلا إذا كان اشتراكه نشطاً. '
+          'لا يمكن ربط المندوب بسلسلة إضافية إلا إذا كان اشتراكه مدفوعاً. '
+          'المناديب الموقوفون يُجدَّدون مرة واحدة وتسري التغطية على كل السلاسل.',
+        ));
+      }
+      final sourceSnap = await _firestore
+          .collection('organizations')
+          .doc(existingDelegate.organizationUID)
+          .collection('companies')
+          .doc(companyUID)
+          .collection('delegates')
+          .doc(existingDelegate.uid)
+          .get();
+      final sourceData = sourceSnap.data();
+      final sourceSub = sourceData == null ? null : sourceData['subscription'];
+      if (!SubscriptionCycleHelper.hasPaidCoverage(
+        sourceSub is Map ? Map<String, dynamic>.from(sourceSub) : null,
+        companyUID: companyUID,
+      )) {
+        return const Left(ServerFailure(
+          'لا يمكن ربط المندوب بسلسلة إضافية إلا إذا كان اشتراكه مدفوعاً. '
           'المناديب الموقوفون يُجدَّدون مرة واحدة وتسري التغطية على كل السلاسل.',
         ));
       }
@@ -500,6 +520,16 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         if (already.exists) {
           return const Left(ServerFailure('المندوب مربوط بهذه السلسلة بالفعل.'));
         }
+      }
+      final orgsToCheck = <String>{
+        targetOrganizationUID.trim(),
+        ...extraOrgs,
+      };
+      final missingOrg = await _firstOrgMissingFromCompany(orgsToCheck.toList(), companyUID);
+      if (missingOrg != null) {
+        return const Left(ServerFailure(
+          'لا يمكن ربط المندوب بسلسلة لا تنتمي لهذه الشركة.',
+        ));
       }
 
       final docRef = _firestore.collection('delegate_requests').doc();
@@ -1703,9 +1733,8 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
     }
   }
 
-  /// An already-active same-company chain doc for [uid], if any. Used so
-  /// add_organization can copy the existing subscription and cannot grant
-  /// a free activation to a suspended or unpaid delegate.
+  /// A same-company chain doc with a real paid (or waived) subscription
+  /// for [uid], if any. Status `active` is not treated as paid.
   Future<Map<String, dynamic>?> _activeSameCompanyDelegateData({
     required String uid,
     required String companyUID,
@@ -1717,8 +1746,32 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
     for (final doc in snaps.docs) {
       final d = doc.data();
       if ((d['companyUID'] ?? '').toString() != companyUID) continue;
-      if ((d['status'] ?? '').toString() != 'active') continue;
+      final sub = d['subscription'];
+      if (!SubscriptionCycleHelper.hasPaidCoverage(
+        sub is Map ? Map<String, dynamic>.from(sub) : null,
+        companyUID: companyUID,
+      )) {
+        continue;
+      }
       return d;
+    }
+    return null;
+  }
+
+  /// Returns the first org in [orgIds] that has no companies/{companyUID} doc.
+  Future<String?> _firstOrgMissingFromCompany(List<String> orgIds, String companyUID) async {
+    final company = companyUID.trim();
+    if (company.isEmpty) return orgIds.isEmpty ? null : orgIds.first;
+    for (final raw in orgIds) {
+      final orgId = raw.trim();
+      if (orgId.isEmpty) continue;
+      final snap = await _firestore
+          .collection('organizations')
+          .doc(orgId)
+          .collection('companies')
+          .doc(company)
+          .get();
+      if (!snap.exists) return orgId;
     }
     return null;
   }

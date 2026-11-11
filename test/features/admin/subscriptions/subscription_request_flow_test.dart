@@ -43,6 +43,28 @@ DelegateSubscriptionRequest req({
       paymentStatus: pay,
     );
 
+
+Future<void> seedPaidAddOrgContext(
+  FakeFirebaseFirestore db, {
+  String uid = 'sup1',
+  List<String> orgs = const ['o1', 'o2'],
+}) async {
+  for (final org in orgs) {
+    await db.doc('organizations/$org/companies/c1').set({'name': 'C'});
+  }
+  await db.doc('organizations/o1/companies/c1/delegates/$uid').set({
+    'uid': uid,
+    'status': 'active',
+    'companyUID': 'c1',
+    'organizationUID': 'o1',
+    'subscription': {
+      'periodCode': '2027_H1',
+      'periodEnd': '2027-06-30',
+      'paymentStatus': 'paid',
+    },
+  });
+}
+
 void main() {
   test('request round-trips subscription fields; legacy docs read as waived', () {
     final r = req().copyWith(
@@ -108,6 +130,7 @@ void main() {
   test('adding a chain is never charged, whatever the caller passes', () async {
     final db = FakeFirebaseFirestore();
     final repo = DelegateSubscriptionRepositoryImpl(firestore: db, storage: _MockStorage());
+    await seedPaidAddOrgContext(db);
     final r = await repo.submitAddOrganizationRequest(
       supervisorUid: 'sup1',
       supervisorName: 'S',
@@ -165,6 +188,9 @@ void main() {
     final db = FakeFirebaseFirestore();
     final repo = DelegateSubscriptionRepositoryImpl(firestore: db, storage: _MockStorage());
     const uid = 'd1';
+    await db.doc('organizations/o1/companies/c1').set({'name': 'C'});
+    await db.doc('organizations/o2/companies/c1').set({'name': 'C'});
+    await db.doc('organizations/o3/companies/c1').set({'name': 'C'});
     await db.doc('organizations/o1/companies/c1/delegates/$uid').set({
       'uid': uid,
       'status': 'active',
@@ -281,10 +307,61 @@ void main() {
     expect((await db.doc('organizations/o2/companies/c1/delegates/$uid').get()).exists, isFalse);
   });
 
+  test('approval refuses add-to-another-chain when the delegate is active but unpaid', () async {
+    final db = FakeFirebaseFirestore();
+    final repo = DelegateSubscriptionRepositoryImpl(firestore: db, storage: _MockStorage());
+    const uid = 'd-unpaid';
+    await db.doc('organizations/o1/companies/c1/delegates/$uid').set({
+      'uid': uid,
+      'status': 'active',
+      'companyUID': 'c1',
+      'organizationUID': 'o1',
+    });
+    final add = DelegateSubscriptionRequest(
+      id: 'add-unpaid',
+      supervisorUid: 'sup1',
+      supervisorName: 'S',
+      supervisorPhone: '',
+      companyUID: 'c1',
+      companyName: 'C',
+      organizationUID: 'o2',
+      organizationName: 'O2',
+      firstName: 'D',
+      secondName: '',
+      thirdName: '',
+      fullName: 'Delegate Unpaid',
+      phoneNumber: '010',
+      nationalId: '',
+      profileImageUrl: '',
+      nationalIdFrontUrl: '',
+      nationalIdBackUrl: '',
+      paymentMethod: SubscriptionPaymentMethod.notRequired,
+      subscriptionCycle: '2027_H1',
+      cycleStartDate: DateTime(2027, 1, 1),
+      cycleEndDate: DateTime(2027, 6, 30, 23, 59, 59),
+      fee: 0,
+      remainingMonths: 0,
+      requestType: kRequestTypeAddOrganization,
+      existingDelegateUid: uid,
+      createdAt: DateTime(2027, 2, 10),
+      paymentStatus: SubscriptionPaymentStatus.notRequired,
+    );
+    await db.doc('delegate_requests/add-unpaid').set(add.toMap());
+    final r = await repo.approveSubscriptionRequest(
+      request: add,
+      reviewerUid: 'sa',
+      reviewerName: 'SA',
+    );
+    expect(r.isLeft(), isTrue);
+    expect((await db.doc('delegate_requests/add-unpaid').get()).data()!['status'], 'pending');
+    expect((await db.doc('organizations/o2/companies/c1/delegates/$uid').get()).exists, isFalse);
+  });
+
   test('partial-duplicate remaining chains attach to the existing uid with no new fee', () async {
     final db = FakeFirebaseFirestore();
     final repo = DelegateSubscriptionRepositoryImpl(firestore: db, storage: _MockStorage());
     const uid = 'd-exist';
+    await seedPaidAddOrgContext(db, uid: uid, orgs: const ['o1', 'o2', 'o3']);
     await db.doc('organizations/o1/companies/c1/delegates/$uid').set({
       'uid': uid,
       'status': 'active',

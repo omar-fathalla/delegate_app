@@ -166,4 +166,41 @@ class SubscriptionCycleHelper {
     final r = roundMoney(amount);
     return r == r.truncateToDouble() ? r.toStringAsFixed(0) : r.toStringAsFixed(2);
   }
+
+  /// True when [subscription] is paid for a period that still covers [at],
+  /// or waived during the free promotion. Status `active` is not a substitute.
+  static bool hasPaidCoverage(
+    Map<String, dynamic>? subscription, {
+    DateTime? at,
+    String? companyUID,
+  }) {
+    if (subscription == null) return false;
+    final status = (subscription['paymentStatus'] ?? '').toString().trim();
+    final period = (subscription['periodCode'] ?? '').toString().trim();
+    if (period.isEmpty) return false;
+    final when = cairoTime(at);
+    if (status == 'paid') {
+      if (period == getCycleCode(at)) return true;
+      final end = _coverageEnd(subscription, period);
+      return end != null && !when.isAfter(end);
+    }
+    if (status == 'waived' && isFreePromotionActive(at, companyUID)) return true;
+    return false;
+  }
+
+  static DateTime? _coverageEnd(Map<String, dynamic> subscription, String period) {
+    final raw = subscription['periodEnd'] ?? subscription['period_end'];
+    if (raw is String && raw.length >= 10) {
+      final parsed = DateTime.tryParse(raw.substring(0, 10));
+      if (parsed != null) {
+        return DateTime(parsed.year, parsed.month, parsed.day, 23, 59, 59);
+      }
+    }
+    final m = RegExp(r'^(\d{4})_H([12])$').firstMatch(period);
+    if (m == null) return null;
+    final year = int.parse(m.group(1)!);
+    return m.group(2) == '1'
+        ? DateTime(year, 6, 30, 23, 59, 59)
+        : DateTime(year, 12, 31, 23, 59, 59);
+  }
 }

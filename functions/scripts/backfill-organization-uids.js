@@ -61,8 +61,48 @@ function planRestore(previous) {
 }
 
 function isDeleteSentinel(value) {
-  return value && typeof value === "object" && value.isEqual &&
-    value.isEqual(require("firebase-admin").firestore.FieldValue.delete());
+  return !!(value && typeof value === "object" && typeof value.isEqual === "function" &&
+    value.isEqual(require("firebase-admin").firestore.FieldValue.delete()));
+}
+
+function valuesEqual(a, b) {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+}
+
+/**
+ * The fields the backfill wrote. Prefer `entry.fields` when the rollback
+ * file has them; otherwise reconstruct from the pre-backfill `previous`
+ * and the live singular organizationUID / organizationName.
+ */
+function writtenFieldsOf(entry, current) {
+  if (entry && entry.fields && typeof entry.fields === "object" &&
+      Object.keys(entry.fields).length > 0) {
+    return entry.fields;
+  }
+  const previous = (entry && entry.previous) || {};
+  return planPatch({
+    organizationUID: current && current.organizationUID,
+    organizationName: current && current.organizationName,
+    organizationUIDs: previous.organizationUIDs,
+    organizationNames: previous.organizationNames,
+  });
+}
+
+function currentMatchesWritten(data, written) {
+  if (!written || typeof written !== "object") return false;
+  const keys = Object.keys(written).filter((k) => !isDeleteSentinel(written[k]));
+  if (keys.length === 0) return false;
+  return keys.every((k) => valuesEqual(data ? data[k] : undefined, written[k]));
+}
+
+/** Restore only when the doc still holds the backfill's written value. */
+function shouldRestore(data, entry) {
+  const written = writtenFieldsOf(entry, data || {});
+  if (!written) return {ok: false, reason: "cannot_reconstruct_written"};
+  if (!currentMatchesWritten(data || {}, written)) {
+    return {ok: false, reason: "current_differs_from_written"};
+  }
+  return {ok: true, written};
 }
 
 async function restore(db, args) {
@@ -73,9 +113,24 @@ async function restore(db, args) {
     throw new Error(`rollback file project ${raw.project} does not match --project ${args.project}`);
   }
   const entries = Array.isArray(raw.entries) ? raw.entries : [];
-  const planned = entries
+  const candidates = entries
     .filter((e) => e && typeof e.path === "string" && e.path.startsWith("delegate_requests/"))
-    .map((e) => ({path: e.path, id: e.path.split("/")[1], patch: planRestore(e.previous), previous: e.previous}));
+    .map((e) => ({path: e.path, id: e.path.split("/")[1], patch: planRestore(e.previous), previous: e.previous, fields: e.fields, entry: e}));
+
+  const planned = [];
+  let skipped = 0;
+  const skipReasons = {};
+  for (const c of candidates) {
+    const snap = await db.doc(c.path).get();
+    const data = snap.exists ? (snap.data() || {}) : null;
+    const decision = shouldRestore(data, c.entry);
+    if (!decision.ok) {
+      skipped++;
+      skipReasons[decision.reason] = (skipReasons[decision.reason] || 0) + 1;
+      continue;
+    }
+    planned.push(c);
+  }
 
   const runId = `org-uids-restore-${new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z")}`;
   const report = {
@@ -84,7 +139,7 @@ async function restore(db, args) {
     runId,
     at: new Date().toISOString(),
     rollbackFile: restorePath,
-    counts: {docs: planned.length, planned: planned.length, skipped: 0, written: 0},
+    counts: {docs: candidates.length, planned: planned.length, skipped, written: 0, skipReasons},
   };
   if (!args.apply) return report;
 
@@ -131,7 +186,7 @@ async function run(db, args) {
     project: args.project,
     runId,
     at: report.at,
-    entries: planned.map((p) => ({path: p.path, previous: p.previous})),
+    entries: planned.map((p) => ({path: p.path, previous: p.previous, fields: p.patch})),
   };
   fs.writeFileSync(rollbackPath, JSON.stringify(rollback, null, 2));
   report.rollbackFile = rollbackPath;
@@ -205,4 +260,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = {planPatch, previousOf, planRestore, restore, run};
+module.exports = {planPatch, previousOf, planRestore, restore, run, writtenFieldsOf, currentMatchesWritten, shouldRestore, isDeleteSentinel};
