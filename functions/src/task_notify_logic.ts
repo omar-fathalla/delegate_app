@@ -203,13 +203,20 @@ export function parseAssignedTo(assignedTo: unknown): ParsedAssignedTo {
   return {kind: "empty"};
 }
 
+function isSectorStaffRole(role: unknown): boolean {
+  return isBranchMarketingRole(role) || isMarketingPromotionRole(role);
+}
+
+/**
+ * «الكل» / `all` is company-delegates only. Sector marketing/promo staff
+ * are not included, even if they appear in a combined candidate list.
+ */
 function seesAllGroup(u: TaskUser, opts: TaskNotifyOpts): boolean {
   const co = String(opts.companyId || "").trim();
   if (!co) return false;
   if (!userInCompany(u, co)) return false;
-  return isFieldDelegateRole(u.role) ||
-    isBranchMarketingRole(u.role) ||
-    isMarketingPromotionRole(u.role);
+  if (isSectorStaffRole(u.role)) return false;
+  return isFieldDelegateRole(u.role);
 }
 
 function seesBranchMarketingGroup(u: TaskUser, opts: TaskNotifyOpts): boolean {
@@ -311,6 +318,72 @@ export function newlyAssignedTaskUserIds(
 ): string[] {
   const before = new Set(taskNotifyUserIds(users, beforeAssignedTo, opts));
   return taskNotifyUserIds(users, afterAssignedTo, opts).filter((id) => !before.has(id));
+}
+
+function groupTokensOf(assignedTo: unknown): string[] {
+  const parsed = parseAssignedTo(assignedTo);
+  if (parsed.kind === "group") return [parsed.token];
+  if (parsed.kind === "mixed") return parsed.tokens;
+  return [];
+}
+
+function hasExplicitUids(assignedTo: unknown): boolean {
+  const parsed = parseAssignedTo(assignedTo);
+  return parsed.kind === "uids" || (parsed.kind === "mixed" && parsed.uids.length > 0);
+}
+
+/** Company delegates subcollection is the source for «الكل» and explicit uids. */
+export function assignmentNeedsCompanyDelegates(assignedTo: unknown): boolean {
+  const tokens = groupTokensOf(assignedTo);
+  return hasExplicitUids(assignedTo) || tokens.some((t) => isAllAssignToken(t));
+}
+
+/** Users-collection sector staff is the source for sector tokens. */
+export function assignmentNeedsSectorStaff(assignedTo: unknown): boolean {
+  return groupTokensOf(assignedTo).some((t) =>
+    t === ASSIGN_ALL_BRANCH_MARKETING || t === ASSIGN_ALL_MARKETING_PROMOTION);
+}
+
+function mergeTaskUsers(...lists: TaskUser[][]): TaskUser[] {
+  const seen = new Map<string, TaskUser>();
+  for (const list of lists) {
+    for (const u of list) {
+      if (!u || !u.id || seen.has(u.id)) continue;
+      seen.set(u.id, u);
+    }
+  }
+  return Array.from(seen.values());
+}
+
+/**
+ * Resolve recipients from the two product sources: company delegates
+ * for «الكل» / explicit uids, and users-collection sector staff for
+ * `all_branch_marketing` / `all_marketing_promotion`.
+ */
+export function taskNotifyUserIdsFromSources(
+  delegates: TaskUser[],
+  sectorStaff: TaskUser[],
+  assignedTo: unknown,
+  opts: TaskNotifyOpts = {},
+): string[] {
+  const lists: TaskUser[][] = [];
+  if (assignmentNeedsCompanyDelegates(assignedTo)) lists.push(delegates);
+  if (assignmentNeedsSectorStaff(assignedTo)) lists.push(sectorStaff);
+  return taskNotifyUserIds(mergeTaskUsers(...lists), assignedTo, opts);
+}
+
+export function newlyAssignedTaskUserIdsFromSources(
+  delegates: TaskUser[],
+  sectorStaff: TaskUser[],
+  beforeAssignedTo: unknown,
+  afterAssignedTo: unknown,
+  opts: TaskNotifyOpts = {},
+): string[] {
+  const before = new Set(taskNotifyUserIdsFromSources(
+    delegates, sectorStaff, beforeAssignedTo, opts));
+  return taskNotifyUserIdsFromSources(
+    delegates, sectorStaff, afterAssignedTo, opts,
+  ).filter((id) => !before.has(id));
 }
 
 

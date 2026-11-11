@@ -13,9 +13,11 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import {
+  assignmentNeedsCompanyDelegates,
+  assignmentNeedsSectorStaff,
+  newlyAssignedTaskUserIdsFromSources,
   parseAssignedTo,
-  newlyAssignedTaskUserIds,
-  taskNotifyUserIds,
+  taskNotifyUserIdsFromSources,
   taskUsersFromDelegateDocs,
   TaskUser,
 } from "./task_notify_logic";
@@ -31,8 +33,8 @@ function notifyBody(title: unknown): string {
 }
 
 /**
- * Same source the task picker reads: organizations/{org}/companies/{co}/delegates.
- * Does not read the `users` collection. Paginates in pages of 1000.
+ * Same source the task picker reads for «الكل»: organizations/{org}/companies/{co}/delegates.
+ * Paginates in pages of 1000.
  */
 async function loadCompanyDelegates(
   db: FirebaseFirestore.Firestore,
@@ -62,6 +64,85 @@ async function loadCompanyDelegates(
   return taskUsersFromDelegateDocs(docs);
 }
 
+function asUser(id: string, data: FirebaseFirestore.DocumentData): TaskUser {
+  return {
+    id,
+    role: data.role,
+    companyUID: data.companyUID,
+    companyId: data.companyId,
+    companyIds: data.companyIds,
+    organizationUID: data.organizationUID,
+    organizationUIDs: data.organizationUIDs,
+    status: data.status,
+    holds: data.holds,
+  };
+}
+
+/**
+ * Sector-token source used in 401af71: the `users` collection, filtered
+ * later by company and role. Includes org-level marketing (no company)
+ * via equality queries that do not need a composite index.
+ */
+async function loadSectorStaffFromUsers(
+  db: FirebaseFirestore.Firestore,
+  companyId: string,
+  organizationId: string,
+): Promise<TaskUser[]> {
+  const users = db.collection("users");
+  const queries: Promise<FirebaseFirestore.QuerySnapshot>[] = [];
+  const co = companyId.trim();
+  const org = organizationId.trim();
+  if (co) {
+    queries.push(users.where("companyUID", "==", co).get());
+    queries.push(users.where("companyId", "==", co).get());
+    queries.push(users.where("companyIds", "array-contains", co).get());
+  }
+  if (org) {
+    const marketingRoles = [
+      "marketing",
+      "marketingPromotion",
+      "marketing_promotion",
+      "marketing-promotion",
+      "branches_marketing",
+      "branches-marketing",
+      "branches_marketing_manager",
+      "branches-marketing-manager",
+      "branchesmarketingmanager",
+    ];
+    for (const role of marketingRoles) {
+      queries.push(users.where("organizationUID", "==", org).where("role", "==", role).get());
+    }
+  }
+  if (queries.length === 0) return [];
+  const snaps = await Promise.all(queries);
+  const seen = new Map<string, TaskUser>();
+  for (const snap of snaps) {
+    for (const doc of snap.docs) {
+      if (!doc.id || seen.has(doc.id)) continue;
+      seen.set(doc.id, asUser(doc.id, doc.data()));
+    }
+  }
+  return Array.from(seen.values());
+}
+
+async function loadSources(
+  db: FirebaseFirestore.Firestore,
+  assignedTo: unknown,
+  opts: {companyId: string; organizationId: string},
+): Promise<{delegates: TaskUser[]; sectorStaff: TaskUser[]}> {
+  const needDelegates = assignmentNeedsCompanyDelegates(assignedTo);
+  const needSector = assignmentNeedsSectorStaff(assignedTo);
+  const [delegates, sectorStaff] = await Promise.all([
+    needDelegates ?
+      loadCompanyDelegates(db, opts.organizationId, opts.companyId) :
+      Promise.resolve([] as TaskUser[]),
+    needSector ?
+      loadSectorStaffFromUsers(db, opts.companyId, opts.organizationId) :
+      Promise.resolve([] as TaskUser[]),
+  ]);
+  return {delegates, sectorStaff};
+}
+
 async function resolveRecipients(
   db: FirebaseFirestore.Firestore,
   assignedTo: unknown,
@@ -69,8 +150,12 @@ async function resolveRecipients(
 ): Promise<{ids: string[]; users: TaskUser[]}> {
   const parsed = parseAssignedTo(assignedTo);
   if (parsed.kind === "empty") return {ids: [], users: []};
-  const users = await loadCompanyDelegates(db, opts.organizationId, opts.companyId);
-  return {ids: taskNotifyUserIds(users, assignedTo, opts), users};
+  const {delegates, sectorStaff} = await loadSources(db, assignedTo, opts);
+  const users = [...delegates, ...sectorStaff];
+  return {
+    ids: taskNotifyUserIdsFromSources(delegates, sectorStaff, assignedTo, opts),
+    users,
+  };
 }
 
 async function senderFields(
@@ -190,12 +275,27 @@ export const onTaskUpdated = functions.firestore
         return null;
       }
       const db = admin.firestore();
-      const users = await loadCompanyDelegates(db, organizationId, companyId);
-      const newly = newlyAssignedTaskUserIds(users, before.assignedTo, after.assignedTo, {
-        companyId,
-        organizationId,
-        createdBy,
-      });
+      const beforeAssigned = before.assignedTo;
+      const afterAssigned = after.assignedTo;
+      const needDelegates = assignmentNeedsCompanyDelegates(beforeAssigned) ||
+        assignmentNeedsCompanyDelegates(afterAssigned);
+      const needSector = assignmentNeedsSectorStaff(beforeAssigned) ||
+        assignmentNeedsSectorStaff(afterAssigned);
+      const [delegates, sectorStaff] = await Promise.all([
+        needDelegates ?
+          loadCompanyDelegates(db, organizationId, companyId) :
+          Promise.resolve([] as TaskUser[]),
+        needSector ?
+          loadSectorStaffFromUsers(db, companyId, organizationId) :
+          Promise.resolve([] as TaskUser[]),
+      ]);
+      const users = [...delegates, ...sectorStaff];
+      const newly = newlyAssignedTaskUserIdsFromSources(
+        delegates, sectorStaff, beforeAssigned, afterAssigned, {
+          companyId,
+          organizationId,
+          createdBy,
+        });
       if (newly.length === 0) {
         console.log("No new recipients for updated task:", taskId);
         return null;
