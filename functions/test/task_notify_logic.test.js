@@ -8,6 +8,10 @@ const {
   userInCompany,
   isExcludedFromTaskNotify,
   taskUsersFromDelegateDocs,
+  taskNotifyUserIdsFromSources,
+  newlyAssignedTaskUserIdsFromSources,
+  assignmentNeedsCompanyDelegates,
+  assignmentNeedsSectorStaff,
 } = require("../lib/task_notify_logic");
 
 const co = "co_dev_test";
@@ -99,9 +103,9 @@ describe("taskNotifyUserIds: all / الكل, company-scoped, no duplicates", () 
     u("multi", {companyUID: "co_home", companyIds: [co, "co_home"]}),
   ];
 
-  test("all notifies company field delegates, marketing and promo, not staff or other companies", () => {
+  test("all notifies company field delegates only, not sector staff or other companies", () => {
     const ids = taskNotifyUserIds(users, "all", {companyId: co, createdBy: "sup"});
-    assert.deepEqual(ids.sort(), ["d1", "d2", "d1-dup", "mkt", "multi", "promo"].sort());
+    assert.deepEqual(ids.sort(), ["d1", "d2", "d1-dup", "multi"].sort());
   });
 
   test("Arabic الكل matches all", () => {
@@ -167,7 +171,7 @@ describe("newlyAssignedTaskUserIds", () => {
 
   test("switching from one person to all notifies the rest of the company group once", () => {
     const ids = newlyAssignedTaskUserIds(users, "d1", "all", {companyId: co, createdBy: "sup"});
-    assert.deepEqual(ids.sort(), ["d2", "mkt"].sort());
+    assert.deepEqual(ids.sort(), ["d2"].sort());
   });
 
   test("leaving assignedTo unchanged notifies nobody", () => {
@@ -243,5 +247,75 @@ describe("taskUsersFromDelegateDocs", () => {
     const users = taskUsersFromDelegateDocs(docs);
     const ids = taskNotifyUserIds(users, "all", {companyId: co, createdBy: "sup"});
     assert.deepEqual(ids.sort(), ["dlg_dev_test_1", "dlg_no_users_doc"].sort());
+  });
+});
+
+describe("taskNotifyUserIdsFromSources: الكل vs sector tokens", () => {
+  const delegates = [
+    u("d1"),
+    u("d2"),
+    u("pending-dlg", {status: "pending"}),
+    u("sus-dlg", {status: "suspended"}),
+  ];
+  const sectorStaff = [
+    u("mkt", {role: "marketing"}),
+    u("mkt-mgr", {role: "branches_marketing_manager"}),
+    u("promo", {role: "marketingPromotion"}),
+    u("mkt-org", {role: "marketing", companyUID: ""}),
+    u("promo-org", {role: "marketingPromotion", companyUID: ""}),
+    u("mkt-other", {role: "marketing", companyUID: "co_other"}),
+    u("mkt-held", {role: "marketing", status: "active", holds: {admin_suspend: {at: "t", by: "sup"}}}),
+  ];
+
+  test("الكل / all uses only company delegates and excludes sector staff", () => {
+    const opts = {companyId: co, organizationId: org, createdBy: "sup"};
+    const fromAll = taskNotifyUserIdsFromSources(delegates, sectorStaff, "all", opts);
+    const fromAr = taskNotifyUserIdsFromSources(delegates, sectorStaff, "الكل", opts);
+    assert.deepEqual(fromAll.sort(), ["d1", "d2"].sort());
+    assert.deepEqual(fromAr, fromAll);
+    assert.equal(fromAll.includes("mkt"), false);
+    assert.equal(fromAll.includes("promo"), false);
+    assert.equal(fromAll.includes("mkt-mgr"), false);
+  });
+
+  test("all_branch_marketing reaches company and org-level sector staff, not field delegates", () => {
+    const ids = taskNotifyUserIdsFromSources(
+      delegates, sectorStaff, "all_branch_marketing",
+      {companyId: co, organizationId: org},
+    );
+    assert.deepEqual(ids.sort(), ["mkt", "mkt-mgr", "mkt-org"].sort());
+    assert.equal(ids.includes("d1"), false);
+    assert.equal(ids.includes("promo"), false);
+    assert.equal(ids.includes("mkt-other"), false);
+    assert.equal(ids.includes("mkt-held"), false);
+  });
+
+  test("all_marketing_promotion reaches company and org-level promo staff, not field delegates", () => {
+    const ids = taskNotifyUserIdsFromSources(
+      delegates, sectorStaff, "all_marketing_promotion",
+      {companyId: co, organizationId: org},
+    );
+    assert.deepEqual(ids.sort(), ["promo", "promo-org"].sort());
+    assert.equal(ids.includes("d1"), false);
+    assert.equal(ids.includes("mkt"), false);
+  });
+
+  test("assignmentNeeds* picks the right source for each token", () => {
+    assert.equal(assignmentNeedsCompanyDelegates("all"), true);
+    assert.equal(assignmentNeedsCompanyDelegates("الكل"), true);
+    assert.equal(assignmentNeedsSectorStaff("all"), false);
+    assert.equal(assignmentNeedsSectorStaff("الكل"), false);
+    assert.equal(assignmentNeedsCompanyDelegates("all_branch_marketing"), false);
+    assert.equal(assignmentNeedsSectorStaff("all_branch_marketing"), true);
+    assert.equal(assignmentNeedsSectorStaff("all_marketing_promotion"), true);
+    assert.equal(assignmentNeedsCompanyDelegates("some-uid"), true);
+    assert.equal(assignmentNeedsSectorStaff("some-uid"), false);
+  });
+
+  test("switching from الكل to a sector token notifies sector staff, not the delegate group again", () => {
+    const opts = {companyId: co, organizationId: org, createdBy: "sup"};
+    const ids = newlyAssignedTaskUserIdsFromSources(
+      delegates, sectorStaff, "all", "all_branch_marketing", opts);
+    assert.deepEqual(ids.sort(), ["mkt", "mkt-mgr", "mkt-org"].sort());
   });
 });
