@@ -155,6 +155,7 @@ class PenaltyBloc extends Bloc<PenaltyEvent, PenaltyState> {
         final uploadRes = await repository.uploadEvidenceFile(
           file: file,
           penaltyId: event.penalty.penaltyId,
+          companyId: event.penalty.companyId,
         );
         uploadRes.fold(
           (_) {}, // ignore error or continue
@@ -208,6 +209,7 @@ class PenaltyBloc extends Bloc<PenaltyEvent, PenaltyState> {
         final uploadRes = await repository.uploadEvidenceFile(
           file: file,
           penaltyId: event.penalty.penaltyId,
+          companyId: event.penalty.companyId,
         );
         uploadRes.fold(
           (_) {},

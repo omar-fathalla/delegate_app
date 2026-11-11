@@ -207,12 +207,12 @@ void main() {
     test('should return EvidenceFile when call is successful', () async {
       // Arrange
       when(() => mockRemoteDataSource.uploadEvidenceFile(
-              file: any(named: 'file'), penaltyId: any(named: 'penaltyId')))
+              file: any(named: 'file'), penaltyId: any(named: 'penaltyId'), companyId: any(named: 'companyId')))
           .thenAnswer((_) async => tEvidenceFile);
 
       // Act
       final result = await repository.uploadEvidenceFile(
-          file: tFile, penaltyId: 'test_id');
+          file: tFile, penaltyId: 'test_id', companyId: 'coA');
 
       // Assert
       expect(result, const Right(tEvidenceFile));
@@ -221,12 +221,12 @@ void main() {
     test('should return Left(ServerFailure) when call fails', () async {
       // Arrange
       when(() => mockRemoteDataSource.uploadEvidenceFile(
-              file: any(named: 'file'), penaltyId: any(named: 'penaltyId')))
+              file: any(named: 'file'), penaltyId: any(named: 'penaltyId'), companyId: any(named: 'companyId')))
           .thenThrow(ServerException('Error'));
 
       // Act
       final result = await repository.uploadEvidenceFile(
-          file: tFile, penaltyId: 'test_id');
+          file: tFile, penaltyId: 'test_id', companyId: 'coA');
 
       // Assert
       expect(result, const Left(ServerFailure('Error')));

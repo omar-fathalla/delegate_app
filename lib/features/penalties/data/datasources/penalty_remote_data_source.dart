@@ -34,6 +34,7 @@ abstract class PenaltyRemoteDataSource {
   Future<EvidenceFile> uploadEvidenceFile({
     required File file,
     required String penaltyId,
+    required String companyId,
   });
   Future<List<PenaltyRuleModel>> getPenaltyRules();
   Future<void> savePenaltyRule(PenaltyRuleModel rule);
@@ -834,8 +835,13 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
   Future<EvidenceFile> uploadEvidenceFile({
     required File file,
     required String penaltyId,
+    required String companyId,
   }) async {
     try {
+      final companyUID = companyId.trim();
+      if (companyUID.isEmpty) {
+        throw ServerException('تعذر تحديد الشركة لرفع مستند الإثبات.');
+      }
       final fileName = file.path.split('/').last.split('\\').last;
       final ext = fileName.split('.').last.toLowerCase();
       final fileType = (ext == 'pdf')
@@ -847,6 +853,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
       final ref = storage
           .ref()
           .child('penalties')
+          .child(companyUID)
           .child('evidence')
           .child(penaltyId.isNotEmpty ? penaltyId : 'temp')
           .child('${DateTime.now().millisecondsSinceEpoch}_$fileName');

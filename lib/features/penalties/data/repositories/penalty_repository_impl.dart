@@ -127,11 +127,13 @@ class PenaltyRepositoryImpl implements PenaltyRepository {
   Future<Either<Failure, EvidenceFile>> uploadEvidenceFile({
     required File file,
     required String penaltyId,
+    required String companyId,
   }) async {
     try {
       final evidence = await remoteDataSource.uploadEvidenceFile(
         file: file,
         penaltyId: penaltyId,
+        companyId: companyId,
       );
       return Right(evidence);
     } on ServerException catch (e) {

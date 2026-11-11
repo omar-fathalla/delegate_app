@@ -312,3 +312,10 @@ test("auditDoc accepts a national_id_rejection source (M-8)", () => {
   assert.strictEqual(rec.source, "national_id_rejection");
   assert.strictEqual(rec.requestId, "r1");
 });
+
+test("reviewer cannot be the national-ID submitter", () => {
+  assert.equal(L.reviewerIsSubmitter("sa1", "sa1"), true);
+  assert.equal(L.reviewerIsSubmitter("sa1", "tech1"), false);
+  assert.equal(L.reviewerIsSubmitter("sa1", ""), false);
+  assert.equal(L.reviewerIsSubmitter("", "sa1"), false);
+});

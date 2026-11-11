@@ -28,6 +28,7 @@ import {
   PRIVILEGED_ALERT_ROLE_VALUES,
   classifyReviewTarget,
   usersProfileSyncPatch,
+  reviewerIsSubmitter,
 } from "./delegate_profile_edit_logic";
 
 function asUpdate(patch: Record<string, unknown>): FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData> {
@@ -521,6 +522,12 @@ export const reviewNationalIdUpdate = functions
     const newId = normalizeIdDigits(String(request.proposedNationalId || ""));
     const delegateUid = String(request.existingDelegateUid || "").trim();
     const supervisorUid = String(request.supervisorUid || "").trim();
+    if (reviewerIsSubmitter(uid, supervisorUid)) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "لا يجوز لمقدم الطلب اعتماد تعديل الرقم القومي بنفسه.",
+      );
+    }
     if (!companyUID || !delegateUid) {
       throw new functions.https.HttpsError("failed-precondition", "بيانات الطلب غير مكتملة.");
     }

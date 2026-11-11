@@ -26,6 +26,7 @@ abstract class PenaltyRepository {
   Future<Either<Failure, EvidenceFile>> uploadEvidenceFile({
     required File file,
     required String penaltyId,
+    required String companyId,
   });
   Future<Either<Failure, List<PenaltyRuleEntity>>> getPenaltyRules();
   Future<Either<Failure, Unit>> savePenaltyRule(PenaltyRuleEntity rule);

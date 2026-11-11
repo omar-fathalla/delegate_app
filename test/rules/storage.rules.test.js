@@ -10,7 +10,7 @@ const {readFileSync} = require("fs");
 const {resolve} = require("path");
 const {initializeTestEnvironment, assertFails, assertSucceeds} = require("@firebase/rules-unit-testing");
 const {doc, setDoc} = require("firebase/firestore");
-const {ref, uploadBytes, getBytes, listAll} = require("firebase/storage");
+const {ref, uploadBytes, getBytes, listAll, deleteObject} = require("firebase/storage");
 
 function splitHost(envName, fallback) {
   const raw = process.env[envName] || fallback;
@@ -160,15 +160,19 @@ describe("storage.rules", () => {
     await assertFails(uploadBytes(path(dlgB, "leave_attachments/coA/dlgA/sick.jpg"), bytes));
     await assertSucceeds(uploadBytes(path(hrA, "leave_attachments/coA/dlgA/staff.jpg"), bytes));
     await assertFails(uploadBytes(path(hrB, "leave_attachments/coA/dlgA/staff.jpg"), bytes));
-    await assertSucceeds(uploadBytes(path(dlg, "feedback_screenshots/dlgA-fb.png"), bytes));
+    const ownFb = {customMetadata: {userId: "dlgA"}};
+    await assertSucceeds(uploadBytes(path(dlg, "feedback_screenshots/dlgA-fb.png"), bytes, ownFb));
     // A password session without role=delegate is not a delegate upload.
     // Use a fresh uid so the emulator does not reuse dlgA's custom claims.
-    await assertFails(uploadBytes(path(storage("dlgBare"), "feedback_screenshots/no-claim.png"), bytes));
+    await assertFails(uploadBytes(path(storage("dlgBare"), "feedback_screenshots/no-claim.png"), bytes, {customMetadata: {userId: "dlgBare"}}));
     await assertFails(uploadBytes(path(storage("accA"), "organizations/o1/companies/coA/delegates/folderA/id.jpg"), bytes));
     await assertFails(uploadBytes(path(storage("mkA"), "organizations/o1/companies/coA/delegates/folderA/id.jpg"), bytes));
     // Accountant/marketing keep same-company access to other org/company files.
     await assertSucceeds(uploadBytes(path(storage("accA"), "organizations/o1/companies/coA/other/note.txt"), bytes));
     await assertSucceeds(uploadBytes(path(storage("mkA"), "organizations/o1/companies/coA/other/note2.txt"), bytes));
+    // F6: accountant/marketing cannot use leave attachments.
+    await assertFails(uploadBytes(path(storage("accA"), "leave_attachments/coA/dlgA/acc.jpg"), bytes));
+    await assertFails(uploadBytes(path(storage("mkA"), "leave_attachments/coA/dlgA/mk.jpg"), bytes));
   });
 
   test("other-company staff and delegates cannot use leftover private paths", async () => {
@@ -186,8 +190,10 @@ describe("storage.rules", () => {
     await assertFails(uploadBytes(path(hrB, "staging/requests/folderA/id.jpg"), bytes));
     await assertFails(uploadBytes(path(hrB, "companies/coA/logo.png"), bytes));
     await assertSucceeds(uploadBytes(path(hrA, "organizations/o1/companies/coA/delegates/folderA/id.jpg"), bytes));
-    await assertSucceeds(uploadBytes(path(hrA, "penalties/p1.jpg"), bytes));
+    await assertSucceeds(uploadBytes(path(hrA, "penalties/coA/evidence/p1/file.jpg"), bytes));
+    await assertFails(uploadBytes(path(hrA, "penalties/evidence/legacy-write.jpg"), bytes));
     await assertFails(uploadBytes(path(dlg, "penalties/owned.jpg"), bytes));
+    await assertFails(uploadBytes(path(dlg, "penalties/coA/evidence/p1/dlg.jpg"), bytes));
   });
 
   test("unauthenticated is denied on private paths; public remains world-readable", async () => {
@@ -200,6 +206,64 @@ describe("storage.rules", () => {
     });
     await assertSucceeds(getBytes(path(store, "public/open.txt")));
   });
+
+  test("delegates only create feedback they own and cannot overwrite others", async () => {
+    const dlg = delegateTok("dlgA", "coA");
+    const dlgB = delegateTok("dlgB", "coA");
+    const hrA = storage("hrA");
+    const own = {customMetadata: {userId: "dlgA"}};
+    const spoof = {customMetadata: {userId: "hrA"}};
+    await assertFails(uploadBytes(path(dlg, "feedback_screenshots/no-meta.png"), bytes));
+    await assertFails(uploadBytes(path(dlg, "feedback_screenshots/spoof.png"), bytes, spoof));
+    await assertSucceeds(uploadBytes(path(hrA, "feedback_screenshots/staff.png"), bytes, {customMetadata: {userId: "hrA"}}));
+    await assertFails(getBytes(path(dlg, "feedback_screenshots/staff.png")));
+    await assertFails(uploadBytes(path(dlg, "feedback_screenshots/staff.png"), bytes, own));
+    await assertSucceeds(uploadBytes(path(dlg, "feedback_screenshots/dlgA-own.png"), bytes, own));
+    await assertSucceeds(getBytes(path(dlg, "feedback_screenshots/dlgA-own.png")));
+    await assertFails(getBytes(path(dlgB, "feedback_screenshots/dlgA-own.png")));
+    await assertFails(uploadBytes(path(dlgB, "feedback_screenshots/dlgA-own.png"), bytes, {customMetadata: {userId: "dlgB"}}));
+    await assertSucceeds(getBytes(path(hrA, "feedback_screenshots/dlgA-own.png")));
+  });
+
+  test("penalty evidence is company-scoped for new uploads; legacy stays readable", async () => {
+    const hrA = storage("hrA");
+    const hrB = storage("hrB");
+    const dlg = delegateTok("dlgA", "coA");
+    await assertSucceeds(uploadBytes(path(hrA, "penalties/coA/evidence/pen1/a.jpg"), bytes));
+    await assertFails(uploadBytes(path(hrB, "penalties/coA/evidence/pen1/b.jpg"), bytes));
+    await assertSucceeds(uploadBytes(path(hrB, "penalties/coB/evidence/pen2/c.jpg"), bytes));
+    await assertFails(getBytes(path(hrB, "penalties/coA/evidence/pen1/a.jpg")));
+    await assertFails(uploadBytes(path(hrA, "penalties/evidence/legacy-new.jpg"), bytes));
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await uploadBytes(ref(ctx.storage(), "penalties/evidence/legacy.jpg"), bytes);
+    });
+    await assertSucceeds(getBytes(path(hrA, "penalties/evidence/legacy.jpg")));
+    await assertSucceeds(getBytes(path(hrB, "penalties/evidence/legacy.jpg")));
+    await assertFails(uploadBytes(path(hrA, "penalties/evidence/legacy.jpg"), bytes));
+    await assertFails(getBytes(path(dlg, "penalties/coA/evidence/pen1/a.jpg")));
+  });
+
+  test("same-company delegates cannot overwrite or delete a colleague permission photo", async () => {
+    const dlg = delegateTok("dlgA", "coA");
+    const dlgB = delegateTok("dlgB", "coA");
+    const hrA = storage("hrA");
+    const hrB = storage("hrB");
+    const owned = "organizations/o1/companies/coA/permissions/p1/photo_dlgA_1.jpg";
+    const legacy = "organizations/o1/companies/coA/permissions/p1/photo_99.jpg";
+    const meta = {customMetadata: {userId: "dlgA", delegateUid: "dlgA"}};
+    await assertSucceeds(uploadBytes(path(dlg, owned), bytes, meta));
+    await assertSucceeds(uploadBytes(path(dlg, legacy), bytes));
+    await assertSucceeds(getBytes(path(dlgB, owned)));
+    await assertFails(uploadBytes(path(dlgB, owned), bytes));
+    await assertFails(uploadBytes(path(dlgB, legacy), bytes));
+    await assertFails(deleteObject(path(dlgB, owned)));
+    await assertFails(deleteObject(path(dlg, legacy)));
+    await assertSucceeds(deleteObject(path(dlg, owned)));
+    await assertSucceeds(uploadBytes(path(hrA, "organizations/o1/companies/coA/permissions/p1/photo_dlgA_2.jpg"), bytes, meta));
+    await assertSucceeds(deleteObject(path(hrA, "organizations/o1/companies/coA/permissions/p1/photo_dlgA_2.jpg")));
+    await assertFails(uploadBytes(path(hrB, owned), bytes));
+  });
+
 });
 
 // Keep a named export so node --test counts the file even if helpers grow.
