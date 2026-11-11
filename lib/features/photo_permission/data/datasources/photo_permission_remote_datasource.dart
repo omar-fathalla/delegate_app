@@ -404,11 +404,20 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     required double longitude,
   }) async {
     try {
-      final fileName = 'photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final fileName = 'photo_${delegateUID}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final ref = storage.ref().child(
           'organizations/$organizationUID/companies/$companyUID/permissions/$permissionId/$fileName');
 
-      await ref.putFile(imageFile);
+      await ref.putFile(
+        imageFile,
+        SettableMetadata(
+          contentType: 'image/jpeg',
+          customMetadata: {
+            'userId': delegateUID,
+            'delegateUid': delegateUID,
+          },
+        ),
+      );
       final photoUrl = await ref.getDownloadURL();
 
       final docRef = firestore

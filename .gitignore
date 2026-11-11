@@ -91,3 +91,7 @@ real_test/
 
 # tashil-dev iOS plist (never commit; see ios/config/README.md)
 ios/config/dev/GoogleService-Info.plist
+
+# Never commit 1st-gen Functions runtime config (may hold secrets).
+functions/.runtimeconfig.json
+.runtimeconfig.json

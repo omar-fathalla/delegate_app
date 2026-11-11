@@ -231,17 +231,40 @@ export const onPhotoPermissionCreated = functions.firestore
         return null;
       }
 
-      const usersQuery = await admin.firestore().collection("users")
+      const usersCol = admin.firestore().collection("users");
+      const orgRoleQuery = usersCol
         .where("organizationUID", "==", organizationId)
         .where("role", "in", [
           "admin", "supervisor", "company-admin", "company_admin",
           "company_supervisor", "organization-admin", "organizationAdmin",
+          "marketingPromotion", "marketing-promotion", "marketing_promotion",
         ])
         .get();
+      const orgAdminByListQuery = usersCol
+        .where("organizationUIDs", "array-contains", organizationId)
+        .get();
+      const globalRoleQuery = usersCol
+        .where("role", "in", [
+          "superAdmin", "super-admin", "super_admin",
+          "technicalSupport", "technical-support", "technical_support",
+        ])
+        .get();
+      const [orgRoleSnap, orgAdminByListSnap, globalSnap] = await Promise.all([
+        orgRoleQuery, orgAdminByListQuery, globalRoleQuery,
+      ]);
+      const seenDocs = new Map<string, FirebaseFirestore.DocumentData & {id: string}>();
+      for (const snap of [orgRoleSnap, orgAdminByListSnap, globalSnap]) {
+        for (const doc of snap.docs) {
+          if (!seenDocs.has(doc.id)) {
+            seenDocs.set(doc.id, {id: doc.id, ...doc.data()});
+          }
+        }
+      }
 
       const targetUserIds = photoPermissionNotifyUserIds(
-        usersQuery.docs.map((doc) => ({id: doc.id, ...doc.data()})),
+        Array.from(seenDocs.values()),
         companyId,
+        organizationId,
       );
 
       if (targetUserIds.length === 0) {

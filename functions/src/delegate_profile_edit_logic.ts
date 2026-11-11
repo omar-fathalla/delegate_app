@@ -79,6 +79,13 @@ export function canCallEditDelegateProfile(role: unknown): boolean {
   return isEditorRole(role) || isReviewerRole(role);
 }
 
+/** Four-eyes: the reviewer of a national-ID change must not be the submitter. */
+export function reviewerIsSubmitter(callerUid: string, submitterUid: string): boolean {
+  const caller = String(callerUid || "").trim();
+  const submitter = String(submitterUid || "").trim();
+  return caller !== "" && submitter !== "" && caller === submitter;
+}
+
 /** Global editors (SA / tech) are not company-scoped. */
 export function profileEditCompanyScope(
   role: unknown,

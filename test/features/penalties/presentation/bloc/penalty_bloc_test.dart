@@ -232,7 +232,7 @@ void main() {
       'should upload files and emit success state',
       build: () {
         when(() => mockPenaltyRepository.uploadEvidenceFile(
-                file: any(named: 'file'), penaltyId: any(named: 'penaltyId')))
+                file: any(named: 'file'), penaltyId: any(named: 'penaltyId'), companyId: any(named: 'companyId')))
             .thenAnswer((_) async => const Right(tEvidenceFile));
         when(() => mockCreatePenaltyUseCase(any()))
             .thenAnswer((_) async => const Right(unit));
@@ -248,7 +248,7 @@ void main() {
       ],
       verify: (_) {
         verify(() => mockPenaltyRepository.uploadEvidenceFile(
-            file: any(named: 'file'), penaltyId: any(named: 'penaltyId'))).called(1);
+            file: any(named: 'file'), penaltyId: any(named: 'penaltyId'), companyId: any(named: 'companyId'))).called(1);
         verify(() => mockCreatePenaltyUseCase(any())).called(1);
       }
     );

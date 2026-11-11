@@ -32,7 +32,7 @@ class FeedbackRemoteDataSourceImpl implements FeedbackRemoteDataSource {
 
     // رفع الصورة إذا كانت موجودة
     if (screenshot != null) {
-      final fileName = 'feedback_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final fileName = 'feedback_${feedback.userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final ref = storage.ref().child('feedback_screenshots/$fileName');
       
       final metadata = SettableMetadata(

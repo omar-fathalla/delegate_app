@@ -110,18 +110,61 @@ service firebase.storage {
 
 
     // ==================== FEEDBACK SCREENSHOTS ====================
-    // Screenshots attached to user feedbacks (delegates, supervisors, admins, marketing)
-    // Path has no company or uid segment, so staff of any company can
-    // still write (residual, documented). Delegates may write with a
-    // real delegate token (role=delegate).
+    // Path stays flat so existing clients keep working. The app sets
+    // custom metadata userId to the caller's uid. Delegates may create
+    // only when that metadata matches; they may read/update/delete only
+    // their own object. Staff of any company still have full access
+    // (residual, documented: no company segment).
     match /feedback_screenshots/{fileName} {
-      allow read, write: if isStorageStaff() || isDelegateToken();
+      // Overwrites must be evaluated against the existing object's
+      // owner even if a client upload is classified as create.
+      allow read: if isStorageStaff()
+        || (isDelegateToken()
+          && resource.metadata.get('userId', '') == request.auth.uid);
+      allow create, update: if isStorageStaff()
+        || (isDelegateToken()
+          && request.resource.metadata.get('userId', '') == request.auth.uid
+          && (resource == null
+            || resource.metadata.get('userId', '') == request.auth.uid));
+      allow delete: if isStorageStaff()
+        || (isDelegateToken()
+          && resource.metadata.get('userId', '') == request.auth.uid);
     }
 
     // ==================== PHOTO PERMISSION IMAGES ====================
+    // Delegates of the company may create and read. Update/delete is
+    // own-uid only (photo_{uid}_* or metadata userId/delegateUid).
+    // Legacy photo_{timestamp}.jpg has no owner in the name; delegates
+    // cannot overwrite or delete those (staff can). Old clients that
+    // still upload photo_{timestamp}.jpg can create new objects.
+    function permissionPhotoNameOwnedByCaller(photoId) {
+      return request.auth.uid != ''
+        && photoId.matches('photo_' + request.auth.uid + '_.*');
+    }
+    function permissionPhotoNameOwnedByOther(photoId) {
+      return photoId.matches('photo_.*_.*')
+        && !permissionPhotoNameOwnedByCaller(photoId);
+    }
+    function delegateOwnsPermissionPhoto(photoId) {
+      return isDelegateToken()
+        && request.auth.uid != ''
+        && (
+          permissionPhotoNameOwnedByCaller(photoId)
+          || resource.metadata.get('userId', '') == request.auth.uid
+          || resource.metadata.get('delegateUid', '') == request.auth.uid
+        );
+    }
     match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
-      allow read, write: if canAccessCompanyFiles(compId)
+      allow read: if canAccessCompanyFiles(compId)
         || delegateTokenOwnsCompany(compId);
+      // Filename photo_{uid}_* is treated as owned by that uid so a
+      // create-classified overwrite cannot steal a colleague's object.
+      allow create, update: if canAccessCompanyFiles(compId)
+        || (delegateTokenOwnsCompany(compId)
+          && !permissionPhotoNameOwnedByOther(photoId)
+          && (resource == null || delegateOwnsPermissionPhoto(photoId)));
+      allow delete: if canAccessCompanyFiles(compId)
+        || (delegateTokenOwnsCompany(compId) && delegateOwnsPermissionPhoto(photoId));
     }
 
     // ==================== TASK IMAGES ====================
@@ -201,19 +244,27 @@ service firebase.storage {
     }
 
     // ==================== PENALTIES ATTACHMENTS ====================
-    // App path is penalties/evidence/{penaltyId}/... with no company
-    // segment. Cannot tenant-scope without breaking clients. Residual:
-    // any named staff of any company may read/write; delegates cannot.
-    match /penalties/{allPaths=**} {
-      allow read, write: if isStorageStaff();
+    // New uploads use penalties/{companyUID}/evidence/{penaltyId}/...
+    // and are tenant-scoped. The legacy path penalties/evidence/...
+    // stays readable by any named staff so existing objects and old
+    // clients that only GET remain usable; new writes on the legacy
+    // path are denied.
+    match /penalties/{compId}/evidence/{penaltyId}/{allPaths=**} {
+      allow read, write: if canAccessCompanyFiles(compId);
+    }
+    match /penalties/evidence/{allPaths=**} {
+      allow read: if isStorageStaff();
+      allow write: if false;
     }
 
     // ==================== LEAVE ATTACHMENTS ====================
     // App path: leave_attachments/{companyUID}/{uid}/...
-    // Staff are same-company (or global). The folder owner may write
+    // Staff: same-company HR / supervisor / org-admin (or global),
+    // same set as web ID-docs. Accountant and marketing are out;
+    // their screens do not use this path. The folder owner may write
     // their own uid segment when the token company matches.
     match /leave_attachments/{compId}/{uid}/{allPaths=**} {
-      allow read, write: if canAccessCompanyFiles(compId)
+      allow read, write: if canAccessWebIdDocs(compId)
         || (delegateTokenOwnsCompany(compId) && request.auth.uid == uid);
     }
 

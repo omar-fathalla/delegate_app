@@ -264,6 +264,7 @@ void main() {
   group('uploadEvidenceFile', () {
     late MockReference mockRootReference;
     late MockReference mockPenaltiesReference;
+    late MockReference mockCompanyReference;
     late MockReference mockEvidenceReference;
     late MockReference mockIdReference;
     late MockReference mockFileReference;
@@ -273,6 +274,7 @@ void main() {
     setUp(() {
       mockRootReference = MockReference();
       mockPenaltiesReference = MockReference();
+      mockCompanyReference = MockReference();
       mockEvidenceReference = MockReference();
       mockIdReference = MockReference();
       mockFileReference = MockReference();
@@ -281,7 +283,8 @@ void main() {
 
       when(() => mockStorage.ref()).thenReturn(mockRootReference);
       when(() => mockRootReference.child('penalties')).thenReturn(mockPenaltiesReference);
-      when(() => mockPenaltiesReference.child('evidence')).thenReturn(mockEvidenceReference);
+      when(() => mockPenaltiesReference.child('coA')).thenReturn(mockCompanyReference);
+      when(() => mockCompanyReference.child('evidence')).thenReturn(mockEvidenceReference);
       when(() => mockEvidenceReference.child(any())).thenReturn(mockIdReference);
       when(() => mockIdReference.child(any())).thenReturn(mockFileReference);
       
@@ -293,7 +296,7 @@ void main() {
       when(() => mockTaskSnapshot.ref).thenReturn(mockFileReference);
       when(() => mockFileReference.getDownloadURL()).thenAnswer((_) async => 'http://test.com/my_image.jpg');
 
-      final result = await dataSource.uploadEvidenceFile(file: mockFile, penaltyId: 'test_id');
+      final result = await dataSource.uploadEvidenceFile(file: mockFile, penaltyId: 'test_id', companyId: 'coA');
 
       expect(result.fileUrl, equals('http://test.com/my_image.jpg'));
       expect(result.fileName, equals('my_image.jpg'));
@@ -305,7 +308,12 @@ void main() {
 
       final call = dataSource.uploadEvidenceFile;
 
-      expect(() => call(file: mockFile, penaltyId: 'test_id'), throwsA(isA<ServerException>()));
+      expect(() => call(file: mockFile, penaltyId: 'test_id', companyId: 'coA'), throwsA(isA<ServerException>()));
+    });
+
+    test('should throw ServerException when companyId is empty', () async {
+      final call = dataSource.uploadEvidenceFile;
+      expect(() => call(file: mockFile, penaltyId: 'test_id', companyId: ''), throwsA(isA<ServerException>()));
     });
   });
 }
