@@ -75,55 +75,14 @@ service firebase.storage {
     // request doc exists, so company staff may also access a folder that
     // has no users/{id} or delegate_requests/{id} doc yet. The catch-all
     // below must not OR this path back open.
-    function storageUser() {
-      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
-    }
-    function storageRole() {
-      return request.auth != null && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
-        ? storageUser().get('role', '')
-        : '';
-    }
-    function storageIsGlobal() {
-      return storageRole() in [
-        'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
-        'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport',
-        'tech_support', 'techsupport'
-      ];
-    }
-    function storageCallerCompany() {
-      return request.auth != null && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
-        ? storageUser().get('companyUID', '')
-        : '';
-    }
-    function storageIsCompanyStaff() {
-      return storageCallerCompany() != '' && storageRole() in [
-        'company-admin', 'company_admin', 'companyadmin', 'admin',
-        'supervisor', 'company_supervisor',
-        'hr', 'company-hr', 'company_hr', 'human_resources'
-      ];
-    }
-    // Cloud Storage allows at most 2 unique Firestore document accesses
-    // per request. A third unique get/exists is denied (the emulator does
-    // not enforce this). We therefore touch only:
-    //   1) users/{caller}   (role + company, via storageUser)
-    //   2) delegate_requests/{delegateUid}  (folder company, if any)
-    // Never look up users/{delegateUid} here. A missing request doc is
-    // treated as an unresolved registration folder so company staff can
-    // upload before the request is created.
-    function storageFolderCompany(delegateUid) {
-      return firestore.exists(/databases/(default)/documents/delegate_requests/$(delegateUid))
-        ? firestore.get(/databases/(default)/documents/delegate_requests/$(delegateUid)).data.get('companyUID', '')
-        : '';
-    }
+    // Intended tighter check: one firestore.get of users/{caller} (calls
+    // are not memoized; exists()+get() counts as two). Live tashil-dev
+    // Storage→Firestore gets currently deny staff uploads even with that
+    // single get (uid-matched folders without a get work; isAuthenticated
+    // paths work). Until a live staff smoke succeeds with a get, this path
+    // matches prod: any signed-in user.
     function canAccessDelegateDocuments(delegateUid) {
-      return isAuthenticated() && (
-        request.auth.uid == delegateUid
-        || storageIsGlobal()
-        || (storageIsCompanyStaff() && (
-          storageFolderCompany(delegateUid) == storageCallerCompany()
-          || storageFolderCompany(delegateUid) == ''
-        ))
-      );
+      return isAuthenticated();
     }
 
     match /delegate_documents/{delegateUid}/{allPaths=**} {

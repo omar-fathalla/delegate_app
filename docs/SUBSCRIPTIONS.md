@@ -142,12 +142,14 @@ requests stay visible), and the next period is listed separately. One submit
 is one period. This does not flip `HOLDS_AUTHORITY_MODE` and does not change
 who may suspend.
 
-Cloud Storage allows at most two unique Firestore document accesses per
-request (the emulator does not enforce this). `canAccessDelegateDocuments`
-therefore looks up only `users/{caller}` and `delegate_requests/{folderId}`.
-It never looks up `users/{folderId}`. A missing request doc is treated as an
-unresolved registration folder so company staff can upload before the request
-is created. Prove this against live tashil-dev with
+Cloud Storage allows at most two `firestore.get`/`exists` *calls* per
+request (the emulator does not enforce this; function calls are not
+memoized). A tighter staff-only `canAccessDelegateDocuments` that gets
+`users/{caller}` once was tried on live tashil-dev and still denied staff
+uploads to a new registration folder (uid-matched folders without a get,
+and `isAuthenticated` paths, worked). Until a live staff smoke succeeds
+with a get, tashil-dev `delegate_documents` matches prod:
+`allow read, write: if isAuthenticated()`. Prove uploads with
 `scripts/smoke_tashil_dev_storage_upload.js` (never against prod).
 
 `startBillingCycle` caps `companyPriors` / `delegatePriors` on the run doc
