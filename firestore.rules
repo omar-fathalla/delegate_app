@@ -237,6 +237,37 @@ service cloud.firestore {
       );
     }
 
+    // One user-doc get, used by org-admin create. Cheaper than chaining
+    // isOrgAdmin + incomingOrgScoped + incomingCompanyScoped (those
+    // re-read the user doc and can blow the 1000-expression budget on
+    // a large request payload).
+    function orgAdminCreatesOwnScopedRequest() {
+      let exists = signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+      let u = exists
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+        : {};
+      let role = u.keys().hasAll(['role']) && u.role is string ? u.role : '';
+      let org = u.keys().hasAll(['organizationUID']) && u.organizationUID is string
+        && u.organizationUID != '' ? u.organizationUID : '';
+      let co = u.keys().hasAll(['companyUID']) && u.companyUID is string
+        && u.companyUID != '' ? u.companyUID : '';
+      let d = request.resource.data;
+      let incomingOrg = d.get('organizationUID', '') != ''
+        ? d.get('organizationUID', '') : d.get('organizationId', '');
+      let incomingCo = d.get('companyUID', '') != ''
+        ? d.get('companyUID', '') : d.get('companyId', '');
+      return role in [
+          'organization-admin', 'organization_admin', 'organizationadmin',
+          'organizationAdmin'
+        ]
+        && d.get('supervisorUid', '') == request.auth.uid
+        && org != ''
+        && co != ''
+        && incomingOrg == org
+        && incomingCo == co;
+    }
+
     function delegatePhoneMatch() {
       return isDelegate() && (
         (resource.data.keys().hasAll(['phoneNumber'])
@@ -1866,10 +1897,7 @@ service cloud.firestore {
       // update_national_id requests are created only by submitNationalIdUpdate
       // (Admin SDK). Clients cannot mint them.
       allow create: if (isSuperAdmin()
-        || (isOrgAdmin()
-          && request.resource.data.get('supervisorUid', '') == request.auth.uid
-          && incomingOrgScoped()
-          && incomingCompanyScoped())
+        || orgAdminCreatesOwnScopedRequest()
         || ((isCompanyAdmin() || isHR())
           && request.resource.data.get('supervisorUid', '') == request.auth.uid
           && incomingCompanyScoped()))

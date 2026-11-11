@@ -202,13 +202,14 @@ export async function quoteSubscriptionRequest(db: Db, requestId: string, at: Da
   return quote;
 }
 
-function projectIdOf(db: Db): string {
-  return str(db.app?.options?.projectId || process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT);
+function projectIdOf(): string {
+  const fromApp = admin.apps.length ? str(admin.app().options.projectId) : "";
+  return fromApp || str(process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT);
 }
 
 /** Load tashil-dev-only free-period bypass flags. Never returns bypass data on prod. */
 async function loadDevQuoteOptions(db: Db, data: Data): Promise<QuoteOptions> {
-  const projectId = projectIdOf(db);
+  const projectId = projectIdOf();
   const companyUID = str(data.companyUID);
   const opts: QuoteOptions = {projectId, companyUID};
   if (projectId !== "tashil-dev") return opts;
@@ -258,7 +259,7 @@ function coverageRef(db: Db, periodCode: string, uid: string) {
   return db.collection(COVERAGE).doc(coverageDocId(periodCode, uid));
 }
 
-function coverageBlocks(other: admin.firestore.DocumentSnapshot, requestId: string): boolean {
+function coverageBlocks(other: admin.firestore.DocumentSnapshot): boolean {
   if (!other.exists) return false;
   const status = str(other.get("status"));
   const paymentStatus = str(other.get("paymentStatus"));
@@ -284,7 +285,7 @@ async function assertNotAlreadyCovered(
     const otherId = str(cov.get("requestId"));
     if (!otherId || otherId === requestId) continue;
     const other = await tx.get(db.collection(REQUESTS).doc(otherId));
-    if (coverageBlocks(other, requestId)) throw new QuoteError("already_covered");
+    if (coverageBlocks(other)) throw new QuoteError("already_covered");
   }
 }
 
