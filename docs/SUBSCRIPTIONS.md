@@ -16,6 +16,27 @@ recomputes the amount when the calendar month changes in the same period
 checkout; a period mismatch or a Paymob amount that does not match the
 fresh quote is rejected and nobody is activated.
 
+## Multi-chain new-delegate requests (Phase 1 item 3)
+
+In the supervisor add-delegate form the chain picker is a multi-select with
+«اختيار الكل». The company is the tenant: the supervisor can pick any of
+their company's chains (up to 10). That produces **one** `delegate_requests`
+document (`organizationUIDs` + singular `organizationUID` for the first
+chain), **one** approval, and **one** subscription — the prorated fee is not
+multiplied by the number of chains. Approval writes a chain doc under each
+selected organization in the same `WriteBatch`.
+
+If the person (national ID or phone) is already on a selected chain, or a
+pending request already lists that chain, the chain is skipped and a warning
+names the skipped and remaining chains. If every selected chain is a
+duplicate, the request is not sent.
+
+Older requests without `organizationUIDs` are still read as
+`[organizationUID]`. The dry-run-first script
+`functions/scripts/backfill-organization-uids.js` can fill the list on
+tashil-dev (rollback file required; no prod apply without a written go).
+
+
 Same rules in two places, kept in sync by tests:
 `lib/core/utils/subscription_cycle_helper.dart` (UI) and
 `functions/src/subscription_logic.ts` (authoritative).

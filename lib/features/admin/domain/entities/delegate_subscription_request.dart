@@ -1,4 +1,11 @@
+import 'package:delegate_app/features/admin/domain/entities/chain_selection.dart';
 import 'package:equatable/equatable.dart';
+
+List<String> _stringList(dynamic raw) {
+  if (raw is! List) return const [];
+  return [for (final e in raw) e.toString().trim()].where((e) => e.isNotEmpty).toList();
+}
+
 
 enum SubscriptionPaymentMethod {
   companyDeduction,
@@ -122,6 +129,11 @@ class DelegateSubscriptionRequest extends Equatable {
   final String companyName;
   final String organizationUID;
   final String organizationName;
+  /// All selected chains (legacy docs may omit this; use [resolvedOrganizationUIDs]).
+  final List<String> organizationUIDs;
+  final List<String> organizationNames;
+  /// Chains the client skipped because the person was already registered there.
+  final List<String> skippedDuplicateOrgUIDs;
   final String firstName;
   final String secondName;
   final String thirdName;
@@ -163,6 +175,9 @@ class DelegateSubscriptionRequest extends Equatable {
     required this.companyName,
     required this.organizationUID,
     required this.organizationName,
+    this.organizationUIDs = const [],
+    this.organizationNames = const [],
+    this.skippedDuplicateOrgUIDs = const [],
     required this.firstName,
     required this.secondName,
     required this.thirdName,
@@ -210,6 +225,9 @@ class DelegateSubscriptionRequest extends Equatable {
       'companyName': companyName,
       'organizationUID': organizationUID,
       'organizationName': organizationName,
+      if (resolvedOrganizationUIDs.isNotEmpty) 'organizationUIDs': resolvedOrganizationUIDs,
+      if (organizationNames.isNotEmpty) 'organizationNames': organizationNames,
+      if (skippedDuplicateOrgUIDs.isNotEmpty) 'skippedDuplicateOrgUIDs': skippedDuplicateOrgUIDs,
       'firstName': firstName,
       'secondName': secondName,
       'thirdName': thirdName,
@@ -289,6 +307,9 @@ class DelegateSubscriptionRequest extends Equatable {
       companyName: map['companyName'] ?? '',
       organizationUID: map['organizationUID'] ?? '',
       organizationName: map['organizationName'] ?? '',
+      organizationUIDs: _stringList(map['organizationUIDs']),
+      organizationNames: _stringList(map['organizationNames']),
+      skippedDuplicateOrgUIDs: _stringList(map['skippedDuplicateOrgUIDs']),
       firstName: map['firstName'] ?? '',
       secondName: map['secondName'] ?? '',
       thirdName: map['thirdName'] ?? '',
@@ -340,6 +361,9 @@ class DelegateSubscriptionRequest extends Equatable {
     String? companyName,
     String? organizationUID,
     String? organizationName,
+    List<String>? organizationUIDs,
+    List<String>? organizationNames,
+    List<String>? skippedDuplicateOrgUIDs,
     String? firstName,
     String? secondName,
     String? thirdName,
@@ -379,6 +403,9 @@ class DelegateSubscriptionRequest extends Equatable {
       companyName: companyName ?? this.companyName,
       organizationUID: organizationUID ?? this.organizationUID,
       organizationName: organizationName ?? this.organizationName,
+      organizationUIDs: organizationUIDs ?? this.organizationUIDs,
+      organizationNames: organizationNames ?? this.organizationNames,
+      skippedDuplicateOrgUIDs: skippedDuplicateOrgUIDs ?? this.skippedDuplicateOrgUIDs,
       firstName: firstName ?? this.firstName,
       secondName: secondName ?? this.secondName,
       thirdName: thirdName ?? this.thirdName,
@@ -413,6 +440,22 @@ class DelegateSubscriptionRequest extends Equatable {
     );
   }
 
+  List<String> get resolvedOrganizationUIDs => resolveOrganizationUIDs(
+        organizationUID: organizationUID,
+        organizationUIDs: organizationUIDs,
+      );
+
+  String nameForOrganization(String uid) {
+    final i = organizationUIDs.indexOf(uid);
+    if (i >= 0 && i < organizationNames.length && organizationNames[i].trim().isNotEmpty) {
+      return organizationNames[i].trim();
+    }
+    if (uid == organizationUID && organizationName.trim().isNotEmpty) {
+      return organizationName.trim();
+    }
+    return uid;
+  }
+
   bool get isDeleteRequest => requestType == 'delete_delegate';
   bool get isAddOrganizationRequest => requestType == 'add_organization';
   bool get isNewDelegateRequest => requestType == 'new_delegate';
@@ -431,6 +474,8 @@ class DelegateSubscriptionRequest extends Equatable {
         supervisorUid,
         companyUID,
         organizationUID,
+        organizationUIDs,
+        skippedDuplicateOrgUIDs,
         phoneNumber,
         nationalId,
         proposedNationalId,

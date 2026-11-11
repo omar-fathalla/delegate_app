@@ -483,7 +483,8 @@ service cloud.firestore {
         && d.get('organizationUID', '') == orgId
         && (orgId == a.get('organizationUID', '')
           || (ty == 'new_delegate'
-            && orgId == get(/databases/$(database)/documents/users/$(a.get('supervisorUid', ''))).data.get('organizationUID', '')));
+            && (orgId == get(/databases/$(database)/documents/users/$(a.get('supervisorUid', ''))).data.get('organizationUID', '')
+              || a.get('organizationUIDs', []).hasAny([orgId]))));
     }
 
     function reqAfter(delegateId) {
@@ -1879,6 +1880,19 @@ service cloud.firestore {
         || resource.id == request.auth.uid;
     }
 
+
+    // Phase 1 item 3: organizationUIDs is optional (legacy docs omit it).
+    // When present it must include organizationUID and stay within 1–10.
+    function requestOrganizationUIDsOk() {
+      return !request.resource.data.keys().hasAll(['organizationUIDs'])
+        || (request.resource.data.organizationUIDs is list
+          && request.resource.data.organizationUIDs.size() >= 1
+          && request.resource.data.organizationUIDs.size() <= 10
+          && request.resource.data.organizationUIDs.hasAll([
+            request.resource.data.get('organizationUID', '')
+          ]));
+    }
+
     match /delegate_requests/{requestId} {
       allow read: if signedIn() && delegateRequestReadOk();
       // Docs-pending: requests are created by staff only (supervisor flow).
@@ -1903,7 +1917,8 @@ service cloud.firestore {
           && incomingCompanyScoped()))
         && request.resource.data.get('requestType', '') != 'update_national_id'
         && request.resource.data.get('actionType', '') != 'update_national_id'
-        && subscriptionPaymentUntouched();
+        && subscriptionPaymentUntouched()
+        && requestOrganizationUIDsOk();
       // Self clause first: the staff role helpers are expensive and would
       // otherwise eat the 1000-expression budget before the docs checks.
       // update_national_id requests are immutable after create: clients

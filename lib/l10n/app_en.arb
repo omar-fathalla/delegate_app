@@ -2373,5 +2373,21 @@
         "type": "String"
       }
     }
+  },
+  "chainPickerTitle": "Target organization / retail chain",
+  "@chainPickerTitle": {
+    "description": "Label for the multi-select chain picker on the add-delegate form"
+  },
+  "chainPickerSelectAll": "Select all",
+  "@chainPickerSelectAll": {
+    "description": "Select or deselect every chain in the add-delegate picker"
+  },
+  "chainPickerOneSubscriptionNote": "One request, one approval, and one subscription. There is no per-chain fee.",
+  "@chainPickerOneSubscriptionNote": {
+    "description": "Explains that multi-chain registration is one subscription with no per-chain fee"
+  },
+  "chainPickerRequired": "Please select at least one chain.",
+  "@chainPickerRequired": {
+    "description": "Error when the supervisor submits without selecting a chain"
   }
 }

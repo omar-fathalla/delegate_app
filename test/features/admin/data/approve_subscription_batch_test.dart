@@ -184,6 +184,35 @@ void main() {
     // app request and cannot stamp the new doc as web.
   });
 
+  test('new_delegate with two organizationUIDs writes both chain docs in the same batch, one fee', () async {
+    final db = FakeFirebaseFirestore();
+    await db.doc('users/sup').set({'role': 'supervisor', 'organizationUID': 'o1', 'companyUID': 'c1'});
+    final req = {
+      ..._req,
+      'organizationUIDs': ['o1', 'o2'],
+      'organizationNames': ['O1', 'O2'],
+      'fee': 416.67,
+    };
+    await db.doc('delegate_requests/r1').set(req);
+    final repo = DelegateSubscriptionRepositoryImpl(firestore: db, storage: _MockStorage());
+    final result = await repo.approveSubscriptionRequest(
+      request: DelegateSubscriptionRequest.fromMap(req, 'r1'),
+      reviewerUid: 'sa',
+      reviewerName: 'SA',
+    );
+    expect(result.isRight(), isTrue);
+    expect((await db.doc('delegate_requests/r1').get()).data()!['status'], 'approved');
+    for (final org in ['o1', 'o2']) {
+      final d = (await db.doc('organizations/$org/companies/c1/delegates/r1').get()).data()!;
+      expect(d['status'], 'active');
+      expect(d['organizationUID'], org);
+      expect(d['registeredVia'], 'mobile_app');
+      expect(d['approvedRequestId'], 'r1');
+      expect((d['subscription'] as Map)['amountDue'], 416.67);
+      expect((d['subscription'] as Map)['registrationRequestId'], 'r1');
+    }
+  });
+
   test('r5: users/{uid} write fails after commit -> surfaced with a working retry', () async {
     final db = _UsersFailFirestore();
     await _seed(db);

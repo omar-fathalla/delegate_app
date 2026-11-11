@@ -2846,4 +2846,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String deviceLockSendError(String error) {
     return 'Could not send the request: $error';
   }
+
+  @override
+  String get chainPickerTitle => 'Target organization / retail chain';
+
+  @override
+  String get chainPickerSelectAll => 'Select all';
+
+  @override
+  String get chainPickerOneSubscriptionNote =>
+      'One request, one approval, and one subscription. There is no per-chain fee.';
+
+  @override
+  String get chainPickerRequired => 'Please select at least one chain.';
 }

@@ -2846,4 +2846,17 @@ class AppLocalizationsAr extends AppLocalizations {
   String deviceLockSendError(String error) {
     return 'حدث خطأ أثناء إرسال الطلب: $error';
   }
+
+  @override
+  String get chainPickerTitle => 'المنظمة / السلسلة التجارية المستهدفة';
+
+  @override
+  String get chainPickerSelectAll => 'اختيار الكل';
+
+  @override
+  String get chainPickerOneSubscriptionNote =>
+      'طلب واحد، موافقة واحدة، واشتراك واحد. لا تُحتسب رسوم لكل سلسلة.';
+
+  @override
+  String get chainPickerRequired => 'يرجى اختيار سلسلة واحدة على الأقل.';
 }
