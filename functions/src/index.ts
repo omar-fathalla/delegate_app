@@ -519,6 +519,8 @@ export {
 // hooks (quoteSubscriptionRequest / applyVerifiedSubscriptionPayment) are
 // library functions for Engineering's Paymob webhook, not deployed endpoints.
 export {stampDelegateSource} from "./stamp_delegate_source";
+export {setDelegateHold} from "./set_delegate_hold";
+export {auditDelegateHoldShadow} from "./holds_shadow";
 export {suspendExpiredSubscriptions} from "./subscription_schedule";
 export {
   expireAbandonedSubscriptionRenewals,
