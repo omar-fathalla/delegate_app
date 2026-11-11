@@ -129,7 +129,6 @@ void main() {
     expect(m['paymentMethod'], 'not_required');
     expect(m['paymentStatus'], 'not_required');
   });
-}
 
   test('submit refuses a suspended delegate or a chain they are already on', () async {
     final db = FakeFirebaseFirestore();
@@ -281,4 +280,4 @@ void main() {
     expect((await db.doc('delegate_requests/add2').get()).data()!['status'], 'pending');
     expect((await db.doc('organizations/o2/companies/c1/delegates/$uid').get()).exists, isFalse);
   });
-
+}
