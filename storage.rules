@@ -34,11 +34,14 @@ service firebase.storage {
       let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
       let role = u.get('role', '');
       let co = u.get('companyUID', '');
+      let intentPath = /databases/(default)/documents/storage_upload_intents/$(folderId);
+      // exists+get of the same doc counts as one of the two allowed gets.
       return isStorageGlobalRole(role)
         || (
           isStorageCompanyStaffRole(role)
           && co != ''
-          && firestore.get(/databases/(default)/documents/storage_upload_intents/$(folderId)).data.get('companyUID', '') == co
+          && firestore.exists(intentPath)
+          && firestore.get(intentPath).data.get('companyUID', '') == co
         );
     }
     function canAccessDelegateDocuments(folderId) {
@@ -169,8 +172,13 @@ service firebase.storage {
     // ==================== FALLBACK FOR ALL OTHER AUTHENTICATED PATHS ====================
     // Do not match delegate_documents: Storage ORs overlapping matches, so a
     // catch-all here would undo the tighter rule above.
+    // Storage ORs overlapping matches, so tenant-scoped prefixes must be
+    // excluded from this catch-all or the tighter rules above are undone.
     match /{firstSegment}/{rest=**} {
-      allow read, write: if isNonAnonymous() && firstSegment != 'delegate_documents';
+      allow read, write: if isNonAnonymous()
+        && firstSegment != 'delegate_documents'
+        && firstSegment != 'delegate_subscription_receipts'
+        && firstSegment != 'companies';
     }
     match /{singleFile} {
       allow read, write: if isNonAnonymous();
