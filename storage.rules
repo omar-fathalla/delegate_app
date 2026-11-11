@@ -109,23 +109,59 @@ service firebase.storage {
     }
 
 
+
+    // M3 residual: when the delegate token carries orgId+companyId and
+    // the delegate doc exists, held accounts cannot write Storage. Skip
+    // the get when claims are missing so older test tokens still work.
+    // Reads stay allowed so the app can listen and sign out.
+    function storageDelegatePath(orgId, co, uid) {
+      return /databases/(default)/documents/organizations/$(orgId)/companies/$(co)/delegates/$(uid);
+    }
+    function storageDelegateAccountWritable(orgId, co, uid) {
+      let d = firestore.get(storageDelegatePath(orgId, co, uid)).data;
+      let st = d.get('status', 'active');
+      let held = st == 'suspended' || st == 'inactive' || st == 'disabled' || st == 'rejected';
+      let holdsEmpty = d.get('holds', {}).keys().size() == 0;
+      return !held && holdsEmpty;
+    }
+    function callerDelegateMayWriteStorage() {
+      let orgId = request.auth.token.get('orgId', '');
+      let co = request.auth.token.get('companyId', '');
+      let uid = request.auth.uid;
+      return !isDelegateToken()
+        || orgId == ''
+        || co == ''
+        || uid == ''
+        || !firestore.exists(storageDelegatePath(orgId, co, uid))
+        || storageDelegateAccountWritable(orgId, co, uid);
+    }
+
     // ==================== FEEDBACK SCREENSHOTS ====================
     // Flat path kept so existing objects remain addressable. New
-    // delegate creates must be named feedback_{uid}_* (uid then '_').
-    // If userId metadata is present it must equal the caller, on create
-    // and on read/update/delete of an existing object. Metadata is not
-    // required on create (live REST often omits it). Legacy objects
-    // that are not feedback_{otherUid}_* stay readable/updatable/
-    // deletable by the delegate when userId metadata equals the
-    // caller. Staff of any company still have full access (residual:
-    // no company segment). New clients write feedback_{uid}_{ts}.jpg.
+    // delegate creates must be named feedback_{uid}_<token> where
+    // <token> has no extra underscore (typically a millisecond
+    // timestamp) so a shorter uid cannot claim feedback_{uid}_2_*.
+    // If userId metadata is present it must equal the caller, on
+    // create and on read/update/delete. Metadata is optional on
+    // create when the filename already names the caller; missing
+    // metadata must not fail the rule (treat it as empty).
+    // Legacy flat-name creates by delegates are denied: older app
+    // builds that uploaded a name like dlgA-fb.png can no longer
+    // create. Existing legacy objects that are not
+    // feedback_{otherUid}_* stay readable/updatable/deletable by
+    // the delegate when userId metadata equals the caller. Staff
+    // of any company still have full access (residual: no company
+    // segment). New clients write feedback_{uid}_{ts}.jpg.
     function feedbackNameOwnedByCaller(fileName) {
       return request.auth.uid != ''
-        && fileName.matches('feedback_' + request.auth.uid + '_.*');
+        && fileName.matches('feedback_' + request.auth.uid + '_[^_]+(\\.[A-Za-z0-9]+)?$');
     }
     function feedbackNameOwnedByOther(fileName) {
       return fileName.matches('feedback_.*_.*')
         && !feedbackNameOwnedByCaller(fileName);
+    }
+    function storageMetaUserId(meta) {
+      return meta == null ? '' : meta.get('userId', '');
     }
     function feedbackMetaOk(userId) {
       return userId == '' || userId == request.auth.uid;
@@ -133,12 +169,12 @@ service firebase.storage {
     function feedbackDelegateMayAccess(fileName) {
       return isDelegateToken()
         && request.auth.uid != ''
-        && feedbackMetaOk(resource.metadata.get('userId', ''))
+        && feedbackMetaOk(storageMetaUserId(resource.metadata))
         && (
           feedbackNameOwnedByCaller(fileName)
           || (
             !feedbackNameOwnedByOther(fileName)
-            && resource.metadata.get('userId', '') == request.auth.uid
+            && storageMetaUserId(resource.metadata) == request.auth.uid
           )
         );
     }
@@ -150,25 +186,29 @@ service firebase.storage {
       allow create, update: if isStorageStaff()
         || (
           isDelegateToken()
-          && feedbackMetaOk(request.resource.metadata.get('userId', ''))
+          && callerDelegateMayWriteStorage()
+          && feedbackMetaOk(storageMetaUserId(request.resource.metadata))
           && (
             (resource == null && feedbackNameOwnedByCaller(fileName))
             || (resource != null && feedbackDelegateMayAccess(fileName))
           )
         );
       allow delete: if isStorageStaff()
-        || feedbackDelegateMayAccess(fileName);
+        || (feedbackDelegateMayAccess(fileName) && callerDelegateMayWriteStorage());
     }
 
     // ==================== PHOTO PERMISSION IMAGES ====================
     // Delegates of the company may create and read. Update/delete is
-    // own-uid only (photo_{uid}_* or metadata userId/delegateUid).
+    // own-uid only: the name must be photo_{uid}_<token> where <token>
+    // has no extra underscore (app: photo_{uid}_{ts}.jpg), or metadata
+    // userId/delegateUid equals the caller. A prefix match is not
+    // enough: photo_{uid}_2_{ts} belongs to uid_2, not uid.
     // Legacy photo_{timestamp}.jpg has no owner in the name; delegates
     // cannot overwrite or delete those (staff can). Old clients that
     // still upload photo_{timestamp}.jpg can create new objects.
     function permissionPhotoNameOwnedByCaller(photoId) {
       return request.auth.uid != ''
-        && photoId.matches('photo_' + request.auth.uid + '_.*');
+        && photoId.matches('photo_' + request.auth.uid + '_[^_]+(\\.[A-Za-z0-9]+)?$');
     }
     function permissionPhotoNameOwnedByOther(photoId) {
       return photoId.matches('photo_.*_.*')
@@ -179,8 +219,8 @@ service firebase.storage {
         && request.auth.uid != ''
         && (
           permissionPhotoNameOwnedByCaller(photoId)
-          || resource.metadata.get('userId', '') == request.auth.uid
-          || resource.metadata.get('delegateUid', '') == request.auth.uid
+          || storageMetaUserId(resource.metadata) == request.auth.uid
+          || (resource.metadata != null && resource.metadata.get('delegateUid', '') == request.auth.uid)
         );
     }
     match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
@@ -190,10 +230,13 @@ service firebase.storage {
       // create-classified overwrite cannot steal a colleague's object.
       allow create, update: if canAccessCompanyFiles(compId)
         || (delegateTokenOwnsCompany(compId)
+          && callerDelegateMayWriteStorage()
           && !permissionPhotoNameOwnedByOther(photoId)
           && (resource == null || delegateOwnsPermissionPhoto(photoId)));
       allow delete: if canAccessCompanyFiles(compId)
-        || (delegateTokenOwnsCompany(compId) && delegateOwnsPermissionPhoto(photoId));
+        || (delegateTokenOwnsCompany(compId)
+          && callerDelegateMayWriteStorage()
+          && delegateOwnsPermissionPhoto(photoId));
     }
 
     // ==================== TASK IMAGES ====================
@@ -293,8 +336,12 @@ service firebase.storage {
     // their screens do not use this path. The folder owner may write
     // their own uid segment when the token company matches.
     match /leave_attachments/{compId}/{uid}/{allPaths=**} {
-      allow read, write: if canAccessWebIdDocs(compId)
+      allow read: if canAccessWebIdDocs(compId)
         || (delegateTokenOwnsCompany(compId) && request.auth.uid == uid);
+      allow write: if canAccessWebIdDocs(compId)
+        || (delegateTokenOwnsCompany(compId)
+          && request.auth.uid == uid
+          && callerDelegateMayWriteStorage());
     }
 
     // ==================== DELEGATE REGISTRATION & SUBSCRIPTION DOCUMENTS ====================

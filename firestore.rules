@@ -1783,9 +1783,31 @@ service cloud.firestore {
 
     // Delegate may notify a same-company supervisor: createdBy is the
     // caller and the payload is scoped to a company in the token.
+    // M3 residual: when orgId+companyId claims are present and the
+    // delegate doc exists, a held account cannot create notifications
+    // or leave requests. Skip the get when claims or the doc are
+    // missing. Do not apply this to reads of the delegate document.
+    function delegateAccountWritable(orgId, co) {
+      let d = get(/databases/$(database)/documents/organizations/$(orgId)/companies/$(co)/delegates/$(request.auth.uid)).data;
+      let st = d.get('status', 'active');
+      let held = st == 'suspended' || st == 'inactive' || st == 'disabled' || st == 'rejected';
+      let holdsEmpty = d.get('holds', {}).keys().size() == 0;
+      return !held && holdsEmpty;
+    }
+    function callerDelegateNotHeld() {
+      let orgId = claimString('orgId');
+      let co = claimString('companyId');
+      return !isDelegate()
+        || orgId == ''
+        || co == ''
+        || !exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(co)/delegates/$(request.auth.uid))
+        || delegateAccountWritable(orgId, co);
+    }
+
     function canDelegateCreateNotification() {
       let d = request.resource.data;
       return isDelegate()
+        && callerDelegateNotHeld()
         && dataHasString(d, 'createdBy')
         && d.createdBy == request.auth.uid
         && (
@@ -1865,7 +1887,17 @@ service cloud.firestore {
       );
     }
 
+    // Cheap, org-admin-only allow so a list query on
+    // organizationId == callerOrg() is provable without the
+    // organizationUID/organizationId OR inside orgScoped().
+    function canReadOrgAdminPenaltyByOrgId() {
+      return isOrgAdmin()
+        && callerOrg() != ''
+        && resource.data.organizationId == callerOrg();
+    }
+
     match /penalties/{penaltyId} {
+      allow read: if signedIn() && canReadOrgAdminPenaltyByOrgId();
       allow read: if signedIn() && (
         isGlobalStaff()
         || (isCompanyScopedStaff() && companyScoped())
@@ -2268,7 +2300,7 @@ service cloud.firestore {
         ownsDelegateId(resource.data.delegateUid)
         || delegateOwns(resource.data.delegateUid)
       );
-      allow create: if signedIn() && (
+      allow create: if signedIn() && callerDelegateNotHeld() && (
         ownsDelegateId(request.resource.data.delegateUid)
         || delegateOwns(request.resource.data.delegateUid)
         || (isCompanyScopedStaff() && incomingCompanyScoped())
