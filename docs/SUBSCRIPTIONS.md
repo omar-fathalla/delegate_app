@@ -142,6 +142,55 @@ requests stay visible), and the next period is listed separately. One submit
 is one period. This does not flip `HOLDS_AUTHORITY_MODE` and does not change
 who may suspend.
 
+## HOLDS_AUTHORITY_MODE (Phase 2 item 4)
+
+`holdsMode()` reads `process.env.HOLDS_AUTHORITY_MODE`. Only the exact value
+`authoritative` flips the writers; any other value (including unset, `shadow`,
+or a typo) stays in shadow. Default is shadow.
+
+Shadow writers may add or remove holds, `statusVersion`, and `statusHistory`,
+but they do not write `status` or `statusReason` (except the existing M1/M2
+prepaid / current-period renewal path that still reactivates a delegate when
+the expiry hold is gone and no legacy non-expiry suspension remains). The
+`auditDelegateHoldShadow` trigger only appends `status_audit`; it never
+corrects status. `startBillingCycle` in shadow writes holds and priors on the
+run doc, not company billing counters or `isPrinted`.
+
+Authoritative mode additionally writes `status` / `statusReason` from the
+holds map (`setDelegateHold`, and the M1/M2 library when those entry points
+run) and lets `startBillingCycle` write company counters and `isPrinted`
+(previous values stay on the `billing_cycles` run doc).
+
+This flip does **not** deploy `suspendExpiredSubscriptions` (M1 is not live
+on tashil-dev). `applyVerifiedSubscriptionPayment` is a Paymob library hook,
+not a deployed tashil-dev function, so this env change does not by itself
+alter a Paymob webhook in another service. `users/{uid}.status` is not
+mirrored; `delegateLoginV2` and the app read the delegate document.
+
+On tashil-dev only, after a written go (never prod, never together with a
+`suspendExpiredSubscriptions` deploy):
+
+```
+bash scripts/holds_authority_mode.sh status --project tashil-dev
+bash scripts/holds_authority_mode.sh flip --project tashil-dev
+```
+
+The script PATCHes `HOLDS_AUTHORITY_MODE` on the allowlisted functions
+`setDelegateHold` and `startBillingCycle`. It does not upload source and it
+refuses any project other than `tashil-dev`. After the flip, a `setDelegateHold`
+call (even an unchanged one) should return `mode: "authoritative"`.
+
+One-step rollback (same script, no source upload):
+
+```
+bash scripts/holds_authority_mode.sh rollback --project tashil-dev
+```
+
+That sets `HOLDS_AUTHORITY_MODE=shadow` on the same two functions. A later
+`firebase deploy` of those functions can drop a hand-patched env var; run
+`status` after any such deploy and re-apply if needed. Do not use this script
+against prod.
+
 Cloud Storage allows at most two `firestore.get`/`exists` calls per
 request (same-document calls may be cached). `delegate_documents` is not
 `isAuthenticated()`: anonymous tokens are denied, a folder owner may

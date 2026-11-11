@@ -9,7 +9,9 @@
  * authoritative, and previous values are stored on the run doc.
  *
  * Deploy: functions:tashil-mobile-notifications:startBillingCycle
- * Do not deploy suspendExpiredSubscriptions with this function.
+ * Mode is process.env.HOLDS_AUTHORITY_MODE (default shadow). Flip or roll
+ * back on tashil-dev with scripts/holds_authority_mode.sh. Do not deploy
+ * suspendExpiredSubscriptions with this function or with a mode flip.
  */
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";

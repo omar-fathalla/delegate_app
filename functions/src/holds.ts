@@ -108,6 +108,22 @@ export function holdsMode(env: NodeJS.Dict<string> = process.env): string {
     HOLDS_MODE_SHADOW;
 }
 
+/**
+ * Status fields written onto the delegate document for a hold change.
+ * Shadow (the default) returns null so callers leave `status` and
+ * `statusReason` alone. Authoritative returns the derived status and the
+ * highest-priority remaining hold (or null, which callers should delete).
+ * Any value other than "authoritative" is treated as shadow (fail closed).
+ */
+export function authorityStatusFields(
+  mode: string,
+  derivedStatus: string,
+  nextStatusReason: string | null,
+): {status: string; statusReason: string | null} | null {
+  if (mode !== HOLDS_MODE_AUTHORITATIVE) return null;
+  return {status: derivedStatus, statusReason: nextStatusReason};
+}
+
 export function isHoldKey(v: unknown): v is HoldKey {
   return typeof v === "string" && (HOLD_KEYS as readonly string[]).includes(v);
 }

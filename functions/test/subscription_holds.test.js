@@ -164,3 +164,22 @@ test("legacy non-expiry statusReason blocks shadow reactivation", () => {
   assert.equal(should({status: "suspended", statusReason: "admin_suspend"}, "active"), false);
   assert.equal(should({status: "suspended", statusReason: "subscription_expired"}, "suspended"), false);
 });
+
+test("planExpiryHoldWrite flip then rollback stops writing status", () => {
+  const base = {
+    data: {status: "active", holds: {}},
+    op: "add",
+    at,
+    actor: "system",
+    source: S.M1_SOURCE,
+    periodCode: "2027_H1",
+  };
+  const auth = S.planExpiryHoldWrite({...base, mode: "authoritative"});
+  assert.equal(auth.update.status, "suspended");
+  assert.equal(auth.update.statusReason, "subscription_expired");
+  const shadow = S.planExpiryHoldWrite({...base, mode: "shadow"});
+  assert.equal(shadow.update.status, undefined);
+  assert.equal(shadow.update.statusReason, undefined);
+  const rolled = S.planExpiryHoldWrite({...base, mode: "shadow"});
+  assert.equal(rolled.update.status, undefined);
+});
