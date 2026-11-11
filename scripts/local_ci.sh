@@ -97,6 +97,20 @@ seed_local_properties() {
 
 seed_local_properties
 
+# Record a clean checkout at the exact SHA *before* jobs (gitignored
+# android/local.properties is not shown by status --porcelain).
+WORKTREE_HEAD="$(git -C "$SRC" rev-parse HEAD)"
+WORKTREE_STATUS="$(git -C "$SRC" status --porcelain || true)"
+{
+  echo "worktree HEAD=${WORKTREE_HEAD}"
+  if [[ -z "${WORKTREE_STATUS}" ]]; then
+    echo "git status --porcelain: (empty)"
+  else
+    echo "git status --porcelain:"
+    printf '%s\n' "${WORKTREE_STATUS}"
+  fi
+} | tee -a "$OUT/full.log"
+
 # Wait for firestore/auth emulator ports to be free after a previous job.
 wait_emulator_ports() {
   local i
@@ -186,6 +200,16 @@ done <"$OUT/results.tsv"
   echo "# Local CI summary"
   echo
   echo "- SHA: \`${SHA}\`"
+  echo "- Worktree HEAD: \`${WORKTREE_HEAD}\`"
+  if [[ -z "${WORKTREE_STATUS:-}" ]]; then
+    echo "- git status --porcelain: empty"
+  else
+    echo "- git status --porcelain:"
+    echo
+    echo '```'
+    printf '%s\n' "${WORKTREE_STATUS}"
+    echo '```'
+  fi
   echo "- Started: ${START_TS}"
   echo "- Finished: ${END_TS}"
   echo "- Duration: ${TOTAL}s"
