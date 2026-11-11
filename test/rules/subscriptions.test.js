@@ -103,6 +103,25 @@ describe("delegate_requests: payment is server-only", () => {
     }));
   });
 
+  test("client cannot create a renewal that is already marked paid via amountPaid", async () => {
+    await assertFails(as("hr1").doc("delegate_requests/paid-amt").set({
+      requestType: "renewal", status: "pending", paymentStatus: "pending", paymentMethod: "paymob",
+      supervisorUid: "hr1",
+      coveredDelegateUids: ["a"], items: [{uid: "a", fee: 416.67}],
+      amountDue: 416.67, amountPaid: 416.67, periodCode: "2027_H1", companyUID: "c1",
+    }));
+  });
+
+  test("client cannot create a renewal with more than 100 covered delegates", async () => {
+    const uids = Array.from({length: 101}, (_, i) => `d${i}`);
+    await assertFails(as("hr1").doc("delegate_requests/too-many").set({
+      requestType: "renewal", status: "pending", paymentStatus: "pending", paymentMethod: "paymob",
+      supervisorUid: "hr1",
+      coveredDelegateUids: uids,
+      amountDue: 416.67, periodCode: "2027_H1", companyUID: "c1",
+    }));
+  });
+
   test("org-admin can create a renewal only in their own org and company", async () => {
     await assertSucceeds(as("oa1").doc("delegate_requests/oa-own").set({
       requestType: "renewal", status: "pending", paymentStatus: "pending", paymentMethod: "paymob",

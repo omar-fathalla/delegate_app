@@ -105,6 +105,31 @@ Future<FakeFirebaseFirestore> seed() async {
 
 class FakeGateway implements SubscriptionPaymentGateway {
   final List<String> started = [];
+  DateTime Function() clock;
+
+  FakeGateway({DateTime Function()? clock})
+    : clock = clock ?? (() => DateTime(2027, 2, 10));
+
+  @override
+  Future<Either<Failure, RenewalQuotePreview>> previewQuote({
+    required String companyUID,
+    String? organizationUID,
+    required List<String> uids,
+  }) async {
+    final amount = SubscriptionCycleHelper.totalFor(uids.length, clock());
+    final cents = (amount * 100).round();
+    return Right(
+      RenewalQuotePreview(
+        amountCents: cents,
+        periodCode: SubscriptionCycleHelper.getCycleCode(clock()),
+        remainingMonths: SubscriptionCycleHelper.getRemainingMonthsInCycle(
+          clock(),
+        ),
+        delegateCount: uids.length,
+      ),
+    );
+  }
+
   @override
   Future<Either<Failure, PaymentCheckout>> startCheckout({
     required String requestId,
@@ -488,7 +513,9 @@ void main() {
           companyName: s.companyName,
           organizationUID: s.organizationUID,
           organizationName: s.organizationName,
-          delegates: list.where((d) => d.uid == 'active1' && d.periodCode == '2027_H1').toList(),
+          delegates: list
+              .where((d) => d.uid == 'active1' && d.periodCode == '2027_H1')
+              .toList(),
         )).getOrElse(() => '');
         expect(id, isNotEmpty);
         final data = (await db.doc('delegate_requests/$id').get()).data()!;
@@ -724,6 +751,17 @@ void main() {
               .value,
           isFalse,
         );
+
+        final cancelBtn = find.widgetWithText(TextButton, 'إلغاء الطلب');
+        await tester.ensureVisible(cancelBtn);
+        await tester.pumpAndSettle();
+        await tester.tap(cancelBtn);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('renewal_cancel_confirm')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('renewal_cancel_confirm_yes')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('renewal_payment_status')), findsNothing);
+        expect(find.text('إلغاء الطلب'), findsNothing);
       },
     );
 
@@ -760,8 +798,8 @@ void main() {
       'advance window enables pay during the free promotion at the next-period fee',
       (tester) async {
         final db = await seed();
-        final gateway = FakeGateway();
         final dec = DateTime.utc(2026, 12, 15, 10);
+        final gateway = FakeGateway(clock: () => dec);
         final repo = SubscriptionRenewalRepository(
           firestore: db,
           clock: () => dec,

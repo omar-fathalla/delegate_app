@@ -27,10 +27,11 @@ export const suspendExpiredSubscriptions = functions
   });
 
 /**
- * 00:10 Cairo every day. Expires abandoned pending renewals whose quote is
- * no longer valid (end of the Cairo month it was quoted in, or the period
- * end, whichever comes first) and finishes rejected/cancelled renewals
- * whose paymentStatus is still pending, freeing their coverage.
+ * 00:10 Cairo every day. Expires abandoned pending renewals whose checkout
+ * TTL (60 minutes by default) or Cairo-month quote window has passed, and
+ * finishes rejected/cancelled renewals still payment-pending, freeing coverage.
+ * The 15-minute reconcileSubscriptionPaymentsScheduled job is the primary
+ * sweeper; this daily run is a backstop.
  */
 export const expireAbandonedSubscriptionRenewals = functions
   .region("us-central1")
@@ -57,5 +58,21 @@ export const finalizeSubscriptionRenewalOnStatus = functions
       (change.before.data() || {}) as Record<string, unknown>,
       (change.after.data() || {}) as Record<string, unknown>,
     );
+    return null;
+  });
+
+/**
+ * Every 15 minutes. Auto-expires awaiting-payment renewals that passed the
+ * checkout TTL so no request stays pending forever, and releases coverage
+ * so the user can retry or start a new request.
+ */
+export const reconcileSubscriptionPaymentsScheduled = functions
+  .region("us-central1")
+  .runWith({timeoutSeconds: 540, memory: "256MB"})
+  .pubsub.schedule("every 15 minutes")
+  .timeZone(TIME_ZONE)
+  .onRun(async () => {
+    const res = await expireAbandonedRenewals(admin.firestore(), new Date());
+    console.log(JSON.stringify({event: "reconcile_subscription_payments", ...res}));
     return null;
   });

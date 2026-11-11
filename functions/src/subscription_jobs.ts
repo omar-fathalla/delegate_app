@@ -10,7 +10,7 @@ import {
   coveredUids,
   isAppAddedRegistration,
   isFreePromotion,
-  isRenewalCoverageExpired,
+  isAwaitingPaymentExpired,
   parsePeriodCode,
   parseAdvanceRenewalConfig,
   periodOf,
@@ -250,6 +250,45 @@ export class QuoteError extends Error {
  * must call this when creating the Paymob order and charge exactly
  * `amountCents` (EGP piasters). Never trust an amount from the client.
  */
+/**
+ * Read-only quote for the confirmation sheet. Does not claim coverage or
+ * write the request. Expires stale awaiting-payment coverage so a preview
+ * cannot be blocked by a request that already passed its checkout TTL.
+ */
+export async function previewRenewalQuote(
+  db: Db,
+  opts: {companyUID: string; organizationUID?: string; uids: string[]; at: Date},
+): Promise<Quote> {
+  const seen = new Set<string>();
+  const uids: string[] = [];
+  for (const raw of opts.uids) {
+    const uid = str(raw);
+    if (!uid || seen.has(uid)) continue;
+    seen.add(uid);
+    uids.push(uid);
+  }
+  if (uids.length === 0) throw new QuoteError("no_delegates");
+  if (uids.length > MAX_DELEGATES_PER_RENEWAL) throw new QuoteError("too_many_delegates");
+  const companyUID = str(opts.companyUID);
+  if (!companyUID) throw new QuoteError("wrong_company");
+  const data: Data = {
+    companyUID,
+    organizationUID: str(opts.organizationUID),
+    requestType: REQUEST_TYPE_RENEWAL,
+  };
+  await assertRenewable(db, data, uids);
+  const advanceCfg = await loadAdvanceRenewalConfig(db);
+  const payable = resolvePayablePeriod(opts.at, "", advanceCfg);
+  if (!payable) throw new QuoteError("period_mismatch");
+  const quoteOpts = await loadDevQuoteOptions(db, data);
+  const quote = quoteFor(uids, opts.at, {...quoteOpts, periodCode: payable.code});
+  if (quote.amountCents <= 0) throw new QuoteError("free_period");
+  await db.runTransaction(async (tx) => {
+    await assertNotAlreadyCovered(tx, db, "_preview_", quote.periodCode, uids, opts.at);
+  });
+  return quote;
+}
+
 export async function quoteSubscriptionRequest(db: Db, requestId: string, at: Date): Promise<Quote> {
   const snap = await db.collection(REQUESTS).doc(requestId).get();
   if (!snap.exists) throw new QuoteError("not_found");
@@ -258,8 +297,8 @@ export async function quoteSubscriptionRequest(db: Db, requestId: string, at: Da
   if (status === "paid") throw new QuoteError("already_paid");
   const requestStatus = str(data.status);
   if (requestStatus === "rejected" || requestStatus === "cancelled") throw new QuoteError("not_payable");
-  if (status === "expired") throw new QuoteError("expired");
-  if (status !== "pending" && status !== "failed") throw new QuoteError("not_payable");
+  // failed / expired: coverage was released; the same request may be retried.
+  if (status !== "pending" && status !== "failed" && status !== "expired") throw new QuoteError("not_payable");
   const type = str(data.requestType || REQUEST_TYPE_NEW);
   if (type !== REQUEST_TYPE_NEW && type !== REQUEST_TYPE_RENEWAL) throw new QuoteError("not_payable");
   const advanceCfg = await loadAdvanceRenewalConfig(db);
@@ -375,8 +414,7 @@ function coverageBlocks(other: admin.firestore.DocumentSnapshot, now: Date): boo
     return false;
   }
   if (paymentStatus !== "pending") return false;
-  const quoted = quotedAtOf((other.data() || {}) as Data);
-  if (quoted && isRenewalCoverageExpired(quoted, now, str(other.get("periodCode")))) return false;
+  if (isAwaitingPaymentExpired((other.data() || {}) as Data, now)) return false;
   return true;
 }
 
@@ -522,8 +560,7 @@ export async function expireAbandonedRenewals(db: Db, now: Date): Promise<{scann
       continue;
     }
     if (payment !== "pending") continue;
-    const quoted = quotedAtOf(data);
-    if (quoted && isRenewalCoverageExpired(quoted, now, str(data.periodCode))) {
+    if (isAwaitingPaymentExpired(data, now)) {
       await finalizeTerminalRenewal(db, doc.id, "expired");
       expired++;
     }
@@ -586,8 +623,7 @@ async function assertNotAlreadyCovered(
       release();
       continue;
     }
-    const quoted = quotedAtOf(data);
-    if (payment === "pending" && quoted && isRenewalCoverageExpired(quoted, now, str(data.periodCode))) {
+    if (payment === "pending" && isAwaitingPaymentExpired(data, now)) {
       applyTerminalUpdate(tx, db, otherId, data, "expired");
       release();
       continue;
@@ -632,7 +668,12 @@ async function persistRecomputedQuote(
   const storedMonths = Number(data.remainingMonths ?? 0);
   const quotedAt = Timestamp.fromDate(at);
   if (storedCents === quote.amountCents && storedMonths === quote.remainingMonths) {
-    tx.update(db.collection(REQUESTS).doc(requestId), {quotedAt, updatedAt: FieldValue.serverTimestamp()});
+    tx.update(db.collection(REQUESTS).doc(requestId), {
+      quotedAt,
+      paymentStatus: "pending",
+      paymentError: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
     return;
   }
   const existingItems = Array.isArray(data.items) ? data.items as Data[] : [];
@@ -648,6 +689,8 @@ async function persistRecomputedQuote(
     remainingMonths: quote.remainingMonths,
     items,
     quotedAt,
+    paymentStatus: "pending",
+    paymentError: FieldValue.delete(),
     updatedAt: FieldValue.serverTimestamp(),
   });
 }
@@ -674,10 +717,13 @@ export interface VerifiedPayment {
   currency: string;
   /** Paymob transaction time. */
   paidAt: Date;
+  isVoided?: boolean;
+  isRefunded?: boolean;
 }
 
 export type ApplyOutcome =
-  | "duplicate" | "not_found" | "already_paid" | "failed" | "rejected" | "paid";
+  | "duplicate" | "not_found" | "already_paid" | "ignored_after_paid"
+  | "failed" | "rejected" | "paid";
 
 /**
  * Hook for Engineering's Paymob webhook. Call ONLY after the Paymob HMAC has
@@ -720,11 +766,32 @@ export async function applyVerifiedSubscriptionPayment(db: Db, p: VerifiedPaymen
     const uids = req.exists ? coveredUids(p.requestId, data) : [];
     const covs = periodCode && uids.length ? await readCoverageSnaps(tx, db, periodCode, uids) : [];
     if (event.exists) return "duplicate";
-    tx.set(eventRef, {requestId: p.requestId, ...paymob, receivedAt: ts});
+    tx.set(eventRef, {
+      requestId: p.requestId, ...paymob, receivedAt: ts,
+      isVoided: !!p.isVoided, isRefunded: !!p.isRefunded,
+    });
     if (!req.exists) return "not_found";
-    if (str(req.get("paymentStatus")) === "paid") return "already_paid";
-    if (!p.success) {
-      tx.update(reqRef, {paymentStatus: "failed", paymob, paymentError: "payment_failed", updatedAt: ts});
+    const isReversal = !!p.isVoided || !!p.isRefunded;
+    if (str(req.get("paymentStatus")) === "paid") {
+      // A later failed / void / refund webhook must not unpay a success.
+      if (isReversal || !p.success) {
+        tx.update(reqRef, {
+          needsReview: true,
+          laterPaymobEvent: {
+            transactionId: txId,
+            orderId: str(p.paymobOrderId),
+            kind: p.isRefunded ? "refund" : p.isVoided ? "void" : "failed",
+            receivedAt: ts,
+          },
+          updatedAt: ts,
+        });
+        return "ignored_after_paid";
+      }
+      return "already_paid";
+    }
+    if (isReversal || !p.success) {
+      const paymentError = p.isRefunded ? "refunded" : p.isVoided ? "voided" : "payment_failed";
+      tx.update(reqRef, {paymentStatus: "failed", paymob, paymentError, updatedAt: ts});
       if (periodCode && uids.length) releaseCoverageIfOwned(tx, db, p.requestId, periodCode, uids, covs);
       return "failed";
     }
@@ -813,8 +880,10 @@ export async function applyPaidRequest(db: Db, requestId: string, asOf?: Date): 
   });
   const at = now.toISOString();
   const mode = holdsMode();
+  const found = new Set<string>();
   for (const doc of await delegateDocsFor(db, uids)) {
     const uid = str(doc.get("uid")) || doc.ref.id;
+    found.add(uid);
     const update: Data = {};
     const sub = subscriptionFor(uid);
     // An advance payment for a future period must not overwrite the
@@ -872,6 +941,14 @@ export async function applyPaidRequest(db: Db, requestId: string, asOf?: Date): 
   }
   // users/{uid}.status is not mirrored here (login reads the delegate doc).
   await writer.flush();
-  await reqRef.update({applyState: "applied", reactivatedDocs: reactivated, appliedAt: ts});
+  const missing = uids.filter((uid) => !found.has(uid));
+  const update: Data = {applyState: "applied", reactivatedDocs: reactivated, appliedAt: ts};
+  // Partial success: deleted or moved delegates are skipped; the rest stay paid.
+  if (missing.length) {
+    update.needsReview = true;
+    update.applyError = "partial_apply";
+    update.missingDelegateUids = missing;
+  }
+  await reqRef.update(update);
   return reactivated;
 }

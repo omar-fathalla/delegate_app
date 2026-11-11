@@ -1982,7 +1982,12 @@ service cloud.firestore {
         && d.get('applyState', '') == ''
         && d.get('paymentError', null) == null
         && d.get('needsReview', false) == false
-        && d.get('quotedAt', null) == null;
+        && d.get('quotedAt', null) == null
+        && d.get('amountPaid', 0) == 0
+        && (!d.keys().hasAll(['coveredDelegateUids'])
+          || (d.coveredDelegateUids is list
+            && d.coveredDelegateUids.size() >= 1
+            && d.coveredDelegateUids.size() <= 100));
     }
     function delegateRequestReadOk() {
       let d = resource.data;
