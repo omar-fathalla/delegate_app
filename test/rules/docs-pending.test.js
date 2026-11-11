@@ -64,7 +64,8 @@ describe("docs-pending rules", () => {
         ...BASE, uid: "pend", status: "pending",
         documents: [{...PHOTO, documentStatus: "pending"}, {...NID, documentStatus: "pending"}]});
       await db.doc("delegate_requests/d1").set({
-        status: "pending", organizationUID: "o1", companyUID: "c1", profileImageUrl: "p0",
+        status: "pending", requestType: "new_delegate", orgCompanyCheck: "ok",
+        organizationUID: "o1", companyUID: "c1", profileImageUrl: "p0",
         documents: [{...PHOTO, documentStatus: "pending"}]});
     });
   });
@@ -210,7 +211,10 @@ describe("docs-pending round 2", () => {
     secondaryURL: "s", uploadedAt: "2026-01-01", reviewedBy: "x"}));
   const PEND = {...BASE, documents: [{...PHOTO, documentStatus: "pending"}, NID, RCPT]};
   const APPROVE = {documents: [{...PHOTO, reviewedBy: "r"}, NID, RCPT]};
-  const seed = (p, d) => env.withSecurityRulesDisabled((c) => c.firestore().doc(p).set(d));
+  const seed = (p, d) => env.withSecurityRulesDisabled((c) => c.firestore().doc(p).set(
+    p.startsWith("delegate_requests/") && d && !Object.prototype.hasOwnProperty.call(d, "orgCompanyCheck")
+      ? {...d, orgCompanyCheck: "ok"}
+      : d));
   // r4: the app's approve batch: request pending -> approved + delegate write.
   const REQ = {status: "pending", requestType: "new_delegate", organizationUID: "o1", companyUID: "c1",
     supervisorUid: "sup", fullName: "Fake", nationalId: "", profileImageUrl: "p0",
@@ -241,9 +245,12 @@ describe("docs-pending round 2", () => {
       for (const [id, d] of Object.entries(USERS)) await db.doc(`users/${id}`).set(d);
       await db.doc("organizations/o1").set({name: "O1"});
       await db.doc("organizations/o1/companies/c1").set({name: "C1"});
+      await db.doc("organizations/o2").set({name: "O2"});
+      await db.doc("organizations/o2/companies/c1").set({name: "C1", organizationUID: "o2"});
       for (const p of Object.values(ALL)) await db.doc(p).set(BASE);
       await db.doc("delegate_requests/d1").set({
-        status: "pending", organizationUID: "o1", companyUID: "c1", profileImageUrl: "p0",
+        status: "pending", requestType: "new_delegate", orgCompanyCheck: "ok",
+        organizationUID: "o1", companyUID: "c1", profileImageUrl: "p0",
         nationalIdFrontUrl: "f0", nationalIdBackUrl: "b0", documents: BASE.documents});
     });
   });
@@ -613,6 +620,7 @@ describe("docs-pending round 2", () => {
     });
     test("ALLOW ts new_delegate copy under the supervisor's organization (2e)", async () => {
       await seed("users/supX", {role: "supervisor", organizationUID: "o9", companyUID: "c1"});
+      await seed("organizations/o9/companies/c1", {name: "C1", organizationUID: "o9"});
       await seed("delegate_requests/n1", {...REQ, supervisorUid: "supX"});
       const db = as("ts");
       const bb = writeBatch(db);

@@ -522,6 +522,7 @@ export {stampDelegateSource} from "./stamp_delegate_source";
 export {setDelegateHold} from "./set_delegate_hold";
 export {auditDelegateHoldShadow} from "./holds_shadow";
 export {auditDelegateRequestOrgs} from "./request_org_company_check";
+export {auditDelegateCreateOrgs} from "./request_org_company_check";
 export {suspendExpiredSubscriptions} from "./subscription_schedule";
 export {
   expireAbandonedSubscriptionRenewals,

@@ -24,3 +24,19 @@ test("summarizeOrgCompanyCheck fails closed without a company and when a chain i
   assert.equal(ok.ok, true);
   assert.equal(ok.reason, "ok");
 });
+
+test("requestApprovalOrgCheckOk requires the ok mark for new_delegate and add_organization", () => {
+  assert.equal(L.requestApprovalOrgCheckOk({requestType: "new_delegate", orgCompanyCheck: "ok"}), true);
+  assert.equal(L.requestApprovalOrgCheckOk({requestType: "add_organization", orgCompanyCheck: "ok"}), true);
+  assert.equal(L.requestApprovalOrgCheckOk({requestType: "new_delegate", orgCompanyCheck: "failed"}), false);
+  assert.equal(L.requestApprovalOrgCheckOk({requestType: "new_delegate"}), false);
+  assert.equal(L.requestApprovalOrgCheckOk({orgCompanyCheck: "failed"}), false); // default type is new_delegate
+  assert.equal(L.requestApprovalOrgCheckOk({requestType: "renewal"}), true);
+  assert.equal(L.requestApprovalOrgCheckOk({requestType: "delete_delegate", orgCompanyCheck: "failed"}), true);
+});
+
+test("delegateCreateCompanyMissing is true when the parent company doc is absent", () => {
+  assert.equal(L.delegateCreateCompanyMissing({orgId: "oX", companyId: "c1", companyExists: false}), true);
+  assert.equal(L.delegateCreateCompanyMissing({orgId: "o1", companyId: "c1", companyExists: true}), false);
+  assert.equal(L.delegateCreateCompanyMissing({orgId: "", companyId: "c1", companyExists: true}), true);
+});

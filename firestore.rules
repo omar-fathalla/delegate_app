@@ -1087,6 +1087,27 @@ service cloud.firestore {
         : !changedKeys().hasAny(sourceStampKeys());
     }
 
+    // MED-2: the auditDelegateRequestOrgs stamp is server-only. Clients
+    // (including HR and org-admin) cannot flip failed -> ok.
+    function orgCompanyCheckKeys() {
+      return ['orgCompanyCheck', 'orgCompanyCheckReason',
+        'orgCompanyCheckMissing', 'orgCompanyCheckAt'];
+    }
+    function orgCompanyCheckKeysLocked() {
+      return request.method == 'create'
+        ? !request.resource.data.keys().hasAny(orgCompanyCheckKeys())
+        : !changedKeys().hasAny(orgCompanyCheckKeys());
+    }
+    // Approving a new_delegate / add_organization request requires the
+    // existing server mark to be ok. The incoming write cannot supply it.
+    function requestApprovalOrgCheckOk() {
+      return request.resource.data.get('status', '') != 'approved'
+        || resource.data.get('status', '') == 'approved'
+        || !(resource.data.get('requestType', 'new_delegate')
+          in ['new_delegate', 'add_organization'])
+        || resource.data.get('orgCompanyCheck', '') == 'ok';
+    }
+
 
     function techRoleList() {
       return ['technical_support', 'technical-support', 'technicalSupport', 'technicalsupport', 'tech_support', 'techsupport'];
@@ -1226,7 +1247,8 @@ service cloud.firestore {
         match /delegates/{delegateId} {
           allow read: if signedIn() && canReadNestedDelegate(orgId, compId, delegateId);
           allow create: if canManageNestedDelegate(orgId, compId) && deviceBindingAbsent() && techCreateOk(orgId, compId, delegateId)
-            && sourceStampKeysLocked();
+            && sourceStampKeysLocked()
+            && exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId));
           // sourceStampKeysLocked is not on this allow: the 4-flip tech
           // approval is already at the 1000-expression budget. Delegate
           // self-updates are hasOnly-gated by delegateFieldsSafe. Staff
@@ -1985,7 +2007,8 @@ service cloud.firestore {
       // unchanged.
       // update_national_id requests are created only by submitNationalIdUpdate
       // (Admin SDK). Clients cannot mint them.
-      allow create: if createDelegateRequestOk();
+      allow create: if createDelegateRequestOk()
+        && orgCompanyCheckKeysLocked();
       // Self clause first: the staff role helpers are expensive and would
       // otherwise eat the 1000-expression budget before the docs checks.
       // update_national_id requests are immutable after create: clients
@@ -2010,6 +2033,8 @@ service cloud.firestore {
         && resource.data.get('actionType', '') != 'update_national_id'
         && (!changedKeys().hasAny(['organizationUIDs', 'organizationUID', 'organizationId', 'companyUID', 'companyId'])
           || (requestOrganizationUIDsOk() && requestPrimaryOrgBelongsToCompany()))
+        && orgCompanyCheckKeysLocked()
+        && requestApprovalOrgCheckOk()
         && subscriptionPaymentUntouched();
       allow delete: if isSuperAdmin() || isOrgAdmin();
     }
