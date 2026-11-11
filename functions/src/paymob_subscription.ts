@@ -11,7 +11,14 @@
  */
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
-import {QuoteError, applyVerifiedSubscriptionPayment, quoteSubscriptionRequest} from "./subscription_jobs";
+import {
+  QuoteError,
+  applyVerifiedSubscriptionPayment,
+  expireAbandonedRenewals,
+  previewRenewalQuote,
+  quoteSubscriptionRequest,
+} from "./subscription_jobs";
+import {CHECKOUT_IN_PROGRESS_SECONDS, isAwaitingPaymentExpired} from "./subscription_logic";
 import {verifyTransactionPostHmac} from "./paymob_hmac";
 
 if (admin.apps.length === 0) admin.initializeApp();
@@ -22,6 +29,13 @@ const WEBHOOK_NAME = "paymobSubscriptionWebhook";
 
 function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
+}
+
+/** Paymob sends transaction and order ids as numbers in the JSON body. */
+function idStr(v: unknown): string {
+  if (typeof v === "string") return v.trim();
+  if (typeof v === "number" && Number.isFinite(v)) return String(Math.trunc(v));
+  return "";
 }
 
 function fail(code: functions.https.FunctionsErrorCode, reason: string, message?: string): never {
@@ -76,6 +90,36 @@ export function checkoutUrl(baseUrl: string, publicKey: string, clientSecret: st
 
 export function webhookUrl(projectId: string, region = "us-central1"): string {
   return `https://${region}-${projectId}.cloudfunctions.net/${WEBHOOK_NAME}`;
+}
+
+function boolFlag(v: unknown): boolean {
+  return v === true || String(v) === "true";
+}
+
+function asTime(v: unknown): Date | null {
+  if (v instanceof Date && !Number.isNaN(v.getTime())) return v;
+  if (v && typeof v === "object" && typeof (v as {toDate?: () => Date}).toDate === "function") {
+    const d = (v as {toDate: () => Date}).toDate();
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof v === "string" || typeof v === "number") {
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (v && typeof v === "object" && typeof (v as {seconds?: number}).seconds === "number") {
+    return new Date((v as {seconds: number}).seconds * 1000);
+  }
+  return null;
+}
+
+/** True when a second checkout would collide with an intention just created. */
+export function isCheckoutInProgress(req: Record<string, unknown>, now: Date): boolean {
+  const checkout = (req.paymobCheckout && typeof req.paymobCheckout === "object")
+    ? req.paymobCheckout as Record<string, unknown>
+    : {};
+  const at = asTime(checkout.createdAt);
+  if (!at) return false;
+  return now.getTime() - at.getTime() < CHECKOUT_IN_PROGRESS_SECONDS * 1000;
 }
 
 const RENEWAL_ROLES = new Set([
@@ -212,6 +256,20 @@ export const createSubscriptionCheckout = functions
     }
     const requestId = str((data as {requestId?: unknown} | null)?.requestId);
     if (!requestId) fail("invalid-argument", "request_id_required", "معرّف طلب التجديد مطلوب.");
+    // Authz first: a signed-in user who cannot pay this request must not
+    // learn whether Paymob is configured.
+    const db = admin.firestore();
+    const snap = await db.collection("delegate_requests").doc(requestId).get();
+    if (!snap.exists) fail("not-found", "not_found", "طلب التجديد غير موجود.");
+    const req = (snap.data() || {}) as Record<string, unknown>;
+    await assertCallerMayPay(db, context.auth!.uid, req);
+    const now = new Date();
+    if (isCheckoutInProgress(req, now) && str(req.paymentStatus) === "pending") {
+      fail("failed-precondition", "checkout_in_progress", quoteErrorMessage("checkout_in_progress"));
+    }
+    if (str(req.paymentStatus) === "pending" && isAwaitingPaymentExpired(req, now)) {
+      await expireAbandonedRenewals(db, now);
+    }
     const env = readPaymobEnv();
     if ("error" in env) {
       const msg = env.error === "paymob_live_forbidden" || env.error === "paymob_test_keys_required"
@@ -219,11 +277,6 @@ export const createSubscriptionCheckout = functions
         : "تم حفظ الطلب بانتظار الدفع، لكن دفع Paymob غير مضبوط على الخادم بعد.";
       fail("failed-precondition", env.error, msg);
     }
-    const db = admin.firestore();
-    const snap = await db.collection("delegate_requests").doc(requestId).get();
-    if (!snap.exists) fail("not-found", "not_found", "طلب التجديد غير موجود.");
-    const req = (snap.data() || {}) as Record<string, unknown>;
-    await assertCallerMayPay(db, context.auth.uid, req);
     let quote;
     try {
       quote = await quoteSubscriptionRequest(db, requestId, new Date());
@@ -261,14 +314,71 @@ export const createSubscriptionCheckout = functions
     };
   });
 
+export const previewSubscriptionQuote = functions
+  .region("us-central1")
+  .runWith(opts)
+  .https.onCall(async (data: unknown, context) => {
+    if (!context.auth || context.auth.token.firebase?.sign_in_provider === "anonymous") {
+      fail("unauthenticated", "sign_in_required");
+    }
+    const body = (data || {}) as {companyUID?: unknown; organizationUID?: unknown; uids?: unknown};
+    const companyUID = str(body.companyUID);
+    if (!companyUID) fail("invalid-argument", "company_required", "معرّف الشركة مطلوب.");
+    const raw = Array.isArray(body.uids) ? body.uids : [];
+    const uids = raw.map((v) => str(v)).filter(Boolean);
+    if (uids.length === 0) fail("invalid-argument", "no_delegates", "اختر مندوباً واحداً على الأقل.");
+    const db = admin.firestore();
+    // Authz against a synthetic request in the same company.
+    await assertCallerMayPay(db, context.auth.uid, {
+      companyUID,
+      organizationUID: str(body.organizationUID),
+      supervisorUid: context.auth.uid,
+    });
+    try {
+      const quote = await previewRenewalQuote(db, {
+        companyUID,
+        organizationUID: str(body.organizationUID),
+        uids,
+        at: new Date(),
+      });
+      return {
+        amountCents: quote.amountCents,
+        amount: quote.amount,
+        periodCode: quote.periodCode,
+        remainingMonths: quote.remainingMonths,
+        delegateCount: quote.items.length,
+      };
+    } catch (e) {
+      const reason = e instanceof QuoteError ? e.reason : "quote_failed";
+      fail("failed-precondition", reason, quoteErrorMessage(reason));
+    }
+  });
+
+export const reconcileSubscriptionPayments = functions
+  .region("us-central1")
+  .runWith({timeoutSeconds: 120, memory: "256MB" as const})
+  .https.onCall(async (_data, context) => {
+    if (!context.auth || context.auth.token.firebase?.sign_in_provider === "anonymous") {
+      fail("unauthenticated", "sign_in_required");
+    }
+    const db = admin.firestore();
+    const snap = await db.collection("users").doc(context.auth.uid).get();
+    const role = str(snap.get("role"));
+    if (!RENEWAL_ROLES.has(role)) fail("permission-denied", "caller_not_allowed");
+    const res = await expireAbandonedRenewals(db, new Date());
+    return res;
+  });
+
 function quoteErrorMessage(reason: string): string {
   switch (reason) {
   case "already_paid":
     return "هذا الطلب مدفوع مسبقاً.";
   case "already_covered":
     return "أحد المناديب المحددين مغطى بالفعل في طلب آخر لنفس الفترة.";
+  case "checkout_in_progress":
+    return "جاري تجهيز الدفع. انتظر لحظات ثم أعد المحاولة.";
   case "expired":
-    return "انتهت صلاحية عرض السعر. أنشئ طلب تجديد جديد.";
+    return "انتهت مهلة الدفع. يمكنك إعادة المحاولة على نفس الطلب.";
   case "free_period":
     return "لا حاجة للدفع خلال فترة العرض المجاني.";
   case "period_mismatch":
@@ -296,26 +406,30 @@ export async function handlePaymobWebhook(opts: {
   if (!opts.obj || !verifyTransactionPostHmac(opts.obj, opts.hmac, opts.hmacSecret)) {
     return {status: 401, outcome: "invalid_hmac"};
   }
-  const pending = opts.obj.pending === true || String(opts.obj.pending) === "true";
+  const pending = boolFlag(opts.obj.pending);
   if (pending) return {status: 200, outcome: "ignored_pending"};
   const requestId = requestIdFromPaymobObj(opts.obj);
-  const txId = str(opts.obj.id);
+  const txId = idStr(opts.obj.id);
   if (!requestId || !txId) return {status: 200, outcome: "ignored_incomplete"};
   const order = (opts.obj.order && typeof opts.obj.order === "object")
     ? opts.obj.order as Record<string, unknown>
     : {};
-  const success = opts.obj.success === true || String(opts.obj.success) === "true";
+  const isVoided = boolFlag(opts.obj.is_voided);
+  const isRefunded = boolFlag(opts.obj.is_refunded);
+  const success = boolFlag(opts.obj.success) && !isVoided && !isRefunded;
   const amountCents = Number(opts.obj.amount_cents);
   const currency = str(opts.obj.currency) || "EGP";
   const paidAt = opts.now || new Date();
   const outcome = await applyVerifiedSubscriptionPayment(opts.db, {
     requestId,
     paymobTransactionId: txId,
-    paymobOrderId: str(order.id),
+    paymobOrderId: idStr(order.id),
     success,
     amountCents: Number.isFinite(amountCents) ? amountCents : 0,
     currency,
     paidAt,
+    isVoided,
+    isRefunded,
   });
   return {status: 200, outcome};
 }

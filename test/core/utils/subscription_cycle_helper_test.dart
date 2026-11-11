@@ -262,6 +262,13 @@ void main() {
       expect(SubscriptionCycleHelper.totalFor(5, DateTime(2026, 11, 10)), 0.0);
       expect(SubscriptionCycleHelper.formatEgp(500), '500');
       expect(SubscriptionCycleHelper.formatEgp(416.67), '416.67');
+      // Same half-up rule as functions/src/subscription_logic.ts: 2 months
+      // is 166.67, and two delegates must be 333.34 (not 333.33).
+      expect(SubscriptionCycleHelper.getFeeForMonths(2), 166.67);
+      expect(
+        SubscriptionCycleHelper.totalFor(2, DateTime(2027, 5, 10)),
+        333.34,
+      );
     });
 
     test('free promotion boundary on 2026-12-31 in Cairo time', () {

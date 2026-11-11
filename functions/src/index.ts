@@ -340,8 +340,11 @@ export {suspendExpiredSubscriptions} from "./subscription_schedule";
 export {
   expireAbandonedSubscriptionRenewals,
   finalizeSubscriptionRenewalOnStatus,
+  reconcileSubscriptionPaymentsScheduled,
 } from "./subscription_schedule";
 export {
   createSubscriptionCheckout,
+  previewSubscriptionQuote,
+  reconcileSubscriptionPayments,
   paymobSubscriptionWebhook,
 } from "./paymob_subscription";

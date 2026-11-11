@@ -116,14 +116,30 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
         .where((d) => _selection.isSelected(d.selectionKey))
         .toList();
     if (chosen.isEmpty) return;
-    final now = _now;
-    final period = _selectedPeriod(_repo.currentPeriodCode(now));
-    final fee = _selection.feePerDelegate(
-      now,
-      widget.supervisor.companyUID,
-      period,
+    setState(() => _submitting = true);
+    final preview = await _gateway.previewQuote(
+      companyUID: widget.supervisor.companyUID,
+      organizationUID: widget.supervisor.organizationUID,
+      uids: chosen.map((d) => d.uid).toList(),
     );
-    final total = _selection.total(now, widget.supervisor.companyUID, period);
+    if (!mounted) return;
+    RenewalQuotePreview? quoted;
+    preview.fold(
+      (f) {
+        setState(() => _submitting = false);
+        AppSnackBar.showError(context, f.message);
+      },
+      (q) {
+        setState(() => _submitting = false);
+        quoted = q;
+      },
+    );
+    if (quoted == null) return;
+    final fee = quoted!.feePerDelegate;
+    final total = quoted!.amount;
+    final period = quoted!.periodCode.isNotEmpty
+        ? quoted!.periodCode
+        : _selectedPeriod(_repo.currentPeriodCode(_now));
     final periodTitle = period.isEmpty
         ? ''
         : SubscriptionCycleHelper.getCycleTitleArabic(
@@ -230,16 +246,69 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
       } else if (changed && status == SubscriptionPaymentStatus.failed) {
         AppSnackBar.showError(
           context,
-          'فشل الدفع، ولم يتم تفعيل أي مندوب. يمكنك المحاولة مرة أخرى.',
+          'فشل الدفع (رفض البطاقة أو 3D Secure أو إلغاء العملية)، ولم يتم تفعيل أي مندوب. يمكنك إعادة المحاولة على نفس الطلب.',
+        );
+      } else if (changed && status == SubscriptionPaymentStatus.expired) {
+        AppSnackBar.showError(
+          context,
+          'انتهت مهلة الدفع وتم إطلاق المناديب. يمكنك إعادة المحاولة على نفس الطلب أو إنشاء طلب جديد.',
         );
       }
     });
   }
 
   Future<void> _cancelPending(String requestId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          key: const Key('renewal_cancel_confirm'),
+          title: const Text('إلغاء طلب التجديد؟'),
+          content: const Text(
+            'سيتم إطلاق المناديب المحددين في هذا الطلب ويمكنك بدء طلب جديد.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('تراجع'),
+            ),
+            FilledButton(
+              key: const Key('renewal_cancel_confirm_yes'),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('تأكيد الإلغاء'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     final r = await _repo.cancelRenewal(requestId);
     if (!mounted) return;
-    r.fold((f) => AppSnackBar.showError(context, f.message), (_) => _load());
+    r.fold((f) => AppSnackBar.showError(context, f.message), (_) {
+      if (_activeRequestId == requestId) {
+        _statusSub?.cancel();
+        setState(() {
+          _activeRequestId = null;
+          _activeStatus = null;
+        });
+      }
+      _load();
+    });
+  }
+
+  Future<void> _retryActiveCheckout() async {
+    final id = _activeRequestId;
+    if (id == null || _submitting) return;
+    setState(() => _submitting = true);
+    final checkout = await _gateway.startCheckout(requestId: id);
+    if (!mounted) return;
+    setState(() => _submitting = false);
+    await checkout.fold(
+      (f) async => AppSnackBar.showError(context, f.message),
+      (c) async =>
+          launchUrl(c.checkoutUrl, mode: LaunchMode.externalApplication),
+    );
   }
 
   Future<void> _openReceipt(String requestId) async {
@@ -389,7 +458,14 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
               periodCode: advance ? nextPeriod : currentPeriod,
             ),
             if (_activeRequestId != null && _activeStatus != null)
-              _PaymentStatusBanner(status: _activeStatus!),
+              _PaymentStatusBanner(
+                status: _activeStatus!,
+                onRetry:
+                    (_activeStatus == SubscriptionPaymentStatus.failed ||
+                        _activeStatus == SubscriptionPaymentStatus.expired)
+                    ? _retryActiveCheckout
+                    : null,
+              ),
             if (!_loading && _error == null && _delegates.isNotEmpty)
               _FilterBar(
                 value: _filter,
@@ -405,6 +481,13 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
                       value: allSelected,
                       onChanged: (v) {
                         if (v == true) {
+                          if (periodSelectable.length >
+                              SubscriptionCycleHelper.maxDelegatesPerRenewal) {
+                            AppSnackBar.showError(
+                              context,
+                              'تم تحديد أول ${SubscriptionCycleHelper.maxDelegatesPerRenewal} مندوب فقط (الحد الأقصى في طلب واحد).',
+                            );
+                          }
                           setState(
                             () => _selection = _selection.selectAll(
                               periodSelectable,
@@ -703,7 +786,8 @@ class _PeriodBanner extends StatelessWidget {
 
 class _PaymentStatusBanner extends StatelessWidget {
   final SubscriptionPaymentStatus status;
-  const _PaymentStatusBanner({required this.status});
+  final VoidCallback? onRetry;
+  const _PaymentStatusBanner({required this.status, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -717,17 +801,17 @@ class _PaymentStatusBanner extends StatelessWidget {
       SubscriptionPaymentStatus.failed => (
         Icons.error_rounded,
         cs.error,
-        'فشل الدفع، ولم يتم تفعيل أي مندوب.',
+        'فشل الدفع (رفض البطاقة أو 3D Secure أو إلغاء العملية)، ولم يتم تفعيل أي مندوب.',
       ),
       SubscriptionPaymentStatus.expired => (
         Icons.timer_off_rounded,
         Colors.orange.shade800,
-        'انتهت صلاحية عرض السعر. يمكن إنشاء طلب تجديد جديد.',
+        'انتهت مهلة الدفع (60 دقيقة) وتم إطلاق المناديب. يمكنك إعادة المحاولة على نفس الطلب أو إنشاء طلب جديد.',
       ),
       _ => (
         Icons.hourglass_top_rounded,
         cs.tertiary,
-        'طلب التجديد بانتظار تأكيد الدفع من Paymob.',
+        'بانتظار تأكيد الدفع من Paymob. إذا أغلقت صفحة الدفع يمكنك العودة لاحقاً؛ سيُلغى الطلب تلقائياً خلال 60 دقيقة إن لم يصل التأكيد.',
       ),
     };
     return Container(
@@ -745,6 +829,12 @@ class _PaymentStatusBanner extends StatelessWidget {
           Icon(icon, color: color, size: 18),
           const SizedBox(width: 8),
           Expanded(child: Text(text, style: const TextStyle(fontSize: 12.5))),
+          if (onRetry != null)
+            TextButton(
+              key: const Key('renewal_retry_payment'),
+              onPressed: onRetry,
+              child: const Text('إعادة المحاولة'),
+            ),
         ],
       ),
     );

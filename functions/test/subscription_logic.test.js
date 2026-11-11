@@ -180,3 +180,33 @@ test("advance renewal window and next-period quote", () => {
   assert.equal(currentInPromo.amount, 0);
 });
 
+test("two delegates at 2 months total 333.34 (same as the Dart helper)", () => {
+  assert.equal(L.feeForMonths(2), 166.67);
+  assert.equal(L.roundMoney(L.feeForMonths(2) * 2), 333.34);
+  assert.equal(L.toCents(333.34), 33334);
+});
+
+test("expires an awaiting request after the 60-minute checkout TTL", () => {
+  const quotedAt = new Date("2027-02-10T10:00:00.000Z");
+  const data = {paymentStatus: "pending", quotedAt, periodCode: "2027_H1"};
+  assert.equal(L.isAwaitingPaymentExpired(data, new Date("2027-02-10T10:59:00.000Z")), false);
+  assert.equal(L.isAwaitingPaymentExpired(data, new Date("2027-02-10T11:00:00.000Z")), true);
+  const withCheckout = {
+    paymentStatus: "pending",
+    quotedAt,
+    periodCode: "2027_H1",
+    paymobCheckout: {createdAt: new Date("2027-02-10T10:30:00.000Z")},
+  };
+  // TTL is measured from checkout start when present.
+  assert.equal(L.isAwaitingPaymentExpired(withCheckout, new Date("2027-02-10T11:20:00.000Z")), false);
+  assert.equal(L.isAwaitingPaymentExpired(withCheckout, new Date("2027-02-10T11:30:00.000Z")), true);
+});
+
+test("does not expire a paid request even after the checkout TTL", () => {
+  const data = {
+    paymentStatus: "paid",
+    quotedAt: new Date("2027-02-01T00:00:00.000Z"),
+    periodCode: "2027_H1",
+  };
+  assert.equal(L.isAwaitingPaymentExpired(data, new Date("2027-02-10T12:00:00.000Z")), false);
+});

@@ -3,15 +3,52 @@ import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/admin/domain/services/subscription_payment_gateway.dart';
 
-/// Calls [createSubscriptionCheckout] on the server. The function quotes the
-/// request and creates a Paymob test-mode intention; this class never sends
-/// an amount and never holds Paymob keys.
+/// Calls [createSubscriptionCheckout] / [previewSubscriptionQuote] on the
+/// server. This class never sends an amount and never holds Paymob keys.
 class PaymobSubscriptionGateway implements SubscriptionPaymentGateway {
   final FirebaseFunctions _functions;
 
   PaymobSubscriptionGateway({FirebaseFunctions? functions})
     : _functions =
           functions ?? FirebaseFunctions.instanceFor(region: 'us-central1');
+
+  @override
+  Future<Either<Failure, RenewalQuotePreview>> previewQuote({
+    required String companyUID,
+    String? organizationUID,
+    required List<String> uids,
+  }) async {
+    try {
+      final result = await _functions
+          .httpsCallable('previewSubscriptionQuote')
+          .call({
+            'companyUID': companyUID,
+            if (organizationUID != null && organizationUID.isNotEmpty)
+              'organizationUID': organizationUID,
+            'uids': uids,
+          });
+      final data = Map<String, dynamic>.from(result.data as Map);
+      final cents = (data['amountCents'] as num?)?.toInt() ?? 0;
+      if (cents <= 0) {
+        return const Left(
+          ServerFailure('تعذر حساب مبلغ التجديد. أعد المحاولة.'),
+        );
+      }
+      return Right(
+        RenewalQuotePreview(
+          amountCents: cents,
+          periodCode: (data['periodCode'] ?? '').toString(),
+          remainingMonths: (data['remainingMonths'] as num?)?.toInt() ?? 0,
+          delegateCount:
+              (data['delegateCount'] as num?)?.toInt() ?? uids.length,
+        ),
+      );
+    } on FirebaseFunctionsException catch (e) {
+      return Left(ServerFailure(_message(e)));
+    } catch (_) {
+      return const Left(ServerFailure('تعذر حساب مبلغ التجديد. أعد المحاولة.'));
+    }
+  }
 
   @override
   Future<Either<Failure, PaymentCheckout>> startCheckout({
@@ -55,6 +92,10 @@ class PaymobSubscriptionGateway implements SubscriptionPaymentGateway {
         return 'هذا الطلب مدفوع مسبقاً.';
       case 'already_covered':
         return 'أحد المناديب المحددين مغطى بالفعل في طلب آخر لنفس الفترة.';
+      case 'checkout_in_progress':
+        return 'جاري تجهيز الدفع. انتظر لحظات ثم أعد المحاولة.';
+      case 'expired':
+        return 'انتهت مهلة الدفع. يمكنك إعادة المحاولة على نفس الطلب.';
       default:
         return 'تعذر بدء الدفع. أعد المحاولة.';
     }

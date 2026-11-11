@@ -2,6 +2,10 @@
 # Flip or roll back HOLDS_AUTHORITY_MODE on already-deployed Cloud Functions.
 # tashil-dev only. PATCHes environment variables; does not upload source.
 # Never touches suspendExpiredSubscriptions.
+# The PATCH uses updateMask=environmentVariables.HOLDS_AUTHORITY_MODE so
+# GCLOUD_PROJECT and every other existing env var are preserved. Do not
+# switch this back to a full environmentVariables replace: that dropped
+# GCLOUD_PROJECT on 2026-11-11 and broke finalizeSubscriptionRenewalOnStatus.
 #
 # Usage:
 #   bash scripts/holds_authority_mode.sh status   --project tashil-dev
@@ -136,24 +140,17 @@ patch_mode() {
   # do not re-fire it once these locals are out of scope (set -u).
   # shellcheck disable=SC2064
   trap 'rm -f "${patch_file:-}" "${resp_file:-}"; trap - RETURN' RETURN
-  json="$(api_get "$name")"
-  python3 -c '
-import json,sys
-value=sys.argv[1]
-# GCLOUD_PROJECT (and a few others) are reserved: including them in a
-# PATCH returns HTTP 400. The system re-injects reserved keys at runtime.
-RESERVED = {
-    "GCLOUD_PROJECT", "FUNCTION_TARGET", "FUNCTION_SIGNATURE_TYPE",
-    "FUNCTION_NAME", "K_SERVICE", "K_REVISION", "K_CONFIGURATION", "PORT",
-}
-d=json.load(sys.stdin)
-env={k:v for k,v in (d.get("environmentVariables") or {}).items() if k not in RESERVED}
-env["HOLDS_AUTHORITY_MODE"]=value
-json.dump({"environmentVariables": env}, sys.stdout)
-' "$value" <<<"$json" > "$patch_file"
+  # Nested field mask: update only HOLDS_AUTHORITY_MODE. A full
+  # environmentVariables replace that omits reserved GCLOUD_PROJECT
+  # drops it, and v1 Firestore triggers do not re-inject it.
+  local script_dir payload mask
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  payload="$(python3 "${script_dir}/holds_authority_mode_payload.py" "$value")"
+  python3 -c 'import json,sys; json.dump(json.load(sys.stdin)["body"], sys.stdout)' <<<"$payload" > "$patch_file"
+  mask="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["updateMask"])' <<<"$payload")"
   token="$(gcloud_cmd auth print-access-token)"
   local http_code resp
-  http_code="$(curl -sS -o "$resp_file" -w "%{http_code}"     -H "Authorization: Bearer ${token}"     -H "Content-Type: application/json"     -X PATCH     -d @"$patch_file"     "https://cloudfunctions.googleapis.com/v1/projects/${PROJECT}/locations/${REGION}/functions/${name}?updateMask=environmentVariables")"
+  http_code="$(curl -sS -o "$resp_file" -w "%{http_code}"     -H "Authorization: Bearer ${token}"     -H "Content-Type: application/json"     -X PATCH     -d @"$patch_file"     "https://cloudfunctions.googleapis.com/v1/projects/${PROJECT}/locations/${REGION}/functions/${name}?updateMask=${mask}")"
   resp="$(cat "$resp_file")"
   if [[ "$http_code" != "200" && "$http_code" != "201" ]]; then
     echo "PATCH ${name} failed HTTP ${http_code}: $(python3 -c 'import json,sys
