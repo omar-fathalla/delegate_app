@@ -329,6 +329,45 @@ describe("delegate_requests: payment is server-only", () => {
   });
 
 
+  test("staff can get a paid receipt and list paid renewals; other companies cannot", async () => {
+    // Get-by-id after payment (receipt page).
+    await assertSucceeds(as("hr1").doc("delegate_requests/paid").get());
+    await assertSucceeds(as("sup").doc("delegate_requests/paid").get());
+    await assertSucceeds(as("admin1").doc("delegate_requests/paid").get());
+    await assertSucceeds(as("oa1").doc("delegate_requests/paid").get());
+    await assertFails(as("sup2").doc("delegate_requests/paid").get());
+    await assertFails(as("hr2").doc("delegate_requests/paid").get());
+    await assertFails(as("d1").doc("delegate_requests/paid").get());
+
+    const col = (uid) => as(uid).collection("delegate_requests");
+    // App query: companyUID + requestType=renewal + paymentStatus=paid.
+    const companyPaid = (uid, co) => col(uid)
+      .where("companyUID", "==", co)
+      .where("requestType", "==", "renewal")
+      .where("paymentStatus", "==", "paid");
+    await assertSucceeds(companyPaid("hr1", "c1").get());
+    await assertSucceeds(companyPaid("sup", "c1").get());
+    await assertSucceeds(companyPaid("admin1", "c1").get());
+    // Org-admin also scopes by organizationUID.
+    await assertSucceeds(
+      companyPaid("oa1", "c1").where("organizationUID", "==", "o1").get(),
+    );
+    await assertSucceeds(col("oa1")
+      .where("organizationUID", "==", "o1")
+      .where("requestType", "==", "renewal")
+      .where("paymentStatus", "==", "paid")
+      .get());
+    const paid = await companyPaid("hr1", "c1").get();
+    const ids = paid.docs.map((d) => d.id);
+    if (!ids.includes("paid")) {
+      throw new Error("expected paid receipt in the company list, got " + ids.join(","));
+    }
+    // Cross-company and unscoped lists stay denied.
+    await assertFails(companyPaid("hr1", "c2").get());
+    await assertFails(companyPaid("sup2", "c1").get());
+    await assertFails(col("hr1").where("requestType", "==", "renewal").where("paymentStatus", "==", "paid").get());
+  });
+
   test("clients cannot flip orgCompanyCheck and cannot approve without ok", async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();

@@ -8,16 +8,16 @@ import 'package:delegate_app/features/admin/domain/entities/subscription_renewal
 import 'package:delegate_app/features/admin/domain/services/subscription_payment_gateway.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
+import 'package:delegate_app/features/admin/presentation/pages/subscription_renewal_receipt_page.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// «تجديد المناديب»: supervisors, company admins, HR, and org-admins
 /// (with a companyUID) may create a renewal (Phase 1 item 2).
 ///
-/// Lists his company's renewable app-added delegates, lets him select any
-/// subset, and pays for the selection in ONE Paymob payment. During the
-/// advance-renewal window the list is next-period coverage (including
-/// currently active delegates); otherwise it is suspended-for-expiry only.
+/// Lists the company's app-added delegates, with filters for suspended and
+/// nearly-ending subscriptions, auto-excludes already covered rows, and
+/// pays for the selection in ONE Paymob payment after a confirmation sheet.
 /// Coverage is recorded by the server; an advance payment does not
 /// reactivate early. Selection/total logic lives in [RenewalSelection] and the
 /// write in [SubscriptionRenewalRepository], so a per-row "renew" button can
@@ -54,6 +54,7 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
   bool _loading = true;
   bool _submitting = false;
   String? _error;
+  RenewalListFilter _filter = RenewalListFilter.all;
   String? _activeRequestId;
   SubscriptionPaymentStatus? _activeStatus;
   StreamSubscription<SubscriptionPaymentStatus>? _statusSub;
@@ -115,6 +116,64 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
         .where((d) => _selection.isSelected(d.selectionKey))
         .toList();
     if (chosen.isEmpty) return;
+    final now = _now;
+    final period = _selectedPeriod(_repo.currentPeriodCode(now));
+    final fee = _selection.feePerDelegate(
+      now,
+      widget.supervisor.companyUID,
+      period,
+    );
+    final total = _selection.total(now, widget.supervisor.companyUID, period);
+    final periodTitle = period.isEmpty
+        ? ''
+        : SubscriptionCycleHelper.getCycleTitleArabic(
+            SubscriptionCycleHelper.getCycleStartDateForCode(period),
+          );
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            child: Column(
+              key: const Key('renewal_confirm_sheet'),
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'ملخص التجديد قبل الدفع',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text('الفترة: $periodTitle'),
+                Text(
+                  'عدد المناديب: ${chosen.length} × ${SubscriptionCycleHelper.formatEgp(fee)} ج.م = ${SubscriptionCycleHelper.formatEgp(total)} ج.م',
+                  key: const Key('renewal_confirm_summary'),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'دفعة واحدة عبر Paymob (بيئة الاختبار). المبلغ يحسبه الخادم، ولن يُجدَّد أي مندوب إن فشل الدفع.',
+                  style: TextStyle(fontSize: 12.5, height: 1.4),
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  key: const Key('renewal_confirm_pay'),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('تأكيد الدفع'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('إلغاء'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
     setState(() => _submitting = true);
     final s = widget.supervisor;
     final created = await _repo.submitRenewal(
@@ -167,6 +226,7 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
           'تم تأكيد الدفع وتسجيل التغطية للمناديب المحددين.',
         );
         _load();
+        _openReceipt(requestId);
       } else if (changed && status == SubscriptionPaymentStatus.failed) {
         AppSnackBar.showError(
           context,
@@ -180,6 +240,97 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
     final r = await _repo.cancelRenewal(requestId);
     if (!mounted) return;
     r.fold((f) => AppSnackBar.showError(context, f.message), (_) => _load());
+  }
+
+  Future<void> _openReceipt(String requestId) async {
+    final result = await _repo.loadReceipt(requestId);
+    if (!mounted) return;
+    result.fold((f) => AppSnackBar.showError(context, f.message), (receipt) {
+      if (receipt == null) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SubscriptionRenewalReceiptPage(receipt: receipt),
+        ),
+      );
+    });
+  }
+
+  Future<void> _openPaidReceipts() async {
+    final s = widget.supervisor;
+    final result = await _repo.loadPaidRenewals(
+      companyUID: s.companyUID,
+      organizationUID: s.role == UserRole.organizationAdmin
+          ? s.organizationUID
+          : null,
+    );
+    if (!mounted) return;
+    result.fold((f) => AppSnackBar.showError(context, f.message), (list) {
+      if (list.isEmpty) {
+        AppSnackBar.showError(context, 'لا توجد إيصالات تجديد مدفوعة بعد.');
+        return;
+      }
+      showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        builder: (ctx) {
+          return Directionality(
+            textDirection: TextDirection.rtl,
+            child: ListView(
+              key: const Key('renewal_receipts_sheet'),
+              shrinkWrap: true,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Text(
+                    'إيصالات التجديد',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+                for (final r in list)
+                  ListTile(
+                    title: Text(
+                      '${r.periodCode} • ${SubscriptionCycleHelper.formatEgp(r.amount)} ج.م',
+                    ),
+                    subtitle: Text('${r.delegateCount} مناديب'),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              SubscriptionRenewalReceiptPage(receipt: r),
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+          );
+        },
+      );
+    });
+  }
+
+  List<RenewableDelegate> _applyFilter(Iterable<RenewableDelegate> input) {
+    final now = _now;
+    final expiring = isRenewalExpiringSoon(now);
+    switch (_filter) {
+      case RenewalListFilter.suspended:
+        return [
+          for (final d in input)
+            if (d.isSuspendedExpired || d.status == 'suspended') d,
+        ];
+      case RenewalListFilter.expiringSoon:
+        return [
+          for (final d in input)
+            if (expiring &&
+                (d.periodCode.isEmpty ||
+                    d.periodCode == _repo.currentPeriodCode(now)) &&
+                !d.isCovered)
+              d,
+        ];
+      case RenewalListFilter.all:
+        return input.toList();
+    }
   }
 
   @override
@@ -196,7 +347,8 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
           now,
           widget.supervisor.companyUID,
         );
-    final selectable = _delegates.where((d) => !d.isAwaitingPayment).toList();
+    final visible = _applyFilter(_delegates);
+    final selectable = visible.where((d) => d.isSelectable).toList();
     final periodForSelectAll = _selectedPeriod(currentPeriod);
     final periodSelectable = selectable
         .where(
@@ -216,6 +368,12 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
           title: const Text(SubscriptionRenewalScreen.title),
           actions: [
             IconButton(
+              tooltip: 'إيصالات التجديد',
+              key: const Key('renewal_receipts_button'),
+              icon: const Icon(Icons.receipt_long_rounded),
+              onPressed: _loading ? null : _openPaidReceipts,
+            ),
+            IconButton(
               tooltip: 'تحديث',
               icon: const Icon(Icons.refresh_rounded),
               onPressed: _loading ? null : _load,
@@ -232,6 +390,11 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
             ),
             if (_activeRequestId != null && _activeStatus != null)
               _PaymentStatusBanner(status: _activeStatus!),
+            if (!_loading && _error == null && _delegates.isNotEmpty)
+              _FilterBar(
+                value: _filter,
+                onChanged: (f) => setState(() => _filter = f),
+              ),
             if (!_loading && _error == null && selectable.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -252,7 +415,7 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
                         }
                       },
                     ),
-                    Text('تحديد الكل (${selectable.length})'),
+                    Text('تحديد الكل (${periodSelectable.length})'),
                   ],
                 ),
               ),
@@ -292,10 +455,11 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
     final now = _now;
     final current = _repo.currentPeriodCode(now);
     final next = _repo.nextPeriodCode(now);
-    final currentRows = _delegates
+    final visible = _applyFilter(_delegates);
+    final currentRows = visible
         .where((d) => d.periodCode == current || d.periodCode.isEmpty)
         .toList();
-    final nextRows = _delegates.where((d) => d.periodCode == next).toList();
+    final nextRows = visible.where((d) => d.periodCode == next).toList();
     final sections = <(String, List<RenewableDelegate>)>[
       if (currentRows.isNotEmpty)
         (
@@ -308,8 +472,19 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
           nextRows,
         ),
     ];
+    if (currentRows.isEmpty && nextRows.isEmpty && visible.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'لا يوجد مناديب في هذا التصنيف.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
     if (sections.isEmpty) {
-      sections.add(('تجديد المناديب', _delegates));
+      sections.add(('تجديد المناديب', visible));
     }
 
     final children = <Widget>[];
@@ -346,6 +521,20 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
       if (d.delegatePublicId?.isNotEmpty == true) d.delegatePublicId!,
     ].join(' • ');
     final key = Key('renewal_row_${d.selectionKey}');
+    if (d.isCovered) {
+      return ListTile(
+        key: key,
+        leading: Icon(Icons.check_circle_outline, color: cs.primary),
+        title: Text(d.fullName),
+        subtitle: Text(
+          [
+            if (subtitle.isNotEmpty) subtitle,
+            d.exclusionReason ?? 'مغطى بالفعل لهذه الفترة',
+          ].join('\n'),
+        ),
+        isThreeLine: subtitle.isNotEmpty,
+      );
+    }
     if (d.isAwaitingPayment) {
       return ListTile(
         key: key,
@@ -556,6 +745,47 @@ class _PaymentStatusBanner extends StatelessWidget {
           Icon(icon, color: color, size: 18),
           const SizedBox(width: 8),
           Expanded(child: Text(text, style: const TextStyle(fontSize: 12.5))),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterBar extends StatelessWidget {
+  final RenewalListFilter value;
+  final ValueChanged<RenewalListFilter> onChanged;
+  const _FilterBar({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget chip(RenewalListFilter f, String label, Key key) {
+      return Padding(
+        padding: const EdgeInsetsDirectional.only(end: 8),
+        child: FilterChip(
+          key: key,
+          label: Text(label),
+          selected: value == f,
+          onSelected: (_) => onChanged(f),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+      child: Row(
+        children: [
+          chip(RenewalListFilter.all, 'الكل', const Key('renewal_filter_all')),
+          chip(
+            RenewalListFilter.suspended,
+            'الموقوفون',
+            const Key('renewal_filter_suspended'),
+          ),
+          chip(
+            RenewalListFilter.expiringSoon,
+            'قرب ينتهي الاشتراك',
+            const Key('renewal_filter_expiring'),
+          ),
         ],
       ),
     );

@@ -222,18 +222,26 @@ set of roles that may create renewals is unchanged.
 exactly `tashil-dev`. The same docs on `practice-firebase-72df1` are ignored.
 The app honors the bypass only for `ENV=dev` and company `co_dev_renewal_paid`.
 
-## What Engineering's Paymob module must provide
+## Paymob checkout (test mode on tashil-dev)
 
-1. A server endpoint that creates the Paymob order for a `requestId`: call
-   `quoteSubscriptionRequest`, charge exactly `amountCents` in EGP, put `requestId` in
-   the order (`merchant_order_id` or extras), return the checkout URL.
-2. Paymob webhook (transaction processed callback): verify the HMAC with the secret from
-   Secret Manager, then call `applyVerifiedSubscriptionPayment` with
-   `{requestId, paymobTransactionId, paymobOrderId, success, amountCents, currency, paidAt}`.
-3. A Dart `SubscriptionPaymentGateway` implementation calling (1); register it in
-   `injection_container.dart` instead of `PaymobNotConnectedGateway`.
-4. Keys (API key, integration id, iframe id, HMAC secret) only in Secret Manager /
-   function config. Never in the app or this repo.
+Named functions (codebase `tashil-mobile-notifications`):
+
+1. `createSubscriptionCheckout` (callable): the app sends only `requestId`. The
+   function calls `quoteSubscriptionRequest`, creates a Paymob Intention for
+   exactly `amountCents` EGP (`special_reference` = requestId), and returns the
+   Unified Checkout URL. Live keys (`sk_live_` / `pk_live_` or `PAYMOB_LIVE=true`)
+   are refused.
+2. `paymobSubscriptionWebhook` (HTTPS): verifies the Transaction Processed HMAC
+   (SHA-512, documented 20-field order) and calls
+   `applyVerifiedSubscriptionPayment`. Failure or amount mismatch marks the
+   request failed and releases coverage; nobody is activated. Success renews every
+   covered uid atomically and idempotently (per Paymob transaction id).
+
+Set test-mode env on the two functions only (never commit values):
+`PAYMOB_SECRET_KEY` (`sk_test_…`), `PAYMOB_PUBLIC_KEY` (`pk_test_…`),
+`PAYMOB_HMAC_SECRET`, `PAYMOB_INTEGRATION_IDS` (comma-separated test Integration
+IDs), optional `PAYMOB_BASE_URL` (default `https://accept.paymob.com`).
+The Flutter `PaymobSubscriptionGateway` calls (1) and never holds keys or amounts.
 
 Nothing here is deployed. Before the scheduled function is deployed, the
 `delegates.uid` collection-group field override in `firestore.indexes.json` and the

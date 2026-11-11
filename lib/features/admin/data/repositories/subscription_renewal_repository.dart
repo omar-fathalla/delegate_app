@@ -92,11 +92,10 @@ class SubscriptionRenewalRepository {
 
   /// App-added delegates of [companyUID] that can be renewed.
   ///
-  /// Always includes the current period (suspended for expiry, plus any
-  /// pending current-period request). During the advance window also
-  /// includes a second list: app-added delegates not covered for the next
-  /// period (including currently active ones) and pending next-period
-  /// requests. A uid may appear once per period.
+  /// Always includes every app-added delegate for the current period
+  /// (covered rows have [RenewableDelegate.isCovered] and a reason).
+  /// During the advance window also includes a second list for the next
+  /// period. A uid may appear once per period.
   Future<Either<Failure, List<RenewableDelegate>>> loadRenewableDelegates({
     required String companyUID,
     String? organizationUID,
@@ -144,9 +143,10 @@ class SubscriptionRenewalRepository {
         final d = snap.data();
         if (d == null) continue;
         RenewableDelegate row(
-          String period,
+          String period, {
           String? pendingId,
-        ) => RenewableDelegate(
+          required bool covered,
+        }) => RenewableDelegate(
           uid: reg.id,
           fullName: (d['fullName'] ?? r['fullName'] ?? '').toString(),
           phoneNumber: (d['phoneNumber'] ?? r['phoneNumber'] ?? '').toString(),
@@ -155,21 +155,29 @@ class SubscriptionRenewalRepository {
           delegatePublicId: d['delegatePublicId']?.toString(),
           pendingRenewalRequestId: pendingId,
           periodCode: period,
+          status: (d['status'] ?? '').toString(),
+          statusReason: (d['statusReason'] ?? '').toString(),
+          isCovered: covered,
+          exclusionReason: covered ? 'مغطى بالفعل لهذه الفترة' : null,
         );
-        final expired =
-            d['status'] == 'suspended' &&
-            d['statusReason'] == kSubscriptionExpiredReason;
-        if (expired && !_subscriptionCovers(d, current)) {
-          out.add(row(current, pending['${reg.id}|$current']));
-        } else if (pending['${reg.id}|$current'] != null) {
-          // A pending current-period request stays visible even if the
-          // row would otherwise be hidden.
-          out.add(row(current, pending['${reg.id}|$current']));
-        }
-        if (advance && !_subscriptionCovers(d, next)) {
-          out.add(row(next, pending['${reg.id}|$next']));
-        } else if (advance && pending['${reg.id}|$next'] != null) {
-          out.add(row(next, pending['${reg.id}|$next']));
+        // Current period: every app-added delegate, so the UI can select
+        // many/all, filter الموقوفين / قرب ينتهي, and show covered ones
+        // as excluded with a reason (L1 group renewal).
+        out.add(
+          row(
+            current,
+            pendingId: pending['${reg.id}|$current'],
+            covered: _subscriptionCovers(d, current),
+          ),
+        );
+        if (advance) {
+          out.add(
+            row(
+              next,
+              pendingId: pending['${reg.id}|$next'],
+              covered: _subscriptionCovers(d, next),
+            ),
+          );
         }
       }
       out.sort((a, b) {
@@ -387,4 +395,80 @@ class SubscriptionRenewalRepository {
           .map(
             (s) => SubscriptionPaymentStatusX.parse(s.data()?['paymentStatus']),
           );
+
+  Future<Either<Failure, RenewalReceipt?>> loadReceipt(String requestId) async {
+    try {
+      final snap = await _requests.doc(requestId).get();
+      final data = snap.data();
+      if (data == null) return const Right(null);
+      return Right(_receiptFrom(requestId, data));
+    } catch (e) {
+      return Left(ServerFailure('تعذر تحميل الإيصال: $e'));
+    }
+  }
+
+  /// Paid renewals for this company (and org, when scoped), newest first.
+  Future<Either<Failure, List<RenewalReceipt>>> loadPaidRenewals({
+    required String companyUID,
+    String? organizationUID,
+  }) async {
+    if (companyUID.trim().isEmpty) {
+      return const Left(ServerFailure('لا توجد شركة مرتبطة بحسابك.'));
+    }
+    try {
+      final org = organizationUID?.trim() ?? '';
+      Query<Map<String, dynamic>> q = _requests
+          .where('companyUID', isEqualTo: companyUID)
+          .where('requestType', isEqualTo: kRequestTypeRenewal)
+          .where('paymentStatus', isEqualTo: 'paid');
+      if (org.isNotEmpty) {
+        q = q.where('organizationUID', isEqualTo: org);
+      }
+      final snap = await q.get();
+      final out = [for (final d in snap.docs) _receiptFrom(d.id, d.data())];
+      out.sort((a, b) => (b.paidAt ?? '').compareTo(a.paidAt ?? ''));
+      return Right(out);
+    } catch (e) {
+      return Left(ServerFailure('تعذر تحميل إيصالات التجديد: $e'));
+    }
+  }
+
+  RenewalReceipt _receiptFrom(String id, Map<String, dynamic> data) {
+    final items = <RenewalItem>[];
+    final rawItems = data['items'];
+    if (rawItems is List) {
+      for (final raw in rawItems) {
+        if (raw is! Map) continue;
+        final m = Map<String, dynamic>.from(raw);
+        items.add(
+          RenewalItem(
+            uid: (m['uid'] ?? '').toString(),
+            fullName: (m['fullName'] ?? '').toString(),
+            fee: (m['fee'] is num) ? (m['fee'] as num).toDouble() : 0,
+          ),
+        );
+      }
+    }
+    final paymob = data['paymob'];
+    String? txId;
+    if (paymob is Map) {
+      txId = paymob['transactionId']?.toString();
+    }
+    final amountRaw = data['amountPaid'] ?? data['amountDue'] ?? data['fee'];
+    return RenewalReceipt(
+      requestId: id,
+      periodCode: (data['periodCode'] ?? data['subscriptionCycle'] ?? '')
+          .toString(),
+      amount: amountRaw is num ? amountRaw.toDouble() : 0,
+      remainingMonths: data['remainingMonths'] is num
+          ? (data['remainingMonths'] as num).toInt()
+          : 0,
+      items: items,
+      paymentStatus: SubscriptionPaymentStatusX.parse(data['paymentStatus']),
+      transactionId: (txId != null && txId.isNotEmpty) ? txId : null,
+      paidAt: data['paidAt']?.toString(),
+      companyName: (data['companyName'] ?? '').toString(),
+      organizationName: (data['organizationName'] ?? '').toString(),
+    );
+  }
 }
