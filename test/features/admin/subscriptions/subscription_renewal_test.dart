@@ -752,7 +752,10 @@ void main() {
           isFalse,
         );
 
-        await tester.tap(find.text('إلغاء الطلب'));
+        final cancelBtn = find.widgetWithText(TextButton, 'إلغاء الطلب');
+        await tester.ensureVisible(cancelBtn);
+        await tester.pumpAndSettle();
+        await tester.tap(cancelBtn);
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('renewal_cancel_confirm')), findsOneWidget);
         await tester.tap(find.byKey(const Key('renewal_cancel_confirm_yes')));

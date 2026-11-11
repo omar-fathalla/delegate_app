@@ -245,7 +245,6 @@ describe("paymob scenario matrix (fake HMAC, no real keys)", () => {
 
   it("a second renewal is blocked while one is still awaiting payment", async () => {
     await jobs.quoteSubscriptionRequest(db, "ren1", AT);
-    db = db; // already seeded
     await seed({db, requestId: "ren2", quotedAt: AT});
     await assert.rejects(
       () => jobs.quoteSubscriptionRequest(db, "ren2", AT),
