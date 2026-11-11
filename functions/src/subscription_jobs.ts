@@ -308,7 +308,7 @@ function applyTerminalUpdate(
   reason: TerminalReason,
 ): void {
   const paymentStatus = reason === "expired" ? "expired" : "failed";
-  const update: Data = {
+  const update: admin.firestore.UpdateData<admin.firestore.DocumentData> = {
     paymentStatus,
     paymentError: reason,
     updatedAt: FieldValue.serverTimestamp(),
