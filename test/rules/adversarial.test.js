@@ -149,8 +149,8 @@ describe("adversarial", ()=>{
     });
     // The app used to get() a missing intent before create; that read
     // must succeed for company staff (resource == null).
-    await rec("ca get missing intent (read-before-create)","allow",getDoc(doc(as("ca"),"storage_upload_intents/missing-new-reg")));
-    await rec("hr get missing intent (read-before-create)","allow",getDoc(doc(as("hr"),"storage_upload_intents/missing-new-reg")));
+    await rec("ca get missing intent","deny",getDoc(doc(as("ca"),"storage_upload_intents/missing-new-reg")));
+    await rec("hr get missing intent","deny",getDoc(doc(as("hr"),"storage_upload_intents/missing-new-reg")));
     await rec("anon get missing intent","deny",getDoc(doc(anon(),"storage_upload_intents/missing-new-reg")));
     await rec("ca create intent own company","deny",setDoc(doc(as("ca"),"storage_upload_intents/f2"),{companyUID:"c1",createdBy:"ca"}));
     await rec("sup create intent own company","deny",setDoc(doc(as("sup"),"storage_upload_intents/f3"),{companyUID:"c1",createdBy:"sup"}));

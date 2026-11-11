@@ -89,4 +89,13 @@ test("folder id must be a single path segment", () => {
   assert.equal(L.isValidFolderId("abc"), true);
   assert.equal(L.isValidFolderId("a/b"), false);
   assert.equal(L.isValidFolderId(""), false);
+  assert.equal(L.isValidFolderId("."), false);
+  assert.equal(L.isValidFolderId(".."), false);
+});
+
+test("inactive status strings are detected", () => {
+  assert.equal(L.isInactiveStatus("inactive"), true);
+  assert.equal(L.isInactiveStatus("disabled"), true);
+  assert.equal(L.isInactiveStatus("active"), false);
+  assert.equal(L.isInactiveStatus(""), false);
 });

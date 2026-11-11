@@ -30,6 +30,26 @@ service firebase.storage {
         'organizationAdmin'
       ];
     }
+    // Other non-delegate staff (marketing, accountant, …) may use
+    // tenant-scoped company/org paths of their own company.
+    function isStorageNamedStaffRole(role) {
+      return isStorageCompanyStaffRole(role)
+        || isStorageGlobalRole(role)
+        || role in [
+          'marketing',
+          'marketingPromotion', 'marketing_promotion', 'marketing-promotion',
+          'marketingpromotion',
+          'branches_marketing_manager', 'branches-marketing-manager',
+          'branches_marketing', 'branchesMarketingManager',
+          'accountant', 'accounting', 'account_admin', 'account-admin'
+        ];
+    }
+    function isStorageStaff() {
+      return isNonAnonymous()
+        && isStorageNamedStaffRole(
+          firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('role', '')
+        );
+    }
     function storageStaffOrGlobalAccess(folderId) {
       let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
       let role = u.get('role', '');
@@ -51,16 +71,26 @@ service firebase.storage {
       );
     }
 
+    function canAccessCompanyFiles(compId) {
+      let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      let role = u.get('role', '');
+      let co = u.get('companyUID', '');
+      return isNonAnonymous() && (
+        isStorageGlobalRole(role)
+        || (isStorageNamedStaffRole(role) && co != '' && co == compId)
+      );
+    }
+
 
     // ==================== FEEDBACK SCREENSHOTS ====================
     // Screenshots attached to user feedbacks (delegates, supervisors, admins, marketing)
     match /feedback_screenshots/{fileName} {
-      allow read, write: if isNonAnonymous();
+      allow read, write: if isStorageStaff();
     }
 
     // ==================== PHOTO PERMISSION IMAGES ====================
     match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
-      allow read, write: if isNonAnonymous();
+      allow read, write: if canAccessCompanyFiles(compId);
     }
 
     // ==================== TASK IMAGES ====================
@@ -84,43 +114,66 @@ service firebase.storage {
       allow delete: if isNonAnonymous() && request.auth.uid == uploaderUid;
     }
 
+    // Web stores ID documents at
+    // organizations/{org}/companies/{co}/delegates/{uid}/...
+    // Tenant-scope by the company segment so those paths stay usable
+    // without an intent (the web repo is not changed in this PR).
+    match /organizations/{orgId}/companies/{compId}/delegates/{delegateUid}/{allPaths=**} {
+      allow read, write: if canAccessCompanyFiles(compId)
+        || (isNonAnonymous() && request.auth.uid == delegateUid);
+    }
+    match /organizations/{orgId}/companies/{compId}/{allPaths=**} {
+      allow read, write: if canAccessCompanyFiles(compId);
+    }
+
     // ==================== ORGANIZATION FILES ====================
-    match /organizations/{orgId}/{allPaths=**} {
-      allow read, write: if isNonAnonymous();
+    // Storage ORs overlapping matches, so this must itself be tenant
+    // scoped or it would reopen the companies/{compId} rule above.
+    function canAccessOrganization(orgId) {
+      let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      let role = u.get('role', '');
+      let co = u.get('companyUID', '');
+      let org = u.get('organizationUID', '');
+      let orgPath = /databases/(default)/documents/organizations/$(orgId);
+      return isNonAnonymous() && isStorageNamedStaffRole(role) && (
+        isStorageGlobalRole(role)
+        || (org != '' && org == orgId)
+        || (
+          co != ''
+          && firestore.exists(orgPath)
+          && firestore.get(orgPath).data.get('companyUID', '') == co
+        )
+      );
+    }
+    // Must not also match .../companies/{compId}/** or the company
+    // tenant rule above is undone by this OR.
+    match /organizations/{orgId}/{segment}/{rest=**} {
+      allow read, write: if segment != 'companies' && canAccessOrganization(orgId);
     }
 
     // ==================== COMPANY FILES ====================
     // Tenant-scoped when the path is the company id.
-    function canAccessCompanyFiles(compId) {
-      let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
-      let role = u.get('role', '');
-      let co = u.get('companyUID', '');
-      return isNonAnonymous() && (
-        isStorageGlobalRole(role)
-        || (co != '' && co == compId)
-      );
-    }
     match /companies/{compId}/{allPaths=**} {
       allow read, write: if canAccessCompanyFiles(compId);
     }
 
     match /companies/{fileName} {
-      allow read, write: if isNonAnonymous();
+      allow read, write: if isStorageStaff();
     }
 
     // ==================== DELEGATE FILES ====================
     match /delegates/{delegateId}/{allPaths=**} {
-      allow read, write: if isNonAnonymous();
+      allow read, write: if canAccessDelegateDocuments(delegateId);
     }
 
     // ==================== PENALTIES ATTACHMENTS ====================
     match /penalties/{allPaths=**} {
-      allow read, write: if isNonAnonymous();
+      allow read, write: if isStorageStaff();
     }
 
     // ==================== LEAVE ATTACHMENTS ====================
     match /leave_attachments/{allPaths=**} {
-      allow read, write: if isNonAnonymous();
+      allow read, write: if isStorageStaff();
     }
 
     // ==================== DELEGATE REGISTRATION & SUBSCRIPTION DOCUMENTS ====================
@@ -155,18 +208,25 @@ service firebase.storage {
     // ==================== PUBLIC FILES ====================
     match /public/{allPaths=**} {
       allow read: if true;
-      allow write: if isNonAnonymous();
+      allow write: if isStorageStaff();
     }
 
     // ==================== STAGING PATH ====================
-    match /staging/{allPaths=**} {
-      allow read, write: if isNonAnonymous();
+    // Web also writes staging/requests/{id}/... Keep the path, but
+    // tenant-scope it like delegate_documents (intent or folder owner).
+    // Other staging prefixes are staff-only.
+    match /staging/requests/{requestId}/{allPaths=**} {
+      allow read, write: if canAccessDelegateDocuments(requestId);
+    }
+    // Storage ORs overlapping matches, so this residual must not
+    // also match staging/requests/{id} or the intent check above is undone.
+    match /staging/{segment}/{rest=**} {
+      allow read, write: if segment != 'requests' && isStorageStaff();
     }
 
     // ==================== GUIDE VIDEOS PATH ====================
     match /guide-videos/{fileName} {
-      allow read: if isNonAnonymous();
-      allow write: if isNonAnonymous();
+      allow read, write: if isStorageStaff();
     }
 
     // ==================== FALLBACK FOR ALL OTHER AUTHENTICATED PATHS ====================
@@ -175,13 +235,20 @@ service firebase.storage {
     // Storage ORs overlapping matches, so tenant-scoped prefixes must be
     // excluded from this catch-all or the tighter rules above are undone.
     match /{firstSegment}/{rest=**} {
-      allow read, write: if isNonAnonymous()
+      allow read, write: if isStorageStaff()
         && firstSegment != 'delegate_documents'
         && firstSegment != 'delegate_subscription_receipts'
-        && firstSegment != 'companies';
+        && firstSegment != 'companies'
+        && firstSegment != 'organizations'
+        && firstSegment != 'delegates'
+        && firstSegment != 'staging'
+        && firstSegment != 'penalties'
+        && firstSegment != 'leave_attachments'
+        && firstSegment != 'feedback_screenshots'
+        && firstSegment != 'public';
     }
     match /{singleFile} {
-      allow read, write: if isNonAnonymous();
+      allow read, write: if isStorageStaff();
     }
   }
 }

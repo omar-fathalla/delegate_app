@@ -541,6 +541,22 @@ describe("docs-pending round 2", () => {
     }
     test("ALLOW sa creates a request for any supervisor", () => ok(setDoc(doc(as("sa"), "delegate_requests/n1"), NEW("sup"))));
     test("DENY ts creates a request (even naming itself)", () => no(setDoc(doc(as("ts"), "delegate_requests/n1"), NEW("ts"))));
+    test("DENY company staff squats a request id reserved by another company", async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await ctx.firestore().doc("storage_upload_intents/squat1").set({
+          companyUID: "c9", createdBy: "callable",
+        });
+      });
+      await no(setDoc(doc(as("ca"), "delegate_requests/squat1"), NEW("ca")));
+    });
+    test("ALLOW company staff creates on an id reserved by their own company", async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await ctx.firestore().doc("storage_upload_intents/own1").set({
+          companyUID: "c1", createdBy: "callable",
+        });
+      });
+      await ok(setDoc(doc(as("ca"), "delegate_requests/own1"), NEW("ca")));
+    });
     test("DENY delegate / acc creates a request", async () => {
       await no(setDoc(doc(as("d1"), "delegate_requests/n1"), NEW("d1")));
       await no(setDoc(doc(as("acc"), "delegate_requests/n1"), NEW("acc")));

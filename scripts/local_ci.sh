@@ -84,7 +84,8 @@ seed_local_properties() {
     "$REPO_ROOT/android/local.properties" \
     "$HOME/Development/SwitchPoint/delegate_app/android/local.properties" \
     /tmp/build-ce97cb3/android/local.properties \
-    /tmp/build-f7dbcf37/android/local.properties
+    /tmp/build-f7dbcf37/android/local.properties \
+    "$HOME/tashil-exports/android/local.properties"
   do
     if [[ -f "$cand" ]] && grep -q '^devMapsAndroidKey=' "$cand" 2>/dev/null; then
       cp "$cand" "$dest"
