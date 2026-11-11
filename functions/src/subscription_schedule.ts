@@ -1,7 +1,7 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
-import {runSubscriptionSuspension, expireAbandonedRenewals, finalizeTerminalRenewal} from "./subscription_jobs";
-import {REQUEST_TYPE_RENEWAL, TIME_ZONE} from "./subscription_logic";
+import {runSubscriptionSuspension, expireAbandonedRenewals, finalizeRenewalOnStatusChange} from "./subscription_jobs";
+import {TIME_ZONE} from "./subscription_logic";
 
 if (admin.apps.length === 0) admin.initializeApp();
 
@@ -40,10 +40,6 @@ export const expireAbandonedSubscriptionRenewals = functions
     return null;
   });
 
-function str(v: unknown): string {
-  return typeof v === "string" ? v.trim() : "";
-}
-
 /**
  * When staff reject or cancel a renewal, set paymentStatus to a terminal
  * state and release coverage so those delegates can be renewed again.
@@ -52,22 +48,11 @@ export const finalizeSubscriptionRenewalOnStatus = functions
   .region("us-central1")
   .firestore.document("delegate_requests/{requestId}")
   .onUpdate(async (change) => {
-    const before = change.before.data() || {};
-    const after = change.after.data() || {};
-    if (str(after.requestType || after.request_type) !== REQUEST_TYPE_RENEWAL) return null;
-    const status = str(after.status);
-    if (status !== "rejected" && status !== "cancelled") return null;
-    const payment = str(after.paymentStatus);
-    if (payment === "paid" || payment === "expired") return null;
-    if (payment === "failed" && str(after.paymentError) === (status === "rejected" ? "staff_rejected" : "cancelled")) {
-      return null;
-    }
-    const beforeStatus = str(before.status);
-    if (beforeStatus === status && payment !== "pending") return null;
-    await finalizeTerminalRenewal(
+    await finalizeRenewalOnStatusChange(
       admin.firestore(),
       change.after.id,
-      status === "rejected" ? "staff_rejected" : "cancelled",
+      (change.before.data() || {}) as Record<string, unknown>,
+      (change.after.data() || {}) as Record<string, unknown>,
     );
     return null;
   });

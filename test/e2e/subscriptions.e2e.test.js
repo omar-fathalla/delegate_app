@@ -274,6 +274,7 @@ test("abandoned pending renewals expire at quote-month end and free their delega
   const expired = (await db.doc("delegate_requests/renAbandon").get()).data();
   assert.equal(expired.paymentStatus, "expired");
   assert.equal(expired.paymentError, "expired");
+  assert.equal(expired.status, "expired");
   const cov = (await db.doc("subscription_coverage/2027_H1_app7").get()).data();
   assert.equal(cov.status, "failed");
 
@@ -333,4 +334,89 @@ test("adding a chain does not itself grant coverage to an unpaid delegate", asyn
   assert.ok(res.suspendedDocs >= 1); // o3 was written active without coverage
   assert.equal(await status("o1", "app9"), "suspended");
   assert.equal(await status("o3", "app9"), "suspended");
+});
+
+test("late finalize on a rejected request does not overwrite a newer coverage claim", async () => {
+  await lateAppAdded("appHold1");
+  await renewal("renHoldOld", ["appHold1"]);
+  await J.quoteSubscriptionRequest(db, "renHoldOld", FEB_2027);
+  await J.finalizeTerminalRenewal(db, "renHoldOld", "staff_rejected");
+  await renewal("renHoldNew", ["appHold1"]);
+  await J.quoteSubscriptionRequest(db, "renHoldNew", FEB_2027);
+  assert.equal((await db.doc("subscription_coverage/2027_H1_appHold1").get()).get("requestId"), "renHoldNew");
+
+  // Same path as the status trigger: rejected → cancelled re-fires finalize.
+  const before = (await db.doc("delegate_requests/renHoldOld").get()).data();
+  await db.doc("delegate_requests/renHoldOld").update({status: "cancelled"});
+  const after = (await db.doc("delegate_requests/renHoldOld").get()).data();
+  await J.finalizeRenewalOnStatusChange(db, "renHoldOld", before, after);
+  const cov = (await db.doc("subscription_coverage/2027_H1_appHold1").get()).data();
+  assert.equal(cov.requestId, "renHoldNew");
+  assert.equal(cov.status, "pending");
+
+  await renewal("renHoldThird", ["appHold1"]);
+  await assert.rejects(J.quoteSubscriptionRequest(db, "renHoldThird", FEB_2027), /already_covered/);
+});
+
+test("late failed Paymob callback does not overwrite a newer coverage claim", async () => {
+  await lateAppAdded("appHold2");
+  await renewal("renPayOld", ["appHold2"]);
+  await J.quoteSubscriptionRequest(db, "renPayOld", FEB_2027);
+  await J.finalizeTerminalRenewal(db, "renPayOld", "staff_rejected");
+  await renewal("renPayNew", ["appHold2"]);
+  await J.quoteSubscriptionRequest(db, "renPayNew", FEB_2027);
+  assert.equal(await pay("renPayOld", "tx-late-fail", 41667, false), "failed");
+  const cov = (await db.doc("subscription_coverage/2027_H1_appHold2").get()).data();
+  assert.equal(cov.requestId, "renPayNew");
+  await renewal("renPayThird", ["appHold2"]);
+  await assert.rejects(J.quoteSubscriptionRequest(db, "renPayThird", FEB_2027), /already_covered/);
+});
+
+test("a paid renewal still blocks coverage after its status is cancelled", async () => {
+  await lateAppAdded("appHold3");
+  await renewal("renPaidCancel", ["appHold3"]);
+  await J.quoteSubscriptionRequest(db, "renPaidCancel", FEB_2027);
+  assert.equal(await pay("renPaidCancel", "tx-paid-cancel", 41667), "paid");
+  await db.doc("delegate_requests/renPaidCancel").update({status: "cancelled"});
+  await renewal("renPaidCancelRetry", ["appHold3"]);
+  await assert.rejects(J.quoteSubscriptionRequest(db, "renPaidCancelRetry", FEB_2027), /already_covered/);
+  const before = {status: "approved", paymentStatus: "paid", requestType: "renewal"};
+  const after = {status: "cancelled", paymentStatus: "paid", requestType: "renewal"};
+  await J.finalizeRenewalOnStatusChange(db, "renPaidCancel", before, after);
+  assert.equal((await db.doc("delegate_requests/renPaidCancel").get()).get("paymentStatus"), "paid");
+});
+
+test("partial-duplicate remaining chains attach to the existing uid with no new fee", async () => {
+  await lateAppAdded("dlgExist");
+  await db.doc(delegatePath("o1", "dlgExist")).set({
+    uid: "dlgExist", status: "active", companyUID: "c1",
+    nationalId: "20000000000099", phoneNumber: "01000000099",
+    subscription: {periodCode: "2027_H1", paymentStatus: "paid", amountDue: 416.67, renewalRequestId: "ren-exist"},
+  });
+  await db.doc("delegate_requests/ren-exist").set({
+    requestType: "renewal", status: "approved", paymentStatus: "paid",
+    supervisorUid: "sup1", companyUID: "c1", organizationUID: "o1",
+    periodCode: "2027_H1", coveredDelegateUids: ["dlgExist"], amountDue: 416.67,
+  });
+  await db.doc("subscription_coverage/2027_H1_dlgExist").set({
+    requestId: "ren-exist", uid: "dlgExist", periodCode: "2027_H1", status: "paid",
+  });
+
+  await db.doc("delegate_requests/addExistRest").set({
+    requestType: "add_organization", status: "approved", supervisorUid: "sup1",
+    companyUID: "c1", organizationUID: "o3", organizationUIDs: ["o3"],
+    existingDelegateUid: "dlgExist",
+    paymentStatus: "not_required", fee: 0, amountDue: 0, periodCode: "2027_H1",
+  });
+  await db.doc(delegatePath("o3", "dlgExist")).set({
+    uid: "dlgExist", status: "active", companyUID: "c1",
+    subscription: {periodCode: "2027_H1", paymentStatus: "paid", amountDue: 416.67, renewalRequestId: "ren-exist"},
+  });
+  const addReq = (await db.doc("delegate_requests/addExistRest").get()).data();
+  assert.equal(addReq.existingDelegateUid, "dlgExist");
+  assert.equal(addReq.fee, 0);
+  assert.equal(addReq.paymentStatus, "not_required");
+  assert.equal((await db.doc(delegatePath("o3", "dlgExist")).get()).get("uid"), "dlgExist");
+  await renewal("renExistDup", ["dlgExist"]);
+  await assert.rejects(J.quoteSubscriptionRequest(db, "renExistDup", FEB_2027), /already_covered/);
 });

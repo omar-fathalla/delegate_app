@@ -285,13 +285,15 @@ export function quotedAtOf(data: Data): Date | null {
 
 function coverageBlocks(other: admin.firestore.DocumentSnapshot, now: Date): boolean {
   if (!other.exists) return false;
-  const status = str(other.get("status"));
   const paymentStatus = str(other.get("paymentStatus"));
-  if (status === "cancelled" || status === "rejected") return false;
+  // A paid request always blocks, even if staff later set status to
+  // cancelled or rejected. Payment, not status, is the coverage source.
+  if (paymentStatus === "paid") return true;
+  const status = str(other.get("status"));
+  if (status === "cancelled" || status === "rejected" || status === "expired") return false;
   if (paymentStatus === "expired" || paymentStatus === "failed" || paymentStatus === "waived" || paymentStatus === "not_required") {
     return false;
   }
-  if (paymentStatus === "paid") return true;
   if (paymentStatus !== "pending") return false;
   const quoted = quotedAtOf((other.data() || {}) as Data);
   if (quoted && isRenewalCoverageExpired(quoted, now, str(other.get("periodCode")))) return false;
@@ -315,10 +317,57 @@ function applyTerminalUpdate(
   };
   if (reason === "staff_rejected" && str(data.status) !== "rejected") update.status = "rejected";
   if (reason === "cancelled" && str(data.status) !== "cancelled") update.status = "cancelled";
+  if (reason === "expired" && str(data.status) !== "expired") update.status = "expired";
   tx.update(db.collection(REQUESTS).doc(requestId), update);
-  const periodCode = str(data.periodCode);
-  const uids = coveredUids(requestId, data);
-  if (periodCode && uids.length) claimCoverage(tx, db, requestId, periodCode, uids, "failed");
+}
+
+async function readCoverageSnaps(
+  tx: admin.firestore.Transaction,
+  db: Db,
+  periodCode: string,
+  uids: string[],
+): Promise<admin.firestore.DocumentSnapshot[]> {
+  const snaps: admin.firestore.DocumentSnapshot[] = [];
+  for (const uid of uids) {
+    snaps.push(await tx.get(coverageRef(db, periodCode, uid)));
+  }
+  return snaps;
+}
+
+/**
+ * Release a coverage claim only when this request still owns it. A late
+ * finalize or failed Paymob callback must not overwrite a newer request's
+ * claim. All snaps must have been read before any write in this transaction.
+ */
+function releaseCoverageIfOwned(
+  tx: admin.firestore.Transaction,
+  db: Db,
+  requestId: string,
+  periodCode: string,
+  uids: string[],
+  snaps: admin.firestore.DocumentSnapshot[],
+): void {
+  for (let i = 0; i < uids.length; i++) {
+    const uid = uids[i];
+    const cov = snaps[i];
+    if (!cov || !cov.exists) continue;
+    if (str(cov.get("requestId")) !== requestId) continue;
+    tx.set(coverageRef(db, periodCode, uid), {
+      requestId,
+      uid,
+      periodCode,
+      status: "failed",
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  }
+}
+
+function canClaimCoverage(snap: admin.firestore.DocumentSnapshot | undefined, requestId: string): boolean {
+  if (!snap || !snap.exists) return true;
+  const owner = str(snap.get("requestId"));
+  if (!owner || owner === requestId) return true;
+  const status = str(snap.get("status"));
+  return status === "failed";
 }
 
 /**
@@ -332,8 +381,36 @@ export async function finalizeTerminalRenewal(db: Db, requestId: string, reason:
     const data = snap.data() as Data;
     if (str(data.requestType) !== REQUEST_TYPE_RENEWAL) return;
     if (str(data.paymentStatus) === "paid") return;
+    const periodCode = str(data.periodCode);
+    const uids = coveredUids(requestId, data);
+    const covs = periodCode && uids.length ? await readCoverageSnaps(tx, db, periodCode, uids) : [];
     applyTerminalUpdate(tx, db, requestId, data, reason);
+    if (periodCode && uids.length) releaseCoverageIfOwned(tx, db, requestId, periodCode, uids, covs);
   });
+}
+
+/**
+ * Body of the `finalizeSubscriptionRenewalOnStatus` trigger. Exported so
+ * tests can drive the same rejected→cancelled re-fire path without standing
+ * up the functions emulator.
+ */
+export async function finalizeRenewalOnStatusChange(
+  db: Db,
+  requestId: string,
+  before: Data,
+  after: Data,
+): Promise<void> {
+  if (str(after.requestType || after.request_type) !== REQUEST_TYPE_RENEWAL) return;
+  const status = str(after.status);
+  if (status !== "rejected" && status !== "cancelled") return;
+  const payment = str(after.paymentStatus);
+  if (payment === "paid" || payment === "expired") return;
+  if (payment === "failed" && str(after.paymentError) === (status === "rejected" ? "staff_rejected" : "cancelled")) {
+    return;
+  }
+  const beforeStatus = str(before.status);
+  if (beforeStatus === status && payment !== "pending") return;
+  await finalizeTerminalRenewal(db, requestId, status === "rejected" ? "staff_rejected" : "cancelled");
 }
 
 /**
@@ -343,7 +420,10 @@ export async function finalizeTerminalRenewal(db: Db, requestId: string, reason:
  * is still pending.
  */
 export async function expireAbandonedRenewals(db: Db, now: Date): Promise<{scanned: number, expired: number, finalized: number}> {
-  const snap = await db.collection(REQUESTS).where("requestType", "==", REQUEST_TYPE_RENEWAL).get();
+  const snap = await db.collection(REQUESTS)
+    .where("requestType", "==", REQUEST_TYPE_RENEWAL)
+    .where("paymentStatus", "==", "pending")
+    .get();
   let expired = 0;
   let finalized = 0;
   for (const doc of snap.docs) {
@@ -387,8 +467,10 @@ async function assertNotAlreadyCovered(
   now: Date,
 ): Promise<void> {
   const others = new Map<string, admin.firestore.DocumentSnapshot>();
+  const coverageByUid = new Map<string, admin.firestore.DocumentSnapshot>();
   for (const uid of uids) {
     const cov = await tx.get(coverageRef(db, periodCode, uid));
+    coverageByUid.set(uid, cov);
     if (!cov.exists) continue;
     const otherId = str(cov.get("requestId"));
     if (!otherId || otherId === requestId) continue;
@@ -401,17 +483,33 @@ async function assertNotAlreadyCovered(
     const data = (other.data() || {}) as Data;
     const status = str(data.status);
     const payment = str(data.paymentStatus);
+    const otherUids = coveredUids(otherId, data).filter((u) => uids.includes(u));
+    const release = () => {
+      if (!periodCode || !otherUids.length) return;
+      const owned: string[] = [];
+      const snaps: admin.firestore.DocumentSnapshot[] = [];
+      for (const uid of otherUids) {
+        const snap = coverageByUid.get(uid);
+        if (!snap) continue;
+        owned.push(uid);
+        snaps.push(snap);
+      }
+      releaseCoverageIfOwned(tx, db, otherId, periodCode, owned, snaps);
+    };
     if (status === "rejected" && payment === "pending") {
       applyTerminalUpdate(tx, db, otherId, data, "staff_rejected");
+      release();
       continue;
     }
     if (status === "cancelled" && payment === "pending") {
       applyTerminalUpdate(tx, db, otherId, data, "cancelled");
+      release();
       continue;
     }
     const quoted = quotedAtOf(data);
     if (payment === "pending" && quoted && isRenewalCoverageExpired(quoted, now, str(data.periodCode))) {
       applyTerminalUpdate(tx, db, otherId, data, "expired");
+      release();
       continue;
     }
     if (coverageBlocks(other, now)) throw new QuoteError("already_covered");
@@ -537,26 +635,28 @@ export async function applyVerifiedSubscriptionPayment(db: Db, p: VerifiedPaymen
 
   const outcome = await db.runTransaction(async (tx): Promise<ApplyOutcome> => {
     const [event, req] = await Promise.all([tx.get(eventRef), tx.get(reqRef)]);
+    const data = (req.exists ? (req.data() || {}) : {}) as Data;
+    const periodCode = str(data.periodCode);
+    const uids = req.exists ? coveredUids(p.requestId, data) : [];
+    const covs = periodCode && uids.length ? await readCoverageSnaps(tx, db, periodCode, uids) : [];
     if (event.exists) return "duplicate";
     tx.set(eventRef, {requestId: p.requestId, ...paymob, receivedAt: ts});
     if (!req.exists) return "not_found";
     if (str(req.get("paymentStatus")) === "paid") return "already_paid";
-    const data = (req.data() || {}) as Data;
-    const periodCode = str(data.periodCode);
-    const uids = coveredUids(p.requestId, data);
     if (!p.success) {
       tx.update(reqRef, {paymentStatus: "failed", paymob, paymentError: "payment_failed", updatedAt: ts});
-      if (periodCode && uids.length) claimCoverage(tx, db, p.requestId, periodCode, uids, "failed");
+      if (periodCode && uids.length) releaseCoverageIfOwned(tx, db, p.requestId, periodCode, uids, covs);
       return "failed";
     }
     if (rejectReason !== "" && rejectReason !== "already_paid") {
       tx.update(reqRef, {
         paymentStatus: "failed", paymob, paymentError: rejectReason, needsReview: true, updatedAt: ts,
       });
-      if (periodCode && uids.length) claimCoverage(tx, db, p.requestId, periodCode, uids, "failed");
+      if (periodCode && uids.length) releaseCoverageIfOwned(tx, db, p.requestId, periodCode, uids, covs);
       return "rejected";
     }
     const isRenewal = str(req.get("requestType")) === REQUEST_TYPE_RENEWAL;
+    const stealsCoverage = periodCode && uids.length && covs.some((s) => !canClaimCoverage(s, p.requestId));
     tx.update(reqRef, {
       paymentStatus: "paid",
       paymob,
@@ -565,9 +665,12 @@ export async function applyVerifiedSubscriptionPayment(db: Db, p: VerifiedPaymen
       paymentError: FieldValue.delete(),
       applyState: "pending",
       ...(isRenewal ? {status: "approved", reviewedBy: "Paymob", reviewedAt: new Date().toISOString()} : {}),
+      ...(stealsCoverage ? {needsReview: true, paymentError: "coverage_held_elsewhere"} : {}),
       updatedAt: ts,
     });
-    if (periodCode && uids.length) claimCoverage(tx, db, p.requestId, periodCode, uids, "paid");
+    if (periodCode && uids.length && !stealsCoverage) {
+      claimCoverage(tx, db, p.requestId, periodCode, uids, "paid");
+    }
     return "paid";
   });
 

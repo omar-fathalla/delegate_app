@@ -901,6 +901,12 @@ class _SubscriptionRequestCard extends StatelessWidget {
         case SubscriptionRequestStatus.rejected:
           statusColor = colorScheme.error;
           break;
+        case SubscriptionRequestStatus.cancelled:
+          statusColor = Colors.grey.shade600;
+          break;
+        case SubscriptionRequestStatus.expired:
+          statusColor = Colors.orange.shade800;
+          break;
       }
     } else {
       switch (request.status) {
@@ -912,6 +918,12 @@ class _SubscriptionRequestCard extends StatelessWidget {
           break;
         case SubscriptionRequestStatus.rejected:
           statusColor = colorScheme.error;
+          break;
+        case SubscriptionRequestStatus.cancelled:
+          statusColor = Colors.grey.shade600;
+          break;
+        case SubscriptionRequestStatus.expired:
+          statusColor = Colors.orange.shade800;
           break;
       }
     }
@@ -1661,6 +1673,18 @@ class _SubscriptionRequestCard extends StatelessWidget {
           label = 'مرفوض';
           icon = Icons.cancel_rounded;
           break;
+        case SubscriptionRequestStatus.cancelled:
+          bg = Colors.grey.withValues(alpha: 0.14);
+          fg = Colors.grey.shade700;
+          label = 'ملغى';
+          icon = Icons.block_rounded;
+          break;
+        case SubscriptionRequestStatus.expired:
+          bg = Colors.orange.withValues(alpha: 0.14);
+          fg = Colors.orange.shade800;
+          label = 'منتهٍ';
+          icon = Icons.timer_off_rounded;
+          break;
       }
     } else {
       switch (status) {
@@ -1681,6 +1705,18 @@ class _SubscriptionRequestCard extends StatelessWidget {
           fg = colorScheme.error;
           label = 'مرفوض';
           icon = Icons.cancel_rounded;
+          break;
+        case SubscriptionRequestStatus.cancelled:
+          bg = Colors.grey.withValues(alpha: 0.14);
+          fg = Colors.grey.shade700;
+          label = 'ملغى';
+          icon = Icons.block_rounded;
+          break;
+        case SubscriptionRequestStatus.expired:
+          bg = Colors.orange.withValues(alpha: 0.14);
+          fg = Colors.orange.shade800;
+          label = 'منتهٍ';
+          icon = Icons.timer_off_rounded;
           break;
       }
     }
