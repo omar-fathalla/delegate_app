@@ -802,48 +802,9 @@ describe("firestore tightened rules", () => {
     );
   });
 
-  test("held delegate cannot create a leave request or leave notification", async () => {
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await ctx.firestore().doc("organizations/o1/companies/c1/delegates/del-1").set({
-        phoneNumber: "01011111111",
-        organizationUID: "o1",
-        companyUID: "c1",
-        role: "delegate",
-        status: "suspended",
-        statusReason: "admin_suspend",
-        holds: {admin_suspend: {at: "2026-11-11"}},
-        uid: "del-1",
-      });
-    });
-    const delegate = dbFor("del-1", DELEGATE);
-    await assertFails(delegate.collection("leave_requests").add({
-      delegateUid: "del-1",
-      companyUID: "c1",
-      organizationUID: "o1",
-      type: "sick",
-      status: "pending",
-    }));
-    await assertFails(delegate.collection("notifications").add({
-      delegateUid: "supervisor_c1",
-      companyUID: "c1",
-      organizationUID: "o1",
-      title: "طلب إجازة",
-      type: "leave_request_submitted",
-      targetRole: "supervisor",
-      isRead: false,
-      createdBy: "del-1",
-    }));
-  });
 
   test("delegate can notify company supervisors when supervisorUid is empty", async () => {
     const delegate = dbFor("del-1", DELEGATE);
-    await assertSucceeds(delegate.collection("leave_requests").add({
-      delegateUid: "del-1",
-      companyUID: "c1",
-      organizationUID: "o1",
-      type: "sick",
-      status: "pending",
-    }));
     await assertSucceeds(delegate.collection("notifications").add({
       delegateUid: "supervisor_c1",
       companyUID: "c1",

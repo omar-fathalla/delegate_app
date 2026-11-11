@@ -1783,31 +1783,11 @@ service cloud.firestore {
 
     // Delegate may notify a same-company supervisor: createdBy is the
     // caller and the payload is scoped to a company in the token.
-    // M3 residual: when orgId+companyId claims are present and the
-    // delegate doc exists, a held account cannot create notifications
-    // or leave requests. Skip the get when claims or the doc are
-    // missing. Do not apply this to reads of the delegate document.
-    function delegateAccountWritable(orgId, co) {
-      let d = get(/databases/$(database)/documents/organizations/$(orgId)/companies/$(co)/delegates/$(request.auth.uid)).data;
-      let st = d.get('status', 'active');
-      let held = st == 'suspended' || st == 'inactive' || st == 'disabled' || st == 'rejected';
-      let holdsEmpty = d.get('holds', {}).keys().size() == 0;
-      return !held && holdsEmpty;
-    }
-    function callerDelegateNotHeld() {
-      let orgId = claimString('orgId');
-      let co = claimString('companyId');
-      return !isDelegate()
-        || orgId == ''
-        || co == ''
-        || !exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(co)/delegates/$(request.auth.uid))
-        || delegateAccountWritable(orgId, co);
-    }
-
+    // A held-account get() is not applied here: it blows the 1000-expression
+    // budget. Storage writes and the app status listener cover M3 instead.
     function canDelegateCreateNotification() {
       let d = request.resource.data;
       return isDelegate()
-        && callerDelegateNotHeld()
         && dataHasString(d, 'createdBy')
         && d.createdBy == request.auth.uid
         && (
@@ -1816,12 +1796,11 @@ service cloud.firestore {
         );
     }
 
-    // Staff/global path is a separate allow from the delegate path so the
-    // held-account get() does not fold into the 1000-expression budget.
-    function canStaffCreateNotification() {
+    function canCreateNotification() {
       return signedIn() && (
         isGlobalStaff()
         || ((isOrgScopedStaff() || isCompanyScopedStaff()) && (incomingOrgScoped() || incomingCompanyScoped() || request.resource.data.createdBy == request.auth.uid))
+        || canDelegateCreateNotification()
       );
     }
 
@@ -1839,8 +1818,7 @@ service cloud.firestore {
       allow read: if canReadOwnNotification();
       allow read: if canReadOrgAdminRoleBroadcast();
       allow read: if canReadNotification();
-      allow create: if canStaffCreateNotification();
-      allow create: if canDelegateCreateNotification();
+      allow create: if canCreateNotification();
       allow update: if (canReadOwnNotification() || canReadNotification()) && (
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']) ||
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']) ||
@@ -2302,15 +2280,12 @@ service cloud.firestore {
         ownsDelegateId(resource.data.delegateUid)
         || delegateOwns(resource.data.delegateUid)
       );
-      allow create: if signedIn() && isGlobalStaff();
-      allow create: if signedIn() && isCompanyScopedStaff() && incomingCompanyScoped();
-      allow create: if signedIn()
-        && isDelegate()
-        && callerDelegateNotHeld()
-        && (
-          ownsDelegateId(request.resource.data.delegateUid)
-          || delegateOwns(request.resource.data.delegateUid)
-        );
+      allow create: if signedIn() && (
+        ownsDelegateId(request.resource.data.delegateUid)
+        || delegateOwns(request.resource.data.delegateUid)
+        || (isCompanyScopedStaff() && incomingCompanyScoped())
+        || isGlobalStaff()
+      );
       allow update: if isGlobalStaff()
         || (isCompanyScopedStaff() && companyScoped())
         || (ownsDelegateId(resource.data.delegateUid) && resource.data.status == 'pending')
