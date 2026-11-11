@@ -1980,21 +1980,27 @@ service cloud.firestore {
         && d.get('supervisorUid', '') == request.auth.uid
         && co != ''
         && incomingCo == co;
-      // F2: a client-chosen request id must not squat a folder that
-      // already has an intent for another company.
-      let intentPath = /databases/$(database)/documents/storage_upload_intents/$(requestId);
-      let reservedCo = exists(intentPath)
-        ? get(intentPath).data.get('companyUID', '')
-        : '';
-      let requestCo = d.get('companyUID', '') != ''
-        ? d.get('companyUID', '') : d.get('companyId', '');
       return signedIn() && (isSa || isOa || isCoStaff)
         && d.get('requestType', '') != 'update_national_id'
         && d.get('actionType', '') != 'update_national_id'
-        && (reservedCo == '' || reservedCo == requestCo)
         && subscriptionPaymentCreateOk()
         && requestOrganizationUIDsOk()
         && requestPrimaryOrgBelongsToCompany();
+    }
+
+    // F2: a client-chosen request id must not squat a folder already
+    // reserved by another company's intent. Defined next to the match
+    // so `requestId` stays a path argument, not a 11th local in
+    // createDelegateRequestOk (max 10 lets).
+    function requestIdNotReservedByOtherCompany(id) {
+      let intentPath = /databases/$(database)/documents/storage_upload_intents/$(id);
+      let reservedCo = exists(intentPath)
+        ? get(intentPath).data.get('companyUID', '')
+        : '';
+      let requestCo = request.resource.data.get('companyUID', '') != ''
+        ? request.resource.data.get('companyUID', '')
+        : request.resource.data.get('companyId', '');
+      return reservedCo == '' || reservedCo == requestCo;
     }
 
       // Subscription Phase 0: the company is the tenant for company staff
@@ -2007,9 +2013,8 @@ service cloud.firestore {
     // tenant key used by Storage rules (one get).
     // Clients cannot mint intents (that was the first-come claim race).
     // ensureStorageUploadIntent (Admin SDK) creates them after verifying
-    // the folder's owning company. A get of a missing doc must be allowed
-    // for company staff: companyScoped() reads resource.data and denied
-    // registration when the helper did get-before-create.
+    // the folder's owning company. Missing and other-company reads both
+    // deny, so 404 vs 403 cannot leak another company's folder.
     function intentCompanyScoped() {
       return callerCompany() != '' && resource.data.companyUID == callerCompany();
     }
@@ -2042,6 +2047,7 @@ service cloud.firestore {
       // update_national_id requests are created only by submitNationalIdUpdate
       // (Admin SDK). Clients cannot mint them.
       allow create: if createDelegateRequestOk()
+        && requestIdNotReservedByOtherCompany(requestId)
         && orgCompanyCheckKeysLocked();
       // Self clause first: the staff role helpers are expensive and would
       // otherwise eat the 1000-expression budget before the docs checks.
