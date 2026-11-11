@@ -17,6 +17,8 @@ test("staff lookup accepts canonical and legacy role spellings and rejects deleg
   assert.equal(isStaffRole("delegate"), false);
   assert.equal(isStaffRole(""), false);
   assert.ok(staffRoleWeight("super_admin") > staffRoleWeight("hr"));
+  assert.equal(staffRoleWeight("supervisor"), staffRoleWeight("admin"));
+  assert.equal(staffRoleWeight("company_supervisor"), staffRoleWeight("company_admin"));
 });
 
 test("public staff profile keeps email and org fields and drops non-staff", () => {

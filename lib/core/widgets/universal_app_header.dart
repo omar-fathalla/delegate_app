@@ -81,10 +81,12 @@ class UniversalAppHeader extends StatelessWidget
       case 'مندوب':
       case 'مروج':
         return l10n.roleDelegate;
+      case 'مشرف الشركة':
+      case 'مسؤول الشركة / المشرف':
+      case 'مسؤول شركة':
+        return l10n.roleCompanyAdmin2;
       case 'مشرف':
         return l10n.roleSupervisor;
-      case 'مسؤول شركة':
-        return l10n.roleCompanyAdmin;
       case 'سوبر أدمن':
         return l10n.roleSuperAdmin;
       case 'أدمن منظمة':
@@ -100,8 +102,8 @@ class UniversalAppHeader extends StatelessWidget
   }
 
   /// يحوّل دور المستخدم إلى تسمية عربية قصيرة تظهر تحت الاسم في الهيدر.
-  /// [rawRole] هو قيمة الحقل `role` الخام من مستند المستخدم إن توفرت،
-  /// ويُستخدم للتمييز بين مشرف الشركة ومسؤول الشركة (كلاهما UserRole.admin).
+  /// Company admin and company supervisor are one UserRole.admin: the label
+  /// does not depend on the raw Firestore role string or job-title position.
   @visibleForTesting
   static String roleLabelFor(
     UserRole role, {
@@ -111,8 +113,9 @@ class UniversalAppHeader extends StatelessWidget
     String? marketingPromotionLabel,
     String? branchesMarketingManagerLabel,
   }) {
-    final raw = (rawRole ?? '').trim().toLowerCase();
-    if (raw.contains('supervisor') || raw == 'مشرف') return 'مشرف';
+    // rawRole is kept on the API so callers can pass the Firestore string;
+    // it must not split company admin vs company supervisor labels.
+    rawRole;
     switch (role) {
       case UserRole.accountant:
         return accountantLabel ?? 'إدارة الحسابات';
@@ -121,8 +124,7 @@ class UniversalAppHeader extends StatelessWidget
       case UserRole.organizationAdmin:
         return 'أدمن منظمة';
       case UserRole.admin:
-        if (position == DelegatePosition.supervisor) return 'مشرف';
-        return 'مسؤول شركة';
+        return 'مشرف الشركة';
       case UserRole.technicalSupport:
         return 'دعم فني';
       case UserRole.marketingPromotion:

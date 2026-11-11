@@ -82,10 +82,11 @@ describe("adversarial", ()=>{
     await rec("oa invite company-admin 30d","deny",setDoc(doc(as("oa"),"invites/j3"),{status:"pending",organizationId:"o1",companyId:"c1",roleToAssign:"company-admin",expiresAt:exp(30)}));
     await rec("oa invite company-admin 3d","allow",setDoc(doc(as("oa"),"invites/j4"),{status:"pending",organizationId:"o1",companyId:"c1",roleToAssign:"company-admin",expiresAt:exp(3)}));
     await rec("oa invite tech support","deny",setDoc(doc(as("oa"),"invites/j5"),{status:"pending",organizationId:"o1",companyId:"c1",roleToAssign:"technical_support",expiresAt:exp(3)}));
-    // NEW-1: supervisor (and HR) cannot invite or edit company-admin invites.
-    await rec("sup invite company-admin own co","deny",setDoc(doc(as("sup"),"invites/k1"),{status:"pending",organizationId:"o1",companyId:"c1",roleToAssign:"company-admin",expiresAt:exp(3)}));
+    // Company admin and company supervisor are one role: supervisor may
+    // invite/edit company-admin invites like a company admin. HR still cannot.
+    await rec("sup invite company-admin own co","allow",setDoc(doc(as("sup"),"invites/k1"),{status:"pending",organizationId:"o1",companyId:"c1",roleToAssign:"company-admin",expiresAt:exp(3)}));
     await rec("hr invite company-admin own co","deny",setDoc(doc(as("hr"),"invites/k2"),{status:"pending",organizationId:"o1",companyId:"c1",roleToAssign:"company-admin",expiresAt:exp(3)}));
-    await rec("sup extends company-admin invite","deny",updateDoc(doc(as("sup"),"invites/i1"),{expiresAt:exp(5)}));
+    await rec("sup extends company-admin invite","allow",updateDoc(doc(as("sup"),"invites/i1"),{expiresAt:exp(5)}));
     await rec("ca invite company-admin own co","allow",setDoc(doc(as("ca"),"invites/j6"),{status:"pending",organizationId:"o1",companyId:"c1",roleToAssign:"company-admin",expiresAt:exp(3)}));
     await rec("oa extends invite expiry to 1 year (update)","deny",updateDoc(doc(as("oa"),"invites/i1"),{expiresAt:exp(365)}));
     await rec("oa reopens claimed invite to pending","deny",updateDoc(doc(as("oa"),"invites/i2"),{status:"pending"}));

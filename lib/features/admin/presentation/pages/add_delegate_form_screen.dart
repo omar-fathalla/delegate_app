@@ -100,7 +100,11 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
       }).toList();
 
       final List<Map<String, dynamic>> orgs = [];
-      if (companyUID.isEmpty) {
+      final role = widget.supervisor.role;
+      final isGlobal = role == UserRole.superAdmin;
+      if (companyUID.isEmpty && !isGlobal) {
+        // Company staff and org-admin fail closed without a companyUID.
+      } else if (companyUID.isEmpty && isGlobal) {
         orgs.addAll(candidates.map((doc) {
           final data = doc.data();
           return {
@@ -128,6 +132,10 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
           }
         }));
         orgs.addAll(checks.whereType<Map<String, dynamic>>());
+      }
+      if (role == UserRole.organizationAdmin) {
+        final ownOrg = widget.supervisor.organizationUID.trim();
+        orgs.removeWhere((o) => (o['uid'] as String).trim() != ownOrg);
       }
 
       if (mounted) {

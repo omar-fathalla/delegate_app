@@ -34,7 +34,19 @@ export const HOLD_PRIORITY: HoldKey[] = [
 
 const SUPER = new Set(["super_admin", "superadmin"]);
 const ORG_ADMIN = new Set(["organization_admin", "organizationadmin", "org_admin"]);
-const COMPANY_ADMIN = new Set(["company_admin", "companyadmin", "admin"]);
+const COMPANY_ADMIN = new Set([
+  "company_admin",
+  "companyadmin",
+  "admin",
+  "supervisor",
+  "company_supervisor",
+]);
+const TECH_SUPPORT = new Set([
+  "technical_support",
+  "technicalsupport",
+  "tech_support",
+  "techsupport",
+]);
 
 export interface HoldEntry {
   at?: string;
@@ -227,12 +239,14 @@ export function decideSetDelegateHold(
   const callerOrg = str(caller.organizationUID);
   const callerCo = str(caller.companyUID);
   const isSuper = SUPER.has(role);
+  const isTech = TECH_SUPPORT.has(role);
   const isOrg = ORG_ADMIN.has(role);
   const isCompany = COMPANY_ADMIN.has(role);
 
-  if (!isSuper && !isOrg && !isCompany) return {ok: false, reason: "caller_not_allowed"};
-  if (isSuper) {
-    // scope is unrestricted
+  if (!isSuper && !isTech && !isOrg && !isCompany) return {ok: false, reason: "caller_not_allowed"};
+  if (isSuper || isTech) {
+    // Super-admin and technical support are unrestricted in scope.
+    // subscription_expired override stays super-admin only (below).
   } else if (isOrg) {
     if (!callerOrg || callerOrg !== orgId) return {ok: false, reason: "out_of_scope"};
   } else {

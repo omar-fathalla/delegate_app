@@ -193,6 +193,16 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         for (final id in resolveOrgs) (nameByUid[id] ?? '').trim().isEmpty ? id : nameByUid[id]!.trim(),
       ];
 
+      if (companyUID.trim().isEmpty) {
+        return const Left(ServerFailure('اختر الشركة أولاً ثم أعد المحاولة.'));
+      }
+      final missingOrg = await _firstOrgMissingFromCompany(resolveOrgs, companyUID);
+      if (missingOrg != null) {
+        return const Left(ServerFailure(
+          'لا يمكن ربط المندوب بسلسلة لا تنتمي لهذه الشركة.',
+        ));
+      }
+
       final request = DelegateSubscriptionRequest(
         id: requestId,
         supervisorUid: supervisorUid,
