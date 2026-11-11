@@ -1858,11 +1858,18 @@ service cloud.firestore {
       // must name itself as supervisorUid (all app flows pass the signed-in
       // user). Super-admin is exempt. Company staff (admin / supervisor / HR)
       // must also set request.companyUID to their own companyUID.
+      // Org-admin create is org- and company-scoped: an org-admin of o1
+      // cannot create a request for a company in o2, and an org-admin
+      // with no companyUID is denied (incomingCompanyScoped fail-closes
+      // on an empty caller company). Roles that may create renewals are
+      // unchanged.
       // update_national_id requests are created only by submitNationalIdUpdate
       // (Admin SDK). Clients cannot mint them.
       allow create: if (isSuperAdmin()
         || (isOrgAdmin()
-          && request.resource.data.get('supervisorUid', '') == request.auth.uid)
+          && request.resource.data.get('supervisorUid', '') == request.auth.uid
+          && incomingOrgScoped()
+          && incomingCompanyScoped())
         || ((isCompanyAdmin() || isHR())
           && request.resource.data.get('supervisorUid', '') == request.auth.uid
           && incomingCompanyScoped()))
@@ -2078,7 +2085,15 @@ service cloud.firestore {
 
     // Server-only OTP enforcement switch read by Cloud Functions
     // (config/delegate_auth.otpEnforcementEnabled). Clients cannot touch it.
+    // config/subscription_dev (tashil-dev free-period bypass list) is also
+    // server-only; the Admin SDK honors it only when projectId is tashil-dev.
     match /config/{docId} {
+      allow read, write: if false;
+    }
+
+    // Server-only coverage claims written by quoteSubscriptionRequest /
+    // applyVerifiedSubscriptionPayment. Clients cannot read or write them.
+    match /subscription_coverage/{id} {
       allow read, write: if false;
     }
 

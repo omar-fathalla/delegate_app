@@ -1,8 +1,10 @@
 import * as admin from "firebase-admin";
+import {FieldValue, Timestamp} from "firebase-admin/firestore";
 import {
   PaymentStatus,
   Period,
   Quote,
+  QuoteOptions,
   REQUEST_TYPE_NEW,
   REQUEST_TYPE_RENEWAL,
   SUSPEND_REASON,
@@ -24,6 +26,8 @@ type Data = Record<string, unknown>;
 const REQUESTS = "delegate_requests";
 const RUNS = "subscription_suspension_runs";
 const EVENTS = "subscription_payment_events";
+const COVERAGE = "subscription_coverage";
+const SUPER_ADMIN_ROLE = "super-admin";
 const BATCH_LIMIT = 400;
 const IN_LIMIT = 30;
 
@@ -126,7 +130,7 @@ export async function runSubscriptionSuspension(db: Db, now: Date): Promise<Susp
   const covered = await coveredDelegateUids(db, period);
   const candidates = [...appAdded.keys()].filter((uid) => !covered.has(uid));
   const res: SuspensionResult = {...base, appAdded: appAdded.size, covered: covered.size, candidates: candidates.length};
-  const ts = admin.firestore.FieldValue.serverTimestamp();
+  const ts = FieldValue.serverTimestamp();
   const writer = new Batcher(db);
 
   for (const doc of await delegateDocsFor(db, candidates)) {
@@ -185,11 +189,122 @@ export async function quoteSubscriptionRequest(db: Db, requestId: string, at: Da
   const uids = coveredUids(requestId, data);
   if (uids.length === 0) throw new QuoteError("no_delegates");
   if (uids.length > MAX_DELEGATES_PER_RENEWAL) throw new QuoteError("too_many_delegates");
+  await assertCreatorScope(db, data);
   if (type === REQUEST_TYPE_RENEWAL) await assertRenewable(db, data, uids);
-  const quote = quoteFor(uids, at);
+  const quoteOpts = await loadDevQuoteOptions(db, data);
+  const quote = quoteFor(uids, at, quoteOpts);
   if (quote.amountCents <= 0) throw new QuoteError("free_period");
-  await persistRecomputedQuote(db, requestId, data, quote);
+  await db.runTransaction(async (tx) => {
+    await assertNotAlreadyCovered(tx, db, requestId, quote.periodCode, uids);
+    await persistRecomputedQuote(tx, db, requestId, data, quote);
+    claimCoverage(tx, db, requestId, quote.periodCode, uids, "pending");
+  });
   return quote;
+}
+
+function projectIdOf(db: Db): string {
+  return str(db.app?.options?.projectId || process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT);
+}
+
+/** Load tashil-dev-only free-period bypass flags. Never returns bypass data on prod. */
+async function loadDevQuoteOptions(db: Db, data: Data): Promise<QuoteOptions> {
+  const projectId = projectIdOf(db);
+  const companyUID = str(data.companyUID);
+  const opts: QuoteOptions = {projectId, companyUID};
+  if (projectId !== "tashil-dev") return opts;
+  const org = str(data.organizationUID);
+  const [cfg, co] = await Promise.all([
+    db.doc("config/subscription_dev").get(),
+    companyUID && org
+      ? db.doc(`organizations/${org}/companies/${companyUID}`).get()
+      : Promise.resolve(null),
+  ]);
+  if (cfg.exists) {
+    const list = cfg.get("bypassFreePeriodForCompanyUIDs");
+    if (Array.isArray(list)) opts.bypassCompanyUIDs = list.map((v: unknown) => str(v)).filter(Boolean);
+  }
+  if (co && co.exists && co.get("subscriptionFreePeriodEnded") === true) {
+    opts.companyFreePeriodEnded = true;
+  }
+  return opts;
+}
+
+/**
+ * The request creator (users/{supervisorUid}) must belong to the request's
+ * organization and company. Missing or empty companyUID is a denial.
+ * Super-admin is exempt. This is the server-side counterpart of the
+ * org-admin create rule (incomingOrgScoped + incomingCompanyScoped).
+ */
+export async function assertCreatorScope(db: Db, request: Data): Promise<void> {
+  const creatorUid = str(request.supervisorUid);
+  if (!creatorUid) throw new QuoteError("creator_missing");
+  const snap = await db.collection("users").doc(creatorUid).get();
+  if (!snap.exists) throw new QuoteError("creator_missing");
+  const role = str(snap.get("role"));
+  if (role === SUPER_ADMIN_ROLE) return;
+  const creatorOrg = str(snap.get("organizationUID") || snap.get("organizationId"));
+  const creatorCompany = str(snap.get("companyUID") || snap.get("companyId"));
+  const requestOrg = str(request.organizationUID || request.organizationId);
+  const requestCompany = str(request.companyUID || request.companyId);
+  if (!creatorOrg || creatorOrg !== requestOrg) throw new QuoteError("creator_wrong_org");
+  if (!creatorCompany || creatorCompany !== requestCompany) throw new QuoteError("creator_wrong_company");
+}
+
+export function coverageDocId(periodCode: string, uid: string): string {
+  return `${periodCode}_${uid}`;
+}
+
+function coverageRef(db: Db, periodCode: string, uid: string) {
+  return db.collection(COVERAGE).doc(coverageDocId(periodCode, uid));
+}
+
+function coverageBlocks(other: admin.firestore.DocumentSnapshot, requestId: string): boolean {
+  if (!other.exists) return false;
+  const status = str(other.get("status"));
+  const paymentStatus = str(other.get("paymentStatus"));
+  if (status === "cancelled") return false;
+  return paymentStatus === "pending" || paymentStatus === "paid";
+}
+
+/**
+ * Transactional: a uid already on another pending or paid renewal for this
+ * period cannot be quoted (or later charged) again. Cancelled and failed
+ * requests do not block a retry. The same request may be re-quoted.
+ */
+async function assertNotAlreadyCovered(
+  tx: admin.firestore.Transaction,
+  db: Db,
+  requestId: string,
+  periodCode: string,
+  uids: string[],
+): Promise<void> {
+  for (const uid of uids) {
+    const cov = await tx.get(coverageRef(db, periodCode, uid));
+    if (!cov.exists) continue;
+    const otherId = str(cov.get("requestId"));
+    if (!otherId || otherId === requestId) continue;
+    const other = await tx.get(db.collection(REQUESTS).doc(otherId));
+    if (coverageBlocks(other, requestId)) throw new QuoteError("already_covered");
+  }
+}
+
+function claimCoverage(
+  tx: admin.firestore.Transaction,
+  db: Db,
+  requestId: string,
+  periodCode: string,
+  uids: string[],
+  status: "pending" | "paid" | "failed",
+): void {
+  for (const uid of uids) {
+    tx.set(coverageRef(db, periodCode, uid), {
+      requestId,
+      uid,
+      periodCode,
+      status,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  }
 }
 
 /**
@@ -198,6 +313,7 @@ export async function quoteSubscriptionRequest(db: Db, requestId: string, at: Da
  * pending request so checkout charges the new amount, not a stale one.
  */
 async function persistRecomputedQuote(
+  tx: admin.firestore.Transaction,
   db: Db,
   requestId: string,
   data: Data,
@@ -215,12 +331,12 @@ async function persistRecomputedQuote(
     fullName: nameByUid.get(i.uid) || "",
     fee: i.fee,
   }));
-  await db.collection(REQUESTS).doc(requestId).update({
+  tx.update(db.collection(REQUESTS).doc(requestId), {
     amountDue: quote.amount,
     fee: quote.amount,
     remainingMonths: quote.remainingMonths,
     items,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
   });
 }
 
@@ -264,14 +380,14 @@ export async function applyVerifiedSubscriptionPayment(db: Db, p: VerifiedPaymen
   if (txId === "" || str(p.requestId) === "") throw new Error("requestId and paymobTransactionId are required");
   const eventRef = db.collection(EVENTS).doc(txId);
   const reqRef = db.collection(REQUESTS).doc(p.requestId);
-  const ts = admin.firestore.FieldValue.serverTimestamp();
+  const ts = FieldValue.serverTimestamp();
   const paymob = {
     transactionId: txId,
     orderId: str(p.paymobOrderId),
     amountCents: p.amountCents,
     currency: p.currency,
     success: p.success,
-    paidAt: admin.firestore.Timestamp.fromDate(p.paidAt),
+    paidAt: Timestamp.fromDate(p.paidAt),
   };
 
   let rejectReason = "";
@@ -291,14 +407,19 @@ export async function applyVerifiedSubscriptionPayment(db: Db, p: VerifiedPaymen
     tx.set(eventRef, {requestId: p.requestId, ...paymob, receivedAt: ts});
     if (!req.exists) return "not_found";
     if (str(req.get("paymentStatus")) === "paid") return "already_paid";
+    const data = (req.data() || {}) as Data;
+    const periodCode = str(data.periodCode);
+    const uids = coveredUids(p.requestId, data);
     if (!p.success) {
       tx.update(reqRef, {paymentStatus: "failed", paymob, paymentError: "payment_failed", updatedAt: ts});
+      if (periodCode && uids.length) claimCoverage(tx, db, p.requestId, periodCode, uids, "failed");
       return "failed";
     }
     if (rejectReason !== "" && rejectReason !== "already_paid") {
       tx.update(reqRef, {
         paymentStatus: "failed", paymob, paymentError: rejectReason, needsReview: true, updatedAt: ts,
       });
+      if (periodCode && uids.length) claimCoverage(tx, db, p.requestId, periodCode, uids, "failed");
       return "rejected";
     }
     const isRenewal = str(req.get("requestType")) === REQUEST_TYPE_RENEWAL;
@@ -307,11 +428,12 @@ export async function applyVerifiedSubscriptionPayment(db: Db, p: VerifiedPaymen
       paymob,
       amountPaid: p.amountCents / 100,
       paidAt: paymob.paidAt,
-      paymentError: admin.firestore.FieldValue.delete(),
+      paymentError: FieldValue.delete(),
       applyState: "pending",
       ...(isRenewal ? {status: "approved", reviewedBy: "Paymob", reviewedAt: new Date().toISOString()} : {}),
       updatedAt: ts,
     });
+    if (periodCode && uids.length) claimCoverage(tx, db, p.requestId, periodCode, uids, "paid");
     return "paid";
   });
 
@@ -337,7 +459,7 @@ export async function applyPaidRequest(db: Db, requestId: string): Promise<numbe
   if (Array.isArray(data.items)) {
     for (const item of data.items as Data[]) fees.set(str(item.uid), Number(item.fee) || 0);
   }
-  const ts = admin.firestore.FieldValue.serverTimestamp();
+  const ts = FieldValue.serverTimestamp();
   const writer = new Batcher(db);
   let reactivated = 0;
   const subscriptionFor = (uid: string) => ({
@@ -355,7 +477,7 @@ export async function applyPaidRequest(db: Db, requestId: string): Promise<numbe
     const update: Data = {subscription: subscriptionFor(uid), updatedAt: ts};
     if (isRenewal && str(doc.get("status")) === "suspended" && str(doc.get("statusReason")) === SUSPEND_REASON) {
       update.status = "active";
-      update.statusReason = admin.firestore.FieldValue.delete();
+      update.statusReason = FieldValue.delete();
       reactivated++;
     }
     await writer.update(doc.ref, update);
@@ -365,7 +487,7 @@ export async function applyPaidRequest(db: Db, requestId: string): Promise<numbe
     for (const u of users) {
       if (u.exists && str(u.get("status")) === "suspended" && str(u.get("statusReason")) === SUSPEND_REASON) {
         await writer.update(u.ref, {
-          status: "active", statusReason: admin.firestore.FieldValue.delete(), updatedAt: ts,
+          status: "active", statusReason: FieldValue.delete(), updatedAt: ts,
         });
       }
     }

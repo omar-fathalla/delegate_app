@@ -94,6 +94,32 @@ void main() {
       expect(SubscriptionCycleHelper.isFreePromotionActive(DateTime(2027, 1, 1, 0, 0, 1)), isFalse);
     });
 
+    test('dev free-period bypass is impossible when isDev is false', () {
+      const company = SubscriptionCycleHelper.devPaidRenewalCompanyUID;
+      expect(
+        SubscriptionCycleHelper.devFreePeriodBypass(isDev: false, companyUID: company),
+        isFalse,
+      );
+      expect(
+        SubscriptionCycleHelper.devFreePeriodBypass(isDev: true, companyUID: company),
+        isTrue,
+      );
+      expect(
+        SubscriptionCycleHelper.devFreePeriodBypass(isDev: true, companyUID: 'co_other'),
+        isFalse,
+      );
+      expect(
+        SubscriptionCycleHelper.devFreePeriodBypass(isDev: true, companyUID: ''),
+        isFalse,
+      );
+      // Widget/unit tests run without ENV=dev, so the live helper stays free in 2026
+      // even when the test company id is passed.
+      expect(
+        SubscriptionCycleHelper.isFreePromotionActive(DateTime(2026, 6, 15), company),
+        isTrue,
+      );
+    });
+
     test('getFeeForMonths is 500 x months / 6 rounded to 2 decimals', () {
       expect(SubscriptionCycleHelper.getFeeForMonths(6), equals(500.0));
       expect(SubscriptionCycleHelper.getFeeForMonths(5), equals(416.67));

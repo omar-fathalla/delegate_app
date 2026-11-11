@@ -25,8 +25,9 @@ describe("delegate_requests: payment is server-only", () => {
       await db.doc("users/hr1").set({role: "hr", organizationUID: "o1", companyUID: "c1"});
       await db.doc("users/hr2").set({role: "hr", organizationUID: "o2", companyUID: "c2"});
       await db.doc("users/admin1").set({role: "admin", organizationUID: "o1", companyUID: "c1"});
-      await db.doc("users/oa1").set({role: "organization-admin", organizationUID: "o1"});
-      await db.doc("users/oa2").set({role: "organization-admin", organizationUID: "o2"});
+      await db.doc("users/oa1").set({role: "organization-admin", organizationUID: "o1", companyUID: "c1"});
+      await db.doc("users/oa0").set({role: "organization-admin", organizationUID: "o1"});
+      await db.doc("users/oa2").set({role: "organization-admin", organizationUID: "o2", companyUID: "c2"});
       await db.doc("users/sa").set({role: "super-admin"});
       await db.doc("users/tech").set({role: "technical_support"});
       await db.doc("users/d1").set({role: "delegate", organizationUID: "o1", companyUID: "c1", uid: "d1"});
@@ -96,6 +97,33 @@ describe("delegate_requests: payment is server-only", () => {
       supervisorUid: "hr1",
       coveredDelegateUids: ["a", "b"], items: [{uid: "a", fee: 416.67}, {uid: "b", fee: 416.67}],
       amountDue: 833.34, periodCode: "2027_H1", companyUID: "c1",
+    }));
+  });
+
+  test("org-admin can create a renewal only in their own org and company", async () => {
+    await assertSucceeds(as("oa1").doc("delegate_requests/oa-own").set({
+      requestType: "renewal", status: "pending", paymentStatus: "pending", paymentMethod: "paymob",
+      supervisorUid: "oa1",
+      coveredDelegateUids: ["a"], items: [{uid: "a", fee: 416.67}],
+      amountDue: 416.67, periodCode: "2027_H1", companyUID: "c1", organizationUID: "o1",
+    }));
+  });
+
+  test("org-admin of o1 cannot create a renewal for a company in o2", async () => {
+    await assertFails(as("oa1").doc("delegate_requests/oa-cross-org").set({
+      requestType: "renewal", status: "pending", paymentStatus: "pending", paymentMethod: "paymob",
+      supervisorUid: "oa1",
+      coveredDelegateUids: ["a"], items: [{uid: "a", fee: 416.67}],
+      amountDue: 416.67, periodCode: "2027_H1", companyUID: "c2", organizationUID: "o2",
+    }));
+  });
+
+  test("org-admin with no companyUID cannot create a renewal", async () => {
+    await assertFails(as("oa0").doc("delegate_requests/oa-no-company").set({
+      requestType: "renewal", status: "pending", paymentStatus: "pending", paymentMethod: "paymob",
+      supervisorUid: "oa0",
+      coveredDelegateUids: ["a"], items: [{uid: "a", fee: 416.67}],
+      amountDue: 416.67, periodCode: "2027_H1", companyUID: "c1", organizationUID: "o1",
     }));
   });
 

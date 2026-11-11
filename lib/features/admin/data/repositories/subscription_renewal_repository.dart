@@ -112,7 +112,7 @@ class SubscriptionRenewalRepository {
       ));
     }
     final now = _clock();
-    if (SubscriptionCycleHelper.isFreePromotionActive(now)) {
+    if (SubscriptionCycleHelper.isFreePromotionActive(now, companyUID)) {
       return const Left(ServerFailure('لا حاجة للتجديد خلال فترة العرض المجاني (حتى 31/12/2026).'));
     }
     final awaiting = delegates.where((d) => d.isAwaitingPayment).map((d) => d.fullName).toList();
@@ -120,9 +120,9 @@ class SubscriptionRenewalRepository {
       return Left(ServerFailure('يوجد طلب تجديد بانتظار الدفع لكل من: ${awaiting.join('، ')}'));
     }
     try {
-      final fee = SubscriptionCycleHelper.getProratedSubscriptionFee(now);
+      final fee = SubscriptionCycleHelper.getProratedSubscriptionFee(now, companyUID);
       final items = delegates.map((d) => RenewalItem(uid: d.uid, fullName: d.fullName, fee: fee)).toList();
-      final total = SubscriptionCycleHelper.totalFor(items.length, now);
+      final total = SubscriptionCycleHelper.totalFor(items.length, now, companyUID);
       final docRef = _requests.doc();
       final request = DelegateSubscriptionRequest(
         id: docRef.id,

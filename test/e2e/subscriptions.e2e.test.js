@@ -36,6 +36,7 @@ async function seed() {
   await del("o2", "web2", "active", {registeredVia: "mobile_app"}); // mislabeled by an old add-org, no app request
   await db.doc("users/app1").set({role: "delegate", status: "active"});
   await db.doc("users/web1").set({role: "delegate", status: "active"});
+  await db.doc("users/sup1").set({role: "supervisor", organizationUID: "o1", companyUID: "c1"});
   // A company in another org: c2 for wrong-company checks.
   await db.doc("delegate_requests/other").set({
     requestType: "new_delegate", status: "approved", supervisorUid: "sup2", companyUID: "c2",
@@ -89,6 +90,7 @@ async function renewal(id, uids, extra = {}) {
   const fee = L.feeAt(FEB_2027);
   await db.doc(`delegate_requests/${id}`).set({
     requestType: "renewal", status: "pending", supervisorUid: "sup1", companyUID: "c1",
+    organizationUID: "o1",
     periodCode: "2027_H1", paymentStatus: "pending", coveredDelegateUids: uids,
     items: uids.map((uid) => ({uid, fee})), amountDue: L.roundMoney(fee * uids.length), ...extra,
   });
@@ -96,6 +98,17 @@ async function renewal(id, uids, extra = {}) {
 const pay = (requestId, tx, amountCents, success = true) => J.applyVerifiedSubscriptionPayment(db, {
   requestId, paymobTransactionId: tx, paymobOrderId: `o-${tx}`, success, amountCents, currency: "EGP", paidAt: FEB_2027,
 });
+
+async function lateAppAdded(uid) {
+  await db.doc(`delegate_requests/${uid}`).set({
+    requestType: "new_delegate", status: "approved", supervisorUid: "sup1", companyUID: "c1",
+    periodCode: "2026_H2", paymentStatus: "waived",
+  });
+  await db.doc(`organizations/o1/companies/c1/delegates/${uid}`).set({
+    uid, status: "active", companyUID: "c1", registeredVia: "mobile_app",
+  });
+}
+
 
 test("quote: partial selection, server-computed total, refuses web or other-company delegates", async () => {
   await renewal("ren1", ["app1", "app2"]);
@@ -110,12 +123,13 @@ test("quote: partial selection, server-computed total, refuses web or other-comp
 });
 
 test("quote is recomputed when the month changes in the same period", async () => {
+  await lateAppAdded("app4");
   const jan = L.cairoMidnight(2027, 1, 15);
-  await renewal("renStale", ["app1"], {
+  await renewal("renStale", ["app4"], {
     amountDue: L.feeAt(jan),
     fee: L.feeAt(jan),
     remainingMonths: 6,
-    items: [{uid: "app1", fullName: "App One", fee: L.feeAt(jan)}],
+    items: [{uid: "app4", fullName: "App Four", fee: L.feeAt(jan)}],
   });
   const q = await J.quoteSubscriptionRequest(db, "renStale", FEB_2027);
   assert.equal(q.amount, 416.67);
@@ -125,7 +139,8 @@ test("quote is recomputed when the month changes in the same period", async () =
   assert.equal(stored.fee, 416.67);
   assert.equal(stored.remainingMonths, 5);
   assert.equal(stored.items[0].fee, 416.67);
-  assert.equal(stored.items[0].fullName, "App One");
+  assert.equal(stored.items[0].fullName, "App Four");
+  await db.doc("delegate_requests/renStale").update({status: "cancelled"});
 });
 
 test("failed payment: nobody is reactivated; retry allowed", async () => {
@@ -192,4 +207,39 @@ test("renewing the rest later: second partial renewal", async () => {
   assert.equal(q.amountCents, 41667);
   assert.equal(await pay("ren2", "tx-2", 41667), "paid");
   assert.equal(await status("o1", "app3"), "active");
+});
+
+test("quote refuses a renewal whose creator is out of org or has no company", async () => {
+  await db.doc("users/oa-other").set({role: "organization-admin", organizationUID: "o2", companyUID: "c2"});
+  await db.doc("users/oa-none").set({role: "organization-admin", organizationUID: "o1"});
+  await renewal("renWrongOrg", ["app4"], {supervisorUid: "oa-other"});
+  await assert.rejects(J.quoteSubscriptionRequest(db, "renWrongOrg", FEB_2027), /creator_wrong_org/);
+  await renewal("renNoCo", ["app4"], {supervisorUid: "oa-none"});
+  await assert.rejects(J.quoteSubscriptionRequest(db, "renNoCo", FEB_2027), /creator_wrong_company/);
+});
+
+test("a uid already on a pending or paid renewal cannot be quoted or charged twice", async () => {
+  // app1 was paid on ren1 for 2027_H1.
+  await renewal("renDup", ["app1"]);
+  await assert.rejects(J.quoteSubscriptionRequest(db, "renDup", FEB_2027), /already_covered/);
+  assert.equal(await pay("renDup", "tx-dup", 41667), "rejected");
+  assert.equal((await db.doc("delegate_requests/renDup").get()).get("paymentError"), "already_covered");
+
+  // Two pending requests for the same unpaid uid: the first quote wins.
+  await lateAppAdded("app5");
+  await renewal("renPendA", ["app5"]);
+  await J.quoteSubscriptionRequest(db, "renPendA", FEB_2027);
+  await renewal("renPendB", ["app5"]);
+  await assert.rejects(J.quoteSubscriptionRequest(db, "renPendB", FEB_2027), /already_covered/);
+
+  // Cancelling the first request frees the uid for a retry.
+  await db.doc("delegate_requests/renPendA").update({status: "cancelled"});
+  const q = await J.quoteSubscriptionRequest(db, "renPendB", FEB_2027);
+  assert.equal(q.amountCents, 41667);
+
+  // A failed payment also allows a later request to quote the same uid.
+  assert.equal(await pay("renPendB", "tx-pend-fail", 41667, false), "failed");
+  await renewal("renPendC", ["app5"]);
+  const q2 = await J.quoteSubscriptionRequest(db, "renPendC", FEB_2027);
+  assert.equal(q2.amountCents, 41667);
 });

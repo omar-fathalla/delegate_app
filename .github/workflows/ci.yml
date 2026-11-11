@@ -55,7 +55,7 @@ jobs:
           # SDK stalled the Analyze post-step for 10+ minutes.
           cache: false
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
       # Fails only on errors; warnings/infos are reported but don't fail the job.
       - name: Analyze
         run: flutter analyze --no-fatal-warnings --no-fatal-infos
@@ -85,7 +85,7 @@ jobs:
           # SDK stalled the Analyze post-step for 10+ minutes.
           cache: false
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
       - name: Test
         run: flutter test --concurrency=1
 
@@ -146,7 +146,7 @@ jobs:
           # SDK stalled the Analyze post-step for 10+ minutes.
           cache: false
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
       - name: Build web
         run: flutter build web --release
 
