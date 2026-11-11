@@ -53,6 +53,14 @@ class SessionManagementService {
     return s == 'suspended' || s == 'rejected';
   }
 
+  /// True when [status] is held or the holds map has any entry.
+  static bool isHeldSnapshot(Map<String, dynamic>? data) {
+    if (data == null) return false;
+    if (isHeldStatus(data['status']?.toString())) return true;
+    final holds = data['holds'];
+    return holds is Map && holds.isNotEmpty;
+  }
+
   /// Live listener: signs the delegate out when the document becomes held.
   /// Registered under [FirestoreSessionSubscriptions] so AuthBloc can cancel
   /// it before [FirebaseAuth.signOut].
@@ -85,7 +93,7 @@ class SessionManagementService {
         .listen((snap) {
       final data = snap.data();
       if (data == null) return;
-      if (isHeldStatus(data['status']?.toString())) {
+      if (isHeldSnapshot(data)) {
         onHeld(heldSessionMessage);
       }
     }, onError: (_) {});
@@ -147,7 +155,7 @@ class SessionManagementService {
 
         if (delegateDoc.exists && delegateDoc.data() != null) {
           final data = delegateDoc.data()!;
-          if (isHeldStatus(data['status']?.toString())) {
+          if (isHeldSnapshot(data)) {
             return const SessionVerificationResult.invalid(
               reason: heldSessionMessage,
             );

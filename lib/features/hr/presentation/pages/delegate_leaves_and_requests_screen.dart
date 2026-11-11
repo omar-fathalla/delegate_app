@@ -9,6 +9,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/hr/domain/services/leave_notification_target.dart';
 
 class DelegateLeavesAndRequestsScreen extends StatefulWidget {
   final Delegate delegate;
@@ -2361,22 +2362,28 @@ class _DelegateLeavesAndRequestsScreenState
                                         }
 
                                         try {
-                                          await FirebaseFirestore.instance
-                                              .collection('notifications')
-                                              .add({
-                                            'delegateUid': widget.delegate.supervisorUid ?? '',
-                                            'companyUID': widget.delegate.companyUID,
-                                            'organizationUID': widget.delegate.organizationUID,
-                                            'title': notifTitle,
-                                            'body':
-                                                'قدم المندوب ${widget.delegate.fullName} طلباً جديداً يحتاج إلى مراجعتك واعتمادك.',
-                                            'type': 'leave_request_submitted',
-                                            'targetRole': 'supervisor',
-                                            'isRead': false,
-                                            'createdAt': FieldValue.serverTimestamp(),
-                                            'createdBy': widget.delegate.uid,
-                                            'senderName': widget.delegate.fullName,
-                                          });
+                                          final notifUid = leaveNotificationDelegateUid(
+                                            supervisorUid: widget.delegate.supervisorUid,
+                                            companyUID: widget.delegate.companyUID,
+                                          );
+                                          if (notifUid != null) {
+                                            await FirebaseFirestore.instance
+                                                .collection('notifications')
+                                                .add({
+                                              'delegateUid': notifUid,
+                                              'companyUID': widget.delegate.companyUID,
+                                              'organizationUID': widget.delegate.organizationUID,
+                                              'title': notifTitle,
+                                              'body':
+                                                  'قدم المندوب ${widget.delegate.fullName} طلباً جديداً يحتاج إلى مراجعتك واعتمادك.',
+                                              'type': 'leave_request_submitted',
+                                              'targetRole': 'supervisor',
+                                              'isRead': false,
+                                              'createdAt': FieldValue.serverTimestamp(),
+                                              'createdBy': widget.delegate.uid,
+                                              'senderName': widget.delegate.fullName,
+                                            });
+                                          }
                                         } catch (_) {}
 
                                         if (ctx.mounted) Navigator.pop(ctx);
