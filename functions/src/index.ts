@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import {photoPermissionNotifyUserIds} from "./photo_permission_notify_logic";
 
 admin.initializeApp();
 
@@ -232,20 +233,16 @@ export const onPhotoPermissionCreated = functions.firestore
 
       const usersQuery = await admin.firestore().collection("users")
         .where("organizationUID", "==", organizationId)
-        .where("role", "in", ["supervisor", "admin", "organizationAdmin"])
+        .where("role", "in", [
+          "admin", "supervisor", "company-admin", "company_admin",
+          "company_supervisor", "organization-admin", "organizationAdmin",
+        ])
         .get();
 
-      const targetUserIds: string[] = [];
-      usersQuery.forEach((doc) => {
-        const userData = doc.data();
-        if (userData.role === 'supervisor') {
-          if (userData.companyUID === companyId) {
-            targetUserIds.push(doc.id);
-          }
-        } else {
-          targetUserIds.push(doc.id);
-        }
-      });
+      const targetUserIds = photoPermissionNotifyUserIds(
+        usersQuery.docs.map((doc) => ({id: doc.id, ...doc.data()})),
+        companyId,
+      );
 
       if (targetUserIds.length === 0) {
         console.log("No users found to notify for permission:", permissionId);

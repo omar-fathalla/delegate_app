@@ -5,6 +5,7 @@ import 'package:delegate_app/features/profile/presentation/pages/profile_screen.
 import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_state.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/admin/domain/entities/delegate_profile_edit_access.dart';
 import 'package:delegate_app/features/admin/presentation/pages/add_delegate_form_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
 import 'package:delegate_app/injection_container.dart';
@@ -1456,13 +1457,14 @@ class _CompactDelegateTile extends StatelessWidget {
         adminDelegate?.position == DelegatePosition.supervisor;
     final isFathalla = _isFathallaDelegate(delegate);
     final canRequestDelete = isSupervisor && !isFathalla;
-    final canEditProfile = isSupervisor &&
-        adminDelegate != null &&
-        adminDelegate!.companyUID.isNotEmpty &&
-        adminDelegate!.companyUID == delegate.companyUID &&
-        (delegate.status == DelegateStatus.active ||
-            delegate.status == DelegateStatus.approved ||
-            delegate.status == DelegateStatus.pending);
+    final canEditProfile = adminDelegate != null &&
+        canShowEditDelegateProfile(
+          role: adminDelegate!.role,
+          callerCompanyUID: adminDelegate!.companyUID,
+          targetCompanyUID: delegate.companyUID,
+          targetEditableStatus:
+              isEditableDelegateProfileStatus(delegate.status),
+        );
 
     final isDark = theme.brightness == Brightness.dark;
     final goldBg = const Color(0xFFB8860B).withValues(alpha: isDark ? 0.28 : 0.12);

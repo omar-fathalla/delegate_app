@@ -541,6 +541,18 @@ describe("docs-pending round 2", () => {
     }
     test("ALLOW sa creates a request for any supervisor", () => ok(setDoc(doc(as("sa"), "delegate_requests/n1"), NEW("sup"))));
     test("DENY ts creates a request (even naming itself)", () => no(setDoc(doc(as("ts"), "delegate_requests/n1"), NEW("ts"))));
+    test("DENY org-admin creates a request whose secondaries include another org", () =>
+      no(setDoc(doc(as("oa"), "delegate_requests/oa-multi"), {
+        ...NEW("oa"), organizationUIDs: ["o1", "o2"],
+      })));
+    test("ALLOW org-admin creates a request whose organizationUIDs is only their org", () =>
+      ok(setDoc(doc(as("oa"), "delegate_requests/oa-own"), {
+        ...NEW("oa"), organizationUIDs: ["o1"],
+      })));
+    test("ALLOW supervisor creates a request spanning two orgs of the same company", () =>
+      ok(setDoc(doc(as("sup"), "delegate_requests/sup-multi"), {
+        ...NEW("sup"), organizationUIDs: ["o1", "o2"],
+      })));
     test("DENY company staff squats a request id reserved by another company", async () => {
       await env.withSecurityRulesDisabled(async (ctx) => {
         await ctx.firestore().doc("storage_upload_intents/squat1").set({

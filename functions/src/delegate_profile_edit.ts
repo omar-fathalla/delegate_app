@@ -11,11 +11,11 @@ import {
   applyProfileFields,
   assertImageFields,
   auditDoc,
-  companyScopeDecision,
   fieldArabicLabel,
   isEditableDelegateStatus,
   isEditableRequestStatus,
-  isEditorRole,
+  canCallEditDelegateProfile,
+  profileEditCompanyScope,
   isPatchableTarget,
   isReviewerRole,
   privilegedAlertDoc,
@@ -208,7 +208,7 @@ function writeAudits(
 }
 
 /**
- * editDelegateProfile (company supervisor / company-admin)
+ * editDelegateProfile (company supervisor / company-admin, super-admin, tech support)
  * Input: { companyUID, delegateUid?, requestId?, fullName?, phoneNumber?,
  *          personalPhotoURL?, nationalIdFrontUrl?, nationalIdBackUrl? }
  * Updates live delegate docs in every chain of the company and keeps open
@@ -221,7 +221,7 @@ export const editDelegateProfile = functions
     const uid = requireAuth(context);
     const db = admin.firestore();
     const caller = await loadCaller(db, uid);
-    if (!isEditorRole(caller.role)) {
+    if (!canCallEditDelegateProfile(caller.role)) {
       throw new functions.https.HttpsError("permission-denied", "غير مسموح.");
     }
     const payload = data && typeof data === "object" ? data as Record<string, unknown> : {};
@@ -229,7 +229,7 @@ export const editDelegateProfile = functions
     if (!companyUID) {
       throw new functions.https.HttpsError("invalid-argument", "companyUID مطلوب.");
     }
-    const scope = companyScopeDecision(caller.companyUID, companyUID);
+    const scope = profileEditCompanyScope(caller.role, caller.companyUID, companyUID);
     if (scope !== "ok") {
       throw new functions.https.HttpsError("permission-denied", "غير مسموح.");
     }
@@ -361,7 +361,7 @@ export const submitNationalIdUpdate = functions
     const uid = requireAuth(context);
     const db = admin.firestore();
     const caller = await loadCaller(db, uid);
-    if (!isEditorRole(caller.role)) {
+    if (!canCallEditDelegateProfile(caller.role)) {
       throw new functions.https.HttpsError("permission-denied", "غير مسموح.");
     }
     const payload = data && typeof data === "object" ? data as Record<string, unknown> : {};
@@ -377,7 +377,7 @@ export const submitNationalIdUpdate = functions
     if (!isValidEgyptianNationalId(newNationalId)) {
       throw new functions.https.HttpsError("invalid-argument", "الرقم القومي يجب أن يكون 14 رقمًا.");
     }
-    if (companyScopeDecision(caller.companyUID, companyUID) !== "ok") {
+    if (profileEditCompanyScope(caller.role, caller.companyUID, companyUID) !== "ok") {
       throw new functions.https.HttpsError("permission-denied", "غير مسموح.");
     }
     if (!delegateUidIn && !requestIdIn) {

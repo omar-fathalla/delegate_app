@@ -11,6 +11,16 @@ test("editor and reviewer role gates", () => {
   assert.ok(L.isReviewerRole("super-admin"));
   assert.ok(L.isReviewerRole("technicalSupport"));
   assert.ok(!L.isReviewerRole("supervisor"));
+  assert.ok(L.canCallEditDelegateProfile("admin"));
+  assert.ok(L.canCallEditDelegateProfile("super-admin"));
+  assert.ok(L.canCallEditDelegateProfile("technical-support"));
+  assert.ok(L.canCallEditDelegateProfile("technicalSupport"));
+  assert.ok(!L.canCallEditDelegateProfile("hr"));
+  assert.equal(L.profileEditCompanyScope("super-admin", "", "coA"), "ok");
+  assert.equal(L.profileEditCompanyScope("technical_support", "", "coA"), "ok");
+  assert.equal(L.profileEditCompanyScope("admin", "coA", "coA"), "ok");
+  assert.equal(L.profileEditCompanyScope("admin", "coA", "coB"), "mismatch");
+  assert.equal(L.profileEditCompanyScope("admin", "", "coA"), "missing-company");
 });
 
 test("editable statuses", () => {
