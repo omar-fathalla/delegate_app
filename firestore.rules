@@ -1943,6 +1943,8 @@ service cloud.firestore {
           'coveredDelegateUids', 'items', 'periodCode', 'requestType', 'applyState',
           'paymentError', 'needsReview', 'paymentMethod', 'status', 'quotedAt'
         ]))
+        // Only evaluate these when the write actually touches payment/status,
+        // so photo/ID re-uploads stay under the 1000-expression budget.
         && waivedWriteOk()
         && newDelegateApprovalPaymentOk();
     }
@@ -2178,7 +2180,7 @@ service cloud.firestore {
           && changedKeys().hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
             'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'])
           && delegateDocsOk() && delegateUrlsWithDocs())
-        || requestStaffUpdateOk(requestId))
+        || (requestStaffUpdateOk(requestId) && subscriptionPaymentUntouched()))
         && !changedKeys().hasAny(['proposedNationalId'])
         && (resource.data.get('requestType', '') == 'update_national_id'
           || request.resource.data.get('requestType', '') != 'update_national_id')
@@ -2192,8 +2194,7 @@ service cloud.firestore {
         && (!changedKeys().hasAny(['organizationUIDs', 'organizationUID', 'organizationId', 'companyUID', 'companyId'])
           || (requestOrganizationUIDsOk() && requestPrimaryOrgBelongsToCompany()))
         && orgCompanyCheckKeysLocked()
-        && requestApprovalOrgCheckOk()
-        && subscriptionPaymentUntouched();
+        && requestApprovalOrgCheckOk();
       allow delete: if isSuperAdmin() || isOrgAdmin();
     }
 
