@@ -22,7 +22,7 @@ const USERS = {
   acc: {role: "accountant", organizationUID: "o1", companyUID: "c1"},
   bmm: {role: "branches_marketing_manager", organizationUID: "o1", companyUID: "c1"},
   mk: {role: "marketing", organizationUID: "o1"},
-  oa: {role: "organization-admin", organizationUID: "o1"},
+  oa: {role: "organization-admin", organizationUID: "o1", companyUID: "c1"},
   ts: {role: "technical_support", organizationUID: "o1"},
   d1: {role: "delegate", organizationUID: "o1", companyUID: "c1"},
 };

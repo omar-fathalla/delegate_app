@@ -85,3 +85,29 @@ test("coverage: paid covers its period; waived only covers free periods; add_org
   assert.equal(L.requestCoversPeriod({periodCode: "2027_H1", paymentStatus: "waived"}, "2027_H1"), false);
   assert.equal(L.requestCoversPeriod({periodCode: "2026_H2", paymentStatus: "waived"}, "2026_H2"), true);
 });
+
+test("free-period bypass is honored only for tashil-dev and a listed company", () => {
+  const at = mid(2026, 6);
+  const dev = {projectId: "tashil-dev", companyUID: "co_dev_renewal_paid", bypassCompanyUIDs: ["co_dev_renewal_paid"]};
+  const prod = {projectId: "practice-firebase-72df1", companyUID: "co_dev_renewal_paid", bypassCompanyUIDs: ["co_dev_renewal_paid"]};
+  const flagOnProd = {projectId: "practice-firebase-72df1", companyUID: "co_dev_renewal_paid", companyFreePeriodEnded: true};
+  const flagOnDev = {projectId: "tashil-dev", companyUID: "co_dev_renewal_paid", companyFreePeriodEnded: true};
+  const otherCo = {projectId: "tashil-dev", companyUID: "co_other", bypassCompanyUIDs: ["co_dev_renewal_paid"]};
+  const noCompany = {projectId: "tashil-dev", bypassCompanyUIDs: ["co_dev_renewal_paid"]};
+
+  assert.equal(L.shouldBypassFreePeriod(dev), true);
+  assert.equal(L.shouldBypassFreePeriod(flagOnDev), true);
+  assert.equal(L.shouldBypassFreePeriod(prod), false);
+  assert.equal(L.shouldBypassFreePeriod(flagOnProd), false);
+  assert.equal(L.shouldBypassFreePeriod(otherCo), false);
+  assert.equal(L.shouldBypassFreePeriod(noCompany), false);
+  assert.equal(L.shouldBypassFreePeriod({}), false);
+
+  assert.equal(L.isFreePromotion(at, dev), false);
+  assert.equal(L.isFreePromotion(at, prod), true);
+  assert.equal(L.isFreePromotion(at, flagOnProd), true);
+  assert.equal(L.feeAt(at, dev), L.feeForMonths(L.remainingMonths(at)));
+  assert.equal(L.feeAt(at, prod), 0);
+  assert.equal(L.quoteFor(["a"], at, dev).amountCents > 0, true);
+  assert.equal(L.quoteFor(["a"], at, prod).amountCents, 0);
+});

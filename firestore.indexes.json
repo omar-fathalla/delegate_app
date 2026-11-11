@@ -5921,6 +5921,25 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "actionType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "targetDelegateId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
     }
   ],
   "fieldOverrides": [

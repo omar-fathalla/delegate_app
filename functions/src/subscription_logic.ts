@@ -123,13 +123,37 @@ export function feeForMonths(months: number): number {
   return roundMoney((PERIOD_FEE_EGP * m) / MONTHS_PER_PERIOD);
 }
 
-export function isFreePromotion(at: Date): boolean {
+/**
+ * Optional quote context. The free-period bypass is honored ONLY when
+ * `projectId` is exactly "tashil-dev". The same company flag or config
+ * list on practice-firebase-72df1 (prod) is ignored.
+ */
+export interface QuoteOptions {
+  projectId?: string;
+  companyUID?: string;
+  bypassCompanyUIDs?: string[];
+  companyFreePeriodEnded?: boolean;
+}
+
+const TASHIL_DEV_PROJECT = "tashil-dev";
+
+export function shouldBypassFreePeriod(opts?: QuoteOptions): boolean {
+  if (!opts) return false;
+  if ((opts.projectId || "").trim() !== TASHIL_DEV_PROJECT) return false;
+  const company = (opts.companyUID || "").trim();
+  if (!company) return false;
+  if (opts.companyFreePeriodEnded === true) return true;
+  return (opts.bypassCompanyUIDs || []).some((id) => (id || "").trim() === company);
+}
+
+export function isFreePromotion(at: Date, opts?: QuoteOptions): boolean {
+  if (shouldBypassFreePeriod(opts)) return false;
   return isoDay(cairoDate(at)) <= FREE_PROMOTION_LAST_DAY;
 }
 
 /** Fee one delegate pays when subscribing or renewing at `at`. */
-export function feeAt(at: Date): number {
-  return isFreePromotion(at) ? 0 : feeForMonths(remainingMonths(at));
+export function feeAt(at: Date, opts?: QuoteOptions): number {
+  return isFreePromotion(at, opts) ? 0 : feeForMonths(remainingMonths(at));
 }
 
 export function toCents(amount: number): number {
@@ -196,8 +220,8 @@ export interface Quote {
 }
 
 /** Authoritative amount for a payable request at `at` (sum of per-delegate prorated fees). */
-export function quoteFor(uids: string[], at: Date): Quote {
-  const fee = feeAt(at);
+export function quoteFor(uids: string[], at: Date, opts?: QuoteOptions): Quote {
+  const fee = feeAt(at, opts);
   const items = uids.map((uid) => ({uid, fee}));
   const amount = roundMoney(items.reduce((s, i) => s + i.fee, 0));
   return {

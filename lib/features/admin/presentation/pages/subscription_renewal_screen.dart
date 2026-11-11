@@ -158,7 +158,7 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final now = _now;
-    final isFree = SubscriptionCycleHelper.isFreePromotionActive(now);
+    final isFree = SubscriptionCycleHelper.isFreePromotionActive(now, widget.supervisor.companyUID);
     final selectable = _delegates.where((d) => !d.isAwaitingPayment).toList();
     final allSelected = selectable.isNotEmpty && _selection.count == selectable.length;
 

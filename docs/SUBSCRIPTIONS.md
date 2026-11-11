@@ -46,10 +46,27 @@ request and are never suspended.
   logged to `subscription_suspension_runs/{period}_{date}`. Never touches docs already
   suspended for another reason.
 - `quoteSubscriptionRequest(db, requestId, at)` → authoritative `amountCents`.
+  Also checks the creator (`users/{supervisorUid}`): org and a non-empty company
+  must match the request (super-admin is exempt). A uid already on another
+  pending or paid renewal for the same period is rejected with `already_covered`
+  (transactional claim in `subscription_coverage/{periodCode}_{uid}`). Cancelled
+  or failed requests do not block a retry. A second partial renewal of other
+  (uncovered) uids in the same period still works.
 - `applyVerifiedSubscriptionPayment(db, payment)` → idempotent per Paymob transaction
   (`subscription_payment_events/{txId}`); on success marks the request paid and, for a
   renewal, reactivates only `coveredDelegateUids` that were suspended for expiry. On
-  failure or amount/period mismatch nobody is activated.
+  failure or amount/period mismatch nobody is activated. The same coverage check
+  runs so a uid cannot be charged twice.
+
+Org-admin create rules require `incomingOrgScoped()` and `incomingCompanyScoped()`
+(cross-org create is denied; an org-admin with no companyUID cannot create). The
+set of roles that may create renewals is unchanged.
+
+**Dev-only free-period bypass (impossible on prod):** the server honors
+`config/subscription_dev.bypassFreePeriodForCompanyUIDs` or a company doc
+`subscriptionFreePeriodEnded: true` only when the Admin SDK `projectId` is
+exactly `tashil-dev`. The same docs on `practice-firebase-72df1` are ignored.
+The app honors the bypass only for `ENV=dev` and company `co_dev_renewal_paid`.
 
 ## What Engineering's Paymob module must provide
 

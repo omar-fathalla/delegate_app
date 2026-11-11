@@ -1,3 +1,5 @@
+import 'package:delegate_app/core/config/app_env.dart';
+
 /// Delegate subscription rules. Mirrors functions/src/subscription_logic.ts;
 /// the server is authoritative (it quotes the Paymob amount and suspends).
 ///
@@ -18,6 +20,11 @@ class SubscriptionCycleHelper {
 
   /// Last free day (inclusive), Cairo calendar date.
   static final DateTime freePromotionLastDay = DateTime(2026, 12, 31);
+
+  /// Fake tashil-dev company whose free period is treated as ended.
+  /// Honored only when [AppEnv.isDev] is true (ENV=dev). A prod build
+  /// never bypasses the promotion, even if this company id is used.
+  static const String devPaidRenewalCompanyUID = 'co_dev_renewal_paid';
 
   /// Kept for older callers: last free instant (Cairo wall time).
   static final DateTime freePromotionEndDate = DateTime(2026, 12, 31, 23, 59, 59);
@@ -123,22 +130,36 @@ class SubscriptionCycleHelper {
     return roundMoney(periodFee * m / monthsPerPeriod);
   }
 
-  static bool isFreePromotionActive([DateTime? date]) {
+  /// Whether the ENV=dev build may skip the free promotion for [companyUID].
+  /// Always false when [isDev] is false (prod builds).
+  static bool devFreePeriodBypass({
+    required bool isDev,
+    required String? companyUID,
+  }) {
+    if (!isDev) return false;
+    final company = (companyUID ?? '').trim();
+    return company.isNotEmpty && company == devPaidRenewalCompanyUID;
+  }
+
+  static bool isFreePromotionActive([DateTime? date, String? companyUID]) {
+    if (devFreePeriodBypass(isDev: AppEnv.isDev, companyUID: companyUID)) {
+      return false;
+    }
     final d = cairoTime(date);
     final day = DateTime(d.year, d.month, d.day);
     return !day.isAfter(freePromotionLastDay);
   }
 
   /// Fee one delegate pays when registering or renewing at [date].
-  static double getProratedSubscriptionFee([DateTime? date]) {
-    if (isFreePromotionActive(date)) return 0.0;
+  static double getProratedSubscriptionFee([DateTime? date, String? companyUID]) {
+    if (isFreePromotionActive(date, companyUID)) return 0.0;
     return getFeeForMonths(getRemainingMonthsInCycle(date));
   }
 
   /// Total for several delegates renewed together (one Paymob payment).
-  static double totalFor(int delegateCount, [DateTime? date]) {
+  static double totalFor(int delegateCount, [DateTime? date, String? companyUID]) {
     if (delegateCount <= 0) return 0.0;
-    return roundMoney(getProratedSubscriptionFee(date) * delegateCount);
+    return roundMoney(getProratedSubscriptionFee(date, companyUID) * delegateCount);
   }
 
   static String formatEgp(double amount) {
