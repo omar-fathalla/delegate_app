@@ -534,7 +534,8 @@ service cloud.firestore {
       return !(stCh && st1 == 'pending' && !approver)
         && ((techSignup && techFlipOk(delegateId) && techReqOk(o1, c1, delegateId))
           || (!techSignup && (delegateDocsOk() || approver)
-            && (!accountCh || saOrTech)));
+            && (!accountCh || saOrTech)
+            && sourceStampKeysLocked()));
     }
 
     // r4: tech support may create a delegate that is active or carries an
@@ -1035,6 +1036,20 @@ service cloud.firestore {
           orgId, compId);
     }
 
+    // Phase 1 item 1: clients cannot set or change source stamps.
+    // The Admin SDK (stampDelegateSource / backfill) bypasses rules.
+    // Do not use these keys in read helpers — keep this off the
+    // company-admin read path another worker is fixing.
+    function sourceStampKeys() {
+      return ['delegateSource', 'chainOrigin', 'delegateSourceInferredBy',
+        'delegateSourceAt', 'delegateSourceRunId'];
+    }
+    function sourceStampKeysLocked() {
+      return request.method == 'create'
+        ? !request.resource.data.keys().hasAny(sourceStampKeys())
+        : !changedKeys().hasAny(sourceStampKeys());
+    }
+
 
     function techRoleList() {
       return ['technical_support', 'technical-support', 'technicalSupport', 'technicalsupport', 'tech_support', 'techsupport'];
@@ -1173,7 +1188,13 @@ service cloud.firestore {
 
         match /delegates/{delegateId} {
           allow read: if signedIn() && canReadNestedDelegate(orgId, compId, delegateId);
-          allow create: if canManageNestedDelegate(orgId, compId) && deviceBindingAbsent() && techCreateOk(orgId, compId, delegateId);
+          allow create: if canManageNestedDelegate(orgId, compId) && deviceBindingAbsent() && techCreateOk(orgId, compId, delegateId)
+            && sourceStampKeysLocked();
+          // sourceStampKeysLocked is not on this allow: the 4-flip tech
+          // approval is already at the 1000-expression budget. Delegate
+          // self-updates are hasOnly-gated by delegateFieldsSafe. Staff
+          // updates take staffDocsApproveOk, which locks source keys on
+          // the non-techSignup branch only (techFlipOk already hasOnly).
           allow update: if delegateOwns(delegateId)
             ? delegateFieldsSafe()
             : (deviceBindingUntouched() && signedIn()
@@ -1391,11 +1412,17 @@ service cloud.firestore {
       allow read: if signedIn() && canReadDelegate();
       // r5 budget: a nested organizations/{o}/companies/{c}/delegates
       // create is decided by the nested match alone.
+      // Lock source stamps on CG create (root / non-nested). Do not put the
+      // lock on CG update: that allow is also evaluated on nested-path writes
+      // (no short-circuit) and the 4-flip tech approval is already at the
+      // 1000-expression budget. Nested updates are locked via
+      // staffDocsApproveOk / delegateFieldsSafe instead.
       allow create: if signedIn() && !onNestedDelegate() && deviceBindingAbsent() && (
         isGlobalStaff() ||
         (isOrgScopedStaff() && incomingOrgScoped()) ||
         (isCompanyScopedStaff() && incomingCompanyScoped())
-      ) && techCreateOk(request.resource.data.get('organizationUID', ''), request.resource.data.get('companyUID', ''), delegateId);
+      ) && techCreateOk(request.resource.data.get('organizationUID', ''), request.resource.data.get('companyUID', ''), delegateId)
+        && sourceStampKeysLocked();
       // r5 budget: a nested organizations/{o}/companies/{c}/delegates
       // update is decided by the nested match alone, for every role.
       allow update: if signedIn() && !onNestedDelegate()

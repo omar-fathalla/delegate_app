@@ -518,4 +518,5 @@ export {
 // Delegate subscriptions: period-end suspension (daily, Cairo time). Paymob
 // hooks (quoteSubscriptionRequest / applyVerifiedSubscriptionPayment) are
 // library functions for Engineering's Paymob webhook, not deployed endpoints.
+export {stampDelegateSource} from "./stamp_delegate_source";
 export {suspendExpiredSubscriptions} from "./subscription_schedule";

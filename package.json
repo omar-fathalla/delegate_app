@@ -11,7 +11,8 @@
     "test:rules:qa-hold": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-qa-hold-reads \"node --test test/rules/qa-hold-reads.test.js\"",
     "test:rules:profile": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-profile-edit \"node --test test/rules/delegate-profile-edit.test.js\"",
     "test:rules:m31": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-m31-delegate-own-reads \"node --test test/rules/m31-delegate-own-reads.test.js\"",
-    "test:rules:subs": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-tashil-subs-rules \"node --test test/rules/subscriptions.test.js\""
+    "test:rules:subs": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-tashil-subs-rules \"node --test test/rules/subscriptions.test.js\"",
+    "test:rules:source": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-delegate-source \"node --test test/rules/delegate-source-lock.test.js\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",
