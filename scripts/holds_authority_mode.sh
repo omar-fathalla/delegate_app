@@ -131,23 +131,33 @@ patch_mode() {
   json="$(api_get "$name")"
   python3 -c '
 import json,sys
-fn=sys.argv[1]
-value=sys.argv[2]
+value=sys.argv[1]
+# GCLOUD_PROJECT (and a few others) are reserved: including them in a
+# PATCH returns HTTP 400. The system re-injects reserved keys at runtime.
+RESERVED = {
+    "GCLOUD_PROJECT", "FUNCTION_TARGET", "FUNCTION_SIGNATURE_TYPE",
+    "FUNCTION_NAME", "K_SERVICE", "K_REVISION", "K_CONFIGURATION", "PORT",
+}
 d=json.load(sys.stdin)
-env=dict(d.get("environmentVariables") or {})
+env={k:v for k,v in (d.get("environmentVariables") or {}).items() if k not in RESERVED}
 env["HOLDS_AUTHORITY_MODE"]=value
-# Preserve existing keys; only add/overwrite the mode.
-out={"environmentVariables": env}
-json.dump(out, sys.stdout)
-' "$name" "$value" <<<"$json" > "/tmp/holds-mode-patch-${name}.json"
+json.dump({"environmentVariables": env}, sys.stdout)
+' "$value" <<<"$json" > "/tmp/holds-mode-patch-${name}.json"
   token="$(gcloud_cmd auth print-access-token)"
-  local resp
-  resp="$(curl -sS -f -H "Authorization: Bearer ${token}" \
-    -H "Content-Type: application/json" \
-    -X PATCH \
-    -d @"/tmp/holds-mode-patch-${name}.json" \
-    "https://cloudfunctions.googleapis.com/v1/projects/${PROJECT}/locations/${REGION}/functions/${name}?updateMask=environmentVariables")"
+  local http_code resp
+  http_code="$(curl -sS -o /tmp/holds-mode-patch-resp-${name}.json -w "%{http_code}"     -H "Authorization: Bearer ${token}"     -H "Content-Type: application/json"     -X PATCH     -d @"/tmp/holds-mode-patch-${name}.json"     "https://cloudfunctions.googleapis.com/v1/projects/${PROJECT}/locations/${REGION}/functions/${name}?updateMask=environmentVariables")"
   rm -f "/tmp/holds-mode-patch-${name}.json"
+  resp="$(cat /tmp/holds-mode-patch-resp-${name}.json)"
+  rm -f "/tmp/holds-mode-patch-resp-${name}.json"
+  if [[ "$http_code" != "200" && "$http_code" != "201" ]]; then
+    echo "PATCH ${name} failed HTTP ${http_code}: $(python3 -c 'import json,sys
+try:
+ d=json.load(sys.stdin); e=d.get("error") or d; print(e.get("message") if isinstance(e,dict) else e)
+except Exception:
+ print(sys.stdin if False else "unreadable body")
+' <<<"$resp")" >&2
+    exit 1
+  fi
   local op
   op="$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("name") or "")' <<<"$resp")"
   if [[ -z "$op" ]]; then
