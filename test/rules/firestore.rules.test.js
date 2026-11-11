@@ -857,10 +857,20 @@ describe("firestore tightened rules", () => {
         .where("type", "==", "check_in")
         .get(),
     );
-    await assertFails(
+    // HR is company-scoped; the same companyId constraint is already
+    // allowed, so extra organizationId + type filters must also succeed.
+    await assertSucceeds(
       hr.collection("attendance_logs")
         .where("organizationId", "==", "o1")
         .where("companyId", "==", "c1")
+        .where("type", "==", "check_in")
+        .get(),
+    );
+    // HR must not list another company's attendance via the org+type query.
+    await assertFails(
+      hr.collection("attendance_logs")
+        .where("organizationId", "==", "o2")
+        .where("companyId", "==", "c9")
         .where("type", "==", "check_in")
         .get(),
     );
