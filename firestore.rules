@@ -1657,6 +1657,16 @@ service cloud.firestore {
       );
     }
 
+    // Cheap, org-admin-only allow so landing queries on
+    // organizationId + companyId + type==check_in (and the
+    // timestamp-bounded variant) are provable without the
+    // organizationUID/organizationId OR inside orgScoped().
+    function canReadOrgAdminAttendanceByOrgId() {
+      return isOrgAdmin()
+        && callerOrg() != ''
+        && resource.data.organizationId == callerOrg();
+    }
+
     function canCreateAttendance() {
       return signedIn() && (
         isGlobalStaff()
@@ -1682,6 +1692,7 @@ service cloud.firestore {
     }
 
     match /attendance_logs/{logId} {
+      allow read: if signedIn() && canReadOrgAdminAttendanceByOrgId();
       allow read: if canReadAttendance();
       allow create: if canCreateAttendance();
       allow update: if canUpdateAttendance();
@@ -1689,6 +1700,7 @@ service cloud.firestore {
     }
 
     match /attendance_logs_testing/{logId} {
+      allow read: if signedIn() && canReadOrgAdminAttendanceByOrgId();
       allow read: if canReadAttendance();
       allow create: if canCreateAttendance();
       allow update: if canUpdateAttendance();

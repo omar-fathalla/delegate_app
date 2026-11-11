@@ -802,6 +802,70 @@ describe("firestore tightened rules", () => {
     );
   });
 
+  test("org-admin L1 landing: attendance_logs check_in queries by org and company", async () => {
+    const start = new Date("2026-11-11T00:00:00.000Z");
+    const mid = new Date("2026-11-11T08:00:00.000Z");
+    const end = new Date("2026-11-12T00:00:00.000Z");
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("attendance_logs/l1-checkin").set({
+        delegateId: "del-1",
+        organizationId: "o1",
+        companyId: "c1",
+        type: "check_in",
+        timestamp: mid,
+      });
+      await ctx.firestore().doc("attendance_logs/l2-checkin").set({
+        delegateId: "other",
+        organizationId: "o2",
+        companyId: "c9",
+        type: "check_in",
+        timestamp: mid,
+      });
+    });
+    const orgAdmin = dbFor("orgadmin");
+    const org2 = dbFor("org2");
+    const hr = dbFor("hr");
+    // Exact app queries from getTodayCheckedInCount: primary (with
+    // timestamp bounds) and the fallback (type only).
+    await assertSucceeds(
+      orgAdmin.collection("attendance_logs")
+        .where("organizationId", "==", "o1")
+        .where("companyId", "==", "c1")
+        .where("type", "==", "check_in")
+        .where("timestamp", ">=", start)
+        .where("timestamp", "<", end)
+        .get(),
+    );
+    await assertSucceeds(
+      orgAdmin.collection("attendance_logs")
+        .where("organizationId", "==", "o1")
+        .where("companyId", "==", "c1")
+        .where("type", "==", "check_in")
+        .get(),
+    );
+    await assertFails(
+      orgAdmin.collection("attendance_logs")
+        .where("organizationId", "==", "o2")
+        .where("companyId", "==", "c9")
+        .where("type", "==", "check_in")
+        .get(),
+    );
+    await assertFails(
+      org2.collection("attendance_logs")
+        .where("organizationId", "==", "o1")
+        .where("companyId", "==", "c1")
+        .where("type", "==", "check_in")
+        .get(),
+    );
+    await assertFails(
+      hr.collection("attendance_logs")
+        .where("organizationId", "==", "o1")
+        .where("companyId", "==", "c1")
+        .where("type", "==", "check_in")
+        .get(),
+    );
+  });
+
 
   test("delegate can notify company supervisors when supervisorUid is empty", async () => {
     const delegate = dbFor("del-1", DELEGATE);
