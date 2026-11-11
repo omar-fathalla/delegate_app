@@ -469,15 +469,14 @@ test("advance renewal: next-period quote is 500 and does not clear an expiry hol
   assert.equal(q.amountCents, 50000);
   assert.equal(q.remainingMonths, 6);
 
-  // Current period is still payable during the window (free in Dec 2026).
+  // A current-period quote in Dec 2026 is still refused as free (the flag
+  // only opens the next period; it does not make a 0 EGP current quote payable).
   await db.doc("delegate_requests/renAdvCurrent").set({
     requestType: "renewal", status: "pending", supervisorUid: "sup1", companyUID: "c1",
     organizationUID: "o1", periodCode: "2026_H2", paymentStatus: "pending",
     coveredDelegateUids: ["appAdv1"], items: [{uid: "appAdv1", fee: 0}], amountDue: 0,
   });
-  const current = await J.quoteSubscriptionRequest(db, "renAdvCurrent", dec);
-  assert.equal(current.periodCode, "2026_H2");
-  assert.equal(current.amount, 0);
+  await assert.rejects(J.quoteSubscriptionRequest(db, "renAdvCurrent", dec), /free_period/);
   await db.doc("delegate_requests/renAdvCurrent").update({status: "cancelled"});
 
   assert.equal(await J.applyVerifiedSubscriptionPayment(db, {
