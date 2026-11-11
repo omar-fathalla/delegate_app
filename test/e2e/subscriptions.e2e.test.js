@@ -100,12 +100,12 @@ const pay = (requestId, tx, amountCents, success = true) => J.applyVerifiedSubsc
 });
 
 async function lateAppAdded(uid) {
+  // Registration request only: enough for assertRenewable. A live delegate
+  // doc would be an extra uncovered app-added uid and would change later
+  // suspension counts in this shared-state suite.
   await db.doc(`delegate_requests/${uid}`).set({
     requestType: "new_delegate", status: "approved", supervisorUid: "sup1", companyUID: "c1",
     periodCode: "2026_H2", paymentStatus: "waived",
-  });
-  await db.doc(`organizations/o1/companies/c1/delegates/${uid}`).set({
-    uid, status: "active", companyUID: "c1", registeredVia: "mobile_app",
   });
 }
 
