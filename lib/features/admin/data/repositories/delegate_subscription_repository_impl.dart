@@ -892,6 +892,28 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         ));
       }
 
+      // MED-2: approval of new_delegate / add_organization requires the
+      // server mark orgCompanyCheck == ok, and every chain must still
+      // belong to the company (the mark is not enough on its own).
+      if (request.isNewDelegateRequest || request.isAddOrganizationRequest) {
+        final live = await _firestore.collection('delegate_requests').doc(request.id).get();
+        final mark = live.data()?['orgCompanyCheck']?.toString();
+        if (mark != 'ok') {
+          return const Left(ServerFailure(
+            'لا يمكن اعتماد الطلب قبل التأكد أن كل السلاسل تنتمي للشركة.',
+          ));
+        }
+        final missingOrg = await _firstOrgMissingFromCompany(
+          request.resolvedOrganizationUIDs,
+          request.companyUID,
+        );
+        if (missingOrg != null) {
+          return const Left(ServerFailure(
+            'لا يمكن اعتماد الطلب: سلسلة لا تنتمي للشركة.',
+          ));
+        }
+      }
+
       // 1. Request status. For new_delegate / add_organization the approval is
       // written in the same WriteBatch as the delegate activation (r4 F2):
       // either both land or the request stays pending.

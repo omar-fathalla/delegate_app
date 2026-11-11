@@ -48,3 +48,31 @@ export function summarizeOrgCompanyCheck(opts: {
   }
   return {ok: true, reason: "ok", companyUID, orgIds: opts.orgIds, missing: []};
 }
+
+export const ORG_COMPANY_CHECK_KEYS = [
+  "orgCompanyCheck",
+  "orgCompanyCheckReason",
+  "orgCompanyCheckMissing",
+  "orgCompanyCheckAt",
+] as const;
+
+/** new_delegate and add_organization must be stamped ok before approval. */
+export function requestApprovalRequiresOrgCheck(requestType: unknown): boolean {
+  const type = str(requestType) || "new_delegate";
+  return type === "new_delegate" || type === "add_organization";
+}
+
+/** True when this request may be approved (mark is ok, or the type is exempt). */
+export function requestApprovalOrgCheckOk(data: Record<string, unknown>): boolean {
+  if (!requestApprovalRequiresOrgCheck(data.requestType)) return true;
+  return str(data.orgCompanyCheck) === "ok";
+}
+
+/** Parent company doc for a nested delegate path must exist. */
+export function delegateCreateCompanyMissing(opts: {
+  orgId: string;
+  companyId: string;
+  companyExists: boolean;
+}): boolean {
+  return !str(opts.orgId) || !str(opts.companyId) || !opts.companyExists;
+}

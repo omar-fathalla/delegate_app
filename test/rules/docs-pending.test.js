@@ -64,7 +64,8 @@ describe("docs-pending rules", () => {
         ...BASE, uid: "pend", status: "pending",
         documents: [{...PHOTO, documentStatus: "pending"}, {...NID, documentStatus: "pending"}]});
       await db.doc("delegate_requests/d1").set({
-        status: "pending", organizationUID: "o1", companyUID: "c1", profileImageUrl: "p0",
+        status: "pending", requestType: "new_delegate", orgCompanyCheck: "ok",
+        organizationUID: "o1", companyUID: "c1", profileImageUrl: "p0",
         documents: [{...PHOTO, documentStatus: "pending"}]});
     });
   });
@@ -212,7 +213,7 @@ describe("docs-pending round 2", () => {
   const APPROVE = {documents: [{...PHOTO, reviewedBy: "r"}, NID, RCPT]};
   const seed = (p, d) => env.withSecurityRulesDisabled((c) => c.firestore().doc(p).set(d));
   // r4: the app's approve batch: request pending -> approved + delegate write.
-  const REQ = {status: "pending", requestType: "new_delegate", organizationUID: "o1", companyUID: "c1",
+  const REQ = {status: "pending", requestType: "new_delegate", orgCompanyCheck: "ok", organizationUID: "o1", companyUID: "c1",
     supervisorUid: "sup", fullName: "Fake", nationalId: "", profileImageUrl: "p0",
     nationalIdFrontUrl: "f0", nationalIdBackUrl: "b0", receiptImageUrl: "r0"};
   const batchApprove = (db, rid, path, data, create = false, reqData = {}) => {

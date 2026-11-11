@@ -46,7 +46,7 @@ describe("delegate_requests: payment is server-only", () => {
         organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
       });
       await db.doc("delegate_requests/legacy").set({
-        requestType: "new_delegate", status: "pending",
+        requestType: "new_delegate", status: "pending", orgCompanyCheck: "ok",
         organizationUID: "o1", companyUID: "c1",
       });
       await db.doc("delegate_requests/scoped").set({
@@ -56,15 +56,15 @@ describe("delegate_requests: payment is server-only", () => {
         requestType: "renewal", status: "pending", organizationUID: "o2", companyUID: "c2", supervisorUid: "sup2",
       });
       await db.doc("delegate_requests/self-d").set({
-        requestType: "new_delegate", status: "pending", delegateUid: "d1", organizationUID: "o1", companyUID: "c1",
+        requestType: "new_delegate", status: "pending", orgCompanyCheck: "ok", delegateUid: "d1", organizationUID: "o1", companyUID: "c1",
       });
       await db.doc("delegate_requests/nid-c1").set({
-        requestType: "new_delegate", status: "pending", nationalId: "29101010100011",
+        requestType: "new_delegate", status: "pending", orgCompanyCheck: "ok", nationalId: "29101010100011",
         phoneNumber: "01011111111", receiptCode: "12345", existingDelegateUid: "d1",
         organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
       });
       await db.doc("delegate_requests/nid-c2").set({
-        requestType: "new_delegate", status: "pending", nationalId: "29101010100011",
+        requestType: "new_delegate", status: "pending", orgCompanyCheck: "ok", nationalId: "29101010100011",
         phoneNumber: "01011111111", receiptCode: "12345", existingDelegateUid: "d1",
         organizationUID: "o2", companyUID: "c2", supervisorUid: "sup2",
       });
@@ -73,12 +73,12 @@ describe("delegate_requests: payment is server-only", () => {
         organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
       });
       await db.doc("delegate_requests/new-approved-c1").set({
-        requestType: "new_delegate", status: "approved",
+        requestType: "new_delegate", status: "approved", orgCompanyCheck: "ok",
         organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
       });
       // Same company, another organization/chain (o3 / c1).
       await db.doc("delegate_requests/nid-c1-other-chain").set({
-        requestType: "new_delegate", status: "pending", nationalId: "29101010100011",
+        requestType: "new_delegate", status: "pending", orgCompanyCheck: "ok", nationalId: "29101010100011",
         phoneNumber: "01011111111", receiptCode: "12345", existingDelegateUid: "d3",
         organizationUID: "o3", companyUID: "c1", supervisorUid: "sup",
       });
@@ -87,7 +87,7 @@ describe("delegate_requests: payment is server-only", () => {
         organizationUID: "o3", companyUID: "c1", supervisorUid: "sup",
       });
       await db.doc("delegate_requests/new-approved-c1-other-chain").set({
-        requestType: "new_delegate", status: "approved",
+        requestType: "new_delegate", status: "approved", orgCompanyCheck: "ok",
         organizationUID: "o3", companyUID: "c1", supervisorUid: "sup",
       });
     });
@@ -326,6 +326,33 @@ describe("delegate_requests: payment is server-only", () => {
       organizationUID: "missing-org", companyUID: "c1",
       organizationUIDs: ["missing-org"],
     }));
+  });
+
+
+  test("clients cannot flip orgCompanyCheck and cannot approve without ok", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.doc("delegate_requests/mark-failed").set({
+        requestType: "new_delegate", status: "pending",
+        organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
+        orgCompanyCheck: "failed", orgCompanyCheckReason: "org_not_in_company",
+        organizationUIDs: ["o1", "oX"],
+      });
+      await db.doc("delegate_requests/mark-ok").set({
+        requestType: "new_delegate", status: "pending",
+        organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
+        orgCompanyCheck: "ok",
+      });
+    });
+    await assertFails(as("hr1").doc("delegate_requests/mark-failed").update({orgCompanyCheck: "ok"}));
+    await assertFails(as("oa1").doc("delegate_requests/mark-failed").update({orgCompanyCheck: "ok"}));
+    await assertFails(as("sa").doc("delegate_requests/mark-failed").update({orgCompanyCheck: "ok"}));
+    await assertFails(as("sa").doc("delegate_requests/mark-failed").update({status: "approved", reviewedBy: "SA"}));
+    await assertFails(as("hr1").doc("delegate_requests/new-with-mark").set({
+      requestType: "new_delegate", status: "pending", supervisorUid: "hr1",
+      companyUID: "c1", organizationUID: "o1", orgCompanyCheck: "ok",
+    }));
+    await assertSucceeds(as("sa").doc("delegate_requests/mark-ok").update({status: "approved", reviewedBy: "SA"}));
   });
 
 });

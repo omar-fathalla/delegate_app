@@ -93,7 +93,11 @@ void main() {
     setUp(() async {
       db = FakeFirebaseFirestore();
       repo = DelegateSubscriptionRepositoryImpl(firestore: db, storage: _MockStorage());
-      await db.doc('delegate_requests/r1').set(req().toMap());
+      await db.doc('organizations/o1/companies/c1').set({'name': 'C'});
+      await db.doc('delegate_requests/r1').set({
+        ...req().toMap(),
+        'orgCompanyCheck': 'ok',
+      });
     });
 
     test('staff cannot approve a renewal by hand (server approves on verified payment)', () async {
@@ -236,7 +240,7 @@ void main() {
       createdAt: DateTime(2027, 2, 10),
       paymentStatus: SubscriptionPaymentStatus.notRequired,
     );
-    await db.doc('delegate_requests/add1').set(add.toMap());
+    await db.doc('delegate_requests/add1').set({...add.toMap(), 'orgCompanyCheck': 'ok'});
 
     final r = await repo.approveSubscriptionRequest(
       request: add,
@@ -296,7 +300,7 @@ void main() {
       createdAt: DateTime(2027, 2, 10),
       paymentStatus: SubscriptionPaymentStatus.notRequired,
     );
-    await db.doc('delegate_requests/add2').set(add.toMap());
+    await db.doc('delegate_requests/add2').set({...add.toMap(), 'orgCompanyCheck': 'ok'});
     final r = await repo.approveSubscriptionRequest(
       request: add,
       reviewerUid: 'sa',
@@ -346,7 +350,7 @@ void main() {
       createdAt: DateTime(2027, 2, 10),
       paymentStatus: SubscriptionPaymentStatus.notRequired,
     );
-    await db.doc('delegate_requests/add-unpaid').set(add.toMap());
+    await db.doc('delegate_requests/add-unpaid').set({...add.toMap(), 'orgCompanyCheck': 'ok'});
     final r = await repo.approveSubscriptionRequest(
       request: add,
       reviewerUid: 'sa',
@@ -418,7 +422,9 @@ void main() {
     expect(written['organizationUIDs'], ['o2', 'o3']);
     expect(written['id'] ?? requestId, isNot(uid));
 
-    final add = DelegateSubscriptionRequest.fromMap(written, requestId);
+    await db.doc('delegate_requests/$requestId').update({'orgCompanyCheck': 'ok'});
+    final stamped = (await db.doc('delegate_requests/$requestId').get()).data()!;
+    final add = DelegateSubscriptionRequest.fromMap(stamped, requestId);
     final approved = await repo.approveSubscriptionRequest(
       request: add,
       reviewerUid: 'sa',
@@ -433,5 +439,53 @@ void main() {
       expect(created['subscription']['renewalRequestId'], 'ren-exist');
       expect(created['subscription']['amountDue'], 416.67);
     }
+  });
+
+  test('approval refuses new_delegate and add_organization when orgCompanyCheck is not ok', () async {
+    final db = FakeFirebaseFirestore();
+    final repo = DelegateSubscriptionRepositoryImpl(firestore: db, storage: _MockStorage());
+    await db.doc('organizations/o1/companies/c1').set({'name': 'C'});
+    await db.doc('delegate_requests/r-failed').set({
+      ...req(pay: SubscriptionPaymentStatus.paid).toMap(),
+      'orgCompanyCheck': 'failed',
+    });
+    final failed = await repo.approveSubscriptionRequest(
+      request: req(pay: SubscriptionPaymentStatus.paid).copyWith(id: 'r-failed'),
+      reviewerUid: 'sa',
+      reviewerName: 'SA',
+    );
+    expect(failed.isLeft(), isTrue);
+    expect((await db.doc('delegate_requests/r-failed').get()).data()!['status'], isNot('approved'));
+    expect((await db.doc('organizations/o1/companies/c1/delegates/r-failed').get()).exists, isFalse);
+
+    await db.doc('delegate_requests/r-missing').set(req(pay: SubscriptionPaymentStatus.paid).toMap());
+    final missing = await repo.approveSubscriptionRequest(
+      request: req(pay: SubscriptionPaymentStatus.paid).copyWith(id: 'r-missing'),
+      reviewerUid: 'sa',
+      reviewerName: 'SA',
+    );
+    expect(missing.isLeft(), isTrue);
+  });
+
+  test('approval refuses a secondary chain that is not in the company even if the mark is ok', () async {
+    final db = FakeFirebaseFirestore();
+    final repo = DelegateSubscriptionRepositoryImpl(firestore: db, storage: _MockStorage());
+    await db.doc('organizations/o1/companies/c1').set({'name': 'C'});
+    await db.doc('delegate_requests/r-ox').set({
+      ...req(pay: SubscriptionPaymentStatus.paid).toMap(),
+      'organizationUID': 'o1',
+      'organizationUIDs': ['o1', 'oX'],
+      'orgCompanyCheck': 'ok',
+    });
+    final r = await repo.approveSubscriptionRequest(
+      request: DelegateSubscriptionRequest.fromMap(
+        (await db.doc('delegate_requests/r-ox').get()).data()!,
+        'r-ox',
+      ),
+      reviewerUid: 'sa',
+      reviewerName: 'SA',
+    );
+    expect(r.isLeft(), isTrue);
+    expect((await db.doc('organizations/oX/companies/c1/delegates/r-ox').get()).exists, isFalse);
   });
 }

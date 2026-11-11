@@ -117,7 +117,7 @@ describe("delegate source stamps are server-only", () => {
         documents: docs,
       });
       await db.doc("delegate_requests/dtech").set({
-        requestType: "new_delegate", status: "pending",
+        requestType: "new_delegate", status: "pending", orgCompanyCheck: "ok",
         supervisorUid: "sup", organizationUID: "o1", companyUID: "c1",
         profileImageUrl: "p0", nationalIdFrontUrl: "f0", nationalIdBackUrl: "b0",
         firstName: "Fake", secondName: "T", thirdName: "User",
@@ -144,7 +144,7 @@ describe("delegate source stamps are server-only", () => {
         documents: docs,
       });
       await db.doc("delegate_requests/dtech").set({
-        requestType: "new_delegate", status: "pending",
+        requestType: "new_delegate", status: "pending", orgCompanyCheck: "ok",
         supervisorUid: "sup", organizationUID: "o1", companyUID: "c1",
         profileImageUrl: "p0", nationalIdFrontUrl: "f0", nationalIdBackUrl: "b0",
         firstName: "Fake", secondName: "T", thirdName: "User",

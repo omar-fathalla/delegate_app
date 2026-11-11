@@ -50,7 +50,8 @@ export const auditDelegateRequestOrgs = functions
     const keys = ["organizationUIDs", "organizationUID", "organizationId", "companyUID", "companyId"];
     const changed = !change.before.exists ||
       keys.some((k) => JSON.stringify(before[k] ?? null) !== JSON.stringify(after[k] ?? null));
-    if (!changed) return null;
+    const markMissing = typeof after.orgCompanyCheck !== "string" || after.orgCompanyCheck === "";
+    if (!changed && !markMissing) return null;
     const result = await evaluateRequestOrgCompany(admin.firestore(), after);
     if (!result.ok) {
       functions.logger.warn("delegate request org is not in company", {
@@ -75,5 +76,30 @@ export const auditDelegateRequestOrgs = functions
       orgCompanyCheckMissing: result.missing,
       orgCompanyCheckAt: FieldValue.serverTimestamp(),
     });
+    return null;
+  });
+
+/**
+ * If a client creates a nested delegate under a company that does not exist
+ * in that organization, delete the doc and log. Admin SDK company creates
+ * in the same batch are visible here after commit.
+ *
+ * Deploy: functions:tashil-mobile-notifications:auditDelegateCreateOrgs
+ * Do not deploy suspendExpiredSubscriptions with this function.
+ */
+export const auditDelegateCreateOrgs = functions
+  .region("us-central1")
+  .runWith({timeoutSeconds: 30, memory: "256MB"})
+  .firestore.document("organizations/{orgId}/companies/{companyId}/delegates/{uid}")
+  .onCreate(async (snap, context) => {
+    const orgId = String(context.params.orgId || "");
+    const companyId = String(context.params.companyId || "");
+    const uid = String(context.params.uid || "");
+    const parent = await snap.ref.parent.parent?.get();
+    if (parent && parent.exists) return null;
+    functions.logger.warn("delegate created under a company that is not in the organization", {
+      orgId, companyId, uid, path: snap.ref.path, reason: "org_not_in_company",
+    });
+    await snap.ref.delete();
     return null;
   });
