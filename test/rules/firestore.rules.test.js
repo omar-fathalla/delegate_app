@@ -837,6 +837,13 @@ describe("firestore tightened rules", () => {
 
   test("delegate can notify company supervisors when supervisorUid is empty", async () => {
     const delegate = dbFor("del-1", DELEGATE);
+    await assertSucceeds(delegate.collection("leave_requests").add({
+      delegateUid: "del-1",
+      companyUID: "c1",
+      organizationUID: "o1",
+      type: "sick",
+      status: "pending",
+    }));
     await assertSucceeds(delegate.collection("notifications").add({
       delegateUid: "supervisor_c1",
       companyUID: "c1",
