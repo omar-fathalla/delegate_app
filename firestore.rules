@@ -1649,22 +1649,16 @@ service cloud.firestore {
       return signedIn() && (
         isGlobalStaff()
         || (isCompanyScopedStaff() && companyScoped())
-        || (isOrgScopedStaff() && orgScoped())
+        // Attendance logs carry organizationId (not organizationUID). A
+        // direct field check lets org-admin landing list queries on
+        // organizationId + companyId + type be proven (L1).
+        || (isOrgScopedStaff() && callerOrg() != ''
+          && resource.data.get('organizationId', '') == callerOrg())
         || ownsDelegateId(resource.data.delegateId)
         || ownsDelegateId(resource.data.userId)
         || delegateOwns(resource.data.delegateId)
         || delegateOwns(resource.data.userId)
       );
-    }
-
-    // Cheap, org-admin-only allow so landing queries on
-    // organizationId + companyId + type==check_in (and the
-    // timestamp-bounded variant) are provable without the
-    // organizationUID/organizationId OR inside orgScoped().
-    function canReadOrgAdminAttendanceByOrgId() {
-      return isOrgAdmin()
-        && callerOrg() != ''
-        && resource.data.organizationId == callerOrg();
     }
 
     function canCreateAttendance() {
@@ -1692,7 +1686,6 @@ service cloud.firestore {
     }
 
     match /attendance_logs/{logId} {
-      allow read: if signedIn() && canReadOrgAdminAttendanceByOrgId();
       allow read: if canReadAttendance();
       allow create: if canCreateAttendance();
       allow update: if canUpdateAttendance();
@@ -1700,7 +1693,6 @@ service cloud.firestore {
     }
 
     match /attendance_logs_testing/{logId} {
-      allow read: if signedIn() && canReadOrgAdminAttendanceByOrgId();
       allow read: if canReadAttendance();
       allow create: if canCreateAttendance();
       allow update: if canUpdateAttendance();
