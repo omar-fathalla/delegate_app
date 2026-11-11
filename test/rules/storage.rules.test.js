@@ -220,6 +220,9 @@ describe("storage.rules", () => {
     await assertFails(uploadBytes(path(dlg, "feedback_screenshots/staff.png"), bytes, own));
     await assertSucceeds(uploadBytes(path(dlg, "feedback_screenshots/dlgA-own.png"), bytes, own));
     await assertSucceeds(getBytes(path(dlg, "feedback_screenshots/dlgA-own.png")));
+    await assertSucceeds(uploadBytes(path(dlg, "feedback_screenshots/feedback_dlgA_named.png"), bytes));
+    await assertSucceeds(getBytes(path(dlg, "feedback_screenshots/feedback_dlgA_named.png")));
+    await assertFails(getBytes(path(dlgB, "feedback_screenshots/feedback_dlgA_named.png")));
     await assertFails(getBytes(path(dlgB, "feedback_screenshots/dlgA-own.png")));
     await assertFails(uploadBytes(path(dlgB, "feedback_screenshots/dlgA-own.png"), bytes, {customMetadata: {userId: "dlgB"}}));
     await assertSucceeds(getBytes(path(hrA, "feedback_screenshots/dlgA-own.png")));

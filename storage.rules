@@ -115,20 +115,28 @@ service firebase.storage {
     // only when that metadata matches; they may read/update/delete only
     // their own object. Staff of any company still have full access
     // (residual, documented: no company segment).
+    // New clients write feedback_{uid}_{timestamp}.jpg. Old clients
+    // keep the flat path and set metadata userId (Flutter SDK).
+    function feedbackNameOwnedByCaller(fileName) {
+      return request.auth.uid != ''
+        && fileName.matches('feedback_' + request.auth.uid + '_.*');
+    }
+    function feedbackOwnedByCaller(fileName) {
+      return feedbackNameOwnedByCaller(fileName)
+        || resource.metadata.get('userId', '') == request.auth.uid;
+    }
     match /feedback_screenshots/{fileName} {
       // Overwrites must be evaluated against the existing object's
       // owner even if a client upload is classified as create.
       allow read: if isStorageStaff()
-        || (isDelegateToken()
-          && resource.metadata.get('userId', '') == request.auth.uid);
+        || (isDelegateToken() && feedbackOwnedByCaller(fileName));
       allow create, update: if isStorageStaff()
         || (isDelegateToken()
-          && request.resource.metadata.get('userId', '') == request.auth.uid
-          && (resource == null
-            || resource.metadata.get('userId', '') == request.auth.uid));
+          && (feedbackNameOwnedByCaller(fileName)
+            || request.resource.metadata.get('userId', '') == request.auth.uid)
+          && (resource == null || feedbackOwnedByCaller(fileName)));
       allow delete: if isStorageStaff()
-        || (isDelegateToken()
-          && resource.metadata.get('userId', '') == request.auth.uid);
+        || (isDelegateToken() && feedbackOwnedByCaller(fileName));
     }
 
     // ==================== PHOTO PERMISSION IMAGES ====================
