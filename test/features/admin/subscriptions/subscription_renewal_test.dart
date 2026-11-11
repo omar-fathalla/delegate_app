@@ -20,6 +20,7 @@ Delegate supervisor({
   DelegateStatus status = DelegateStatus.active,
   String organizationUID = 'o1',
   String companyUID = 'c1',
+  UserRole role = UserRole.delegate,
 }) =>
     Delegate(
       uid: uid,
@@ -51,6 +52,7 @@ Delegate supervisor({
       paymentAmount: 0,
       version: 1,
       documents: const [],
+      role: role,
     );
 
 Future<FakeFirebaseFirestore> seed() async {
@@ -158,6 +160,35 @@ void main() {
       final repo = SubscriptionRenewalRepository(firestore: await seed(), clock: () => feb2027);
       final list = (await repo.loadRenewableDelegates(companyUID: 'c1')).getOrElse(() => []);
       expect(list.map((d) => d.uid), ['a', 'b', 'c']);
+    });
+
+    test('org-admin list query is scoped to organizationUID; HR sees every chain', () async {
+      final db = await seed();
+      await db.doc('delegate_requests/o2d').set({
+        'requestType': kRequestTypeNewDelegate,
+        'status': 'approved',
+        'supervisorUid': 'sup1',
+        'companyUID': 'c1',
+        'organizationUID': 'o2',
+        'fullName': 'req o2d',
+      });
+      await db.doc('organizations/o2/companies/c1/delegates/o2d').set({
+        'uid': 'o2d',
+        'fullName': 'مندوب o2d',
+        'phoneNumber': '010o2d',
+        'organizationName': 'سلسلة 2',
+        'status': 'suspended',
+        'statusReason': kSubscriptionExpiredReason,
+      });
+      final repo = SubscriptionRenewalRepository(firestore: db, clock: () => feb2027);
+      final hr = (await repo.loadRenewableDelegates(companyUID: 'c1')).getOrElse(() => []);
+      expect(hr.map((d) => d.uid), containsAll(['a', 'b', 'c', 'o2d']));
+      final orgAdmin = (await repo.loadRenewableDelegates(
+        companyUID: 'c1',
+        organizationUID: 'o1',
+      )).getOrElse(() => []);
+      expect(orgAdmin.map((d) => d.uid).toSet(), {'a', 'b', 'c'});
+      expect(orgAdmin.map((d) => d.uid), isNot(contains('o2d')));
     });
 
     test('partial renewal: one request, one payment, only the selected delegates', () async {
