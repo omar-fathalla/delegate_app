@@ -1802,25 +1802,19 @@ service cloud.firestore {
       );
     }
 
-    // Role-key broadcasts are a separate allow so a list query on
+    // Cheap, org-admin-only allow so a list query on
     // delegateUid == 'organizationAdmin' (etc.) is provable without
-    // also constraining type (isPrivilegedStaffAlert would otherwise
-    // deny the unscoped org-admin bell queries).
-    function canReadRoleKeyNotification() {
-      return signedIn() && (
-        (isSuperAdmin() && resource.data.delegateUid in ['super-admin', 'super_admin', 'superAdmin', 'role_super_admin'])
-        || (isTechnicalSupport() && resource.data.delegateUid in ['technicalSupport', 'technical-support', 'technical_support', 'role_technical_support'])
-        || (isOrgAdmin() && resource.data.delegateUid in ['organizationAdmin', 'organization-admin', 'organization_admin'])
-        || (isHR() && resource.data.delegateUid in ['hr', 'company-hr', 'company_hr'])
-        || (isMarketing() && resource.data.delegateUid in ['marketing', 'marketing_promotion', 'marketingPromotion'])
-        || (isBranchesMarketing() && resource.data.delegateUid in ['branchesMarketingManager', 'branches_marketing', 'branches-marketing'])
-        || (isCompanyAdmin() && resource.data.delegateUid in ['company-admin', 'admin', 'supervisor', 'company_admin'])
-      );
+    // folding isPrivilegedStaffAlert into the query, and without
+    // adding every staff roleIs() to the get() budget (M-7).
+    function canReadOrgAdminRoleBroadcast() {
+      return isOrgAdmin() && resource.data.get('delegateUid', '') in [
+        'organizationAdmin', 'organization-admin', 'organization_admin'
+      ];
     }
 
     match /notifications/{notificationId} {
       allow read: if canReadOwnNotification();
-      allow read: if canReadRoleKeyNotification();
+      allow read: if canReadOrgAdminRoleBroadcast();
       allow read: if canReadNotification();
       allow create: if canCreateNotification();
       allow update: if (canReadOwnNotification() || canReadNotification()) && (

@@ -1407,6 +1407,7 @@ class _DelegateLeavesAndRequestsScreenState
     final reasonCtrl = TextEditingController();
     XFile? pickedAttachment;
     bool isSubmitting = false;
+    String? submittedLeaveId;
 
     await showModalBottomSheet(
       context: context,
