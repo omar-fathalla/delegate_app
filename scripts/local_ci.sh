@@ -156,14 +156,14 @@ run_job() {
 
 # --- jobs, same commands and timeouts as .github/workflows/ci.yml ---
 
-run_job analyze 20 'flutter pub get && flutter analyze --no-fatal-warnings --no-fatal-infos'
+run_job analyze 20 'flutter pub get --enforce-lockfile && flutter analyze --no-fatal-warnings --no-fatal-infos'
 
-run_job test 30 'flutter pub get && flutter test --concurrency=1'
+run_job test 30 'flutter pub get --enforce-lockfile && flutter test --concurrency=1'
 
 wait_emulator_ports
 run_job p0-scripts 15 'cd functions && npm ci && npx --yes firebase-tools@14.15.1 emulators:exec --only auth,firestore --project demo-p0-scripts "node --test scripts/p0-scripts.emulator.test.js"'
 
-run_job build-web 30 'flutter pub get && flutter build web --release'
+run_job build-web 30 'flutter pub get --enforce-lockfile && flutter build web --release'
 
 run_job ios-dev-config-check 5 'bash scripts/ios_dev_config_check.sh && bash scripts/maestro_check_flow_headers.sh && bash scripts/patrol_check_integration_targets.sh'
 
@@ -174,7 +174,7 @@ wait_emulator_ports
 run_job rules 20 'npm install --no-audit --no-fund && npm --prefix functions ci && npm run test:rules && npm run test:rules:interim && npm run test:rules:p0 && npm run test:rules:adv && npm run test:rules:docs && npm run test:rules:subs && npm run test:rules:qa-hold && npm run test:rules:profile && npm run test:rules:m31 && npm run test:rules:source && npm run test:e2e:subscriptions && npm run test:e2e:delegate'
 
 # Extra vs ci.yml: Android dev debug APK (requested for local machine CI).
-run_job android-dev-build 30 "flutter pub get && flutter build apk --debug --flavor dev --dart-define=ENV=dev --dart-define=GIT_SHA=${SHA}"
+run_job android-dev-build 30 "flutter pub get --enforce-lockfile && flutter build apk --debug --flavor dev --dart-define=ENV=dev --dart-define=GIT_SHA=${SHA}"
 
 END_TS="$(now)"
 END_EPOCH="$(date +%s)"

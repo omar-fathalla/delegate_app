@@ -1042,7 +1042,7 @@ service cloud.firestore {
     // company-admin read path another worker is fixing.
     function sourceStampKeys() {
       return ['delegateSource', 'chainOrigin', 'delegateSourceInferredBy',
-        'delegateSourceAt', 'delegateSourceRunId'];
+        'delegateSourceAt', 'delegateSourceRunId', 'delegateSourceRevertRunId'];
     }
     function sourceStampKeysLocked() {
       return request.method == 'create'

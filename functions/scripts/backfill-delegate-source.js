@@ -385,6 +385,19 @@ async function runBackfill(db, L, args) {
     lowConfidenceUids: counts.lowConfidenceUids,
   };
 
+  const rule5 = planned.filter((p) => p.rule === 5);
+  const rule5ListPath = path.join(
+    path.dirname(args.report || process.cwd() + path.sep + "x"),
+    `delegate-source-rule5-review-${runId}.txt`,
+  );
+  // Ids only (uid and path). Never names, phones, or national IDs.
+  // Required for a prod dry-run so Mohamed can review rule-5 "unknown → web".
+  const rule5Lines = rule5.map((p) => `${p.uid}\t${p.path}`).join("\n") + (rule5.length ? "\n" : "");
+  fs.writeFileSync(rule5ListPath, rule5Lines);
+  console.log(`wrote rule-5 review list (${rule5.length} ids, no personal data) ${rule5ListPath}`);
+  report.rule5ReviewFile = rule5ListPath;
+  report.counts.rule5ReviewUidCount = rule5.length;
+
   const rollbackPath = args.rollback ||
     (args.apply ? path.join(process.cwd(), `delegate-source-rollback-${runId}.json`) : "");
   if (rollbackPath) {
@@ -409,9 +422,11 @@ async function runBackfill(db, L, args) {
       const batch = db.batch();
       const slice = planned.slice(i, i + 400);
       for (const p of slice) {
+        const {FieldValue} = require("firebase-admin/firestore");
         batch.update(db.doc(p.path), {
           ...p.fields,
-          delegateSourceAt: require("firebase-admin").firestore.FieldValue.serverTimestamp(),
+          delegateSourceAt: FieldValue.serverTimestamp(),
+          delegateSourceRevertRunId: FieldValue.delete(),
         });
       }
       await batch.commit();
@@ -454,7 +469,7 @@ async function runRevert(db, args) {
     };
   }
 
-  const FieldValue = require("firebase-admin").firestore.FieldValue;
+  const {FieldValue} = require("firebase-admin/firestore");
   let written = 0;
   for (let i = 0; i < entries.length; i += 400) {
     const batch = db.batch();
@@ -463,12 +478,15 @@ async function runRevert(db, args) {
       const prev = e.previous || {};
       const hadSource = prev.delegateSource != null && prev.delegateSource !== "";
       if (!hadSource) {
+        // Marker the trigger honours so deleting the stamp does not
+        // immediately re-stamp (inferredBy=trigger) while we revert.
         batch.update(db.doc(e.path), {
           delegateSource: FieldValue.delete(),
           chainOrigin: FieldValue.delete(),
           delegateSourceInferredBy: FieldValue.delete(),
           delegateSourceAt: FieldValue.delete(),
           delegateSourceRunId: FieldValue.delete(),
+          delegateSourceRevertRunId: runId,
         });
       } else {
         batch.update(db.doc(e.path), {
