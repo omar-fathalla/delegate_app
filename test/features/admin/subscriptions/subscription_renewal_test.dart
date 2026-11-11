@@ -119,6 +119,14 @@ void main() {
       expect(RenewalSelection(const {'a', 'zzz', 'c'}).retainOnly(ds).selectedUids, {'a'});
     });
 
+    test('total is recomputed when the calendar month changes in the same period', () {
+      const sel = RenewalSelection({'a', 'b'});
+      expect(sel.total(DateTime(2027, 1, 15)), 1000.0);
+      expect(sel.feePerDelegate(DateTime(2027, 1, 15)), 500.0);
+      expect(sel.total(DateTime(2027, 2, 1)), 833.34);
+      expect(sel.feePerDelegate(DateTime(2027, 2, 1)), 416.67);
+    });
+
     test('nothing to pay during the free promotion', () {
       expect(const RenewalSelection().selectAll(ds).total(nov2026), 0);
     });

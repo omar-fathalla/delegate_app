@@ -1,4 +1,5 @@
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:equatable/equatable.dart';
 
 /// Status reason the server writes when a period ends without a paid subscription.
@@ -77,4 +78,24 @@ class RenewalSelection extends Equatable {
 
   @override
   List<Object?> get props => [selectedUids.toList()..sort()];
+}
+
+
+/// Who may open «تجديد المناديب» and create a renewal (Mohamed, Phase 1 item 2).
+/// Supervisors share [UserRole.admin] with company admins. HR and org-admins
+/// are also allowed, but only inside their company — an empty [companyUID]
+/// is fail-closed (the item stays hidden). Paymob online only, cap 100.
+bool canCreateSubscriptionRenewal({
+  required UserRole role,
+  required String companyUID,
+}) {
+  if (companyUID.trim().isEmpty) return false;
+  switch (role) {
+    case UserRole.admin: // company admin and company supervisor
+    case UserRole.hr:
+    case UserRole.organizationAdmin:
+      return true;
+    default:
+      return false;
+  }
 }

@@ -11,7 +11,8 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// «تجديد المناديب»: company admin or HR renewal page (Mohamed policy #212).
+/// «تجديد المناديب»: supervisors, company admins, HR, and org-admins
+/// (with a companyUID) may create a renewal (Phase 1 item 2).
 ///
 /// Lists his company's suspended (subscription expired) app-added delegates,
 /// lets him select any subset, and pays for the selection in ONE Paymob

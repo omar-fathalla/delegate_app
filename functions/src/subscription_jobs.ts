@@ -12,6 +12,7 @@ import {
   parsePeriodCode,
   periodOf,
   quoteFor,
+  toCents,
   requestCoversPeriod,
   shouldSuspendStatus,
   MAX_DELEGATES_PER_RENEWAL,
@@ -187,7 +188,40 @@ export async function quoteSubscriptionRequest(db: Db, requestId: string, at: Da
   if (type === REQUEST_TYPE_RENEWAL) await assertRenewable(db, data, uids);
   const quote = quoteFor(uids, at);
   if (quote.amountCents <= 0) throw new QuoteError("free_period");
+  await persistRecomputedQuote(db, requestId, data, quote);
   return quote;
+}
+
+/**
+ * When the calendar month changes inside the same period, the prorated
+ * fee changes (500 × remainingMonths / 6). Write the fresh quote onto the
+ * pending request so checkout charges the new amount, not a stale one.
+ */
+async function persistRecomputedQuote(
+  db: Db,
+  requestId: string,
+  data: Data,
+  quote: Quote,
+): Promise<void> {
+  const storedCents = toCents(Number(data.amountDue ?? data.fee ?? 0));
+  const storedMonths = Number(data.remainingMonths ?? 0);
+  if (storedCents === quote.amountCents && storedMonths === quote.remainingMonths) {
+    return;
+  }
+  const existingItems = Array.isArray(data.items) ? data.items as Data[] : [];
+  const nameByUid = new Map(existingItems.map((i) => [str(i.uid), str(i.fullName)]));
+  const items = quote.items.map((i) => ({
+    uid: i.uid,
+    fullName: nameByUid.get(i.uid) || "",
+    fee: i.fee,
+  }));
+  await db.collection(REQUESTS).doc(requestId).update({
+    amountDue: quote.amount,
+    fee: quote.amount,
+    remainingMonths: quote.remainingMonths,
+    items,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
 }
 
 /** Every renewed uid must be an app-added delegate of the requesting company. */
