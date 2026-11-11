@@ -2,8 +2,11 @@
  * Callable startBillingCycle (Phase 2 item 2). Replaces web W7
  * clearAllDeferredPayments$ with an idempotent, resumable org-admin run.
  *
- * Shadow mode: adds billing_cycle_reset holds and resets company deferred
- * counters. It does not write status or statusReason.
+ * Shadow mode: adds billing_cycle_reset holds and writes only to
+ * billing_cycles or shadow fields (holds, statusHistory, priors). It does
+ * not write status, statusReason, company billing counters, or isPrinted.
+ * Real company / isPrinted writes run only when HOLDS_AUTHORITY_MODE is
+ * authoritative, and previous values are stored on the run doc.
  *
  * Deploy: functions:tashil-mobile-notifications:startBillingCycle
  * Do not deploy suspendExpiredSubscriptions with this function.
@@ -30,8 +33,10 @@ import {
   addReason,
   billingRunId,
   claimBillingRun,
-  companyResetData,
   decideStartBillingCycle,
+  planCompanyBillingWrite,
+  planDelegatePrintedWrite,
+  shouldWriteCompanyBilling,
   finishBillingRun,
   parseDelegatePath,
   periodCodeAt,
@@ -167,17 +172,24 @@ async function resetCompanyPage(
   }
   const snap = await q.get();
   const writer = new Batcher(db);
-  const patch = {
-    ...companyResetData(),
-    updatedAt: FieldValue.serverTimestamp(),
-  };
+  const priors = {...(state.companyPriors || {})};
+  const mode = state.mode || "";
   let lastId = state.cursor;
   for (const doc of snap.docs) {
-    await writer.update(doc.ref, patch);
+    const data = (doc.data() || {}) as Record<string, unknown>;
+    const planned = planCompanyBillingWrite(mode, data);
+    if (!priors[doc.id]) priors[doc.id] = planned.prior;
     addCount(state.counts, "companies");
-    addCount(state.counts, "companiesReset");
+    if (planned.visibleWrite && shouldWriteCompanyBilling(mode)) {
+      await writer.update(doc.ref, {
+        ...planned.visibleWrite,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      addCount(state.counts, "companiesReset");
+    }
     lastId = doc.id;
   }
+  state.companyPriors = priors;
   await writer.flush();
   if (snap.size < BILLING_PAGE_SIZE) {
     state.phase = BILLING_PHASE_DELEGATES;
@@ -212,6 +224,7 @@ async function resetDelegatePage(
   }
   const snap = await q.get();
   const writer = new Batcher(db);
+  const delegatePriors = {...(state.delegatePriors || {})};
   let lastPath = state.cursor;
   for (const doc of snap.docs) {
     addCount(state.counts, "docs");
@@ -248,13 +261,19 @@ async function resetDelegatePage(
       addReason(state.counts, "already_held");
       continue;
     }
+    const printed = planDelegatePrintedWrite(ctx.mode, data);
+    if (!delegatePriors[doc.ref.path]) {
+      delegatePriors[doc.ref.path] = printed.prior;
+    }
     const update: Record<string, unknown> = {
       holds: serializeHolds(plan.nextHolds),
       statusVersion: plan.statusVersion,
       holdsAuthorityAt: ctx.at,
-      isPrinted: false,
       updatedAt: FieldValue.serverTimestamp(),
     };
+    if (printed.visibleWrite) {
+      Object.assign(update, printed.visibleWrite);
+    }
     if (ctx.mode === "authoritative") {
       update.status = plan.derivedStatus;
       update.statusReason = plan.nextStatusReason === null ?
@@ -268,6 +287,7 @@ async function resetDelegatePage(
     addCount(state.counts, "written");
   }
   await writer.flush();
+  state.delegatePriors = delegatePriors;
   if (snap.size < BILLING_PAGE_SIZE) {
     return finishBillingRun(state, new Date().toISOString(), Date.now());
   }

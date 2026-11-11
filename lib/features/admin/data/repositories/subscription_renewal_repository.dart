@@ -23,17 +23,27 @@ class SubscriptionRenewalRepository {
   /// across every organization/chain of that company.
   Future<Either<Failure, List<RenewableDelegate>>> loadRenewableDelegates({
     required String companyUID,
+    String? organizationUID,
   }) async {
     if (companyUID.trim().isEmpty) {
       return const Left(ServerFailure('لا توجد شركة مرتبطة بحسابك.'));
     }
     try {
-      final regs = await _requests
+      final org = organizationUID?.trim() ?? '';
+      Query<Map<String, dynamic>> regsQuery = _requests
           .where('companyUID', isEqualTo: companyUID)
           .where('requestType', isEqualTo: kRequestTypeNewDelegate)
-          .where('status', isEqualTo: 'approved')
-          .get();
-      final pending = await _pendingRenewalsByUid(companyUID: companyUID);
+          .where('status', isEqualTo: 'approved');
+      if (org.isNotEmpty) {
+        // Org-admin read rules require docOrg == caller org; the unfiltered
+        // companyUID query is PERMISSION_DENIED for that role.
+        regsQuery = regsQuery.where('organizationUID', isEqualTo: org);
+      }
+      final regs = await regsQuery.get();
+      final pending = await _pendingRenewalsByUid(
+        companyUID: companyUID,
+        organizationUID: org.isEmpty ? null : org,
+      );
       final out = <RenewableDelegate>[];
       for (final reg in regs.docs) {
         final r = reg.data();
@@ -71,13 +81,18 @@ class SubscriptionRenewalRepository {
   /// uid -> id of an open (unpaid, not failed) renewal for the current period.
   Future<Map<String, String>> _pendingRenewalsByUid({
     required String companyUID,
+    String? organizationUID,
   }) async {
     final period = SubscriptionCycleHelper.getCycleCode(_clock());
-    final snap = await _requests
+    final org = organizationUID?.trim() ?? '';
+    Query<Map<String, dynamic>> pendingQuery = _requests
         .where('companyUID', isEqualTo: companyUID)
         .where('requestType', isEqualTo: kRequestTypeRenewal)
-        .where('status', isEqualTo: 'pending')
-        .get();
+        .where('status', isEqualTo: 'pending');
+    if (org.isNotEmpty) {
+      pendingQuery = pendingQuery.where('organizationUID', isEqualTo: org);
+    }
+    final snap = await pendingQuery.get();
     final out = <String, String>{};
     for (final doc in snap.docs) {
       final data = doc.data();

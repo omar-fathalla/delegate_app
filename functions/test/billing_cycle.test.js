@@ -167,3 +167,31 @@ test("periodCodeAt uses the Cairo period and companyResetData clears deferred co
     totalApprovedDelegates: 0,
   });
 });
+
+test("shadow mode plans no company or isPrinted writes and keeps priors", () => {
+  const company = {deferredPayment: 250, hasDeferredPayment: true, totalApprovedDelegates: 8};
+  const shadow = B.planCompanyBillingWrite("shadow", company);
+  assert.equal(shadow.visibleWrite, null);
+  assert.deepEqual(shadow.prior, company);
+  const auth = B.planCompanyBillingWrite("authoritative", company);
+  assert.deepEqual(auth.visibleWrite, B.companyResetData());
+  assert.deepEqual(auth.prior, company);
+  assert.equal(B.shouldWriteCompanyBilling("shadow"), false);
+  assert.equal(B.shouldWriteCompanyBilling("authoritative"), true);
+
+  const printed = B.planDelegatePrintedWrite("shadow", {isPrinted: true});
+  assert.equal(printed.visibleWrite, null);
+  assert.deepEqual(printed.prior, {isPrinted: true});
+  const printedAuth = B.planDelegatePrintedWrite("authoritative", {isPrinted: true});
+  assert.deepEqual(printedAuth.visibleWrite, {isPrinted: false});
+  assert.deepEqual(printedAuth.prior, {isPrinted: true});
+  assert.equal(B.shouldWriteDelegatePrinted("shadow"), false);
+  assert.equal(B.shouldWriteDelegatePrinted("authoritative"), true);
+
+  const missing = B.planCompanyBillingWrite("shadow", {});
+  assert.deepEqual(missing.prior, {
+    deferredPayment: null,
+    hasDeferredPayment: null,
+    totalApprovedDelegates: null,
+  });
+});

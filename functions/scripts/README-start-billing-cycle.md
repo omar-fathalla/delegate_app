@@ -61,12 +61,17 @@ Run document (server-only): `billing_cycles/{orgId}_{cycleId}`
 
 ## Behaviour
 
-- Resets every company under the org: `deferredPayment=0`,
-  `hasDeferredPayment=false`, `totalApprovedDelegates=0`.
+- In **authoritative** mode only, resets every company under the org:
+  `deferredPayment=0`, `hasDeferredPayment=false`,
+  `totalApprovedDelegates=0`, and sets `isPrinted` to `false` on held
+  delegates. Previous values are stored on the `billing_cycles` run doc
+  (`companyPriors`, `delegatePriors`) so they can be restored.
 - Adds a `billing_cycle_reset` hold on **web-billed** chain docs in that
   org. Scope is per org (every chain of the uid in that org).
-- In shadow mode (the default until Phase 2 item 4) it does **not** write
-  `status` or `statusReason`. `isPrinted` is set to `false`.
+- In shadow mode (the default until Phase 2 item 4) it writes only to
+  `billing_cycles` or shadow fields (`holds`, `statusHistory`, priors).
+  It does **not** write `status`, `statusReason`, company billing
+  counters, or `isPrinted`.
 - Skips a doc when any of these is true:
   - `source` / `delegateSource` is `app`
   - the uid is an approved app `new_delegate` request (same rule as

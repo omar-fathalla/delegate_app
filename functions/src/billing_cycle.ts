@@ -63,6 +63,10 @@ export interface BillingRunState {
   companiesReset: boolean;
   counts: BillingCounts;
   mode: string;
+  /** Before-values for company billing fields (rollback). Written only to billing_cycles. */
+  companyPriors?: Record<string, CompanyBillingPrior>;
+  /** Before-values for isPrinted on held delegates (authoritative writes). */
+  delegatePriors?: Record<string, DelegatePrintPrior>;
   startedAt?: string;
   updatedAt?: string;
   finishedAt?: string;
@@ -186,6 +190,74 @@ export function companyResetData(): Record<string, unknown> {
     deferredPayment: 0,
     hasDeferredPayment: false,
     totalApprovedDelegates: 0,
+  };
+}
+
+export const BILLING_MODE_AUTHORITATIVE = "authoritative";
+
+export interface CompanyBillingPrior {
+  deferredPayment: unknown;
+  hasDeferredPayment: unknown;
+  totalApprovedDelegates: unknown;
+}
+
+export interface DelegatePrintPrior {
+  isPrinted: unknown;
+}
+
+export function isBillingAuthoritative(mode: string): boolean {
+  return mode === BILLING_MODE_AUTHORITATIVE;
+}
+
+/** Real company / isPrinted writes happen only in authoritative mode. */
+export function shouldWriteCompanyBilling(mode: string): boolean {
+  return isBillingAuthoritative(mode);
+}
+
+export function shouldWriteDelegatePrinted(mode: string): boolean {
+  return isBillingAuthoritative(mode);
+}
+
+export function snapshotCompanyBillingFields(data: Record<string, unknown>): CompanyBillingPrior {
+  return {
+    deferredPayment: Object.prototype.hasOwnProperty.call(data, "deferredPayment") ?
+      data.deferredPayment : null,
+    hasDeferredPayment: Object.prototype.hasOwnProperty.call(data, "hasDeferredPayment") ?
+      data.hasDeferredPayment : null,
+    totalApprovedDelegates: Object.prototype.hasOwnProperty.call(data, "totalApprovedDelegates") ?
+      data.totalApprovedDelegates : null,
+  };
+}
+
+export function snapshotDelegatePrinted(data: Record<string, unknown>): DelegatePrintPrior {
+  return {
+    isPrinted: Object.prototype.hasOwnProperty.call(data, "isPrinted") ? data.isPrinted : null,
+  };
+}
+
+/**
+ * Visible company patch, or null in shadow. The prior is always returned so
+ * it can be stored on the billing_cycles run doc.
+ */
+export function planCompanyBillingWrite(
+  mode: string,
+  data: Record<string, unknown>,
+): {prior: CompanyBillingPrior; visibleWrite: Record<string, unknown> | null} {
+  const prior = snapshotCompanyBillingFields(data);
+  return {
+    prior,
+    visibleWrite: shouldWriteCompanyBilling(mode) ? companyResetData() : null,
+  };
+}
+
+export function planDelegatePrintedWrite(
+  mode: string,
+  data: Record<string, unknown>,
+): {prior: DelegatePrintPrior; visibleWrite: Record<string, unknown> | null} {
+  const prior = snapshotDelegatePrinted(data);
+  return {
+    prior,
+    visibleWrite: shouldWriteDelegatePrinted(mode) ? {isPrinted: false} : null,
   };
 }
 

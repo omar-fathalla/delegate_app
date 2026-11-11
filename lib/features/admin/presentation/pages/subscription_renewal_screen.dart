@@ -74,8 +74,12 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
       _loading = true;
       _error = null;
     });
+    final supervisor = widget.supervisor;
     final result = await _repo.loadRenewableDelegates(
-      companyUID: widget.supervisor.companyUID,
+      companyUID: supervisor.companyUID,
+      organizationUID: supervisor.role == UserRole.organizationAdmin
+          ? supervisor.organizationUID
+          : null,
     );
     if (!mounted) return;
     result.fold(
