@@ -140,6 +140,24 @@ describe("adversarial", ()=>{
     await rec("sa reads mail doc","deny",getDoc(doc(as("sa"),"mail/m1")));
     await rec("sa lists mail","deny",getDocs(collection(as("sa"),"mail")));
     await rec("anon get delegate","deny",getDoc(doc(anon(),"organizations/o1/companies/c1/delegates/d1")));});
+  test("storage_upload_intents are company-scoped and immutable", async()=>{
+    await env.withSecurityRulesDisabled(async ctx=>{
+      await setDoc(doc(ctx.firestore(),"users/ca2"),{role:"company-admin",organizationUID:"o2",companyUID:"c9"});
+    });
+    await rec("ca create intent own company","allow",setDoc(doc(as("ca"),"storage_upload_intents/f1"),{companyUID:"c1",createdBy:"ca"}));
+    await rec("sup create intent own company","allow",setDoc(doc(as("sup"),"storage_upload_intents/f2"),{companyUID:"c1",createdBy:"sup"}));
+    await rec("hr create intent own company","allow",setDoc(doc(as("hr"),"storage_upload_intents/f3"),{companyUID:"c1",createdBy:"hr"}));
+    await rec("ca2 create intent for other company","deny",setDoc(doc(as("ca2"),"storage_upload_intents/f4"),{companyUID:"c1",createdBy:"ca2"}));
+    await rec("ca2 create intent own company","allow",setDoc(doc(as("ca2"),"storage_upload_intents/f5"),{companyUID:"c9",createdBy:"ca2"}));
+    await rec("accountant create intent","deny",setDoc(doc(as("acc"),"storage_upload_intents/f6"),{companyUID:"c1",createdBy:"acc"}));
+    await rec("anon create intent","deny",setDoc(doc(anon(),"storage_upload_intents/f7"),{companyUID:"c1",createdBy:"anon1"}));
+    await rec("ca read own company intent","allow",getDoc(doc(as("ca"),"storage_upload_intents/f1")));
+    await rec("ca2 read other company intent","deny",getDoc(doc(as("ca2"),"storage_upload_intents/f1")));
+    await rec("ca update intent companyUID","deny",updateDoc(doc(as("ca"),"storage_upload_intents/f1"),{companyUID:"c9"}));
+    await rec("ca delete intent","deny",deleteDoc(doc(as("ca"),"storage_upload_intents/f1")));
+    await rec("ca create intent missing createdBy","deny",setDoc(doc(as("ca"),"storage_upload_intents/f8"),{companyUID:"c1"}));
+  });
+
   // Runs last: every recorded case must match its expectation.
   // Known, out-of-scope gaps (tracked, not fixed in this PR):
   //  D2 delegate reads another delegate of its company (delegates follow-up, N4)

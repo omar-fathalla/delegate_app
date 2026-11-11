@@ -8,6 +8,7 @@ import 'package:delegate_app/features/admin/domain/services/delegate_duplicate.d
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/features/admin/domain/entities/chain_selection.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
+import 'package:delegate_app/features/admin/data/datasources/storage_upload_intent.dart';
 import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
 import 'package:flutter/foundation.dart';
@@ -133,7 +134,18 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         }
       }
 
-      // 1. Upload Profile Image
+      // 1. Bind the storage folder to this company, then upload images.
+      final intentError = await ensureStorageUploadIntent(
+        firestore: _firestore,
+        folderId: requestId,
+        companyUID: companyUID,
+        createdBy: supervisorUid,
+      );
+      if (intentError != null) {
+        return Left(ServerFailure(intentError));
+      }
+
+      // 2. Upload Profile Image
       final profileSnap = await _storage
           .ref('delegate_documents/$requestId/profile.jpg')
           .putFile(profileImage);

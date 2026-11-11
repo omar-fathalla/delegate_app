@@ -1,7 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:delegate_app/features/admin/data/datasources/storage_upload_intent.dart';
 
 class DelegateProfileEditException implements Exception {
   DelegateProfileEditException(this.message);
@@ -182,10 +185,22 @@ class DelegateProfileEditRepository {
     XFile? personalPhoto,
     XFile? idFront,
     XFile? idBack,
-  }) {
+  }) async {
     final id = (delegateUid != null && delegateUid.isNotEmpty)
         ? delegateUid
         : (requestId ?? 'unknown');
+    final hasImages = personalPhoto != null || idFront != null || idBack != null;
+    if (hasImages && id != 'unknown') {
+      final intentError = await ensureStorageUploadIntent(
+        firestore: FirebaseFirestore.instance,
+        folderId: id,
+        companyUID: companyUID,
+        createdBy: FirebaseAuth.instance.currentUser?.uid ?? '',
+      );
+      if (intentError != null) {
+        return DelegateProfileSaveResult(saved: false, message: intentError);
+      }
+    }
     return saveDelegateProfileEdit(
       upload: uploadImage,
       edit: ({

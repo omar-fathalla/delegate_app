@@ -70,19 +70,60 @@ service firebase.storage {
     }
 
     // ==================== DELEGATE REGISTRATION & SUBSCRIPTION DOCUMENTS ====================
-    // P-1: only the delegate, their company staff, and super-admin / tech.
-    // Registration uploads to delegate_documents/{requestId} *before* the
-    // request doc exists, so company staff may also access a folder that
-    // has no users/{id} or delegate_requests/{id} doc yet. The catch-all
-    // below must not OR this path back open.
-    // Intended tighter check: one firestore.get of users/{caller} (calls
-    // are not memoized; exists()+get() counts as two). Live tashil-dev
-    // Storage→Firestore gets currently deny staff uploads even with that
-    // single get (uid-matched folders without a get work; isAuthenticated
-    // paths work). Until a live staff smoke succeeds with a get, this path
-    // matches prod: any signed-in user.
-    function canAccessDelegateDocuments(delegateUid) {
-      return isAuthenticated();
+    // P-1: the folder owner (uid == folder id), company staff / HR / org-admin
+    // of the SAME company, and super-admin / technical support.
+    // Anonymous tokens are denied even though request.auth != null.
+    //
+    // Staff access requires a prior storage_upload_intents/{folderId} doc
+    // whose companyUID matches the caller. There is no empty-company
+    // fallback: a missing intent denies staff, so they cannot create,
+    // read or delete another company's folder. Write the intent before
+    // uploading (registration does this). At most two firestore.get
+    // calls: users/{caller} and storage_upload_intents/{folderId}.
+    // The folder-owner check short-circuits with zero gets.
+    //
+    // Cross-service IAM: the Cloud Storage for Firebase service agent
+    // (service-<PROJECT_NUMBER>@gcp-sa-firebasestorage.iam.gserviceaccount.com)
+    // must have roles/firebaserules.firestoreServiceAgent on the project,
+    // or these gets deny and staff uploads fail. Granted on tashil-dev;
+    // prod is a separate, owner-approved change.
+    function isNonAnonymous() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+    function isStorageGlobalRole(role) {
+      return role in [
+        'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+        'Super-Admin', 'SUPER_ADMIN',
+        'technical_support', 'technical-support', 'technicalSupport',
+        'technicalsupport', 'tech_support', 'techsupport'
+      ];
+    }
+    function isStorageCompanyStaffRole(role) {
+      return role in [
+        'company-admin', 'company_admin', 'companyadmin', 'admin',
+        'supervisor', 'company_supervisor',
+        'hr', 'company-hr', 'company_hr', 'human_resources',
+        'organization-admin', 'organization_admin', 'organizationadmin',
+        'organizationAdmin'
+      ];
+    }
+    function storageStaffOrGlobalAccess(folderId) {
+      let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      let role = u.get('role', '');
+      let co = u.get('companyUID', '');
+      return isStorageGlobalRole(role)
+        || (
+          isStorageCompanyStaffRole(role)
+          && co != ''
+          && firestore.get(/databases/(default)/documents/storage_upload_intents/$(folderId)).data.get('companyUID', '') == co
+        );
+    }
+    function canAccessDelegateDocuments(folderId) {
+      return isNonAnonymous() && (
+        request.auth.uid == folderId
+        || storageStaffOrGlobalAccess(folderId)
+      );
     }
 
     match /delegate_documents/{delegateUid}/{allPaths=**} {
