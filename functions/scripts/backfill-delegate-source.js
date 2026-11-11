@@ -3,9 +3,12 @@
  *
  * Dry-run by default. Writes a JSON report (counts only in the console;
  * the file may include document paths and uids, never names, phones, or
- * national IDs). --apply also writes a rollback file.
+ * national IDs). Pass --rollback on a dry-run to save the rollback file
+ * *before* --apply. --apply also rewrites that file immediately before
+ * any writes.
  *
  *   node scripts/backfill-delegate-source.js --project tashil-dev
+ *   node scripts/backfill-delegate-source.js --project tashil-dev --rollback ./rollback.json
  *   node scripts/backfill-delegate-source.js --project tashil-dev --apply --rollback ./rollback.json
  *   node scripts/backfill-delegate-source.js --project tashil-dev --revert --run <runId>
  *   node scripts/backfill-delegate-source.js --project tashil-dev --revert --rollback ./rollback.json
@@ -382,12 +385,9 @@ async function runBackfill(db, L, args) {
     lowConfidenceUids: counts.lowConfidenceUids,
   };
 
-  if (args.apply) {
-    if (PROD_PROJECTS.has(args.project) && args.allowProd !== args.project) {
-      throw new Error("Refusing to apply on prod without --allow-prod-project.");
-    }
-    const rollbackPath = args.rollback ||
-      path.join(process.cwd(), `delegate-source-rollback-${runId}.json`);
+  const rollbackPath = args.rollback ||
+    (args.apply ? path.join(process.cwd(), `delegate-source-rollback-${runId}.json`) : "");
+  if (rollbackPath) {
     const rollback = {
       project: args.project,
       runId,
@@ -396,6 +396,13 @@ async function runBackfill(db, L, args) {
     };
     fs.writeFileSync(rollbackPath, JSON.stringify(rollback, null, 2));
     console.log(`wrote rollback file ${rollbackPath}`);
+    report.rollbackFile = rollbackPath;
+  }
+
+  if (args.apply) {
+    if (PROD_PROJECTS.has(args.project) && args.allowProd !== args.project) {
+      throw new Error("Refusing to apply on prod without --allow-prod-project.");
+    }
 
     let written = 0;
     for (let i = 0; i < planned.length; i += 400) {
@@ -411,7 +418,6 @@ async function runBackfill(db, L, args) {
       written += slice.length;
     }
     report.counts.written = written;
-    report.rollbackFile = rollbackPath;
   }
 
   return {report, runId};

@@ -24,10 +24,12 @@ This script backfills existing docs.
 ```bash
 cd functions
 npm run build
-# Dry-run (default)
-node scripts/backfill-delegate-source.js --project tashil-dev --report /tmp/delegate-source-report.json
+# Dry-run (default) and save the rollback file *before* any writes
+node scripts/backfill-delegate-source.js --project tashil-dev \
+  --report /tmp/delegate-source-report.json \
+  --rollback /tmp/delegate-source-rollback.json
 
-# Apply (only after written go) + rollback file
+# Apply (tashil-dev only) after the rollback file exists
 node scripts/backfill-delegate-source.js --project tashil-dev --apply \
   --report /tmp/delegate-source-report.json \
   --rollback /tmp/delegate-source-rollback.json
@@ -49,3 +51,22 @@ fails, it falls back to
 `organizations/{org}/companies/{company}/requests` for each company
 already seen on a delegate doc (single-field `actionType`, filtered in
 memory). The report records `webQueryOk` and `webQueryMode`.
+
+## Review docs (safest rule)
+
+Inference follows plan §5.4. Docs with **no app or web evidence** are
+rule 5: `delegateSource: 'web'`, `chainOrigin: 'unknown'`, confidence
+`review`. That is the safest default — **keep them `web` unless the
+evidence says app**.
+
+Evidence that says app:
+
+- Rule 1 or 2 (an app `delegate_requests/{uid}` new_delegate with a
+  supervisor) — high confidence `app`
+- Rule 4 (`registeredVia == 'mobile_app'` and no web/app-request
+  signals) — low confidence `app`, listed in `lowConfidenceUids`
+
+A tashil-dev dry-run (runId `dev-20261110T224032Z-b4c1ea`, nested
+web-request fallback) found 104 unstamped docs: 4 rule-1 `app` (high)
+and 100 rule-5 `web` (review). Zero rule 4. The 100 review docs stay
+`web`.
