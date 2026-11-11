@@ -92,13 +92,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   void _startHoldWatch(Delegate delegate) {
     if (delegate.role != UserRole.delegate) return;
-    SessionManagementService.watchDelegateStatus(
-      delegate: delegate,
-      onHeld: (reason) {
-        if (isClosed) return;
-        add(HeldSessionDetected(message: reason));
-      },
-    );
+    try {
+      SessionManagementService.watchDelegateStatus(
+        delegate: delegate,
+        onHeld: (reason) {
+          if (isClosed) return;
+          add(HeldSessionDetected(message: reason));
+        },
+      );
+    } catch (_) {}
   }
 
   Future<void> _onHeldSessionDetected(

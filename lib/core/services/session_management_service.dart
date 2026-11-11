@@ -67,7 +67,13 @@ class SessionManagementService {
     final compId = delegate.companyUID.trim();
     final uid = delegate.uid.trim();
     if (orgId.isEmpty || compId.isEmpty || uid.isEmpty) return null;
-    final fs = firestore ?? _firestore;
+    final FirebaseFirestore fs;
+    try {
+      fs = firestore ?? FirebaseFirestore.instance;
+    } catch (_) {
+      // Widget/bloc tests have no [DEFAULT] Firebase app.
+      return null;
+    }
     final sub = fs
         .collection('organizations')
         .doc(orgId)
