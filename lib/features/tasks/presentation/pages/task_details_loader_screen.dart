@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:delegate_app/features/auth/presentation/bloc/auth_state.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/tasks/data/models/task_model.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/task_details_screen.dart';
