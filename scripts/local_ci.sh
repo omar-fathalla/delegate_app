@@ -136,7 +136,10 @@ run_job() {
   set +e
   (
     cd "$SRC" || exit 1
-    timeout --kill-after=30s "${minutes}m" bash -lc "$*"
+    # -c, not -lc: a login shell resets PATH and picks Homebrew Flutter
+    # 3.41.2 over the intended $FLUTTER_SDK (3.44.5), which breaks
+    # `flutter pub get --enforce-lockfile`.
+    timeout --kill-after=30s "${minutes}m" bash -c "$*"
   ) >>"$log" 2>&1
   rc=$?
   end_e="$(date +%s)"

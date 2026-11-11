@@ -20,7 +20,19 @@ const BASE = {
 
 describe("delegate source stamps are server-only", () => {
   let env;
-  const as = (uid) => env.authenticatedContext(uid, {firebase: {sign_in_provider: "password"}}).firestore();
+  // Role claims are required for delegateOwns / isDelegate (users/{uid}
+  // is not enough). Without them, a self-update falls through to the
+  // staff path and hits the 1000-expression budget.
+  const CLAIMS = {
+    sa: {role: "super-admin"},
+    sup: {role: "supervisor", organizationUID: "o1", companyUID: "c1"},
+    d1: {role: "delegate", organizationUID: "o1", companyUID: "c1"},
+    ts: {role: "technical_support", organizationUID: "o1"},
+  };
+  const as = (uid) => env.authenticatedContext(uid, {
+    firebase: {sign_in_provider: "password"},
+    ...(CLAIMS[uid] || {}),
+  }).firestore();
 
   before(async () => {
     env = await initializeTestEnvironment({
