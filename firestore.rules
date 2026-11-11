@@ -1372,6 +1372,31 @@ service cloud.firestore {
         function taskTouchesSenderKeys() {
           return request.resource.data.diff(resource.data).affectedKeys().hasAny(taskSenderKeys());
         }
+        // Assignment fields: only the supervisor/admin roles that create
+        // tasks (not hr, accountant, or delegates).
+        function taskAssignerLevel(role) {
+          let level = taskStaffLevel(role);
+          return role in ['hr', 'company-hr', 'company_hr', 'human_resources',
+              'accountant', 'accounting', 'account_admin'] ? 0 : level;
+        }
+        function taskAssignerScope(taskCompany) {
+          let ud = taskUserData();
+          let role = ud.get('role', '') is string ? ud.get('role', '') : '';
+          let level = taskAssignerLevel(role);
+          let org = taskOrgOf(ud);
+          let comp = taskCompanyOf(ud);
+          return level == 1 ? 1
+            : level == 2 && org == orgId ? 2
+            : level == 3 && org == orgId && comp != '' && comp == taskCompany ? 3
+            : 0;
+        }
+        function taskAssignmentKeys() {
+          return ['assignedTo', 'assignedToName', 'companyId', 'companyUID'];
+        }
+        function taskTouchesAssignmentKeys() {
+          return request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(taskAssignmentKeys());
+        }
         // An attached image must sit under the uploader's own folder.
         function incomingTaskImageOk() {
           return !request.resource.data.keys().hasAny(['imagePath'])
@@ -1398,11 +1423,15 @@ service cloud.firestore {
         function taskCanUpdate() {
           let scope = taskStaffScope(resource.data.get('companyId', ''));
           let isSender = resource.data.get('createdBy', '') == request.auth.uid;
+          let canAssign = !taskTouchesAssignmentKeys()
+            || taskAssignerScope(resource.data.get('companyId', '')) > 0;
           return (scope > 0
               && (scope == 1 || isSender || !taskTouchesSenderKeys())
-              && taskImageChangeOk())
+              && taskImageChangeOk()
+              && canAssign)
             || (taskDelegateTarget()
-              && (ownsDelegateId(resource.data.createdBy) || !taskTouchesSenderKeys()));
+              && (ownsDelegateId(resource.data.createdBy) || !taskTouchesSenderKeys())
+              && !taskTouchesAssignmentKeys());
         }
         function taskCanDelete() {
           let scope = taskStaffScope(resource.data.get('companyId', ''));

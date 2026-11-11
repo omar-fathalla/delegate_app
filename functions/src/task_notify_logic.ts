@@ -8,6 +8,8 @@
  * intended people. Resolution is company-scoped and de-duplicated.
  */
 
+import {canonicalStatus, hasAnyHold, parseHolds} from "./holds";
+
 export const ASSIGN_ALL = "all";
 export const ASSIGN_ALL_AR = "الكل";
 export const ASSIGN_ALL_BRANCH_MARKETING = "all_branch_marketing";
@@ -34,11 +36,14 @@ const MARKETING_PROMOTION_ROLES = new Set([
   "marketingpromotion",
 ]);
 
+/** Statuses that must not receive a new-task notification. */
 const SKIP_STATUS = new Set([
   "pending",
   "rejected",
   "deleted",
   "disabled",
+  "suspended",
+  "inactive",
 ]);
 
 export type TaskUser = {
@@ -50,6 +55,7 @@ export type TaskUser = {
   organizationUID?: unknown;
   organizationUIDs?: unknown;
   status?: unknown;
+  holds?: unknown;
 };
 
 export type TaskNotifyOpts = {
@@ -137,9 +143,23 @@ export function userInOrg(u: TaskUser, organizationId: string): boolean {
   return orgIdsOf(u).includes(org);
 }
 
+/**
+ * Exclude pending/rejected/deleted/disabled, and anyone the HOLDS model
+ * treats as suspended (legacy status, or a non-empty holds object).
+ * `approved` is canonicalized to `active` and is kept.
+ */
+export function isExcludedFromTaskNotify(u: TaskUser): boolean {
+  if (hasAnyHold(parseHolds(u.holds))) return true;
+  const s = canonicalStatus(u.status);
+  return s !== "" && (SKIP_STATUS.has(s) || SKIP_STATUS.has(normalizeStatusRaw(u.status)));
+}
+
+function normalizeStatusRaw(status: unknown): string {
+  return String(status || "").trim().toLowerCase();
+}
+
 function isSkippedStatus(u: TaskUser): boolean {
-  const s = String(u.status || "").trim().toLowerCase();
-  return s !== "" && SKIP_STATUS.has(s);
+  return isExcludedFromTaskNotify(u);
 }
 
 export type ParsedAssignedTo =
@@ -183,13 +203,20 @@ export function parseAssignedTo(assignedTo: unknown): ParsedAssignedTo {
   return {kind: "empty"};
 }
 
+function isSectorStaffRole(role: unknown): boolean {
+  return isBranchMarketingRole(role) || isMarketingPromotionRole(role);
+}
+
+/**
+ * «الكل» / `all` is company-delegates only. Sector marketing/promo staff
+ * are not included, even if they appear in a combined candidate list.
+ */
 function seesAllGroup(u: TaskUser, opts: TaskNotifyOpts): boolean {
   const co = String(opts.companyId || "").trim();
   if (!co) return false;
   if (!userInCompany(u, co)) return false;
-  return isFieldDelegateRole(u.role) ||
-    isBranchMarketingRole(u.role) ||
-    isMarketingPromotionRole(u.role);
+  if (isSectorStaffRole(u.role)) return false;
+  return isFieldDelegateRole(u.role);
 }
 
 function seesBranchMarketingGroup(u: TaskUser, opts: TaskNotifyOpts): boolean {
@@ -234,7 +261,7 @@ function explicitUidAllowed(u: TaskUser | undefined, uid: string, opts: TaskNoti
 /**
  * Unique recipient uids for a task. Never treats a string assignedTo as
  * an array of characters. Group `all` requires a company id (fail closed).
- * The creator is never notified. Pending/rejected/deleted users are skipped.
+ * The creator is never notified. Suspended/inactive/held and pending/rejected/deleted/disabled are skipped.
  */
 export function taskNotifyUserIds(
   users: TaskUser[],
@@ -291,4 +318,103 @@ export function newlyAssignedTaskUserIds(
 ): string[] {
   const before = new Set(taskNotifyUserIds(users, beforeAssignedTo, opts));
   return taskNotifyUserIds(users, afterAssignedTo, opts).filter((id) => !before.has(id));
+}
+
+function groupTokensOf(assignedTo: unknown): string[] {
+  const parsed = parseAssignedTo(assignedTo);
+  if (parsed.kind === "group") return [parsed.token];
+  if (parsed.kind === "mixed") return parsed.tokens;
+  return [];
+}
+
+function hasExplicitUids(assignedTo: unknown): boolean {
+  const parsed = parseAssignedTo(assignedTo);
+  return parsed.kind === "uids" || (parsed.kind === "mixed" && parsed.uids.length > 0);
+}
+
+/** Company delegates subcollection is the source for «الكل» and explicit uids. */
+export function assignmentNeedsCompanyDelegates(assignedTo: unknown): boolean {
+  const tokens = groupTokensOf(assignedTo);
+  return hasExplicitUids(assignedTo) || tokens.some((t) => isAllAssignToken(t));
+}
+
+/** Users-collection sector staff is the source for sector tokens. */
+export function assignmentNeedsSectorStaff(assignedTo: unknown): boolean {
+  return groupTokensOf(assignedTo).some((t) =>
+    t === ASSIGN_ALL_BRANCH_MARKETING || t === ASSIGN_ALL_MARKETING_PROMOTION);
+}
+
+function mergeTaskUsers(...lists: TaskUser[][]): TaskUser[] {
+  const seen = new Map<string, TaskUser>();
+  for (const list of lists) {
+    for (const u of list) {
+      if (!u || !u.id || seen.has(u.id)) continue;
+      seen.set(u.id, u);
+    }
+  }
+  return Array.from(seen.values());
+}
+
+/**
+ * Resolve recipients from the two product sources: company delegates
+ * for «الكل» / explicit uids, and users-collection sector staff for
+ * `all_branch_marketing` / `all_marketing_promotion`.
+ */
+export function taskNotifyUserIdsFromSources(
+  delegates: TaskUser[],
+  sectorStaff: TaskUser[],
+  assignedTo: unknown,
+  opts: TaskNotifyOpts = {},
+): string[] {
+  const lists: TaskUser[][] = [];
+  if (assignmentNeedsCompanyDelegates(assignedTo)) lists.push(delegates);
+  if (assignmentNeedsSectorStaff(assignedTo)) lists.push(sectorStaff);
+  return taskNotifyUserIds(mergeTaskUsers(...lists), assignedTo, opts);
+}
+
+export function newlyAssignedTaskUserIdsFromSources(
+  delegates: TaskUser[],
+  sectorStaff: TaskUser[],
+  beforeAssignedTo: unknown,
+  afterAssignedTo: unknown,
+  opts: TaskNotifyOpts = {},
+): string[] {
+  const before = new Set(taskNotifyUserIdsFromSources(
+    delegates, sectorStaff, beforeAssignedTo, opts));
+  return taskNotifyUserIdsFromSources(
+    delegates, sectorStaff, afterAssignedTo, opts,
+  ).filter((id) => !before.has(id));
+}
+
+
+export type DelegateDocLike = {id: string; data: Record<string, unknown>};
+
+/**
+ * Map `organizations/{org}/companies/{companyUID}/delegates` docs to
+ * [TaskUser]s. Dedupes by uid, skips docs with no uid. The resolved uid is
+ * `data.uid` when present, otherwise the document id (same as the picker).
+ */
+export function taskUsersFromDelegateDocs(docs: DelegateDocLike[]): TaskUser[] {
+  const seen = new Map<string, TaskUser>();
+  for (const doc of docs) {
+    if (!doc) continue;
+    const data = doc.data || {};
+    const fromField = String(data.uid || "").trim();
+    const fromId = String(doc.id || "").trim();
+    const id = fromField || fromId;
+    if (!id) continue;
+    if (seen.has(id)) continue;
+    seen.set(id, {
+      id,
+      role: data.role,
+      companyUID: data.companyUID,
+      companyId: data.companyId,
+      companyIds: data.companyIds,
+      organizationUID: data.organizationUID,
+      organizationUIDs: data.organizationUIDs,
+      status: data.status,
+      holds: data.holds,
+    });
+  }
+  return Array.from(seen.values());
 }

@@ -6,6 +6,7 @@ import 'package:delegate_app/core/services/crashlytics_service.dart';
 import 'package:delegate_app/core/services/app_bloc_observer.dart';
 import 'package:delegate_app/core/services/firestore_client_health.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
+import 'package:delegate_app/core/services/task_push_route.dart';
 import 'package:delegate_app/core/config/app_env.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -141,13 +142,16 @@ void main() async {
 
   // Set up notification tap handler for navigation
   PushNotificationService.onNotificationTap = (data) {
-    final taskId = data['taskId'];
-    final organizationId = data['organizationId'];
-    if (taskId != null && organizationId != null) {
-      // Navigate to task details
-      // Note: This will be handled by the app when it's in foreground
-      debugPrint('Notification tapped: taskId=$taskId, orgId=$organizationId');
-    }
+    final route = taskPushRoute(data);
+    if (route == null) return;
+    debugPrint('Notification tapped: opening $route');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        appRouter.go(route);
+      } catch (e) {
+        debugPrint('Notification tap navigation error: $e');
+      }
+    });
   };
 
   // Note: FCM initialization is now done post-login in SplashScreen/LoginScreen

@@ -707,6 +707,23 @@ describe("firestore tightened rules", () => {
       await seedSent();
       await assertSucceeds(dbFor("super").doc("organizations/o1/tasks/sent").delete());
     });
+
+    test("delegates and accountants cannot change assignedTo or companyId; supervisors can", async () => {
+      await seedSent();
+      const delegate = dbFor("del-1", DELEGATE);
+      await assertFails(delegate.doc("organizations/o1/tasks/sent").update({assignedTo: "all"}));
+      await assertFails(delegate.doc("organizations/o1/tasks/sent").update({companyId: "c2"}));
+      await assertFails(delegate.doc("organizations/o1/tasks/sent").update({companyUID: "c2"}));
+      await assertSucceeds(delegate.doc("organizations/o1/tasks/sent").update({status: "inProgress"}));
+
+      await assertFails(dbFor("accountant").doc("organizations/o1/tasks/sent").update({assignedTo: "all"}));
+      await assertFails(dbFor("hr").doc("organizations/o1/tasks/sent").update({assignedTo: "all_branch_marketing"}));
+      await assertSucceeds(dbFor("hr").doc("organizations/o1/tasks/sent").update({status: "inProgress"}));
+
+      await assertSucceeds(dbFor("comp").doc("organizations/o1/tasks/sent").update({
+        assignedTo: "all", assignedToName: "جميع المناديب",
+      }));
+    });
   });
 
   test("delegate can create a same-company supervisor leave notification without organizationId", async () => {
