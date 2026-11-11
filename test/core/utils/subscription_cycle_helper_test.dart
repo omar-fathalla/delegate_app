@@ -180,5 +180,38 @@ void main() {
       expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2027, 3, 1)), equals(333.33));
       expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2027, 4, 1)), equals(250.0));
     });
+
+    test('hasPaidCoverage requires a paid or waived current-period subscription', () {
+      final at = DateTime(2027, 2, 10);
+      expect(
+        SubscriptionCycleHelper.hasPaidCoverage({
+          'paymentStatus': 'paid',
+          'periodCode': '2027_H1',
+        }, at: at),
+        isTrue,
+      );
+      expect(
+        SubscriptionCycleHelper.hasPaidCoverage({
+          'paymentStatus': 'paid',
+          'periodCode': '2026_H2',
+        }, at: at),
+        isFalse,
+      );
+      expect(
+        SubscriptionCycleHelper.hasPaidCoverage({
+          'paymentStatus': 'pending',
+          'periodCode': '2027_H1',
+        }, at: at),
+        isFalse,
+      );
+      expect(SubscriptionCycleHelper.hasPaidCoverage(null, at: at), isFalse);
+      expect(
+        SubscriptionCycleHelper.hasPaidCoverage({
+          'paymentStatus': 'waived',
+          'periodCode': '2026_H2',
+        }, at: DateTime(2026, 8, 1), companyUID: 'other'),
+        isTrue,
+      );
+    });
   });
 }

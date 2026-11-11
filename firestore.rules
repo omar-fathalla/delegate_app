@@ -1857,11 +1857,16 @@ service cloud.firestore {
         ]));
     }
 
-      // Subscription Phase 0: the company is the tenant for company staff
-      // (admin / supervisor / HR). They may read and list requests for any
-      // organization/chain under their companyUID. Org-admin stays org-scoped.
-      // Super-admin and technical support remain global. Cross-company denied.
-      // One users/{uid} read (budget).
+    // Create path only: no resource.diff, no before. Cheaper on large payloads.
+    function subscriptionPaymentCreateOk() {
+      let d = request.resource.data;
+      return d.get('paymentStatus', '') != 'paid'
+        && d.get('paymob', null) == null
+        && d.get('applyState', '') == ''
+        && d.get('paymentError', null) == null
+        && d.get('needsReview', false) == false
+        && d.get('quotedAt', null) == null;
+    }
     function delegateRequestReadOk() {
       let d = resource.data;
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
@@ -1900,7 +1905,9 @@ service cloud.firestore {
     }
 
     // When organizationUIDs is present, the primary chain must be a company
-    // under that organization. Only the primary is checked (expression budget).
+    // under that organization. Checking every secondary here overflows the
+    // 1000-expression budget (org-admin add_organization already sat at the
+    // limit). Secondaries are enforced server-side and logged.
     function requestPrimaryOrgBelongsToCompany() {
       let d = request.resource.data;
       let org = d.get('organizationUID', '');
@@ -1911,6 +1918,56 @@ service cloud.firestore {
         || exists(/databases/$(database)/documents/organizations/$(org)/companies/$(co));
     }
 
+
+    // One users/{uid} get for create. Avoids isSuperAdmin + orgAdminCreatesOwnScopedRequest
+    // each re-reading the caller, which blew the 1000-expression budget on
+    // org-admin add_organization payloads. Policy unchanged: org-admin may
+    // only create for their own org and company (not another org of the
+    // same company); company staff must match companyUID; fail-closed on
+    // an empty companyUID.
+    function createDelegateRequestOk() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let org = u.get('organizationUID', '');
+      let co = u.get('companyUID', '');
+      let d = request.resource.data;
+      let incomingOrg = d.get('organizationUID', '') != ''
+        ? d.get('organizationUID', '') : d.get('organizationId', '');
+      let incomingCo = d.get('companyUID', '') != ''
+        ? d.get('companyUID', '') : d.get('companyId', '');
+      let isSa = r in [
+        'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+        'Super-Admin', 'SUPER_ADMIN'
+      ];
+      let isOa = r in [
+          'organization-admin', 'organization_admin', 'organizationadmin',
+          'organizationAdmin'
+        ]
+        && d.get('supervisorUid', '') == request.auth.uid
+        && org != '' && co != ''
+        && incomingOrg == org
+        && incomingCo == co;
+      let isCoStaff = r in [
+          'company-admin', 'company_admin', 'companyadmin', 'admin',
+          'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'human_resources'
+        ]
+        && d.get('supervisorUid', '') == request.auth.uid
+        && co != ''
+        && incomingCo == co;
+      return signedIn() && (isSa || isOa || isCoStaff)
+        && d.get('requestType', '') != 'update_national_id'
+        && d.get('actionType', '') != 'update_national_id'
+        && subscriptionPaymentCreateOk()
+        && requestOrganizationUIDsOk()
+        && requestPrimaryOrgBelongsToCompany();
+    }
+
+      // Subscription Phase 0: the company is the tenant for company staff
+      // (admin / supervisor / HR). They may read and list requests for any
+      // organization/chain under their companyUID. Org-admin stays org-scoped.
+      // Super-admin and technical support remain global. Cross-company denied.
+      // One users/{uid} read (budget).
     match /delegate_requests/{requestId} {
       allow read: if signedIn() && delegateRequestReadOk();
       // Docs-pending: requests are created by staff only (supervisor flow).
@@ -1928,16 +1985,7 @@ service cloud.firestore {
       // unchanged.
       // update_national_id requests are created only by submitNationalIdUpdate
       // (Admin SDK). Clients cannot mint them.
-      allow create: if (isSuperAdmin()
-        || orgAdminCreatesOwnScopedRequest()
-        || ((isCompanyAdmin() || isHR())
-          && request.resource.data.get('supervisorUid', '') == request.auth.uid
-          && incomingCompanyScoped()))
-        && request.resource.data.get('requestType', '') != 'update_national_id'
-        && request.resource.data.get('actionType', '') != 'update_national_id'
-        && subscriptionPaymentUntouched()
-        && requestOrganizationUIDsOk()
-        && requestPrimaryOrgBelongsToCompany();
+      allow create: if createDelegateRequestOk();
       // Self clause first: the staff role helpers are expensive and would
       // otherwise eat the 1000-expression budget before the docs checks.
       // update_national_id requests are immutable after create: clients
@@ -1960,8 +2008,8 @@ service cloud.firestore {
         // Only Admin SDK review/submit callables write review fields.
         && resource.data.get('requestType', '') != 'update_national_id'
         && resource.data.get('actionType', '') != 'update_national_id'
-        && requestOrganizationUIDsOk()
-        && requestPrimaryOrgBelongsToCompany()
+        && (!changedKeys().hasAny(['organizationUIDs', 'organizationUID', 'organizationId', 'companyUID', 'companyId'])
+          || (requestOrganizationUIDsOk() && requestPrimaryOrgBelongsToCompany()))
         && subscriptionPaymentUntouched();
       allow delete: if isSuperAdmin() || isOrgAdmin();
     }
