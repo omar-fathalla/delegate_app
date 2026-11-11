@@ -203,4 +203,92 @@ class SubscriptionCycleHelper {
         ? DateTime(year, 6, 30, 23, 59, 59)
         : DateTime(year, 12, 31, 23, 59, 59);
   }
+
+  // -------------------------------------------------------- advance renewal
+
+  /// Default length of the advance-renewal window (Cairo calendar days).
+  static const int defaultAdvanceRenewalDays = 30;
+
+  /// tashil-dev window so the ENV=dev app can be exercised before late December.
+  static const int devAdvanceRenewalDays = 60;
+
+  /// The period after [code] (or after the period of [date] when [code] is null).
+  static String nextCycleCode([DateTime? date, String? code]) {
+    final current = code ?? getCycleCode(date);
+    final m = RegExp(r'^(\d{4})_H([12])$').firstMatch(current);
+    if (m == null) {
+      final d = cairoTime(date);
+      return d.month <= 6 ? '${d.year}_H2' : '${d.year + 1}_H1';
+    }
+    final year = int.parse(m.group(1)!);
+    return m.group(2) == '1' ? '${year}_H2' : '${year + 1}_H1';
+  }
+
+  /// First day of [periodCode] as Cairo wall time. Throws on a bad code.
+  static DateTime getCycleStartDateForCode(String periodCode) {
+    final m = RegExp(r'^(\d{4})_H([12])$').firstMatch(periodCode.trim());
+    if (m == null) {
+      throw ArgumentError.value(periodCode, 'periodCode');
+    }
+    final year = int.parse(m.group(1)!);
+    return m.group(2) == '1' ? DateTime(year, 1, 1) : DateTime(year, 7, 1);
+  }
+
+  static DateTime getCycleEndDateForCode(String periodCode) {
+    final m = RegExp(r'^(\d{4})_H([12])$').firstMatch(periodCode.trim());
+    if (m == null) {
+      throw ArgumentError.value(periodCode, 'periodCode');
+    }
+    final year = int.parse(m.group(1)!);
+    return m.group(2) == '1'
+        ? DateTime(year, 6, 30, 23, 59, 59)
+        : DateTime(year, 12, 31, 23, 59, 59);
+  }
+
+  static String periodStartDayForCode(String periodCode) => _day(getCycleStartDateForCode(periodCode));
+  static String periodEndDayForCode(String periodCode) => _day(getCycleEndDateForCode(periodCode));
+
+  /// 00:00 Cairo on the first day of the last [days] calendar days of the
+  /// current period (the period end day is included).
+  static DateTime advanceWindowOpensAt(DateTime date, {int days = defaultAdvanceRenewalDays}) {
+    final safe = days < 1 ? defaultAdvanceRenewalDays : (days > 180 ? 180 : days);
+    final end = getCycleEndDate(date);
+    final openDay = DateTime(end.year, end.month, end.day).subtract(Duration(days: safe - 1));
+    return DateTime(openDay.year, openDay.month, openDay.day);
+  }
+
+  static bool isAdvanceRenewalOpen(
+    DateTime date, {
+    required bool enabled,
+    int days = defaultAdvanceRenewalDays,
+  }) {
+    if (!enabled) return false;
+    final cairo = cairoTime(date);
+    final opens = advanceWindowOpensAt(date, days: days);
+    final periodEndExclusive = getCycleEndDate(date).add(const Duration(seconds: 1));
+    return !cairo.isBefore(opens) && cairo.isBefore(periodEndExclusive);
+  }
+
+  /// Cycle a quote/request should target at [date]. Next period when the
+  /// advance window is open; otherwise the current period.
+  static String payableCycleCode(
+    DateTime date, {
+    required bool enabled,
+    int days = defaultAdvanceRenewalDays,
+  }) {
+    if (isAdvanceRenewalOpen(date, enabled: enabled, days: days)) {
+      return nextCycleCode(date);
+    }
+    return getCycleCode(date);
+  }
+
+  /// Fee for [periodCode] at [date]. A future period is quoted at its start
+  /// (full 500, not today's remaining months or today's free-promotion zero).
+  static double getFeeForPeriod(String periodCode, [DateTime? date, String? companyUID]) {
+    final current = getCycleCode(date);
+    if (periodCode == current) {
+      return getProratedSubscriptionFee(date, companyUID);
+    }
+    return getProratedSubscriptionFee(getCycleStartDateForCode(periodCode), companyUID);
+  }
 }

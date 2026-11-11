@@ -12,11 +12,14 @@ import {
   isFreePromotion,
   isRenewalCoverageExpired,
   parsePeriodCode,
+  parseAdvanceRenewalConfig,
   periodOf,
   quoteFor,
+  resolvePayablePeriod,
   toCents,
   requestCoversPeriod,
   MAX_DELEGATES_PER_RENEWAL,
+  type AdvanceRenewalConfig,
 } from "./subscription_logic";
 import {M1_SOURCE, M2_SOURCE, planExpiryHoldWrite} from "./subscription_holds";
 
@@ -119,6 +122,8 @@ export interface SuspensionResult {
   suspendedDocs: number;
   suspendedUsers: number;
   alreadySuspended: number;
+  /** Expiry holds removed because the uid is already covered for this period. */
+  clearedHolds?: number;
 }
 
 /**
@@ -178,6 +183,35 @@ export async function runSubscriptionSuspension(db: Db, now: Date): Promise<Susp
     }
     res.suspendedDocs++;
   }
+  // Prepaid / already-covered app-added uids: drop a leftover expiry hold
+  // (e.g. advance renewal paid in the previous period). Shadow mode still
+  // does not write status or users/{uid}.
+  let clearedHolds = 0;
+  const coveredList = [...covered];
+  for (const doc of await delegateDocsFor(db, coveredList)) {
+    const uid = str(doc.get("uid")) || doc.ref.id;
+    if (!appAdded.has(uid)) continue;
+    const planned = planExpiryHoldWrite({
+      data: (doc.data() || {}) as Data,
+      op: "remove",
+      at,
+      actor: "system",
+      source: M1_SOURCE,
+      periodCode: period.code,
+      mode,
+      inferLegacyExpiry: true,
+    });
+    if (!planned.ok || planned.unchanged) continue;
+    await writer.update(doc.ref, withWriteMeta({...planned.update}, ts));
+    if (planned.plan.history && Object.keys(planned.plan.history).length) {
+      await writer.set(doc.ref.collection("statusHistory").doc(), {
+        ...planned.plan.history,
+        writtenAt: ts,
+      });
+    }
+    clearedHolds++;
+  }
+  res.clearedHolds = clearedHolds;
   // users/{uid} is mirrored by the holds trigger once it is authoritative.
   // Shadow mode does not write it here.
   await writer.flush();
@@ -211,14 +245,16 @@ export async function quoteSubscriptionRequest(db: Db, requestId: string, at: Da
   if (status !== "pending" && status !== "failed") throw new QuoteError("not_payable");
   const type = str(data.requestType || REQUEST_TYPE_NEW);
   if (type !== REQUEST_TYPE_NEW && type !== REQUEST_TYPE_RENEWAL) throw new QuoteError("not_payable");
-  if (str(data.periodCode) !== periodOf(at).code) throw new QuoteError("period_mismatch");
+  const advanceCfg = await loadAdvanceRenewalConfig(db);
+  const payable = resolvePayablePeriod(at, str(data.periodCode), advanceCfg);
+  if (!payable) throw new QuoteError("period_mismatch");
   const uids = coveredUids(requestId, data);
   if (uids.length === 0) throw new QuoteError("no_delegates");
   if (uids.length > MAX_DELEGATES_PER_RENEWAL) throw new QuoteError("too_many_delegates");
   await assertCreatorScope(db, data);
   if (type === REQUEST_TYPE_RENEWAL) await assertRenewable(db, data, uids);
   const quoteOpts = await loadDevQuoteOptions(db, data);
-  const quote = quoteFor(uids, at, quoteOpts);
+  const quote = quoteFor(uids, at, {...quoteOpts, periodCode: payable.code});
   if (quote.amountCents <= 0) throw new QuoteError("free_period");
   await db.runTransaction(async (tx) => {
     await assertNotAlreadyCovered(tx, db, requestId, quote.periodCode, uids, at);
@@ -254,6 +290,11 @@ async function loadDevQuoteOptions(db: Db, data: Data): Promise<QuoteOptions> {
     opts.companyFreePeriodEnded = true;
   }
   return opts;
+}
+
+async function loadAdvanceRenewalConfig(db: Db): Promise<AdvanceRenewalConfig> {
+  const snap = await db.doc("config/subscriptions").get();
+  return parseAdvanceRenewalConfig(snap.exists ? (snap.data() as Record<string, unknown>) : null);
 }
 
 /**
@@ -696,7 +737,7 @@ export async function applyVerifiedSubscriptionPayment(db: Db, p: VerifiedPaymen
     return "paid";
   });
 
-  if (outcome === "paid") await applyPaidRequest(db, p.requestId);
+  if (outcome === "paid") await applyPaidRequest(db, p.requestId, p.paidAt);
   console.log(JSON.stringify({event: "subscription_payment", requestId: p.requestId, txId, outcome, rejectReason}));
   return outcome;
 }
@@ -707,14 +748,34 @@ export async function applyVerifiedSubscriptionPayment(db: Db, p: VerifiedPaymen
  * other holds stay). Shadow mode does not write status or statusReason.
  * Re-runnable: call it again for a request whose applyState is not "applied".
  */
-export async function applyPaidRequest(db: Db, requestId: string): Promise<number> {
+function resolveApplyAsOf(asOf: Date | undefined, data: Data): Date {
+  if (asOf instanceof Date && !Number.isNaN(asOf.getTime())) return asOf;
+  const raw = data.paidAt;
+  if (raw instanceof Timestamp) return raw.toDate();
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) return raw;
+  if (typeof raw === "string") {
+    const d = new Date(raw);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  if (raw && typeof raw === "object" && typeof (raw as {toDate?: unknown}).toDate === "function") {
+    const d = (raw as {toDate: () => Date}).toDate();
+    if (d instanceof Date && !Number.isNaN(d.getTime())) return d;
+  }
+  return new Date();
+}
+
+export async function applyPaidRequest(db: Db, requestId: string, asOf?: Date): Promise<number> {
   const reqRef = db.collection(REQUESTS).doc(requestId);
   const req = await reqRef.get();
   if (!req.exists || str(req.get("paymentStatus")) !== "paid") return 0;
   const data = req.data() as Data;
   const period = parsePeriodCode(data.periodCode);
   if (!period) return 0;
+  const now = resolveApplyAsOf(asOf, data);
   const isRenewal = str(data.requestType) === REQUEST_TYPE_RENEWAL;
+  // Only drop the expiry hold when the payment is for the current period.
+  // An advance payment for the next period must not reactivate early.
+  const clearsExpiryHold = isRenewal && period.code === periodOf(now).code;
   const uids = coveredUids(requestId, data);
   const fees = new Map<string, number>();
   if (Array.isArray(data.items)) {
@@ -733,14 +794,16 @@ export async function applyPaidRequest(db: Db, requestId: string): Promise<numbe
     registrationRequestId: isRenewal ? null : requestId,
     paidAt: data.paidAt ?? null,
   });
-  const at = new Date().toISOString();
+  const at = now.toISOString();
   const mode = process.env.HOLDS_AUTHORITY_MODE;
   for (const doc of await delegateDocsFor(db, uids)) {
     const uid = str(doc.get("uid")) || doc.ref.id;
     const update: Data = {subscription: subscriptionFor(uid)};
     // Renewal payment only: remove the expiry hold. Other holds stay.
-    // new_delegate payments never reactivate (V1).
-    if (isRenewal) {
+    // new_delegate payments never reactivate (V1). Future-period
+    // (advance) payments write coverage now and leave the hold until
+    // that period starts (M1 then clears it for covered uids).
+    if (clearsExpiryHold) {
       const planned = planExpiryHoldWrite({
         data: (doc.data() || {}) as Data,
         op: "remove",

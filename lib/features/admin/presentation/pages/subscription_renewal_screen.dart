@@ -14,10 +14,12 @@ import 'package:url_launcher/url_launcher.dart';
 /// «تجديد المناديب»: supervisors, company admins, HR, and org-admins
 /// (with a companyUID) may create a renewal (Phase 1 item 2).
 ///
-/// Lists his company's suspended (subscription expired) app-added delegates,
-/// lets him select any subset, and pays for the selection in ONE Paymob
-/// payment. Only delegates in a verified, paid renewal are reactivated (by
-/// the server). Selection/total logic lives in [RenewalSelection] and the
+/// Lists his company's renewable app-added delegates, lets him select any
+/// subset, and pays for the selection in ONE Paymob payment. During the
+/// advance-renewal window the list is next-period coverage (including
+/// currently active delegates); otherwise it is suspended-for-expiry only.
+/// Coverage is recorded by the server; an advance payment does not
+/// reactivate early. Selection/total logic lives in [RenewalSelection] and the
 /// write in [SubscriptionRenewalRepository], so a per-row "renew" button can
 /// reuse them later with `RenewalSelection.single(uid)`.
 class SubscriptionRenewalScreen extends StatefulWidget {
@@ -144,7 +146,7 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
       final changed = status != _activeStatus;
       setState(() => _activeStatus = status);
       if (changed && status == SubscriptionPaymentStatus.paid) {
-        AppSnackBar.showSuccess(context, 'تم تأكيد الدفع وإعادة تفعيل المناديب المحددين.');
+        AppSnackBar.showSuccess(context, 'تم تأكيد الدفع وتسجيل التغطية للمناديب المحددين.');
         _load();
       } else if (changed && status == SubscriptionPaymentStatus.failed) {
         AppSnackBar.showError(context, 'فشل الدفع، ولم يتم تفعيل أي مندوب. يمكنك المحاولة مرة أخرى.');
@@ -162,7 +164,10 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final now = _now;
-    final isFree = SubscriptionCycleHelper.isFreePromotionActive(now, widget.supervisor.companyUID);
+    final advance = _repo.isAdvanceRenewalOpen(now);
+    final targetPeriod = _repo.targetPeriodCode(now);
+    final isFree = !advance &&
+        SubscriptionCycleHelper.isFreePromotionActive(now, widget.supervisor.companyUID);
     final selectable = _delegates.where((d) => !d.isAwaitingPayment).toList();
     final allSelected = selectable.isNotEmpty && _selection.count == selectable.length;
 
@@ -181,7 +186,7 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
         ),
         body: Column(
           children: [
-            _PeriodBanner(now: now, isFree: isFree),
+            _PeriodBanner(now: now, isFree: isFree, advance: advance, periodCode: targetPeriod),
             if (_activeRequestId != null && _activeStatus != null)
               _PaymentStatusBanner(status: _activeStatus!),
             if (!_loading && _error == null && selectable.isNotEmpty)
@@ -202,7 +207,7 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
             Expanded(child: _buildList(cs)),
           ],
         ),
-        bottomNavigationBar: _buildBottomBar(cs, now, isFree),
+        bottomNavigationBar: _buildBottomBar(cs, now, isFree, targetPeriod),
       ),
     );
   }
@@ -218,10 +223,13 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
       );
     }
     if (_delegates.isEmpty) {
-      return const Center(
+      final empty = _repo.isAdvanceRenewalOpen(_now)
+          ? 'لا يوجد مناديب بحاجة لتجديد مقدَّم لهذه الدورة حالياً.'
+          : 'لا يوجد مناديب موقوفون بانتهاء الاشتراك حالياً.';
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text('لا يوجد مناديب موقوفون بانتهاء الاشتراك حالياً.', textAlign: TextAlign.center),
+          padding: const EdgeInsets.all(24),
+          child: Text(empty, textAlign: TextAlign.center),
         ),
       );
     }
@@ -277,10 +285,11 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
     );
   }
 
-  Widget? _buildBottomBar(ColorScheme cs, DateTime now, bool isFree) {
+  Widget? _buildBottomBar(ColorScheme cs, DateTime now, bool isFree, String targetPeriod) {
     if (_loading || _delegates.isEmpty) return null;
-    final fee = _selection.feePerDelegate(now);
-    final total = _selection.total(now);
+    final period = _repo.isAdvanceRenewalOpen(now) ? targetPeriod : null;
+    final fee = _selection.feePerDelegate(now, widget.supervisor.companyUID, period);
+    final total = _selection.total(now, widget.supervisor.companyUID, period);
     final canPay = !_submitting && !isFree && !_selection.isEmpty;
     return SafeArea(
       child: Container(
@@ -328,17 +337,34 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
 class _PeriodBanner extends StatelessWidget {
   final DateTime now;
   final bool isFree;
-  const _PeriodBanner({required this.now, required this.isFree});
+  final bool advance;
+  final String periodCode;
+  const _PeriodBanner({
+    required this.now,
+    required this.isFree,
+    required this.advance,
+    required this.periodCode,
+  });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final months = SubscriptionCycleHelper.getRemainingMonthsInCycle(now);
-    final text = isFree
-        ? 'الاشتراك مجاني حتى 31/12/2026، لا حاجة للتجديد الآن.'
-        : '${SubscriptionCycleHelper.getCycleTitleArabic(now)} • متبقٍ $months ${months == 1 ? 'شهر' : 'أشهر'}. '
-            'الحد الأقصى ${SubscriptionCycleHelper.maxDelegatesPerRenewal} مندوباً في طلب واحد. '
-            'يمكنك تجديد بعض المناديب الآن والباقي لاحقاً.';
+    final String text;
+    if (advance) {
+      final title = SubscriptionCycleHelper.getCycleTitleArabic(
+        SubscriptionCycleHelper.getCycleStartDateForCode(periodCode),
+      );
+      text = 'التجديد المقدَّم مفتوح ل$title. الرسوم كاملة للدورة التالية، '
+          'ولا تُطبَّق مجانية 2026 على تلك الدورة. '
+          'الحد الأقصى ${SubscriptionCycleHelper.maxDelegatesPerRenewal} مندوباً في طلب واحد.';
+    } else if (isFree) {
+      text = 'الاشتراك مجاني حتى 31/12/2026، لا حاجة للتجديد الآن.';
+    } else {
+      text = '${SubscriptionCycleHelper.getCycleTitleArabic(now)} • متبقٍ $months ${months == 1 ? 'شهر' : 'أشهر'}. '
+          'الحد الأقصى ${SubscriptionCycleHelper.maxDelegatesPerRenewal} مندوباً في طلب واحد. '
+          'يمكنك تجديد بعض المناديب الآن والباقي لاحقاً.';
+    }
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.all(12),
@@ -361,7 +387,7 @@ class _PaymentStatusBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final (icon, color, text) = switch (status) {
-      SubscriptionPaymentStatus.paid => (Icons.check_circle_rounded, cs.primary, 'تم الدفع وتفعيل المناديب المحددين.'),
+      SubscriptionPaymentStatus.paid => (Icons.check_circle_rounded, cs.primary, 'تم الدفع وتسجيل التغطية للمناديب المحددين.'),
       SubscriptionPaymentStatus.failed => (Icons.error_rounded, cs.error, 'فشل الدفع، ولم يتم تفعيل أي مندوب.'),
       SubscriptionPaymentStatus.expired => (Icons.timer_off_rounded, Colors.orange.shade800, 'انتهت صلاحية عرض السعر. يمكن إنشاء طلب تجديد جديد.'),
       _ => (Icons.hourglass_top_rounded, cs.tertiary, 'طلب التجديد بانتظار تأكيد الدفع من Paymob.'),

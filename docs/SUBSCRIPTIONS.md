@@ -79,6 +79,10 @@ request and are never suspended.
   logged to `subscription_suspension_runs/{period}_{date}`. Never touches docs already
   suspended for another reason.
 - `quoteSubscriptionRequest(db, requestId, at)` → authoritative `amountCents`.
+  The request's `periodCode` must be the current period, or the next period
+  when advance renewal is open (see below). A future-period quote is computed
+  at that period's start (full 500 EGP, not today's remaining months, and not
+  zeroed by a free promotion that only covers today).
   Also checks the creator (`users/{supervisorUid}`): org and a non-empty company
   must match the request (super-admin is exempt). A uid already on another
   pending or paid renewal for the same period is rejected with `already_covered`
@@ -98,9 +102,30 @@ request and are never suspended.
   renewal can proceed without waiting for the job.
 - `applyVerifiedSubscriptionPayment(db, payment)` → idempotent per Paymob transaction
   (`subscription_payment_events/{txId}`); on success marks the request paid and, for a
-  renewal, reactivates only `coveredDelegateUids` that were suspended for expiry. On
-  failure or amount/period mismatch nobody is activated. The same coverage check
-  runs so a uid cannot be charged twice.
+  current-period renewal, removes the expiry hold on `coveredDelegateUids` that were
+  suspended for expiry. An advance payment for a future period writes coverage now
+  and leaves the expiry hold in place (paying in November for January must not
+  reactivate early). On failure or amount/period mismatch nobody is activated.
+  The same coverage check runs so a uid cannot be charged twice.
+
+## Advance renewal (`advanceRenewalEnabled`)
+
+Off by default. `config/subscriptions` may set `advanceRenewalEnabled: true` and
+`advanceRenewalDays` (default 30, max 180). When the flag is on, quotes for the
+*next* period are accepted in the last N Cairo calendar days of the current
+period (the period end day is included; the window closes at the period end).
+The current period remains payable at any time.
+
+`applyPaidRequest` only drops `subscription_expired` when the paid period is
+the current one. When that future period starts, M1 skips uids already covered
+by a paid/waived request and also removes a leftover expiry hold on those
+app-added docs. In shadow mode this is a holds-only write (no status / no
+`users/{uid}`).
+
+The production app keeps the advance UI off (`advanceRenewalEnabled` is not
+readable by clients). An `ENV=dev` build treats the window as enabled with
+`advanceRenewalDays: 60` so tashil-dev testers can use it before late December.
+This does not flip `HOLDS_AUTHORITY_MODE` and does not change who may suspend.
 
 Org-admin create rules require `incomingOrgScoped()` and `incomingCompanyScoped()`
 (cross-org create is denied; an org-admin with no companyUID cannot create). The

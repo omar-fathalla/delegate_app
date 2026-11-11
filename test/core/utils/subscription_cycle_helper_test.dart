@@ -213,5 +213,80 @@ void main() {
         isTrue,
       );
     });
+
+    test('nextCycleCode walks H1 to H2 and H2 to the next year', () {
+      expect(SubscriptionCycleHelper.nextCycleCode(DateTime(2026, 11, 11)), '2027_H1');
+      expect(SubscriptionCycleHelper.nextCycleCode(DateTime(2027, 3, 1)), '2027_H2');
+      expect(SubscriptionCycleHelper.nextCycleCode(null, '2026_H2'), '2027_H1');
+    });
+
+    test('advance window is closed when the flag is off', () {
+      expect(
+        SubscriptionCycleHelper.isAdvanceRenewalOpen(DateTime(2026, 12, 15), enabled: false, days: 30),
+        isFalse,
+      );
+      expect(
+        SubscriptionCycleHelper.payableCycleCode(DateTime(2026, 12, 15), enabled: false, days: 30),
+        '2026_H2',
+      );
+    });
+
+    test('30-day window opens on 2 Dec and closes at the period end', () {
+      expect(
+        SubscriptionCycleHelper.advanceWindowOpensAt(DateTime(2026, 11, 11), days: 30),
+        DateTime(2026, 12, 2),
+      );
+      expect(
+        SubscriptionCycleHelper.isAdvanceRenewalOpen(DateTime(2026, 12, 1), enabled: true, days: 30),
+        isFalse,
+      );
+      expect(
+        SubscriptionCycleHelper.isAdvanceRenewalOpen(DateTime(2026, 12, 2), enabled: true, days: 30),
+        isTrue,
+      );
+      expect(
+        SubscriptionCycleHelper.isAdvanceRenewalOpen(DateTime(2026, 12, 31, 23, 59, 59), enabled: true, days: 30),
+        isTrue,
+      );
+      expect(
+        SubscriptionCycleHelper.isAdvanceRenewalOpen(DateTime(2027, 1, 1), enabled: true, days: 30),
+        isFalse,
+      );
+    });
+
+    test('60-day tashil-dev window is already open in mid-November 2026', () {
+      expect(
+        SubscriptionCycleHelper.advanceWindowOpensAt(DateTime(2026, 11, 11), days: 60),
+        DateTime(2026, 11, 2),
+      );
+      expect(
+        SubscriptionCycleHelper.isAdvanceRenewalOpen(DateTime(2026, 11, 11), enabled: true, days: 60),
+        isTrue,
+      );
+      expect(
+        SubscriptionCycleHelper.payableCycleCode(DateTime(2026, 11, 11), enabled: true, days: 60),
+        '2027_H1',
+      );
+      // February is not in the last 60 days of H1 (window opens ~3 May).
+      expect(
+        SubscriptionCycleHelper.isAdvanceRenewalOpen(DateTime(2027, 2, 10), enabled: true, days: 60),
+        isFalse,
+      );
+    });
+
+    test('a future period is quoted at its start, not zeroed by today\'s free promotion', () {
+      expect(
+        SubscriptionCycleHelper.getFeeForPeriod('2027_H1', DateTime(2026, 12, 15)),
+        500.0,
+      );
+      expect(
+        SubscriptionCycleHelper.getFeeForPeriod('2026_H2', DateTime(2026, 12, 15)),
+        0.0,
+      );
+      expect(
+        SubscriptionCycleHelper.getFeeForPeriod('2027_H1', DateTime(2027, 3, 1)),
+        333.33,
+      );
+    });
   });
 }
