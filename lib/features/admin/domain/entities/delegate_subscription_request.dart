@@ -54,11 +54,11 @@ extension SubscriptionPaymentMethodX on SubscriptionPaymentMethod {
   }
 }
 
-enum SubscriptionRequestStatus { pending, approved, rejected }
+enum SubscriptionRequestStatus { pending, approved, rejected, cancelled, expired }
 
 /// Payment state of a request. Only the server (verified Paymob webhook)
 /// may set [paid]; firestore.rules deny it from clients.
-enum SubscriptionPaymentStatus { pending, paid, failed, waived, notRequired }
+enum SubscriptionPaymentStatus { pending, paid, failed, waived, notRequired, expired }
 
 extension SubscriptionPaymentStatusX on SubscriptionPaymentStatus {
   String get wire => switch (this) {
@@ -67,6 +67,7 @@ extension SubscriptionPaymentStatusX on SubscriptionPaymentStatus {
         SubscriptionPaymentStatus.failed => 'failed',
         SubscriptionPaymentStatus.waived => 'waived',
         SubscriptionPaymentStatus.notRequired => 'not_required',
+        SubscriptionPaymentStatus.expired => 'expired',
       };
 
   String get arabicLabel => switch (this) {
@@ -75,6 +76,7 @@ extension SubscriptionPaymentStatusX on SubscriptionPaymentStatus {
         SubscriptionPaymentStatus.failed => 'فشل الدفع',
         SubscriptionPaymentStatus.waived => 'مجاني (عرض 2026)',
         SubscriptionPaymentStatus.notRequired => 'بدون رسوم',
+        SubscriptionPaymentStatus.expired => 'منتهية',
       };
 
   static SubscriptionPaymentStatus parse(dynamic v, {SubscriptionPaymentStatus fallback = SubscriptionPaymentStatus.pending}) {
@@ -89,6 +91,8 @@ extension SubscriptionPaymentStatusX on SubscriptionPaymentStatus {
         return SubscriptionPaymentStatus.notRequired;
       case 'pending':
         return SubscriptionPaymentStatus.pending;
+      case 'expired':
+        return SubscriptionPaymentStatus.expired;
       default:
         return fallback;
     }
@@ -283,6 +287,8 @@ class DelegateSubscriptionRequest extends Equatable {
     SubscriptionRequestStatus parseStatus(dynamic val) {
       if (val == 'approved') return SubscriptionRequestStatus.approved;
       if (val == 'rejected') return SubscriptionRequestStatus.rejected;
+      if (val == 'cancelled') return SubscriptionRequestStatus.cancelled;
+      if (val == 'expired') return SubscriptionRequestStatus.expired;
       // action_required is still an open request; show it with the pending queue.
       return SubscriptionRequestStatus.pending;
     }

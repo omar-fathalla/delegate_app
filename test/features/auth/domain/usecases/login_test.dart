@@ -435,5 +435,20 @@ void main() {
         expect((f as AuthFailure).message, 'رقم الهاتف أو كلمة المرور غير صحيحة');
       }, (_) => fail('left'));
     });
+
+    test('auto mode falls through to staff when national ID length is invalid', () async {
+      mockAuthRepository.loginDelegateStub = (_, _) async => const Left(
+        AuthFailure('يجب أن يتكون الرقم القومي من 14 رقمًا', 'invalid_national_id'),
+      );
+      mockAuthRepository.getDelegatesByPhoneStub = (_) async => const Right([]);
+      final result = await usecase(const LoginParams(
+        phoneNumber: tMobile, password: 'Short1', mode: LoginMode.auto));
+      expect(mockAuthRepository.loginDelegateCallCount, 1);
+      expect(mockAuthRepository.getDelegatesByPhoneCallCount, 1);
+      result.fold((f) {
+        expect(f, isA<AuthFailure>());
+        expect((f as AuthFailure).code, 'invalid_credentials');
+      }, (_) => fail('staff path should run after invalid_national_id'));
+    });
   });
 }

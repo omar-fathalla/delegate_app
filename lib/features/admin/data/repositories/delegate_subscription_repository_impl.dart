@@ -12,6 +12,7 @@ import 'package:delegate_app/features/admin/domain/repositories/delegate_subscri
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
 import 'package:flutter/foundation.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 
 class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionRepository {
   final FirebaseFirestore _firestore;
@@ -454,6 +455,8 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
     File? receiptImage,
     double? fee,
     int? remainingMonths,
+    List<String> organizationUIDs = const [],
+    List<String> organizationNames = const [],
   }) async {
     try {
       if (existingDelegate.companyUID.trim() != companyUID.trim()) {
@@ -480,6 +483,23 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
           .get();
       if (alreadyOnTarget.exists) {
         return const Left(ServerFailure('المندوب مربوط بهذه السلسلة بالفعل.'));
+      }
+      final extraOrgs = [
+        for (final id in organizationUIDs)
+          if (id.trim().isNotEmpty && id.trim() != targetOrganizationUID.trim()) id.trim(),
+      ];
+      for (final orgId in extraOrgs) {
+        final already = await _firestore
+            .collection('organizations')
+            .doc(orgId)
+            .collection('companies')
+            .doc(companyUID)
+            .collection('delegates')
+            .doc(existingDelegate.uid)
+            .get();
+        if (already.exists) {
+          return const Left(ServerFailure('المندوب مربوط بهذه السلسلة بالفعل.'));
+        }
       }
 
       final docRef = _firestore.collection('delegate_requests').doc();
@@ -528,6 +548,12 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         companyName: companyName,
         organizationUID: targetOrganizationUID,
         organizationName: targetOrganizationName,
+        organizationUIDs: organizationUIDs.isNotEmpty
+            ? organizationUIDs
+            : [targetOrganizationUID],
+        organizationNames: organizationNames.isNotEmpty
+            ? organizationNames
+            : [targetOrganizationName],
         firstName: existingDelegate.firstName,
         secondName: existingDelegate.middleName,
         thirdName: existingDelegate.lastName,
@@ -603,6 +629,38 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
   }
 
   @override
+
+  @override
+  Future<Either<Failure, Delegate>> loadCompanyDelegate({
+    required String companyUID,
+    required String organizationUID,
+    required String uid,
+  }) async {
+    try {
+      final col = _firestore
+          .collection('organizations')
+          .doc(organizationUID)
+          .collection('companies')
+          .doc(companyUID)
+          .collection('delegates');
+      var snap = await col.doc(uid).get();
+      if (!snap.exists) {
+        final q = await col.where('uid', isEqualTo: uid).limit(1).get();
+        if (q.docs.isNotEmpty) snap = q.docs.first;
+      }
+      if (!snap.exists) {
+        return const Left(ServerFailure('تعذر العثور على المندوب المسجل. لن يتم إنشاء هوية جديدة.'));
+      }
+      final data = snap.data() ?? <String, dynamic>{};
+      if ((data['companyUID'] ?? companyUID).toString().trim() != companyUID.trim()) {
+        return const Left(ServerFailure('لا يمكن ربط مندوب من شركة أخرى. الاشتراك واحد داخل الشركة نفسها.'));
+      }
+      return Right(DelegateModel.fromJson({...data, 'uid': data['uid'] ?? snap.id}, (data['uid'] ?? snap.id).toString()));
+    } catch (e) {
+      return Left(ServerFailure('تعذر التحقق من المندوب المسجل. أعد المحاولة.'));
+    }
+  }
+
   Future<Either<Failure, String>> submitDeleteDelegateRequest({
     required String supervisorUid,
     required String supervisorName,

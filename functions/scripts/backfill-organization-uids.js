@@ -6,6 +6,8 @@
  *
  *   node scripts/backfill-organization-uids.js --project tashil-dev --rollback /tmp/org-uids-rollback.json
  *   node scripts/backfill-organization-uids.js --project tashil-dev --apply --rollback /tmp/org-uids-rollback.json
+ *   node scripts/backfill-organization-uids.js --project tashil-dev --restore /tmp/org-uids-rollback.json
+ *   node scripts/backfill-organization-uids.js --project tashil-dev --apply --restore /tmp/org-uids-rollback.json
  *
  * tashil-dev only unless a later written go passes --allow-prod-project.
  * Does not deploy anything. Counts only in stdout; no personal data.
@@ -39,6 +41,65 @@ function previousOf(data) {
     organizationNames: Object.prototype.hasOwnProperty.call(data, "organizationNames")
       ? data.organizationNames : null,
   };
+}
+
+/** Build the write that puts a doc back to its pre-backfill fields. */
+function planRestore(previous) {
+  const admin = require("firebase-admin");
+  const patch = {};
+  if (!previous || previous.organizationUIDs === null || previous.organizationUIDs === undefined) {
+    patch.organizationUIDs = admin.firestore.FieldValue.delete();
+  } else {
+    patch.organizationUIDs = previous.organizationUIDs;
+  }
+  if (!previous || previous.organizationNames === null || previous.organizationNames === undefined) {
+    patch.organizationNames = admin.firestore.FieldValue.delete();
+  } else {
+    patch.organizationNames = previous.organizationNames;
+  }
+  return patch;
+}
+
+function isDeleteSentinel(value) {
+  return value && typeof value === "object" && value.isEqual &&
+    value.isEqual(require("firebase-admin").firestore.FieldValue.delete());
+}
+
+async function restore(db, args) {
+  const restorePath = args.restore;
+  if (!restorePath) throw new Error("--restore requires a rollback JSON file");
+  const raw = JSON.parse(fs.readFileSync(restorePath, "utf8"));
+  if (raw.project && raw.project !== args.project) {
+    throw new Error(`rollback file project ${raw.project} does not match --project ${args.project}`);
+  }
+  const entries = Array.isArray(raw.entries) ? raw.entries : [];
+  const planned = entries
+    .filter((e) => e && typeof e.path === "string" && e.path.startsWith("delegate_requests/"))
+    .map((e) => ({path: e.path, id: e.path.split("/")[1], patch: planRestore(e.previous), previous: e.previous}));
+
+  const runId = `org-uids-restore-${new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z")}`;
+  const report = {
+    project: args.project,
+    mode: args.apply ? "restore-apply" : "restore-dry-run",
+    runId,
+    at: new Date().toISOString(),
+    rollbackFile: restorePath,
+    counts: {docs: planned.length, planned: planned.length, skipped: 0, written: 0},
+  };
+  if (!args.apply) return report;
+
+  let written = 0;
+  for (let i = 0; i < planned.length; i += 400) {
+    const batch = db.batch();
+    const slice = planned.slice(i, i + 400);
+    for (const p of slice) {
+      batch.update(db.doc(p.path), p.patch);
+    }
+    await batch.commit();
+    written += slice.length;
+  }
+  report.counts.written = written;
+  return report;
 }
 
 async function run(db, args) {
@@ -99,11 +160,14 @@ async function main() {
   const project = assertTarget(parsed);
   parsed.project = project;
   parsed.rollback = "";
+  parsed.restore = "";
   const rest = parsed.rest || [];
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (a === "--rollback") parsed.rollback = rest[++i] || "";
     else if (a.startsWith("--rollback=")) parsed.rollback = a.slice(11);
+    else if (a === "--restore") parsed.restore = rest[++i] || "";
+    else if (a.startsWith("--restore=")) parsed.restore = a.slice(10);
     else if (a === "--help" || a === "-h") {
       console.log("See file header for usage.");
       process.exit(0);
@@ -121,7 +185,9 @@ async function main() {
         : undefined,
     });
   }
-  const report = await run(admin.firestore(), parsed);
+  const report = parsed.restore
+    ? await restore(admin.firestore(), parsed)
+    : await run(admin.firestore(), parsed);
   const reportPath = path.join(
     "/tmp",
     `organization-uids-report-${report.runId}.json`,
@@ -139,4 +205,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = {planPatch, previousOf, run};
+module.exports = {planPatch, previousOf, planRestore, restore, run};

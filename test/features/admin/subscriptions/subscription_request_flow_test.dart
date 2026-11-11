@@ -280,4 +280,81 @@ void main() {
     expect((await db.doc('delegate_requests/add2').get()).data()!['status'], 'pending');
     expect((await db.doc('organizations/o2/companies/c1/delegates/$uid').get()).exists, isFalse);
   });
+
+  test('partial-duplicate remaining chains attach to the existing uid with no new fee', () async {
+    final db = FakeFirebaseFirestore();
+    final repo = DelegateSubscriptionRepositoryImpl(firestore: db, storage: _MockStorage());
+    const uid = 'd-exist';
+    await db.doc('organizations/o1/companies/c1/delegates/$uid').set({
+      'uid': uid,
+      'status': 'active',
+      'companyUID': 'c1',
+      'organizationUID': 'o1',
+      'organizationName': 'O1',
+      'fullName': 'Existing Delegate',
+      'firstName': 'Existing',
+      'nationalId': '20000000000099',
+      'nationalityID': '20000000000099',
+      'phoneNumber': '01000000099',
+      'subscription': {
+        'periodCode': '2027_H1',
+        'periodStart': '2027-01-01',
+        'periodEnd': '2027-06-30',
+        'amountDue': 416.67,
+        'paymentStatus': 'paid',
+        'renewalRequestId': 'ren-exist',
+      },
+    });
+
+    final loaded = await repo.loadCompanyDelegate(
+      companyUID: 'c1',
+      organizationUID: 'o1',
+      uid: uid,
+    );
+    final existing = loaded.getOrElse(() => throw StateError('missing delegate'));
+    expect(existing.uid, uid);
+    expect(existing.status, DelegateStatus.active);
+
+    final submitted = await repo.submitAddOrganizationRequest(
+      supervisorUid: 'sup1',
+      supervisorName: 'S',
+      supervisorPhone: '',
+      companyUID: 'c1',
+      companyName: 'C',
+      targetOrganizationUID: 'o2',
+      targetOrganizationName: 'O2',
+      organizationUIDs: const ['o2', 'o3'],
+      organizationNames: const ['O2', 'O3'],
+      existingDelegate: existing,
+      paymentMethod: SubscriptionPaymentMethod.paymob,
+      fee: 500,
+      remainingMonths: 5,
+    );
+    expect(submitted.isRight(), isTrue);
+    final requestId = submitted.getOrElse(() => '');
+    final written = (await db.doc('delegate_requests/$requestId').get()).data()!;
+    expect(written['requestType'], kRequestTypeAddOrganization);
+    expect(written['existingDelegateUid'], uid);
+    expect(written['fee'], 0.0);
+    expect(written['amountDue'], 0.0);
+    expect(written['paymentStatus'], 'not_required');
+    expect(written['organizationUIDs'], ['o2', 'o3']);
+    expect(written['id'] ?? requestId, isNot(uid));
+
+    final add = DelegateSubscriptionRequest.fromMap(written, requestId);
+    final approved = await repo.approveSubscriptionRequest(
+      request: add,
+      reviewerUid: 'sa',
+      reviewerName: 'SA',
+    );
+    expect(approved.isRight(), isTrue);
+    for (final org in ['o2', 'o3']) {
+      final created = (await db.doc('organizations/$org/companies/c1/delegates/$uid').get()).data()!;
+      expect(created['uid'], uid);
+      expect(created['status'], 'active');
+      expect(created['subscription']['paymentStatus'], 'paid');
+      expect(created['subscription']['renewalRequestId'], 'ren-exist');
+      expect(created['subscription']['amountDue'], 416.67);
+    }
+  });
 }

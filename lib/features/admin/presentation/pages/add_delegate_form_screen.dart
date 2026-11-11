@@ -167,14 +167,21 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
       return;
     }
 
-    final duplicates = await findDuplicateChainUids(
-      firestore: FirebaseFirestore.instance,
-      companyUID: widget.supervisor.companyUID,
-      nationalId: _nationalIdController.text.trim(),
-      phoneNumber: _phoneController.text.trim(),
-      organizationUIDs: _selectedOrgUIDs,
-    );
+    late final DuplicateChainLookup lookup;
+    try {
+      lookup = await lookupDuplicateChains(
+        firestore: FirebaseFirestore.instance,
+        companyUID: widget.supervisor.companyUID,
+        nationalId: _nationalIdController.text.trim(),
+        phoneNumber: _phoneController.text.trim(),
+        organizationUIDs: _selectedOrgUIDs,
+      );
+    } on DuplicateChainLookupException catch (e) {
+      AppSnackBar.showError(context, e.message);
+      return;
+    }
     if (!mounted) return;
+    final duplicates = lookup.duplicateOrgUids;
     final selection = partitionSelectedChains(
       all: chainOptions,
       selectedUids: _selectedOrgUIDs,
@@ -197,6 +204,82 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
     final selectedOrgUID = selection.primaryUid!;
     final selectedOrgName = selection.primaryName!;
 
+    // Partial duplicate: attach remaining chains to the existing uid, no new fee.
+    if (selection.skippedUids.isNotEmpty &&
+        lookup.existingDelegateUid != null &&
+        lookup.existingDelegateUid!.trim().isNotEmpty &&
+        selection.keptUids.isNotEmpty) {
+      setState(() => _isSubmitting = true);
+      final repo = sl<DelegateSubscriptionRepository>();
+      final existing = await repo.loadCompanyDelegate(
+        companyUID: widget.supervisor.companyUID,
+        organizationUID: lookup.existingDelegateOrganizationUID ?? selection.skippedUids.first,
+        uid: lookup.existingDelegateUid!,
+      );
+      if (!mounted) return;
+      final loaded = existing.fold<Delegate?>(
+        (f) {
+          setState(() => _isSubmitting = false);
+          AppSnackBar.showError(context, f.message);
+          return null;
+        },
+        (d) => d,
+      );
+      if (loaded == null) return;
+      final result = await repo.submitAddOrganizationRequest(
+        supervisorUid: widget.supervisor.uid,
+        supervisorName: widget.supervisor.fullName,
+        supervisorPhone: widget.supervisor.phoneNumber,
+        companyUID: widget.supervisor.companyUID,
+        companyName: widget.supervisor.companyName,
+        targetOrganizationUID: selectedOrgUID,
+        targetOrganizationName: selectedOrgName,
+        organizationUIDs: selection.keptUids,
+        organizationNames: selection.keptNames,
+        existingDelegate: loaded,
+        paymentMethod: SubscriptionPaymentMethod.notRequired,
+      );
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      await result.fold(
+        (failure) async {
+          AppSnackBar.showError(context, failure.message);
+        },
+        (requestId) async {
+          AppSnackBar.showSuccess(
+            context,
+            'تم إرسال طلب ربط المندوب الحالي بالسلاسل المتبقية بدون رسوم إضافية. بانتظار اعتماد الإدارة.',
+          );
+          final goToApprovals = await showDialog<bool>(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              title: Row(
+                children: [
+                  Icon(Icons.check_circle_rounded, color: Theme.of(ctx).colorScheme.primary, size: 26),
+                  const SizedBox(width: 10),
+                  const Text('تم إرسال الطلب بنجاح', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                ],
+              ),
+              content: const Text('سيتم ربط المندوب الحالي بالسلاسل المتبقية بدون إنشاء هوية أو رسم جديد.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: const Text('حسناً'),
+                ),
+              ],
+            ),
+          );
+          if (!mounted) return;
+          if (goToApprovals == true) {
+            // left for consistency with the new-delegate path; default is just close.
+          }
+          if (mounted) Navigator.of(context).pop();
+        },
+      );
+      return;
+    }
     if (_profileImage == null) {
       AppSnackBar.showError(context, 'يرجى رفع الصورة الشخصية للمندوب.');
       return;

@@ -1390,6 +1390,18 @@ class _SuperAdminSubscriptionFinancialReportScreenState
           colorScheme.error,
           colorScheme.errorContainer.withValues(alpha: 0.4),
         ),
+      SubscriptionRequestStatus.cancelled => (
+          'ملغى',
+          Icons.block_rounded,
+          Colors.grey.shade700,
+          Colors.grey.withValues(alpha: 0.14),
+        ),
+      SubscriptionRequestStatus.expired => (
+          'منتهٍ',
+          Icons.timer_off_rounded,
+          Colors.orange.shade800,
+          Colors.orange.withValues(alpha: 0.14),
+        ),
     };
 
     return Container(
@@ -1516,6 +1528,8 @@ class _SuperAdminSubscriptionFinancialReportScreenState
           SubscriptionRequestStatus.approved => 'معتمد',
           SubscriptionRequestStatus.pending => 'قيد الانتظار',
           SubscriptionRequestStatus.rejected => 'مرفوض',
+          SubscriptionRequestStatus.cancelled => 'ملغى',
+          SubscriptionRequestStatus.expired => 'منتهٍ',
         };
 
         buffer.writeln(

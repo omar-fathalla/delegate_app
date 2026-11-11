@@ -31,6 +31,9 @@ describe("delegate_requests: payment is server-only", () => {
       await db.doc("users/sa").set({role: "super-admin"});
       await db.doc("users/tech").set({role: "technical_support"});
       await db.doc("users/d1").set({role: "delegate", organizationUID: "o1", companyUID: "c1", uid: "d1"});
+      await db.doc("organizations/o1/companies/c1").set({companyUID: "c1"});
+      await db.doc("organizations/o2/companies/c2").set({companyUID: "c2"});
+      await db.doc("organizations/o3/companies/c1").set({companyUID: "c1"});
       await db.doc("delegate_requests/pending").set({
         requestType: "renewal", status: "pending", paymentStatus: "pending",
         coveredDelegateUids: ["a"], amountDue: 416.67, periodCode: "2027_H1",
@@ -295,6 +298,34 @@ describe("delegate_requests: payment is server-only", () => {
     // Only super-admin / technical support may approve or reject.
     await assertSucceeds(as("sa").doc("delegate_requests/legacy").update({status: "approved", reviewedBy: "SA"}));
     await assertSucceeds(as("tech").doc("delegate_requests/nid-c1").update({status: "rejected", rejectionReason: "r"}));
+  });
+
+  test("company staff cannot cancel a paid renewal or write quotedAt", async () => {
+    await assertFails(as("sup").doc("delegate_requests/paid").update({status: "cancelled"}));
+    await assertFails(as("hr1").doc("delegate_requests/paid").update({status: "cancelled"}));
+    await assertFails(as("oa1").doc("delegate_requests/paid").update({status: "cancelled"}));
+    await assertFails(as("sa").doc("delegate_requests/paid").update({status: "cancelled"}));
+    await assertFails(as("sup").doc("delegate_requests/pending").update({quotedAt: "2027-04-01T00:00:00Z"}));
+    await assertFails(as("sa").doc("delegate_requests/pending").update({quotedAt: "2027-04-01T00:00:00Z"}));
+  });
+
+  test("organizationUIDs is capped after create and the primary chain must belong to the company", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("delegate_requests/multi").set({
+        requestType: "new_delegate", status: "pending",
+        organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
+        organizationUIDs: ["o1", "o3"],
+      });
+    });
+    const twelve = Array.from({length: 12}, (_, i) => i === 0 ? "o1" : `ox${i}`);
+    await assertFails(as("sup").doc("delegate_requests/multi").update({organizationUIDs: twelve}));
+    await assertFails(as("sa").doc("delegate_requests/multi").update({organizationUIDs: twelve}));
+    await assertSucceeds(as("sa").doc("delegate_requests/multi").update({organizationUIDs: ["o1"]}));
+    await assertFails(as("sa").doc("delegate_requests/no-such-chain").set({
+      requestType: "new_delegate", status: "pending", supervisorUid: "sa",
+      organizationUID: "missing-org", companyUID: "c1",
+      organizationUIDs: ["missing-org"],
+    }));
   });
 
 });

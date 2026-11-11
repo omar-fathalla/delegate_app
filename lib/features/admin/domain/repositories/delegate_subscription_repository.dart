@@ -47,6 +47,16 @@ abstract class DelegateSubscriptionRepository {
     File? receiptImage,
     double? fee,
     int? remainingMonths,
+    List<String> organizationUIDs = const [],
+    List<String> organizationNames = const [],
+  });
+
+  /// Loads a live company delegate so remaining chains can be attached
+  /// to the existing identity (no new fee, no new uid).
+  Future<Either<Failure, Delegate>> loadCompanyDelegate({
+    required String companyUID,
+    required String organizationUID,
+    required String uid,
   });
 
   /// Submits a request by a company supervisor to delete a non-Fathalla delegate

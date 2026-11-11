@@ -24,7 +24,13 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
     // Only a credential miss falls through to staff. Pending, blocked,
     // rate-limited, and outages stay on the delegate path.
     return delegateResult.fold((failure) async {
-      if (failure is! DelegateCredentialsFailure) return Left(failure);
+      // invalid_national_id is raised when the "national ID" is shorter
+      // than 6 or longer than 20 characters (a staff password). Fall
+      // through to staff in auto mode so HR login is not blocked.
+      final isIdFormat = failure is AuthFailure && failure.code == 'invalid_national_id';
+      if (failure is! DelegateCredentialsFailure && !isIdFormat) {
+        return Left(failure);
+      }
       if (params.mode == LoginMode.delegate) return Left(failure);
       return _loginStaff(params);
     }, (delegates) => _finish(delegates, params));

@@ -26,5 +26,16 @@ void main() {
       organizationUIDs: ['o1', 'o2', 'o3', 'o4'],
     );
     expect(found, {'o1', 'o2', 'o3'});
+
+    final lookup = await lookupDuplicateChains(
+      firestore: db,
+      companyUID: 'c1',
+      nationalId: '20000000000001',
+      phoneNumber: '01000000911',
+      organizationUIDs: ['o1', 'o2', 'o3', 'o4'],
+    );
+    expect(lookup.duplicateOrgUids, {'o1', 'o2', 'o3'});
+    expect(lookup.existingDelegateUid, 'd1');
+    expect(lookup.existingDelegateOrganizationUID, 'o1');
   });
 }
