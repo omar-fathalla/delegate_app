@@ -7,7 +7,6 @@ import {
   QuoteOptions,
   REQUEST_TYPE_NEW,
   REQUEST_TYPE_RENEWAL,
-  SUSPEND_REASON,
   coveredUids,
   isAppAddedRegistration,
   isFreePromotion,
@@ -17,9 +16,9 @@ import {
   quoteFor,
   toCents,
   requestCoversPeriod,
-  shouldSuspendStatus,
   MAX_DELEGATES_PER_RENEWAL,
 } from "./subscription_logic";
+import {M1_SOURCE, M2_SOURCE, planExpiryHoldWrite} from "./subscription_holds";
 
 type Db = admin.firestore.Firestore;
 type Data = Record<string, unknown>;
@@ -42,6 +41,13 @@ function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
+/** Attach timestamps and turn a null statusReason into a delete (authoritative). */
+function withWriteMeta(update: Data, ts: FirebaseFirestore.FieldValue): Data {
+  const out: Data = {...update, updatedAt: ts};
+  if (out.statusReason === null) out.statusReason = FieldValue.delete();
+  return out;
+}
+
 /** Batched writer that commits every BATCH_LIMIT operations. */
 class Batcher {
   private batch: admin.firestore.WriteBatch;
@@ -52,6 +58,12 @@ class Batcher {
   }
   async update(ref: admin.firestore.DocumentReference, data: Data): Promise<void> {
     this.batch.update(ref, data as admin.firestore.UpdateData<admin.firestore.DocumentData>);
+    this.count++;
+    this.writes++;
+    if (this.count >= BATCH_LIMIT) await this.flush();
+  }
+  async set(ref: admin.firestore.DocumentReference, data: Data): Promise<void> {
+    this.batch.set(ref, data);
     this.count++;
     this.writes++;
     if (this.count >= BATCH_LIMIT) await this.flush();
@@ -110,11 +122,13 @@ export interface SuspensionResult {
 }
 
 /**
- * Suspends every app-added delegate that has no paid subscription for the
- * current period. Idempotent: already-suspended docs are left as they are
- * (so manual suspensions are never overwritten), and web delegates are
- * never selected. Runs daily so a missed run or a client-side reactivation
- * is corrected on the next run.
+ * Adds a subscription_expired hold on every app-added delegate that has no
+ * paid subscription for the current period, through holds.ts. Web delegates
+ * are never selected. Holds stack: a manual / admin suspension is not
+ * overwritten; the expiry hold is added beside it. Shadow mode (default)
+ * does not write status, statusReason, or users/{uid}. Idempotent: an
+ * existing expiry hold is left as it is. Do not deploy
+ * suspendExpiredSubscriptions with this change.
  */
 export async function runSubscriptionSuspension(db: Db, now: Date): Promise<SuspensionResult> {
   const period = periodOf(now);
@@ -133,31 +147,39 @@ export async function runSubscriptionSuspension(db: Db, now: Date): Promise<Susp
   const res: SuspensionResult = {...base, appAdded: appAdded.size, covered: covered.size, candidates: candidates.length};
   const ts = FieldValue.serverTimestamp();
   const writer = new Batcher(db);
+  const at = now.toISOString();
+  const mode = process.env.HOLDS_AUTHORITY_MODE; // holdsMode() reads this
 
   for (const doc of await delegateDocsFor(db, candidates)) {
-    const status = doc.get("status");
-    if (str(status).toLowerCase() === "suspended") {
+    const planned = planExpiryHoldWrite({
+      data: (doc.data() || {}) as Data,
+      op: "add",
+      at,
+      actor: "system",
+      source: M1_SOURCE,
+      periodCode: period.code,
+      mode,
+    });
+    if (!planned.ok) continue;
+    if (planned.unchanged) {
       res.alreadySuspended++;
       continue;
     }
-    if (!shouldSuspendStatus(status)) continue;
-    await writer.update(doc.ref, {
-      "status": "suspended",
-      "statusReason": SUSPEND_REASON,
+    await writer.update(doc.ref, withWriteMeta({
+      ...planned.update,
       "subscription.suspendedForPeriod": period.code,
       "subscription.suspendedAt": ts,
-      "updatedAt": ts,
-    });
+    }, ts));
+    if (planned.plan.history && Object.keys(planned.plan.history).length) {
+      await writer.set(doc.ref.collection("statusHistory").doc(), {
+        ...planned.plan.history,
+        writtenAt: ts,
+      });
+    }
     res.suspendedDocs++;
   }
-  for (const part of chunks(candidates, 100)) {
-    const snaps = await db.getAll(...part.map((uid) => db.collection("users").doc(uid)));
-    for (const snap of snaps) {
-      if (!snap.exists || !shouldSuspendStatus(snap.get("status"))) continue;
-      await writer.update(snap.ref, {status: "suspended", statusReason: SUSPEND_REASON, updatedAt: ts});
-      res.suspendedUsers++;
-    }
-  }
+  // users/{uid} is mirrored by the holds trigger once it is authoritative.
+  // Shadow mode does not write it here.
   await writer.flush();
   await db.collection(RUNS).doc(`${period.code}_${now.toISOString().slice(0, 10)}`).set({
     ...res, ranAt: ts,
@@ -680,8 +702,10 @@ export async function applyVerifiedSubscriptionPayment(db: Db, p: VerifiedPaymen
 }
 
 /**
- * Writes the paid subscription onto the delegate docs. Re-runnable: call it
- * again for a request whose applyState is not "applied".
+ * Writes the paid subscription onto the delegate docs. A paid renewal
+ * removes the subscription_expired hold through holds.ts (renewal only;
+ * other holds stay). Shadow mode does not write status or statusReason.
+ * Re-runnable: call it again for a request whose applyState is not "applied".
  */
 export async function applyPaidRequest(db: Db, requestId: string): Promise<number> {
   const reqRef = db.collection(REQUESTS).doc(requestId);
@@ -709,26 +733,39 @@ export async function applyPaidRequest(db: Db, requestId: string): Promise<numbe
     registrationRequestId: isRenewal ? null : requestId,
     paidAt: data.paidAt ?? null,
   });
+  const at = new Date().toISOString();
+  const mode = process.env.HOLDS_AUTHORITY_MODE;
   for (const doc of await delegateDocsFor(db, uids)) {
-    const uid = str(doc.get("uid"));
-    const update: Data = {subscription: subscriptionFor(uid), updatedAt: ts};
-    if (isRenewal && str(doc.get("status")) === "suspended" && str(doc.get("statusReason")) === SUSPEND_REASON) {
-      update.status = "active";
-      update.statusReason = FieldValue.delete();
-      reactivated++;
-    }
-    await writer.update(doc.ref, update);
-  }
-  if (isRenewal) {
-    const users = await db.getAll(...uids.map((uid) => db.collection("users").doc(uid)));
-    for (const u of users) {
-      if (u.exists && str(u.get("status")) === "suspended" && str(u.get("statusReason")) === SUSPEND_REASON) {
-        await writer.update(u.ref, {
-          status: "active", statusReason: FieldValue.delete(), updatedAt: ts,
-        });
+    const uid = str(doc.get("uid")) || doc.ref.id;
+    const update: Data = {subscription: subscriptionFor(uid)};
+    // Renewal payment only: remove the expiry hold. Other holds stay.
+    // new_delegate payments never reactivate (V1).
+    if (isRenewal) {
+      const planned = planExpiryHoldWrite({
+        data: (doc.data() || {}) as Data,
+        op: "remove",
+        at,
+        actor: "paymob",
+        source: M2_SOURCE,
+        requestId: requestId,
+        periodCode: period.code,
+        mode,
+        inferLegacyExpiry: true,
+      });
+      if (planned.ok && !planned.unchanged) {
+        Object.assign(update, planned.update);
+        reactivated++;
+        if (planned.plan.history && Object.keys(planned.plan.history).length) {
+          await writer.set(doc.ref.collection("statusHistory").doc(), {
+            ...planned.plan.history,
+            writtenAt: ts,
+          });
+        }
       }
     }
+    await writer.update(doc.ref, withWriteMeta(update, ts));
   }
+  // users/{uid} is mirrored by the holds trigger once it is authoritative.
   await writer.flush();
   await reqRef.update({applyState: "applied", reactivatedDocs: reactivated, appliedAt: ts});
   return reactivated;
