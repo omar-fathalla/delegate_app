@@ -1814,9 +1814,19 @@ service cloud.firestore {
       ];
     }
 
+    // Cheap allow so a list query on delegateUid == 'supervisor_' +
+    // company is provable for company admins and supervisors (I2 leave
+    // fallback). Folding this into canReadNotification hits the cap.
+    function canReadCompanySupervisorBroadcast() {
+      return isCompanyAdmin()
+        && callerCompany() != ''
+        && resource.data.delegateUid == 'supervisor_' + callerCompany();
+    }
+
     match /notifications/{notificationId} {
       allow read: if canReadOwnNotification();
       allow read: if canReadOrgAdminRoleBroadcast();
+      allow read: if canReadCompanySupervisorBroadcast();
       allow read: if canReadNotification();
       allow create: if canCreateNotification();
       allow update: if (canReadOwnNotification() || canReadNotification()) && (
