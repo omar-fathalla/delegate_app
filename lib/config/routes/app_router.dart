@@ -19,6 +19,7 @@ import 'package:delegate_app/features/hr/presentation/pages/hr_delegate_attendan
 import 'package:delegate_app/features/settings/presentation/pages/privacy_policy_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
+import 'package:delegate_app/features/tasks/presentation/pages/task_details_loader_screen.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/task_details_screen.dart';
 import 'package:delegate_app/features/notifications/presentation/pages/notifications_page.dart';
 import 'package:delegate_app/features/feedback/presentation/pages/submit_feedback_screen.dart';
@@ -187,6 +188,21 @@ final appRouter = GoRouter(
             isAdmin: extras['isAdmin'] as bool,
             organizationId: extras['organizationId'] as String,
             currentUserId: extras['currentUserId'] as String?,
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/tasks/:taskId',
+      pageBuilder: (context, state) {
+        final taskId = state.pathParameters['taskId'] ?? '';
+        final extra = state.extra;
+        final delegate = extra is Delegate ? extra : null;
+        return AppMotionPage.sharedAxis(
+          state: state,
+          child: TaskDetailsLoaderScreen(
+            taskId: taskId,
+            delegate: delegate,
           ),
         );
       },

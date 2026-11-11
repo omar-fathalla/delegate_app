@@ -16,6 +16,7 @@ import {
   parseAssignedTo,
   newlyAssignedTaskUserIds,
   taskNotifyUserIds,
+  taskUsersFromDelegateDocs,
   TaskUser,
 } from "./task_notify_logic";
 
@@ -29,91 +30,73 @@ function notifyBody(title: unknown): string {
   return t ? `تم تعيين مهمة جديدة لك: ${t}` : "تم تعيين مهمة جديدة لك";
 }
 
-function asUser(id: string, data: FirebaseFirestore.DocumentData): TaskUser {
-  return {
-    id,
-    role: data.role,
-    companyUID: data.companyUID,
-    companyId: data.companyId,
-    companyIds: data.companyIds,
-    organizationUID: data.organizationUID,
-    organizationUIDs: data.organizationUIDs,
-    status: data.status,
-  };
-}
-
-async function loadGroupCandidates(
+/**
+ * Same source the task picker reads: organizations/{org}/companies/{co}/delegates.
+ * Does not read the `users` collection. Paginates in pages of 1000.
+ */
+async function loadCompanyDelegates(
   db: FirebaseFirestore.Firestore,
-  companyId: string,
   organizationId: string,
+  companyId: string,
 ): Promise<TaskUser[]> {
-  const users = db.collection("users");
-  const queries: Promise<FirebaseFirestore.QuerySnapshot>[] = [];
   const co = companyId.trim();
   const org = organizationId.trim();
-  if (co) {
-    queries.push(users.where("companyUID", "==", co).get());
-    queries.push(users.where("companyId", "==", co).get());
-    queries.push(users.where("companyIds", "array-contains", co).get());
-  }
-  if (org) {
-    // Equality pairs only — avoid a composite index on organizationUIDs+role.
-    const marketingRoles = [
-      "marketing",
-      "marketingPromotion",
-      "marketing_promotion",
-      "marketing-promotion",
-      "branches_marketing",
-      "branches-marketing",
-    ];
-    for (const role of marketingRoles) {
-      queries.push(users.where("organizationUID", "==", org).where("role", "==", role).get());
-    }
-  }
-  if (queries.length === 0) return [];
-  const snaps = await Promise.all(queries);
-  const seen = new Map<string, TaskUser>();
-  for (const snap of snaps) {
+  if (!co || !org) return [];
+  const col = db
+    .collection("organizations").doc(org)
+    .collection("companies").doc(co)
+    .collection("delegates");
+  const docs: {id: string; data: Record<string, unknown>}[] = [];
+  let last: FirebaseFirestore.QueryDocumentSnapshot | undefined;
+  for (;;) {
+    let q: FirebaseFirestore.Query = col.limit(1000);
+    if (last) q = q.startAfter(last);
+    const snap = await q.get();
+    if (snap.empty) break;
     for (const doc of snap.docs) {
-      if (!seen.has(doc.id)) seen.set(doc.id, asUser(doc.id, doc.data()));
+      docs.push({id: doc.id, data: doc.data() as Record<string, unknown>});
     }
+    if (snap.size < 1000) break;
+    last = snap.docs[snap.docs.length - 1];
   }
-  return Array.from(seen.values());
-}
-
-async function loadUsersByIds(
-  db: FirebaseFirestore.Firestore,
-  uids: string[],
-): Promise<TaskUser[]> {
-  const out: TaskUser[] = [];
-  for (const id of uids) {
-    const snap = await db.collection("users").doc(id).get();
-    if (snap.exists) out.push(asUser(snap.id, snap.data() as FirebaseFirestore.DocumentData));
-  }
-  return out;
+  return taskUsersFromDelegateDocs(docs);
 }
 
 async function resolveRecipients(
   db: FirebaseFirestore.Firestore,
   assignedTo: unknown,
   opts: {companyId: string; organizationId: string; createdBy: string},
-): Promise<string[]> {
+): Promise<{ids: string[]; users: TaskUser[]}> {
   const parsed = parseAssignedTo(assignedTo);
-  if (parsed.kind === "empty") return [];
-  let users: TaskUser[] = [];
-  if (parsed.kind === "uids") {
-    users = await loadUsersByIds(db, parsed.uids);
-  } else {
-    users = await loadGroupCandidates(db, opts.companyId, opts.organizationId);
-    if (parsed.kind === "mixed") {
-      const extra = await loadUsersByIds(db, parsed.uids);
-      const seen = new Set(users.map((u) => u.id));
-      for (const u of extra) {
-        if (!seen.has(u.id)) users.push(u);
+  if (parsed.kind === "empty") return {ids: [], users: []};
+  const users = await loadCompanyDelegates(db, opts.organizationId, opts.companyId);
+  return {ids: taskNotifyUserIds(users, assignedTo, opts), users};
+}
+
+async function senderFields(
+  db: FirebaseFirestore.Firestore,
+  task: FirebaseFirestore.DocumentData,
+  users: TaskUser[],
+): Promise<{senderName: string; senderRole: string}> {
+  let senderName = String(task.createdByName || task.senderName || "").trim();
+  const createdBy = String(task.createdBy || "").trim();
+  const fromTask = String(task.createdByRole || task.senderRole || "").trim();
+  const fromUser = users.find((u) => u.id === createdBy);
+  let senderRole = fromTask || String(fromUser?.role || "").trim();
+  // Staff senders (org admin, etc.) may not be in the company delegates
+  // list. Look up their profile only to label the card, never for recipients.
+  if (createdBy && (!senderName || !senderRole)) {
+    const snap = await db.collection("users").doc(createdBy).get();
+    if (snap.exists) {
+      const data = snap.data() || {};
+      if (!senderName) {
+        senderName = String(data.displayName || data.fullName || data.name || "").trim();
       }
+      if (!senderRole) senderRole = String(data.role || "").trim();
     }
   }
-  return taskNotifyUserIds(users, assignedTo, opts);
+  if (!senderRole && senderName) senderRole = "supervisor";
+  return {senderName, senderRole};
 }
 
 async function writeTaskNotifications(args: {
@@ -122,8 +105,10 @@ async function writeTaskNotifications(args: {
   companyId: string;
   taskId: string;
   title: unknown;
+  senderName?: string;
+  senderRole?: string;
 }): Promise<number> {
-  const {recipientIds, organizationId, companyId, taskId, title} = args;
+  const {recipientIds, organizationId, companyId, taskId, title, senderName, senderRole} = args;
   if (recipientIds.length === 0) return 0;
   const db = admin.firestore();
   const body = notifyBody(title);
@@ -143,6 +128,8 @@ async function writeTaskNotifications(args: {
         taskId,
         isRead: false,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        ...(senderName ? {senderName, createdByName: senderName} : {}),
+        ...(senderRole ? {senderRole} : {}),
       });
     }
     await batch.commit();
@@ -161,7 +148,7 @@ export const onTaskCreated = functions.firestore
     const createdBy = String(task.createdBy || "").trim();
 
     try {
-      const recipientIds = await resolveRecipients(admin.firestore(), task.assignedTo, {
+      const {ids: recipientIds, users} = await resolveRecipients(admin.firestore(), task.assignedTo, {
         companyId,
         organizationId,
         createdBy,
@@ -170,12 +157,15 @@ export const onTaskCreated = functions.firestore
         console.log("No recipients for new task:", taskId, "assignedTo=", task.assignedTo);
         return null;
       }
+      const sender = await senderFields(admin.firestore(), task, users);
       const n = await writeTaskNotifications({
         recipientIds,
         organizationId,
         companyId,
         taskId,
         title: task.title,
+        senderName: sender.senderName,
+        senderRole: sender.senderRole,
       });
       console.log(`Created ${n} new-task notifications for ${taskId}`);
       return null;
@@ -200,16 +190,7 @@ export const onTaskUpdated = functions.firestore
         return null;
       }
       const db = admin.firestore();
-      const parsedAfter = parseAssignedTo(after.assignedTo);
-      const parsedBefore = parseAssignedTo(before.assignedTo);
-      const needsGroup = parsedAfter.kind === "group" || parsedAfter.kind === "mixed" ||
-        parsedBefore.kind === "group" || parsedBefore.kind === "mixed";
-      const users = needsGroup ?
-        await loadGroupCandidates(db, companyId, organizationId) :
-        await loadUsersByIds(db, [
-          ...(parsedBefore.kind === "uids" ? parsedBefore.uids : []),
-          ...(parsedAfter.kind === "uids" ? parsedAfter.uids : []),
-        ]);
+      const users = await loadCompanyDelegates(db, organizationId, companyId);
       const newly = newlyAssignedTaskUserIds(users, before.assignedTo, after.assignedTo, {
         companyId,
         organizationId,
@@ -219,12 +200,15 @@ export const onTaskUpdated = functions.firestore
         console.log("No new recipients for updated task:", taskId);
         return null;
       }
+      const sender = await senderFields(db, after, users);
       const n = await writeTaskNotifications({
         recipientIds: newly,
         organizationId,
         companyId,
         taskId,
         title: after.title,
+        senderName: sender.senderName,
+        senderRole: sender.senderRole,
       });
       console.log(`Created ${n} new-assignment notifications for ${taskId}`);
       return null;

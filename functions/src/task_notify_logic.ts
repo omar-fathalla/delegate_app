@@ -8,6 +8,8 @@
  * intended people. Resolution is company-scoped and de-duplicated.
  */
 
+import {canonicalStatus, hasAnyHold, parseHolds} from "./holds";
+
 export const ASSIGN_ALL = "all";
 export const ASSIGN_ALL_AR = "الكل";
 export const ASSIGN_ALL_BRANCH_MARKETING = "all_branch_marketing";
@@ -34,11 +36,14 @@ const MARKETING_PROMOTION_ROLES = new Set([
   "marketingpromotion",
 ]);
 
+/** Statuses that must not receive a new-task notification. */
 const SKIP_STATUS = new Set([
   "pending",
   "rejected",
   "deleted",
   "disabled",
+  "suspended",
+  "inactive",
 ]);
 
 export type TaskUser = {
@@ -50,6 +55,7 @@ export type TaskUser = {
   organizationUID?: unknown;
   organizationUIDs?: unknown;
   status?: unknown;
+  holds?: unknown;
 };
 
 export type TaskNotifyOpts = {
@@ -137,9 +143,23 @@ export function userInOrg(u: TaskUser, organizationId: string): boolean {
   return orgIdsOf(u).includes(org);
 }
 
+/**
+ * Exclude pending/rejected/deleted/disabled, and anyone the HOLDS model
+ * treats as suspended (legacy status, or a non-empty holds object).
+ * `approved` is canonicalized to `active` and is kept.
+ */
+export function isExcludedFromTaskNotify(u: TaskUser): boolean {
+  if (hasAnyHold(parseHolds(u.holds))) return true;
+  const s = canonicalStatus(u.status);
+  return s !== "" && (SKIP_STATUS.has(s) || SKIP_STATUS.has(normalizeStatusRaw(u.status)));
+}
+
+function normalizeStatusRaw(status: unknown): string {
+  return String(status || "").trim().toLowerCase();
+}
+
 function isSkippedStatus(u: TaskUser): boolean {
-  const s = String(u.status || "").trim().toLowerCase();
-  return s !== "" && SKIP_STATUS.has(s);
+  return isExcludedFromTaskNotify(u);
 }
 
 export type ParsedAssignedTo =
@@ -234,7 +254,7 @@ function explicitUidAllowed(u: TaskUser | undefined, uid: string, opts: TaskNoti
 /**
  * Unique recipient uids for a task. Never treats a string assignedTo as
  * an array of characters. Group `all` requires a company id (fail closed).
- * The creator is never notified. Pending/rejected/deleted users are skipped.
+ * The creator is never notified. Suspended/inactive/held and pending/rejected/deleted/disabled are skipped.
  */
 export function taskNotifyUserIds(
   users: TaskUser[],
@@ -291,4 +311,37 @@ export function newlyAssignedTaskUserIds(
 ): string[] {
   const before = new Set(taskNotifyUserIds(users, beforeAssignedTo, opts));
   return taskNotifyUserIds(users, afterAssignedTo, opts).filter((id) => !before.has(id));
+}
+
+
+export type DelegateDocLike = {id: string; data: Record<string, unknown>};
+
+/**
+ * Map `organizations/{org}/companies/{companyUID}/delegates` docs to
+ * [TaskUser]s. Dedupes by uid, skips docs with no uid. The resolved uid is
+ * `data.uid` when present, otherwise the document id (same as the picker).
+ */
+export function taskUsersFromDelegateDocs(docs: DelegateDocLike[]): TaskUser[] {
+  const seen = new Map<string, TaskUser>();
+  for (const doc of docs) {
+    if (!doc) continue;
+    const data = doc.data || {};
+    const fromField = String(data.uid || "").trim();
+    const fromId = String(doc.id || "").trim();
+    const id = fromField || fromId;
+    if (!id) continue;
+    if (seen.has(id)) continue;
+    seen.set(id, {
+      id,
+      role: data.role,
+      companyUID: data.companyUID,
+      companyId: data.companyId,
+      companyIds: data.companyIds,
+      organizationUID: data.organizationUID,
+      organizationUIDs: data.organizationUIDs,
+      status: data.status,
+      holds: data.holds,
+    });
+  }
+  return Array.from(seen.values());
 }

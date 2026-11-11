@@ -6,6 +6,8 @@ const {
   newlyAssignedTaskUserIds,
   isGroupAssignToken,
   userInCompany,
+  isExcludedFromTaskNotify,
+  taskUsersFromDelegateDocs,
 } = require("../lib/task_notify_logic");
 
 const co = "co_dev_test";
@@ -190,5 +192,56 @@ describe("userInCompany", () => {
     assert.equal(userInCompany({id: "a", companyUID: "x", companyIds: ["c1"]}, "c1"), true);
     assert.equal(userInCompany({id: "a", companyUID: "x"}, "c1"), false);
     assert.equal(userInCompany({id: "a", companyUID: "c1"}, ""), false);
+  });
+});
+
+describe("isExcludedFromTaskNotify / HOLDS", () => {
+  test("skips suspended, inactive, disabled, pending, rejected, deleted", () => {
+    for (const status of ["suspended", "inactive", "disabled", "pending", "rejected", "deleted"]) {
+      assert.equal(isExcludedFromTaskNotify({id: "x", status}), true, status);
+    }
+    assert.equal(isExcludedFromTaskNotify({id: "x", status: "active"}), false);
+    assert.equal(isExcludedFromTaskNotify({id: "x", status: "approved"}), false);
+  });
+
+  test("skips a delegate with a hold even if status is still active", () => {
+    assert.equal(isExcludedFromTaskNotify({
+      id: "x",
+      status: "active",
+      holds: {admin_suspend: {at: "2026-11-11T00:00:00Z", by: "sup"}},
+    }), true);
+    assert.equal(isExcludedFromTaskNotify({id: "x", status: "active", holds: {}}), false);
+  });
+
+  test("all does not notify suspended or held delegates", () => {
+    const users = [
+      u("ok"),
+      u("sus", {status: "suspended"}),
+      u("held", {status: "active", holds: {subscription_expired: {at: "t", by: "sys"}}}),
+    ];
+    assert.deepEqual(taskNotifyUserIds(users, "all", {companyId: co}), ["ok"]);
+  });
+});
+
+describe("taskUsersFromDelegateDocs", () => {
+  test("uses data.uid when present, else doc id; skips empty; dedupes", () => {
+    const users = taskUsersFromDelegateDocs([
+      {id: "doc-1", data: {uid: "auth-1", role: "delegate", status: "approved", companyUID: co}},
+      {id: "auth-2", data: {role: "marketing", status: "active", companyUID: co}},
+      {id: "", data: {uid: "", role: "delegate"}},
+      {id: "doc-dup", data: {uid: "auth-1", role: "delegate", status: "approved"}},
+    ]);
+    assert.deepEqual(users.map((x) => x.id), ["auth-1", "auth-2"]);
+  });
+
+  test("all recipients come from company delegate docs, not a users collection", () => {
+    const docs = [
+      {id: "dlg_dev_test_1", data: {uid: "dlg_dev_test_1", role: "delegate", status: "approved", companyUID: co}},
+      {id: "dlg_no_users_doc", data: {role: "delegate", status: "active", companyUID: co}},
+      {id: "sus", data: {uid: "sus", role: "delegate", status: "suspended", companyUID: co}},
+    ];
+    const users = taskUsersFromDelegateDocs(docs);
+    const ids = taskNotifyUserIds(users, "all", {companyId: co, createdBy: "sup"});
+    assert.deepEqual(ids.sort(), ["dlg_dev_test_1", "dlg_no_users_doc"].sort());
   });
 });
