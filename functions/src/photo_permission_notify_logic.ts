@@ -117,7 +117,7 @@ export function photoPermissionNotifyUserIds(
     organizationUIDs?: unknown;
   }[],
   companyId: string,
-  organizationId: string = "",
+  organizationId = "",
 ): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
