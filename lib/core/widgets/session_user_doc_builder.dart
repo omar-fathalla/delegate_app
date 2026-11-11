@@ -58,12 +58,19 @@ class _SessionUserDocBuilderState extends State<SessionUserDocBuilder> {
     unawaited(FirestoreSessionSubscriptions.instance.cancel(key));
     _sub = null;
     if (widget.uid.isEmpty) return;
-    final fs = widget.firestore ?? FirebaseFirestore.instance;
-    _sub = fs.collection('users').doc(widget.uid).snapshots().listen((doc) {
-      if (!mounted) return;
-      setState(() => _snap = doc);
-    }, onError: (_) {});
-    FirestoreSessionSubscriptions.instance.register(key, _sub!);
+    // Widget tests (and any pre-Firebase context) have no [DEFAULT] app.
+    // The previous StreamBuilder caught this and used an empty stream; the
+    // header already falls back to Delegate fields when the snap is null.
+    try {
+      final fs = widget.firestore ?? FirebaseFirestore.instance;
+      _sub = fs.collection('users').doc(widget.uid).snapshots().listen((doc) {
+        if (!mounted) return;
+        setState(() => _snap = doc);
+      }, onError: (_) {});
+      FirestoreSessionSubscriptions.instance.register(key, _sub!);
+    } catch (_) {
+      _sub = null;
+    }
   }
 
   @override
