@@ -6,14 +6,20 @@ void main() {
   String label(UserRole r, {DelegatePosition? p, String? raw}) =>
       UniversalAppHeader.roleLabelFor(r, position: p, rawRole: raw);
 
-  test('company_supervisor maps to مشرف', () {
-    expect(label(UserRole.admin, raw: 'company_supervisor'), 'مشرف');
-    expect(label(UserRole.admin, raw: 'supervisor'), 'مشرف');
-    expect(label(UserRole.admin, p: DelegatePosition.supervisor), 'مشرف');
+  test('company admin and company supervisor share one label', () {
+    expect(label(UserRole.admin, raw: 'company_supervisor'), 'مشرف الشركة');
+    expect(label(UserRole.admin, raw: 'supervisor'), 'مشرف الشركة');
+    expect(label(UserRole.admin, raw: 'admin'), 'مشرف الشركة');
+    expect(label(UserRole.admin, raw: 'company_admin'), 'مشرف الشركة');
+    expect(
+      label(UserRole.admin, p: DelegatePosition.supervisor),
+      'مشرف الشركة',
+    );
+    expect(label(UserRole.admin), 'مشرف الشركة');
   });
 
-  test('company admin without supervisor role stays مسؤول شركة', () {
-    expect(label(UserRole.admin, raw: 'company_admin'), 'مسؤول شركة');
+  test('field-supervisor job title on a delegate stays مشرف', () {
+    expect(label(UserRole.delegate, p: DelegatePosition.supervisor), 'مشرف');
   });
 
   test('other roles keep sensible labels', () {

@@ -2,8 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
+import 'package:delegate_app/features/admin/domain/entities/chain_selection.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
+import 'package:delegate_app/features/admin/presentation/widgets/chain_multi_select.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 
@@ -26,10 +28,8 @@ class LinkDelegateToOrgSheet extends StatefulWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => LinkDelegateToOrgSheet(
-        delegate: delegate,
-        supervisor: supervisor,
-      ),
+      builder: (_) =>
+          LinkDelegateToOrgSheet(delegate: delegate, supervisor: supervisor),
     );
   }
 
@@ -38,16 +38,13 @@ class LinkDelegateToOrgSheet extends StatefulWidget {
 }
 
 class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
-
   final _formKey = GlobalKey<FormState>();
 
   List<Map<String, dynamic>> _organizations = [];
-  String? _selectedOrgUID;
-  String? _selectedOrgName;
+  final Set<String> _selectedOrgUIDs = {};
   bool _isLoadingOrgs = true;
 
   bool _isSubmitting = false;
-
 
   @override
   void initState() {
@@ -62,45 +59,79 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
 
   Future<void> _fetchAvailableOrganizations() async {
     try {
-      final snap =
-          await FirebaseFirestore.instance.collection('organizations').get();
+      final snap = await FirebaseFirestore.instance
+          .collection('organizations')
+          .get();
 
-      // Current delegate organizations to exclude
-      final currentOrgUID = widget.delegate.organizationUID.trim().toLowerCase();
-      final currentOrgName =
-          widget.delegate.organizationName.trim().toLowerCase();
+      final currentOrgUID = widget.delegate.organizationUID
+          .trim()
+          .toLowerCase();
+      final currentOrgName = widget.delegate.organizationName
+          .trim()
+          .toLowerCase();
       final allKnownOrgNames = widget.delegate.allOrganizationNames
           .map((n) => n.trim().toLowerCase())
           .toSet();
+      final alreadyUids = {currentOrgUID}..removeWhere((id) => id.isEmpty);
 
-      final orgs = snap.docs
-          .map((doc) {
-            final data = doc.data();
-            return {
-              'uid': doc.id,
-              'name': (data['name'] ?? data['title'] ?? doc.id).toString(),
-            };
-          })
-          .where((org) {
-            final uid = (org['uid'] ?? '').toString().trim().toLowerCase();
-            final name = (org['name'] ?? '').toString().trim().toLowerCase();
+      final companyUID =
+          (widget.supervisor.companyUID.isNotEmpty
+                  ? widget.supervisor.companyUID
+                  : widget.delegate.companyUID)
+              .trim();
+      final role = widget.supervisor.role;
+      final isGlobal = role == UserRole.superAdmin;
+      if (companyUID.isEmpty && !isGlobal) {
+        if (mounted) {
+          setState(() {
+            _organizations = [];
+            _selectedOrgUIDs.clear();
+            _isLoadingOrgs = false;
+          });
+        }
+        return;
+      }
 
-            // Exclude current organization or any organization the delegate already belongs to
-            if (uid == currentOrgUID) return false;
-            if (name == currentOrgName) return false;
-            if (allKnownOrgNames.contains(name)) return false;
-
-            return true;
-          })
-          .toList();
+      final List<Map<String, dynamic>> orgs = [];
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final uid = doc.id;
+        final name = (data['name'] ?? data['title'] ?? doc.id).toString();
+        final uidKey = uid.trim().toLowerCase();
+        final nameKey = name.trim().toLowerCase();
+        final isFathalla = nameKey.contains('fathalla') ||
+            nameKey.contains('فتح الله') ||
+            nameKey.contains('فتح_الله') ||
+            uidKey.contains('fathalla') ||
+            uidKey.contains('فتح_الله');
+        if (isFathalla) continue;
+        if (alreadyUids.contains(uidKey)) continue;
+        if (nameKey == currentOrgName) continue;
+        if (allKnownOrgNames.contains(nameKey)) continue;
+        if (companyUID.isNotEmpty) {
+          try {
+            final cDoc = await FirebaseFirestore.instance
+                .collection('organizations')
+                .doc(uid)
+                .collection('companies')
+                .doc(companyUID)
+                .get();
+            if (!cDoc.exists) continue;
+          } catch (_) {
+            continue;
+          }
+        }
+        orgs.add({'uid': uid, 'name': name});
+      }
+      if (role == UserRole.organizationAdmin) {
+        final ownOrg = widget.supervisor.organizationUID.trim();
+        orgs.removeWhere((o) => (o['uid'] as String).trim() != ownOrg);
+      }
 
       if (mounted) {
         setState(() {
           _organizations = orgs;
-          if (_organizations.isNotEmpty) {
-            _selectedOrgUID = _organizations.first['uid'];
-            _selectedOrgName = _organizations.first['name'];
-          }
+          _selectedOrgUIDs.clear();
           _isLoadingOrgs = false;
         });
       }
@@ -112,13 +143,27 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_selectedOrgUID == null || _selectedOrgUID!.isEmpty) {
-      AppSnackBar.showError(
-        context,
-        'يرجى اختيار السلسلة / المنظمة المستهدفة.',
-      );
+    if (_selectedOrgUIDs.isEmpty) {
+      AppSnackBar.showError(context, 'يرجى اختيار سلسلة واحدة على الأقل.');
       return;
     }
+
+    final selected = [
+      for (final org in _organizations)
+        if (_selectedOrgUIDs.contains(org['uid'])) org,
+    ];
+    if (selected.isEmpty) {
+      AppSnackBar.showError(context, 'يرجى اختيار سلسلة واحدة على الأقل.');
+      return;
+    }
+    final primary = selected.first;
+    final extraUids = [
+      for (final org in selected.skip(1)) org['uid'] as String,
+    ];
+    final extraNames = [
+      for (final org in selected.skip(1)) org['name'] as String,
+    ];
+    final selectedNames = [for (final org in selected) org['name'] as String];
 
     setState(() => _isSubmitting = true);
 
@@ -133,8 +178,10 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
       companyName: widget.supervisor.companyName.isNotEmpty
           ? widget.supervisor.companyName
           : widget.delegate.companyName,
-      targetOrganizationUID: _selectedOrgUID!,
-      targetOrganizationName: _selectedOrgName ?? _selectedOrgUID!,
+      targetOrganizationUID: primary['uid'] as String,
+      targetOrganizationName: primary['name'] as String,
+      organizationUIDs: extraUids,
+      organizationNames: extraNames,
       existingDelegate: widget.delegate,
       // One subscription per delegate covers all chains: no fee here.
       paymentMethod: SubscriptionPaymentMethod.notRequired,
@@ -145,16 +192,15 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
     if (!mounted) return;
     setState(() => _isSubmitting = false);
 
-    result.fold(
-      (failure) => AppSnackBar.showError(context, failure.message),
-      (_) {
-        AppSnackBar.showSuccess(
-          context,
-          'تم إرسال طلب ربط المندوب بسلسلة ($_selectedOrgName) بنجاح (بدون رسوم إضافية)! بانتظار الاعتماد.',
-        );
-        Navigator.pop(context, true);
-      },
-    );
+    result.fold((failure) => AppSnackBar.showError(context, failure.message), (
+      _,
+    ) {
+      AppSnackBar.showSuccess(
+        context,
+        'تم إرسال طلب ربط المندوب بـ ${selectedNames.length} سلسلة (${selectedNames.join('، ')}) بنجاح (بدون رسوم إضافية)! بانتظار الاعتماد.',
+      );
+      Navigator.pop(context, true);
+    });
   }
 
   @override
@@ -218,7 +264,7 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
                             ),
                           ),
                           Text(
-                            'سداد الاشتراك والاعتماد للعمل في سلاسل تجارية متعددة',
+                            'يمكن اختيار أكثر من سلسلة داخل نفس الشركة، بدون رسوم إضافية.',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -252,8 +298,9 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
                                 .withValues(alpha: 0.45),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: colorScheme.outlineVariant
-                                  .withValues(alpha: 0.5),
+                              color: colorScheme.outlineVariant.withValues(
+                                alpha: 0.5,
+                              ),
                             ),
                           ),
                           child: Row(
@@ -300,8 +347,9 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
                                           ),
                                           decoration: BoxDecoration(
                                             color: colorScheme.primaryContainer,
-                                            borderRadius:
-                                                BorderRadius.circular(6),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
                                           ),
                                           child: Text(
                                             widget.delegate.organizationName,
@@ -341,8 +389,9 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: colorScheme.errorContainer
-                                  .withValues(alpha: 0.3),
+                              color: colorScheme.errorContainer.withValues(
+                                alpha: 0.3,
+                              ),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
@@ -362,44 +411,20 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
                             ),
                           )
                         else
-                          DropdownButtonFormField<String>(
-                            initialValue: _selectedOrgUID,
-                            decoration: InputDecoration(
-                              prefixIcon: const Icon(
-                                Icons.storefront_rounded,
-                                size: 20,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 12,
-                              ),
-                            ),
-                            items: _organizations.map((org) {
-                              return DropdownMenuItem<String>(
-                                value: org['uid'],
-                                child: Text(
-                                  org['name'],
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13.5,
-                                  ),
+                          ChainMultiSelect(
+                            chains: [
+                              for (final org in _organizations)
+                                ChainOption(
+                                  uid: org['uid'] as String,
+                                  name: org['name'] as String,
                                 ),
-                              );
-                            }).toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                final match = _organizations.firstWhere(
-                                  (o) => o['uid'] == val,
-                                );
-                                setState(() {
-                                  _selectedOrgUID = val;
-                                  _selectedOrgName = match['name'];
-                                });
-                              }
-                            },
+                            ],
+                            selectedUids: _selectedOrgUIDs,
+                            onChanged: (next) => setState(() {
+                              _selectedOrgUIDs
+                                ..clear()
+                                ..addAll(next);
+                            }),
                           ),
                         const SizedBox(height: 16),
 
@@ -415,7 +440,10 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
                               borderRadius: BorderRadius.circular(14),
                             ),
                           ),
-                          onPressed: (_isSubmitting || _organizations.isEmpty)
+                          onPressed:
+                              (_isSubmitting ||
+                                  _organizations.isEmpty ||
+                                  _selectedOrgUIDs.isEmpty)
                               ? null
                               : _submit,
                           icon: _isSubmitting
@@ -431,7 +459,7 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
                           label: Text(
                             _isSubmitting
                                 ? 'جاري إرسال الطلب...'
-                                : 'تأكيد ربط المندوب بالسلسلة (بدون رسوم)',
+                                : 'تأكيد ربط المندوب بالسلاسل (بدون رسوم)',
                             style: const TextStyle(
                               fontSize: 14.5,
                               fontWeight: FontWeight.bold,
@@ -467,7 +495,11 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
             child: Text(
               'بدون رسوم إضافية: اشتراك المندوب الواحد يغطي كل السلاسل. '
               'يتجدد الاشتراك مرة واحدة كل دورة (يناير–يونيو / يوليو–ديسمبر) من صفحة «تجديد المناديب».',
-              style: TextStyle(fontSize: 12.5, height: 1.5, color: colorScheme.onSurface),
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.5,
+                color: colorScheme.onSurface,
+              ),
             ),
           ),
         ],

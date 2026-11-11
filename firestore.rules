@@ -89,10 +89,13 @@ service cloud.firestore {
       ]);
     }
 
-    // Strict company admin (no supervisor): only these may invite or edit
-    // company-admin invites (NEW-1).
+    // Company admin and company supervisor are one role (permissions + labels).
+    // Both may invite or edit company-admin invites in their company.
     function isStrictCompanyAdmin() {
-      return roleIs(['company-admin', 'company_admin', 'companyadmin', 'admin']);
+      return roleIs([
+        'company-admin', 'company_admin', 'companyadmin', 'admin',
+        'supervisor', 'company_supervisor'
+      ]);
     }
 
     function isHR() {

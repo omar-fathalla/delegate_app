@@ -1,5 +1,6 @@
 /**
- * Callable setDelegateHold. Org / company admins and super-admins only.
+ * Callable setDelegateHold. Super-admin, technical support, org-admin,
+ * and company admin / company supervisor (one role) only.
  * Flutter has no App Check yet, so this callable does not enforce it.
  *
  * Deploy: functions:tashil-mobile-notifications:setDelegateHold

@@ -13,6 +13,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/core/services/session_management_service.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
+import 'package:delegate_app/core/widgets/app_snack_bar.dart';
+import 'package:delegate_app/features/admin/data/datasources/delegate_hold_remote.dart';
+import 'package:delegate_app/features/admin/domain/entities/delegate_hold_access.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/link_delegate_to_org_sheet.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/delete_delegate_request_sheet.dart';
 import 'package:delegate_app/features/admin/presentation/pages/edit_delegate_profile_screen.dart';
@@ -916,6 +919,70 @@ class _CompactDelegateTile extends StatelessWidget {
     this.onRefresh,
   });
 
+  bool get _canSetHold =>
+      adminDelegate != null &&
+      canSetDelegateHold(
+        role: adminDelegate!.role,
+        callerOrganizationUID: adminDelegate!.organizationUID,
+        callerCompanyUID: adminDelegate!.companyUID,
+        targetOrganizationUID: delegate.organizationUID,
+        targetCompanyUID: delegate.companyUID,
+      );
+
+  bool get _isVisiblySuspended => delegate.status == DelegateStatus.suspended;
+
+  Future<void> _confirmSetHold(BuildContext context, {required bool suspend}) async {
+    final action = suspend ? 'إيقاف' : 'إعادة تفعيل';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final colorScheme = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('$action المندوب'),
+          content: Text(
+            'هل تريد $action المندوب "${delegate.fullName}"؟\n\n'
+            'يُسجَّل الطلب في سجلات الإيقاف الآن. الحالة الظاهرة قد لا تتغير فوراً.',
+            style: const TextStyle(fontSize: 14, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: suspend ? colorScheme.error : colorScheme.primary,
+                foregroundColor: suspend ? colorScheme.onError : colorScheme.onPrimary,
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text('تأكيد $action'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await DelegateHoldRemote().setDelegateHold(
+        uid: delegate.uid,
+        organizationUID: delegate.organizationUID,
+        companyUID: delegate.companyUID,
+        op: suspend ? 'add' : 'remove',
+      );
+      if (!context.mounted) return;
+      AppSnackBar.showSuccess(
+        context,
+        suspend
+            ? 'تم تسجيل إيقاف المندوب.'
+            : 'تم تسجيل إعادة تفعيل المندوب.',
+      );
+      onRefresh?.call();
+    } on DelegateHoldException catch (e) {
+      if (context.mounted) AppSnackBar.showError(context, e.message);
+    }
+  }
+
   Future<void> _confirmForceLogout(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1505,10 +1572,38 @@ class _CompactDelegateTile extends StatelessWidget {
           )
         : null;
 
+    final holdBtn = _canSetHold
+        ? _buildActionPill(
+            context: context,
+            icon: Icon(_isVisiblySuspended
+                ? Icons.play_circle_outline_rounded
+                : Icons.pause_circle_outline_rounded),
+            label: _isVisiblySuspended ? 'إعادة تفعيل' : 'إيقاف المندوب',
+            backgroundColor: theme.colorScheme.error.withValues(
+              alpha: isDark ? 0.22 : 0.10,
+            ),
+            borderColor: theme.colorScheme.error.withValues(alpha: 0.4),
+            foregroundColor: isDark
+                ? theme.colorScheme.error
+                : theme.colorScheme.error,
+            tooltip: _isVisiblySuspended
+                ? 'إعادة تفعيل المندوب (إزالة إيقاف الإدارة)'
+                : 'إيقاف المندوب من قبل الإدارة',
+            height: canRequestDelete ? 30 : 40,
+            width: canRequestDelete ? 104 : null,
+            fontSize: canRequestDelete ? 10.5 : 11.5,
+            onPressed: () => _confirmSetHold(
+              context,
+              suspend: !_isVisiblySuspended,
+            ),
+          )
+        : null;
+
     final extras = <Widget>[
       ?editBtn,
       if (canRequestDelete) ?deleteRequestBtn,
       if (isSuperAdmin) ?logoutBtn,
+      if (_canSetHold) ?holdBtn,
     ];
     if (extras.isEmpty) return linkOrgBtn;
     return Column(
