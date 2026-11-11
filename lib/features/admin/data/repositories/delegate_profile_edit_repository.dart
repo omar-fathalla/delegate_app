@@ -192,10 +192,9 @@ class DelegateProfileEditRepository {
     final hasImages = personalPhoto != null || idFront != null || idBack != null;
     if (hasImages && id != 'unknown') {
       final intentError = await ensureStorageUploadIntent(
-        firestore: FirebaseFirestore.instance,
+        functions: _functions,
         folderId: id,
         companyUID: companyUID,
-        createdBy: FirebaseAuth.instance.currentUser?.uid ?? '',
       );
       if (intentError != null) {
         return DelegateProfileSaveResult(saved: false, message: intentError);

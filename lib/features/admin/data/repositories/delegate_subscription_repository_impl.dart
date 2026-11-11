@@ -136,10 +136,9 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
 
       // 1. Bind the storage folder to this company, then upload images.
       final intentError = await ensureStorageUploadIntent(
-        firestore: _firestore,
+        functions: _functions,
         folderId: requestId,
         companyUID: companyUID,
-        createdBy: supervisorUid,
       );
       if (intentError != null) {
         return Left(ServerFailure(intentError));

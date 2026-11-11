@@ -1993,23 +1993,22 @@ service cloud.firestore {
     // Written by staff immediately before a Storage upload to
     // delegate_documents/{id}. Immutable to clients. companyUID is the
     // tenant key used by Storage rules (one get).
+    // Clients cannot mint intents (that was the first-come claim race).
+    // ensureStorageUploadIntent (Admin SDK) creates them after verifying
+    // the folder's owning company. A get of a missing doc must be allowed
+    // for company staff: companyScoped() reads resource.data and denied
+    // registration when the helper did get-before-create.
+    function intentCompanyScoped() {
+      return callerCompany() != '' && resource.data.companyUID == callerCompany();
+    }
     match /storage_upload_intents/{intentId} {
       allow read: if signedIn() && (
         isGlobalStaff()
-        || ((isCompanyAdmin() || isHR() || isOrgAdmin()) && companyScoped())
+        || ((isCompanyAdmin() || isHR() || isOrgAdmin()) && (
+          resource == null || intentCompanyScoped()
+        ))
       );
-      allow create: if signedIn()
-        && request.resource.data.keys().hasAll(['companyUID', 'createdBy'])
-        && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.companyUID is string
-        && request.resource.data.companyUID != ''
-        && request.resource.data.createdBy is string
-        && request.resource.data.createdBy != ''
-        && (
-          isGlobalStaff()
-          || ((isCompanyAdmin() || isHR() || isOrgAdmin()) && incomingCompanyScoped())
-        );
-      allow update, delete: if false;
+      allow create, update, delete: if false;
     }
 
     match /delegate_requests/{requestId} {

@@ -143,19 +143,26 @@ describe("adversarial", ()=>{
   test("storage_upload_intents are company-scoped and immutable", async()=>{
     await env.withSecurityRulesDisabled(async ctx=>{
       await setDoc(doc(ctx.firestore(),"users/ca2"),{role:"company-admin",organizationUID:"o2",companyUID:"c9"});
+      // Seeded like the callable (Admin SDK). Clients cannot create.
+      await setDoc(doc(ctx.firestore(),"storage_upload_intents/f1"),{companyUID:"c1",createdBy:"callable"});
     });
-    await rec("ca create intent own company","allow",setDoc(doc(as("ca"),"storage_upload_intents/f1"),{companyUID:"c1",createdBy:"ca"}));
-    await rec("sup create intent own company","allow",setDoc(doc(as("sup"),"storage_upload_intents/f2"),{companyUID:"c1",createdBy:"sup"}));
-    await rec("hr create intent own company","allow",setDoc(doc(as("hr"),"storage_upload_intents/f3"),{companyUID:"c1",createdBy:"hr"}));
-    await rec("ca2 create intent for other company","deny",setDoc(doc(as("ca2"),"storage_upload_intents/f4"),{companyUID:"c1",createdBy:"ca2"}));
-    await rec("ca2 create intent own company","allow",setDoc(doc(as("ca2"),"storage_upload_intents/f5"),{companyUID:"c9",createdBy:"ca2"}));
-    await rec("accountant create intent","deny",setDoc(doc(as("acc"),"storage_upload_intents/f6"),{companyUID:"c1",createdBy:"acc"}));
-    await rec("anon create intent","deny",setDoc(doc(anon(),"storage_upload_intents/f7"),{companyUID:"c1",createdBy:"anon1"}));
+    // The app used to get() a missing intent before create; that read
+    // must succeed for company staff (resource == null).
+    await rec("ca get missing intent (read-before-create)","allow",getDoc(doc(as("ca"),"storage_upload_intents/missing-new-reg")));
+    await rec("hr get missing intent (read-before-create)","allow",getDoc(doc(as("hr"),"storage_upload_intents/missing-new-reg")));
+    await rec("anon get missing intent","deny",getDoc(doc(anon(),"storage_upload_intents/missing-new-reg")));
+    await rec("ca create intent own company","deny",setDoc(doc(as("ca"),"storage_upload_intents/f2"),{companyUID:"c1",createdBy:"ca"}));
+    await rec("sup create intent own company","deny",setDoc(doc(as("sup"),"storage_upload_intents/f3"),{companyUID:"c1",createdBy:"sup"}));
+    await rec("hr create intent own company","deny",setDoc(doc(as("hr"),"storage_upload_intents/f4"),{companyUID:"c1",createdBy:"hr"}));
+    await rec("ca2 create intent for other company","deny",setDoc(doc(as("ca2"),"storage_upload_intents/f5"),{companyUID:"c1",createdBy:"ca2"}));
+    await rec("ca2 create intent own company","deny",setDoc(doc(as("ca2"),"storage_upload_intents/f6"),{companyUID:"c9",createdBy:"ca2"}));
+    await rec("accountant create intent","deny",setDoc(doc(as("acc"),"storage_upload_intents/f7"),{companyUID:"c1",createdBy:"acc"}));
+    await rec("anon create intent","deny",setDoc(doc(anon(),"storage_upload_intents/f8"),{companyUID:"c1",createdBy:"anon1"}));
     await rec("ca read own company intent","allow",getDoc(doc(as("ca"),"storage_upload_intents/f1")));
     await rec("ca2 read other company intent","deny",getDoc(doc(as("ca2"),"storage_upload_intents/f1")));
     await rec("ca update intent companyUID","deny",updateDoc(doc(as("ca"),"storage_upload_intents/f1"),{companyUID:"c9"}));
     await rec("ca delete intent","deny",deleteDoc(doc(as("ca"),"storage_upload_intents/f1")));
-    await rec("ca create intent missing createdBy","deny",setDoc(doc(as("ca"),"storage_upload_intents/f8"),{companyUID:"c1"}));
+    await rec("ca create intent missing createdBy","deny",setDoc(doc(as("ca"),"storage_upload_intents/f9"),{companyUID:"c1"}));
   });
 
   // Runs last: every recorded case must match its expectation.
