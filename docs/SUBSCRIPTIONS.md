@@ -107,6 +107,16 @@ request and are never suspended.
   and leaves the expiry hold in place (paying in November for January must not
   reactivate early). On failure or amount/period mismatch nobody is activated.
   The same coverage check runs so a uid cannot be charged twice.
+  An advance (future-period) payment writes `nextSubscription` and leaves the
+  current `subscription` map intact. `hasPaidCoverage` only counts a paid/waived
+  map whose `periodCode` is the period being asked about (a prepaid 2027_H1
+  does not cover November 2026). When that future period becomes current, M1
+  promotes `nextSubscription` into `subscription` and deletes `nextSubscription`.
+  In shadow mode a *current-period* paid renewal that leaves no holds also
+  writes `status: active` and deletes `statusReason` on the delegate docs
+  (same as the legacy path), so a paid delegate is not left suspended.
+  `users/{uid}` is still not mirrored in shadow. An advance payment must not
+  reactivate early.
 
 ## Advance renewal (`advanceRenewalEnabled`)
 
@@ -122,10 +132,27 @@ by a paid/waived request and also removes a leftover expiry hold on those
 app-added docs. In shadow mode this is a holds-only write (no status / no
 `users/{uid}`).
 
-The production app keeps the advance UI off (`advanceRenewalEnabled` is not
-readable by clients). An `ENV=dev` build treats the window as enabled with
-`advanceRenewalDays: 60` so tashil-dev testers can use it before late December.
-This does not flip `HOLDS_AUTHORITY_MODE` and does not change who may suspend.
+Clients may read only `config/subscriptions` (signed-in, no writes). The app
+reads `advanceRenewalEnabled` / `advanceRenewalDays` from that doc and falls
+back to the compile-time default (`ENV=dev` on, 60 days; prod off, 30 days)
+if the doc is missing or unreadable. A constructor override still wins in
+tests. During the advance window the renewal screen lists both periods: the
+current period stays renewable and cancellable (pending current-period
+requests stay visible), and the next period is listed separately. One submit
+is one period. This does not flip `HOLDS_AUTHORITY_MODE` and does not change
+who may suspend.
+
+Cloud Storage allows at most two unique Firestore document accesses per
+request (the emulator does not enforce this). `canAccessDelegateDocuments`
+therefore looks up only `users/{caller}` and `delegate_requests/{folderId}`.
+It never looks up `users/{folderId}`. A missing request doc is treated as an
+unresolved registration folder so company staff can upload before the request
+is created. Prove this against live tashil-dev with
+`scripts/smoke_tashil_dev_storage_upload.js` (never against prod).
+
+`startBillingCycle` caps `companyPriors` / `delegatePriors` on the run doc
+at 100 entries and spills the rest to
+`billing_cycles/{runId}/prior_shards/{shardId}`.
 
 Org-admin create rules require `incomingOrgScoped()` and `incomingCompanyScoped()`
 (cross-org create is denied; an org-admin with no companyUID cannot create). The

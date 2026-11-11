@@ -42,6 +42,10 @@ import {
   periodCodeAt,
   skipReasonForDelegate,
   yieldBillingRun,
+  partitionPriors,
+  priorShardId,
+  BILLING_PRIOR_DOC_CAP,
+  BILLING_PRIOR_SHARDS,
   type BillingRunState,
 } from "./billing_cycle";
 import {appAddedDelegateUids, coveredDelegateUids} from "./subscription_jobs";
@@ -147,15 +151,57 @@ async function loadOrClaimRun(
       tx.set(ref, stored, {merge: true});
     }
     return {action: claim.action, state: claim.state, ref};
+  }).then(async (claimed) => {
+    if (claimed.action === "resume" || claimed.action === "noop_done") {
+      return {...claimed, state: await mergePriorShards(ref, claimed.state)};
+    }
+    return claimed;
   });
+}
+
+async function mergePriorShards(
+  ref: FirebaseFirestore.DocumentReference,
+  state: BillingRunState,
+): Promise<BillingRunState> {
+  const snap = await ref.collection(BILLING_PRIOR_SHARDS).get();
+  if (snap.empty) return state;
+  const companyPriors = {...(state.companyPriors || {})} as Record<string, NonNullable<BillingRunState["companyPriors"]>[string]>;
+  const delegatePriors = {...(state.delegatePriors || {})} as Record<string, NonNullable<BillingRunState["delegatePriors"]>[string]>;
+  for (const doc of snap.docs) {
+    const data = doc.data() as {kind?: string; key?: string; prior?: Record<string, unknown>};
+    if (!data.key || !data.prior) continue;
+    if (data.kind === "company" && !companyPriors[data.key]) {
+      companyPriors[data.key] = data.prior as unknown as typeof companyPriors[string];
+    } else if (data.kind === "delegate" && !delegatePriors[data.key]) {
+      delegatePriors[data.key] = data.prior as unknown as typeof delegatePriors[string];
+    }
+  }
+  return {...state, companyPriors, delegatePriors};
 }
 
 async function saveRun(
   ref: FirebaseFirestore.DocumentReference,
   state: BillingRunState,
 ): Promise<void> {
+  const companies = partitionPriors(state.companyPriors, BILLING_PRIOR_DOC_CAP);
+  const delegates = partitionPriors(state.delegatePriors, BILLING_PRIOR_DOC_CAP);
+  const writer = new Batcher(ref.firestore);
+  for (const [key, prior] of Object.entries(companies.tail)) {
+    await writer.set(ref.collection(BILLING_PRIOR_SHARDS).doc(priorShardId("company", key)), {
+      kind: "company", key, prior,
+    }, true);
+  }
+  for (const [key, prior] of Object.entries(delegates.tail)) {
+    await writer.set(ref.collection(BILLING_PRIOR_SHARDS).doc(priorShardId("delegate", key)), {
+      kind: "delegate", key, prior,
+    }, true);
+  }
+  await writer.flush();
   await ref.set({
     ...state,
+    companyPriors: companies.head,
+    delegatePriors: delegates.head,
+    priorShardCount: companies.spilled + delegates.spilled,
     updatedAtTs: FieldValue.serverTimestamp(),
   }, {merge: true});
 }

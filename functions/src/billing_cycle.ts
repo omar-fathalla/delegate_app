@@ -344,3 +344,29 @@ export function finishBillingRun(state: BillingRunState, at: string, nowMs: numb
 export function periodCodeAt(at: Date): string {
   return periodOf(at).code;
 }
+
+/** Max prior entries kept on the billing_cycles run doc (1 MiB limit). */
+export const BILLING_PRIOR_DOC_CAP = 100;
+export const BILLING_PRIOR_SHARDS = "prior_shards";
+
+export function partitionPriors<T>(
+  map: Record<string, T> | undefined,
+  cap: number = BILLING_PRIOR_DOC_CAP,
+): {head: Record<string, T>; tail: Record<string, T>; spilled: number} {
+  const src = map || {};
+  const keys = Object.keys(src).sort();
+  if (keys.length <= cap) return {head: {...src}, tail: {}, spilled: 0};
+  const head: Record<string, T> = {};
+  const tail: Record<string, T> = {};
+  keys.forEach((k, i) => {
+    if (i < cap) head[k] = src[k];
+    else tail[k] = src[k];
+  });
+  return {head, tail, spilled: keys.length - cap};
+}
+
+export function priorShardId(kind: "company" | "delegate", key: string): string {
+  const safe = key.replace(/\//g, "_").replace(/[^A-Za-z0-9_.:-]/g, "_");
+  const trimmed = safe.length > 180 ? safe.slice(0, 180) : safe;
+  return `${kind}_${trimmed}`;
+}

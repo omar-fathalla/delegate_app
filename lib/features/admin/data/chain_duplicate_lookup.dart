@@ -21,7 +21,9 @@ class DuplicateChainLookup {
 }
 
 class DuplicateChainLookupException implements Exception {
-  const DuplicateChainLookupException([this.message = 'تعذر التحقق من المندوبين المسجلين. أعد المحاولة.']);
+  const DuplicateChainLookupException([
+    this.message = 'تعذر التحقق من المندوبين المسجلين. أعد المحاولة.',
+  ]);
   final String message;
   @override
   String toString() => message;
@@ -82,6 +84,28 @@ Future<DuplicateChainLookup> lookupDuplicateChains({
     }
   }
 
+  String _nationalIdOf(Map<String, dynamic> data) {
+    final raw = (data['nationalId'] ?? data['nationalityID'] ?? '').toString();
+    return raw.trim();
+  }
+
+  /// Phone match with a different national ID is a conflict: never attach
+  /// the typed person to that existing record.
+  void _assertPhoneMatchesIdentity(Map<String, dynamic> data) {
+    if (nid.isEmpty) return;
+    final existingNid = _nationalIdOf(data);
+    if (existingNid.isEmpty) {
+      throw const DuplicateChainLookupException(
+        'رقم الهاتف مسجّل لمندوب دون رقم قومي مؤكد. لا يمكن ربط هذا الطلب بتلك الهوية. راجع الرقم القومي ورقم الهاتف.',
+      );
+    }
+    if (existingNid != nid) {
+      throw const DuplicateChainLookupException(
+        'رقم الهاتف مسجّل لمندوب برقم قومي مختلف. لا يمكن ربط هذا الطلب بتلك الهوية. راجع الرقم القومي ورقم الهاتف.',
+      );
+    }
+  }
+
   for (final orgId in orgs) {
     final col = firestore
         .collection('organizations')
@@ -90,7 +114,10 @@ Future<DuplicateChainLookup> lookupDuplicateChains({
         .doc(companyUID)
         .collection('delegates');
 
-    Future<QuerySnapshot<Map<String, dynamic>>> query(String field, String value) async {
+    Future<QuerySnapshot<Map<String, dynamic>>> query(
+      String field,
+      String value,
+    ) async {
       try {
         return await col.where(field, isEqualTo: value).limit(2).get();
       } catch (e) {
@@ -100,21 +127,26 @@ Future<DuplicateChainLookup> lookupDuplicateChains({
       }
     }
 
-    Future<void> collect(String field, String value) async {
+    Future<void> collect(
+      String field,
+      String value, {
+      required bool phoneMatch,
+    }) async {
       if (value.isEmpty) return;
       final snap = await query(field, value);
       if (snap.docs.isEmpty) return;
       found.add(orgId);
       for (final doc in snap.docs) {
         final data = doc.data();
+        if (phoneMatch) _assertPhoneMatchesIdentity(data);
         final uid = (data['uid'] ?? doc.id).toString();
         recordUid(orgId, uid);
       }
     }
 
-    await collect('nationalId', nid);
-    await collect('nationalityID', nid);
-    await collect('phoneNumber', phone);
+    await collect('nationalId', nid, phoneMatch: false);
+    await collect('nationalityID', nid, phoneMatch: false);
+    await collect('phoneNumber', phone, phoneMatch: true);
   }
 
   Future<void> scanRequests(String field, String value) async {
@@ -144,8 +176,11 @@ Future<DuplicateChainLookup> lookupDuplicateChains({
             if (e.toString().trim().isNotEmpty) e.toString().trim(),
       };
       found.addAll(ids.intersection(orgs));
+      // Pending requests only occupy the chain; identity checks that would
+      // attach to a live record run against delegate docs, not this scan.
       final existing = (data['existingDelegateUid'] ?? '').toString().trim();
-      if (existing.isNotEmpty) recordUid(primary.isNotEmpty ? primary : existing, existing);
+      if (existing.isNotEmpty)
+        recordUid(primary.isNotEmpty ? primary : existing, existing);
     }
   }
 

@@ -448,6 +448,7 @@ test("advance renewal: next-period quote is 500 and does not clear an expiry hol
   await db.doc(delegatePath("o1", "appAdv1")).set({
     uid: "appAdv1", status: "suspended", companyUID: "c1",
     statusReason: "subscription_expired",
+    subscription: {periodCode: "2026_H2", paymentStatus: "paid", amountDue: 0},
     holds: {subscription_expired: {
       at: "2026-07-01T00:05:00.000Z", by: "system",
       source: "suspendExpiredSubscriptions", periodCode: "2026_H2",
@@ -487,8 +488,10 @@ test("advance renewal: next-period quote is 500 and does not clear an expiry hol
   assert.equal(d.status, "suspended", "must not reactivate before the paid period starts");
   assert.equal(d.statusReason, "subscription_expired");
   assert.ok(d.holds && d.holds.subscription_expired);
-  assert.equal(d.subscription.periodCode, "2027_H1");
+  assert.equal(d.subscription.periodCode, "2026_H2", "current subscription must be preserved");
   assert.equal(d.subscription.paymentStatus, "paid");
+  assert.equal(d.nextSubscription.periodCode, "2027_H1");
+  assert.equal(d.nextSubscription.paymentStatus, "paid");
 });
 
 test("advance renewal: on Jan 1 M1 skips prepaid uids and clears a leftover expiry hold", async () => {
@@ -496,10 +499,37 @@ test("advance renewal: on Jan 1 M1 skips prepaid uids and clears a leftover expi
   assert.ok((res.clearedHolds || 0) >= 1, `clearedHolds=${res.clearedHolds}`);
   const d = (await db.doc(delegatePath("o1", "appAdv1")).get()).data();
   assert.equal(d.holds && d.holds.subscription_expired, undefined);
-  // Shadow: leftover status is unchanged until the authoritative flip.
+  // Shadow: leftover status is unchanged until a current-period payment
+  // (or the authoritative flip). M1 only promotes nextSubscription.
   assert.equal(d.status, "suspended");
   assert.equal(d.statusReason, "subscription_expired");
   assert.equal(d.subscription.periodCode, "2027_H1");
+  assert.equal(d.nextSubscription, undefined);
   await db.doc("config/subscriptions").delete();
+});
+
+test("shadow paid renewal reactivates a legacy-suspended delegate when no holds remain", async () => {
+  await lateAppAdded("appShadowRe");
+  await db.doc(delegatePath("o1", "appShadowRe")).set({
+    uid: "appShadowRe", status: "suspended", companyUID: "c1",
+    statusReason: "subscription_expired",
+    holds: {subscription_expired: {
+      at: "2027-01-01T00:05:00.000Z", by: "system",
+      source: "suspendExpiredSubscriptions", periodCode: "2027_H1",
+    }},
+  });
+  await renewal("renShadowRe", ["appShadowRe"]);
+  const q = await J.quoteSubscriptionRequest(db, "renShadowRe", FEB_2027);
+  assert.equal(await J.applyVerifiedSubscriptionPayment(db, {
+    requestId: "renShadowRe", paymobTransactionId: "tx-shadow-re",
+    paymobOrderId: "o-shadow-re", success: true, amountCents: q.amountCents,
+    currency: "EGP", paidAt: FEB_2027,
+  }), "paid");
+  const d = (await db.doc(delegatePath("o1", "appShadowRe")).get()).data();
+  assert.equal(d.holds && d.holds.subscription_expired, undefined);
+  assert.equal(d.status, "active");
+  assert.equal(d.statusReason, undefined);
+  assert.equal(d.subscription.periodCode, "2027_H1");
+  assert.equal(d.subscription.paymentStatus, "paid");
 });
 

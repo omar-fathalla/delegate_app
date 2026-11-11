@@ -481,9 +481,11 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
           .get();
       final sourceData = sourceSnap.data();
       final sourceSub = sourceData == null ? null : sourceData['subscription'];
+      final sourceNext = sourceData == null ? null : sourceData['nextSubscription'];
       if (!SubscriptionCycleHelper.hasPaidCoverage(
         sourceSub is Map ? Map<String, dynamic>.from(sourceSub) : null,
         companyUID: companyUID,
+        nextSubscription: sourceNext is Map ? Map<String, dynamic>.from(sourceNext) : null,
       )) {
         return const Left(ServerFailure(
           'لا يمكن ربط المندوب بسلسلة إضافية إلا إذا كان اشتراكه مدفوعاً. '
@@ -1769,9 +1771,11 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       final d = doc.data();
       if ((d['companyUID'] ?? '').toString() != companyUID) continue;
       final sub = d['subscription'];
+      final next = d['nextSubscription'];
       if (!SubscriptionCycleHelper.hasPaidCoverage(
         sub is Map ? Map<String, dynamic>.from(sub) : null,
         companyUID: companyUID,
+        nextSubscription: next is Map ? Map<String, dynamic>.from(next) : null,
       )) {
         continue;
       }

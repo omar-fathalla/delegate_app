@@ -195,3 +195,17 @@ test("shadow mode plans no company or isPrinted writes and keeps priors", () => 
     totalApprovedDelegates: null,
   });
 });
+
+test("prior maps cap on the run doc and spill the rest", () => {
+  const map = {};
+  for (let i = 0; i < 150; i++) map[`k${String(i).padStart(3, "0")}`] = {n: i};
+  const part = B.partitionPriors(map, 100);
+  assert.equal(Object.keys(part.head).length, 100);
+  assert.equal(Object.keys(part.tail).length, 50);
+  assert.equal(part.spilled, 50);
+  assert.ok(part.head.k000);
+  assert.ok(part.tail.k100);
+  assert.equal(B.priorShardId("delegate", "organizations/o1/companies/c1/delegates/d1"),
+    "delegate_organizations_o1_companies_c1_delegates_d1");
+});
+

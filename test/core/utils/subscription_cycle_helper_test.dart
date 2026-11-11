@@ -57,7 +57,10 @@ void main() {
       final futureDate = DateTime.now().add(const Duration(days: 5));
 
       expect(SubscriptionCycleHelper.isSubscriptionExpired(pastDate), isTrue);
-      expect(SubscriptionCycleHelper.isSubscriptionExpired(futureDate), isFalse);
+      expect(
+        SubscriptionCycleHelper.isSubscriptionExpired(futureDate),
+        isFalse,
+      );
       expect(SubscriptionCycleHelper.isSubscriptionExpired(null), isFalse);
     });
 
@@ -65,57 +68,154 @@ void main() {
       final futureDate = DateTime.now().add(const Duration(days: 10, hours: 2));
       final pastDate = DateTime.now().subtract(const Duration(days: 2));
 
-      expect(SubscriptionCycleHelper.daysRemaining(futureDate), inInclusiveRange(9, 11));
+      expect(
+        SubscriptionCycleHelper.daysRemaining(futureDate),
+        inInclusiveRange(9, 11),
+      );
       expect(SubscriptionCycleHelper.daysRemaining(pastDate), equals(0));
       expect(SubscriptionCycleHelper.daysRemaining(null), equals(0));
     });
 
-    test('getRemainingMonthsInCycle calculates remaining months properly in H1 and H2', () {
-      // H1 (Jan to Jun)
-      expect(SubscriptionCycleHelper.getRemainingMonthsInCycle(DateTime(2026, 1, 15)), equals(6));
-      expect(SubscriptionCycleHelper.getRemainingMonthsInCycle(DateTime(2026, 2, 10)), equals(5));
-      expect(SubscriptionCycleHelper.getRemainingMonthsInCycle(DateTime(2026, 3, 20)), equals(4));
-      expect(SubscriptionCycleHelper.getRemainingMonthsInCycle(DateTime(2026, 4, 5)), equals(3));
-      expect(SubscriptionCycleHelper.getRemainingMonthsInCycle(DateTime(2026, 5, 25)), equals(2));
-      expect(SubscriptionCycleHelper.getRemainingMonthsInCycle(DateTime(2026, 6, 30)), equals(1));
+    test(
+      'getRemainingMonthsInCycle calculates remaining months properly in H1 and H2',
+      () {
+        // H1 (Jan to Jun)
+        expect(
+          SubscriptionCycleHelper.getRemainingMonthsInCycle(
+            DateTime(2026, 1, 15),
+          ),
+          equals(6),
+        );
+        expect(
+          SubscriptionCycleHelper.getRemainingMonthsInCycle(
+            DateTime(2026, 2, 10),
+          ),
+          equals(5),
+        );
+        expect(
+          SubscriptionCycleHelper.getRemainingMonthsInCycle(
+            DateTime(2026, 3, 20),
+          ),
+          equals(4),
+        );
+        expect(
+          SubscriptionCycleHelper.getRemainingMonthsInCycle(
+            DateTime(2026, 4, 5),
+          ),
+          equals(3),
+        );
+        expect(
+          SubscriptionCycleHelper.getRemainingMonthsInCycle(
+            DateTime(2026, 5, 25),
+          ),
+          equals(2),
+        );
+        expect(
+          SubscriptionCycleHelper.getRemainingMonthsInCycle(
+            DateTime(2026, 6, 30),
+          ),
+          equals(1),
+        );
 
-      // H2 (Jul to Dec)
-      expect(SubscriptionCycleHelper.getRemainingMonthsInCycle(DateTime(2026, 7, 1)), equals(6));
-      expect(SubscriptionCycleHelper.getRemainingMonthsInCycle(DateTime(2026, 8, 14)), equals(5));
-      expect(SubscriptionCycleHelper.getRemainingMonthsInCycle(DateTime(2026, 9, 15)), equals(4));
-      expect(SubscriptionCycleHelper.getRemainingMonthsInCycle(DateTime(2026, 10, 22)), equals(3));
-      expect(SubscriptionCycleHelper.getRemainingMonthsInCycle(DateTime(2026, 11, 8)), equals(2));
-      expect(SubscriptionCycleHelper.getRemainingMonthsInCycle(DateTime(2026, 12, 31)), equals(1));
-    });
+        // H2 (Jul to Dec)
+        expect(
+          SubscriptionCycleHelper.getRemainingMonthsInCycle(
+            DateTime(2026, 7, 1),
+          ),
+          equals(6),
+        );
+        expect(
+          SubscriptionCycleHelper.getRemainingMonthsInCycle(
+            DateTime(2026, 8, 14),
+          ),
+          equals(5),
+        );
+        expect(
+          SubscriptionCycleHelper.getRemainingMonthsInCycle(
+            DateTime(2026, 9, 15),
+          ),
+          equals(4),
+        );
+        expect(
+          SubscriptionCycleHelper.getRemainingMonthsInCycle(
+            DateTime(2026, 10, 22),
+          ),
+          equals(3),
+        );
+        expect(
+          SubscriptionCycleHelper.getRemainingMonthsInCycle(
+            DateTime(2026, 11, 8),
+          ),
+          equals(2),
+        );
+        expect(
+          SubscriptionCycleHelper.getRemainingMonthsInCycle(
+            DateTime(2026, 12, 31),
+          ),
+          equals(1),
+        );
+      },
+    );
 
-    test('isFreePromotionActive correctly identifies promotion window until 31/12/2026', () {
-      expect(SubscriptionCycleHelper.isFreePromotionActive(DateTime(2026, 10, 8)), isTrue);
-      expect(SubscriptionCycleHelper.isFreePromotionActive(DateTime(2026, 12, 31, 23, 59, 59)), isTrue);
-      expect(SubscriptionCycleHelper.isFreePromotionActive(DateTime(2027, 1, 1, 0, 0, 1)), isFalse);
-    });
+    test(
+      'isFreePromotionActive correctly identifies promotion window until 31/12/2026',
+      () {
+        expect(
+          SubscriptionCycleHelper.isFreePromotionActive(DateTime(2026, 10, 8)),
+          isTrue,
+        );
+        expect(
+          SubscriptionCycleHelper.isFreePromotionActive(
+            DateTime(2026, 12, 31, 23, 59, 59),
+          ),
+          isTrue,
+        );
+        expect(
+          SubscriptionCycleHelper.isFreePromotionActive(
+            DateTime(2027, 1, 1, 0, 0, 1),
+          ),
+          isFalse,
+        );
+      },
+    );
 
     test('dev free-period bypass is impossible when isDev is false', () {
       const company = SubscriptionCycleHelper.devPaidRenewalCompanyUID;
       expect(
-        SubscriptionCycleHelper.devFreePeriodBypass(isDev: false, companyUID: company),
+        SubscriptionCycleHelper.devFreePeriodBypass(
+          isDev: false,
+          companyUID: company,
+        ),
         isFalse,
       );
       expect(
-        SubscriptionCycleHelper.devFreePeriodBypass(isDev: true, companyUID: company),
+        SubscriptionCycleHelper.devFreePeriodBypass(
+          isDev: true,
+          companyUID: company,
+        ),
         isTrue,
       );
       expect(
-        SubscriptionCycleHelper.devFreePeriodBypass(isDev: true, companyUID: 'co_other'),
+        SubscriptionCycleHelper.devFreePeriodBypass(
+          isDev: true,
+          companyUID: 'co_other',
+        ),
         isFalse,
       );
       expect(
-        SubscriptionCycleHelper.devFreePeriodBypass(isDev: true, companyUID: ''),
+        SubscriptionCycleHelper.devFreePeriodBypass(
+          isDev: true,
+          companyUID: '',
+        ),
         isFalse,
       );
       // Widget/unit tests run without ENV=dev, so the live helper stays free in 2026
       // even when the test company id is passed.
       expect(
-        SubscriptionCycleHelper.isFreePromotionActive(DateTime(2026, 6, 15), company),
+        SubscriptionCycleHelper.isFreePromotionActive(
+          DateTime(2026, 6, 15),
+          company,
+        ),
         isTrue,
       );
     });
@@ -134,16 +234,30 @@ void main() {
       for (var m = 1; m <= 12; m++) {
         final first = DateTime(2027, m, 1);
         final last = DateTime(2027, m + 1, 0, 23, 59);
-        expect(SubscriptionCycleHelper.getProratedSubscriptionFee(first), expected[(m - 1) % 6], reason: 'month $m day 1');
-        expect(SubscriptionCycleHelper.getProratedSubscriptionFee(last), expected[(m - 1) % 6], reason: 'month $m last day');
+        expect(
+          SubscriptionCycleHelper.getProratedSubscriptionFee(first),
+          expected[(m - 1) % 6],
+          reason: 'month $m day 1',
+        );
+        expect(
+          SubscriptionCycleHelper.getProratedSubscriptionFee(last),
+          expected[(m - 1) % 6],
+          reason: 'month $m last day',
+        );
       }
     });
 
     test('roundMoney and totals for a multi-delegate renewal', () {
       expect(SubscriptionCycleHelper.roundMoney(416.666666), 416.67);
       expect(SubscriptionCycleHelper.roundMoney(1.005), 1.01);
-      expect(SubscriptionCycleHelper.totalFor(3, DateTime(2027, 2, 10)), 1250.01);
-      expect(SubscriptionCycleHelper.totalFor(2, DateTime(2027, 2, 10)), 833.34);
+      expect(
+        SubscriptionCycleHelper.totalFor(3, DateTime(2027, 2, 10)),
+        1250.01,
+      );
+      expect(
+        SubscriptionCycleHelper.totalFor(2, DateTime(2027, 2, 10)),
+        833.34,
+      );
       expect(SubscriptionCycleHelper.totalFor(0, DateTime(2027, 2, 10)), 0.0);
       expect(SubscriptionCycleHelper.totalFor(5, DateTime(2026, 11, 10)), 0.0);
       expect(SubscriptionCycleHelper.formatEgp(500), '500');
@@ -152,141 +266,311 @@ void main() {
 
     test('free promotion boundary on 2026-12-31 in Cairo time', () {
       // 21:59:59Z on 31 Dec = 23:59:59 Cairo (UTC+2) -> still free.
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime.utc(2026, 12, 31, 21, 59, 59)), 0.0);
+      expect(
+        SubscriptionCycleHelper.getProratedSubscriptionFee(
+          DateTime.utc(2026, 12, 31, 21, 59, 59),
+        ),
+        0.0,
+      );
       // 22:00Z on 31 Dec = 00:00 on 1 Jan 2027 Cairo -> paid, full period.
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime.utc(2026, 12, 31, 22)), 500.0);
-      expect(SubscriptionCycleHelper.getCycleCode(DateTime.utc(2026, 12, 31, 22)), '2027_H1');
+      expect(
+        SubscriptionCycleHelper.getProratedSubscriptionFee(
+          DateTime.utc(2026, 12, 31, 22),
+        ),
+        500.0,
+      );
+      expect(
+        SubscriptionCycleHelper.getCycleCode(DateTime.utc(2026, 12, 31, 22)),
+        '2027_H1',
+      );
       for (var m = 1; m <= 12; m++) {
-        expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, m, 15)), 0.0);
+        expect(
+          SubscriptionCycleHelper.getProratedSubscriptionFee(
+            DateTime(2026, m, 15),
+          ),
+          0.0,
+        );
       }
     });
 
     test('period boundaries in Cairo time (summer time on 1 July)', () {
       // Cairo is UTC+3 on 1 July: 21:00Z on 30 June is already H2.
-      expect(SubscriptionCycleHelper.cairoUtcOffset(DateTime.utc(2027, 6, 30, 12)), const Duration(hours: 3));
-      expect(SubscriptionCycleHelper.getCycleCode(DateTime.utc(2027, 6, 30, 20, 59, 59)), '2027_H1');
-      expect(SubscriptionCycleHelper.getCycleCode(DateTime.utc(2027, 6, 30, 21)), '2027_H2');
+      expect(
+        SubscriptionCycleHelper.cairoUtcOffset(DateTime.utc(2027, 6, 30, 12)),
+        const Duration(hours: 3),
+      );
+      expect(
+        SubscriptionCycleHelper.getCycleCode(
+          DateTime.utc(2027, 6, 30, 20, 59, 59),
+        ),
+        '2027_H1',
+      );
+      expect(
+        SubscriptionCycleHelper.getCycleCode(DateTime.utc(2027, 6, 30, 21)),
+        '2027_H2',
+      );
       // Winter: UTC+2.
-      expect(SubscriptionCycleHelper.cairoUtcOffset(DateTime.utc(2027, 1, 1)), const Duration(hours: 2));
-      expect(SubscriptionCycleHelper.periodStartDay(DateTime(2027, 3, 3)), '2027-01-01');
-      expect(SubscriptionCycleHelper.periodEndDay(DateTime(2027, 3, 3)), '2027-06-30');
-      expect(SubscriptionCycleHelper.periodEndDay(DateTime(2027, 9, 3)), '2027-12-31');
+      expect(
+        SubscriptionCycleHelper.cairoUtcOffset(DateTime.utc(2027, 1, 1)),
+        const Duration(hours: 2),
+      );
+      expect(
+        SubscriptionCycleHelper.periodStartDay(DateTime(2027, 3, 3)),
+        '2027-01-01',
+      );
+      expect(
+        SubscriptionCycleHelper.periodEndDay(DateTime(2027, 3, 3)),
+        '2027-06-30',
+      );
+      expect(
+        SubscriptionCycleHelper.periodEndDay(DateTime(2027, 9, 3)),
+        '2027-12-31',
+      );
     });
 
-    test('getProratedSubscriptionFee returns 0.0 during the 2026 promotion, prorated after', () {
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 10, 8)), equals(0.0));
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2026, 12, 31)), equals(0.0));
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2027, 1, 1)), equals(500.0));
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2027, 3, 1)), equals(333.33));
-      expect(SubscriptionCycleHelper.getProratedSubscriptionFee(DateTime(2027, 4, 1)), equals(250.0));
-    });
+    test(
+      'getProratedSubscriptionFee returns 0.0 during the 2026 promotion, prorated after',
+      () {
+        expect(
+          SubscriptionCycleHelper.getProratedSubscriptionFee(
+            DateTime(2026, 10, 8),
+          ),
+          equals(0.0),
+        );
+        expect(
+          SubscriptionCycleHelper.getProratedSubscriptionFee(
+            DateTime(2026, 12, 31),
+          ),
+          equals(0.0),
+        );
+        expect(
+          SubscriptionCycleHelper.getProratedSubscriptionFee(
+            DateTime(2027, 1, 1),
+          ),
+          equals(500.0),
+        );
+        expect(
+          SubscriptionCycleHelper.getProratedSubscriptionFee(
+            DateTime(2027, 3, 1),
+          ),
+          equals(333.33),
+        );
+        expect(
+          SubscriptionCycleHelper.getProratedSubscriptionFee(
+            DateTime(2027, 4, 1),
+          ),
+          equals(250.0),
+        );
+      },
+    );
 
-    test('hasPaidCoverage requires a paid or waived current-period subscription', () {
-      final at = DateTime(2027, 2, 10);
-      expect(
-        SubscriptionCycleHelper.hasPaidCoverage({
-          'paymentStatus': 'paid',
-          'periodCode': '2027_H1',
-        }, at: at),
-        isTrue,
-      );
-      expect(
-        SubscriptionCycleHelper.hasPaidCoverage({
-          'paymentStatus': 'paid',
-          'periodCode': '2026_H2',
-        }, at: at),
-        isFalse,
-      );
-      expect(
-        SubscriptionCycleHelper.hasPaidCoverage({
-          'paymentStatus': 'pending',
-          'periodCode': '2027_H1',
-        }, at: at),
-        isFalse,
-      );
-      expect(SubscriptionCycleHelper.hasPaidCoverage(null, at: at), isFalse);
-      expect(
-        SubscriptionCycleHelper.hasPaidCoverage({
-          'paymentStatus': 'waived',
-          'periodCode': '2026_H2',
-        }, at: DateTime(2026, 8, 1), companyUID: 'other'),
-        isTrue,
-      );
-    });
+    test(
+      'hasPaidCoverage requires a paid or waived current-period subscription',
+      () {
+        final at = DateTime(2027, 2, 10);
+        expect(
+          SubscriptionCycleHelper.hasPaidCoverage({
+            'paymentStatus': 'paid',
+            'periodCode': '2027_H1',
+          }, at: at),
+          isTrue,
+        );
+        expect(
+          SubscriptionCycleHelper.hasPaidCoverage({
+            'paymentStatus': 'paid',
+            'periodCode': '2026_H2',
+          }, at: at),
+          isFalse,
+        );
+        expect(
+          SubscriptionCycleHelper.hasPaidCoverage({
+            'paymentStatus': 'pending',
+            'periodCode': '2027_H1',
+          }, at: at),
+          isFalse,
+        );
+        expect(SubscriptionCycleHelper.hasPaidCoverage(null, at: at), isFalse);
+        expect(
+          SubscriptionCycleHelper.hasPaidCoverage(
+            {'paymentStatus': 'waived', 'periodCode': '2026_H2'},
+            at: DateTime(2026, 8, 1),
+            companyUID: 'other',
+          ),
+          isTrue,
+        );
+        // A prepaid next period must not count as current coverage.
+        expect(
+          SubscriptionCycleHelper.hasPaidCoverage(
+            {'paymentStatus': 'paid', 'periodCode': '2026_H2'},
+            at: DateTime(2026, 11, 11),
+            nextSubscription: {
+              'paymentStatus': 'paid',
+              'periodCode': '2027_H1',
+            },
+          ),
+          isTrue,
+        );
+        expect(
+          SubscriptionCycleHelper.hasPaidCoverage({
+            'paymentStatus': 'paid',
+            'periodCode': '2026_H2',
+          }, at: DateTime(2026, 11, 11)),
+          isTrue,
+        );
+        expect(
+          SubscriptionCycleHelper.hasPaidCoverage({
+            'paymentStatus': 'paid',
+            'periodCode': '2027_H1',
+          }, at: DateTime(2026, 11, 11)),
+          isFalse,
+        );
+        expect(
+          SubscriptionCycleHelper.hasPaidCoverage(
+            {'paymentStatus': 'paid', 'periodCode': '2026_H2'},
+            at: DateTime(2027, 1, 2),
+            nextSubscription: {
+              'paymentStatus': 'paid',
+              'periodCode': '2027_H1',
+            },
+          ),
+          isTrue,
+        );
+      },
+    );
 
     test('nextCycleCode walks H1 to H2 and H2 to the next year', () {
-      expect(SubscriptionCycleHelper.nextCycleCode(DateTime(2026, 11, 11)), '2027_H1');
-      expect(SubscriptionCycleHelper.nextCycleCode(DateTime(2027, 3, 1)), '2027_H2');
+      expect(
+        SubscriptionCycleHelper.nextCycleCode(DateTime(2026, 11, 11)),
+        '2027_H1',
+      );
+      expect(
+        SubscriptionCycleHelper.nextCycleCode(DateTime(2027, 3, 1)),
+        '2027_H2',
+      );
       expect(SubscriptionCycleHelper.nextCycleCode(null, '2026_H2'), '2027_H1');
     });
 
     test('advance window is closed when the flag is off', () {
       expect(
-        SubscriptionCycleHelper.isAdvanceRenewalOpen(DateTime(2026, 12, 15), enabled: false, days: 30),
+        SubscriptionCycleHelper.isAdvanceRenewalOpen(
+          DateTime(2026, 12, 15),
+          enabled: false,
+          days: 30,
+        ),
         isFalse,
       );
       expect(
-        SubscriptionCycleHelper.payableCycleCode(DateTime(2026, 12, 15), enabled: false, days: 30),
+        SubscriptionCycleHelper.payableCycleCode(
+          DateTime(2026, 12, 15),
+          enabled: false,
+          days: 30,
+        ),
         '2026_H2',
       );
     });
 
     test('30-day window opens on 2 Dec and closes at the period end', () {
       expect(
-        SubscriptionCycleHelper.advanceWindowOpensAt(DateTime(2026, 11, 11), days: 30),
+        SubscriptionCycleHelper.advanceWindowOpensAt(
+          DateTime(2026, 11, 11),
+          days: 30,
+        ),
         DateTime(2026, 12, 2),
       );
       expect(
-        SubscriptionCycleHelper.isAdvanceRenewalOpen(DateTime(2026, 12, 1), enabled: true, days: 30),
+        SubscriptionCycleHelper.isAdvanceRenewalOpen(
+          DateTime(2026, 12, 1),
+          enabled: true,
+          days: 30,
+        ),
         isFalse,
       );
       expect(
-        SubscriptionCycleHelper.isAdvanceRenewalOpen(DateTime(2026, 12, 2), enabled: true, days: 30),
+        SubscriptionCycleHelper.isAdvanceRenewalOpen(
+          DateTime(2026, 12, 2),
+          enabled: true,
+          days: 30,
+        ),
         isTrue,
       );
       expect(
-        SubscriptionCycleHelper.isAdvanceRenewalOpen(DateTime(2026, 12, 31, 23, 59, 59), enabled: true, days: 30),
+        SubscriptionCycleHelper.isAdvanceRenewalOpen(
+          DateTime(2026, 12, 31, 23, 59, 59),
+          enabled: true,
+          days: 30,
+        ),
         isTrue,
       );
       expect(
-        SubscriptionCycleHelper.isAdvanceRenewalOpen(DateTime(2027, 1, 1), enabled: true, days: 30),
+        SubscriptionCycleHelper.isAdvanceRenewalOpen(
+          DateTime(2027, 1, 1),
+          enabled: true,
+          days: 30,
+        ),
         isFalse,
       );
     });
 
     test('60-day tashil-dev window is already open in mid-November 2026', () {
       expect(
-        SubscriptionCycleHelper.advanceWindowOpensAt(DateTime(2026, 11, 11), days: 60),
+        SubscriptionCycleHelper.advanceWindowOpensAt(
+          DateTime(2026, 11, 11),
+          days: 60,
+        ),
         DateTime(2026, 11, 2),
       );
       expect(
-        SubscriptionCycleHelper.isAdvanceRenewalOpen(DateTime(2026, 11, 11), enabled: true, days: 60),
+        SubscriptionCycleHelper.isAdvanceRenewalOpen(
+          DateTime(2026, 11, 11),
+          enabled: true,
+          days: 60,
+        ),
         isTrue,
       );
       expect(
-        SubscriptionCycleHelper.payableCycleCode(DateTime(2026, 11, 11), enabled: true, days: 60),
+        SubscriptionCycleHelper.payableCycleCode(
+          DateTime(2026, 11, 11),
+          enabled: true,
+          days: 60,
+        ),
         '2027_H1',
       );
       // February is not in the last 60 days of H1 (window opens ~3 May).
       expect(
-        SubscriptionCycleHelper.isAdvanceRenewalOpen(DateTime(2027, 2, 10), enabled: true, days: 60),
+        SubscriptionCycleHelper.isAdvanceRenewalOpen(
+          DateTime(2027, 2, 10),
+          enabled: true,
+          days: 60,
+        ),
         isFalse,
       );
     });
 
-    test('a future period is quoted at its start, not zeroed by today\'s free promotion', () {
-      expect(
-        SubscriptionCycleHelper.getFeeForPeriod('2027_H1', DateTime(2026, 12, 15)),
-        500.0,
-      );
-      expect(
-        SubscriptionCycleHelper.getFeeForPeriod('2026_H2', DateTime(2026, 12, 15)),
-        0.0,
-      );
-      expect(
-        SubscriptionCycleHelper.getFeeForPeriod('2027_H1', DateTime(2027, 3, 1)),
-        333.33,
-      );
-    });
+    test(
+      'a future period is quoted at its start, not zeroed by today\'s free promotion',
+      () {
+        expect(
+          SubscriptionCycleHelper.getFeeForPeriod(
+            '2027_H1',
+            DateTime(2026, 12, 15),
+          ),
+          500.0,
+        );
+        expect(
+          SubscriptionCycleHelper.getFeeForPeriod(
+            '2026_H2',
+            DateTime(2026, 12, 15),
+          ),
+          0.0,
+        );
+        expect(
+          SubscriptionCycleHelper.getFeeForPeriod(
+            '2027_H1',
+            DateTime(2027, 3, 1),
+          ),
+          333.33,
+        );
+      },
+    );
   });
 }

@@ -2174,14 +2174,15 @@ service cloud.firestore {
     }
 
     match /leave_requests/{requestId} {
-      // Own-id first so a delegateUid==uid list stays under the
-      // 1000-expression budget and is provable without companyUID.
+      // Split allow rules so a company+status list is provable for HR
+      // (a single OR with unconstrained own-id branches made that query
+      // PERMISSION_DENIED). Own-id stays a separate rule for delegates.
+      allow read: if signedIn() && isGlobalStaff();
+      allow read: if signedIn() && isCompanyScopedStaff() && companyScoped();
+      allow read: if signedIn() && isOrgScopedStaff() && orgScoped();
       allow read: if signedIn() && (
         ownsDelegateId(resource.data.delegateUid)
         || delegateOwns(resource.data.delegateUid)
-        || isGlobalStaff()
-        || (isCompanyScopedStaff() && companyScoped())
-        || (isOrgScopedStaff() && orgScoped())
       );
       allow create: if signedIn() && (
         ownsDelegateId(request.resource.data.delegateUid)
@@ -2224,6 +2225,13 @@ service cloud.firestore {
     // (config/delegate_auth.otpEnforcementEnabled). Clients cannot touch it.
     // config/subscription_dev (tashil-dev free-period bypass list) is also
     // server-only; the Admin SDK honors it only when projectId is tashil-dev.
+    // Public subscription flags (advance renewal, etc.). Clients may read
+    // only this doc; every other config/* stays deny-all. Do not put secrets
+    // or bypass lists here.
+    match /config/subscriptions {
+      allow read: if signedIn();
+      allow write: if false;
+    }
     match /config/{docId} {
       allow read, write: if false;
     }

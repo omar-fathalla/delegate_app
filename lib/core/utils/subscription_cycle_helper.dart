@@ -27,7 +27,14 @@ class SubscriptionCycleHelper {
   static const String devPaidRenewalCompanyUID = 'co_dev_renewal_paid';
 
   /// Kept for older callers: last free instant (Cairo wall time).
-  static final DateTime freePromotionEndDate = DateTime(2026, 12, 31, 23, 59, 59);
+  static final DateTime freePromotionEndDate = DateTime(
+    2026,
+    12,
+    31,
+    23,
+    59,
+    59,
+  );
 
   // ---------------------------------------------------------------- Cairo time
 
@@ -37,7 +44,15 @@ class SubscriptionCycleHelper {
     if (!d.isUtc) return d;
     final offset = cairoUtcOffset(d);
     final w = d.add(offset);
-    return DateTime(w.year, w.month, w.day, w.hour, w.minute, w.second, w.millisecond);
+    return DateTime(
+      w.year,
+      w.month,
+      w.day,
+      w.hour,
+      w.minute,
+      w.second,
+      w.millisecond,
+    );
   }
 
   /// Egypt: UTC+2, UTC+3 from the last Friday of April 00:00 to the end of the
@@ -45,9 +60,21 @@ class SubscriptionCycleHelper {
   static Duration cairoUtcOffset(DateTime utc) {
     final y = utc.year;
     if (y < 2023) return const Duration(hours: 2);
-    final start = _lastWeekday(y, 4, DateTime.friday); // 00:00 local = 22:00 UTC the day before
-    final end = _lastWeekday(y, 10, DateTime.thursday); // 24:00 local (UTC+3) = 21:00 UTC
-    final startUtc = DateTime.utc(start.year, start.month, start.day).subtract(const Duration(hours: 2));
+    final start = _lastWeekday(
+      y,
+      4,
+      DateTime.friday,
+    ); // 00:00 local = 22:00 UTC the day before
+    final end = _lastWeekday(
+      y,
+      10,
+      DateTime.thursday,
+    ); // 24:00 local (UTC+3) = 21:00 UTC
+    final startUtc = DateTime.utc(
+      start.year,
+      start.month,
+      start.day,
+    ).subtract(const Duration(hours: 2));
     final endUtc = DateTime.utc(end.year, end.month, end.day, 21);
     final inDst = !utc.isBefore(startUtc) && utc.isBefore(endUtc);
     return Duration(hours: inDst ? 3 : 2);
@@ -93,7 +120,8 @@ class SubscriptionCycleHelper {
   }
 
   /// 'YYYY-MM-DD' inclusive bounds stored on subscriptions.
-  static String periodStartDay([DateTime? date]) => _day(getCycleStartDate(date));
+  static String periodStartDay([DateTime? date]) =>
+      _day(getCycleStartDate(date));
   static String periodEndDay([DateTime? date]) => _day(getCycleEndDate(date));
 
   static String _day(DateTime d) =>
@@ -151,20 +179,31 @@ class SubscriptionCycleHelper {
   }
 
   /// Fee one delegate pays when registering or renewing at [date].
-  static double getProratedSubscriptionFee([DateTime? date, String? companyUID]) {
+  static double getProratedSubscriptionFee([
+    DateTime? date,
+    String? companyUID,
+  ]) {
     if (isFreePromotionActive(date, companyUID)) return 0.0;
     return getFeeForMonths(getRemainingMonthsInCycle(date));
   }
 
   /// Total for several delegates renewed together (one Paymob payment).
-  static double totalFor(int delegateCount, [DateTime? date, String? companyUID]) {
+  static double totalFor(
+    int delegateCount, [
+    DateTime? date,
+    String? companyUID,
+  ]) {
     if (delegateCount <= 0) return 0.0;
-    return roundMoney(getProratedSubscriptionFee(date, companyUID) * delegateCount);
+    return roundMoney(
+      getProratedSubscriptionFee(date, companyUID) * delegateCount,
+    );
   }
 
   static String formatEgp(double amount) {
     final r = roundMoney(amount);
-    return r == r.truncateToDouble() ? r.toStringAsFixed(0) : r.toStringAsFixed(2);
+    return r == r.truncateToDouble()
+        ? r.toStringAsFixed(0)
+        : r.toStringAsFixed(2);
   }
 
   /// True when [subscription] is paid for a period that still covers [at],
@@ -173,22 +212,38 @@ class SubscriptionCycleHelper {
     Map<String, dynamic>? subscription, {
     DateTime? at,
     String? companyUID,
+    Map<String, dynamic>? nextSubscription,
+  }) {
+    if (_mapCoversPeriod(subscription, at: at, companyUID: companyUID))
+      return true;
+    if (_mapCoversPeriod(nextSubscription, at: at, companyUID: companyUID))
+      return true;
+    return false;
+  }
+
+  /// A paid map covers only its own period (a prepaid next period stored on
+  /// [nextSubscription] or mistakenly on [subscription] must not count as
+  /// current coverage). Waived maps cover only during the free promotion.
+  static bool _mapCoversPeriod(
+    Map<String, dynamic>? subscription, {
+    DateTime? at,
+    String? companyUID,
   }) {
     if (subscription == null) return false;
     final status = (subscription['paymentStatus'] ?? '').toString().trim();
     final period = (subscription['periodCode'] ?? '').toString().trim();
     if (period.isEmpty) return false;
-    final when = cairoTime(at);
-    if (status == 'paid') {
-      if (period == getCycleCode(at)) return true;
-      final end = _coverageEnd(subscription, period);
-      return end != null && !when.isAfter(end);
+    if (status == 'paid') return period == getCycleCode(at);
+    if (status == 'waived' && isFreePromotionActive(at, companyUID)) {
+      return period == getCycleCode(at);
     }
-    if (status == 'waived' && isFreePromotionActive(at, companyUID)) return true;
     return false;
   }
 
-  static DateTime? _coverageEnd(Map<String, dynamic> subscription, String period) {
+  static DateTime? _coverageEnd(
+    Map<String, dynamic> subscription,
+    String period,
+  ) {
     final raw = subscription['periodEnd'] ?? subscription['period_end'];
     if (raw is String && raw.length >= 10) {
       final parsed = DateTime.tryParse(raw.substring(0, 10));
@@ -245,15 +300,26 @@ class SubscriptionCycleHelper {
         : DateTime(year, 12, 31, 23, 59, 59);
   }
 
-  static String periodStartDayForCode(String periodCode) => _day(getCycleStartDateForCode(periodCode));
-  static String periodEndDayForCode(String periodCode) => _day(getCycleEndDateForCode(periodCode));
+  static String periodStartDayForCode(String periodCode) =>
+      _day(getCycleStartDateForCode(periodCode));
+  static String periodEndDayForCode(String periodCode) =>
+      _day(getCycleEndDateForCode(periodCode));
 
   /// 00:00 Cairo on the first day of the last [days] calendar days of the
   /// current period (the period end day is included).
-  static DateTime advanceWindowOpensAt(DateTime date, {int days = defaultAdvanceRenewalDays}) {
-    final safe = days < 1 ? defaultAdvanceRenewalDays : (days > 180 ? 180 : days);
+  static DateTime advanceWindowOpensAt(
+    DateTime date, {
+    int days = defaultAdvanceRenewalDays,
+  }) {
+    final safe = days < 1
+        ? defaultAdvanceRenewalDays
+        : (days > 180 ? 180 : days);
     final end = getCycleEndDate(date);
-    final openDay = DateTime(end.year, end.month, end.day).subtract(Duration(days: safe - 1));
+    final openDay = DateTime(
+      end.year,
+      end.month,
+      end.day,
+    ).subtract(Duration(days: safe - 1));
     return DateTime(openDay.year, openDay.month, openDay.day);
   }
 
@@ -265,7 +331,9 @@ class SubscriptionCycleHelper {
     if (!enabled) return false;
     final cairo = cairoTime(date);
     final opens = advanceWindowOpensAt(date, days: days);
-    final periodEndExclusive = getCycleEndDate(date).add(const Duration(seconds: 1));
+    final periodEndExclusive = getCycleEndDate(
+      date,
+    ).add(const Duration(seconds: 1));
     return !cairo.isBefore(opens) && cairo.isBefore(periodEndExclusive);
   }
 
@@ -284,11 +352,18 @@ class SubscriptionCycleHelper {
 
   /// Fee for [periodCode] at [date]. A future period is quoted at its start
   /// (full 500, not today's remaining months or today's free-promotion zero).
-  static double getFeeForPeriod(String periodCode, [DateTime? date, String? companyUID]) {
+  static double getFeeForPeriod(
+    String periodCode, [
+    DateTime? date,
+    String? companyUID,
+  ]) {
     final current = getCycleCode(date);
     if (periodCode == current) {
       return getProratedSubscriptionFee(date, companyUID);
     }
-    return getProratedSubscriptionFee(getCycleStartDateForCode(periodCode), companyUID);
+    return getProratedSubscriptionFee(
+      getCycleStartDateForCode(periodCode),
+      companyUID,
+    );
   }
 }
