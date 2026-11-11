@@ -82,6 +82,7 @@ export const setDelegateHold = functions.region("us-central1").runWith(opts).htt
       return {
         ok: true,
         unchanged: !!plan.unchanged,
+        reason: plan.reason || null,
         mode: plan.mode || holdsMode(),
         holds: plan.nextHolds,
         derivedStatus: plan.derivedStatus,

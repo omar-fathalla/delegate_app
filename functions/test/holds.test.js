@@ -197,6 +197,83 @@ test("inferHoldsFromStatusReason maps web and mobile reasons", () => {
   assert.deepEqual(H.inferHoldsFromStatusReason("rejected", "some text", at, "backfill"), {});
 });
 
+test("legacy suspended with no holds map: remove admin_suspend does not reactivate subscription_expired", () => {
+  const plan = H.planHoldChange({
+    data: {status: "suspended", statusReason: "subscription_expired"},
+    op: "remove", hold: H.HOLD_ADMIN_SUSPEND, actor: "sup", mode: "authoritative", at,
+  });
+  assert.equal(plan.ok, true);
+  assert.equal(plan.reason, "hold_not_present");
+  assert.equal(plan.unchanged, false);
+  assert.equal(plan.derivedStatus, "suspended");
+  assert.ok(plan.nextHolds.subscription_expired);
+  assert.equal(plan.nextHolds.admin_suspend, undefined);
+  assert.equal(plan.nextStatusReason, "subscription_expired");
+});
+
+test("legacy payment-bypass: add then remove admin_suspend keeps subscription_expired", () => {
+  const added = H.planHoldChange({
+    data: {status: "suspended", statusReason: "subscription_expired"},
+    op: "add", hold: H.HOLD_ADMIN_SUSPEND, actor: "sup", mode: "authoritative", at,
+  });
+  assert.equal(added.ok, true);
+  assert.equal(added.derivedStatus, "suspended");
+  assert.ok(added.nextHolds.subscription_expired);
+  assert.ok(added.nextHolds.admin_suspend);
+  assert.equal(added.nextStatusReason, "admin_suspend");
+  const removed = H.planHoldChange({
+    data: {status: "suspended", statusReason: "admin_suspend", holds: added.nextHolds, statusVersion: added.statusVersion},
+    op: "remove", hold: H.HOLD_ADMIN_SUSPEND, actor: "sup", mode: "authoritative", at,
+  });
+  assert.equal(removed.ok, true);
+  assert.equal(removed.derivedStatus, "suspended");
+  assert.ok(removed.nextHolds.subscription_expired);
+  assert.equal(removed.nextHolds.admin_suspend, undefined);
+  assert.equal(removed.nextStatusReason, "subscription_expired");
+});
+
+test("removing a non-present hold on an already-mapped document is a clear no-op", () => {
+  const plan = H.planHoldChange({
+    data: {
+      status: "suspended",
+      statusReason: "subscription_expired",
+      holds: {[H.HOLD_SUBSCRIPTION_EXPIRED]: {at}},
+      statusVersion: 1,
+    },
+    op: "remove", hold: H.HOLD_ADMIN_SUSPEND, actor: "sup", mode: "authoritative", at,
+  });
+  assert.equal(plan.ok, true);
+  assert.equal(plan.unchanged, true);
+  assert.equal(plan.reason, "hold_not_present");
+  assert.equal(plan.derivedStatus, "suspended");
+  assert.ok(plan.nextHolds.subscription_expired);
+});
+
+test("shouldRevokeRefreshTokens only after an authoritative write that leaves the delegate suspended", () => {
+  const added = H.planHoldChange({
+    data: {status: "active", holds: {}},
+    op: "add", hold: H.HOLD_ADMIN_SUSPEND, actor: "sup", mode: "authoritative", at,
+  });
+  assert.equal(H.shouldRevokeRefreshTokens(added), true);
+  const shadow = H.planHoldChange({
+    data: {status: "active", holds: {}},
+    op: "add", hold: H.HOLD_ADMIN_SUSPEND, actor: "sup", mode: "shadow", at,
+  });
+  assert.equal(H.shouldRevokeRefreshTokens(shadow), false);
+  const removed = H.planHoldChange({
+    data: {status: "suspended", holds: {[H.HOLD_ADMIN_SUSPEND]: {at}}, statusVersion: 1},
+    op: "remove", hold: H.HOLD_ADMIN_SUSPEND, actor: "sup", mode: "authoritative", at,
+  });
+  assert.equal(removed.derivedStatus, "active");
+  assert.equal(H.shouldRevokeRefreshTokens(removed), false);
+  const noop = H.planHoldChange({
+    data: {status: "suspended", holds: {[H.HOLD_ADMIN_SUSPEND]: {at}}, statusVersion: 1},
+    op: "add", hold: H.HOLD_ADMIN_SUSPEND, actor: "sup", mode: "authoritative", at,
+  });
+  assert.equal(noop.unchanged, true);
+  assert.equal(H.shouldRevokeRefreshTokens(noop), false);
+});
+
 test("inferRejectionReason copies free text only on rejected docs", () => {
   assert.equal(H.inferRejectionReason("rejected", "وثائق ناقصة", ""), "وثائق ناقصة");
   assert.equal(H.inferRejectionReason("rejected", "suspend", ""), "");

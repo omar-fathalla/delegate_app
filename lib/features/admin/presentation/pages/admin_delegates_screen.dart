@@ -942,8 +942,13 @@ class _CompactDelegateTile extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Text('$action المندوب'),
           content: Text(
-            'هل تريد $action المندوب "${delegate.fullName}"؟\n\n'
-            'يُسجَّل الطلب في سجلات الإيقاف الآن. الحالة الظاهرة قد لا تتغير فوراً.',
+            suspend
+                ? 'هل تريد إيقاف المندوب "${delegate.fullName}"؟\n\n'
+                    'سيتم إيقاف حساب المندوب وتسجيل خروجه. إذا كان عليه إيقاف آخر '
+                    '(مثل انتهاء الاشتراك) فسيبقى موقوفاً حتى تُرفع كل أسباب الإيقاف.'
+                : 'هل تريد إعادة تفعيل المندوب "${delegate.fullName}"؟\n\n'
+                    'سيتم رفع إيقاف الإدارة فقط. إذا كان المندوب موقوفاً لسبب آخر '
+                    '(مثل انتهاء الاشتراك) فسيبقى موقوفاً.',
             style: const TextStyle(fontSize: 14, height: 1.4),
           ),
           actions: [
@@ -965,19 +970,32 @@ class _CompactDelegateTile extends StatelessWidget {
     );
     if (confirmed != true || !context.mounted) return;
     try {
-      await DelegateHoldRemote().setDelegateHold(
+      final result = await DelegateHoldRemote().setDelegateHold(
         uid: delegate.uid,
         organizationUID: delegate.organizationUID,
         companyUID: delegate.companyUID,
         op: suspend ? 'add' : 'remove',
       );
       if (!context.mounted) return;
-      AppSnackBar.showSuccess(
-        context,
-        suspend
-            ? 'تم تسجيل إيقاف المندوب.'
-            : 'تم تسجيل إعادة تفعيل المندوب.',
-      );
+      final reason = result['reason']?.toString();
+      final derived = result['derivedStatus']?.toString();
+      if (reason == 'hold_not_present') {
+        AppSnackBar.showSuccess(
+          context,
+          derived == 'suspended'
+              ? 'هذا الإيقاف غير موجود. المندوب ما زال موقوفاً لسبب آخر.'
+              : 'هذا الإيقاف غير موجود على حساب المندوب.',
+        );
+      } else if (suspend) {
+        AppSnackBar.showSuccess(context, 'تم إيقاف المندوب.');
+      } else if (derived == 'suspended') {
+        AppSnackBar.showSuccess(
+          context,
+          'تم رفع إيقاف الإدارة. المندوب ما زال موقوفاً لسبب آخر.',
+        );
+      } else {
+        AppSnackBar.showSuccess(context, 'تم إعادة تفعيل المندوب.');
+      }
       onRefresh?.call();
     } on DelegateHoldException catch (e) {
       if (context.mounted) AppSnackBar.showError(context, e.message);

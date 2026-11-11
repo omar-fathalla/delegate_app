@@ -393,6 +393,13 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           ),
         );
         break;
+      case 'manage_delegates':
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => AdminDelegatesScreen(adminDelegate: widget.delegate),
+          ),
+        );
+        break;
       case 'session_control':
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -849,6 +856,11 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
               ),
             ],
             if (isTechnicalSupport) ...[
+              buildPopupItem(
+                value: 'manage_delegates',
+                icon: Icons.groups_rounded,
+                title: 'المناديب — تعديل وإيقاف',
+              ),
               buildPopupItem(
                 value: 'photo_permissions',
                 icon: Icons.photo_library_rounded,

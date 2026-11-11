@@ -2,7 +2,9 @@
  * Firestore transaction that applies a hold add/remove through holds.ts.
  * Shadow mode does not write status or statusReason.
  */
+import {getAuth} from "firebase-admin/auth";
 import {FieldValue} from "firebase-admin/firestore";
+import {logger} from "firebase-functions";
 import {
   HOLD_KEYS,
   authorityStatusFields,
@@ -10,6 +12,7 @@ import {
   isHoldKey,
   isHoldOp,
   planHoldChange,
+  shouldRevokeRefreshTokens,
   type HoldKey,
   type HoldOp,
   type HoldChangePlan,
@@ -37,6 +40,7 @@ export interface ApplyHoldArgs {
   cycleId?: string;
   at?: string;
   mode?: string;
+  revokeRefreshTokens?: (uid: string) => Promise<void>;
 }
 
 function serializeHolds(holds: HoldChangePlan["nextHolds"]): Record<string, unknown> {
@@ -101,6 +105,17 @@ export async function applyHoldChange(db: Db, args: ApplyHoldArgs): Promise<Hold
       ...plan.history,
       writtenAt: FieldValue.serverTimestamp(),
     });
+    return plan;
+  }).then(async (plan) => {
+    if (shouldRevokeRefreshTokens(plan)) {
+      try {
+        const revoke = args.revokeRefreshTokens ??
+          ((uid: string) => getAuth().revokeRefreshTokens(uid));
+        await revoke(args.uid);
+      } catch (e) {
+        logger.warn("revokeRefreshTokens failed after hold", {message: String(e)});
+      }
+    }
     return plan;
   });
 }
