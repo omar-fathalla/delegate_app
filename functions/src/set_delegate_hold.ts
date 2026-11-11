@@ -4,7 +4,10 @@
  * Flutter has no App Check yet, so this callable does not enforce it.
  *
  * Deploy: functions:tashil-mobile-notifications:setDelegateHold
- * Do not deploy suspendExpiredSubscriptions with this function.
+ * Mode is process.env.HOLDS_AUTHORITY_MODE (default shadow). Flip or roll
+ * back on tashil-dev with scripts/holds_authority_mode.sh — do not upload
+ * source and do not deploy suspendExpiredSubscriptions with this function
+ * or with a mode flip.
  */
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";

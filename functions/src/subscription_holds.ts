@@ -8,6 +8,7 @@
 import {
   HOLD_KEYS,
   HOLD_SUBSCRIPTION_EXPIRED,
+  authorityStatusFields,
   holdsMode,
   parseHolds,
   planHoldChange,
@@ -131,9 +132,10 @@ export function planExpiryHoldWrite(input: {
     holdsAuthorityAt: input.at,
     ...(input.extra || {}),
   };
-  if (mode === "authoritative") {
-    update.status = plan.derivedStatus;
-    update.statusReason = plan.nextStatusReason;
+  const statusWrite = authorityStatusFields(mode, plan.derivedStatus, plan.nextStatusReason);
+  if (statusWrite) {
+    update.status = statusWrite.status;
+    update.statusReason = statusWrite.statusReason;
   }
   return {...empty, update};
 }

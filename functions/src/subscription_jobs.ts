@@ -228,8 +228,8 @@ export async function runSubscriptionSuspension(db: Db, now: Date): Promise<Susp
     if (planned.ok && !planned.unchanged) clearedHolds++;
   }
   res.clearedHolds = clearedHolds;
-  // users/{uid} is mirrored by the holds trigger once it is authoritative.
-  // Shadow mode does not write it here.
+  // users/{uid}.status is not mirrored here (login reads the delegate doc).
+  // Shadow mode does not write users/{uid}.
   await writer.flush();
   await db.collection(RUNS).doc(`${period.code}_${now.toISOString().slice(0, 10)}`).set({
     ...res, ranAt: ts,
@@ -869,7 +869,7 @@ export async function applyPaidRequest(db: Db, requestId: string, asOf?: Date): 
     }
     await writer.update(doc.ref, withWriteMeta(update, ts));
   }
-  // users/{uid} is mirrored by the holds trigger once it is authoritative.
+  // users/{uid}.status is not mirrored here (login reads the delegate doc).
   await writer.flush();
   await reqRef.update({applyState: "applied", reactivatedDocs: reactivated, appliedAt: ts});
   return reactivated;

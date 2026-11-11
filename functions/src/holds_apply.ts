@@ -5,6 +5,7 @@
 import {FieldValue} from "firebase-admin/firestore";
 import {
   HOLD_KEYS,
+  authorityStatusFields,
   holdsMode,
   isHoldKey,
   isHoldOp,
@@ -89,9 +90,11 @@ export async function applyHoldChange(db: Db, args: ApplyHoldArgs): Promise<Hold
       holdsAuthorityAt: at,
       updatedAt: FieldValue.serverTimestamp(),
     };
-    if (mode === "authoritative") {
-      update.status = plan.derivedStatus;
-      update.statusReason = plan.nextStatusReason === null ? FieldValue.delete() : plan.nextStatusReason;
+    const statusWrite = authorityStatusFields(mode, plan.derivedStatus, plan.nextStatusReason);
+    if (statusWrite) {
+      update.status = statusWrite.status;
+      update.statusReason = statusWrite.statusReason === null ?
+        FieldValue.delete() : statusWrite.statusReason;
     }
     tx.update(ref, update as FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData>);
     tx.set(ref.collection("statusHistory").doc(), {

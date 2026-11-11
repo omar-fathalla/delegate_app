@@ -31,7 +31,35 @@ test("holdsMode defaults to shadow unless HOLDS_AUTHORITY_MODE=authoritative", (
   assert.equal(H.holdsMode({}), "shadow");
   assert.equal(H.holdsMode({HOLDS_AUTHORITY_MODE: "shadow"}), "shadow");
   assert.equal(H.holdsMode({HOLDS_AUTHORITY_MODE: "nope"}), "shadow");
+  assert.equal(H.holdsMode({HOLDS_AUTHORITY_MODE: "Authoritative"}), "shadow");
   assert.equal(H.holdsMode({HOLDS_AUTHORITY_MODE: "authoritative"}), "authoritative");
+});
+
+test("authorityStatusFields writes status only in authoritative; rollback is one step", () => {
+  const derived = "suspended";
+  const reason = H.HOLD_ADMIN_SUSPEND;
+  assert.equal(H.authorityStatusFields("shadow", derived, reason), null);
+  assert.equal(H.authorityStatusFields("nope", derived, reason), null);
+  assert.equal(H.authorityStatusFields("", derived, reason), null);
+  assert.equal(H.authorityStatusFields(H.holdsMode({}), derived, reason), null);
+  assert.deepEqual(
+    H.authorityStatusFields("authoritative", derived, reason),
+    {status: "suspended", statusReason: reason},
+  );
+  assert.deepEqual(
+    H.authorityStatusFields("authoritative", "active", null),
+    {status: "active", statusReason: null},
+  );
+  // One-step rollback: after a flip, any non-authoritative env is shadow again.
+  const flipped = H.holdsMode({HOLDS_AUTHORITY_MODE: "authoritative"});
+  assert.equal(flipped, "authoritative");
+  assert.ok(H.authorityStatusFields(flipped, derived, reason));
+  const rolled = H.holdsMode({HOLDS_AUTHORITY_MODE: "shadow"});
+  assert.equal(rolled, "shadow");
+  assert.equal(H.authorityStatusFields(rolled, derived, reason), null);
+  const unset = H.holdsMode({});
+  assert.equal(unset, "shadow");
+  assert.equal(H.authorityStatusFields(unset, derived, reason), null);
 });
 
 test("planHoldChange in shadow does not change derived vs current status write", () => {
