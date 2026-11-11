@@ -54,6 +54,11 @@ describe("storage.rules", () => {
       await setDoc(doc(db, "users/hrB"), {role: "hr", companyUID: "coB", organizationUID: "o2"});
       await setDoc(doc(db, "users/supA"), {role: "admin", companyUID: "coA", organizationUID: "o1"});
       await setDoc(doc(db, "users/dlgA"), {role: "delegate", companyUID: "coA", uid: "dlgA"});
+      await setDoc(doc(db, "users/dlgB"), {role: "delegate", companyUID: "coA", uid: "dlgB"});
+      await setDoc(doc(db, "users/dlgOther"), {role: "delegate", companyUID: "coB", uid: "dlgOther"});
+      await setDoc(doc(db, "users/dlgBare"), {role: "delegate", companyUID: "coA", uid: "dlgBare"});
+      await setDoc(doc(db, "users/accA"), {role: "accountant", companyUID: "coA", organizationUID: "o1"});
+      await setDoc(doc(db, "users/mkA"), {role: "marketing", companyUID: "coA", organizationUID: "o1"});
       await setDoc(doc(db, "storage_upload_intents/folderA"), {companyUID: "coA", createdBy: "callable"});
       await setDoc(doc(db, "organizations/o1/companies/coA/delegates/dlgA"), {
         uid: "dlgA", companyUID: "coA", status: "active",
@@ -61,10 +66,19 @@ describe("storage.rules", () => {
     });
   });
 
-  function storage(uid, provider) {
+  function storage(uid, provider, claims) {
     return env.authenticatedContext(uid, {
       firebase: {sign_in_provider: provider || "password"},
+      ...(claims || {}),
     }).storage();
+  }
+  function delegateTok(uid, companyId, extra) {
+    return storage(uid, "password", {
+      role: "delegate",
+      delegateId: uid,
+      companyId,
+      ...(extra || {}),
+    });
   }
   function path(store, p) {
     return ref(store, p);
@@ -127,6 +141,34 @@ describe("storage.rules", () => {
     const hrB = storage("hrB");
     await assertSucceeds(uploadBytes(path(hrA, "companies/coA/logo.png"), bytes));
     await assertFails(uploadBytes(path(hrB, "companies/coA/logo.png"), bytes));
+  });
+
+  test("delegates can upload permission photos, leave attachments, and feedback", async () => {
+    const dlg = delegateTok("dlgA", "coA");
+    // Distinct uids: the emulator reuses custom claims on the same auth
+    // uid within a test, so dlgA cannot also stand in as a coB token.
+    const dlgOtherCo = delegateTok("dlgOther", "coB");
+    const dlgB = delegateTok("dlgB", "coA");
+    const hrA = storage("hrA");
+    const hrB = storage("hrB");
+    await assertSucceeds(uploadBytes(path(dlg, "organizations/o1/companies/coA/permissions/p1/photo_1.jpg"), bytes));
+    await assertFails(uploadBytes(path(dlg, "organizations/o1/companies/coB/permissions/p1/photo_1.jpg"), bytes));
+    await assertFails(uploadBytes(path(dlgOtherCo, "organizations/o1/companies/coA/permissions/p1/photo_1.jpg"), bytes));
+    await assertSucceeds(uploadBytes(path(dlg, "leave_attachments/coA/dlgA/sick.jpg"), bytes));
+    await assertFails(uploadBytes(path(dlg, "leave_attachments/coA/otherUid/sick.jpg"), bytes));
+    await assertFails(uploadBytes(path(dlg, "leave_attachments/coB/dlgA/sick.jpg"), bytes));
+    await assertFails(uploadBytes(path(dlgB, "leave_attachments/coA/dlgA/sick.jpg"), bytes));
+    await assertSucceeds(uploadBytes(path(hrA, "leave_attachments/coA/dlgA/staff.jpg"), bytes));
+    await assertFails(uploadBytes(path(hrB, "leave_attachments/coA/dlgA/staff.jpg"), bytes));
+    await assertSucceeds(uploadBytes(path(dlg, "feedback_screenshots/dlgA-fb.png"), bytes));
+    // A password session without role=delegate is not a delegate upload.
+    // Use a fresh uid so the emulator does not reuse dlgA's custom claims.
+    await assertFails(uploadBytes(path(storage("dlgBare"), "feedback_screenshots/no-claim.png"), bytes));
+    await assertFails(uploadBytes(path(storage("accA"), "organizations/o1/companies/coA/delegates/folderA/id.jpg"), bytes));
+    await assertFails(uploadBytes(path(storage("mkA"), "organizations/o1/companies/coA/delegates/folderA/id.jpg"), bytes));
+    // Accountant/marketing keep same-company access to other org/company files.
+    await assertSucceeds(uploadBytes(path(storage("accA"), "organizations/o1/companies/coA/other/note.txt"), bytes));
+    await assertSucceeds(uploadBytes(path(storage("mkA"), "organizations/o1/companies/coA/other/note2.txt"), bytes));
   });
 
   test("other-company staff and delegates cannot use leftover private paths", async () => {

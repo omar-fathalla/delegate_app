@@ -1988,6 +1988,24 @@ service cloud.firestore {
         && requestPrimaryOrgBelongsToCompany();
     }
 
+    // L1: org-admin may only include their own organization in
+    // organizationUIDs (decision 3). Supervisor/HR may span orgs of
+    // their company. Kept out of createDelegateRequestOk (max 10 lets).
+    function orgAdminSecondaryOrgsOwnOnly() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let org = u.get('organizationUID', '');
+      return !(r in [
+          'organization-admin', 'organization_admin', 'organizationadmin',
+          'organizationAdmin'
+        ])
+        || !request.resource.data.keys().hasAll(['organizationUIDs'])
+        || (org != ''
+          && request.resource.data.organizationUIDs is list
+          && request.resource.data.organizationUIDs.size() >= 1
+          && request.resource.data.organizationUIDs.hasOnly([org]));
+    }
+
     // F2: a client-chosen request id must not squat a folder already
     // reserved by another company's intent. Defined next to the match
     // so `requestId` stays a path argument, not a 11th local in
@@ -2048,6 +2066,7 @@ service cloud.firestore {
       // (Admin SDK). Clients cannot mint them.
       allow create: if createDelegateRequestOk()
         && requestIdNotReservedByOtherCompany(requestId)
+        && orgAdminSecondaryOrgsOwnOnly()
         && orgCompanyCheckKeysLocked();
       // Self clause first: the staff role helpers are expensive and would
       // otherwise eat the 1000-expression budget before the docs checks.

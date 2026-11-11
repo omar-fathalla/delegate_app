@@ -74,6 +74,21 @@ export function isReviewerRole(role: unknown): boolean {
   return REVIEWER_ROLES.has(raw) || REVIEWER_ROLES.has(canonicalizeRole(role));
 }
 
+/** Mohamed's decision: SA and tech support may also edit delegate data. */
+export function canCallEditDelegateProfile(role: unknown): boolean {
+  return isEditorRole(role) || isReviewerRole(role);
+}
+
+/** Global editors (SA / tech) are not company-scoped. */
+export function profileEditCompanyScope(
+  role: unknown,
+  callerCompanyUID: string,
+  targetCompanyUID: string,
+): CompanyScopeResult {
+  if (isReviewerRole(role)) return "ok";
+  return companyScopeDecision(callerCompanyUID, targetCompanyUID);
+}
+
 export function isEditableRequestStatus(status: unknown): boolean {
   return EDITABLE_REQUEST_STATUSES.has(String(status || "").toLowerCase());
 }

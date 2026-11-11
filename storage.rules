@@ -81,16 +81,47 @@ service firebase.storage {
       );
     }
 
+    // Delegate tokens always have role=delegate and companyId (singular).
+    // companyIds is present only when the delegate is in more than one company.
+    function isDelegateToken() {
+      return isNonAnonymous()
+        && request.auth.token.get('role', '') == 'delegate';
+    }
+    function delegateTokenOwnsCompany(compId) {
+      return isDelegateToken()
+        && compId != ''
+        && (
+          request.auth.token.get('companyId', '') == compId
+          || compId in request.auth.token.get('companyIds', [])
+        );
+    }
+    // Web ID-docs: registration-style company staff (admin / supervisor /
+    // HR / org-admin) and global roles. Accountant and marketing stay out
+    // so this path matches delegate_documents more closely.
+    function canAccessWebIdDocs(compId) {
+      let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      let role = u.get('role', '');
+      let co = u.get('companyUID', '');
+      return isNonAnonymous() && (
+        isStorageGlobalRole(role)
+        || (isStorageCompanyStaffRole(role) && co != '' && co == compId)
+      );
+    }
+
 
     // ==================== FEEDBACK SCREENSHOTS ====================
     // Screenshots attached to user feedbacks (delegates, supervisors, admins, marketing)
+    // Path has no company or uid segment, so staff of any company can
+    // still write (residual, documented). Delegates may write with a
+    // real delegate token (role=delegate).
     match /feedback_screenshots/{fileName} {
-      allow read, write: if isStorageStaff();
+      allow read, write: if isStorageStaff() || isDelegateToken();
     }
 
     // ==================== PHOTO PERMISSION IMAGES ====================
     match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
-      allow read, write: if canAccessCompanyFiles(compId);
+      allow read, write: if canAccessCompanyFiles(compId)
+        || delegateTokenOwnsCompany(compId);
     }
 
     // ==================== TASK IMAGES ====================
@@ -119,11 +150,14 @@ service firebase.storage {
     // Tenant-scope by the company segment so those paths stay usable
     // without an intent (the web repo is not changed in this PR).
     match /organizations/{orgId}/companies/{compId}/delegates/{delegateUid}/{allPaths=**} {
-      allow read, write: if canAccessCompanyFiles(compId)
+      allow read, write: if canAccessWebIdDocs(compId)
         || (isNonAnonymous() && request.auth.uid == delegateUid);
     }
-    match /organizations/{orgId}/companies/{compId}/{allPaths=**} {
-      allow read, write: if canAccessCompanyFiles(compId);
+    // Storage ORs overlapping matches, so this residual must not also
+    // match .../delegates/{uid}/** or canAccessWebIdDocs is undone and
+    // accountant/marketing would regain ID-doc access.
+    match /organizations/{orgId}/companies/{compId}/{segment}/{rest=**} {
+      allow read, write: if segment != 'delegates' && canAccessCompanyFiles(compId);
     }
 
     // ==================== ORGANIZATION FILES ====================
@@ -167,13 +201,20 @@ service firebase.storage {
     }
 
     // ==================== PENALTIES ATTACHMENTS ====================
+    // App path is penalties/evidence/{penaltyId}/... with no company
+    // segment. Cannot tenant-scope without breaking clients. Residual:
+    // any named staff of any company may read/write; delegates cannot.
     match /penalties/{allPaths=**} {
       allow read, write: if isStorageStaff();
     }
 
     // ==================== LEAVE ATTACHMENTS ====================
-    match /leave_attachments/{allPaths=**} {
-      allow read, write: if isStorageStaff();
+    // App path: leave_attachments/{companyUID}/{uid}/...
+    // Staff are same-company (or global). The folder owner may write
+    // their own uid segment when the token company matches.
+    match /leave_attachments/{compId}/{uid}/{allPaths=**} {
+      allow read, write: if canAccessCompanyFiles(compId)
+        || (delegateTokenOwnsCompany(compId) && request.auth.uid == uid);
     }
 
     // ==================== DELEGATE REGISTRATION & SUBSCRIPTION DOCUMENTS ====================
