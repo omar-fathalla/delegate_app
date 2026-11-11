@@ -1,35 +1,58 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
-/// Writes [storage_upload_intents/{folderId}] before a staff upload to
-/// `delegate_documents/{folderId}`. Storage rules use this doc as the
-/// company tenant check. The doc is immutable to clients; a mismatch
-/// with an existing intent is fail-closed.
+/// Asks the [ensureStorageUploadIntent] callable to bind
+/// `storage_upload_intents/{folderId}` to the folder's owning company
+/// before a staff upload to `delegate_documents/{folderId}`.
+///
+/// The callable verifies an existing request or delegate, or reserves a
+/// new folder for the caller's company. Clients no longer read-or-create
+/// the intent (a get of a missing doc was permission-denied, and a client
+/// create could claim another company's folder).
 Future<String?> ensureStorageUploadIntent({
-  required FirebaseFirestore firestore,
   required String folderId,
   required String companyUID,
-  required String createdBy,
+  FirebaseFunctions? functions,
 }) async {
   final id = folderId.trim();
   final company = companyUID.trim();
-  final uid = createdBy.trim();
   if (id.isEmpty) return 'تعذر تحديد مجلد المستندات.';
   if (company.isEmpty) return 'اختر الشركة أولاً ثم أعد المحاولة.';
-  if (uid.isEmpty) return 'تعذر تحديد المستخدم.';
-  final ref = firestore.collection('storage_upload_intents').doc(id);
-  final existing = await ref.get();
-  if (existing.exists) {
-    final existingCompany =
-        (existing.data()?['companyUID'] ?? '').toString().trim();
-    if (existingCompany != company) {
-      return 'لا يمكن رفع المستندات لمجلد يخص شركة أخرى.';
-    }
+  try {
+    final callable =
+        (functions ?? FirebaseFunctions.instanceFor(region: 'us-central1'))
+            .httpsCallable('ensureStorageUploadIntent');
+    await callable.call({'folderId': id, 'companyUID': company});
     return null;
+  } on FirebaseFunctionsException catch (e) {
+    return _intentErrorMessage(e);
+  } catch (_) {
+    return 'تعذر تجهيز مجلد المستندات. أعد المحاولة.';
   }
-  await ref.set({
-    'companyUID': company,
-    'createdBy': uid,
-    'createdAt': FieldValue.serverTimestamp(),
-  });
-  return null;
+}
+
+String _intentErrorMessage(FirebaseFunctionsException e) {
+  final reason =
+      (e.details is Map ? (e.details as Map)['reason'] : null)?.toString() ??
+      e.message ??
+      e.code;
+  switch (reason) {
+    case 'folder_other_company':
+    case 'company_mismatch':
+      return 'لا يمكن رفع المستندات لمجلد يخص شركة أخرى.';
+    case 'sign_in_required':
+    case 'unauthenticated':
+      return 'يجب تسجيل الدخول أولاً.';
+    case 'caller_not_staff':
+    case 'caller_no_company':
+      return 'ليس لديك صلاحية رفع مستندات لهذا المجلد.';
+    case 'company_required':
+      return 'اختر الشركة أولاً ثم أعد المحاولة.';
+    case 'folder_id_required':
+      return 'تعذر تحديد مجلد المستندات.';
+    default:
+      if (e.code == 'permission-denied' || e.code == 'unauthenticated') {
+        return 'ليس لديك صلاحية رفع مستندات لهذا المجلد.';
+      }
+      return 'تعذر تجهيز مجلد المستندات. أعد المحاولة.';
+  }
 }

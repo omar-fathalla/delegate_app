@@ -7,90 +7,12 @@ service firebase.storage {
     function isAuthenticated() {
       return request.auth != null;
     }
-
-    // ==================== FEEDBACK SCREENSHOTS ====================
-    // Screenshots attached to user feedbacks (delegates, supervisors, admins, marketing)
-    match /feedback_screenshots/{fileName} {
-      allow read, write: if isAuthenticated();
-    }
-
-    // ==================== PHOTO PERMISSION IMAGES ====================
-    match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    // ==================== TASK IMAGES ====================
-    // Images a supervisor attaches to a task. Only the uploader writes or
-    // deletes their own files (<5 MB, image/*); any signed-in member of the
-    // organization (staff users doc or delegate token) can read.
-    // NOTE: Storage ORs overlapping matches, so this only restricts access
-    // once the /organizations/{orgId}/{allPaths=**} and /{allPaths=**}
-    // catch-alls below are narrowed. Until then they still allow any
-    // authenticated user.
-    match /organizations/{orgId}/task_images/{uploaderUid}/{fileName} {
-      allow read: if isAuthenticated() && (
-        request.auth.token.get('orgId', '') == orgId
-        || orgId in request.auth.token.get('orgIds', [])
-        || firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('organizationUID', '') == orgId
-      );
-      allow create, update: if isAuthenticated()
-        && request.auth.uid == uploaderUid
-        && request.resource.size < 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
-      allow delete: if isAuthenticated() && request.auth.uid == uploaderUid;
-    }
-
-    // ==================== ORGANIZATION FILES ====================
-    match /organizations/{orgId}/{allPaths=**} {
-      allow read, write: if isAuthenticated();
-    }
-
-    // ==================== COMPANY FILES ====================
-    match /companies/{compId}/{allPaths=**} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /companies/{fileName} {
-      allow read, write: if isAuthenticated();
-    }
-
-    // ==================== DELEGATE FILES ====================
-    match /delegates/{delegateId}/{allPaths=**} {
-      allow read, write: if isAuthenticated();
-    }
-
-    // ==================== PENALTIES ATTACHMENTS ====================
-    match /penalties/{allPaths=**} {
-      allow read, write: if isAuthenticated();
-    }
-
-    // ==================== LEAVE ATTACHMENTS ====================
-    match /leave_attachments/{allPaths=**} {
-      allow read, write: if isAuthenticated();
-    }
-
-    // ==================== DELEGATE REGISTRATION & SUBSCRIPTION DOCUMENTS ====================
-    // P-1: the folder owner (uid == folder id), company staff / HR / org-admin
-    // of the SAME company, and super-admin / technical support.
-    // Anonymous tokens are denied even though request.auth != null.
-    //
-    // Staff access requires a prior storage_upload_intents/{folderId} doc
-    // whose companyUID matches the caller. There is no empty-company
-    // fallback: a missing intent denies staff, so they cannot create,
-    // read or delete another company's folder. Write the intent before
-    // uploading (registration does this). At most two firestore.get
-    // calls: users/{caller} and storage_upload_intents/{folderId}.
-    // The folder-owner check short-circuits with zero gets.
-    //
-    // Cross-service IAM: the Cloud Storage for Firebase service agent
-    // (service-<PROJECT_NUMBER>@gcp-sa-firebasestorage.iam.gserviceaccount.com)
-    // must have roles/firebaserules.firestoreServiceAgent on the project,
-    // or these gets deny and staff uploads fail. Granted on tashil-dev;
-    // prod is a separate, owner-approved change.
+    // Anonymous tokens count as authenticated. Use this to close that hole.
     function isNonAnonymous() {
       return request.auth != null
         && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
+
     function isStorageGlobalRole(role) {
       return role in [
         'super-admin', 'super_admin', 'superadmin', 'superAdmin',
@@ -112,11 +34,14 @@ service firebase.storage {
       let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
       let role = u.get('role', '');
       let co = u.get('companyUID', '');
+      let intentPath = /databases/(default)/documents/storage_upload_intents/$(folderId);
+      // exists+get of the same doc counts as one of the two allowed gets.
       return isStorageGlobalRole(role)
         || (
           isStorageCompanyStaffRole(role)
           && co != ''
-          && firestore.get(/databases/(default)/documents/storage_upload_intents/$(folderId)).data.get('companyUID', '') == co
+          && firestore.exists(intentPath)
+          && firestore.get(intentPath).data.get('companyUID', '') == co
         );
     }
     function canAccessDelegateDocuments(folderId) {
@@ -126,39 +51,137 @@ service firebase.storage {
       );
     }
 
+
+    // ==================== FEEDBACK SCREENSHOTS ====================
+    // Screenshots attached to user feedbacks (delegates, supervisors, admins, marketing)
+    match /feedback_screenshots/{fileName} {
+      allow read, write: if isNonAnonymous();
+    }
+
+    // ==================== PHOTO PERMISSION IMAGES ====================
+    match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
+      allow read, write: if isNonAnonymous();
+    }
+
+    // ==================== TASK IMAGES ====================
+    // Images a supervisor attaches to a task. Only the uploader writes or
+    // deletes their own files (<5 MB, image/*); any signed-in member of the
+    // organization (staff users doc or delegate token) can read.
+    // NOTE: Storage ORs overlapping matches, so this only restricts access
+    // once the /organizations/{orgId}/{allPaths=**} and /{allPaths=**}
+    // catch-alls below are narrowed. Until then they still allow any
+    // non-anonymous signed-in user.
+    match /organizations/{orgId}/task_images/{uploaderUid}/{fileName} {
+      allow read: if isNonAnonymous() && (
+        request.auth.token.get('orgId', '') == orgId
+        || orgId in request.auth.token.get('orgIds', [])
+        || firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('organizationUID', '') == orgId
+      );
+      allow create, update: if isNonAnonymous()
+        && request.auth.uid == uploaderUid
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isNonAnonymous() && request.auth.uid == uploaderUid;
+    }
+
+    // ==================== ORGANIZATION FILES ====================
+    match /organizations/{orgId}/{allPaths=**} {
+      allow read, write: if isNonAnonymous();
+    }
+
+    // ==================== COMPANY FILES ====================
+    // Tenant-scoped when the path is the company id.
+    function canAccessCompanyFiles(compId) {
+      let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      let role = u.get('role', '');
+      let co = u.get('companyUID', '');
+      return isNonAnonymous() && (
+        isStorageGlobalRole(role)
+        || (co != '' && co == compId)
+      );
+    }
+    match /companies/{compId}/{allPaths=**} {
+      allow read, write: if canAccessCompanyFiles(compId);
+    }
+
+    match /companies/{fileName} {
+      allow read, write: if isNonAnonymous();
+    }
+
+    // ==================== DELEGATE FILES ====================
+    match /delegates/{delegateId}/{allPaths=**} {
+      allow read, write: if isNonAnonymous();
+    }
+
+    // ==================== PENALTIES ATTACHMENTS ====================
+    match /penalties/{allPaths=**} {
+      allow read, write: if isNonAnonymous();
+    }
+
+    // ==================== LEAVE ATTACHMENTS ====================
+    match /leave_attachments/{allPaths=**} {
+      allow read, write: if isNonAnonymous();
+    }
+
+    // ==================== DELEGATE REGISTRATION & SUBSCRIPTION DOCUMENTS ====================
+    // P-1: the folder owner (uid == folder id), company staff / HR / org-admin
+    // of the SAME company, and super-admin / technical support.
+    // Anonymous tokens are denied even though request.auth != null.
+    //
+    // Staff access requires a prior storage_upload_intents/{folderId} doc
+    // whose companyUID matches the caller. Intents are created only by
+    // the ensureStorageUploadIntent callable, which verifies the folder's
+    // owning company (request or delegate). Backfill every delegate uid
+    // so same-company staff keep access to web/legacy folders. There is
+    // no empty-company fallback. At most two firestore.get calls:
+    // users/{caller} and storage_upload_intents/{folderId}. The
+    // folder-owner check short-circuits with zero gets.
+    //
+    // Cross-service IAM: the Cloud Storage for Firebase service agent
+    // (service-<PROJECT_NUMBER>@gcp-sa-firebasestorage.iam.gserviceaccount.com)
+    // must have roles/firebaserules.firestoreServiceAgent on the project,
+    // or these gets deny and staff uploads fail. Granted on tashil-dev;
+    // prod is a separate, owner-approved change.
     match /delegate_documents/{delegateUid}/{allPaths=**} {
       allow read, write: if canAccessDelegateDocuments(delegateUid);
     }
 
-    match /delegate_subscription_receipts/{allPaths=**} {
-      allow read, write: if isAuthenticated();
+    // Same tenant check as documents when an intent exists for the request id
+    // (registration writes the intent first). Anonymous is denied.
+    match /delegate_subscription_receipts/{requestId}/{allPaths=**} {
+      allow read, write: if canAccessDelegateDocuments(requestId);
     }
 
     // ==================== PUBLIC FILES ====================
     match /public/{allPaths=**} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow write: if isNonAnonymous();
     }
 
     // ==================== STAGING PATH ====================
     match /staging/{allPaths=**} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isNonAnonymous();
     }
 
     // ==================== GUIDE VIDEOS PATH ====================
     match /guide-videos/{fileName} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if isNonAnonymous();
+      allow write: if isNonAnonymous();
     }
 
     // ==================== FALLBACK FOR ALL OTHER AUTHENTICATED PATHS ====================
     // Do not match delegate_documents: Storage ORs overlapping matches, so a
     // catch-all here would undo the tighter rule above.
+    // Storage ORs overlapping matches, so tenant-scoped prefixes must be
+    // excluded from this catch-all or the tighter rules above are undone.
     match /{firstSegment}/{rest=**} {
-      allow read, write: if isAuthenticated() && firstSegment != 'delegate_documents';
+      allow read, write: if isNonAnonymous()
+        && firstSegment != 'delegate_documents'
+        && firstSegment != 'delegate_subscription_receipts'
+        && firstSegment != 'companies';
     }
     match /{singleFile} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isNonAnonymous();
     }
   }
 }
