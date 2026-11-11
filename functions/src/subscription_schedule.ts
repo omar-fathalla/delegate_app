@@ -10,8 +10,11 @@ if (admin.apps.length === 0) admin.initializeApp();
  * delegate without a paid subscription for the new period; on other days it
  * is a cheap re-check (idempotent).
  *
- * Not deployed to prod from this change. Do not deploy it together with
- * expireAbandonedSubscriptionRenewals unless there is a separate written go.
+ * Not deployed to prod or tashil-dev from Phase 2 item 3. The job now uses
+ * holds.ts in shadow mode; do not deploy this function until Mohamed says
+ * to, and never together with a HOLDS_AUTHORITY_MODE flip. Do not deploy
+ * it together with expireAbandonedSubscriptionRenewals unless there is a
+ * separate written go.
  */
 export const suspendExpiredSubscriptions = functions
   .region("us-central1")

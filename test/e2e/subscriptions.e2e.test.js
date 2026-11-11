@@ -1,5 +1,6 @@
 /**
  * Subscription suspension + Paymob payment hook against the Firestore emulator.
+ * Default holds mode is shadow: M1/M2 write holds, not status.
  *   npm run test:e2e:subscriptions
  * Emulator only (demo-* project). Nothing here talks to a real project.
  */
@@ -45,6 +46,10 @@ async function seed() {
 }
 
 const status = async (org, uid) => (await db.doc(delegatePath(org, uid)).get()).get("status");
+const expiryHold = async (org, uid) => {
+  const holds = (await db.doc(delegatePath(org, uid)).get()).get("holds") || {};
+  return holds.subscription_expired || null;
+};
 
 test.before(async () => {
   assert.ok(process.env.FIRESTORE_EMULATOR_HOST, "run under the Firestore emulator");
@@ -58,22 +63,31 @@ test("no suspension during the free promotion (2026)", async () => {
   assert.equal(await status("o1", "app1"), "active");
 });
 
-test("period end: app-added delegates suspended in every chain; web, manual and pending untouched", async () => {
+test("period end: app-added delegates get an expiry hold in every chain; web and pending untouched", async () => {
   const res = await J.runSubscriptionSuspension(db, new Date(JAN1_2027.getTime() + 5 * 60 * 1000));
   assert.equal(res.periodCode, "2027_H1");
-  assert.equal(res.suspendedDocs, 5); // app1 x2, app2, app3, other (company c2)
-  assert.equal(res.suspendedUsers, 1);
-  for (const [o, u] of [["o1", "app1"], ["o2", "app1"], ["o1", "app2"], ["o1", "app3"]]) {
-    assert.equal(await status(o, u), "suspended", `${o}/${u}`);
+  // app1 x2, app2, app3, other (c2), plus stacking on the manual suspension.
+  assert.equal(res.suspendedDocs, 6);
+  assert.equal(res.suspendedUsers, 0); // users/{uid} is mirrored later, in authoritative mode
+  for (const [o, u, st] of [["o1", "app1", "active"], ["o2", "app1", "active"], ["o1", "app2", "active"], ["o1", "app3", "approved"]]) {
+    // Shadow: status is unchanged; the hold is the new signal.
+    assert.equal(await status(o, u), st, `${o}/${u}`);
     const d = (await db.doc(delegatePath(o, u)).get()).data();
-    assert.equal(d.statusReason, "subscription_expired");
+    assert.equal(d.statusReason, undefined);
     assert.equal(d.subscription.suspendedForPeriod, "2027_H1");
+    assert.equal(d.holds.subscription_expired.periodCode, "2027_H1");
   }
   assert.equal(await status("o1", "web1"), "active");
+  assert.equal(await expiryHold("o1", "web1"), null);
   assert.equal(await status("o2", "web2"), "active");
-  assert.equal((await db.doc(delegatePath("o1", "manual")).get()).get("statusReason"), "manual");
+  assert.equal(await expiryHold("o2", "web2"), null);
+  const manual = (await db.doc(delegatePath("o1", "manual")).get()).data();
+  assert.equal(manual.status, "suspended");
+  assert.equal(manual.statusReason, "manual"); // not overwritten in shadow
+  assert.ok(manual.holds.subscription_expired);
   assert.equal(await status("o1", "pend"), "pending");
-  assert.equal((await db.doc("users/app1").get()).get("status"), "suspended");
+  assert.equal(await expiryHold("o1", "pend"), null);
+  assert.equal((await db.doc("users/app1").get()).get("status"), "active");
   assert.equal((await db.doc("users/web1").get()).get("status"), "active");
   const runs = await db.collection("subscription_suspension_runs").get();
   assert.equal(runs.size, 1);
@@ -83,7 +97,7 @@ test("idempotent: a second run changes nothing", async () => {
   const res = await J.runSubscriptionSuspension(db, new Date(JAN1_2027.getTime() + 60 * 60 * 1000));
   assert.equal(res.suspendedDocs, 0);
   assert.equal(res.suspendedUsers, 0);
-  assert.equal(res.alreadySuspended, 6); // 5 + the manual one
+  assert.equal(res.alreadySuspended, 6); // 5 app-added chains + the stacked manual
 });
 
 async function renewal(id, uids, extra = {}) {
@@ -147,8 +161,8 @@ test("failed payment: nobody is reactivated; retry allowed", async () => {
   assert.equal(await pay("ren1", "tx-fail", 83334, false), "failed");
   const r = (await db.doc("delegate_requests/ren1").get()).data();
   assert.equal(r.paymentStatus, "failed");
-  assert.equal(await status("o1", "app1"), "suspended");
-  assert.equal(await status("o1", "app2"), "suspended");
+  assert.ok(await expiryHold("o1", "app1"));
+  assert.ok(await expiryHold("o1", "app2"));
 });
 
 test("wrong amount is rejected for review and activates nobody", async () => {
@@ -156,7 +170,7 @@ test("wrong amount is rejected for review and activates nobody", async () => {
   const r = (await db.doc("delegate_requests/ren1").get()).data();
   assert.equal(r.paymentError, "amount_mismatch");
   assert.equal(r.needsReview, true);
-  assert.equal(await status("o1", "app1"), "suspended");
+  assert.ok(await expiryHold("o1", "app1"));
 });
 
 test("verified payment reactivates only the selected delegates, in all their chains", async () => {
@@ -170,6 +184,7 @@ test("verified payment reactivates only the selected delegates, in all their cha
     const d = (await db.doc(delegatePath(o, u)).get()).data();
     assert.equal(d.status, "active", `${o}/${u}`);
     assert.equal(d.statusReason, undefined);
+    assert.equal(d.holds && d.holds.subscription_expired, undefined, `${o}/${u} hold`);
     assert.equal(d.subscription.periodCode, "2027_H1");
     assert.equal(d.subscription.periodStart, "2027-01-01");
     assert.equal(d.subscription.periodEnd, "2027-06-30");
@@ -177,7 +192,7 @@ test("verified payment reactivates only the selected delegates, in all their cha
     assert.equal(d.subscription.paymentStatus, "paid");
     assert.equal(d.subscription.renewalRequestId, "ren1");
   }
-  assert.equal(await status("o1", "app3"), "suspended"); // not selected: renew later
+  assert.ok(await expiryHold("o1", "app3")); // not selected: renew later
   assert.equal((await db.doc("users/app1").get()).get("status"), "active");
 });
 
@@ -190,15 +205,17 @@ test("paid renewal keeps them active on the next daily run; the unselected one s
   const res = await J.runSubscriptionSuspension(db, new Date(Date.UTC(2027, 1, 11, 10)));
   assert.equal(res.covered, 2);
   assert.equal(res.suspendedDocs, 0);
-  assert.equal(await status("o1", "app1"), "active");
-  assert.equal(await status("o1", "app3"), "suspended");
+  assert.equal(await expiryHold("o1", "app1"), null);
+  assert.ok(await expiryHold("o1", "app3"));
 });
 
-test("client-forced reactivation without payment is undone by the next run", async () => {
-  await db.doc(delegatePath("o1", "app3")).update({status: "active"});
+test("clearing the expiry hold without payment is undone by the next run", async () => {
+  await db.doc(delegatePath("o1", "app3")).update({status: "active", holds: {}});
   const res = await J.runSubscriptionSuspension(db, new Date(Date.UTC(2027, 1, 12, 10)));
   assert.equal(res.suspendedDocs, 1);
-  assert.equal(await status("o1", "app3"), "suspended");
+  assert.ok(await expiryHold("o1", "app3"));
+  // Shadow: status is not rewritten.
+  assert.equal(await status("o1", "app3"), "active");
 });
 
 test("renewing the rest later: second partial renewal", async () => {
@@ -206,6 +223,7 @@ test("renewing the rest later: second partial renewal", async () => {
   const q = await J.quoteSubscriptionRequest(db, "ren2", FEB_2027);
   assert.equal(q.amountCents, 41667);
   assert.equal(await pay("ren2", "tx-2", 41667), "paid");
+  assert.equal(await expiryHold("o1", "app3"), null);
   assert.equal(await status("o1", "app3"), "active");
 });
 
@@ -287,11 +305,13 @@ test("abandoned pending renewals expire at quote-month end and free their delega
 test("paid add-to-another-chain keeps one subscription across chains", async () => {
   await lateAppAdded("app8");
   await db.doc(delegatePath("o1", "app8")).set({
-    uid: "app8", status: "suspended", statusReason: "subscription_expired", companyUID: "c1",
+    uid: "app8", status: "active", companyUID: "c1",
+    holds: {subscription_expired: {at: "2027-01-01T00:05:00.000Z", by: "system", source: "suspendExpiredSubscriptions", periodCode: "2027_H1"}},
   });
   await renewal("renAddChain", ["app8"]);
   await J.quoteSubscriptionRequest(db, "renAddChain", FEB_2027);
   assert.equal(await pay("renAddChain", "tx-add-chain", 41667), "paid");
+  assert.equal(await expiryHold("o1", "app8"), null);
   assert.equal(await status("o1", "app8"), "active");
 
   // New chain, no new payment: coverage is still the paid renewal for this uid.
@@ -318,7 +338,8 @@ test("paid add-to-another-chain keeps one subscription across chains", async () 
 test("adding a chain does not itself grant coverage to an unpaid delegate", async () => {
   await lateAppAdded("app9");
   await db.doc(delegatePath("o1", "app9")).set({
-    uid: "app9", status: "suspended", statusReason: "subscription_expired", companyUID: "c1",
+    uid: "app9", status: "active", companyUID: "c1",
+    holds: {subscription_expired: {at: "2027-01-01T00:05:00.000Z", by: "system", source: "suspendExpiredSubscriptions", periodCode: "2027_H1"}},
   });
   await db.doc("delegate_requests/addOrgApp9").set({
     requestType: "add_organization", status: "approved", supervisorUid: "sup1",
@@ -332,8 +353,8 @@ test("adding a chain does not itself grant coverage to an unpaid delegate", asyn
   });
   const res = await J.runSubscriptionSuspension(db, new Date(Date.UTC(2027, 1, 14, 10)));
   assert.ok(res.suspendedDocs >= 1); // o3 was written active without coverage
-  assert.equal(await status("o1", "app9"), "suspended");
-  assert.equal(await status("o3", "app9"), "suspended");
+  assert.ok(await expiryHold("o1", "app9"));
+  assert.ok(await expiryHold("o3", "app9"));
 });
 
 test("late finalize on a rejected request does not overwrite a newer coverage claim", async () => {
