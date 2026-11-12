@@ -532,79 +532,64 @@ class SubscriptionRequestCardHeader extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Do not wrap this in LayoutBuilder: the live list card
+        // (SubscriptionRequestListCard) sits inside IntrinsicHeight for the
+        // 3.5px status stripe, and LayoutBuilder cannot return intrinsic
+        // dimensions (blank list in debug). Wrap already bounds chip width.
         Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final chipMax = constraints.maxWidth;
-              return Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: chipMax),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primaryContainer.withValues(
-                          alpha: 0.65,
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.corporate_fare_rounded,
-                            size: 13,
-                            color: colorScheme.primary,
-                          ),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              request.organizationName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.65),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.corporate_fare_rounded,
+                      size: 13,
+                      color: colorScheme.primary,
                     ),
-                  ),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: chipMax),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                    const SizedBox(width: 4),
+                    Flexible(
                       child: Text(
-                        request.companyName,
+                        request.organizationName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.primary,
                         ),
                       ),
                     ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  request.companyName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurfaceVariant,
                   ),
-                ],
-              );
-            },
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(width: 6),

@@ -1,5 +1,6 @@
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
+import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/add_delegate_subscription_section.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/company_exclusive_card_intro.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/subscription_request_status_widgets.dart';
@@ -390,6 +391,120 @@ void main() {
       expect(find.textContaining('بدون رسوم'), findsOneWidget);
       expect(find.text('إيصال إلكتروني'), findsNothing);
       expect(find.textContaining('كود:'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'F11: live list card (IntrinsicHeight) lays out long names and awaiting badge',
+    (tester) async {
+      final theme = await promoTestTheme();
+      final errors = <String>[];
+      final previous = FlutterError.onError;
+      FlutterError.onError = (details) {
+        errors.add('${details.exception}');
+        previous?.call(details);
+      };
+      addTearDown(() => FlutterError.onError = previous);
+
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() async => tester.binding.setSurfaceSize(null));
+
+      final req = DelegateSubscriptionRequest(
+        id: 'r-live-overflow',
+        supervisorUid: 's1',
+        supervisorName: 'مشرف',
+        supervisorPhone: '01000000000',
+        companyUID: 'c1',
+        companyName: 'DEV شركة تجريبية',
+        organizationUID: 'o1',
+        organizationName: 'DEV منظمة تجريبية',
+        firstName: 'أحمد',
+        secondName: 'محمود',
+        thirdName: 'علي',
+        fullName: 'QA Expiry Probe',
+        phoneNumber: '01011111111',
+        nationalId: '12345678901234',
+        profileImageUrl: '',
+        nationalIdFrontUrl: '',
+        nationalIdBackUrl: '',
+        paymentMethod: SubscriptionPaymentMethod.paymob,
+        subscriptionCycle: '2026_H2',
+        cycleStartDate: DateTime(2026, 7, 1),
+        cycleEndDate: DateTime(2026, 12, 31),
+        fee: 166.67,
+        remainingMonths: 2,
+        status: SubscriptionRequestStatus.pending,
+        createdAt: DateTime(2026, 11, 12),
+        paymentStatus: SubscriptionPaymentStatus.pending,
+      );
+      final admin = Delegate(
+        uid: 'sa1',
+        firstName: 'مشرف',
+        middleName: '',
+        lastName: '',
+        fullName: 'مشرف عام',
+        nationalityID: '',
+        motherName: '',
+        city: '',
+        phoneNumber: '01000000000',
+        gender: DelegateGender.male,
+        position: DelegatePosition.supervisor,
+        birthDate: DateTime(1990),
+        organizationUID: 'o1',
+        organizationName: 'لولو',
+        companyUID: 'c1',
+        companyName: 'يوني',
+        status: DelegateStatus.active,
+        delegatePublicId: '',
+        allReceiptCodes: const [],
+        createdAt: DateTime(2026),
+        createdBy: '',
+        hasPendingUpdate: false,
+        isDeductedFromCompany: false,
+        isPrinted: false,
+        isProfileComplete: true,
+        numberOfDocuments: 0,
+        paymentAmount: 0,
+        version: 1,
+        documents: const [],
+        role: UserRole.superAdmin,
+      );
+
+      await tester.pumpWidget(
+        promoTestApp(
+          theme: theme,
+          child: SizedBox(
+            width: 360,
+            child: SubscriptionRequestListCard(
+              request: req,
+              currentAdmin: admin,
+              onApprove: () {},
+              onReject: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final layoutErrors = errors
+          .where(
+            (e) =>
+                e.contains('LayoutBuilder') ||
+                e.contains('intrinsic dimensions') ||
+                e.contains('overflowed') ||
+                e.contains('OVERFLOWED'),
+          )
+          .toList();
+      expect(layoutErrors, isEmpty, reason: layoutErrors.join('\n'));
+      expect(tester.takeException(), isNull);
+      expect(find.byType(SubscriptionRequestListCard), findsOneWidget);
+      expect(
+        tester.getSize(find.byType(SubscriptionRequestListCard)).height,
+        greaterThan(1),
+      );
+      expect(find.textContaining('DEV منظمة تجريبية'), findsOneWidget);
+      expect(find.textContaining('DEV شركة تجريبية'), findsOneWidget);
+      expect(find.text('بانتظار الدفع الإلكتروني'), findsOneWidget);
     },
   );
 }
