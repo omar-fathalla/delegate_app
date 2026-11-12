@@ -17,6 +17,7 @@ class PaymobSubscriptionGateway implements SubscriptionPaymentGateway {
     required String companyUID,
     String? organizationUID,
     required List<String> uids,
+    String? periodCode,
   }) async {
     try {
       final result = await _functions
@@ -26,6 +27,8 @@ class PaymobSubscriptionGateway implements SubscriptionPaymentGateway {
             if (organizationUID != null && organizationUID.isNotEmpty)
               'organizationUID': organizationUID,
             'uids': uids,
+            if (periodCode != null && periodCode.isNotEmpty)
+              'periodCode': periodCode,
           });
       final data = Map<String, dynamic>.from(result.data as Map);
       final cents = (data['amountCents'] as num?)?.toInt() ?? 0;

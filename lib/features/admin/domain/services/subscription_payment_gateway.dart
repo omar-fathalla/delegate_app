@@ -44,6 +44,7 @@ abstract class SubscriptionPaymentGateway {
     required String companyUID,
     String? organizationUID,
     required List<String> uids,
+    String? periodCode,
   });
 
   Future<Either<Failure, PaymentCheckout>> startCheckout({
@@ -64,6 +65,7 @@ class PaymobNotConnectedGateway implements SubscriptionPaymentGateway {
     required String companyUID,
     String? organizationUID,
     required List<String> uids,
+    String? periodCode,
   }) async => const Left(ServerFailure(message));
 
   @override

@@ -1460,6 +1460,11 @@ class _SubscriptionRequestCard extends StatelessWidget {
                               ? MainAxisAlignment.end
                               : MainAxisAlignment.start,
                           children: [
+                            // Pending Paymob renewals are approved by the
+                            // webhook after payment. Hide the manual button
+                            // for tech support and super-admin too (tapping
+                            // was already blocked).
+                            if (!request.isRenewalRequest) ...[
                             Flexible(
                               fit: isWide ? FlexFit.loose : FlexFit.tight,
                               child: FilledButton.icon(
@@ -1489,6 +1494,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 8),
+                            ],
                             Flexible(
                               fit: isWide ? FlexFit.loose : FlexFit.tight,
                               child: OutlinedButton.icon(
