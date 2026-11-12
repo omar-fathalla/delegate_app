@@ -202,7 +202,7 @@ class _DelegateSubscriptionRequestsPageState
                         itemCount: displayedRequests.length,
                         itemBuilder: (context, index) {
                           final request = displayedRequests[index];
-                          return _SubscriptionRequestCard(
+                          return SubscriptionRequestListCard(
                             request: request,
                             currentAdmin: widget.currentAdmin,
                             onApprove: () => _handleApprove(request),
@@ -782,13 +782,16 @@ bool _canSupervisorEditRequest(Delegate admin, DelegateSubscriptionRequest reque
   return request.status == SubscriptionRequestStatus.pending;
 }
 
-class _SubscriptionRequestCard extends StatelessWidget {
+/// Live request card on this page, including the IntrinsicHeight + 3.5px
+/// status stripe. Tests must pump this widget (not only
+/// [SubscriptionRequestPaymentCard]) so LayoutBuilder/intrinsic bugs surface.
+class SubscriptionRequestListCard extends StatelessWidget {
   final DelegateSubscriptionRequest request;
   final Delegate currentAdmin;
   final VoidCallback onApprove;
   final VoidCallback onReject;
 
-  const _SubscriptionRequestCard({
+  const SubscriptionRequestListCard({
     required this.request,
     required this.currentAdmin,
     required this.onApprove,
