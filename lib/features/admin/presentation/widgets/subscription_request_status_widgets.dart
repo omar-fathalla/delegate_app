@@ -51,7 +51,8 @@ class SubscriptionRequestPaymentChips extends StatelessWidget {
               ],
             ),
           )
-        else if (request.paymentMethod == SubscriptionPaymentMethod.companyDeduction)
+        else if (request.paymentMethod ==
+            SubscriptionPaymentMethod.companyDeduction)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
@@ -67,13 +68,16 @@ class SubscriptionRequestPaymentChips extends StatelessWidget {
               ),
             ),
           )
-        else if (request.paymentMethod == SubscriptionPaymentMethod.instaPay) ...[
+        else if (request.paymentMethod ==
+            SubscriptionPaymentMethod.instaPay) ...[
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
               color: const Color(0xFF6B21A8).withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: const Color(0xFF9333EA).withValues(alpha: 0.3)),
+              border: Border.all(
+                color: const Color(0xFF9333EA).withValues(alpha: 0.3),
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -107,7 +111,8 @@ class SubscriptionRequestPaymentChips extends StatelessWidget {
                 request.receiptImageUrl!,
               ),
             ),
-        ] else if (request.paymentMethod == SubscriptionPaymentMethod.paymob) ...[
+        ] else if (request.paymentMethod ==
+            SubscriptionPaymentMethod.paymob) ...[
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
             decoration: BoxDecoration(
@@ -150,7 +155,8 @@ class SubscriptionRequestPaymentChips extends StatelessWidget {
               ),
             ),
           ),
-        ] else ...[
+        ] else if (request.paymentMethod ==
+            SubscriptionPaymentMethod.branchReceipt) ...[
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
@@ -316,19 +322,24 @@ class SubscriptionRequestStatusBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: fg.withValues(alpha: 0.25),
-          width: 0.8,
-        ),
+        border: Border.all(color: fg.withValues(alpha: 0.25), width: 0.8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 12, color: fg, fill: 0),
           const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: fg),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.bold,
+                color: fg,
+              ),
+            ),
           ),
         ],
       ),
@@ -397,8 +408,8 @@ class SubscriptionRequestPendingActions extends StatelessWidget {
               request.isAwaitingPaymobPayment
                   ? 'بانتظار الدفع الإلكتروني. لا يمكن الاعتماد قبل تأكيد الدفع.'
                   : request.isRenewalRequest
-                      ? 'طلب التجديد يُعتمد تلقائياً بعد تأكيد الدفع الإلكتروني.'
-                      : 'الطلب قيد الانتظار وبانتظار المراجعة والاعتماد.',
+                  ? 'طلب التجديد يُعتمد تلقائياً بعد تأكيد الدفع الإلكتروني.'
+                  : 'الطلب قيد الانتظار وبانتظار المراجعة والاعتماد.',
               style: TextStyle(
                 fontSize: 11.5,
                 color: request.isAwaitingPaymobPayment
@@ -417,8 +428,9 @@ class SubscriptionRequestPendingActions extends StatelessWidget {
     }
 
     final buttons = Row(
-      mainAxisAlignment:
-          isWide ? MainAxisAlignment.end : MainAxisAlignment.start,
+      mainAxisAlignment: isWide
+          ? MainAxisAlignment.end
+          : MainAxisAlignment.start,
       children: [
         if (_showApprove) ...[
           Flexible(
@@ -430,8 +442,10 @@ class SubscriptionRequestPendingActions extends StatelessWidget {
                     : const Color(0xFF16A34A),
                 foregroundColor: Colors.white,
                 minimumSize: const Size(48, 48),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 9,
+                  horizontal: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -447,9 +461,12 @@ class SubscriptionRequestPendingActions extends StatelessWidget {
                 request.requestType == 'delete_delegate'
                     ? 'اعتماد الحذف النهائي'
                     : request.isNationalIdUpdateRequest
-                        ? 'اعتماد تعديل الرقم القومي'
-                        : 'اعتماد وتفعيل',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ? 'اعتماد تعديل الرقم القومي'
+                    : 'اعتماد وتفعيل',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
               ),
             ),
           ),
@@ -461,10 +478,14 @@ class SubscriptionRequestPendingActions extends StatelessWidget {
             child: OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
                 foregroundColor: colorScheme.error,
-                side: BorderSide(color: colorScheme.error.withValues(alpha: 0.7)),
+                side: BorderSide(
+                  color: colorScheme.error.withValues(alpha: 0.7),
+                ),
                 minimumSize: const Size(48, 48),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 9,
+                  horizontal: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -475,9 +496,12 @@ class SubscriptionRequestPendingActions extends StatelessWidget {
                 request.requestType == 'delete_delegate'
                     ? 'رفض طلب الحذف'
                     : request.isNationalIdUpdateRequest
-                        ? 'رفض تعديل الرقم القومي'
-                        : 'رفض الطلب',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ? 'رفض تعديل الرقم القومي'
+                    : 'رفض الطلب',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
               ),
             ),
           ),
@@ -490,15 +514,111 @@ class SubscriptionRequestPendingActions extends StatelessWidget {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        waitingBanner,
-        const SizedBox(height: 8),
-        buttons,
-      ],
+      children: [waitingBanner, const SizedBox(height: 8), buttons],
     );
   }
 }
 
+/// Org chip + company chip + status badge. Chips shrink or wrap so the
+/// long «بانتظار الدفع الإلكتروني» badge never overflows the card (F11).
+class SubscriptionRequestCardHeader extends StatelessWidget {
+  const SubscriptionRequestCardHeader({super.key, required this.request});
+
+  final DelegateSubscriptionRequest request;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final chipMax = constraints.maxWidth;
+              return Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: chipMax),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer.withValues(
+                          alpha: 0.65,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.corporate_fare_rounded,
+                            size: 13,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              request.organizationName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: chipMax),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        request.companyName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 6),
+        Flexible(
+          fit: FlexFit.loose,
+          child: Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: SubscriptionRequestStatusBadge(request: request),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 /// Compact card used by tests and screenshots: the same chips, badge, and
 /// pending actions the live requests page renders.
@@ -531,19 +651,11 @@ class SubscriptionRequestPaymentCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    request.fullName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-                SubscriptionRequestStatusBadge(request: request),
-              ],
+            SubscriptionRequestCardHeader(request: request),
+            const SizedBox(height: 10),
+            Text(
+              request.fullName,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
             const SizedBox(height: 10),
             SubscriptionRequestPaymentChips(request: request),

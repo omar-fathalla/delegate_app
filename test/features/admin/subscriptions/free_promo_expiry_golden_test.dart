@@ -22,6 +22,8 @@ DelegateSubscriptionRequest _request({
   SubscriptionPaymentStatus paymentStatus = SubscriptionPaymentStatus.pending,
   String name = 'أحمد محمود',
   double fee = 500,
+  String companyName = 'شركة التجربة',
+  String organizationName = 'لولو',
 }) {
   return DelegateSubscriptionRequest(
     id: 'r1',
@@ -29,9 +31,9 @@ DelegateSubscriptionRequest _request({
     supervisorName: 'مشرف',
     supervisorPhone: '01000000000',
     companyUID: 'c1',
-    companyName: 'شركة التجربة',
+    companyName: companyName,
     organizationUID: 'o1',
-    organizationName: 'لولو',
+    organizationName: organizationName,
     firstName: 'أحمد',
     secondName: 'محمود',
     thirdName: 'علي',
@@ -92,10 +94,16 @@ Widget _homeCard({required bool isFree}) {
         decoration: BoxDecoration(
           color: cs.surfaceContainer,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: cs.primary.withValues(alpha: 0.2), width: 1.5),
+          border: Border.all(
+            color: cs.primary.withValues(alpha: 0.2),
+            width: 1.5,
+          ),
         ),
         padding: const EdgeInsets.all(18),
-        child: CompanyExclusiveCardIntro(isArabic: true, isFreePromotion: isFree),
+        child: CompanyExclusiveCardIntro(
+          isArabic: true,
+          isFreePromotion: isFree,
+        ),
       );
     },
   );
@@ -127,7 +135,15 @@ void main() {
     await prepare(tester);
     final theme = await promoTestTheme();
     SubscriptionCycleHelper.nowOverride = () => DateTime.utc(2026, 11, 10, 10);
-    await tester.pumpWidget(promoTestApp(theme: theme, child: Padding(padding: const EdgeInsets.all(16), child: _homeCard(isFree: true))));
+    await tester.pumpWidget(
+      promoTestApp(
+        theme: theme,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: _homeCard(isFree: true),
+        ),
+      ),
+    );
     await shot(tester, 'admin_home_before');
   });
 
@@ -135,7 +151,15 @@ void main() {
     await prepare(tester);
     final theme = await promoTestTheme();
     SubscriptionCycleHelper.nowOverride = () => DateTime.utc(2027, 2, 10, 10);
-    await tester.pumpWidget(promoTestApp(theme: theme, child: Padding(padding: const EdgeInsets.all(16), child: _homeCard(isFree: false))));
+    await tester.pumpWidget(
+      promoTestApp(
+        theme: theme,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: _homeCard(isFree: false),
+        ),
+      ),
+    );
     await shot(tester, 'admin_home_after');
   });
 
@@ -144,13 +168,15 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(390, 1400));
     final theme = await promoTestTheme();
     SubscriptionCycleHelper.nowOverride = () => DateTime.utc(2026, 11, 10, 10);
-    await tester.pumpWidget(promoTestApp(
-      theme: theme,
-      child: const SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: AddDelegateSubscriptionSection(isFree: true, showSubmit: true),
+    await tester.pumpWidget(
+      promoTestApp(
+        theme: theme,
+        child: const SingleChildScrollView(
+          padding: EdgeInsets.all(16),
+          child: AddDelegateSubscriptionSection(isFree: true, showSubmit: true),
+        ),
       ),
-    ));
+    );
     await shot(tester, 'add_delegate_before');
   });
 
@@ -159,13 +185,18 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(390, 900));
     final theme = await promoTestTheme();
     SubscriptionCycleHelper.nowOverride = () => DateTime.utc(2027, 2, 10, 10);
-    await tester.pumpWidget(promoTestApp(
-      theme: theme,
-      child: const SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: AddDelegateSubscriptionSection(isFree: false, showSubmit: true),
+    await tester.pumpWidget(
+      promoTestApp(
+        theme: theme,
+        child: const SingleChildScrollView(
+          padding: EdgeInsets.all(16),
+          child: AddDelegateSubscriptionSection(
+            isFree: false,
+            showSubmit: true,
+          ),
+        ),
       ),
-    ));
+    );
     await shot(tester, 'add_delegate_after');
   });
 
@@ -178,13 +209,18 @@ void main() {
       fee: 0,
       name: 'محمد علي',
     );
-    await tester.pumpWidget(promoTestApp(
-      theme: theme,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: SubscriptionRequestPaymentCard(request: req, role: UserRole.superAdmin),
+    await tester.pumpWidget(
+      promoTestApp(
+        theme: theme,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: SubscriptionRequestPaymentCard(
+            request: req,
+            role: UserRole.superAdmin,
+          ),
+        ),
       ),
-    ));
+    );
     await shot(tester, 'subscription_requests_before');
   });
 
@@ -194,6 +230,8 @@ void main() {
     final pending = _request(
       method: SubscriptionPaymentMethod.paymob,
       paymentStatus: SubscriptionPaymentStatus.pending,
+      organizationName: 'DEV منظمة تجريبية',
+      companyName: 'DEV شركة تجريبية',
     );
     final archival = _request(
       method: SubscriptionPaymentMethod.freePromotion,
@@ -201,19 +239,27 @@ void main() {
       fee: 0,
       name: 'سجل قديم',
     );
-    await tester.pumpWidget(promoTestApp(
-      theme: theme,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            SubscriptionRequestPaymentCard(request: pending, role: UserRole.superAdmin),
-            const SizedBox(height: 12),
-            SubscriptionRequestPaymentCard(request: archival, role: UserRole.superAdmin),
-          ],
+    await tester.pumpWidget(
+      promoTestApp(
+        theme: theme,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              SubscriptionRequestPaymentCard(
+                request: pending,
+                role: UserRole.superAdmin,
+              ),
+              const SizedBox(height: 12),
+              SubscriptionRequestPaymentCard(
+                request: archival,
+                role: UserRole.superAdmin,
+              ),
+            ],
+          ),
         ),
       ),
-    ));
+    );
     await shot(tester, 'subscription_requests_after');
   });
 
@@ -223,16 +269,18 @@ void main() {
     final db = await renewal.seed();
     final clock = () => renewal.nov2026;
     final repo = SubscriptionRenewalRepository(firestore: db, clock: clock);
-    await tester.pumpWidget(promoTestApp(
-      theme: theme,
-      child: SubscriptionRenewalScreen(
-        supervisor: renewal.supervisor(),
-        repository: repo,
-        paymentGateway: _FakeGateway(),
-        clock: clock,
+    await tester.pumpWidget(
+      promoTestApp(
+        theme: theme,
+        child: SubscriptionRenewalScreen(
+          supervisor: renewal.supervisor(),
+          repository: repo,
+          paymentGateway: _FakeGateway(),
+          clock: clock,
+        ),
+        wrapScaffold: false,
       ),
-      wrapScaffold: false,
-    ));
+    );
     await tester.pumpAndSettle();
     await shot(tester, 'subscription_renewal_before');
   });
@@ -243,16 +291,18 @@ void main() {
     final db = await renewal.seed();
     final clock = () => renewal.feb2027;
     final repo = SubscriptionRenewalRepository(firestore: db, clock: clock);
-    await tester.pumpWidget(promoTestApp(
-      theme: theme,
-      child: SubscriptionRenewalScreen(
-        supervisor: renewal.supervisor(),
-        repository: repo,
-        paymentGateway: _FakeGateway(),
-        clock: clock,
+    await tester.pumpWidget(
+      promoTestApp(
+        theme: theme,
+        child: SubscriptionRenewalScreen(
+          supervisor: renewal.supervisor(),
+          repository: repo,
+          paymentGateway: _FakeGateway(),
+          clock: clock,
+        ),
+        wrapScaffold: false,
       ),
-      wrapScaffold: false,
-    ));
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('renewal_select_all')));
     await tester.pumpAndSettle();

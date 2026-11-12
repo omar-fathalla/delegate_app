@@ -2007,8 +2007,9 @@ service cloud.firestore {
       return incoming != 'waived' || before == 'waived' || !freePromotionEnded();
     }
 
-    // Staff may not approve a new_delegate request whose subscription is unpaid.
-    // paid / waived / not_required are settled. Missing paymentStatus is not.
+    // Staff may not approve a Paymob new_delegate or renewal whose
+    // subscription is unpaid (F14). paid / waived / not_required are settled.
+    // Legacy docs (no paymentMethod) stay approvable.
     function newDelegateApprovalPaymentOk() {
       let incoming = request.resource.data;
       let before = resource == null ? {} : resource.data;
@@ -2016,10 +2017,8 @@ service cloud.firestore {
       let st = incoming.get('status', '');
       let method = incoming.get('paymentMethod', before.get('paymentMethod', ''));
       let pay = incoming.get('paymentStatus', before.get('paymentStatus', ''));
-      // Only Paymob new-delegate approvals require a settled payment.
-      // Legacy docs (no paymentMethod / no paymentStatus) stay approvable.
       return st != 'approved'
-        || ty != 'new_delegate'
+        || (ty != 'new_delegate' && ty != 'renewal')
         || method != 'paymob'
         || pay == 'paid'
         || pay == 'waived'

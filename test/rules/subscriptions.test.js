@@ -430,4 +430,28 @@ describe("delegate_requests: payment is server-only", () => {
     }));
   });
 
+  test("staff cannot approve an unpaid Paymob renewal (F14)", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.doc("delegate_requests/ren-unpaid").set({
+        requestType: "renewal", status: "pending",
+        organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
+        orgCompanyCheck: "ok",
+        paymentStatus: "pending", paymentMethod: "paymob",
+        fee: 500, periodCode: "2027_H1",
+      });
+      await db.doc("delegate_requests/ren-paid").set({
+        requestType: "renewal", status: "pending",
+        organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
+        orgCompanyCheck: "ok",
+        paymentStatus: "paid", paymentMethod: "paymob",
+        fee: 500, periodCode: "2027_H1",
+      });
+    });
+    await assertFails(as("sa").doc("delegate_requests/ren-unpaid").update({status: "approved", reviewedBy: "SA"}));
+    await assertFails(as("tech").doc("delegate_requests/ren-unpaid").update({status: "approved", reviewedBy: "TECH"}));
+    await assertSucceeds(as("sa").doc("delegate_requests/ren-unpaid").update({status: "rejected", reviewedBy: "SA"}));
+    await assertSucceeds(as("sa").doc("delegate_requests/ren-paid").update({status: "approved", reviewedBy: "SA"}));
+  });
+
 });

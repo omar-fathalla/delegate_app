@@ -439,22 +439,76 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
           _submitSucceeded = true;
           _resetFormAfterSuccessfulSubmit();
         });
+        String? checkoutError;
+        if (!isFree) {
+          // Paymob checkout: the server creates the order and computes the amount.
+          final checkout = await sl<SubscriptionPaymentGateway>().startCheckout(requestId: requestId);
+          if (!mounted) return;
+          checkout.fold(
+            (f) => checkoutError = f.message,
+            (c) { launchUrl(c.checkoutUrl, mode: LaunchMode.externalApplication); },
+          );
+          if (!mounted) return;
+        }
+
+        if (checkoutError != null) {
+          AppSnackBar.showError(context, checkoutError!);
+          final goToApprovals = await showDialog<bool>(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              title: Row(
+                children: [
+                  Icon(Icons.error_rounded, color: Theme.of(ctx).colorScheme.error, size: 26),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'تعذر بدء الدفع الإلكتروني',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+              content: Text(
+                '$checkoutError\n\nتم حفظ طلب التسجيل، لكن لم يبدأ الدفع. يمكنك إعادة المحاولة من شاشة الاعتمادات.',
+                style: const TextStyle(fontSize: 13.5, height: 1.4),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('العودة للمناديب'),
+                ),
+                FilledButton.icon(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  icon: const Icon(Icons.how_to_reg_rounded, size: 18),
+                  label: const Text('عرض شاشة الاعتمادات'),
+                ),
+              ],
+            ),
+          );
+          if (!mounted) return;
+          if (goToApprovals == true) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => DelegateSubscriptionRequestsPage(
+                  currentAdmin: widget.supervisor,
+                ),
+              ),
+            );
+          } else {
+            Navigator.pop(context, true);
+          }
+          return;
+        }
+
         AppSnackBar.showSuccess(
           context,
           isFree
               ? 'تم إرسال طلب تسجيل المندوب بنجاح (مجاناً ضمن العرض الترويجي)! بانتظار اعتماد الإدارة.'
               : 'تم إرسال طلب التسجيل بانتظار الدفع الإلكتروني، ثم اعتماد الدعم الفني.',
         );
-        if (!isFree) {
-          // Paymob checkout: the server creates the order and computes the amount.
-          final checkout = await sl<SubscriptionPaymentGateway>().startCheckout(requestId: requestId);
-          if (!mounted) return;
-          await checkout.fold(
-            (f) async => AppSnackBar.showError(context, f.message),
-            (c) async => launchUrl(c.checkoutUrl, mode: LaunchMode.externalApplication),
-          );
-          if (!mounted) return;
-        }
 
         final goToApprovals = await showDialog<bool>(
           context: context,
@@ -508,6 +562,13 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: _buildFormScaffold(theme, colorScheme),
+    );
+  }
+
+  Widget _buildFormScaffold(ThemeData theme, ColorScheme colorScheme) {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
