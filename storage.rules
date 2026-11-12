@@ -240,23 +240,40 @@ service firebase.storage {
     }
 
     // ==================== TASK IMAGES ====================
-    // Images a supervisor attaches to a task. Only the uploader writes or
-    // deletes their own files (<5 MB, image/*); any signed-in member of the
-    // organization (staff users doc or delegate token) can read.
-    // NOTE: Storage ORs overlapping matches, so this only restricts access
-    // once the /organizations/{orgId}/{allPaths=**} and /{allPaths=**}
-    // catch-alls below are narrowed. Until then they still allow any
-    // non-anonymous signed-in user.
-    match /organizations/{orgId}/task_images/{uploaderUid}/{fileName} {
-      allow read: if isNonAnonymous() && (
-        request.auth.token.get('orgId', '') == orgId
-        || orgId in request.auth.token.get('orgIds', [])
-        || firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('organizationUID', '') == orgId
-      );
-      allow create, update: if isNonAnonymous()
+    // Phase 2: company-scoped path, N1-r filename task_{uid}_{token},
+    // upload only with a matching ensureStorageUploadIntent doc.
+    // Client reads (get/list) and download URLs are denied; the
+    // getTaskImage callable serves bytes to the sender and intended
+    // recipients. The org catch-all below must exclude task_images
+    // (Storage ORs overlapping matches).
+    function isOwnedTaskImageName(fileName, uid) {
+      return fileName.matches('task_' + uid + '_[^_]+(\\.[A-Za-z0-9]+)?$');
+    }
+    function taskImageIntentPath(fileName) {
+      return /databases/(default)/documents/storage_upload_intents/$(fileName);
+    }
+    function taskImageIntentMatchesCompany(fileName, compId) {
+      let intentPath = taskImageIntentPath(fileName);
+      return firestore.exists(intentPath)
+        && firestore.get(intentPath).data.get('companyUID', '') == compId;
+    }
+
+    match /task_images/{compId}/{uploaderUid}/{fileName} {
+      allow get, list: if false;
+      allow create: if isNonAnonymous()
         && request.auth.uid == uploaderUid
+        && isOwnedTaskImageName(fileName, request.auth.uid)
         && request.resource.size < 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+        && request.resource.contentType.matches('image/.*')
+        && taskImageIntentMatchesCompany(fileName, compId);
+      allow update: if false;
+      allow delete: if isNonAnonymous() && request.auth.uid == uploaderUid;
+    }
+
+    // Legacy org-level path: no new creates, no client reads. The
+    // uploader may still delete when the task image is removed.
+    match /organizations/{orgId}/task_images/{uploaderUid}/{fileName} {
+      allow get, list, create, update: if false;
       allow delete: if isNonAnonymous() && request.auth.uid == uploaderUid;
     }
 
@@ -297,7 +314,9 @@ service firebase.storage {
     // Must not also match .../companies/{compId}/** or the company
     // tenant rule above is undone by this OR.
     match /organizations/{orgId}/{segment}/{rest=**} {
-      allow read, write: if segment != 'companies' && canAccessOrganization(orgId);
+      allow read, write: if segment != 'companies'
+        && segment != 'task_images'
+        && canAccessOrganization(orgId);
     }
 
     // ==================== COMPANY FILES ====================
@@ -413,7 +432,8 @@ service firebase.storage {
         && firstSegment != 'penalties'
         && firstSegment != 'leave_attachments'
         && firstSegment != 'feedback_screenshots'
-        && firstSegment != 'public';
+        && firstSegment != 'public'
+        && firstSegment != 'task_images';
     }
     match /{singleFile} {
       allow read, write: if isStorageStaff();

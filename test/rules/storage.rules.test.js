@@ -364,6 +364,56 @@ describe("storage.rules", () => {
     await assertSucceeds(uploadBytes(path(activeTok, "leave_attachments/coA/dlgA/heldcheck.jpg"), bytes));
   });
 
+  test("task images: upload requires intent and exact N1-r name; client reads are denied", async () => {
+    const imageBytes = Uint8Array.from(Buffer.from("fake-jpeg"));
+    const meta = {contentType: "image/jpeg"};
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "storage_upload_intents/task_supA_1.jpg"), {
+        companyUID: "coA", createdBy: "callable", purpose: "task_image",
+      });
+    });
+    const sup = storage("supA");
+    const hr = storage("hrA");
+    const dlg = delegateTok("dlgA", "coA", {orgId: "o1"});
+    const otherCo = storage("hrB");
+    const owned = "task_images/coA/supA/task_supA_1.jpg";
+    const colliding = "task_images/coA/supA/task_supA_2_1.jpg";
+    const otherUid = "task_images/coA/supA/task_hrA_1.jpg";
+    const otherCompany = "task_images/coB/supA/task_supA_1.jpg";
+    const noIntent = "task_images/coA/supA/task_supA_99.jpg";
+
+    await assertSucceeds(uploadBytes(path(sup, owned), imageBytes, meta));
+    await assertFails(uploadBytes(path(sup, colliding), imageBytes, meta));
+    await assertFails(uploadBytes(path(sup, otherUid), imageBytes, meta));
+    await assertFails(uploadBytes(path(sup, otherCompany), imageBytes, meta));
+    await assertFails(uploadBytes(path(sup, noIntent), imageBytes, meta));
+    await assertFails(uploadBytes(path(hr, "task_images/coA/hrA/task_hrA_1.jpg"), imageBytes, meta));
+    await assertFails(uploadBytes(path(otherCo, owned), imageBytes, meta));
+
+    await assertFails(getBytes(path(sup, owned)));
+    await assertFails(getBytes(path(hr, owned)));
+    await assertFails(getBytes(path(dlg, owned)));
+    await assertFails(getBytes(path(otherCo, owned)));
+    await assertFails(listAll(path(sup, "task_images/coA/supA")));
+
+    await assertFails(deleteObject(path(hr, owned)));
+    await assertSucceeds(deleteObject(path(sup, owned)));
+  });
+
+  test("legacy task image path is closed for create and client reads, even to org staff", async () => {
+    const imageBytes = Uint8Array.from(Buffer.from("fake-jpeg"));
+    const meta = {contentType: "image/jpeg"};
+    const legacy = "organizations/o1/task_images/supA/legacy.jpg";
+    const sup = storage("supA");
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await uploadBytes(ref(ctx.storage(), legacy), imageBytes, meta);
+    });
+    await assertFails(getBytes(path(sup, legacy)));
+    await assertFails(uploadBytes(path(sup, "organizations/o1/task_images/supA/task_supA_new.jpg"), imageBytes, meta));
+    await assertSucceeds(deleteObject(path(sup, legacy)));
+  });
+
 });
 
 // Keep a named export so node --test counts the file even if helpers grow.

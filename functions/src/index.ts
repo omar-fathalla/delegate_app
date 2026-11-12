@@ -5,6 +5,8 @@ import {photoPermissionNotifyUserIds} from "./photo_permission_notify_logic";
 admin.initializeApp();
 
 export {onTaskCreated, onTaskUpdated} from "./task_notify";
+export {getTaskImage, onTaskImageFinalize} from "./task_image_access";
+
 
 /**
  * Cloud Function triggered when a new photo permission is created.

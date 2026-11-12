@@ -666,12 +666,23 @@ describe("firestore tightened rules", () => {
       const comp = dbFor("comp");
       await assertSucceeds(comp.doc("organizations/o1/tasks/new1").set({
         companyId: "c1", assignedTo: "del-1", createdBy: "comp", title: "T",
-        imageUrl: "https://example.com/x.jpg",
-        imagePath: "organizations/o1/task_images/comp/x.jpg",
+        imagePath: "task_images/c1/comp/task_comp_x.jpg",
       }));
       await assertFails(comp.doc("organizations/o1/tasks/new2").set({
         companyId: "c1", assignedTo: "del-1", createdBy: "comp", title: "T",
-        imagePath: "organizations/o1/task_images/hr/x.jpg",
+        imagePath: "task_images/c1/hr/task_hr_x.jpg",
+      }));
+      await assertFails(comp.doc("organizations/o1/tasks/new3").set({
+        companyId: "c1", assignedTo: "del-1", createdBy: "comp", title: "T",
+        imagePath: "task_images/c2/comp/task_comp_x.jpg",
+      }));
+      await assertFails(comp.doc("organizations/o1/tasks/new4").set({
+        companyId: "c1", assignedTo: "del-1", createdBy: "comp", title: "T",
+        imagePath: "organizations/o1/task_images/comp/x.jpg",
+      }));
+      await assertFails(comp.doc("organizations/o1/tasks/new5").set({
+        companyId: "c1", assignedTo: "del-1", createdBy: "comp", title: "T",
+        imagePath: "task_images/c1/comp/task_comp_2_x.jpg",
       }));
     });
 

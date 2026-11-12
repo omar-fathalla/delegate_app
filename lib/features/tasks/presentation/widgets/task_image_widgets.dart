@@ -1,6 +1,6 @@
 import 'dart:io';
+import 'dart:typed_data';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:delegate_app/features/tasks/data/services/task_image_storage.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -8,11 +8,57 @@ import 'package:image_picker/image_picker.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 /// Rounded thumbnail of a task image. Tapping opens [TaskImageViewer].
-class TaskImageThumbnail extends StatelessWidget {
-  const TaskImageThumbnail({super.key, required this.url, this.height = 200});
+///
+/// Bytes are loaded through [TaskImageFetcher] (getTaskImage). A stored
+/// public download URL is never fetched.
+class TaskImageThumbnail extends StatefulWidget {
+  const TaskImageThumbnail({
+    super.key,
+    required this.imagePath,
+    this.taskId,
+    this.organizationId,
+    this.height = 200,
+    this.fetcher,
+  });
 
-  final String url;
+  final String imagePath;
+  final String? taskId;
+  final String? organizationId;
   final double height;
+  final TaskImageFetcher? fetcher;
+
+  @override
+  State<TaskImageThumbnail> createState() => _TaskImageThumbnailState();
+}
+
+class _TaskImageThumbnailState extends State<TaskImageThumbnail> {
+  late Future<Uint8List> _bytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _bytes = _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant TaskImageThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imagePath != widget.imagePath ||
+        oldWidget.taskId != widget.taskId ||
+        oldWidget.organizationId != widget.organizationId) {
+      _bytes = _load();
+    }
+  }
+
+  Future<Uint8List> _load() {
+    final fetcher =
+        widget.fetcher ?? TaskImageFetcher.debugOverride ?? TaskImageFetcher();
+    return fetcher.load(
+      imagePath: widget.imagePath,
+      taskId: widget.taskId,
+      organizationId: widget.organizationId,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,36 +72,50 @@ class TaskImageThumbnail extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: Material(
           color: scheme.surfaceContainerHighest,
-          child: InkWell(
-            onTap: () => TaskImageViewer.open(context, url),
-            child: Hero(
-              tag: 'task-image-$url',
-              child: CachedNetworkImage(
-                imageUrl: url,
-                height: height,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                placeholder: (_, _) => SizedBox(
-                  height: height,
-                  child: const Center(child: CircularProgressIndicator()),
-                ),
-                errorWidget: (_, _, _) => SizedBox(
-                  height: height,
+          child: FutureBuilder<Uint8List>(
+            future: _bytes,
+            builder: (context, snap) {
+              if (snap.hasData) {
+                final bytes = snap.data!;
+                return InkWell(
+                  onTap: () => TaskImageViewer.open(context, bytes),
+                  child: Hero(
+                    tag: 'task-image-${widget.imagePath}',
+                    child: Image.memory(
+                      bytes,
+                      height: widget.height,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                );
+              }
+              if (snap.hasError) {
+                return SizedBox(
+                  height: widget.height,
                   child: Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Symbols.broken_image_rounded,
-                            color: scheme.onSurfaceVariant),
+                        Icon(
+                          Symbols.broken_image_rounded,
+                          color: scheme.onSurfaceVariant,
+                        ),
                         const SizedBox(height: 4),
-                        Text(l10n.taskImageLoadFailed,
-                            style: TextStyle(color: scheme.onSurfaceVariant)),
+                        Text(
+                          l10n.taskImageLoadFailed,
+                          style: TextStyle(color: scheme.onSurfaceVariant),
+                        ),
                       ],
                     ),
                   ),
-                ),
-              ),
-            ),
+                );
+              }
+              return SizedBox(
+                height: widget.height,
+                child: const Center(child: CircularProgressIndicator()),
+              );
+            },
           ),
         ),
       ),
@@ -65,15 +125,15 @@ class TaskImageThumbnail extends StatelessWidget {
 
 /// Full-screen, pinch-to-zoom viewer for a task image.
 class TaskImageViewer extends StatelessWidget {
-  const TaskImageViewer({super.key, required this.url});
+  const TaskImageViewer({super.key, required this.bytes});
 
-  final String url;
+  final Uint8List bytes;
 
-  static Future<void> open(BuildContext context, String url) {
+  static Future<void> open(BuildContext context, Uint8List bytes) {
     return Navigator.of(context).push(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
-        builder: (_) => TaskImageViewer(url: url),
+        builder: (_) => TaskImageViewer(bytes: bytes),
       ),
     );
   }
@@ -98,10 +158,7 @@ class TaskImageViewer extends StatelessWidget {
         child: InteractiveViewer(
           minScale: 1,
           maxScale: 5,
-          child: Hero(
-            tag: 'task-image-$url',
-            child: CachedNetworkImage(imageUrl: url, fit: BoxFit.contain),
-          ),
+          child: Image.memory(bytes, fit: BoxFit.contain),
         ),
       ),
     );
@@ -117,15 +174,19 @@ class TaskImagePickerField extends StatefulWidget {
   const TaskImagePickerField({
     super.key,
     required this.organizationId,
+    required this.companyId,
     required this.onChanged,
     this.onUploadingChanged,
-    this.initialUrl,
+    this.initialPath,
+    this.initialTaskId,
     this.storage,
     this.picker,
   });
 
   final String organizationId;
-  final String? initialUrl;
+  final String companyId;
+  final String? initialPath;
+  final String? initialTaskId;
   final ValueChanged<TaskImageUpload?> onChanged;
   final ValueChanged<bool>? onUploadingChanged;
   final TaskImageStorage? storage;
@@ -142,7 +203,7 @@ class TaskImagePickerField extends StatefulWidget {
 }
 
 class _TaskImagePickerFieldState extends State<TaskImagePickerField> {
-  String? _url;
+  String? _path;
   File? _localFile;
   double? _progress;
   bool _failed = false;
@@ -150,10 +211,15 @@ class _TaskImagePickerFieldState extends State<TaskImagePickerField> {
   @override
   void initState() {
     super.initState();
-    _url = widget.initialUrl;
+    _path = widget.initialPath;
   }
 
   bool get _uploading => _progress != null;
+
+  TaskImageStorage get _storage =>
+      widget.storage ??
+      TaskImagePickerField.debugStorageOverride ??
+      TaskImageStorage();
 
   Future<void> _chooseSource() async {
     final l10n = AppLocalizations.of(context)!;
@@ -180,19 +246,25 @@ class _TaskImagePickerFieldState extends State<TaskImagePickerField> {
       ),
     );
     if (source == null) return;
-    // image_picker resizes and re-encodes as JPEG: this is the compression.
-    final picked = await (widget.picker ?? TaskImagePickerField.debugPickerOverride ?? ImagePicker()).pickImage(
-      source: source,
-      maxWidth: 1600,
-      maxHeight: 1600,
-      imageQuality: 75,
-    );
+    // image_picker resizes and re-encodes as JPEG: this is the compression
+    // and it drops GPS / device metadata from the original file.
+    final picked =
+        await (widget.picker ??
+                TaskImagePickerField.debugPickerOverride ??
+                ImagePicker())
+            .pickImage(
+              source: source,
+              maxWidth: 1600,
+              maxHeight: 1600,
+              imageQuality: 75,
+            );
     if (picked == null || !mounted) return;
     final file = File(picked.path);
     if (await file.length() > TaskImageStorage.maxBytes) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l10n.taskImageTooLarge)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.taskImageTooLarge)));
       return;
     }
     setState(() => _localFile = file);
@@ -208,16 +280,20 @@ class _TaskImagePickerFieldState extends State<TaskImagePickerField> {
     });
     widget.onUploadingChanged?.call(true);
     try {
-      final result = await (widget.storage ?? TaskImagePickerField.debugStorageOverride ?? TaskImageStorage()).upload(
-        organizationId: widget.organizationId,
+      final previous = _path;
+      final result = await _storage.upload(
+        companyId: widget.companyId,
         file: file,
         onProgress: (p) {
           if (mounted) setState(() => _progress = p);
         },
       );
+      if (previous != null && previous != result.path) {
+        await _storage.deleteQuietly(previous);
+      }
       if (!mounted) return;
       setState(() {
-        _url = result.url;
+        _path = result.path;
         _progress = null;
       });
       widget.onChanged(result);
@@ -232,13 +308,15 @@ class _TaskImagePickerFieldState extends State<TaskImagePickerField> {
     }
   }
 
-  void _remove() {
+  Future<void> _remove() async {
+    final previous = _path;
     setState(() {
-      _url = null;
+      _path = null;
       _localFile = null;
       _failed = false;
     });
     widget.onChanged(null);
+    if (previous != null) await _storage.deleteQuietly(previous);
   }
 
   @override
@@ -247,7 +325,7 @@ class _TaskImagePickerFieldState extends State<TaskImagePickerField> {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    if (_url == null && _localFile == null) {
+    if (_path == null && _localFile == null) {
       return OutlinedButton.icon(
         onPressed: _chooseSource,
         icon: const Icon(Symbols.add_photo_alternate_rounded),
@@ -255,18 +333,31 @@ class _TaskImagePickerFieldState extends State<TaskImagePickerField> {
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.fromHeight(48),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
         ),
       );
     }
 
-    final preview = _localFile != null && (_uploading || _failed || _url == null)
-        ? ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Image.file(_localFile!,
-                height: 200, width: double.infinity, fit: BoxFit.cover),
-          )
-        : TaskImageThumbnail(url: _url!);
+    final Widget preview;
+    if (_localFile != null) {
+      preview = ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Image.file(
+          _localFile!,
+          height: 200,
+          width: double.infinity,
+          fit: BoxFit.cover,
+        ),
+      );
+    } else {
+      preview = TaskImageThumbnail(
+        imagePath: _path!,
+        taskId: widget.initialTaskId,
+        organizationId: widget.organizationId,
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -274,8 +365,12 @@ class _TaskImagePickerFieldState extends State<TaskImagePickerField> {
         preview,
         const SizedBox(height: 8),
         if (_uploading) ...[
-          Text(l10n.taskImageUploading,
-              style: textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant)),
+          Text(
+            l10n.taskImageUploading,
+            style: textTheme.bodyMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: 6),
           LinearProgressIndicator(
             value: _progress == 0 ? null : _progress,
@@ -287,8 +382,10 @@ class _TaskImagePickerFieldState extends State<TaskImagePickerField> {
               Icon(Symbols.error_rounded, color: scheme.error, size: 20),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(l10n.taskImageUploadFailed,
-                    style: textTheme.bodyMedium?.copyWith(color: scheme.error)),
+                child: Text(
+                  l10n.taskImageUploadFailed,
+                  style: textTheme.bodyMedium?.copyWith(color: scheme.error),
+                ),
               ),
               TextButton(onPressed: _upload, child: Text(l10n.taskImageRetry)),
             ],
@@ -323,10 +420,9 @@ class TaskEditedLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final style = Theme.of(context)
-        .textTheme
-        .labelMedium
-        ?.copyWith(color: scheme.onSurfaceVariant);
+    final style = Theme.of(
+      context,
+    ).textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -340,7 +436,11 @@ class TaskEditedLabel extends StatelessWidget {
 
 /// Compact markers for list cards: an image icon and/or the edited label.
 class TaskCardMeta extends StatelessWidget {
-  const TaskCardMeta({super.key, required this.hasImage, required this.isEdited});
+  const TaskCardMeta({
+    super.key,
+    required this.hasImage,
+    required this.isEdited,
+  });
 
   final bool hasImage;
   final bool isEdited;
@@ -356,10 +456,12 @@ class TaskCardMeta extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (hasImage)
-            Icon(Symbols.image_rounded,
-                size: 16,
-                color: scheme.primary,
-                semanticLabel: l10n.taskImageAttached),
+            Icon(
+              Symbols.image_rounded,
+              size: 16,
+              color: scheme.primary,
+              semanticLabel: l10n.taskImageAttached,
+            ),
           if (hasImage && isEdited) const SizedBox(width: 8),
           if (isEdited) const TaskEditedLabel(),
         ],

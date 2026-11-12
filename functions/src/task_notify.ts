@@ -21,6 +21,7 @@ import {
   taskUsersFromDelegateDocs,
   TaskUser,
 } from "./task_notify_logic";
+import {upsertTaskImageGrant} from "./task_image_access";
 
 if (admin.apps.length === 0) admin.initializeApp();
 
@@ -238,6 +239,18 @@ export const onTaskCreated = functions.firestore
         organizationId,
         createdBy,
       });
+      try {
+        await upsertTaskImageGrant(admin.firestore(), {
+          imagePath: task.imagePath,
+          createdBy,
+          recipientIds,
+          companyUID: companyId,
+          organizationId,
+          taskId,
+        });
+      } catch (grantErr) {
+        console.error("Error writing task image grant on create:", grantErr);
+      }
       if (recipientIds.length === 0) {
         console.log("No recipients for new task:", taskId, "assignedTo=", task.assignedTo);
         return null;
@@ -272,6 +285,26 @@ export const onTaskUpdated = functions.firestore
 
     try {
       if (before.assignedTo === after.assignedTo) {
+        if (String(before.imagePath || "") !== String(after.imagePath || "")) {
+          try {
+            const {ids} = await resolveRecipients(admin.firestore(), after.assignedTo, {
+              companyId,
+              organizationId,
+              createdBy,
+            });
+            await upsertTaskImageGrant(admin.firestore(), {
+              imagePath: after.imagePath,
+              previousImagePath: before.imagePath,
+              createdBy,
+              recipientIds: ids,
+              companyUID: companyId,
+              organizationId,
+              taskId,
+            });
+          } catch (grantErr) {
+            console.error("Error writing task image grant on image change:", grantErr);
+          }
+        }
         return null;
       }
       const db = admin.firestore();
@@ -311,6 +344,24 @@ export const onTaskUpdated = functions.firestore
         senderRole: sender.senderRole,
       });
       console.log(`Created ${n} new-assignment notifications for ${taskId}`);
+      try {
+        const {ids} = await resolveRecipients(db, after.assignedTo, {
+          companyId,
+          organizationId,
+          createdBy,
+        });
+        await upsertTaskImageGrant(db, {
+          imagePath: after.imagePath,
+          previousImagePath: before.imagePath,
+          createdBy,
+          recipientIds: ids,
+          companyUID: companyId,
+          organizationId,
+          taskId,
+        });
+      } catch (grantErr) {
+        console.error("Error writing task image grant on assignment change:", grantErr);
+      }
       return null;
     } catch (error) {
       console.error("Error in onTaskUpdated:", error);

@@ -11,6 +11,8 @@ import * as functions from "firebase-functions";
 import {
   decideEnsureIntent,
   isInactiveStatus,
+  isTaskImageFolderId,
+  isTaskImagePurpose,
   isValidFolderId,
   normalizeFolderId,
   resolveOwningCompany,
@@ -69,6 +71,10 @@ export const ensureStorageUploadIntent = functions
     const p = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
     const folderId = normalizeFolderId(p.folderId ?? p.id);
     if (!isValidFolderId(folderId)) fail("invalid-argument", "folder_id_required");
+    const purpose = typeof p.purpose === "string" ? p.purpose.trim() : "";
+    if (isTaskImagePurpose(purpose) && !isTaskImageFolderId(folderId, ctx.auth.uid)) {
+      fail("invalid-argument", "folder_id_required");
+    }
 
     const db = admin.firestore();
     const userSnap = await db.collection("users").doc(ctx.auth.uid).get();
@@ -87,9 +93,21 @@ export const ensureStorageUploadIntent = functions
       }
     }
 
-    const hits = await loadHits(db, folderId);
-    const resolved = resolveOwningCompany(hits);
-    if (!resolved.ok) fail("failed-precondition", resolved.reason);
+    // Task-image intents are a reserved object name for the caller's
+    // company. Do not resolve them against request or delegate folders.
+    let resolved: {companyUID: string | null; lockedByIntent: boolean};
+    if (isTaskImagePurpose(purpose)) {
+      const existing = await db.collection("storage_upload_intents").doc(folderId).get();
+      const co = companyOf(existing.data());
+      resolved = existing.exists && co
+        ? {companyUID: co, lockedByIntent: true}
+        : {companyUID: null, lockedByIntent: false};
+    } else {
+      const hits = await loadHits(db, folderId);
+      const resolvedHits = resolveOwningCompany(hits);
+      if (!resolvedHits.ok) fail("failed-precondition", resolvedHits.reason);
+      resolved = resolvedHits;
+    }
 
     const decision = decideEnsureIntent({
       authenticated: true,
@@ -99,6 +117,7 @@ export const ensureStorageUploadIntent = functions
       requestedCompany: p.companyUID ?? p.companyId,
       ownerCompany: resolved.companyUID,
       lockedByIntent: resolved.lockedByIntent,
+      purpose,
     });
     if (!decision.ok) {
       const code = decision.reason === "sign_in_required" ? "unauthenticated"
@@ -118,6 +137,7 @@ export const ensureStorageUploadIntent = functions
         createdBy: ctx.auth.uid,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         source: "ensureStorageUploadIntent",
+        ...(isTaskImagePurpose(purpose) ? {purpose: "task_image"} : {}),
       });
     } catch (err: unknown) {
       const code = typeof err === "object" && err && "code" in err ?

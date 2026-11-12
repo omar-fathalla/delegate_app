@@ -207,6 +207,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                       const SizedBox(height: 16),
                       TaskImagePickerField(
                         organizationId: widget.adminDelegate.organizationUID,
+                        companyId: widget.adminDelegate.companyUID,
                         onChanged: (upload) => setState(() => _image = upload),
                         onUploadingChanged: (v) =>
                             setState(() => _imageUploading = v),
@@ -460,7 +461,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                                           createdBy: widget.adminDelegate.uid,
                                           createdByName:
                                               '${widget.adminDelegate.firstName} ${widget.adminDelegate.lastName}',
-                                          imageUrl: _image?.url,
+                                          imageUrl: null,
                                           imagePath: _image?.path,
                                         ),
                                       );

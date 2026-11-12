@@ -99,3 +99,45 @@ test("inactive status strings are detected", () => {
   assert.equal(L.isInactiveStatus("active"), false);
   assert.equal(L.isInactiveStatus(""), false);
 });
+
+test("task-image purpose allows assigners and rejects HR", () => {
+  const d = L.decideEnsureIntent({
+    authenticated: true, anonymous: false, role: "marketing",
+    callerCompany: "co_a", requestedCompany: "co_a",
+    ownerCompany: null, lockedByIntent: false, purpose: "task_image",
+  });
+  assert.deepEqual(d, {ok: true, action: "create", companyUID: "co_a"});
+  assert.equal(L.decideEnsureIntent({
+    authenticated: true, anonymous: false, role: "hr",
+    callerCompany: "co_a", requestedCompany: "co_a",
+    ownerCompany: null, lockedByIntent: false, purpose: "task_image",
+  }).reason, "caller_not_staff");
+  assert.equal(L.decideEnsureIntent({
+    authenticated: true, anonymous: false, role: "marketing",
+    callerCompany: "co_a", requestedCompany: "co_b",
+    ownerCompany: null, lockedByIntent: false, purpose: "task_image",
+  }).reason, "company_mismatch");
+});
+
+test("org-level assigner may reserve a requested company for a task image", () => {
+  const d = L.decideEnsureIntent({
+    authenticated: true, anonymous: false, role: "marketingPromotion",
+    callerCompany: "", requestedCompany: "co_a",
+    ownerCompany: null, lockedByIntent: false, purpose: "task_image",
+  });
+  assert.deepEqual(d, {ok: true, action: "create", companyUID: "co_a"});
+});
+
+test("document-folder purpose is unchanged: marketing still cannot mint", () => {
+  assert.equal(L.decideEnsureIntent({
+    authenticated: true, anonymous: false, role: "marketing",
+    callerCompany: "co_a", requestedCompany: "co_a",
+    ownerCompany: null, lockedByIntent: false,
+  }).reason, "caller_not_staff");
+});
+
+test("task-image folder id is exact N1-r ownership", () => {
+  assert.equal(L.isTaskImageFolderId("task_sup1_171.jpg", "sup1"), true);
+  assert.equal(L.isTaskImageFolderId("task_sup1_2_171.jpg", "sup1"), false);
+  assert.equal(L.isTaskImageFolderId("task_sup2_171.jpg", "sup1"), false);
+});

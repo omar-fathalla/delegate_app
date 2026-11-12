@@ -89,7 +89,10 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         _descriptionController.text != _task.description;
     var base = _task;
     if (_newImage != null) {
-      base = base.copyWith(imageUrl: _newImage!.url, imagePath: _newImage!.path);
+      base = base.copyWith(
+        imagePath: _newImage!.path,
+        clearImageUrl: true,
+      );
     } else if (_imageRemoved) {
       base = base.copyWith(clearImage: true);
     }
@@ -312,7 +315,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                     const SizedBox(height: 12),
                     TaskImagePickerField(
                       organizationId: widget.organizationId,
-                      initialUrl: _imageRemoved ? null : _task.imageUrl,
+                      companyId: _task.companyId,
+                      initialPath: _imageRemoved ? null : _task.imagePath,
+                      initialTaskId: _task.uid,
                       onChanged: (upload) => setState(() {
                         _newImage = upload;
                         _imageRemoved = upload == null;
@@ -320,9 +325,14 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                       onUploadingChanged: (v) =>
                           setState(() => _imageUploading = v),
                     ),
-                  ] else if (_task.hasImage) ...[
+                  ] else if (_task.imagePath != null &&
+                      _task.imagePath!.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    TaskImageThumbnail(url: _task.imageUrl!),
+                    TaskImageThumbnail(
+                      imagePath: _task.imagePath!,
+                      taskId: _task.uid,
+                      organizationId: widget.organizationId,
+                    ),
                   ],
                   if (_task.isEdited && !_isEditing) ...[
                     const SizedBox(height: 8),
