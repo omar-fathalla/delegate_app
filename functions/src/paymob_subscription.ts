@@ -321,7 +321,9 @@ export const previewSubscriptionQuote = functions
     if (!context.auth || context.auth.token.firebase?.sign_in_provider === "anonymous") {
       fail("unauthenticated", "sign_in_required");
     }
-    const body = (data || {}) as {companyUID?: unknown; organizationUID?: unknown; uids?: unknown};
+    const body = (data || {}) as {
+      companyUID?: unknown; organizationUID?: unknown; uids?: unknown; periodCode?: unknown;
+    };
     const companyUID = str(body.companyUID);
     if (!companyUID) fail("invalid-argument", "company_required", "معرّف الشركة مطلوب.");
     const raw = Array.isArray(body.uids) ? body.uids : [];
@@ -339,6 +341,7 @@ export const previewSubscriptionQuote = functions
         companyUID,
         organizationUID: str(body.organizationUID),
         uids,
+        periodCode: str(body.periodCode),
         at: new Date(),
       });
       return {

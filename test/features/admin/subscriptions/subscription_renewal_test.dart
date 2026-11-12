@@ -115,6 +115,7 @@ class FakeGateway implements SubscriptionPaymentGateway {
     required String companyUID,
     String? organizationUID,
     required List<String> uids,
+    String? periodCode,
   }) async {
     final amount = SubscriptionCycleHelper.totalFor(uids.length, clock());
     final cents = (amount * 100).round();

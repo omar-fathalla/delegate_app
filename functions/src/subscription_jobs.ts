@@ -257,7 +257,7 @@ export class QuoteError extends Error {
  */
 export async function previewRenewalQuote(
   db: Db,
-  opts: {companyUID: string; organizationUID?: string; uids: string[]; at: Date},
+  opts: {companyUID: string; organizationUID?: string; uids: string[]; at: Date; periodCode?: string},
 ): Promise<Quote> {
   const seen = new Set<string>();
   const uids: string[] = [];
@@ -278,7 +278,11 @@ export async function previewRenewalQuote(
   };
   await assertRenewable(db, data, uids);
   const advanceCfg = await loadAdvanceRenewalConfig(db);
-  const payable = resolvePayablePeriod(opts.at, "", advanceCfg);
+  // Empty periodCode falls back to the current cycle only. The app must
+  // still send the selected period so an advance renewal (next cycle)
+  // is not quoted as the current one.
+  const requested = str(opts.periodCode) || periodOf(opts.at).code;
+  const payable = resolvePayablePeriod(opts.at, requested, advanceCfg);
   if (!payable) throw new QuoteError("period_mismatch");
   const quoteOpts = await loadDevQuoteOptions(db, data);
   const quote = quoteFor(uids, opts.at, {...quoteOpts, periodCode: payable.code});

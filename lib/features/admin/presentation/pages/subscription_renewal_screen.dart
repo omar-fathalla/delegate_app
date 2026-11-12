@@ -117,10 +117,12 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> {
         .toList();
     if (chosen.isEmpty) return;
     setState(() => _submitting = true);
+    final selectedPeriod = _selectedPeriod(_repo.currentPeriodCode(_now));
     final preview = await _gateway.previewQuote(
       companyUID: widget.supervisor.companyUID,
       organizationUID: widget.supervisor.organizationUID,
       uids: chosen.map((d) => d.uid).toList(),
+      periodCode: selectedPeriod,
     );
     if (!mounted) return;
     RenewalQuotePreview? quoted;
