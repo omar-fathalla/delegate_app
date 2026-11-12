@@ -95,19 +95,17 @@ class _DelegateSubscriptionRequestsPageState
       body: StreamBuilder<List<DelegateSubscriptionRequest>>(
         stream: repo.getSubscriptionRequestsStream(
           statusFilter: null,
-          companyUID:
-              (widget.currentAdmin.role == UserRole.superAdmin ||
+          companyUID: (widget.currentAdmin.role == UserRole.superAdmin ||
                   widget.currentAdmin.role == UserRole.technicalSupport ||
                   widget.currentAdmin.role == UserRole.organizationAdmin)
               ? null
               : (widget.currentAdmin.companyUID.isNotEmpty
-                    ? widget.currentAdmin.companyUID
-                    : null),
-          organizationUID:
-              widget.currentAdmin.role == UserRole.organizationAdmin
+                  ? widget.currentAdmin.companyUID
+                  : null),
+          organizationUID: widget.currentAdmin.role == UserRole.organizationAdmin
               ? (widget.currentAdmin.organizationUID.isNotEmpty
-                    ? widget.currentAdmin.organizationUID
-                    : null)
+                  ? widget.currentAdmin.organizationUID
+                  : null)
               : null,
         ),
         builder: (context, snapshot) {
@@ -122,18 +120,11 @@ class _DelegateSubscriptionRequestsPageState
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.error_outline_rounded,
-                      size: 48,
-                      color: colorScheme.error,
-                    ),
+                    Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
                     const SizedBox(height: 12),
                     Text(
                       'حدث خطأ أثناء تحميل الطلبات: ${snapshot.error}',
-                      style: TextStyle(
-                        color: colorScheme.error,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: TextStyle(color: colorScheme.error, fontWeight: FontWeight.w600),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -206,10 +197,7 @@ class _DelegateSubscriptionRequestsPageState
                 child: displayedRequests.isEmpty
                     ? _buildEmptyState(context, colorScheme)
                     : ListView.builder(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         itemCount: displayedRequests.length,
                         itemBuilder: (context, index) {
                           final request = displayedRequests[index];
@@ -242,48 +230,47 @@ class _DelegateSubscriptionRequestsPageState
     final searchWidget = _buildSearchField(colorScheme);
     final countBadge = _buildSummaryCountBadge(colorScheme, totalCount);
 
-    final statusButtonGroup =
-        TashilConnectedButtonGroup<SubscriptionRequestStatus?>(
-          height: 44.0,
-          width: isWide ? null : double.infinity,
-          isScrollable: false,
-          selectedValue: _statusFilter,
-          onSelected: (val) => setState(() => _statusFilter = val),
-          items: [
-            TashilConnectedButtonItem<SubscriptionRequestStatus?>(
-              value: null,
-              label: 'الكل',
-              count: totalCount,
-              icon: Icons.filter_list_rounded,
-              activeColor: colorScheme.primary,
-              activeForegroundColor: colorScheme.onPrimary,
-            ),
-            TashilConnectedButtonItem<SubscriptionRequestStatus?>(
-              value: SubscriptionRequestStatus.pending,
-              label: 'قيد الانتظار',
-              count: pendingCount,
-              icon: Icons.hourglass_top_rounded,
-              activeColor: colorScheme.primary,
-              activeForegroundColor: colorScheme.onPrimary,
-            ),
-            TashilConnectedButtonItem<SubscriptionRequestStatus?>(
-              value: SubscriptionRequestStatus.approved,
-              label: 'المعتمدة',
-              count: approvedCount,
-              icon: Icons.verified_rounded,
-              activeColor: colorScheme.primary,
-              activeForegroundColor: colorScheme.onPrimary,
-            ),
-            TashilConnectedButtonItem<SubscriptionRequestStatus?>(
-              value: SubscriptionRequestStatus.rejected,
-              label: 'المرفوضة',
-              count: rejectedCount,
-              icon: Icons.cancel_rounded,
-              activeColor: colorScheme.primary,
-              activeForegroundColor: colorScheme.onPrimary,
-            ),
-          ],
-        );
+    final statusButtonGroup = TashilConnectedButtonGroup<SubscriptionRequestStatus?>(
+      height: 44.0,
+      width: isWide ? null : double.infinity,
+      isScrollable: false,
+      selectedValue: _statusFilter,
+      onSelected: (val) => setState(() => _statusFilter = val),
+      items: [
+        TashilConnectedButtonItem<SubscriptionRequestStatus?>(
+          value: null,
+          label: 'الكل',
+          count: totalCount,
+          icon: Icons.filter_list_rounded,
+          activeColor: colorScheme.primary,
+          activeForegroundColor: colorScheme.onPrimary,
+        ),
+        TashilConnectedButtonItem<SubscriptionRequestStatus?>(
+          value: SubscriptionRequestStatus.pending,
+          label: 'قيد الانتظار',
+          count: pendingCount,
+          icon: Icons.hourglass_top_rounded,
+          activeColor: colorScheme.primary,
+          activeForegroundColor: colorScheme.onPrimary,
+        ),
+        TashilConnectedButtonItem<SubscriptionRequestStatus?>(
+          value: SubscriptionRequestStatus.approved,
+          label: 'المعتمدة',
+          count: approvedCount,
+          icon: Icons.verified_rounded,
+          activeColor: colorScheme.primary,
+          activeForegroundColor: colorScheme.onPrimary,
+        ),
+        TashilConnectedButtonItem<SubscriptionRequestStatus?>(
+          value: SubscriptionRequestStatus.rejected,
+          label: 'المرفوضة',
+          count: rejectedCount,
+          icon: Icons.cancel_rounded,
+          activeColor: colorScheme.primary,
+          activeForegroundColor: colorScheme.onPrimary,
+        ),
+      ],
+    );
 
     if (isWide) {
       return Padding(
@@ -351,9 +338,7 @@ class _DelegateSubscriptionRequestsPageState
           prefixIcon: Icon(
             Icons.search_rounded,
             size: 20,
-            color: _isSearchFocused
-                ? colorScheme.primary
-                : colorScheme.onSurfaceVariant,
+            color: _isSearchFocused ? colorScheme.primary : colorScheme.onSurfaceVariant,
           ),
           suffixIcon: AnimatedSwitcher(
             duration: AppMotionDurations.short3,
@@ -362,11 +347,7 @@ class _DelegateSubscriptionRequestsPageState
             child: _searchQuery.isNotEmpty
                 ? IconButton(
                     key: const ValueKey('clear_search_btn'),
-                    icon: Icon(
-                      Icons.close_rounded,
-                      size: 18,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+                    icon: Icon(Icons.close_rounded, size: 18, color: colorScheme.onSurfaceVariant),
                     onPressed: () {
                       _searchController.clear();
                       setState(() => _searchQuery = '');
@@ -375,13 +356,9 @@ class _DelegateSubscriptionRequestsPageState
                 : const SizedBox.shrink(key: ValueKey('empty_search_suffix')),
           ),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 10,
-          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         ),
-        onChanged: (val) =>
-            setState(() => _searchQuery = val.trim().toLowerCase()),
+        onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
       ),
     );
   }
@@ -459,7 +436,11 @@ class _DelegateSubscriptionRequestsPageState
                   color: colorScheme.outlineVariant.withValues(alpha: 0.35),
                 ),
               ),
-              child: Icon(icon, size: 38, color: colorScheme.primary),
+              child: Icon(
+                icon,
+                size: 38,
+                color: colorScheme.primary,
+              ),
             ),
             const SizedBox(height: 16),
             Text(
@@ -484,9 +465,7 @@ class _DelegateSubscriptionRequestsPageState
               const SizedBox(height: 18),
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                   side: BorderSide(color: colorScheme.outlineVariant),
                 ),
                 onPressed: () {
@@ -497,10 +476,7 @@ class _DelegateSubscriptionRequestsPageState
                   });
                 },
                 icon: const Icon(Icons.refresh_rounded, size: 16),
-                label: const Text(
-                  'عرض جميع الطلبات',
-                  style: TextStyle(fontSize: 12.5),
-                ),
+                label: const Text('عرض جميع الطلبات', style: TextStyle(fontSize: 12.5)),
               ),
             ],
           ],
@@ -508,6 +484,7 @@ class _DelegateSubscriptionRequestsPageState
       ),
     );
   }
+
 
   Future<void> _handleNationalIdReview(
     DelegateSubscriptionRequest request, {
@@ -602,9 +579,7 @@ class _DelegateSubscriptionRequestsPageState
         title: Row(
           children: [
             Icon(
-              isDelete
-                  ? Icons.delete_forever_rounded
-                  : Icons.check_circle_rounded,
+              isDelete ? Icons.delete_forever_rounded : Icons.check_circle_rounded,
               color: isDelete ? Colors.red : Colors.green,
             ),
             const SizedBox(width: 8),
@@ -617,13 +592,13 @@ class _DelegateSubscriptionRequestsPageState
         content: Text(
           isDelete
               ? 'هل أنت متأكد من الموافقة على طلب الحذف للمندوب "${request.fullName}" المقدم من المشرف ${request.supervisorName}؟\n\n'
-                    '⚠️ تحذير: سيتم حذف المندوب وكافة بياناته وسجلاته نهائياً من قاعدة البيانات والمنظومة، ولا يمكن التراجع عن هذا الإجراء.\n\n'
-                    '${request.rejectionReason?.isNotEmpty == true ? "سبب طلب الحذف: ${request.rejectionReason}" : ""}'
+                  '⚠️ تحذير: سيتم حذف المندوب وكافة بياناته وسجلاته نهائياً من قاعدة البيانات والمنظومة، ولا يمكن التراجع عن هذا الإجراء.\n\n'
+                  '${request.rejectionReason?.isNotEmpty == true ? "سبب طلب الحذف: ${request.rejectionReason}" : ""}'
               : request.requestType == 'add_organization'
-              ? 'هل أنت متأكد من الموافقة على ربط المندوب "${request.fullName}" بسلسلة "${request.organizationName}"؟ (بدون رسوم: الاشتراك الواحد يغطي كل السلاسل)\n\n'
-                    'طريقة الدفع: ${request.paymentMethod.displayName}${request.receiptCode != null ? " (كود: ${request.receiptCode})" : ""}'
-              : 'هل أنت متأكد من اعتماد المندوب "${request.fullName}" وتفعيل اشتراكه بقيمة ${SubscriptionCycleHelper.formatEgp(request.fee)} ج.م (${request.remainingMonths} أشهر، ${request.paymentStatus.arabicLabel}) حتى نهاية دورة ${request.subscriptionCycle}؟\n\n'
-                    'طريقة الدفع: ${request.paymentMethod.displayName}${request.receiptCode != null ? " (كود: ${request.receiptCode})" : ""}',
+                  ? 'هل أنت متأكد من الموافقة على ربط المندوب "${request.fullName}" بسلسلة "${request.organizationName}"؟ (بدون رسوم: الاشتراك الواحد يغطي كل السلاسل)\n\n'
+                      'طريقة الدفع: ${request.paymentMethod.displayName}${request.receiptCode != null ? " (كود: ${request.receiptCode})" : ""}'
+                  : 'هل أنت متأكد من اعتماد المندوب "${request.fullName}" وتفعيل اشتراكه بقيمة ${SubscriptionCycleHelper.formatEgp(request.fee)} ج.م (${request.remainingMonths} أشهر، ${request.paymentStatus.arabicLabel}) حتى نهاية دورة ${request.subscriptionCycle}؟\n\n'
+                      'طريقة الدفع: ${request.paymentMethod.displayName}${request.receiptCode != null ? " (كود: ${request.receiptCode})" : ""}',
         ),
         actions: [
           TextButton(
@@ -790,12 +765,8 @@ class _DelegateSubscriptionRequestsPageState
   }
 }
 
-bool _canSupervisorEditRequest(
-  Delegate admin,
-  DelegateSubscriptionRequest request,
-) {
-  final isEditor =
-      admin.role == UserRole.admin ||
+bool _canSupervisorEditRequest(Delegate admin, DelegateSubscriptionRequest request) {
+  final isEditor = admin.role == UserRole.admin ||
       admin.position == DelegatePosition.supervisor;
   if (!isEditor) return false;
   if (admin.companyUID.isEmpty || admin.companyUID != request.companyUID) {
@@ -861,11 +832,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(
-                      Icons.close_rounded,
-                      size: 20,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+                    icon: Icon(Icons.close_rounded, size: 20, color: colorScheme.onSurfaceVariant),
                     tooltip: 'إغلاق',
                     onPressed: () => Navigator.pop(ctx),
                   ),
@@ -895,18 +862,11 @@ class _SubscriptionRequestCard extends StatelessWidget {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              Icons.broken_image_outlined,
-                              size: 44,
-                              color: colorScheme.error,
-                            ),
+                            Icon(Icons.broken_image_outlined, size: 44, color: colorScheme.error),
                             const SizedBox(height: 8),
                             Text(
                               'فشل تحميل الصورة',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                              style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
                             ),
                           ],
                         ),
@@ -927,9 +887,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isWide = MediaQuery.sizeOf(context).width >= 768;
-    final dateStr = DateFormat(
-      'yyyy/MM/dd • hh:mm a',
-    ).format(request.createdAt);
+    final dateStr = DateFormat('yyyy/MM/dd • hh:mm a').format(request.createdAt);
 
     final Color statusColor;
     if (request.requestType == 'delete_delegate') {
@@ -986,7 +944,10 @@ class _SubscriptionRequestCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // 3.5px start border stripe for status indication (Single-Seed Standard)
-            Container(width: 3.5, color: statusColor),
+            Container(
+              width: 3.5,
+              color: statusColor,
+            ),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(14),
@@ -996,14 +957,13 @@ class _SubscriptionRequestCard extends StatelessWidget {
                     if (request.requestType == 'delete_delegate') ...[
                       Container(
                         margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: Colors.red.shade50,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.red.shade300),
+                          border: Border.all(
+                            color: Colors.red.shade300,
+                          ),
                         ),
                         child: Row(
                           children: [
@@ -1029,35 +989,20 @@ class _SubscriptionRequestCard extends StatelessWidget {
                     ] else if (request.isRenewalRequest) ...[
                       Container(
                         margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: colorScheme.tertiaryContainer.withValues(
-                            alpha: 0.35,
-                          ),
+                          color: colorScheme.tertiaryContainer.withValues(alpha: 0.35),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: colorScheme.tertiary.withValues(alpha: 0.3),
-                          ),
+                          border: Border.all(color: colorScheme.tertiary.withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           children: [
-                            Icon(
-                              Icons.autorenew_rounded,
-                              size: 16,
-                              color: colorScheme.tertiary,
-                            ),
+                            Icon(Icons.autorenew_rounded, size: 16, color: colorScheme.tertiary),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 'طلب تجديد (${request.items.length} مندوب) • ${request.paymentStatus.arabicLabel} • يُعتمد تلقائياً بعد الدفع',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onSurface,
-                                ),
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
                               ),
                             ),
                           ],
@@ -1066,28 +1011,17 @@ class _SubscriptionRequestCard extends StatelessWidget {
                     ] else if (request.isNationalIdUpdateRequest) ...[
                       Container(
                         margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: colorScheme.secondaryContainer.withValues(
-                            alpha: 0.45,
-                          ),
+                          color: colorScheme.secondaryContainer.withValues(alpha: 0.45),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: colorScheme.secondary.withValues(
-                              alpha: 0.35,
-                            ),
+                            color: colorScheme.secondary.withValues(alpha: 0.35),
                           ),
                         ),
                         child: Row(
                           children: [
-                            Icon(
-                              Icons.badge_outlined,
-                              size: 16,
-                              color: colorScheme.secondary,
-                            ),
+                            Icon(Icons.badge_outlined, size: 16, color: colorScheme.secondary),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -1105,14 +1039,9 @@ class _SubscriptionRequestCard extends StatelessWidget {
                     ] else if (request.requestType == 'add_organization') ...[
                       Container(
                         margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer.withValues(
-                            alpha: 0.35,
-                          ),
+                          color: colorScheme.primaryContainer.withValues(alpha: 0.35),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: colorScheme.primary.withValues(alpha: 0.3),
@@ -1146,24 +1075,15 @@ class _SubscriptionRequestCard extends StatelessWidget {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer.withValues(
-                              alpha: 0.65,
-                            ),
+                            color: colorScheme.primaryContainer.withValues(alpha: 0.65),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                Icons.corporate_fare_rounded,
-                                size: 13,
-                                color: colorScheme.primary,
-                              ),
+                              Icon(Icons.corporate_fare_rounded, size: 13, color: colorScheme.primary),
                               const SizedBox(width: 4),
                               Text(
                                 request.organizationName,
@@ -1178,10 +1098,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(8),
@@ -1199,8 +1116,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
                         _buildStatusBadge(
                           request.status,
                           colorScheme,
-                          isDeleteRequest:
-                              request.requestType == 'delete_delegate',
+                          isDeleteRequest: request.requestType == 'delete_delegate',
                         ),
                       ],
                     ),
@@ -1226,19 +1142,13 @@ class _SubscriptionRequestCard extends StatelessWidget {
                                 width: 50,
                                 height: 50,
                                 color: colorScheme.surfaceContainerHighest,
-                                child: Icon(
-                                  Icons.person_rounded,
-                                  color: colorScheme.outlineVariant,
-                                ),
+                                child: Icon(Icons.person_rounded, color: colorScheme.outlineVariant),
                               ),
                               errorWidget: (context, url, error) => Container(
                                 width: 50,
                                 height: 50,
                                 color: colorScheme.surfaceContainerHighest,
-                                child: Icon(
-                                  Icons.person_rounded,
-                                  color: colorScheme.outlineVariant,
-                                ),
+                                child: Icon(Icons.person_rounded, color: colorScheme.outlineVariant),
                               ),
                             ),
                           ),
@@ -1258,42 +1168,25 @@ class _SubscriptionRequestCard extends StatelessWidget {
                               const SizedBox(height: 2),
                               Row(
                                 children: [
-                                  Icon(
-                                    Icons.phone_rounded,
-                                    size: 12,
-                                    color: colorScheme.outline,
-                                  ),
+                                  Icon(Icons.phone_rounded, size: 12, color: colorScheme.outline),
                                   const SizedBox(width: 4),
                                   Text(
                                     request.phoneNumber,
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      color: colorScheme.outline,
-                                    ),
+                                    style: TextStyle(fontSize: 11.5, color: colorScheme.outline),
                                   ),
                                   const SizedBox(width: 8),
-                                  Icon(
-                                    Icons.badge_rounded,
-                                    size: 12,
-                                    color: colorScheme.outline,
-                                  ),
+                                  Icon(Icons.badge_rounded, size: 12, color: colorScheme.outline),
                                   const SizedBox(width: 4),
                                   Text(
                                     request.nationalId,
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      color: colorScheme.outline,
-                                    ),
+                                    style: TextStyle(fontSize: 11.5, color: colorScheme.outline),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 '${request.supervisorName} • $dateStr',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: colorScheme.outline,
-                                ),
+                                style: TextStyle(fontSize: 10, color: colorScheme.outline),
                               ),
                             ],
                           ),
@@ -1308,32 +1201,20 @@ class _SubscriptionRequestCard extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 8,
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                               decoration: BoxDecoration(
-                                color: Colors.red.shade50.withValues(
-                                  alpha: 0.5,
-                                ),
+                                color: Colors.red.shade50.withValues(alpha: 0.5),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(color: Colors.red.shade200),
                               ),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(
-                                    Icons.info_outline_rounded,
-                                    size: 16,
-                                    color: Colors.red.shade700,
-                                  ),
+                                  Icon(Icons.info_outline_rounded, size: 16, color: Colors.red.shade700),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      request.rejectionReason != null &&
-                                              request.rejectionReason!
-                                                  .trim()
-                                                  .isNotEmpty
+                                      request.rejectionReason != null && request.rejectionReason!.trim().isNotEmpty
                                           ? 'سبب طلب الحذف: ${request.rejectionReason}'
                                           : 'طلب حذف مقدم من المشرف بدون سبب إضافي',
                                       style: TextStyle(
@@ -1347,24 +1228,17 @@ class _SubscriptionRequestCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          if (request.nationalIdFrontUrl.isNotEmpty ||
-                              request.nationalIdBackUrl.isNotEmpty) ...[
+                          if (request.nationalIdFrontUrl.isNotEmpty || request.nationalIdBackUrl.isNotEmpty) ...[
                             const SizedBox(width: 8),
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 if (request.nationalIdFrontUrl.isNotEmpty)
                                   IconButton.outlined(
-                                    constraints: const BoxConstraints(
-                                      minWidth: 32,
-                                      minHeight: 32,
-                                    ),
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                     padding: EdgeInsets.zero,
                                     tooltip: 'وجه البطاقة',
-                                    icon: const Icon(
-                                      Icons.badge_outlined,
-                                      size: 16,
-                                    ),
+                                    icon: const Icon(Icons.badge_outlined, size: 16),
                                     onPressed: () => _showImageDialog(
                                       context,
                                       'بطاقة الرقم القومي (الوجه) - ${request.fullName}',
@@ -1374,16 +1248,10 @@ class _SubscriptionRequestCard extends StatelessWidget {
                                 if (request.nationalIdBackUrl.isNotEmpty) ...[
                                   const SizedBox(width: 4),
                                   IconButton.outlined(
-                                    constraints: const BoxConstraints(
-                                      minWidth: 32,
-                                      minHeight: 32,
-                                    ),
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                     padding: EdgeInsets.zero,
                                     tooltip: 'ظهر البطاقة',
-                                    icon: const Icon(
-                                      Icons.flip_rounded,
-                                      size: 16,
-                                    ),
+                                    icon: const Icon(Icons.flip_rounded, size: 16),
                                     onPressed: () => _showImageDialog(
                                       context,
                                       'بطاقة الرقم القومي (الظهر) - ${request.fullName}',
@@ -1406,28 +1274,18 @@ class _SubscriptionRequestCard extends StatelessWidget {
                               spacing: 6,
                               runSpacing: 4,
                               children: [
-                                if (request.paymentMethod ==
-                                    SubscriptionPaymentMethod.freePromotion)
+                                if (request.paymentMethod == SubscriptionPaymentMethod.freePromotion)
                                   Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 7,
-                                      vertical: 2.5,
-                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                                     decoration: BoxDecoration(
                                       color: const Color(0xFFDCFCE7),
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                        color: const Color(0xFF86EFAC),
-                                      ),
+                                      border: Border.all(color: const Color(0xFF86EFAC)),
                                     ),
                                     child: const Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(
-                                          Icons.card_giftcard_rounded,
-                                          size: 13,
-                                          color: Color(0xFF16A34A),
-                                        ),
+                                        Icon(Icons.card_giftcard_rounded, size: 13, color: Color(0xFF16A34A)),
                                         SizedBox(width: 4),
                                         Text(
                                           'عرض مجاني (0 ج.م)',
@@ -1440,16 +1298,11 @@ class _SubscriptionRequestCard extends StatelessWidget {
                                       ],
                                     ),
                                   )
-                                else if (request.paymentMethod ==
-                                    SubscriptionPaymentMethod.companyDeduction)
+                                else if (request.paymentMethod == SubscriptionPaymentMethod.companyDeduction)
                                   Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: colorScheme.secondaryContainer
-                                          .withValues(alpha: 0.5),
+                                      color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
@@ -1461,23 +1314,13 @@ class _SubscriptionRequestCard extends StatelessWidget {
                                       ),
                                     ),
                                   )
-                                else if (request.paymentMethod ==
-                                    SubscriptionPaymentMethod.instaPay) ...[
+                                else if (request.paymentMethod == SubscriptionPaymentMethod.instaPay) ...[
                                   Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: const Color(
-                                        0xFF6B21A8,
-                                      ).withValues(alpha: 0.12),
+                                      color: const Color(0xFF6B21A8).withValues(alpha: 0.12),
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                        color: const Color(
-                                          0xFF9333EA,
-                                        ).withValues(alpha: 0.3),
-                                      ),
+                                      border: Border.all(color: const Color(0xFF9333EA).withValues(alpha: 0.3)),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -1502,16 +1345,10 @@ class _SubscriptionRequestCard extends StatelessWidget {
                                   ),
                                   if (request.receiptImageUrl != null)
                                     IconButton.filledTonal(
-                                      constraints: const BoxConstraints(
-                                        minWidth: 32,
-                                        minHeight: 32,
-                                      ),
+                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                       padding: EdgeInsets.zero,
                                       tooltip: 'عرض إشعار تحويل انستاباي',
-                                      icon: const Icon(
-                                        Icons.receipt_long_rounded,
-                                        size: 16,
-                                      ),
+                                      icon: const Icon(Icons.receipt_long_rounded, size: 16),
                                       onPressed: () => _showImageDialog(
                                         context,
                                         'إشعار تحويل انستاباي - ${request.fullName}',
@@ -1520,13 +1357,9 @@ class _SubscriptionRequestCard extends StatelessWidget {
                                     ),
                                 ] else ...[
                                   Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: colorScheme.primaryContainer
-                                          .withValues(alpha: 0.5),
+                                      color: colorScheme.primaryContainer.withValues(alpha: 0.5),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
@@ -1539,13 +1372,9 @@ class _SubscriptionRequestCard extends StatelessWidget {
                                     ),
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color:
-                                          colorScheme.surfaceContainerHighest,
+                                      color: colorScheme.surfaceContainerHighest,
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
@@ -1559,16 +1388,10 @@ class _SubscriptionRequestCard extends StatelessWidget {
                                   ),
                                   if (request.receiptImageUrl != null)
                                     IconButton.filledTonal(
-                                      constraints: const BoxConstraints(
-                                        minWidth: 32,
-                                        minHeight: 32,
-                                      ),
+                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                       padding: EdgeInsets.zero,
                                       tooltip: 'عرض الإيصال الإلكتروني',
-                                      icon: const Icon(
-                                        Icons.receipt_long_rounded,
-                                        size: 16,
-                                      ),
+                                      icon: const Icon(Icons.receipt_long_rounded, size: 16),
                                       onPressed: () => _showImageDialog(
                                         context,
                                         'إيصال إلكتروني - كود ${request.receiptCode}',
@@ -1577,10 +1400,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
                                     ),
                                 ],
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
                                     color: colorScheme.surfaceContainerHighest,
                                     borderRadius: BorderRadius.circular(6),
@@ -1603,16 +1423,10 @@ class _SubscriptionRequestCard extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton.outlined(
-                                constraints: const BoxConstraints(
-                                  minWidth: 32,
-                                  minHeight: 32,
-                                ),
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                 padding: EdgeInsets.zero,
                                 tooltip: 'وجه البطاقة',
-                                icon: const Icon(
-                                  Icons.badge_outlined,
-                                  size: 16,
-                                ),
+                                icon: const Icon(Icons.badge_outlined, size: 16),
                                 onPressed: () => _showImageDialog(
                                   context,
                                   'بطاقة الرقم القومي (الوجه) - ${request.fullName}',
@@ -1621,10 +1435,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
                               ),
                               const SizedBox(width: 4),
                               IconButton.outlined(
-                                constraints: const BoxConstraints(
-                                  minWidth: 32,
-                                  minHeight: 32,
-                                ),
+                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                 padding: EdgeInsets.zero,
                                 tooltip: 'ظهر البطاقة',
                                 icon: const Icon(Icons.flip_rounded, size: 16),
@@ -1640,8 +1451,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
                       ),
 
                     // Row 4: Action Buttons or Status Message
-                    if (request.status ==
-                        SubscriptionRequestStatus.pending) ...[
+                    if (request.status == SubscriptionRequestStatus.pending) ...[
                       const SizedBox(height: 12),
                       if (currentAdmin.role == UserRole.superAdmin ||
                           currentAdmin.role == UserRole.technicalSupport)
@@ -1655,76 +1465,54 @@ class _SubscriptionRequestCard extends StatelessWidget {
                             // for tech support and super-admin too (tapping
                             // was already blocked).
                             if (!request.isRenewalRequest) ...[
-                              Flexible(
-                                fit: isWide ? FlexFit.loose : FlexFit.tight,
-                                child: FilledButton.icon(
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor:
-                                        request.requestType == 'delete_delegate'
-                                        ? Colors.red.shade700
-                                        : const Color(0xFF16A34A),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 9,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  onPressed: onApprove,
-                                  icon: Icon(
-                                    request.requestType == 'delete_delegate'
-                                        ? Icons.delete_forever_rounded
-                                        : Icons.verified_rounded,
-                                    size: 17,
-                                  ),
-                                  label: Text(
-                                    request.requestType == 'delete_delegate'
-                                        ? 'اعتماد الحذف النهائي'
-                                        : request.isNationalIdUpdateRequest
-                                        ? 'اعتماد تعديل الرقم القومي'
-                                        : 'اعتماد وتفعيل',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                    ),
-                                  ),
+                            Flexible(
+                              fit: isWide ? FlexFit.loose : FlexFit.tight,
+                              child: FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: request.requestType == 'delete_delegate'
+                                      ? Colors.red.shade700
+                                      : const Color(0xFF16A34A),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 9),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                onPressed: onApprove,
+                                icon: Icon(
+                                  request.requestType == 'delete_delegate'
+                                      ? Icons.delete_forever_rounded
+                                      : Icons.verified_rounded,
+                                  size: 17,
+                                ),
+                                label: Text(
+                                  request.requestType == 'delete_delegate'
+                                      ? 'اعتماد الحذف النهائي'
+                                      : request.isNationalIdUpdateRequest
+                                          ? 'اعتماد تعديل الرقم القومي'
+                                          : 'اعتماد وتفعيل',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                            ),
+                            const SizedBox(width: 8),
                             ],
                             Flexible(
                               fit: isWide ? FlexFit.loose : FlexFit.tight,
                               child: OutlinedButton.icon(
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: colorScheme.error,
-                                  side: BorderSide(
-                                    color: colorScheme.error.withValues(
-                                      alpha: 0.7,
-                                    ),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 9,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
+                                  side: BorderSide(color: colorScheme.error.withValues(alpha: 0.7)),
+                                  padding: const EdgeInsets.symmetric(vertical: 9),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 ),
                                 onPressed: onReject,
-                                icon: const Icon(
-                                  Icons.cancel_rounded,
-                                  size: 17,
-                                ),
+                                icon: const Icon(Icons.cancel_rounded, size: 17),
                                 label: Text(
                                   request.requestType == 'delete_delegate'
                                       ? 'رفض طلب الحذف'
                                       : request.isNationalIdUpdateRequest
-                                      ? 'رفض تعديل الرقم القومي'
-                                      : 'رفض الطلب',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                  ),
+                                          ? 'رفض تعديل الرقم القومي'
+                                          : 'رفض الطلب',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                 ),
                               ),
                             ),
@@ -1732,26 +1520,15 @@ class _SubscriptionRequestCard extends StatelessWidget {
                         )
                       else
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 7,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                           decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer.withValues(
-                              alpha: 0.35,
-                            ),
+                            color: colorScheme.primaryContainer.withValues(alpha: 0.35),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: colorScheme.primary.withValues(alpha: 0.2),
-                            ),
+                            border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
                           ),
                           child: Row(
                             children: [
-                              Icon(
-                                Icons.hourglass_top_rounded,
-                                size: 16,
-                                color: colorScheme.primary,
-                              ),
+                              Icon(Icons.hourglass_top_rounded, size: 16, color: colorScheme.primary),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
@@ -1770,15 +1547,14 @@ class _SubscriptionRequestCard extends StatelessWidget {
                         const SizedBox(height: 8),
                         OutlinedButton.icon(
                           onPressed: () async {
-                            final result = await Navigator.of(context)
-                                .push<bool>(
-                                  MaterialPageRoute(
-                                    builder: (_) => EditDelegateProfileScreen(
-                                      supervisor: currentAdmin,
-                                      request: request,
-                                    ),
-                                  ),
-                                );
+                            final result = await Navigator.of(context).push<bool>(
+                              MaterialPageRoute(
+                                builder: (_) => EditDelegateProfileScreen(
+                                  supervisor: currentAdmin,
+                                  request: request,
+                                ),
+                              ),
+                            );
                             if (result == true) {
                               // stream rebuilds the list
                             }
@@ -1787,14 +1563,10 @@ class _SubscriptionRequestCard extends StatelessWidget {
                           label: const Text('تعديل بيانات الطلب'),
                         ),
                       ],
-                    ] else if (request.status ==
-                        SubscriptionRequestStatus.approved) ...[
+                    ] else if (request.status == SubscriptionRequestStatus.approved) ...[
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: request.requestType == 'delete_delegate'
                               ? Colors.grey.shade100
@@ -1803,9 +1575,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
                           border: Border.all(
                             color: request.requestType == 'delete_delegate'
                                 ? Colors.grey.shade300
-                                : const Color(
-                                    0xFF16A34A,
-                                  ).withValues(alpha: 0.25),
+                                : const Color(0xFF16A34A).withValues(alpha: 0.25),
                           ),
                         ),
                         child: Row(
@@ -1825,12 +1595,11 @@ class _SubscriptionRequestCard extends StatelessWidget {
                                 request.requestType == 'delete_delegate'
                                     ? 'تم تنفيذ الحذف النهائي للمندوب بنجاح${request.reviewedBy != null ? " (${request.reviewedBy})" : ""}!'
                                     : request.isNationalIdUpdateRequest
-                                    ? 'تم اعتماد الرقم القومي الجديد${request.reviewedBy != null ? " (${request.reviewedBy})" : ""}'
-                                    : 'تم اعتماد وتفعيل المندوب بنجاح${request.reviewedBy != null ? " (${request.reviewedBy})" : ""}!',
+                                        ? 'تم اعتماد الرقم القومي الجديد${request.reviewedBy != null ? " (${request.reviewedBy})" : ""}'
+                                        : 'تم اعتماد وتفعيل المندوب بنجاح${request.reviewedBy != null ? " (${request.reviewedBy})" : ""}!',
                                 style: TextStyle(
                                   fontSize: 11.5,
-                                  color:
-                                      request.requestType == 'delete_delegate'
+                                  color: request.requestType == 'delete_delegate'
                                       ? Colors.grey.shade800
                                       : const Color(0xFF16A34A),
                                   fontWeight: FontWeight.w600,
@@ -1840,31 +1609,19 @@ class _SubscriptionRequestCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                    ] else if (request.status ==
-                        SubscriptionRequestStatus.rejected) ...[
+                    ] else if (request.status == SubscriptionRequestStatus.rejected) ...[
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: colorScheme.errorContainer.withValues(
-                            alpha: 0.4,
-                          ),
+                          color: colorScheme.errorContainer.withValues(alpha: 0.4),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: colorScheme.error.withValues(alpha: 0.25),
-                          ),
+                          border: Border.all(color: colorScheme.error.withValues(alpha: 0.25)),
                         ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.cancel_rounded,
-                              size: 16,
-                              color: colorScheme.error,
-                            ),
+                            Icon(Icons.cancel_rounded, size: 16, color: colorScheme.error),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
@@ -1975,7 +1732,10 @@ class _SubscriptionRequestCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: fg.withValues(alpha: 0.25), width: 0.8),
+        border: Border.all(
+          color: fg.withValues(alpha: 0.25),
+          width: 0.8,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1984,11 +1744,7 @@ class _SubscriptionRequestCard extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.bold,
-              color: fg,
-            ),
+            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: fg),
           ),
         ],
       ),
