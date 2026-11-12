@@ -283,15 +283,19 @@ export async function previewRenewalQuote(
     requestType: REQUEST_TYPE_RENEWAL,
   };
   await assertRenewable(db, data, uids);
-  const advanceCfg = await loadAdvanceRenewalConfig(db);
+  const publicCfg = await loadPublicSubscriptionConfig(db);
   // Empty periodCode falls back to the current cycle only. The app must
   // still send the selected period so an advance renewal (next cycle)
   // is not quoted as the current one.
   const requested = str(opts.periodCode) || periodOf(opts.at).code;
-  const payable = resolvePayablePeriod(opts.at, requested, advanceCfg);
+  const payable = resolvePayablePeriod(opts.at, requested, publicCfg.advance);
   if (!payable) throw new QuoteError("period_mismatch");
   const quoteOpts = await loadDevQuoteOptions(db, data);
-  const quote = quoteFor(uids, opts.at, {...quoteOpts, periodCode: payable.code});
+  const quote = quoteFor(uids, opts.at, {
+    ...quoteOpts,
+    periodCode: payable.code,
+    freePromotionLastDay: publicCfg.freePromotionLastDay,
+  });
   if (quote.amountCents <= 0) throw new QuoteError("free_period");
   await db.runTransaction(async (tx) => {
     await assertNotAlreadyCovered(tx, db, "_preview_", quote.periodCode, uids, opts.at);
