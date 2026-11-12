@@ -98,12 +98,25 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         (widget.currentUserCompanyId ?? '') == _task.companyId;
   }
 
+  /// «إرفاق إثبات» only when the signed-in user may write proofs for this
+  /// task: its assignee or an intended recipient, same company, not
+  /// cancelled (B1; the server rules enforce the same).
   bool get _canEditOwnProofs {
     if (_viewerId == null || _viewerId!.isEmpty) return false;
     if (_isSender) return false;
-    if (!isTaskProofUploaderRole(widget.currentUserRole)) return false;
-    return _currentStatus != TaskStatus.cancelled &&
-        _task.status != TaskStatus.cancelled;
+    return canWriteTaskProof(
+      role: widget.currentUserRole,
+      viewerIds: [
+        widget.currentUserId,
+        widget.authUidOverride ?? FirebaseAuth.instance.currentUser?.uid,
+      ],
+      viewerCompanyId: widget.currentUserCompanyId,
+      taskCompanyId: _task.companyId,
+      assignedTo: _task.assignedTo,
+      cancelled:
+          _currentStatus == TaskStatus.cancelled ||
+          _task.status == TaskStatus.cancelled,
+    );
   }
 
   bool get _proofsChanged =>
@@ -112,8 +125,10 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   TaskRemoteDataSource get _proofs =>
       widget.proofSource ?? di.sl<TaskRemoteDataSource>();
 
-  TaskImageStorage get _proofStorage =>
-      TaskImageStorage.proof(organizationId: widget.organizationId);
+  TaskImageStorage get _proofStorage => TaskImageStorage.proof(
+    organizationId: widget.organizationId,
+    taskId: _task.uid,
+  );
 
   TaskImageFetcher get _proofFetcher => TaskImageFetcher.proof();
 
@@ -224,7 +239,6 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         uploaderUid: uid,
         imagePaths: List<String>.from(_ownProofPaths),
         companyUID: _task.companyId,
-        uploadedByName: widget.currentUserName ?? '',
       );
       _savedOwnProofPaths = List<String>.from(_ownProofPaths);
       _sessionProofUploads.clear();

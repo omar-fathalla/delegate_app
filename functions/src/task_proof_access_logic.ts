@@ -165,3 +165,98 @@ export function canReadTaskProof(input: {
 export function shouldStripTaskProofDownloadToken(objectName: unknown): boolean {
   return parseTaskProofPath(objectName) != null;
 }
+
+const ALL_TOKENS = new Set(["all", "الكل"]);
+const BRANCH_MARKETING_TOKEN = "all_branch_marketing";
+const MARKETING_PROMOTION_TOKEN = "all_marketing_promotion";
+
+function lc(v: unknown): string {
+  return str(v).toLowerCase().replace(/-/g, "_");
+}
+
+function isFieldDelegateProofRole(role: unknown): boolean {
+  return lc(role) === "delegate";
+}
+
+function isBranchMarketingProofRole(role: unknown): boolean {
+  return new Set([
+    "marketing", "branches_marketing", "branchesmarketing",
+    "branches_marketing_manager", "branchesmarketingmanager",
+  ]).has(lc(role));
+}
+
+function isMarketingPromotionProofRole(role: unknown): boolean {
+  return new Set(["marketing_promotion", "marketingpromotion"]).has(lc(role));
+}
+
+/**
+ * B1: who may attach proof photos to a task. Only the task's assignee or
+ * its intended recipients, in the task's org and company, and never on a
+ * cancelled task. «الكل» is company field delegates only; sector tokens
+ * accept the matching role (org-level sector staff with no company too).
+ * Mirrors proofCallerMayWrite() in firestore.rules.
+ */
+export function canWriteTaskProof(input: {
+  callerUid: unknown;
+  callerRole: unknown;
+  callerIds?: readonly unknown[];
+  callerCompanyIds: readonly unknown[];
+  callerOrgIds: readonly unknown[];
+  organizationId: unknown;
+  task: {companyId?: unknown; companyUID?: unknown; assignedTo?: unknown; status?: unknown} | null;
+}): {ok: true} | {ok: false; reason: string} {
+  const caller = str(input.callerUid);
+  if (!caller) return {ok: false, reason: "sign_in_required"};
+  const task = input.task;
+  if (!task) return {ok: false, reason: "task_not_found"};
+  if (str(task.status) === "cancelled") return {ok: false, reason: "task_cancelled"};
+  const org = str(input.organizationId);
+  const orgs = input.callerOrgIds.map(str).filter(Boolean);
+  if (!org || !orgs.includes(org)) return {ok: false, reason: "org_mismatch"};
+  const taskCo = str(task.companyId) || str(task.companyUID);
+  if (!taskCo) return {ok: false, reason: "company_mismatch"};
+  const cos = input.callerCompanyIds.map(str).filter(Boolean);
+  const inCompany = cos.includes(taskCo);
+  const assigned = str(task.assignedTo);
+  if (!assigned) return {ok: false, reason: "not_assigned"};
+  const ids = new Set([caller, ...(input.callerIds || []).map(str).filter(Boolean)]);
+  const role = input.callerRole;
+  if (ALL_TOKENS.has(assigned)) {
+    if (!inCompany) return {ok: false, reason: "company_mismatch"};
+    return isFieldDelegateProofRole(role) ? {ok: true} : {ok: false, reason: "not_assigned"};
+  }
+  if (assigned === BRANCH_MARKETING_TOKEN || assigned === MARKETING_PROMOTION_TOKEN) {
+    const roleOk = assigned === BRANCH_MARKETING_TOKEN
+      ? isBranchMarketingProofRole(role)
+      : isMarketingPromotionProofRole(role);
+    if (!roleOk) return {ok: false, reason: "not_assigned"};
+    if (!inCompany && cos.length > 0) return {ok: false, reason: "company_mismatch"};
+    return {ok: true};
+  }
+  if (!ids.has(assigned)) return {ok: false, reason: "not_assigned"};
+  if (!inCompany) return {ok: false, reason: "company_mismatch"};
+  if (!isTaskProofUploaderRole(role)) return {ok: false, reason: "not_allowed"};
+  return {ok: true};
+}
+
+/**
+ * Display name for a proofs doc, from the uploader's own profile. Never
+ * from the client. Same order as the app's profile models.
+ */
+export function proofDisplayNameFrom(
+  ...profiles: Array<Record<string, unknown> | null | undefined>
+): string {
+  for (const d of profiles) {
+    if (!d) continue;
+    const display = str(d.displayName);
+    if (display) return display;
+    const full = str(d.fullName);
+    if (full) return full;
+    const combined = [str(d.firstName), str(d.middleName), str(d.lastName)]
+      .filter(Boolean).join(" ");
+    if (combined) return combined;
+    const name = str(d.name);
+    if (name) return name;
+  }
+  return "";
+}

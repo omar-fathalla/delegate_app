@@ -13,6 +13,7 @@ Future<String?> ensureStorageUploadIntent({
   required String companyUID,
   String? purpose,
   String? organizationId,
+  String? taskId,
   FirebaseFunctions? functions,
 }) async {
   final id = folderId.trim();
@@ -28,6 +29,8 @@ Future<String?> ensureStorageUploadIntent({
     if (kind.isNotEmpty) payload['purpose'] = kind;
     final org = organizationId?.trim() ?? '';
     if (org.isNotEmpty) payload['organizationId'] = org;
+    final task = taskId?.trim() ?? '';
+    if (task.isNotEmpty) payload['taskId'] = task;
     await callable.call(payload);
     return null;
   } on FirebaseFunctionsException catch (e) {
@@ -49,6 +52,12 @@ String _intentErrorMessage(FirebaseFunctionsException e) {
     case 'sign_in_required':
     case 'unauthenticated':
       return 'يجب تسجيل الدخول أولاً.';
+    case 'not_assigned':
+    case 'task_cancelled':
+    case 'org_mismatch':
+    case 'task_required':
+    case 'task_not_found':
+      return 'لا يمكن إرفاق إثبات لهذه المهمة.';
     case 'caller_not_staff':
     case 'caller_no_company':
       return 'ليس لديك صلاحية رفع مستندات لهذا المجلد.';

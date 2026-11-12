@@ -60,7 +60,6 @@ abstract class TaskRemoteDataSource {
     required String uploaderUid,
     required List<String> imagePaths,
     required String companyUID,
-    String uploadedByName = '',
   });
 }
 
@@ -375,7 +374,6 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
     required String uploaderUid,
     required List<String> imagePaths,
     required String companyUID,
-    String uploadedByName = '',
   }) async {
     final ref = _taskCollection(
       organizationId,
@@ -395,13 +393,14 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
     List<String> previous = const [];
     final existing = await ref.get();
     if (existing.exists) previous = _proofFromDoc(existing).imagePaths;
+    // uploadedByName is server-set from the uploader's profile
+    // (onTaskProofWritten). Merge so a client save never sends or clears it.
     await ref.set({
       'uploadedBy': uploaderUid,
-      'uploadedByName': uploadedByName,
       'companyUID': companyUID,
       'taskId': taskId,
       'imagePaths': paths,
-    });
+    }, SetOptions(merge: true));
     final keep = paths.toSet();
     for (final path in previous) {
       if (!keep.contains(path)) {

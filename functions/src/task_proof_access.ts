@@ -8,7 +8,7 @@
  * who are not the sender, other companies, tech support, and super
  * admin are denied.
  *
- * Deploy: functions:getTaskProofImage,functions:onTaskDeleted --project tashil-dev
+ * Deploy: functions:getTaskProofImage,functions:onTaskDeleted,functions:onTaskProofWritten --project tashil-dev
  * Never deploy suspendExpiredSubscriptions with this function.
  */
 import * as admin from "firebase-admin";
@@ -17,6 +17,7 @@ import {
   canReadTaskProof,
   normalizeTaskProofPath,
   parseTaskProofPath,
+  proofDisplayNameFrom,
   str,
   taskProofPathsFrom,
 } from "./task_proof_access_logic";
@@ -163,5 +164,43 @@ export const onTaskDeleted = functions
       } catch (err) {
         functions.logger.warn("proof doc delete failed", {id: doc.id, err});
       }
+    }
+  });
+
+/**
+ * B1: the uploader label on a proofs doc comes from the uploader's own
+ * profile, never from the client. Rules forbid clients from adding or
+ * changing uploadedByName; this trigger sets it (idempotent: no write
+ * when it already matches, so it does not loop).
+ */
+export const onTaskProofWritten = functions
+  .region("us-central1")
+  .runWith({timeoutSeconds: 60, memory: "256MB"})
+  .firestore.document("organizations/{orgId}/tasks/{taskId}/proofs/{uploaderUid}")
+  .onWrite(async (change, context) => {
+    if (!change.after.exists) return;
+    const data = (change.after.data() || {}) as Record<string, unknown>;
+    const uid = str(context.params.uploaderUid);
+    const orgId = str(context.params.orgId);
+    const companyId = str(data.companyUID);
+    const db = admin.firestore();
+    const userSnap = await db.collection("users").doc(uid).get();
+    let delegate: Record<string, unknown> | null = null;
+    if (orgId && companyId && !companyId.includes("/")) {
+      const del = await db.doc(
+        `organizations/${orgId}/companies/${companyId}/delegates/${uid}`,
+      ).get();
+      if (del.exists) delegate = (del.data() || {}) as Record<string, unknown>;
+    }
+    const name = proofDisplayNameFrom(
+      userSnap.exists ? (userSnap.data() || {}) as Record<string, unknown> : null,
+      delegate,
+    );
+    const current = typeof data.uploadedByName === "string" ? data.uploadedByName : null;
+    if (name) {
+      if (current === name) return;
+      await change.after.ref.update({uploadedByName: name});
+    } else if (current !== null) {
+      await change.after.ref.update({uploadedByName: admin.firestore.FieldValue.delete()});
     }
   });

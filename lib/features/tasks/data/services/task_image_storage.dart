@@ -37,6 +37,7 @@ class TaskImageStorage {
       required String companyUID,
       String? purpose,
       String? organizationId,
+      String? taskId,
       FirebaseFunctions? functions,
     })?
     ensureIntent,
@@ -44,6 +45,7 @@ class TaskImageStorage {
     this.rootPrefix = 'task_images',
     this.namePrefix = 'task',
     this.organizationId,
+    this.taskId,
   }) : _storage = storage,
        _auth = auth,
        _functions = functions,
@@ -57,6 +59,7 @@ class TaskImageStorage {
     required String companyUID,
     String? purpose,
     String? organizationId,
+    String? taskId,
     FirebaseFunctions? functions,
   })?
   _ensureIntent;
@@ -66,17 +69,23 @@ class TaskImageStorage {
   final String namePrefix;
   final String? organizationId;
 
+  /// Proof uploads name the task so the server can check the caller is its
+  /// assignee / recipient and the task is not cancelled (B1).
+  final String? taskId;
+
   /// Uploads a delegate proof photo under `task_proof/{company}/{uid}/`.
   factory TaskImageStorage.proof({
     FirebaseStorage? storage,
     FirebaseAuth? auth,
     FirebaseFunctions? functions,
     String? organizationId,
+    String? taskId,
     Future<String?> Function({
       required String folderId,
       required String companyUID,
       String? purpose,
       String? organizationId,
+      String? taskId,
       FirebaseFunctions? functions,
     })?
     ensureIntent,
@@ -89,6 +98,7 @@ class TaskImageStorage {
     rootPrefix: kTaskProofRoot,
     namePrefix: 'proof',
     organizationId: organizationId,
+    taskId: taskId,
   );
 
   static const int maxBytes = 5 * 1024 * 1024;
@@ -120,6 +130,7 @@ class TaskImageStorage {
       companyUID: company,
       purpose: purpose,
       organizationId: organizationId,
+      taskId: taskId,
       functions: _functions,
     );
     if (intentError != null) {

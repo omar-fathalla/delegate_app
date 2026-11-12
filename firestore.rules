@@ -1496,50 +1496,99 @@ service cloud.firestore {
               && isCompanyAdmin()
               && callerCompany() == proofTaskCompany();
           }
-          function proofPathOk(path) {
-            return path is string
-              && path.matches(
-                '^task_proof/' + proofTaskCompany() + '/' + request.auth.uid
-                  + '/proof_' + request.auth.uid + '_[^_]+$'
-              );
+          // Each path must be the caller's own N1-r name under the task's
+          // company: task_proof/{taskCo}/{uid}/proof_{uid}_{token}.
+          function proofPathsOk(paths, pattern) {
+            return paths is list
+              && paths.size() <= 3
+              && (paths.size() == 0 || (paths[0] is string && paths[0].matches(pattern)))
+              && (paths.size() < 2 || (paths[1] is string && paths[1].matches(pattern)))
+              && (paths.size() < 3 || (paths[2] is string && paths[2].matches(pattern)));
           }
-          function incomingProofListOk() {
-            return request.resource.data.imagePaths is list
-              && request.resource.data.imagePaths.size() <= 3
-              && (request.resource.data.imagePaths.size() == 0
-                || proofPathOk(request.resource.data.imagePaths[0]))
-              && (request.resource.data.imagePaths.size() < 2
-                || proofPathOk(request.resource.data.imagePaths[1]))
-              && (request.resource.data.imagePaths.size() < 3
-                || proofPathOk(request.resource.data.imagePaths[2]));
+          // uploadedByName is set by the onTaskProofWritten trigger from
+          // the uploader's profile. A client may not add or change it.
+          function proofNameOk(data) {
+            return !data.keys().hasAny(['uploadedByName'])
+              || (resource != null
+                && resource.data.get('uploadedByName', null) == data.uploadedByName);
           }
-          function proofMetaOk() {
-            return request.resource.data.uploadedBy == request.auth.uid
-              && request.resource.data.companyUID == proofTaskCompany()
-              && request.resource.data.get('taskId', taskId) == taskId
-              && incomingProofListOk();
-          }
-          function proofCallerBlocked() {
-            let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
-            let delPath = /databases/$(database)/documents/organizations/$(orgId)/companies/$(proofTaskCompany())/delegates/$(request.auth.uid);
-            let data = exists(userPath)
-              ? get(userPath).data
-              : (exists(delPath) ? get(delPath).data : {});
-            let status = data.get('status', 'active');
-            let holds = data.keys().hasAny(['holds']) && data.holds is map
-              ? data.holds
-              : {};
-            let held = holds.keys().hasAny(['admin_suspend'])
-              || holds.keys().hasAny(['subscription_expired'])
-              || holds.keys().hasAny(['billing_cycle_reset']);
-            return held
+          // Held / inactive callers cannot write (users doc, else the
+          // company delegate doc). Reads of existing proofs stay allowed.
+          function proofCallerBlocked(taskCo, ud) {
+            let delPath = /databases/$(database)/documents/organizations/$(orgId)/companies/$(taskCo)/delegates/$(request.auth.uid);
+            let data = ud.size() > 0 ? ud : (exists(delPath) ? get(delPath).data : {});
+            let holds = data.get('holds', {});
+            return (holds is map
+                && holds.keys().hasAny(['admin_suspend', 'subscription_expired', 'billing_cycle_reset']))
               || data.get('isActive', true) == false
-              || status == 'pending'
-              || status == 'rejected'
-              || status == 'deleted'
-              || status == 'disabled'
-              || status == 'suspended'
-              || status == 'inactive';
+              || data.get('status', 'active') in
+                ['pending', 'rejected', 'deleted', 'disabled', 'suspended', 'inactive'];
+          }
+          // Field delegate (login token) of this org and the task's company.
+          function proofDelegateIn(taskCo) {
+            return claimString('role') == 'delegate'
+              && delegateOtpOk()
+              && (claimString('orgId') == orgId || claimListHas('orgIds', orgId))
+              && (claimString('companyId') == taskCo || claimListHas('companyIds', taskCo));
+          }
+          function proofStaffCoOk(taskCo, ud) {
+            return taskOrgOf(ud) == orgId
+              && (taskCompanyOf(ud) == taskCo
+                || (ud.get('companyIds', []) is list && taskCo in ud.get('companyIds', [])));
+          }
+          // Org-level sector staff (no company) also get company sector tasks.
+          function proofSectorCoOk(taskCo, ud) {
+            return proofStaffCoOk(taskCo, ud)
+              || (taskOrgOf(ud) == orgId && taskCompanyOf(ud) == '');
+          }
+          // B1: only the task's assignee or its intended recipients.
+          // «الكل» is company field delegates only (as for notifications);
+          // sector tokens accept the matching users-doc role.
+          function proofAssignedOk(assigned, taskCo, ud) {
+            let role = ud.get('role', '');
+            return !(assigned is string) || assigned == '' ? false
+              : assigned == 'all' || assigned == 'الكل' ? proofDelegateIn(taskCo)
+              : assigned == 'all_branch_marketing' ? (role in [
+                  'marketing', 'branches_marketing', 'branches-marketing',
+                  'branchesmarketing', 'branches_marketing_manager',
+                  'branches-marketing-manager', 'branchesmarketingmanager',
+                  'branchesMarketingManager']
+                && proofSectorCoOk(taskCo, ud))
+              : assigned == 'all_marketing_promotion' ? (role in [
+                  'marketingPromotion', 'marketing_promotion',
+                  'marketing-promotion', 'marketingpromotion']
+                && proofSectorCoOk(taskCo, ud))
+              : assigned == request.auth.uid && role in [
+                  'delegate', 'promoter', 'field_delegate', 'field-delegate',
+                  'marketing', 'marketingPromotion', 'marketing_promotion',
+                  'marketing-promotion', 'marketingpromotion',
+                  'branches_marketing_manager', 'branches-marketing-manager',
+                  'branches_marketing', 'branchesMarketingManager',
+                  'branches-marketing', 'branchesmarketingmanager']
+                ? proofStaffCoOk(taskCo, ud)
+              : proofDelegateIn(taskCo) && ownsDelegateId(assigned);
+          }
+          // Own doc, not held, path shape, at most 3, and (B1) the caller
+          // is an assignee/recipient in the task's org and company, the task
+          // is not cancelled, and the uploader label is not client-set.
+          function proofWriteOk() {
+            let task = proofTask();
+            let taskCo = task.get('companyId', '');
+            let data = request.resource.data;
+            let uid = request.auth.uid;
+            let ud = taskUserData();
+            return task.get('status', '') != 'cancelled'
+              && taskCo is string && taskCo != ''
+              && data.keys().hasOnly(
+                ['uploadedBy', 'uploadedByName', 'companyUID', 'taskId', 'imagePaths'])
+              && data.get('uploadedBy', '') == uid
+              && data.get('companyUID', '') == taskCo
+              && data.get('taskId', taskId) == taskId
+              && proofNameOk(data)
+              && proofPathsOk(data.get('imagePaths', null),
+                '^task_proof/' + taskCo + '/' + uid + '/proof_' + uid + '_[^_]+$')
+              && proofAssignedOk(task.get('assignedTo', ''), taskCo, ud)
+              && !proofCallerBlocked(taskCo, ud);
           }
 
           allow get: if signedIn() && (
@@ -1550,8 +1599,7 @@ service cloud.firestore {
           allow list: if signedIn() && (isProofSender() || isProofCompanySupervisor());
           allow create, update: if signedIn()
             && request.auth.uid == uploaderUid
-            && !proofCallerBlocked()
-            && proofMetaOk();
+            && proofWriteOk();
           allow delete: if signedIn() && request.auth.uid == uploaderUid;
         }
       }
