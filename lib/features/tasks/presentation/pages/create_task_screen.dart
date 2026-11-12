@@ -31,6 +31,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   String _selectedAssignedToName = '';
   TaskImageUpload? _image;
   bool _imageUploading = false;
+  bool _createSubmitted = false;
 
   @override
   void initState() {
@@ -46,6 +47,10 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
 
   @override
   void dispose() {
+    // Abandoning the create form must not leave an unreferenced upload.
+    if (!_createSubmitted && _image != null && _image!.path.isNotEmpty) {
+      TaskImageStorage().deleteQuietly(_image!.path);
+    }
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
@@ -75,6 +80,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       child: BlocListener<CreateTaskBloc, CreateTaskState>(
         listener: (context, state) {
           if (state is CreateTaskSuccess) {
+            _createSubmitted = true;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(l10n.taskCreatedSuccessfully)),
             );

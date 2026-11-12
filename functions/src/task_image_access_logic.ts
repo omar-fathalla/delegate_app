@@ -140,3 +140,48 @@ export function grantReaderUids(createdBy: unknown, recipientIds: readonly strin
   }
   return out;
 }
+
+export function shouldStripTaskImageDownloadToken(objectName: unknown): boolean {
+  return parseTaskImagePath(objectName) != null;
+}
+
+export type TaskImageGrantView = {
+  imagePath?: unknown;
+  createdBy?: unknown;
+  readerUids?: unknown;
+  companyUID?: unknown;
+};
+
+/**
+ * Prefer the send-time grant (held/suspended users stay if they were
+ * already readers). Fall back to a live assignment set that also keeps
+ * held/suspended recipients. Never treats a missing imageUrl as a denial.
+ */
+export function decideAuthorizedTaskImageRead(input: {
+  callerUid: unknown;
+  requestedPath: unknown;
+  taskImagePath: unknown;
+  taskCompanyId: unknown;
+  createdBy: unknown;
+  grant?: TaskImageGrantView | null;
+  fallbackRecipientIds: readonly string[];
+}): {ok: true} | {ok: false; reason: string} {
+  const grant = input.grant;
+  const grantPath = grant ? str(grant.imagePath) : "";
+  const taskPath = str(input.taskImagePath);
+  const useGrant = !!(grant && grantPath && grantPath === taskPath);
+  const readerIds = useGrant
+    ? (Array.isArray(grant!.readerUids) ? grant!.readerUids.map((v) => str(v)).filter(Boolean) : [])
+    : input.fallbackRecipientIds;
+  const createdBy = useGrant && str(grant!.createdBy) ? grant!.createdBy : input.createdBy;
+  const company = useGrant && str(grant!.companyUID) ? grant!.companyUID : input.taskCompanyId;
+  return canReadTaskImage({
+    callerUid: input.callerUid,
+    createdBy,
+    recipientIds: readerIds,
+    requestedPath: input.requestedPath,
+    taskImagePath: taskPath,
+    taskCompanyId: company,
+  });
+}
+

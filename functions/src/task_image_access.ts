@@ -8,20 +8,22 @@
  */
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
+import {onObjectFinalized} from "firebase-functions/v2/storage";
 import {
   assignmentNeedsCompanyDelegates,
   assignmentNeedsSectorStaff,
   parseAssignedTo,
-  taskNotifyUserIdsFromSources,
+  taskImageReaderIdsFromSources,
   taskUsersFromDelegateDocs,
   TaskUser,
 } from "./task_notify_logic";
 import {
   canPreviewUnsentTaskImage,
-  canReadTaskImage,
+  decideAuthorizedTaskImageRead,
   fileNameFromImagePath,
   grantReaderUids,
   parseTaskImagePath,
+  shouldStripTaskImageDownloadToken,
   str,
 } from "./task_image_access_logic";
 
@@ -135,7 +137,7 @@ async function resolveRecipientIds(
       loadSectorStaffFromUsers(db, opts.companyId, opts.organizationId) :
       Promise.resolve([] as TaskUser[]),
   ]);
-  return taskNotifyUserIdsFromSources(delegates, sectorStaff, assignedTo, opts);
+  return taskImageReaderIdsFromSources(delegates, sectorStaff, assignedTo, opts);
 }
 
 export async function upsertTaskImageGrant(
@@ -154,7 +156,13 @@ export async function upsertTaskImageGrant(
   const previous = str(opts.previousImagePath);
   const currentName = current ? fileNameFromImagePath(current) : "";
   const previousName = previous ? fileNameFromImagePath(previous) : "";
+  let inherited: string[] = [];
   if (previousName && previousName !== currentName) {
+    const prev = await db.collection("task_image_grants").doc(previousName).get();
+    if (prev.exists) {
+      const raw = prev.data()?.readerUids;
+      if (Array.isArray(raw)) inherited = raw.map((v) => str(v)).filter(Boolean);
+    }
     await db.collection("task_image_grants").doc(previousName).delete().catch(() => undefined);
   }
   if (!current || !currentName || !parseTaskImagePath(current)) {
@@ -163,7 +171,7 @@ export async function upsertTaskImageGrant(
     }
     return;
   }
-  const readers = grantReaderUids(opts.createdBy, opts.recipientIds);
+  const readers = grantReaderUids(opts.createdBy, [...opts.recipientIds, ...inherited]);
   await db.collection("task_image_grants").doc(currentName).set({
     imagePath: current,
     companyUID: str(opts.companyUID),
@@ -236,51 +244,69 @@ export const getTaskImage = functions
     const task = snap.data() || {};
     const companyId = str(task.companyId) || str(task.companyUID);
     const createdBy = str(task.createdBy);
-    const recipientIds = await resolveRecipientIds(db, task.assignedTo, {
-      companyId,
-      organizationId,
-      createdBy,
-    });
-    const decision = canReadTaskImage({
+    const fileName = fileNameFromImagePath(str(task.imagePath) || imagePath);
+    const grantSnap = fileName
+      ? await db.collection("task_image_grants").doc(fileName).get()
+      : null;
+    const grant = grantSnap && grantSnap.exists ? (grantSnap.data() || {}) : null;
+    let fallbackRecipientIds: string[] = [];
+    if (!grant) {
+      fallbackRecipientIds = await resolveRecipientIds(db, task.assignedTo, {
+        companyId,
+        organizationId,
+        createdBy,
+      });
+    }
+    const decision = decideAuthorizedTaskImageRead({
       callerUid: caller,
-      createdBy,
-      recipientIds,
       requestedPath: imagePath,
       taskImagePath: task.imagePath,
       taskCompanyId: companyId,
+      createdBy,
+      grant,
+      fallbackRecipientIds,
     });
     if (!decision.ok) fail("permission-denied", decision.reason);
-    try {
-      await upsertTaskImageGrant(db, {
-        imagePath: task.imagePath,
-        createdBy,
-        recipientIds,
-        companyUID: companyId,
-        organizationId,
-        taskId,
-      });
-    } catch (err) {
-      console.error("upsertTaskImageGrant failed:", err);
+    // Do not rewrite an existing send-time grant on read: a notify-style
+    // set would drop held recipients. Only create a grant when missing.
+    if (!grant) {
+      try {
+        await upsertTaskImageGrant(db, {
+          imagePath: task.imagePath,
+          createdBy,
+          recipientIds: fallbackRecipientIds,
+          companyUID: companyId,
+          organizationId,
+          taskId,
+        });
+      } catch (err) {
+        console.error("upsertTaskImageGrant failed:", err);
+      }
     }
     return await readTaskImageBytes(imagePath);
   });
 
 /**
- * Remove public download tokens from new task-image uploads so a copied
- * URL cannot bypass access checks.
+ * 2nd-gen Storage finalize trigger in the bucket region (EUR4 /
+ * europe-west4). Strips download tokens immediately, including orphan
+ * uploads that are never attached to a task. Do not deploy a 1st-gen
+ * us-central1 storage trigger against this bucket.
  *
  * Deploy: functions:tashil-mobile-notifications:onTaskImageFinalize
+ *   --project tashil-dev
  */
-export const onTaskImageFinalize = functions
-  .region("us-central1")
-  .runWith({timeoutSeconds: 30, memory: "256MB"})
-  .storage.object()
-  .onFinalize(async (object) => {
-    const name = String(object.name || "");
-    if (!parseTaskImagePath(name)) return null;
-    const bucketName = object.bucket;
-    if (!bucketName) return null;
+export const onTaskImageFinalize = onObjectFinalized(
+  {
+    region: "europe-west4",
+    bucket: "tashil-dev.firebasestorage.app",
+    memory: "256MiB",
+    timeoutSeconds: 30,
+  },
+  async (event) => {
+    const name = String(event.data?.name || "");
+    const bucketName = String(event.data?.bucket || "");
+    if (!shouldStripTaskImageDownloadToken(name) || !bucketName) return;
     const file = admin.storage().bucket(bucketName).file(name);
     await stripDownloadTokens(file);
-    return null;
-  });
+  },
+);

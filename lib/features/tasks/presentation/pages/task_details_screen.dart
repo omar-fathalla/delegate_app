@@ -51,6 +51,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   TaskImageUpload? _newImage;
   bool _imageRemoved = false;
   bool _imageUploading = false;
+  bool _editSaved = false;
 
   /// Only the supervisor who sent the task may edit or delete it.
   bool get _isSender {
@@ -76,6 +77,14 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
 
   @override
   void dispose() {
+    // Cancel / abandon must leave the original file intact. Only drop an
+    // uncommitted replacement upload.
+    if (!_editSaved &&
+        _newImage != null &&
+        _newImage!.path.isNotEmpty &&
+        _newImage!.path != _task.imagePath) {
+      TaskImageStorage().deleteQuietly(_newImage!.path);
+    }
     _titleController.dispose();
     _descriptionController.dispose();
     _notesController.dispose();
@@ -125,6 +134,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     setState(() {
       _task = updatedTask;
       _isEditing = false;
+      _editSaved = true;
       _newImage = null;
       _imageRemoved = false;
     });
@@ -318,10 +328,23 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                       companyId: _task.companyId,
                       initialPath: _imageRemoved ? null : _task.imagePath,
                       initialTaskId: _task.uid,
-                      onChanged: (upload) => setState(() {
-                        _newImage = upload;
-                        _imageRemoved = upload == null;
-                      }),
+                      deleteStorageImmediately: false,
+                      onChanged: (upload) {
+                        final previousNew = _newImage;
+                        setState(() {
+                          _newImage = upload;
+                          _imageRemoved = upload == null;
+                        });
+                        // A second uncommitted replacement can be dropped;
+                        // the original saved path is never deleted here.
+                        final previousPath = previousNew?.path;
+                        if (previousPath != null &&
+                            previousPath.isNotEmpty &&
+                            previousPath != _task.imagePath &&
+                            previousPath != upload?.path) {
+                          TaskImageStorage().deleteQuietly(previousPath);
+                        }
+                      },
                       onUploadingChanged: (v) =>
                           setState(() => _imageUploading = v),
                     ),
