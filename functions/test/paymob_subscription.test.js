@@ -79,6 +79,87 @@ describe("paymob env", () => {
     assert.equal(paymob.readPaymobEnv({}).error, "paymob_not_configured");
   });
 
+  it("accepts regional and classic test keys and refuses live keys", () => {
+    const regional = paymob.readPaymobEnv({
+      ...base,
+      PAYMOB_SECRET_KEY: "egy_sk_test_PLACEHOLDER",
+      PAYMOB_PUBLIC_KEY: "egy_pk_test_PLACEHOLDER",
+    });
+    assert.equal("error" in regional, false);
+    assert.equal(regional.secretKey, "egy_sk_test_PLACEHOLDER");
+    assert.equal(regional.publicKey, "egy_pk_test_PLACEHOLDER");
+
+    const classic = paymob.readPaymobEnv({
+      ...base,
+      PAYMOB_SECRET_KEY: "sk_test_PLACEHOLDER",
+      PAYMOB_PUBLIC_KEY: "pk_test_PLACEHOLDER",
+    });
+    assert.equal("error" in classic, false);
+
+    const mixed = paymob.readPaymobEnv({
+      ...base,
+      PAYMOB_SECRET_KEY: "egy_sk_test_PLACEHOLDER",
+      PAYMOB_PUBLIC_KEY: "pk_test_PLACEHOLDER",
+    });
+    assert.equal("error" in mixed, false);
+
+    for (const region of ["om", "egypt"]) {
+      const bounded = paymob.readPaymobEnv({
+        ...base,
+        PAYMOB_SECRET_KEY: `${region}_sk_test_PLACEHOLDER`,
+        PAYMOB_PUBLIC_KEY: `${region}_pk_test_PLACEHOLDER`,
+      });
+      assert.equal("error" in bounded, false);
+    }
+
+    for (const secretKey of ["egy_sk_live_PLACEHOLDER", "sk_live_PLACEHOLDER"]) {
+      assert.equal(
+        paymob.readPaymobEnv({...base, PAYMOB_SECRET_KEY: secretKey}).error,
+        "paymob_live_forbidden",
+      );
+    }
+    for (const publicKey of ["egy_pk_live_PLACEHOLDER", "pk_live_PLACEHOLDER"]) {
+      assert.equal(
+        paymob.readPaymobEnv({...base, PAYMOB_PUBLIC_KEY: publicKey}).error,
+        "paymob_live_forbidden",
+      );
+    }
+    assert.equal(
+      paymob.readPaymobEnv({
+        ...base,
+        PAYMOB_SECRET_KEY: "egy_sk_test_PLACEHOLDER",
+        PAYMOB_PUBLIC_KEY: "egy_pk_test_PLACEHOLDER",
+        PAYMOB_LIVE: "true",
+      }).error,
+      "paymob_live_forbidden",
+    );
+    assert.equal(
+      paymob.readPaymobEnv({
+        ...base,
+        PAYMOB_SECRET_KEY: "egy_sk_test_PLACEHOLDER",
+        PAYMOB_PUBLIC_KEY: "egy_pk_test_PLACEHOLDER",
+        PAYMOB_MODE: "live",
+      }).error,
+      "paymob_live_forbidden",
+    );
+    assert.equal(
+      paymob.readPaymobEnv({...base, PAYMOB_SECRET_KEY: "e_sk_test_PLACEHOLDER"}).error,
+      "paymob_test_keys_required",
+    );
+    assert.equal(
+      paymob.readPaymobEnv({...base, PAYMOB_PUBLIC_KEY: "abcdef_pk_test_PLACEHOLDER"}).error,
+      "paymob_test_keys_required",
+    );
+    assert.equal(
+      paymob.readPaymobEnv({...base, PAYMOB_SECRET_KEY: "EGY_sk_test_PLACEHOLDER"}).error,
+      "paymob_test_keys_required",
+    );
+    assert.equal(
+      paymob.readPaymobEnv({...base, PAYMOB_SECRET_KEY: "xx_extra_sk_live_PLACEHOLDER"}).error,
+      "paymob_live_forbidden",
+    );
+  });
+
   it("builds the unified checkout URL", () => {
     const url = paymob.checkoutUrl("https://accept.paymob.com", "pk_test_x", "egy_csk_test_y");
     assert.equal(

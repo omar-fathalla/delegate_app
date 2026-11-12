@@ -6,8 +6,10 @@
  * Deploy (tashil-dev only, named):
  *   functions:tashil-mobile-notifications:createSubscriptionCheckout
  *   functions:tashil-mobile-notifications:paymobSubscriptionWebhook
- * Never deploy suspendExpiredSubscriptions with these. Test-mode keys only
- * (sk_test_ / pk_test_). Live keys are refused.
+ * Never deploy suspendExpiredSubscriptions with these. Test-mode keys only:
+ * classic sk_test_ / pk_test_, or the same prefix after a 2-5 letter region
+ * (egy_sk_test_ / egy_pk_test_). Live keys are refused, including regional
+ * ones (sk_live_, pk_live_, egy_sk_live_, egy_pk_live_).
  */
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
@@ -50,6 +52,13 @@ export interface PaymobEnv {
   integrationIds: number[];
 }
 
+/** Classic test keys, or the same kind after a 2-5 letter region (egy_sk_test_...). */
+const PAYMOB_TEST_SECRET_KEY = /^(?:[a-z]{2,5}_)?sk_test_/;
+const PAYMOB_TEST_PUBLIC_KEY = /^(?:[a-z]{2,5}_)?pk_test_/;
+/** Live keys at the start or after any prefix (sk_live_..., egy_sk_live_...). */
+const PAYMOB_LIVE_SECRET_KEY = /(?:^|_)sk_live_/;
+const PAYMOB_LIVE_PUBLIC_KEY = /(?:^|_)pk_live_/;
+
 export function readPaymobEnv(env: NodeJS.ProcessEnv = process.env): PaymobEnv | {error: string} {
   const secretKey = str(env.PAYMOB_SECRET_KEY);
   const publicKey = str(env.PAYMOB_PUBLIC_KEY);
@@ -66,10 +75,10 @@ export function readPaymobEnv(env: NodeJS.ProcessEnv = process.env): PaymobEnv |
   if (str(env.PAYMOB_LIVE).toLowerCase() === "true" || str(env.PAYMOB_MODE).toLowerCase() === "live") {
     return {error: "paymob_live_forbidden"};
   }
-  if (secretKey.startsWith("sk_live_") || publicKey.startsWith("pk_live_")) {
+  if (PAYMOB_LIVE_SECRET_KEY.test(secretKey) || PAYMOB_LIVE_PUBLIC_KEY.test(publicKey)) {
     return {error: "paymob_live_forbidden"};
   }
-  if (!secretKey.startsWith("sk_test_") || !publicKey.startsWith("pk_test_")) {
+  if (!PAYMOB_TEST_SECRET_KEY.test(secretKey) || !PAYMOB_TEST_PUBLIC_KEY.test(publicKey)) {
     return {error: "paymob_test_keys_required"};
   }
   if (!baseUrl.startsWith("https://accept.paymob.com") &&
