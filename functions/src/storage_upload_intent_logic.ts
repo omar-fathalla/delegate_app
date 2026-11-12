@@ -10,6 +10,22 @@ export const GLOBAL_STAFF_ROLES = new Set([
   "technicalsupport", "tech_support", "techsupport",
 ]);
 
+export const TASK_IMAGE_PURPOSE = "task_image";
+
+/** Roles that may send a task (and therefore attach an image). HR and accountant are out. */
+export const TASK_ASSIGNER_ROLES = new Set([
+  "company-admin", "company_admin", "companyadmin", "admin",
+  "supervisor", "company_supervisor",
+  "organization-admin", "organization_admin", "organizationadmin",
+  "organizationAdmin",
+  "marketing",
+  "marketingPromotion", "marketing_promotion", "marketing-promotion",
+  "marketingpromotion",
+  "branches_marketing_manager", "branches-marketing-manager",
+  "branches_marketing", "branchesMarketingManager",
+  "branches-marketing", "branchesmarketingmanager",
+]);
+
 export const COMPANY_STAFF_ROLES = new Set([
   "company-admin", "company_admin", "companyadmin", "admin",
   "supervisor", "company_supervisor",
@@ -54,6 +70,36 @@ export function staffKind(role: unknown): "global" | "company" | "none" {
   return "none";
 }
 
+export function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Intent / object name for a task image: exact task_{callerUid}_{token}.ext (N1-r). */
+export function isTaskImageFolderId(folderId: string, callerUid: string): boolean {
+  const id = str(callerUid);
+  const name = str(folderId);
+  if (!id || !name) return false;
+  return new RegExp(`^task_${escapeRegExp(id)}_[^_]+(\\.[A-Za-z0-9]+)?$`).test(name);
+}
+
+export function isTaskImagePurpose(purpose: unknown): boolean {
+  return str(purpose) === TASK_IMAGE_PURPOSE;
+}
+
+/**
+ * Task-image intents are limited to assigner roles (not HR / accountant).
+ * Document-folder intents keep the original staffKind list.
+ */
+export function staffKindForPurpose(role: unknown, purpose: unknown): "global" | "company" | "none" {
+  if (isTaskImagePurpose(purpose)) {
+    const r = str(role);
+    if (GLOBAL_STAFF_ROLES.has(r)) return "global";
+    if (TASK_ASSIGNER_ROLES.has(r)) return "company";
+    return "none";
+  }
+  return staffKind(role);
+}
+
 /**
  * All known records for this folder must agree on the company. An existing
  * intent wins as the locked tenant. Conflicting companies are fail-closed.
@@ -78,6 +124,8 @@ export function resolveOwningCompany(hits: OwnerHit[]):
  * @param ownerCompany company already bound to the folder, or null if new
  * @param callerCompany the staff user's companyUID
  * @param requestedCompany optional client hint, used only for a new reservation by global staff
+ *   (or by org-level task assigners with no companyUID)
+ * @param purpose `task_image` reserves a task-image object name; default is a document folder
  */
 export function decideEnsureIntent(input: {
   authenticated: boolean;
@@ -87,11 +135,12 @@ export function decideEnsureIntent(input: {
   requestedCompany: unknown;
   ownerCompany: string | null;
   lockedByIntent: boolean;
+  purpose?: unknown;
 }): IntentDecision {
   if (!input.authenticated || input.anonymous) {
     return {ok: false, reason: "sign_in_required"};
   }
-  const kind = staffKind(input.role);
+  const kind = staffKindForPurpose(input.role, input.purpose);
   if (kind === "none") return {ok: false, reason: "caller_not_staff"};
   const callerCo = str(input.callerCompany);
   const requested = str(input.requestedCompany);
@@ -99,7 +148,18 @@ export function decideEnsureIntent(input: {
 
   if (owner) {
     if (kind === "company") {
-      if (!callerCo) return {ok: false, reason: "caller_no_company"};
+      if (!callerCo) {
+        // Org-level marketing / org-admin may attach to a requested company
+        // they already reserved; they cannot switch it.
+        if (isTaskImagePurpose(input.purpose) && requested && requested === owner) {
+          return {
+            ok: true,
+            action: input.lockedByIntent ? "reuse" : "create",
+            companyUID: owner,
+          };
+        }
+        return {ok: false, reason: "caller_no_company"};
+      }
       if (callerCo !== owner) return {ok: false, reason: "folder_other_company"};
     }
     return {
@@ -109,10 +169,12 @@ export function decideEnsureIntent(input: {
     };
   }
 
-  // New folder: reserve for the caller's company. Global staff may pass a hint.
-  const reserve = kind === "global" ? (requested || callerCo) : callerCo;
+  // New folder: reserve for the caller's company. Global staff (and
+  // org-level task assigners with no company) may pass a hint.
+  const orgLevelAssigner = isTaskImagePurpose(input.purpose) && kind === "company" && !callerCo;
+  const reserve = kind === "global" || orgLevelAssigner ? (requested || callerCo) : callerCo;
   if (!reserve) return {ok: false, reason: "company_required"};
-  if (kind === "company" && requested && requested !== callerCo) {
+  if (kind === "company" && callerCo && requested && requested !== callerCo) {
     return {ok: false, reason: "company_mismatch"};
   }
   return {ok: true, action: "create", companyUID: reserve};

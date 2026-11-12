@@ -11,6 +11,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 Future<String?> ensureStorageUploadIntent({
   required String folderId,
   required String companyUID,
+  String? purpose,
   FirebaseFunctions? functions,
 }) async {
   final id = folderId.trim();
@@ -21,7 +22,10 @@ Future<String?> ensureStorageUploadIntent({
     final callable =
         (functions ?? FirebaseFunctions.instanceFor(region: 'us-central1'))
             .httpsCallable('ensureStorageUploadIntent');
-    await callable.call({'folderId': id, 'companyUID': company});
+    final payload = <String, dynamic>{'folderId': id, 'companyUID': company};
+    final kind = purpose?.trim() ?? '';
+    if (kind.isNotEmpty) payload['purpose'] = kind;
+    await callable.call(payload);
     return null;
   } on FirebaseFunctionsException catch (e) {
     return _intentErrorMessage(e);

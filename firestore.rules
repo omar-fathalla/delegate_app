@@ -1397,12 +1397,14 @@ service cloud.firestore {
           return request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(taskAssignmentKeys());
         }
-        // An attached image must sit under the uploader's own folder.
+        // An attached image must sit under the uploader's company folder
+        // with an N1-r name: task_images/{companyId}/{uid}/task_{uid}_{token}.
+        // Legacy org-level paths cannot be written on create or image change.
         function incomingTaskImageOk() {
           return !request.resource.data.keys().hasAny(['imagePath'])
             || (request.resource.data.imagePath is string
               && request.resource.data.imagePath.matches(
-                '^organizations/' + orgId + '/task_images/' + request.auth.uid + '/[^/]+$'));
+                '^task_images/' + request.resource.data.get('companyId', '') + '/' + request.auth.uid + '/task_' + request.auth.uid + '_[^_]+$'));
         }
         // On update the path is only checked when the image changes, so other
         // staff can still change status on a task that carries an image.
@@ -2168,6 +2170,12 @@ service cloud.firestore {
     function intentCompanyScoped() {
       return callerCompany() != '' && resource.data.companyUID == callerCompany();
     }
+    // Written only by Admin SDK (onTaskCreated / onTaskUpdated /
+    // getTaskImage). Clients cannot read or write grants.
+    match /task_image_grants/{grantId} {
+      allow read, write: if false;
+    }
+
     match /storage_upload_intents/{intentId} {
       // Missing and other-company docs both deny, so a 404 vs 403
       // cannot leak whether another company's folder exists.

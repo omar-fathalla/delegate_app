@@ -25,13 +25,15 @@ class TaskEntity extends Equatable {
   /// Download URL of the image the sender attached, if any.
   final String? imageUrl;
 
-  /// Storage path of [imageUrl], used to delete the file with the task.
+  /// Storage path of the attached image. Display goes through getTaskImage.
   final String? imagePath;
 
   /// Set when the sender edits the title, description or image.
   final DateTime? editedAt;
 
-  bool get hasImage => imageUrl != null && imageUrl!.isNotEmpty;
+  bool get hasImage =>
+      (imagePath != null && imagePath!.isNotEmpty) ||
+      (imageUrl != null && imageUrl!.isNotEmpty);
   bool get isEdited => editedAt != null;
 
   const TaskEntity({
@@ -75,6 +77,7 @@ class TaskEntity extends Equatable {
     String? imagePath,
     DateTime? editedAt,
     bool clearImage = false,
+    bool clearImageUrl = false,
   }) {
     return TaskEntity(
       uid: uid ?? this.uid,
@@ -92,7 +95,9 @@ class TaskEntity extends Equatable {
       completedAt: completedAt ?? this.completedAt,
       completedBy: completedBy ?? this.completedBy,
       notes: notes ?? this.notes,
-      imageUrl: clearImage ? null : (imageUrl ?? this.imageUrl),
+      imageUrl: clearImage || clearImageUrl
+          ? null
+          : (imageUrl ?? this.imageUrl),
       imagePath: clearImage ? null : (imagePath ?? this.imagePath),
       editedAt: editedAt ?? this.editedAt,
     );
