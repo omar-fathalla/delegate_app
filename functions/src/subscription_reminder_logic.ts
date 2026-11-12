@@ -55,32 +55,53 @@ export interface SubscriptionInvoiceUserCandidate {
   status?: unknown;
 }
 
+function liveCompanySupervisors(opts: {
+  companyUID: string;
+  organizationUID?: string;
+  candidates: SubscriptionInvoiceUserCandidate[];
+}): string[] {
+  const company = str(opts.companyUID);
+  if (!company) return [];
+  const org = str(opts.organizationUID);
+  const uids = new Set<string>();
+  for (const u of opts.candidates) {
+    if (isExcludedSupervisorRecipient(u)) continue;
+    if (!isCompanySupervisorRole(u.role)) continue;
+    if (companyOf(u) !== company) continue;
+    if (org) {
+      const uOrg = orgOf(u);
+      if (uOrg && uOrg !== org) continue;
+    }
+    const uid = str(u.uid);
+    if (uid) uids.add(uid);
+  }
+  return [...uids].sort((a, b) => a.localeCompare(b));
+}
+
 /**
- * Recipient for subscription renewal invoice / reminder: current company
- * supervisor inbox, not the staff uid on `delegate_requests.supervisorUid`.
- * When several live supervisors exist, pick the lowest uid (localeCompare).
+ * Renewal reminder recipients: every live company supervisor (personal inbox),
+ * not `delegate_requests.supervisorUid`. With no live supervisor, the company
+ * broadcast key `supervisor_{companyUID}` (all supervisors query this inbox).
  */
+export function recipientUidsForSubscriptionReminder(opts: {
+  companyUID: string;
+  organizationUID?: string;
+  candidates: SubscriptionInvoiceUserCandidate[];
+}): string[] {
+  const live = liveCompanySupervisors(opts);
+  if (live.length) return live;
+  const fallback = supervisorCompanyInboxKey(opts.companyUID);
+  return fallback ? [fallback] : [];
+}
+
+/** @deprecated Use recipientUidsForSubscriptionReminder */
 export function userIdForSubscriptionInvoice(opts: {
   companyUID: string;
   organizationUID?: string;
   candidates: SubscriptionInvoiceUserCandidate[];
 }): string {
-  const company = str(opts.companyUID);
-  if (!company) return "";
-  const org = str(opts.organizationUID);
-  const matches = opts.candidates.filter((u) => {
-    if (isExcludedSupervisorRecipient(u)) return false;
-    if (!isCompanySupervisorRole(u.role)) return false;
-    if (companyOf(u) !== company) return false;
-    if (!org) return true;
-    const uOrg = orgOf(u);
-    return !uOrg || uOrg === org;
-  });
-  if (matches.length) {
-    matches.sort((a, b) => str(a.uid).localeCompare(str(b.uid)));
-    return str(matches[0].uid);
-  }
-  return supervisorCompanyInboxKey(company);
+  const all = recipientUidsForSubscriptionReminder(opts);
+  return all[0] || "";
 }
 
 export function subscriptionReminderAlertDoc(opts: {

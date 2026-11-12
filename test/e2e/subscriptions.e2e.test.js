@@ -636,6 +636,32 @@ test("subscription reminder targets company supervisor inbox, not request creato
   assert.ok(inbox.size >= 1);
 });
 
+test("subscription reminder fans out to every live company supervisor", async () => {
+  await db.doc("users/sup_b").set({
+    role: "company_supervisor", organizationUID: "o1", companyUID: "c1", status: "active",
+  });
+  await db.doc("users/sup_inact").set({
+    role: "supervisor", organizationUID: "o1", companyUID: "c1", isActive: false,
+  });
+  const jun16 = L.cairoMidnight(2027, 6, 16);
+  await db.doc("subscription_reminder_runs/2027_H1_2027-06-16").delete();
+  const res = await J.runSubscriptionReminders(db, jun16);
+  assert.ok(res.notifications >= 1);
+  for (const uid of ["sup1", "sup_b"]) {
+    const snap = await db.collection("notifications")
+      .where("type", "==", "subscription_renewal_reminder")
+      .where("companyUID", "==", "c1")
+      .where("delegateUid", "==", uid)
+      .get();
+    assert.ok(snap.size >= 1, uid);
+  }
+  const inactiveMis = await db.collection("notifications")
+    .where("type", "==", "subscription_renewal_reminder")
+    .where("delegateUid", "==", "sup_inact")
+    .get();
+  assert.equal(inactiveMis.size, 0);
+});
+
 test("subscription reminder uses replacement supervisor when request creator uid is stale", async () => {
   await db.doc("users/old_sup").set({
     role: "hr", organizationUID: "o1", companyUID: "c1", status: "active",

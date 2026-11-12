@@ -3,36 +3,37 @@ const assert = require("node:assert/strict");
 const L = require("../lib/subscription_logic");
 const R = require("../lib/subscription_reminder_logic");
 
-test("userIdForSubscriptionInvoice prefers company supervisor user, not request creator", () => {
-  const id = R.userIdForSubscriptionInvoice({
+test("recipientUidsForSubscriptionReminder notifies every live supervisor, not HR", () => {
+  const ids = R.recipientUidsForSubscriptionReminder({
     companyUID: "c1",
     organizationUID: "o1",
     candidates: [
       {uid: "hr1", role: "hr", companyUID: "c1", organizationUID: "o1"},
       {uid: "sup1", role: "supervisor", companyUID: "c1", organizationUID: "o1"},
+      {uid: "sup2", role: "company_supervisor", companyUID: "c1", organizationUID: "o1"},
     ],
   });
-  assert.equal(id, "sup1");
+  assert.deepEqual(ids, ["sup1", "sup2"]);
 });
 
-test("userIdForSubscriptionInvoice falls back to supervisor_{company}", () => {
-  assert.equal(
-    R.userIdForSubscriptionInvoice({companyUID: "c1", organizationUID: "o1", candidates: []}),
-    "supervisor_c1",
+test("recipientUidsForSubscriptionReminder falls back to supervisor_{company}", () => {
+  assert.deepEqual(
+    R.recipientUidsForSubscriptionReminder({companyUID: "c1", organizationUID: "o1", candidates: []}),
+    ["supervisor_c1"],
   );
   assert.equal(R.supervisorCompanyInboxKey("c1"), "supervisor_c1");
 });
 
-test("userIdForSubscriptionInvoice ignores supervisor from another company", () => {
-  const id = R.userIdForSubscriptionInvoice({
+test("recipientUidsForSubscriptionReminder ignores supervisor from another company", () => {
+  const ids = R.recipientUidsForSubscriptionReminder({
     companyUID: "c1",
     candidates: [{uid: "sup2", role: "supervisor", companyUID: "c2"}],
   });
-  assert.equal(id, "supervisor_c1");
+  assert.deepEqual(ids, ["supervisor_c1"]);
 });
 
-test("replacement supervisor when original left company (wrong companyUID on role)", () => {
-  const id = R.userIdForSubscriptionInvoice({
+test("departed supervisor wrong company excluded; replacement included", () => {
+  const ids = R.recipientUidsForSubscriptionReminder({
     companyUID: "c1",
     organizationUID: "o1",
     candidates: [
@@ -40,55 +41,37 @@ test("replacement supervisor when original left company (wrong companyUID on rol
       {uid: "new_sup", role: "supervisor", companyUID: "c1", organizationUID: "o1"},
     ],
   });
-  assert.equal(id, "new_sup");
+  assert.deepEqual(ids, ["new_sup"]);
 });
 
-test("replacement supervisor when original no longer has supervisor role", () => {
-  const id = R.userIdForSubscriptionInvoice({
+test("HR or former supervisor role on request creator uid is not a recipient", () => {
+  const ids = R.recipientUidsForSubscriptionReminder({
     companyUID: "c1",
     candidates: [
       {uid: "old_sup", role: "hr", companyUID: "c1"},
       {uid: "new_sup", role: "company_supervisor", companyUID: "c1"},
     ],
   });
-  assert.equal(id, "new_sup");
+  assert.deepEqual(ids, ["new_sup"]);
 });
 
-test("original supervisor deleted/inactive excluded — replacement or inbox fallback", () => {
-  assert.equal(
-    R.userIdForSubscriptionInvoice({
+test("deleted/inactive supervisors excluded from fan-out", () => {
+  assert.deepEqual(
+    R.recipientUidsForSubscriptionReminder({
       companyUID: "c1",
       candidates: [{uid: "gone", role: "supervisor", companyUID: "c1", status: "deleted"}],
     }),
-    "supervisor_c1",
+    ["supervisor_c1"],
   );
-  const withReplacement = R.userIdForSubscriptionInvoice({
+  const withReplacement = R.recipientUidsForSubscriptionReminder({
     companyUID: "c1",
     candidates: [
       {uid: "gone", role: "supervisor", companyUID: "c1", status: "deleted"},
       {uid: "live", role: "supervisor", companyUID: "c1", status: "active"},
+      {uid: "off", role: "supervisor", companyUID: "c1", isActive: false},
     ],
   });
-  assert.equal(withReplacement, "live");
-  assert.equal(
-    R.userIdForSubscriptionInvoice({
-      companyUID: "c1",
-      candidates: [{uid: "off", role: "supervisor", companyUID: "c1", isActive: false}],
-    }),
-    "supervisor_c1",
-  );
-});
-
-test("deterministic pick: lowest uid when multiple live supervisors", () => {
-  const id = R.userIdForSubscriptionInvoice({
-    companyUID: "c1",
-    candidates: [
-      {uid: "sup_z", role: "supervisor", companyUID: "c1"},
-      {uid: "sup_a", role: "supervisor", companyUID: "c1"},
-      {uid: "sup_m", role: "company_supervisor", companyUID: "c1"},
-    ],
-  });
-  assert.equal(id, "sup_a");
+  assert.deepEqual(withReplacement, ["live"]);
 });
 
 test("subscriptionReminderAlertDoc uses Tashil Arabic style", () => {

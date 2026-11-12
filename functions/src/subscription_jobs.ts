@@ -32,8 +32,8 @@ import {holdsMode} from "./holds";
 import {M1_SOURCE, M2_SOURCE, planExpiryHoldWrite, shouldShadowReactivateAfterExpiryClear} from "./subscription_holds";
 import {
   REMINDER_RUNS,
+  recipientUidsForSubscriptionReminder,
   subscriptionReminderAlertDoc,
-  userIdForSubscriptionInvoice,
   type SubscriptionInvoiceUserCandidate,
 } from "./subscription_reminder_logic";
 
@@ -410,10 +410,11 @@ export interface ReminderResult {
 }
 
 /**
- * One notification per company when today is exactly `reminderDays` before
- * the current period ends. Recipient is the live company supervisor (not
- * `delegate_requests.supervisorUid`). Only app-added delegates without paid
- * coverage for the *next* period are counted. Idempotent per day.
+ * One reminder per company per live supervisor when today is exactly
+ * `reminderDays` before the current period ends (fan-out to each supervisor uid,
+ * else `supervisor_{companyUID}`). Not `delegate_requests.supervisorUid`.
+ * Only app-added delegates without paid coverage for the *next* period are
+ * counted. Idempotent per day.
  */
 export async function runSubscriptionReminders(db: Db, now: Date): Promise<ReminderResult> {
   const publicCfg = await loadPublicSubscriptionConfig(db);
@@ -485,26 +486,27 @@ export async function runSubscriptionReminders(db: Db, now: Date): Promise<Remin
   const writer = new Batcher(db);
   let notifications = 0;
   for (const g of groups.values()) {
-    const recipientUid = userIdForSubscriptionInvoice({
+    const recipientUids = recipientUidsForSubscriptionReminder({
       companyUID: g.companyUID,
       organizationUID: g.organizationUID,
       candidates: supervisorsByCompany.get(g.companyUID) || [],
     });
-    if (!recipientUid) continue;
-    const doc = subscriptionReminderAlertDoc({
-      recipientUid,
-      organizationUID: g.organizationUID,
-      companyUID: g.companyUID,
-      endingPeriod: current,
-      nextPeriod: upcoming,
-      uncoveredCount: g.count,
-      reminderDays: publicCfg.reminderDays,
-    });
-    await writer.set(db.collection("notifications").doc(), {
-      ...doc,
-      createdAt: FieldValue.serverTimestamp(),
-    });
-    notifications++;
+    for (const recipientUid of recipientUids) {
+      const doc = subscriptionReminderAlertDoc({
+        recipientUid,
+        organizationUID: g.organizationUID,
+        companyUID: g.companyUID,
+        endingPeriod: current,
+        nextPeriod: upcoming,
+        uncoveredCount: g.count,
+        reminderDays: publicCfg.reminderDays,
+      });
+      await writer.set(db.collection("notifications").doc(), {
+        ...doc,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      notifications++;
+    }
   }
   await writer.flush();
   const res: ReminderResult = {
