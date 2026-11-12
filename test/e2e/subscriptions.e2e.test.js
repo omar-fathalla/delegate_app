@@ -99,7 +99,10 @@ test("period end: app-added delegates get an expiry hold in every chain; web and
   assert.equal(await expiryHold("o1", "pend"), null);
   assert.equal((await db.doc("users/app1").get()).get("status"), "active");
   assert.equal((await db.doc("users/web1").get()).get("status"), "active");
-  const runs = await db.collection("subscription_suspension_runs").get();
+  const runs = await db.collection("subscription_suspension_runs")
+    .where("periodCode", "==", "2027_H1")
+    .where("suspendedDocs", "==", 6)
+    .get();
   assert.equal(runs.size, 1);
 });
 
@@ -635,6 +638,22 @@ test("reminder skipped on non-reminder day", async () => {
   const jun10 = L.cairoMidnight(2027, 6, 10);
   const res = await J.runSubscriptionReminders(db, jun10);
   assert.equal(res.skipped, "not_reminder_day");
+});
+
+test("Dec 17 2026 reminds for 2027_H1 even though today is still free promo", async () => {
+  const dec17 = L.cairoMidnight(2026, 12, 17);
+  const res = await J.runSubscriptionReminders(db, dec17);
+  assert.notEqual(res.skipped, "free_promotion");
+  assert.equal(res.endingPeriodCode, "2026_H2");
+  assert.equal(res.nextPeriodCode, "2027_H1");
+  assert.ok(res.notifications >= 1);
+});
+
+test("Jun 16 2026 skips reminder because upcoming 2026_H2 is still free", async () => {
+  const jun16 = L.cairoMidnight(2026, 6, 16);
+  const res = await J.runSubscriptionReminders(db, jun16);
+  assert.equal(res.skipped, "free_promotion");
+  assert.equal(res.nextPeriodCode, "2026_H2");
 });
 
 

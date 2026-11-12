@@ -228,6 +228,22 @@ test("subscription grace blocks suspension 1–14 Jan and 1–14 Jul (Cairo)", (
   assert.equal(L.isWithinSubscriptionGrace(L.cairoMidnight(2027, 3, 1)), false);
 });
 
+test("reminder free-promo skip uses upcoming period end, not today", () => {
+  const dec17 = L.cairoMidnight(2026, 12, 17);
+  const curDec = L.periodOf(dec17);
+  const upJan = L.nextPeriod(curDec);
+  assert.equal(curDec.code, "2026_H2");
+  assert.equal(upJan.code, "2027_H1");
+  assert.equal(L.isPeriodFreePromotion(upJan), false);
+  assert.equal(L.isSubscriptionReminderDay(dec17, 14), true);
+  assert.equal(L.isFreePromotion(dec17), true, "today is still free promo");
+
+  const jun16 = L.cairoMidnight(2026, 6, 16);
+  const upH2 = L.nextPeriod(L.periodOf(jun16));
+  assert.equal(upH2.code, "2026_H2");
+  assert.equal(L.isPeriodFreePromotion(upH2), true);
+});
+
 test("subscription reminder day is 14 Cairo days before period end", () => {
   const h1 = L.periodFor(2027, 1);
   assert.equal(L.subscriptionReminderCairoDay(h1, 14), "2027-06-16");

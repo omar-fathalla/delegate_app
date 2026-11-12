@@ -350,6 +350,12 @@ export function isFreePromotion(at: Date, opts?: QuoteOptions): boolean {
   return isoDay(cairoDate(at)) <= last;
 }
 
+/** True when the whole [period] still falls inside the free promotion (end day inclusive). */
+export function isPeriodFreePromotion(period: Period, lastDay?: string): boolean {
+  const last = parseFreePromotionLastDay({freePromotionLastDay: lastDay});
+  return period.endDay <= last;
+}
+
 /** Fee one delegate pays when subscribing or renewing at `at`. */
 export function feeAt(at: Date, opts?: QuoteOptions): number {
   return isFreePromotion(at, opts) ? 0 : feeForMonths(remainingMonths(at));
