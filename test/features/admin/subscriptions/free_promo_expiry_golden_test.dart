@@ -57,6 +57,25 @@ DelegateSubscriptionRequest _request({
 
 class _FakeGateway implements SubscriptionPaymentGateway {
   @override
+  Future<Either<Failure, RenewalQuotePreview>> previewQuote({
+    required String companyUID,
+    String? organizationUID,
+    required List<String> uids,
+    String? periodCode,
+  }) async {
+    final now = SubscriptionCycleHelper.currentTime();
+    final amount = SubscriptionCycleHelper.totalFor(uids.length, now);
+    return Right(
+      RenewalQuotePreview(
+        amountCents: (amount * 100).round(),
+        periodCode: periodCode ?? SubscriptionCycleHelper.getCycleCode(now),
+        remainingMonths: SubscriptionCycleHelper.getRemainingMonthsInCycle(now),
+        delegateCount: uids.length,
+      ),
+    );
+  }
+
+  @override
   Future<Either<Failure, PaymentCheckout>> startCheckout({
     required String requestId,
   }) async {
