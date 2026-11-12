@@ -43,17 +43,26 @@ void main() {
     ds = TaskRemoteDataSourceImpl(firestore: db, storage: storage);
   });
 
-  test('model round-trips image and edited fields; omits them when null', () async {
-    final edited = TaskModel.fromEntity(base.copyWith(editedAt: DateTime(2026, 11, 2, 10)));
-    await db.doc('organizations/o1/tasks/t1').set(edited.toFirestore());
-    final back = TaskModel.fromFirestore(await db.doc('organizations/o1/tasks/t1').get());
-    expect(back.imageUrl, base.imageUrl);
-    expect(back.imagePath, base.imagePath);
-    expect(back.isEdited, isTrue);
-    final plain = TaskModel.fromEntity(base.copyWith(clearImage: true)).toFirestore();
-    expect(plain.containsKey('imageUrl'), isFalse);
-    expect(plain.containsKey('editedAt'), isFalse);
-  });
+  test(
+    'model round-trips image and edited fields; omits them when null',
+    () async {
+      final edited = TaskModel.fromEntity(
+        base.copyWith(editedAt: DateTime(2026, 11, 2, 10)),
+      );
+      await db.doc('organizations/o1/tasks/t1').set(edited.toFirestore());
+      final back = TaskModel.fromFirestore(
+        await db.doc('organizations/o1/tasks/t1').get(),
+      );
+      expect(back.imageUrl, base.imageUrl);
+      expect(back.imagePath, base.imagePath);
+      expect(back.isEdited, isTrue);
+      final plain = TaskModel.fromEntity(
+        base.copyWith(clearImage: true),
+      ).toFirestore();
+      expect(plain.containsKey('imageUrl'), isFalse);
+      expect(plain.containsKey('editedAt'), isFalse);
+    },
+  );
 
   test('createTask stores the image', () async {
     final created = await ds.createTask('o1', base);
@@ -61,21 +70,31 @@ void main() {
     expect(snap.data()!['imagePath'], base.imagePath);
   });
 
-  test('sender edit that removes the image clears fields and deletes the file', () async {
-    await db.doc('organizations/o1/tasks/t1').set(base.toFirestore());
-    final edited = base.copyWith(clearImage: true, editedAt: DateTime.now(), description: 'D2');
-    await ds.updateTask('o1', TaskModel.fromEntity(edited));
-    final data = (await db.doc('organizations/o1/tasks/t1').get()).data()!;
-    expect(data.containsKey('imageUrl'), isFalse);
-    expect(data['description'], 'D2');
-    expect(data['editedAt'], isA<Timestamp>());
-    verify(() => storage.ref(base.imagePath!)).called(1);
-    verify(() => ref.delete()).called(1);
-  });
+  test(
+    'sender edit that removes the image clears fields and deletes the file',
+    () async {
+      await db.doc('organizations/o1/tasks/t1').set(base.toFirestore());
+      final edited = base.copyWith(
+        clearImage: true,
+        editedAt: DateTime.now(),
+        description: 'D2',
+      );
+      await ds.updateTask('o1', TaskModel.fromEntity(edited));
+      final data = (await db.doc('organizations/o1/tasks/t1').get()).data()!;
+      expect(data.containsKey('imageUrl'), isFalse);
+      expect(data['description'], 'D2');
+      expect(data['editedAt'], isA<Timestamp>());
+      verify(() => storage.ref(base.imagePath!)).called(1);
+      verify(() => ref.delete()).called(1);
+    },
+  );
 
   test('delegate status update keeps the image and deletes nothing', () async {
     await db.doc('organizations/o1/tasks/t1').set(base.toFirestore());
-    await ds.updateTask('o1', TaskModel.fromEntity(base.copyWith(status: TaskStatus.completed)));
+    await ds.updateTask(
+      'o1',
+      TaskModel.fromEntity(base.copyWith(status: TaskStatus.completed)),
+    );
     final data = (await db.doc('organizations/o1/tasks/t1').get()).data()!;
     expect(data['imageUrl'], base.imageUrl);
     verifyNever(() => ref.delete());
@@ -87,4 +106,78 @@ void main() {
     expect((await db.doc('organizations/o1/tasks/t1').get()).exists, isFalse);
     verify(() => ref.delete()).called(1);
   });
+
+  test(
+    'title-only sender edit keeps imagePath when imageUrl is absent',
+    () async {
+      const path = 'task_images/c1/sup-1/task_sup-1_1.jpg';
+      final phase2 = TaskModel.fromEntity(
+        base.copyWith(imagePath: path, clearImageUrl: true),
+      );
+      await db.doc('organizations/o1/tasks/t1').set(phase2.toFirestore());
+      await ds.updateTask(
+        'o1',
+        TaskModel.fromEntity(
+          phase2.copyWith(title: 'T2', editedAt: DateTime(2026, 11, 12, 8)),
+        ),
+      );
+      final data = (await db.doc('organizations/o1/tasks/t1').get()).data()!;
+      expect(data['imagePath'], path);
+      expect(data.containsKey('imageUrl'), isFalse);
+      expect(data['title'], 'T2');
+      verifyNever(() => ref.delete());
+    },
+  );
+
+  test(
+    'replace + save links the new image and deletes only the old file',
+    () async {
+      const oldPath = 'task_images/c1/sup-1/task_sup-1_1.jpg';
+      const newPath = 'task_images/c1/sup-1/task_sup-1_2.jpg';
+      final phase2 = TaskModel.fromEntity(
+        base.copyWith(imagePath: oldPath, clearImageUrl: true),
+      );
+      await db.doc('organizations/o1/tasks/t1').set(phase2.toFirestore());
+      await ds.updateTask(
+        'o1',
+        TaskModel.fromEntity(
+          phase2.copyWith(
+            imagePath: newPath,
+            editedAt: DateTime(2026, 11, 12, 8),
+          ),
+        ),
+      );
+      final data = (await db.doc('organizations/o1/tasks/t1').get()).data()!;
+      expect(data['imagePath'], newPath);
+      expect(data.containsKey('imageUrl'), isFalse);
+      verify(() => storage.ref(oldPath)).called(1);
+      verify(() => ref.delete()).called(1);
+      verifyNever(() => storage.ref(newPath));
+    },
+  );
+
+  test(
+    'explicit remove + save clears imagePath when imageUrl was already absent',
+    () async {
+      const path = 'task_images/c1/sup-1/task_sup-1_1.jpg';
+      final phase2 = TaskModel.fromEntity(
+        base.copyWith(imagePath: path, clearImageUrl: true),
+      );
+      await db.doc('organizations/o1/tasks/t1').set(phase2.toFirestore());
+      await ds.updateTask(
+        'o1',
+        TaskModel.fromEntity(
+          phase2.copyWith(
+            clearImage: true,
+            editedAt: DateTime(2026, 11, 12, 8),
+          ),
+        ),
+      );
+      final data = (await db.doc('organizations/o1/tasks/t1').get()).data()!;
+      expect(data.containsKey('imagePath'), isFalse);
+      expect(data.containsKey('imageUrl'), isFalse);
+      verify(() => storage.ref(path)).called(1);
+      verify(() => ref.delete()).called(1);
+    },
+  );
 }

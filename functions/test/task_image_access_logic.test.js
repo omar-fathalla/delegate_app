@@ -70,3 +70,44 @@ test("unsent preview is only for the uploader on the new path", () => {
 test("grant reader list always includes the sender and de-duplicates", () => {
   assert.deepEqual(L.grantReaderUids("sup1", ["dlgA", "sup1", "dlgA"]), ["sup1", "dlgA"]);
 });
+
+test("finalize should strip tokens on new and legacy task image paths, including orphans", () => {
+  assert.equal(L.shouldStripTaskImageDownloadToken("task_images/coA/sup1/task_sup1_1.jpg"), true);
+  assert.equal(L.shouldStripTaskImageDownloadToken("organizations/o1/task_images/sup1/uuid.jpg"), true);
+  assert.equal(L.shouldStripTaskImageDownloadToken("delegate_documents/folderA/x.jpg"), false);
+  assert.equal(L.shouldStripTaskImageDownloadToken("task_images/coA/sup1/task_sup1_2_1.jpg"), false);
+});
+
+test("a held recipient already in the send-time grant can still read", () => {
+  const path = "task_images/coA/sup1/task_sup1_1.jpg";
+  const grant = {
+    imagePath: path,
+    createdBy: "sup1",
+    readerUids: ["sup1", "dlgA"],
+    companyUID: "coA",
+  };
+  const r = L.decideAuthorizedTaskImageRead({
+    callerUid: "dlgA",
+    requestedPath: path,
+    taskImagePath: path,
+    taskCompanyId: "coA",
+    createdBy: "sup1",
+    grant,
+    fallbackRecipientIds: [], // live notify set would have dropped the held user
+  });
+  assert.deepEqual(r, {ok: true});
+});
+
+test("title-only or non-image edits do not affect path authorization", () => {
+  const path = "task_images/coA/sup1/task_sup1_1.jpg";
+  const r = L.decideAuthorizedTaskImageRead({
+    callerUid: "dlgA",
+    requestedPath: path,
+    taskImagePath: path,
+    taskCompanyId: "coA",
+    createdBy: "sup1",
+    grant: {imagePath: path, createdBy: "sup1", readerUids: ["dlgA"], companyUID: "coA"},
+    fallbackRecipientIds: ["dlgA"],
+  });
+  assert.deepEqual(r, {ok: true});
+});

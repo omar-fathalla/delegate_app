@@ -9,6 +9,7 @@ const {
   isExcludedFromTaskNotify,
   taskUsersFromDelegateDocs,
   taskNotifyUserIdsFromSources,
+  taskImageReaderIdsFromSources,
   newlyAssignedTaskUserIdsFromSources,
   assignmentNeedsCompanyDelegates,
   assignmentNeedsSectorStaff,
@@ -318,4 +319,22 @@ describe("taskNotifyUserIdsFromSources: الكل vs sector tokens", () => {
       delegates, sectorStaff, "all", "all_branch_marketing", opts);
     assert.deepEqual(ids.sort(), ["mkt", "mkt-mgr", "mkt-org"].sort());
   });
+});
+
+test("image readers keep a held or suspended assignee; notifications still skip them", () => {
+  const users = [
+    {id: "dlgA", role: "delegate", companyUID: "coA", status: "active", holds: {admin_suspend: {at: "2026-11-12"}}},
+    {id: "dlgB", role: "delegate", companyUID: "coA", status: "suspended"},
+    {id: "dlgC", role: "delegate", companyUID: "coA", status: "active"},
+  ];
+  const opts = {companyId: "coA", organizationId: "o1", createdBy: "sup1"};
+  const notified = taskNotifyUserIds(users, "all", opts);
+  assert.deepEqual(notified, ["dlgC"]);
+  const readers = taskNotifyUserIds(users, "all", opts, "image");
+  assert.ok(readers.includes("dlgA"));
+  assert.ok(readers.includes("dlgB"));
+  assert.ok(readers.includes("dlgC"));
+  const fromSources = taskImageReaderIdsFromSources(users, [], "dlgA", opts);
+  assert.deepEqual(fromSources, ["dlgA"]);
+  assert.deepEqual(taskNotifyUserIdsFromSources(users, [], "dlgA", opts), []);
 });

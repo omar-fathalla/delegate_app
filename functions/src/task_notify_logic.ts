@@ -46,6 +46,16 @@ const SKIP_STATUS = new Set([
   "inactive",
 ]);
 
+/** Image access still grants held/suspended/inactive readers who are in the assignment set. */
+const SKIP_STATUS_IMAGE = new Set([
+  "pending",
+  "rejected",
+  "deleted",
+  "disabled",
+]);
+
+export type TaskRecipientMode = "notify" | "image";
+
 export type TaskUser = {
   id: string;
   role?: unknown;
@@ -158,7 +168,13 @@ function normalizeStatusRaw(status: unknown): string {
   return String(status || "").trim().toLowerCase();
 }
 
-function isSkippedStatus(u: TaskUser): boolean {
+function isSkippedStatus(u: TaskUser, mode: TaskRecipientMode = "notify"): boolean {
+  if (mode === "image") {
+    // Holds and suspended/inactive do not lose an existing image.
+    const s = canonicalStatus(u.status);
+    const raw = normalizeStatusRaw(u.status);
+    return (s !== "" && SKIP_STATUS_IMAGE.has(s)) || SKIP_STATUS_IMAGE.has(raw);
+  }
   return isExcludedFromTaskNotify(u);
 }
 
@@ -247,13 +263,18 @@ function matchesGroup(u: TaskUser, token: string, opts: TaskNotifyOpts): boolean
   return false;
 }
 
-function explicitUidAllowed(u: TaskUser | undefined, uid: string, opts: TaskNotifyOpts): boolean {
+function explicitUidAllowed(
+  u: TaskUser | undefined,
+  uid: string,
+  opts: TaskNotifyOpts,
+  mode: TaskRecipientMode = "notify",
+): boolean {
   const co = String(opts.companyId || "").trim();
   if (!u) {
     // The task names this uid; include it when we have no profile to check.
     return true;
   }
-  if (isSkippedStatus(u)) return false;
+  if (isSkippedStatus(u, mode)) return false;
   if (co && !userInCompany(u, co)) return false;
   return true;
 }
@@ -267,6 +288,7 @@ export function taskNotifyUserIds(
   users: TaskUser[],
   assignedTo: unknown,
   opts: TaskNotifyOpts = {},
+  mode: TaskRecipientMode = "notify",
 ): string[] {
   const createdBy = String(opts.createdBy || "").trim();
   const parsed = parseAssignedTo(assignedTo);
@@ -293,13 +315,13 @@ export function taskNotifyUserIds(
 
   for (const token of tokens) {
     for (const u of byId.values()) {
-      if (isSkippedStatus(u)) continue;
+      if (isSkippedStatus(u, mode)) continue;
       if (matchesGroup(u, token, opts)) add(u.id);
     }
   }
 
   for (const uid of uids) {
-    if (explicitUidAllowed(byId.get(uid), uid, opts)) add(uid);
+    if (explicitUidAllowed(byId.get(uid), uid, opts, mode)) add(uid);
   }
 
   return out;
@@ -365,11 +387,22 @@ export function taskNotifyUserIdsFromSources(
   sectorStaff: TaskUser[],
   assignedTo: unknown,
   opts: TaskNotifyOpts = {},
+  mode: TaskRecipientMode = "notify",
 ): string[] {
   const lists: TaskUser[][] = [];
   if (assignmentNeedsCompanyDelegates(assignedTo)) lists.push(delegates);
   if (assignmentNeedsSectorStaff(assignedTo)) lists.push(sectorStaff);
-  return taskNotifyUserIds(mergeTaskUsers(...lists), assignedTo, opts);
+  return taskNotifyUserIds(mergeTaskUsers(...lists), assignedTo, opts, mode);
+}
+
+/** Same assignment set as notifications, but held/suspended readers stay. */
+export function taskImageReaderIdsFromSources(
+  delegates: TaskUser[],
+  sectorStaff: TaskUser[],
+  assignedTo: unknown,
+  opts: TaskNotifyOpts = {},
+): string[] {
+  return taskNotifyUserIdsFromSources(delegates, sectorStaff, assignedTo, opts, "image");
 }
 
 export function newlyAssignedTaskUserIdsFromSources(

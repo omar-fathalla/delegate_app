@@ -261,18 +261,30 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
     final data = task.toFirestore();
     String? oldImagePath;
     if (task.editedAt != null) {
-      // Sender edit: an image that was removed or replaced must disappear
-      // from the doc and from Storage.
+      // Phase 2 leaves imageUrl empty on purpose (no public URL). Never
+      // treat a missing imageUrl as "remove the image". Only clear
+      // imagePath when the sender explicitly saved a removal.
       final before = await ref.get();
       final beforeData = before.data() as Map<String, dynamic>?;
       oldImagePath = beforeData?['imagePath'] as String?;
-      if (task.imageUrl == null) {
-        data['imageUrl'] = FieldValue.delete();
+      final newPath =
+          (task.imagePath != null && task.imagePath!.trim().isNotEmpty)
+              ? task.imagePath!.trim()
+              : null;
+      data['imageUrl'] = FieldValue.delete();
+      if (newPath == null) {
         data['imagePath'] = FieldValue.delete();
+      } else {
+        data['imagePath'] = newPath;
       }
     }
     await ref.update(data);
-    if (oldImagePath != null && oldImagePath != task.imagePath) {
+    final savedPath =
+        (task.imagePath != null && task.imagePath!.trim().isNotEmpty)
+            ? task.imagePath!.trim()
+            : null;
+    // Delete the previous object only after the new path (if any) is linked.
+    if (oldImagePath != null && oldImagePath != savedPath) {
       await _deleteImageQuietly(oldImagePath);
     }
   }

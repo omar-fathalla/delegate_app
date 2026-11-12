@@ -179,6 +179,7 @@ class TaskImagePickerField extends StatefulWidget {
     this.onUploadingChanged,
     this.initialPath,
     this.initialTaskId,
+    this.deleteStorageImmediately = true,
     this.storage,
     this.picker,
   });
@@ -187,10 +188,27 @@ class TaskImagePickerField extends StatefulWidget {
   final String companyId;
   final String? initialPath;
   final String? initialTaskId;
+
+  /// When false (edit screen), picking a replacement or tapping Remove
+  /// must not delete the saved object until the sender saves.
+  final bool deleteStorageImmediately;
   final ValueChanged<TaskImageUpload?> onChanged;
   final ValueChanged<bool>? onUploadingChanged;
   final TaskImageStorage? storage;
   final ImagePicker? picker;
+
+  /// Whether picking a replacement or tapping Remove should delete
+  /// [previousPath] immediately. Edit screens pass false and wait for Save.
+  @visibleForTesting
+  static bool shouldDeleteStoredImageNow({
+    required bool deleteStorageImmediately,
+    required String? previousPath,
+    String? nextPath,
+  }) {
+    if (!deleteStorageImmediately || previousPath == null) return false;
+    if (nextPath != null && nextPath == previousPath) return false;
+    return true;
+  }
 
   /// Test/preview seams used when the screen builds the field itself.
   @visibleForTesting
@@ -288,8 +306,12 @@ class _TaskImagePickerFieldState extends State<TaskImagePickerField> {
           if (mounted) setState(() => _progress = p);
         },
       );
-      if (previous != null && previous != result.path) {
-        await _storage.deleteQuietly(previous);
+      if (TaskImagePickerField.shouldDeleteStoredImageNow(
+        deleteStorageImmediately: widget.deleteStorageImmediately,
+        previousPath: previous,
+        nextPath: result.path,
+      )) {
+        await _storage.deleteQuietly(previous!);
       }
       if (!mounted) return;
       setState(() {
@@ -316,7 +338,12 @@ class _TaskImagePickerFieldState extends State<TaskImagePickerField> {
       _failed = false;
     });
     widget.onChanged(null);
-    if (previous != null) await _storage.deleteQuietly(previous);
+    if (TaskImagePickerField.shouldDeleteStoredImageNow(
+      deleteStorageImmediately: widget.deleteStorageImmediately,
+      previousPath: previous,
+    )) {
+      await _storage.deleteQuietly(previous!);
+    }
   }
 
   @override
