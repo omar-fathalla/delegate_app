@@ -300,7 +300,6 @@ void main() {
           'task_proof/c1/del-1/proof_del-1_b.jpg',
         ],
         companyUID: 'c1',
-        uploadedByName: 'Del',
       );
       await ds.saveTaskProof(
         organizationId: 'o1',
@@ -311,6 +310,13 @@ void main() {
       );
       final mine = await ds.getTaskProof('o1', 't1', 'del-1');
       expect(mine!.imagePaths.length, 2);
+      // B1: the client never writes the uploader label.
+      final raw = await db.doc('organizations/o1/tasks/t1/proofs/del-1').get();
+      expect(raw.data()!.containsKey('uploadedByName'), isFalse);
+      // The server-set label (onTaskProofWritten) survives a client save.
+      await db.doc('organizations/o1/tasks/t1/proofs/del-1').update({
+        'uploadedByName': 'Server Name',
+      });
       final all = await ds.listTaskProofs('o1', 't1');
       expect(all.map((p) => p.uploaderUid).toSet(), {'del-1', 'del-2'});
 
@@ -341,6 +347,8 @@ void main() {
       verify(() => ref.delete()).called(1);
       final other = await ds.getTaskProof('o1', 't1', 'del-2');
       expect(other!.imagePaths, ['task_proof/c1/del-2/proof_del-2_a.jpg']);
+      final renamed = await ds.getTaskProof('o1', 't1', 'del-1');
+      expect(renamed!.uploadedByName, 'Server Name');
     },
   );
 

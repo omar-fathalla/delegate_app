@@ -21,6 +21,7 @@ import {
   type OwnerHit,
 } from "./storage_upload_intent_logic";
 import {hasAnyHold, parseHolds} from "./holds";
+import {canWriteTaskProof} from "./task_proof_access_logic";
 
 if (admin.apps.length === 0) admin.initializeApp();
 
@@ -106,6 +107,8 @@ export const ensureStorageUploadIntent = functions
         status: d.status,
         holds: d.holds,
         isActive: d.isActive,
+        companyIds: d.companyIds,
+        organizationUIDs: d.organizationUIDs,
       };
     }
     const authUser = await admin.auth().getUser(ctx.auth.uid);
@@ -122,6 +125,42 @@ export const ensureStorageUploadIntent = functions
       if (org.exists && (od.isActive === false || isInactiveStatus(od.status))) {
         fail("permission-denied", "org_inactive");
       }
+    }
+
+    // B1: a proof upload must name a task the caller is assigned to (or an
+    // intended recipient of), in their org and company, not cancelled.
+    if (isTaskProofPurpose(purpose)) {
+      const taskId = str(p.taskId);
+      if (!taskId || taskId.includes("/")) fail("invalid-argument", "task_required");
+      const taskOrg = str(p.organizationId) || str(p.organizationUID) || orgId;
+      if (!taskOrg || taskOrg.includes("/")) fail("invalid-argument", "task_required");
+      const taskSnap = await db.doc(`organizations/${taskOrg}/tasks/${taskId}`).get();
+      const task = taskSnap.exists ? (taskSnap.data() || {}) as Record<string, unknown> : null;
+      const tok = ctx.auth.token as Record<string, unknown>;
+      const isDelegateToken = str(tok.role) === "delegate";
+      const list = (v: unknown): unknown[] => Array.isArray(v) ? v : [];
+      const proofDecision = canWriteTaskProof({
+        callerUid: ctx.auth.uid,
+        callerRole: user.role,
+        callerIds: isDelegateToken ? [tok.delegateId, ...list(tok.delegateIds)] : [],
+        callerCompanyIds: [
+          user.companyUID, user.companyId, ...list(user.companyIds),
+          ...(isDelegateToken ? [tok.companyId, ...list(tok.companyIds)] : []),
+        ],
+        callerOrgIds: [
+          orgId, ...list(user.organizationUIDs),
+          ...(isDelegateToken ? [tok.orgId, ...list(tok.orgIds)] : []),
+        ],
+        organizationId: taskOrg,
+        task,
+      });
+      if (!proofDecision.ok) {
+        fail(proofDecision.reason === "task_not_found" ? "not-found" : "permission-denied",
+          proofDecision.reason);
+      }
+      const taskCo = str(task?.companyId) || str(task?.companyUID);
+      const requestedCo = str(p.companyUID) || str(p.companyId);
+      if (requestedCo && requestedCo !== taskCo) fail("invalid-argument", "company_mismatch");
     }
 
     // Task-image intents are a reserved object name for the caller's

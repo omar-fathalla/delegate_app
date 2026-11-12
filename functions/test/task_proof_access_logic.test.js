@@ -103,3 +103,96 @@ describe("task proof access", () => {
     }).reason, "path_mismatch");
   });
 });
+
+describe("task proof write authorization (B1)", () => {
+  const base = {
+    callerUid: "dlgA",
+    callerRole: "delegate",
+    callerIds: [],
+    callerCompanyIds: ["coA"],
+    callerOrgIds: ["o1"],
+    organizationId: "o1",
+    task: {companyId: "coA", assignedTo: "dlgA", status: "inProgress"},
+  };
+  const ok = (over) => L.canWriteTaskProof({...base, ...over});
+
+  test("assigned delegate may write; also via a delegateId claim", () => {
+    assert.deepEqual(ok({}), {ok: true});
+    assert.deepEqual(ok({callerUid: "auth-x", callerIds: ["dlgA"]}), {ok: true});
+  });
+
+  test("other-company / other-org HR is denied", () => {
+    const r = ok({callerUid: "hrB", callerRole: "hr", callerCompanyIds: ["coB"], callerOrgIds: ["o2"]});
+    assert.equal(r.ok, false);
+    assert.equal(r.reason, "org_mismatch");
+  });
+
+  test("same-company accountant not assigned is denied", () => {
+    assert.equal(ok({callerUid: "accA", callerRole: "accountant"}).reason, "not_assigned");
+  });
+
+  test("same-company accountant even if named as assignee is not an attach role", () => {
+    const r = ok({callerUid: "accA", callerRole: "accountant",
+      task: {companyId: "coA", assignedTo: "accA", status: "pending"}});
+    assert.equal(r.reason, "not_allowed");
+  });
+
+  test("unassigned same-company marketing is denied on a single-assignee task", () => {
+    assert.equal(ok({callerUid: "mpA", callerRole: "marketingPromotion"}).reason, "not_assigned");
+  });
+
+  test("cancelled task is denied even for the assignee", () => {
+    assert.equal(ok({task: {companyId: "coA", assignedTo: "dlgA", status: "cancelled"}}).reason,
+      "task_cancelled");
+  });
+
+  test("«الكل» accepts same-company field delegates only", () => {
+    const all = {companyId: "coA", assignedTo: "all", status: "pending"};
+    const allAr = {companyId: "coA", assignedTo: "الكل", status: "pending"};
+    assert.deepEqual(ok({task: all}), {ok: true});
+    assert.deepEqual(ok({task: allAr}), {ok: true});
+    assert.equal(ok({task: all, callerRole: "marketing"}).ok, false);
+    assert.equal(ok({task: all, callerRole: "branchesMarketingManager"}).ok, false);
+    assert.equal(ok({task: all, callerRole: "marketingPromotion"}).ok, false);
+    assert.equal(ok({task: all, callerRole: "hr"}).ok, false);
+    assert.equal(ok({task: all, callerCompanyIds: ["coB"]}).reason, "company_mismatch");
+  });
+
+  test("sector tasks accept only the matching sector role", () => {
+    const bm = {companyId: "coA", assignedTo: "all_branch_marketing", status: "pending"};
+    const mp = {companyId: "coA", assignedTo: "all_marketing_promotion", status: "pending"};
+    assert.deepEqual(ok({task: bm, callerRole: "branchesMarketingManager"}), {ok: true});
+    assert.deepEqual(ok({task: bm, callerRole: "marketing"}), {ok: true});
+    assert.equal(ok({task: bm, callerRole: "marketingPromotion"}).ok, false);
+    assert.equal(ok({task: bm, callerRole: "delegate"}).ok, false);
+    assert.deepEqual(ok({task: mp, callerRole: "marketing_promotion"}), {ok: true});
+    assert.equal(ok({task: mp, callerRole: "marketing"}).ok, false);
+    // Org-level sector staff (no company) in the same org.
+    assert.deepEqual(ok({task: mp, callerRole: "marketingPromotion", callerCompanyIds: []}), {ok: true});
+    assert.equal(ok({task: mp, callerRole: "marketingPromotion", callerCompanyIds: ["coB"]}).ok, false);
+  });
+
+  test("missing task / signed out", () => {
+    assert.equal(ok({task: null}).reason, "task_not_found");
+    assert.equal(ok({callerUid: ""}).reason, "sign_in_required");
+  });
+
+  test("display name comes from the profile, never the client", () => {
+    assert.equal(L.proofDisplayNameFrom({displayName: "Shown", fullName: "Full"}), "Shown");
+    assert.equal(L.proofDisplayNameFrom({firstName: "A", lastName: "B"}), "A B");
+    assert.equal(L.proofDisplayNameFrom(null, {fullName: "Del Doc"}), "Del Doc");
+    assert.equal(L.proofDisplayNameFrom({}, {name: "N"}), "N");
+    assert.equal(L.proofDisplayNameFrom(null, null), "");
+  });
+});
+
+describe("proof upload intent wiring (B1)", () => {
+  const {readFileSync} = require("fs");
+  const {resolve} = require("path");
+  const src = readFileSync(resolve(__dirname, "../src/storage_upload_intent.ts"), "utf8");
+  test("task_proof_image intents require a task and the B1 assignment check", () => {
+    assert.match(src, /canWriteTaskProof\(/);
+    assert.match(src, /"task_required"/);
+    assert.match(src, /organizations\/\$\{taskOrg\}\/tasks\/\$\{taskId\}/);
+  });
+});

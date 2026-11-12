@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:delegate_app/features/admin/data/datasources/storage_upload_intent.dart';
 import 'package:delegate_app/features/tasks/data/services/task_image_storage.dart';
 import 'package:delegate_app/features/tasks/domain/task_proof_paths.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
@@ -108,5 +109,31 @@ void main() {
     expect(storage.rootPrefix, kTaskProofRoot);
     expect(storage.namePrefix, 'proof');
     expect(TaskImageFetcher.proof().callableName, 'getTaskProofImage');
+  });
+
+  test('proof upload intents name the task (B1)', () async {
+    final functions = _FakeFunctions();
+    final callable = _FakeCallable();
+    Map? sent;
+    when(
+      () => functions.httpsCallable('ensureStorageUploadIntent'),
+    ).thenReturn(callable);
+    when(() => callable.call(any())).thenAnswer((inv) async {
+      sent = inv.positionalArguments.first as Map;
+      return _FakeResult({'ok': true});
+    });
+    final err = await ensureStorageUploadIntent(
+      folderId: 'proof_del-1_1.jpg',
+      companyUID: 'c1',
+      purpose: kTaskProofPurpose,
+      organizationId: 'o1',
+      taskId: 't1',
+      functions: functions,
+    );
+    expect(err, isNull);
+    expect(sent!['taskId'], 't1');
+    expect(sent!['purpose'], kTaskProofPurpose);
+    expect(sent!['organizationId'], 'o1');
+    expect(TaskImageStorage.proof(taskId: 't1').taskId, 't1');
   });
 }

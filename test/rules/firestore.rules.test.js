@@ -1085,6 +1085,158 @@ describe("firestore tightened rules", () => {
       }));
     });
 
+    // B1: only the assignee / intended recipients, in the task's org and
+    // company, on a non-cancelled task, may write proofs. The uploader
+    // label is server-set (onTaskProofWritten) and cannot be spoofed.
+    const seedB1 = async () => {
+      await seed();
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        const db = ctx.firestore();
+        await db.doc("users/hrB").set({role: "hr", organizationUID: "o2", companyUID: "c9"});
+        await db.doc("users/mpA").set({
+          role: "marketingPromotion", organizationUID: "o1", companyUID: "c1", fullName: "MP A",
+        });
+        await db.doc("users/mpOrg").set({role: "marketingPromotion", organizationUID: "o1"});
+        await db.doc("users/mpC2").set({
+          role: "marketingPromotion", organizationUID: "o1", companyUID: "c2",
+        });
+        await db.doc("users/bmA").set({
+          role: "branches_marketing_manager", organizationUID: "o1", companyUID: "c1",
+        });
+        await db.doc("organizations/o1/tasks/single-task").set({
+          companyId: "c1", assignedTo: "del-1", createdBy: "comp", title: "One", status: "pending",
+        });
+        await db.doc("organizations/o1/tasks/mp-task").set({
+          companyId: "c1", assignedTo: "mpA", createdBy: "comp", title: "MP", status: "pending",
+        });
+        await db.doc("organizations/o1/tasks/cancelled-task").set({
+          companyId: "c1", assignedTo: "del-1", createdBy: "comp", title: "X", status: "cancelled",
+        });
+        await db.doc("organizations/o1/tasks/bm-task").set({
+          companyId: "c1", assignedTo: "all_branch_marketing", createdBy: "comp", title: "BM",
+          status: "pending",
+        });
+        await db.doc("organizations/o1/tasks/mp-sector-task").set({
+          companyId: "c1", assignedTo: "all_marketing_promotion", createdBy: "comp", title: "MPS",
+          status: "pending",
+        });
+      });
+    };
+    const proofDoc = (uid, taskId, extra = {}) => ({
+      uploadedBy: uid,
+      companyUID: "c1",
+      taskId,
+      imagePaths: [pathFor(uid, "a")],
+      ...extra,
+    });
+    const textOnly = (uid, taskId) => ({uploadedBy: uid, companyUID: "c1", taskId, imagePaths: []});
+
+    test("B1: other-org HR cannot plant a text-only proof", async () => {
+      await seedB1();
+      const db = dbFor("hrB");
+      await assertFails(db.doc("organizations/o1/tasks/single-task/proofs/hrB")
+        .set(textOnly("hrB", "single-task")));
+      await assertFails(db.doc("organizations/o1/tasks/all-task/proofs/hrB")
+        .set(textOnly("hrB", "all-task")));
+    });
+
+    test("B1: same-company accountant (not an attach role, not assigned) is denied", async () => {
+      await seedB1();
+      const db = dbFor("accountant");
+      await assertFails(db.doc("organizations/o1/tasks/single-task/proofs/accountant")
+        .set(textOnly("accountant", "single-task")));
+      await assertFails(db.doc("organizations/o1/tasks/all-task/proofs/accountant")
+        .set(textOnly("accountant", "all-task")));
+    });
+
+    test("B1: unassigned same-company marketing cannot write or spoof a name", async () => {
+      await seedB1();
+      const db = dbFor("mpA");
+      await assertFails(db.doc("organizations/o1/tasks/single-task/proofs/mpA")
+        .set(proofDoc("mpA", "single-task")));
+      await assertFails(db.doc("organizations/o1/tasks/single-task/proofs/mpA")
+        .set(proofDoc("mpA", "single-task", {uploadedByName: "مندوب تجريبي DEV"})));
+    });
+
+    test("B1: uploadedByName is server-set; clients cannot add or change it", async () => {
+      await seedB1();
+      const ref = "organizations/o1/tasks/mp-task/proofs/mpA";
+      const db = dbFor("mpA");
+      // The assigned marketing user may write, but not with a name.
+      await assertFails(db.doc(ref).set(proofDoc("mpA", "mp-task", {uploadedByName: "مندوب تجريبي DEV"})));
+      await assertSucceeds(db.doc(ref).set(proofDoc("mpA", "mp-task")));
+      // Server (trigger) sets the real profile name.
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await ctx.firestore().doc(ref).update({uploadedByName: "MP A"});
+      });
+      await assertFails(db.doc(ref).update({uploadedByName: "مندوب تجريبي DEV"}));
+      await assertSucceeds(db.doc(ref).set({imagePaths: [pathFor("mpA", "b")]}, {merge: true}));
+      await assertSucceeds(db.doc(ref).set(proofDoc("mpA", "mp-task", {uploadedByName: "MP A"})));
+      // No extra display fields either.
+      await assertFails(db.doc(ref).set(proofDoc("mpA", "mp-task", {displayName: "X"})));
+    });
+
+    test("B1: the assignee cannot write proofs on a cancelled task", async () => {
+      await seedB1();
+      const del = dbFor("del-1", DELEGATE);
+      await assertFails(del.doc("organizations/o1/tasks/cancelled-task/proofs/del-1")
+        .set(proofDoc("del-1", "cancelled-task")));
+      await assertSucceeds(del.doc("organizations/o1/tasks/single-task/proofs/del-1")
+        .set(proofDoc("del-1", "single-task")));
+    });
+
+    test("B1: a delegate not assigned to a single-assignee task is denied", async () => {
+      await seedB1();
+      const other = dbFor("del-2", DELEGATE2);
+      await assertFails(other.doc("organizations/o1/tasks/single-task/proofs/del-2")
+        .set(proofDoc("del-2", "single-task")));
+    });
+
+    test("B1: «الكل» accepts same-company delegates only, not marketing or other companies", async () => {
+      await seedB1();
+      await assertSucceeds(dbFor("del-2", DELEGATE2).doc("organizations/o1/tasks/all-task/proofs/del-2")
+        .set(proofDoc("del-2", "all-task")));
+      await assertFails(dbFor("mpA").doc("organizations/o1/tasks/all-task/proofs/mpA")
+        .set(proofDoc("mpA", "all-task")));
+      await assertFails(dbFor("bmA").doc("organizations/o1/tasks/all-task/proofs/bmA")
+        .set(proofDoc("bmA", "all-task")));
+      await assertFails(dbFor("marketing").doc("organizations/o1/tasks/all-task/proofs/marketing")
+        .set(proofDoc("marketing", "all-task")));
+      const c2Delegate = {...DELEGATE2, delegateId: "stranger", delegateIds: ["stranger"], companyId: "c2"};
+      await assertFails(dbFor("stranger", c2Delegate).doc("organizations/o1/tasks/all-task/proofs/stranger")
+        .set(proofDoc("stranger", "all-task")));
+      const o2Delegate = {...DELEGATE2, delegateId: "other", delegateIds: ["other"], orgId: "o2", companyId: "c9"};
+      await assertFails(dbFor("other", o2Delegate).doc("organizations/o1/tasks/all-task/proofs/other")
+        .set(proofDoc("other", "all-task")));
+    });
+
+    test("B1: sector tasks accept only the matching sector role", async () => {
+      await seedB1();
+      await assertSucceeds(dbFor("bmA").doc("organizations/o1/tasks/bm-task/proofs/bmA")
+        .set(proofDoc("bmA", "bm-task")));
+      await assertFails(dbFor("mpA").doc("organizations/o1/tasks/bm-task/proofs/mpA")
+        .set(proofDoc("mpA", "bm-task")));
+      await assertFails(dbFor("del-1", DELEGATE).doc("organizations/o1/tasks/bm-task/proofs/del-1")
+        .set(proofDoc("del-1", "bm-task")));
+      await assertSucceeds(dbFor("mpA").doc("organizations/o1/tasks/mp-sector-task/proofs/mpA")
+        .set(proofDoc("mpA", "mp-sector-task")));
+      await assertSucceeds(dbFor("mpOrg").doc("organizations/o1/tasks/mp-sector-task/proofs/mpOrg")
+        .set(proofDoc("mpOrg", "mp-sector-task")));
+      await assertFails(dbFor("mpC2").doc("organizations/o1/tasks/mp-sector-task/proofs/mpC2")
+        .set(proofDoc("mpC2", "mp-sector-task")));
+      await assertFails(dbFor("bmA").doc("organizations/o1/tasks/mp-sector-task/proofs/bmA")
+        .set(proofDoc("bmA", "mp-sector-task")));
+    });
+
+    test("B1: signed-out and anonymous writes stay denied", async () => {
+      await seedB1();
+      const unauth = testEnv.unauthenticatedContext().firestore();
+      await assertFails(unauth.doc("organizations/o1/tasks/all-task/proofs/del-1")
+        .set(proofDoc("del-1", "all-task")));
+      await assertFails(anonDb().doc("organizations/o1/tasks/all-task/proofs/anon-user")
+        .set(textOnly("anon-user", "all-task")));
+    });
+
     test("a sender title-only edit does not need to touch proof docs", async () => {
       await seed();
       await testEnv.withSecurityRulesDisabled(async (ctx) => {
