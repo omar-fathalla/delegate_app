@@ -400,6 +400,14 @@ describe("delegate_requests: payment is server-only", () => {
         requestType: "new_delegate", status: "pending",
         organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
         orgCompanyCheck: "ok",
+        paymentStatus: "waived",
+      });
+      await db.doc("delegate_requests/paymob-unpaid").set({
+        requestType: "new_delegate", status: "pending",
+        organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
+        orgCompanyCheck: "ok",
+        paymentStatus: "pending", paymentMethod: "paymob",
+        fee: 500,
       });
     });
     await assertFails(as("hr1").doc("delegate_requests/mark-failed").update({orgCompanyCheck: "ok"}));
@@ -411,6 +419,15 @@ describe("delegate_requests: payment is server-only", () => {
       companyUID: "c1", organizationUID: "o1", orgCompanyCheck: "ok",
     }));
     await assertSucceeds(as("sa").doc("delegate_requests/mark-ok").update({status: "approved", reviewedBy: "SA"}));
+    await assertFails(as("sa").doc("delegate_requests/paymob-unpaid").update({status: "approved", reviewedBy: "SA"}));
+  });
+
+  test("clients can create waived requests before the promo end instant", async () => {
+    await assertSucceeds(as("hr1").doc("delegate_requests/waived-before").set({
+      requestType: "new_delegate", status: "pending", supervisorUid: "hr1",
+      companyUID: "c1", organizationUID: "o1",
+      paymentStatus: "waived", paymentMethod: "free_promotion", fee: 0,
+    }));
   });
 
 });

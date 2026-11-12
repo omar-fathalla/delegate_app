@@ -1971,7 +1971,9 @@ service cloud.firestore {
           'paymentStatus', 'paymob', 'paidAt', 'amountPaid', 'amountDue',
           'coveredDelegateUids', 'items', 'periodCode', 'requestType', 'applyState',
           'paymentError', 'needsReview', 'paymentMethod', 'status', 'quotedAt'
-        ]));
+        ]))
+        && waivedWriteOk()
+        && newDelegateApprovalPaymentOk();
     }
 
     // Create path only: no resource.diff, no before. Cheaper on large payloads.
@@ -1983,11 +1985,45 @@ service cloud.firestore {
         && d.get('paymentError', null) == null
         && d.get('needsReview', false) == false
         && d.get('quotedAt', null) == null
+        && waivedWriteOk()
         && d.get('amountPaid', 0) == 0
         && (!d.keys().hasAll(['coveredDelegateUids'])
           || (d.coveredDelegateUids is list
             && d.coveredDelegateUids.size() >= 1
             && d.coveredDelegateUids.size() <= 100));
+    }
+
+    // Default last free instant: 2027-01-01 00:00 Africa/Cairo = 2026-12-31 22:00:00Z
+    // (EET, UTC+2). Must stay aligned with FREE_PROMOTION_LAST_DAY fallback.
+    function freePromotionEnded() {
+      return request.time >= (timestamp.date(2026, 12, 31) + duration.value(22, 'h'));
+    }
+
+    // Clients may not newly mark a request waived after the promo ends.
+    // Existing waived docs can keep their status.
+    function waivedWriteOk() {
+      let incoming = request.resource.data.get('paymentStatus', '');
+      let before = resource == null ? '' : resource.data.get('paymentStatus', '');
+      return incoming != 'waived' || before == 'waived' || !freePromotionEnded();
+    }
+
+    // Staff may not approve a new_delegate request whose subscription is unpaid.
+    // paid / waived / not_required are settled. Missing paymentStatus is not.
+    function newDelegateApprovalPaymentOk() {
+      let incoming = request.resource.data;
+      let before = resource == null ? {} : resource.data;
+      let ty = incoming.get('requestType', before.get('requestType', ''));
+      let st = incoming.get('status', '');
+      let method = incoming.get('paymentMethod', before.get('paymentMethod', ''));
+      let pay = incoming.get('paymentStatus', before.get('paymentStatus', ''));
+      // Only Paymob new-delegate approvals require a settled payment.
+      // Legacy docs (no paymentMethod / no paymentStatus) stay approvable.
+      return st != 'approved'
+        || ty != 'new_delegate'
+        || method != 'paymob'
+        || pay == 'paid'
+        || pay == 'waived'
+        || pay == 'not_required';
     }
     function delegateRequestReadOk() {
       let d = resource.data;
@@ -2176,7 +2212,7 @@ service cloud.firestore {
           && changedKeys().hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
             'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'])
           && delegateDocsOk() && delegateUrlsWithDocs())
-        || requestStaffUpdateOk(requestId))
+        || (requestStaffUpdateOk(requestId) && subscriptionPaymentUntouched()))
         && !changedKeys().hasAny(['proposedNationalId'])
         && (resource.data.get('requestType', '') == 'update_national_id'
           || request.resource.data.get('requestType', '') != 'update_national_id')
@@ -2190,8 +2226,7 @@ service cloud.firestore {
         && (!changedKeys().hasAny(['organizationUIDs', 'organizationUID', 'organizationId', 'companyUID', 'companyId'])
           || (requestOrganizationUIDsOk() && requestPrimaryOrgBelongsToCompany()))
         && orgCompanyCheckKeysLocked()
-        && requestApprovalOrgCheckOk()
-        && subscriptionPaymentUntouched();
+        && requestApprovalOrgCheckOk();
       allow delete: if isSuperAdmin() || isOrgAdmin();
     }
 

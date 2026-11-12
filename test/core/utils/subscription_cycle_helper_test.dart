@@ -3,6 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('SubscriptionCycleHelper', () {
+    setUp(SubscriptionCycleHelper.resetConfigForTest);
+    tearDown(SubscriptionCycleHelper.resetConfigForTest);
+
     test('getCycleCode returns correct H1 and H2 codes', () {
       final h1Date = DateTime(2026, 3, 15);
       final h2Date = DateTime(2026, 8, 20);
@@ -176,8 +179,62 @@ void main() {
           ),
           isFalse,
         );
+        // 31 Dec 2026 21:59:59 UTC is still 23:59:59 Cairo (UTC+2).
+        expect(
+          SubscriptionCycleHelper.isFreePromotionActive(
+            DateTime.utc(2026, 12, 31, 21, 59, 59),
+          ),
+          isTrue,
+        );
+        // 31 Dec 2026 22:00:00 UTC is 1 Jan 2027 00:00 Cairo — promo ended.
+        expect(
+          SubscriptionCycleHelper.isFreePromotionActive(
+            DateTime.utc(2026, 12, 31, 22),
+          ),
+          isFalse,
+        );
       },
     );
+
+    test('nowOverride is used when the date argument is omitted', () {
+      SubscriptionCycleHelper.nowOverride = () => DateTime.utc(2026, 12, 31, 21, 59, 59);
+      expect(SubscriptionCycleHelper.isFreePromotionActive(), isTrue);
+      SubscriptionCycleHelper.nowOverride = () => DateTime.utc(2026, 12, 31, 22);
+      expect(SubscriptionCycleHelper.isFreePromotionActive(), isFalse);
+    });
+
+    test('applyConfig moves the last free Cairo day', () {
+      SubscriptionCycleHelper.applyConfig(freePromotionLastDay: '2026-11-30');
+      expect(
+        SubscriptionCycleHelper.isFreePromotionActive(DateTime(2026, 11, 30, 23, 59, 59)),
+        isTrue,
+      );
+      expect(
+        SubscriptionCycleHelper.isFreePromotionActive(DateTime(2026, 12, 1)),
+        isFalse,
+      );
+      SubscriptionCycleHelper.applyConfig(freePromotionLastDay: 'not-a-date');
+      expect(SubscriptionCycleHelper.freePromotionLastDayIso, '2026-12-31');
+    });
+
+    test('getCycleShortTitleArabic is sentence-safe', () {
+      expect(
+        SubscriptionCycleHelper.getCycleShortTitleArabic(DateTime(2027, 1, 1)),
+        'النصف الأول 2027',
+      );
+      expect(
+        SubscriptionCycleHelper.getCycleShortTitleArabic(DateTime(2027, 7, 1)),
+        'النصف الثاني 2027',
+      );
+      expect(
+        SubscriptionCycleHelper.getCycleShortTitleArabicForCode('2027_H1'),
+        'النصف الأول 2027',
+      );
+      expect(
+        SubscriptionCycleHelper.getCycleTitleArabic(DateTime(2027, 1, 1)),
+        contains('•'),
+      );
+    });
 
     test('dev free-period bypass is impossible when isDev is false', () {
       const company = SubscriptionCycleHelper.devPaidRenewalCompanyUID;

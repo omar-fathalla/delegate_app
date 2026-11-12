@@ -128,6 +128,9 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:delegate_app/features/feedback/feedback_injection.dart';
 import 'package:delegate_app/features/private_label/private_label_injection.dart';
 import 'package:delegate_app/core/services/trusted_time_service.dart';
+import 'package:delegate_app/core/services/subscription_promo_config.dart';
+import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
+import 'package:delegate_app/core/utils/promo_clock_binding.dart';
 import 'package:get_it/get_it.dart';
 
 // Photo Permission Feature Imports
@@ -652,6 +655,17 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
     ),
   );
   sl.registerLazySingleton(() => FirebaseStorage.instance);
+
+  sl.registerLazySingleton<SubscriptionPromoConfig>(
+    () => SubscriptionPromoConfig(firestore: sl()),
+  );
+  SubscriptionCycleHelper.nowOverride = () => sl<TrustedTimeService>().now.toUtc();
+  PromoClockBinding.onResumeRefresh = () async {
+    await sl<TrustedTimeService>().syncServerTime();
+    await sl<SubscriptionPromoConfig>().refresh();
+  };
+  // Best-effort; demo mode or a missing doc keeps the compiled fallback date.
+  await sl<SubscriptionPromoConfig>().refresh();
 }
 
 /// Minimal dependency initialization specifically for background isolates (e.g. WorkManager photo sync).

@@ -128,6 +128,12 @@ export function parseAdvanceRenewalConfig(raw?: Record<string, unknown> | null):
   return {enabled: raw?.advanceRenewalEnabled === true, days};
 }
 
+/** ISO calendar day `YYYY-MM-DD` from config, else [FREE_PROMOTION_LAST_DAY]. */
+export function parseFreePromotionLastDay(raw?: Record<string, unknown> | null): string {
+  const d = typeof raw?.freePromotionLastDay === "string" ? raw.freePromotionLastDay.trim() : "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : FREE_PROMOTION_LAST_DAY;
+}
+
 /**
  * 00:00 Cairo on the first day of the last `days` calendar days of [period]
  * (the period end day is included).
@@ -268,6 +274,8 @@ export interface QuoteOptions {
   companyFreePeriodEnded?: boolean;
   /** When set, the quote is for this period (advance renewal uses next). */
   periodCode?: string;
+  /** Cairo calendar last free day, from config/subscriptions (else the compiled default). */
+  freePromotionLastDay?: string;
 }
 
 const TASHIL_DEV_PROJECT = "tashil-dev";
@@ -283,7 +291,8 @@ export function shouldBypassFreePeriod(opts?: QuoteOptions): boolean {
 
 export function isFreePromotion(at: Date, opts?: QuoteOptions): boolean {
   if (shouldBypassFreePeriod(opts)) return false;
-  return isoDay(cairoDate(at)) <= FREE_PROMOTION_LAST_DAY;
+  const last = parseFreePromotionLastDay({freePromotionLastDay: opts?.freePromotionLastDay});
+  return isoDay(cairoDate(at)) <= last;
 }
 
 /** Fee one delegate pays when subscribing or renewing at `at`. */
@@ -325,12 +334,17 @@ export function coveredUids(requestId: string, data: Record<string, unknown>): s
 }
 
 /** A paid (or, for free periods, waived) request covers its delegates for its period. */
-export function requestCoversPeriod(data: Record<string, unknown>, periodCode: string): boolean {
+export function requestCoversPeriod(
+  data: Record<string, unknown>,
+  periodCode: string,
+  lastDay: string = FREE_PROMOTION_LAST_DAY,
+): boolean {
   if (str(data.periodCode) !== periodCode) return false;
   const status = str(data.paymentStatus);
   if (status === "paid") return true;
   const period = parsePeriodCode(periodCode);
-  return status === "waived" && period !== null && period.endDay <= FREE_PROMOTION_LAST_DAY;
+  const last = parseFreePromotionLastDay({freePromotionLastDay: lastDay});
+  return status === "waived" && period !== null && period.endDay <= last;
 }
 
 /** Statuses the period-end job moves to "suspended". */

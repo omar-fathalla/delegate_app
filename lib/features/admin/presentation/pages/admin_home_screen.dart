@@ -32,6 +32,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
+import 'package:delegate_app/core/utils/promo_clock_binding.dart';
+import 'package:delegate_app/features/admin/presentation/widgets/company_exclusive_card_intro.dart';
 
 
 /// Org-admin must query only their organization. Company supervisors
@@ -70,7 +72,7 @@ class _AdminHomeBody extends StatefulWidget {
   State<_AdminHomeBody> createState() => _AdminHomeBodyState();
 }
 
-class _AdminHomeBodyState extends State<_AdminHomeBody> {
+class _AdminHomeBodyState extends State<_AdminHomeBody> with WidgetsBindingObserver, PromoClockBinding {
   static final Map<String, List<String>> _orgsMemoryCache = {};
   List<String> _supervisorOrganizations = [];
 
@@ -1316,116 +1318,13 @@ class _AdminHomeBodyState extends State<_AdminHomeBody> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // الشارة الترويجية (Badge) - ميزة حصرية للشركات + عرض مجاني حتى 31/12
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.business_rounded,
-                        size: 14,
-                        color: colorScheme.onPrimaryContainer,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        isArabic ? 'ميزة حصرية للشركات' : 'Exclusive for Companies',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onPrimaryContainer,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (SubscriptionCycleHelper.isFreePromotionActive()) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF86EFAC)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.local_offer_rounded,
-                          size: 14,
-                          color: Color(0xFF16A34A),
-                        ),
-                        SizedBox(width: 5),
-                        Text(
-                          'مجاناً حتى 31/12',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF15803D),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // عنوان الكارت بأيقونة جوجل ماتيريال (بدون إيموجي)
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.hub_rounded,
-                    color: colorScheme.primary,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    isArabic
-                        ? 'متابعة مناديبك في كافة السلاسل من مكان واحد'
-                        : 'Track Your Delegates Across All Retail Chains',
-                    style: TextStyle(
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
-                      letterSpacing: 0.1,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // نص الوصف
-            Text(
-              isArabic
-                  ? (SubscriptionCycleHelper.isFreePromotionActive()
-                      ? 'يمكنك الآن إضافة المناديب للسلاسل والمنظمات الأخرى ومتابعة حضورهم وانصرافهم ورفع التصوير مجاناً بالكامل حتى 31/12 بدون أي رسوم اشتراك.'
-                      : 'الآن يمكن لشركتك إضافة ومتابعة حضور وانصراف مناديبها المتواجدين في فروع السلاسل التجارية والمنظمات الأخرى، مع تقارير انضباط ميداني موحدة ولحظية.')
-                  : 'Your company can now add and track delegate attendance across partner retail chains and organizations in real time from this dashboard.',
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.5,
-                color: colorScheme.onSurfaceVariant,
+            CompanyExclusiveCardIntro(
+              isArabic: isArabic,
+              isFreePromotion: SubscriptionCycleHelper.isFreePromotionActive(
+                null,
+                widget.adminDelegate.companyUID,
               ),
             ),
-            const SizedBox(height: 14),
 
             // عنوان فرعي للسلاسل المدعومة بأيقونة جوجل ماتيريال
             Row(

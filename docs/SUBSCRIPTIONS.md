@@ -3,7 +3,7 @@
 Rules (Mohamed): periods H1 = 1 Jan–30 Jun, H2 = 1 Jul–31 Dec (Africa/Cairo).
 500 EGP per delegate per period, prorated: `500 × remainingMonths / 6`, join
 month counted in full, rounded half-up to 2 dp (500, 416.67, 333.33, 250,
-166.67, 83.33). Free until 2026-12-31; first paid period 2027_H1. One
+166.67, 83.33). Free until the Cairo calendar day in `config/subscriptions.freePromotionLastDay` (fallback `2026-12-31`); first paid period 2027_H1. One
 subscription per delegate covers every chain (add_organization is free).
 Payment is online via Paymob only, charged once at registration/renewal.
 Renewal creation: company supervisor and company admin (`UserRole.admin`;
@@ -133,7 +133,7 @@ app-added docs. In shadow mode this is a holds-only write (no status / no
 `users/{uid}`).
 
 Clients may read only `config/subscriptions` (signed-in, no writes). The app
-reads `advanceRenewalEnabled` / `advanceRenewalDays` from that doc and falls
+reads `advanceRenewalEnabled` / `advanceRenewalDays` and `freePromotionLastDay` (Cairo `YYYY-MM-DD`, fallback `2026-12-31`) from that doc. Functions are authoritative for quotes; the app mirrors the date and uses TrustedTime for "now". After 2027-01-01 00:00 Africa/Cairo, rules reject new `waived` writes and unpaid `new_delegate` approvals. The same doc also falls
 back to the compile-time default (`ENV=dev` on, 60 days; prod off, 30 days)
 if the doc is missing or unreadable. A constructor override still wins in
 tests. During the advance window the renewal screen lists both periods: the

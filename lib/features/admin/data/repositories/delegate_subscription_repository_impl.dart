@@ -63,8 +63,8 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
 
       // Subscription terms are always computed here (never trusted from the
       // caller). From 2027 the only paid method is Paymob (online).
-      final now = DateTime.now().toUtc();
-      final isFree = SubscriptionCycleHelper.isFreePromotionActive(now);
+      final now = SubscriptionCycleHelper.currentTime();
+      final isFree = SubscriptionCycleHelper.isFreePromotionActive(now, companyUID);
       if (!isFree) {
         paymentMethod = SubscriptionPaymentMethod.paymob;
         receiptCode = null;
@@ -176,7 +176,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       final cycleStartDate = SubscriptionCycleHelper.getCycleStartDate(now);
       final cycleEndDate = SubscriptionCycleHelper.getCycleEndDate(now);
       final calculatedRemainingMonths = SubscriptionCycleHelper.getRemainingMonthsInCycle(now);
-      final calculatedFee = SubscriptionCycleHelper.getProratedSubscriptionFee(now);
+      final calculatedFee = SubscriptionCycleHelper.getProratedSubscriptionFee(now, companyUID);
 
       final fullName = '$firstName $secondName $thirdName'.trim();
 

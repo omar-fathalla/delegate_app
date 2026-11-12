@@ -2,15 +2,18 @@ import 'dart:io';
 import 'package:delegate_app/features/admin/domain/services/subscription_payment_gateway.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:delegate_app/features/admin/data/chain_duplicate_lookup.dart';
 import 'package:delegate_app/features/admin/domain/entities/chain_selection.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/chain_multi_select.dart';
+import 'package:delegate_app/features/admin/presentation/widgets/add_delegate_subscription_section.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
+import 'package:delegate_app/core/utils/promo_clock_binding.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
@@ -27,7 +30,7 @@ class AddDelegateFormScreen extends StatefulWidget {
   State<AddDelegateFormScreen> createState() => _AddDelegateFormScreenState();
 }
 
-class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
+class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with WidgetsBindingObserver, PromoClockBinding {
 
   final _formKey = GlobalKey<FormState>();
 
@@ -64,10 +67,7 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
   @override
   void initState() {
     super.initState();
-    // 2026: free promotion. From 2027 the only method is online (Paymob).
-    _paymentMethod = SubscriptionCycleHelper.isFreePromotionActive()
-        ? SubscriptionPaymentMethod.freePromotion
-        : SubscriptionPaymentMethod.paymob;
+    _syncPaymentMethod();
     _fetchOrganizations();
   }
 
@@ -177,9 +177,25 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
     _nationalIdBack = null;
     _receiptImage = null;
     _isReceiptCodeValid = null;
-    _paymentMethod = SubscriptionCycleHelper.isFreePromotionActive()
+    _syncPaymentMethod();
+  }
+
+
+  String? get _companyUID => widget.supervisor.companyUID;
+
+  bool get _isFreePromotion =>
+      SubscriptionCycleHelper.isFreePromotionActive(null, _companyUID);
+
+  void _syncPaymentMethod() {
+    _paymentMethod = _isFreePromotion
         ? SubscriptionPaymentMethod.freePromotion
-        : SubscriptionPaymentMethod.companyDeduction;
+        : SubscriptionPaymentMethod.paymob;
+  }
+
+  @override
+  void onPromoClockTick() {
+    if (!mounted) return;
+    setState(_syncPaymentMethod);
   }
 
   Future<void> _submit() async {
@@ -374,8 +390,9 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
       }
     }
 
+    _syncPaymentMethod();
     final remainingMonths = SubscriptionCycleHelper.getRemainingMonthsInCycle();
-    final fee = SubscriptionCycleHelper.getProratedSubscriptionFee();
+    final fee = SubscriptionCycleHelper.getProratedSubscriptionFee(null, _companyUID);
 
     final repo = sl<DelegateSubscriptionRepository>();
     final result = await repo.submitSubscriptionRequest(
@@ -537,55 +554,24 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
 
                       // 5. Payment Method & Subscription
                       _buildSectionHeader(
-                        SubscriptionCycleHelper.isFreePromotionActive()
+                        _isFreePromotion
                             ? 'الاشتراك والربط (مجاناً حتى 31/12)'
-                            : 'الاشتراك والدفع الإلكتروني (${SubscriptionCycleHelper.getRemainingMonthsInCycle()} أشهر - ${SubscriptionCycleHelper.formatEgp(SubscriptionCycleHelper.getProratedSubscriptionFee())} ج.م)',
-                        SubscriptionCycleHelper.isFreePromotionActive()
+                            : 'الاشتراك والدفع الإلكتروني (${SubscriptionCycleHelper.getRemainingMonthsInCycle()} أشهر - ${SubscriptionCycleHelper.formatEgp(SubscriptionCycleHelper.getProratedSubscriptionFee(null, _companyUID))} ج.م)',
+                        _isFreePromotion
                             ? Icons.card_giftcard_rounded
-                            : Icons.payments_rounded,
+                            : Symbols.payments_rounded,
                       ),
                       const SizedBox(height: 8),
-                      SubscriptionCycleHelper.isFreePromotionActive()
+                      _isFreePromotion
                           ? _buildFreePromotionCard(colorScheme)
                           : _buildPaymobCard(colorScheme),
                       const SizedBox(height: 24),
 
                       // 6. Submit Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            elevation: 1,
-                          ),
-                          onPressed: (_isSubmitting || _submitSucceeded) ? null : _submit,
-                          icon: _isSubmitting
-                              ? SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    color: colorScheme.onPrimary,
-                                  ),
-                                )
-                              : const Icon(Icons.send_rounded, size: 22),
-                          label: Text(
-                            _isSubmitting
-                                ? 'جاري رفع البيانات وإرسال الطلب...'
-                                : (SubscriptionCycleHelper.isFreePromotionActive()
-                                    ? 'إرسال طلب التسجيل (مجاناً)'
-                                    : 'إرسال طلب التسجيل'),
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              height: 1.25,
-                            ),
-                          ),
-                        ),
+                      AddDelegateSubmitButton(
+                        isFree: _isFreePromotion,
+                        isBusy: _isSubmitting || _submitSucceeded,
+                        onSubmit: _submit,
                       ),
                       const SizedBox(height: 48),
                     ],
@@ -597,69 +583,9 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
   }
 
   Widget _buildCycleBanner(ColorScheme colorScheme) {
-    final isFree = SubscriptionCycleHelper.isFreePromotionActive();
-    final cycleTitle = SubscriptionCycleHelper.getCycleTitleArabic();
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isFree
-            ? const Color(0xFFDCFCE7).withValues(alpha: 0.6)
-            : colorScheme.primaryContainer.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isFree
-              ? const Color(0xFF86EFAC)
-              : colorScheme.primary.withValues(alpha: 0.25),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: isFree ? const Color(0xFF16A34A) : colorScheme.primary,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              isFree ? Icons.local_offer_rounded : Icons.date_range_rounded,
-              color: Colors.white,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isFree
-                      ? 'عرض ترويجي مجاني ممتد لنهاية العام'
-                      : 'دورة الاشتراك النصف سنوية المطبقة',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: isFree ? const Color(0xFF14532D) : colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  isFree
-                      ? 'الخدمة مجانية بالكامل لجميع السلاسل والمنظمات حتى 31 ديسمبر 2026'
-                      : cycleTitle,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: isFree
-                        ? const Color(0xFF15803D)
-                        : colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    return AddDelegateCycleBanner(isFree: _isFreePromotion, colorScheme: colorScheme);
   }
+
 
   Widget _buildOrganizationSelector(ColorScheme colorScheme) {
     final chains = _organizations
@@ -853,7 +779,7 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
                 context: context,
                 labelText: 'الرقم القومي (14 رقم) للباسورد *',
                 helperText: 'يُعتمد الرقم القومي ككلمة مرور افتراضية لتسجيل دخول المندوب',
-                prefixIcon: Icon(Icons.credit_card_rounded, size: 20, color: colorScheme.primary),
+                prefixIcon: Icon(Symbols.credit_card_rounded, size: 20, color: colorScheme.primary),
               ),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'يرجى إدخال الرقم القومي';
@@ -978,325 +904,16 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> {
     );
   }
 
-  /// كارت العرض الترويجي المجاني (حتى 31/12) بمواصفات Material Design 3
+  /// كارت الدفع الإلكتروني عبر Paymob بعد انتهاء العرض الترويجي.
   Widget _buildPaymobCard(ColorScheme colorScheme) {
-    final months = SubscriptionCycleHelper.getRemainingMonthsInCycle();
-    final fee = SubscriptionCycleHelper.getProratedSubscriptionFee();
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant),
-      ),
-      color: colorScheme.surfaceContainerLow,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.credit_card_rounded, color: colorScheme.primary),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text('الدفع إلكترونياً عبر Paymob', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-                Text(
-                  '${SubscriptionCycleHelper.formatEgp(fee)} ج.م',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: colorScheme.primary),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'اشتراك $months ${months == 1 ? 'شهر' : 'أشهر'} حتى نهاية ${SubscriptionCycleHelper.getCycleTitleArabic()}. '
-              'الاشتراك الواحد يغطي كل السلاسل. يتم تفعيل المندوب بعد تأكيد الدفع واعتماد المستندات.',
-              style: TextStyle(fontSize: 12, height: 1.5, color: colorScheme.onSurfaceVariant),
-            ),
-          ],
-        ),
-      ),
-    );
+    return AddDelegatePaymobCard(companyUID: _companyUID, colorScheme: colorScheme);
   }
+
 
   Widget _buildFreePromotionCard(ColorScheme colorScheme) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark
-            ? colorScheme.surfaceContainerLow
-            : const Color(0xFFF0FDF4),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark
-              ? const Color(0xFF16A34A).withValues(alpha: 0.4)
-              : const Color(0xFF86EFAC),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF16A34A).withValues(alpha: isDark ? 0.05 : 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top Row: Badges
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF166534).withValues(alpha: 0.4)
-                      : const Color(0xFFDCFCE7),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF16A34A) : const Color(0xFF86EFAC),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.local_offer_rounded,
-                      size: 15,
-                      color: Color(0xFF16A34A),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'عرض خاص حتى 31 ديسمبر 2026',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF16A34A),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.check_circle_rounded, size: 14, color: Colors.white),
-                    SizedBox(width: 4),
-                    Text(
-                      'مجاناً 0 ج.م',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Main Header
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF166534).withValues(alpha: 0.4)
-                      : const Color(0xFFDCFCE7),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.card_giftcard_rounded,
-                  color: Color(0xFF16A34A),
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'اشتراك ومتابعة مجاناً بالكامل حتى 31/12',
-                  style: TextStyle(
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? colorScheme.onSurface : const Color(0xFF14532D),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Clarifying Announcement Message Box (User exact words)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? colorScheme.surfaceContainer
-                  : Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isDark
-                    ? colorScheme.outlineVariant
-                    : const Color(0xFFBBF7D0),
-              ),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  Icons.info_outline_rounded,
-                  size: 18,
-                  color: Color(0xFF16A34A),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'يمكنك الآن إضافة المناديب للسلاسل والمنظمات الأخرى ومتابعة حضورهم وانصرافهم ورفع التصوير مجاناً بالكامل حتى 31/12 بدون أي رسوم اشتراك.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.5,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? colorScheme.onSurface : const Color(0xFF1F2937),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Benefit Checkpoints
-          _buildPromotionBenefitItem(
-            colorScheme,
-            icon: Icons.storefront_rounded,
-            title: 'إضافة غير محدودة لكافة السلاسل الشريكة',
-            subtitle: 'سجل مناديبك في زهران ماركت، جملة ماركت، كارفور، وبيت الجملة.',
-            isDark: isDark,
-          ),
-          const SizedBox(height: 8),
-          _buildPromotionBenefitItem(
-            colorScheme,
-            icon: Icons.access_time_filled_rounded,
-            title: 'متابعة لحظية للحضور والانصراف',
-            subtitle: 'تقارير ميدانية موحدة لضبط التواجد والالتزام بساعات العمل.',
-            isDark: isDark,
-          ),
-          const SizedBox(height: 8),
-          _buildPromotionBenefitItem(
-            colorScheme,
-            icon: Icons.camera_alt_rounded,
-            title: 'رفع تقارير وأذونات التصوير الميداني',
-            subtitle: 'إدارة وتفعيل أذونات التصوير الشهرية ومراجعة معروضات المندوب.',
-            isDark: isDark,
-          ),
-          const SizedBox(height: 8),
-          _buildPromotionBenefitItem(
-            colorScheme,
-            icon: Icons.money_off_rounded,
-            title: 'بدون أي إجراء مالي أو إيصالات',
-            subtitle: 'لا يلزم سداد أي مبالغ أو إرفاق إيصالات دفع خلال فترة العرض.',
-            isDark: isDark,
-          ),
-          const SizedBox(height: 12),
-
-          // Reassurance Note
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? colorScheme.surfaceContainerHigh
-                  : const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.verified_user_rounded,
-                  size: 16,
-                  color: colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'سيتم اعتماد وتفعيل حساب المندوب فور مراجعة المستندات من الدعم الفني.',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    return AddDelegateFreePromotionCard(colorScheme: colorScheme);
   }
 
-  Widget _buildPromotionBenefitItem(
-    ColorScheme colorScheme, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool isDark,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(5),
-          decoration: BoxDecoration(
-            color: isDark
-                ? const Color(0xFF166534).withValues(alpha: 0.3)
-                : const Color(0xFFDCFCE7),
-            borderRadius: BorderRadius.circular(7),
-          ),
-          child: Icon(icon, size: 15, color: const Color(0xFF16A34A)),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? colorScheme.onSurface : const Color(0xFF1E293B),
-                ),
-              ),
-              const SizedBox(height: 1),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: colorScheme.onSurfaceVariant,
-                  height: 1.3,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+
 
 }
