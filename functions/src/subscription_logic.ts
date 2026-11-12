@@ -196,6 +196,56 @@ export function isRenewalCoverageExpired(quotedAt: Date, now: Date, periodCode?:
   return now.getTime() >= renewalCoverageExpiryAt(quotedAt, periodCode).getTime();
 }
 
+/** Default time a pending checkout / quote may wait for a Paymob webhook. */
+export const DEFAULT_CHECKOUT_TTL_MINUTES = 60;
+export const CHECKOUT_IN_PROGRESS_SECONDS = 20;
+
+export function checkoutTtlMs(minutes?: number): number {
+  const n = Number(minutes);
+  const mins = Number.isFinite(n) && n >= 30 && n <= 60 ? Math.trunc(n) : DEFAULT_CHECKOUT_TTL_MINUTES;
+  return mins * 60 * 1000;
+}
+
+function asDate(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  if (typeof value === "string") {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof value === "object" && typeof (value as {toDate?: unknown}).toDate === "function") {
+    const d = (value as {toDate: () => Date}).toDate();
+    return d instanceof Date && !Number.isNaN(d.getTime()) ? d : null;
+  }
+  return null;
+}
+
+/**
+ * When an awaiting-payment request should auto-expire so it cannot stay
+ * pending forever. Prefer the checkout start, then the quote, then create.
+ * The Cairo-month coverage window remains an upper bound.
+ */
+export function awaitingStartedAt(data: Record<string, unknown>): Date | null {
+  const checkout = (data.paymobCheckout && typeof data.paymobCheckout === "object")
+    ? data.paymobCheckout as Record<string, unknown>
+    : {};
+  return asDate(checkout.createdAt) || asDate(data.quotedAt) || asDate(data.createdAt);
+}
+
+export function isAwaitingPaymentExpired(
+  data: Record<string, unknown>,
+  now: Date,
+  ttlMinutes?: number,
+): boolean {
+  const payment = typeof data.paymentStatus === "string" ? data.paymentStatus : "";
+  if (payment === "paid" || payment === "waived" || payment === "not_required") return false;
+  const started = awaitingStartedAt(data);
+  if (started && now.getTime() >= started.getTime() + checkoutTtlMs(ttlMinutes)) return true;
+  const quoted = asDate(data.quotedAt);
+  const period = typeof data.periodCode === "string" ? data.periodCode : "";
+  return !!(quoted && isRenewalCoverageExpired(quoted, now, period));
+}
+
 /** Months left in the period including the current month (1..6). */
 export function remainingMonths(at: Date): number {
   const {month} = cairoDate(at);

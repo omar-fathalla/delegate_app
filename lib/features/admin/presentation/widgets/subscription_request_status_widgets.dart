@@ -356,16 +356,71 @@ class SubscriptionRequestPendingActions extends StatelessWidget {
   bool get _isStaff =>
       role == UserRole.superAdmin || role == UserRole.technicalSupport;
 
-  bool get _showApprove => _isStaff && !request.isAwaitingPaymobPayment;
+  /// Hide approve while a Paymob new-delegate is unpaid, and for renewals
+  /// (those are approved by the Paymob webhook — F9). Reject stays available.
+  bool get _showApprove =>
+      _isStaff && !request.isAwaitingPaymobPayment && !request.isRenewalRequest;
+
+  bool get _showReject => _isStaff;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    if (_showApprove) {
-      return Row(
-        mainAxisAlignment:
-            isWide ? MainAxisAlignment.end : MainAxisAlignment.start,
+    final waitingBanner = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: request.isAwaitingPaymobPayment
+            ? colorScheme.tertiaryContainer
+            : colorScheme.primaryContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: request.isAwaitingPaymobPayment
+              ? colorScheme.tertiary.withValues(alpha: 0.4)
+              : colorScheme.primary.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
         children: [
+          Icon(
+            request.isAwaitingPaymobPayment
+                ? Symbols.hourglass_top_rounded
+                : Icons.hourglass_top_rounded,
+            size: 16,
+            color: request.isAwaitingPaymobPayment
+                ? colorScheme.onTertiaryContainer
+                : colorScheme.primary,
+            fill: 0,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              request.isAwaitingPaymobPayment
+                  ? 'بانتظار الدفع الإلكتروني. لا يمكن الاعتماد قبل تأكيد الدفع.'
+                  : request.isRenewalRequest
+                      ? 'طلب التجديد يُعتمد تلقائياً بعد تأكيد الدفع الإلكتروني.'
+                      : 'الطلب قيد الانتظار وبانتظار المراجعة والاعتماد.',
+              style: TextStyle(
+                fontSize: 11.5,
+                color: request.isAwaitingPaymobPayment
+                    ? colorScheme.onTertiaryContainer
+                    : colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (!_isStaff) {
+      return waitingBanner;
+    }
+
+    final buttons = Row(
+      mainAxisAlignment:
+          isWide ? MainAxisAlignment.end : MainAxisAlignment.start,
+      children: [
+        if (_showApprove) ...[
           Flexible(
             fit: isWide ? FlexFit.loose : FlexFit.tight,
             child: FilledButton.icon(
@@ -399,6 +454,8 @@ class SubscriptionRequestPendingActions extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
+        ],
+        if (_showReject)
           Flexible(
             fit: isWide ? FlexFit.loose : FlexFit.tight,
             child: OutlinedButton.icon(
@@ -424,55 +481,24 @@ class SubscriptionRequestPendingActions extends StatelessWidget {
               ),
             ),
           ),
-        ],
-      );
+      ],
+    );
+
+    if (_showApprove) {
+      return buttons;
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: request.isAwaitingPaymobPayment
-            ? colorScheme.tertiaryContainer
-            : colorScheme.primaryContainer.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: request.isAwaitingPaymobPayment
-              ? colorScheme.tertiary.withValues(alpha: 0.4)
-              : colorScheme.primary.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            request.isAwaitingPaymobPayment
-                ? Symbols.hourglass_top_rounded
-                : Icons.hourglass_top_rounded,
-            size: 16,
-            color: request.isAwaitingPaymobPayment
-                ? colorScheme.onTertiaryContainer
-                : colorScheme.primary,
-            fill: 0,
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              request.isAwaitingPaymobPayment
-                  ? 'بانتظار الدفع الإلكتروني. لا يمكن الاعتماد قبل تأكيد الدفع.'
-                  : 'الطلب قيد الانتظار وبانتظار المراجعة والاعتماد.',
-              style: TextStyle(
-                fontSize: 11.5,
-                color: request.isAwaitingPaymobPayment
-                    ? colorScheme.onTertiaryContainer
-                    : colorScheme.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        waitingBanner,
+        const SizedBox(height: 8),
+        buttons,
+      ],
     );
   }
 }
+
 
 /// Compact card used by tests and screenshots: the same chips, badge, and
 /// pending actions the live requests page renders.

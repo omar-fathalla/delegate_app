@@ -1313,7 +1313,6 @@ class _SubscriptionRequestCard extends StatelessWidget {
                         onApprove: onApprove,
                         onReject: onReject,
                       ),
-
                       if (_canSupervisorEditRequest(currentAdmin, request)) ...[
                         const SizedBox(height: 8),
                         OutlinedButton.icon(

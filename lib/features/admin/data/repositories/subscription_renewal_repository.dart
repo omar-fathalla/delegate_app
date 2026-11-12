@@ -128,59 +128,79 @@ class SubscriptionRenewalRepository {
         organizationUID: org.isEmpty ? null : org,
         periods: {current, if (advance) next},
       );
-      final out = <RenewableDelegate>[];
+      final eligible = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
       for (final reg in regs.docs) {
         final r = reg.data();
         if ((r['supervisorUid'] ?? '').toString().isEmpty) continue;
         if ((r['existingDelegateUid'] ?? '').toString().isNotEmpty) continue;
-        final org = (r['organizationUID'] ?? '').toString();
-        if (org.isEmpty) continue;
-        final snap = await _firestore
-            .collection('organizations')
-            .doc(org)
-            .collection('companies')
-            .doc(companyUID)
-            .collection('delegates')
-            .doc(reg.id)
-            .get();
-        final d = snap.data();
-        if (d == null) continue;
-        RenewableDelegate row(
-          String period, {
-          String? pendingId,
-          required bool covered,
-        }) => RenewableDelegate(
-          uid: reg.id,
-          fullName: (d['fullName'] ?? r['fullName'] ?? '').toString(),
-          phoneNumber: (d['phoneNumber'] ?? r['phoneNumber'] ?? '').toString(),
-          organizationName:
-              (d['organizationName'] ?? r['organizationName'] ?? '').toString(),
-          delegatePublicId: d['delegatePublicId']?.toString(),
-          pendingRenewalRequestId: pendingId,
-          periodCode: period,
-          status: (d['status'] ?? '').toString(),
-          statusReason: (d['statusReason'] ?? '').toString(),
-          isCovered: covered,
-          exclusionReason: covered ? 'مغطى بالفعل لهذه الفترة' : null,
+        final rowOrg = (r['organizationUID'] ?? '').toString();
+        if (rowOrg.isEmpty) continue;
+        eligible.add(reg);
+      }
+      const batchSize = 20;
+      final out = <RenewableDelegate>[];
+      for (var i = 0; i < eligible.length; i += batchSize) {
+        final end = i + batchSize > eligible.length
+            ? eligible.length
+            : i + batchSize;
+        final chunk = eligible.sublist(i, end);
+        final snaps = await Future.wait(
+          chunk.map((reg) {
+            final rowOrg = (reg.data()['organizationUID'] ?? '').toString();
+            return _firestore
+                .collection('organizations')
+                .doc(rowOrg)
+                .collection('companies')
+                .doc(companyUID)
+                .collection('delegates')
+                .doc(reg.id)
+                .get();
+          }),
         );
-        // Current period: every app-added delegate, so the UI can select
-        // many/all, filter الموقوفين / قرب ينتهي, and show covered ones
-        // as excluded with a reason (L1 group renewal).
-        out.add(
-          row(
-            current,
-            pendingId: pending['${reg.id}|$current'],
-            covered: _subscriptionCovers(d, current),
-          ),
-        );
-        if (advance) {
+        for (var j = 0; j < chunk.length; j++) {
+          final reg = chunk[j];
+          final r = reg.data();
+          final d = snaps[j].data();
+          if (d == null) continue;
+          RenewableDelegate row(
+            String period, {
+            String? pendingId,
+            required bool covered,
+          }) => RenewableDelegate(
+            uid: reg.id,
+            fullName: (d['fullName'] ?? r['fullName'] ?? '').toString(),
+            phoneNumber: (d['phoneNumber'] ?? r['phoneNumber'] ?? '')
+                .toString(),
+            organizationName:
+                (d['organizationName'] ?? r['organizationName'] ?? '')
+                    .toString(),
+            delegatePublicId: d['delegatePublicId']?.toString(),
+            pendingRenewalRequestId: pendingId,
+            periodCode: period,
+            status: (d['status'] ?? '').toString(),
+            statusReason: (d['statusReason'] ?? '').toString(),
+            isCovered: covered,
+            exclusionReason: covered ? 'مغطى بالفعل لهذه الفترة' : null,
+          );
+          // Current period: every app-added delegate, so the UI can select
+          // many/all, filter الموقوفين / قرب ينتهي, and show covered ones
+          // as excluded with a reason (L1 group renewal).
           out.add(
             row(
-              next,
-              pendingId: pending['${reg.id}|$next'],
-              covered: _subscriptionCovers(d, next),
+              current,
+              pendingId: pending['${reg.id}|$current'],
+              covered: _subscriptionCovers(d, current),
             ),
           );
+          if (advance) {
+            out.add(
+              row(
+                next,
+                pendingId: pending['${reg.id}|$next'],
+                covered: _subscriptionCovers(d, next),
+              ),
+            );
+          }
         }
       }
       out.sort((a, b) {

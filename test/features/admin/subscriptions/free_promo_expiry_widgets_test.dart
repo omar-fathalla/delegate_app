@@ -174,4 +174,55 @@ void main() {
     );
     expect(find.text('مجاناً حتى 31/12'), findsOneWidget);
   });
+
+  testWidgets('F9: staff do not see approve on a pending Paymob renewal', (tester) async {
+    final theme = await promoTestTheme();
+    final req = _request(
+      method: SubscriptionPaymentMethod.paymob,
+      paymentStatus: SubscriptionPaymentStatus.pending,
+      name: 'تجديد جماعي',
+    );
+    // _request defaults to new_delegate; copy with renewal type via constructor fields.
+    final renewal = DelegateSubscriptionRequest(
+      id: req.id,
+      supervisorUid: req.supervisorUid,
+      supervisorName: req.supervisorName,
+      supervisorPhone: req.supervisorPhone,
+      companyUID: req.companyUID,
+      companyName: req.companyName,
+      organizationUID: req.organizationUID,
+      organizationName: req.organizationName,
+      firstName: req.firstName,
+      secondName: req.secondName,
+      thirdName: req.thirdName,
+      fullName: req.fullName,
+      phoneNumber: req.phoneNumber,
+      nationalId: req.nationalId,
+      profileImageUrl: '',
+      nationalIdFrontUrl: '',
+      nationalIdBackUrl: '',
+      paymentMethod: SubscriptionPaymentMethod.paymob,
+      subscriptionCycle: '2027_H1',
+      cycleStartDate: DateTime(2027, 1, 1),
+      cycleEndDate: DateTime(2027, 6, 30),
+      fee: 500,
+      remainingMonths: 5,
+      status: SubscriptionRequestStatus.pending,
+      requestType: kRequestTypeRenewal,
+      createdAt: DateTime(2027, 2, 1),
+      paymentStatus: SubscriptionPaymentStatus.pending,
+    );
+    await tester.pumpWidget(
+      promoTestApp(
+        theme: theme,
+        child: SubscriptionRequestPaymentCard(
+          request: renewal,
+          role: UserRole.superAdmin,
+        ),
+      ),
+    );
+    expect(find.text('اعتماد وتفعيل'), findsNothing);
+    expect(find.text('رفض الطلب'), findsOneWidget);
+    expect(find.textContaining('بانتظار الدفع الإلكتروني'), findsWidgets);
+  });
 }
