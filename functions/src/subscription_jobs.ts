@@ -19,6 +19,7 @@ import {
   nextPeriod,
   isWithinSubscriptionGrace,
   isSubscriptionReminderDay,
+  isPeriodFreePromotion,
   cairoDate,
   quoteFor,
   resolvePayablePeriod,
@@ -420,7 +421,7 @@ export async function runSubscriptionReminders(db: Db, now: Date): Promise<Remin
     notifications: 0,
     uncoveredDelegates: 0,
   };
-  if (isFreePromotion(now, {freePromotionLastDay: publicCfg.freePromotionLastDay})) {
+  if (isPeriodFreePromotion(upcoming, publicCfg.freePromotionLastDay)) {
     const res = {...base, skipped: "free_promotion" as const};
     console.log(JSON.stringify({event: "subscription_reminder", ...res}));
     return res;

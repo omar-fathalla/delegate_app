@@ -84,7 +84,11 @@ request and are never suspended.
   reminder day (default **14** Cairo days before 30 Jun and 31 Dec, overridable via
   `config/subscriptions.subscriptionReminderDays`) writes one notification per
   supervisor with app-added delegates lacking paid coverage for the **next** period.
-  Web-added delegates are excluded. Logged to `subscription_reminder_runs/{period}_{date}`.
+  Skipped when that **next** period is still free (its end day is on or before
+  `freePromotionLastDay`), not merely because “today” is inside the promo window —
+  so **17 Dec 2026** can remind for **2027_H1** while **16 Jun 2026** still skips
+  for free **2026_H2**. Web-added delegates are excluded. Logged to
+  `subscription_reminder_runs/{period}_{date}`.
 - `quoteSubscriptionRequest(db, requestId, at)` → authoritative `amountCents`.
   The request's `periodCode` must be the current period, or the next period
   when advance renewal is open (see below). A future-period quote is computed
