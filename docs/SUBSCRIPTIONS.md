@@ -75,9 +75,16 @@ request and are never suspended.
 - `suspendExpiredSubscriptions` (scheduled, 00:05 Africa/Cairo daily, codebase
   `tashil-mobile-notifications`): from 2027, suspends every app-added delegate (all its
   chain docs + `users/{uid}`) not covered by a paid request for the current period;
-  `status: suspended`, `statusReason: subscription_expired`. Idempotent, batched (400),
-  logged to `subscription_suspension_runs/{period}_{date}`. Never touches docs already
-  suspended for another reason.
+  `status: suspended`, `statusReason: subscription_expired`. After each period end,
+  **15 Cairo calendar days of grace** apply (1–14 Jan and 1–14 Jul); suspension for
+  the new half runs from **15 Jan** and **15 Jul**, not the 1st. Idempotent, batched
+  (400), logged to `subscription_suspension_runs/{period}_{date}`. Never touches docs
+  already suspended for another reason.
+- `remindSupervisorsBeforeSubscriptionPeriodEnd` (00:08 Africa/Cairo daily): on the
+  reminder day (default **14** Cairo days before 30 Jun and 31 Dec, overridable via
+  `config/subscriptions.subscriptionReminderDays`) writes one notification per
+  supervisor with app-added delegates lacking paid coverage for the **next** period.
+  Web-added delegates are excluded. Logged to `subscription_reminder_runs/{period}_{date}`.
 - `quoteSubscriptionRequest(db, requestId, at)` → authoritative `amountCents`.
   The request's `periodCode` must be the current period, or the next period
   when advance renewal is open (see below). A future-period quote is computed

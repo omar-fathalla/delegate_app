@@ -23,6 +23,12 @@ class SubscriptionCycleHelper {
   /// Mohamed policy (PR #212): max delegates per single renewal / Paymob payment.
   static const int maxDelegatesPerRenewal = 100;
 
+  /// Supervisor reminder default: Cairo days before each period end (30 Jun / 31 Dec).
+  static const int defaultSubscriptionReminderDays = 14;
+
+  /// Grace after period end before suspending unpaid app-added delegates (15 Jul / 15 Jan).
+  static const int subscriptionGraceDays = 15;
+
   /// Fallback last free day (inclusive), Cairo calendar date, when config is absent.
   static const String defaultFreePromotionLastDayIso = '2026-12-31';
 
@@ -179,6 +185,14 @@ class SubscriptionCycleHelper {
   static String periodStartDay([DateTime? date]) =>
       _day(getCycleStartDate(date));
   static String periodEndDay([DateTime? date]) => _day(getCycleEndDate(date));
+
+  /// 1–14 Jan and 1–14 Jul (Cairo): suspension for the new half is deferred.
+  static bool isWithinSubscriptionGrace([DateTime? date]) {
+    final d = cairoTime(date);
+    if (d.month == 1 && d.day < subscriptionGraceDays) return true;
+    if (d.month == 7 && d.day < subscriptionGraceDays) return true;
+    return false;
+  }
 
   static String _day(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';

@@ -218,6 +218,28 @@ test("expires an awaiting request after the 60-minute checkout TTL", () => {
   assert.equal(L.isAwaitingPaymentExpired(withCheckout, new Date("2027-02-10T11:30:00.000Z")), true);
 });
 
+test("subscription grace blocks suspension 1–14 Jan and 1–14 Jul (Cairo)", () => {
+  assert.equal(L.isWithinSubscriptionGrace(L.cairoMidnight(2027, 1, 1)), true);
+  assert.equal(L.isWithinSubscriptionGrace(L.cairoMidnight(2027, 1, 14)), true);
+  assert.equal(L.isWithinSubscriptionGrace(L.cairoMidnight(2027, 1, 15)), false);
+  assert.equal(L.isWithinSubscriptionGrace(L.cairoMidnight(2027, 7, 1)), true);
+  assert.equal(L.isWithinSubscriptionGrace(L.cairoMidnight(2027, 7, 14)), true);
+  assert.equal(L.isWithinSubscriptionGrace(L.cairoMidnight(2027, 7, 15)), false);
+  assert.equal(L.isWithinSubscriptionGrace(L.cairoMidnight(2027, 3, 1)), false);
+});
+
+test("subscription reminder day is 14 Cairo days before period end", () => {
+  const h1 = L.periodFor(2027, 1);
+  assert.equal(L.subscriptionReminderCairoDay(h1, 14), "2027-06-16");
+  const h2 = L.periodFor(2027, 2);
+  assert.equal(L.subscriptionReminderCairoDay(h2, 14), "2027-12-17");
+  const jun16 = L.cairoMidnight(2027, 6, 16);
+  assert.equal(L.isSubscriptionReminderDay(jun16, 14), true);
+  assert.equal(L.isSubscriptionReminderDay(L.cairoMidnight(2027, 6, 15), 14), false);
+  assert.equal(L.parseSubscriptionReminderDays({subscriptionReminderDays: 7}), 7);
+  assert.equal(L.parseSubscriptionReminderDays({subscriptionReminderDays: 0}), L.DEFAULT_SUBSCRIPTION_REMINDER_DAYS);
+});
+
 test("does not expire a paid request even after the checkout TTL", () => {
   const data = {
     paymentStatus: "paid",

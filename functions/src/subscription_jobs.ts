@@ -14,7 +14,12 @@ import {
   parsePeriodCode,
   parseAdvanceRenewalConfig,
   parseFreePromotionLastDay,
+  parseSubscriptionReminderDays,
   periodOf,
+  nextPeriod,
+  isWithinSubscriptionGrace,
+  isSubscriptionReminderDay,
+  cairoDate,
   quoteFor,
   resolvePayablePeriod,
   toCents,
@@ -24,6 +29,7 @@ import {
 } from "./subscription_logic";
 import {holdsMode} from "./holds";
 import {M1_SOURCE, M2_SOURCE, planExpiryHoldWrite, shouldShadowReactivateAfterExpiryClear} from "./subscription_holds";
+import {REMINDER_RUNS, subscriptionReminderAlertDoc} from "./subscription_reminder_logic";
 
 type Db = admin.firestore.Firestore;
 type Data = Record<string, unknown>;
@@ -121,7 +127,7 @@ async function delegateDocsFor(db: Db, uids: string[]) {
 
 export interface SuspensionResult {
   periodCode: string;
-  skipped?: "free_promotion";
+  skipped?: "free_promotion" | "grace_period";
   appAdded: number;
   covered: number;
   candidates: number;
@@ -153,10 +159,17 @@ export async function runSubscriptionSuspension(db: Db, now: Date): Promise<Susp
     console.log(JSON.stringify({event: "subscription_suspension", ...res}));
     return res;
   }
+  const inGrace = isWithinSubscriptionGrace(now);
   const appAdded = await appAddedDelegateUids(db);
   const covered = await coveredDelegateUids(db, period, publicCfg.freePromotionLastDay);
-  const candidates = [...appAdded.keys()].filter((uid) => !covered.has(uid));
-  const res: SuspensionResult = {...base, appAdded: appAdded.size, covered: covered.size, candidates: candidates.length};
+  const candidates = inGrace ? [] : [...appAdded.keys()].filter((uid) => !covered.has(uid));
+  const res: SuspensionResult = {
+    ...base,
+    appAdded: appAdded.size,
+    covered: covered.size,
+    candidates: candidates.length,
+    ...(inGrace ? {skipped: "grace_period" as const} : {}),
+  };
   const ts = FieldValue.serverTimestamp();
   const writer = new Batcher(db);
   const at = now.toISOString();
@@ -369,13 +382,131 @@ async function loadDevQuoteOptions(db: Db, data: Data): Promise<QuoteOptions> {
 async function loadPublicSubscriptionConfig(db: Db): Promise<{
   advance: AdvanceRenewalConfig;
   freePromotionLastDay: string;
+  reminderDays: number;
 }> {
   const snap = await db.doc("config/subscriptions").get();
   const raw = snap.exists ? (snap.data() as Record<string, unknown>) : null;
   return {
     advance: parseAdvanceRenewalConfig(raw),
     freePromotionLastDay: parseFreePromotionLastDay(raw),
+    reminderDays: parseSubscriptionReminderDays(raw),
   };
+}
+
+export interface ReminderResult {
+  endingPeriodCode: string;
+  nextPeriodCode: string;
+  skipped?: "free_promotion" | "not_reminder_day" | "no_uncovered";
+  reminderDays: number;
+  supervisors: number;
+  notifications: number;
+  uncoveredDelegates: number;
+}
+
+/**
+ * One notification per supervisor (per company) when today is exactly
+ * `reminderDays` before the current period ends. Only app-added delegates
+ * without paid coverage for the *next* period are counted. Idempotent per day.
+ */
+export async function runSubscriptionReminders(db: Db, now: Date): Promise<ReminderResult> {
+  const publicCfg = await loadPublicSubscriptionConfig(db);
+  const current = periodOf(now);
+  const upcoming = nextPeriod(current);
+  const base: ReminderResult = {
+    endingPeriodCode: current.code,
+    nextPeriodCode: upcoming.code,
+    reminderDays: publicCfg.reminderDays,
+    supervisors: 0,
+    notifications: 0,
+    uncoveredDelegates: 0,
+  };
+  if (isFreePromotion(now, {freePromotionLastDay: publicCfg.freePromotionLastDay})) {
+    const res = {...base, skipped: "free_promotion" as const};
+    console.log(JSON.stringify({event: "subscription_reminder", ...res}));
+    return res;
+  }
+  if (!isSubscriptionReminderDay(now, publicCfg.reminderDays)) {
+    const res = {...base, skipped: "not_reminder_day" as const};
+    console.log(JSON.stringify({event: "subscription_reminder", ...res}));
+    return res;
+  }
+  const dayKey = isoReminderDay(now);
+  const runRef = db.collection(REMINDER_RUNS).doc(`${current.code}_${dayKey}`);
+  const prior = await runRef.get();
+  if (prior.exists && prior.get("notifications") > 0) {
+    const res: ReminderResult = {
+      endingPeriodCode: String(prior.get("endingPeriodCode") || current.code),
+      nextPeriodCode: String(prior.get("nextPeriodCode") || upcoming.code),
+      reminderDays: Number(prior.get("reminderDays")) || publicCfg.reminderDays,
+      supervisors: Number(prior.get("supervisors")) || 0,
+      notifications: Number(prior.get("notifications")) || 0,
+      uncoveredDelegates: Number(prior.get("uncoveredDelegates")) || 0,
+    };
+    console.log(JSON.stringify({event: "subscription_reminder", ...res, idempotent: true}));
+    return res;
+  }
+
+  const appAdded = await appAddedDelegateUids(db);
+  const covered = await coveredDelegateUids(db, upcoming, publicCfg.freePromotionLastDay);
+  const groups = new Map<string, {
+    supervisorUid: string;
+    companyUID: string;
+    organizationUID: string;
+    count: number;
+  }>();
+  let uncoveredDelegates = 0;
+  for (const [uid, req] of appAdded) {
+    if (covered.has(uid)) continue;
+    uncoveredDelegates++;
+    const supervisorUid = str(req.supervisorUid);
+    const companyUID = str(req.companyUID);
+    const organizationUID = str(req.organizationUID || req.organizationId);
+    if (!supervisorUid || !companyUID) continue;
+    const key = `${supervisorUid}\0${companyUID}`;
+    const g = groups.get(key);
+    if (g) g.count++;
+    else groups.set(key, {supervisorUid, companyUID, organizationUID, count: 1});
+  }
+  if (groups.size === 0) {
+    const res = {...base, uncoveredDelegates, skipped: "no_uncovered" as const};
+    await runRef.set({...res, ranAt: FieldValue.serverTimestamp()}, {merge: true});
+    console.log(JSON.stringify({event: "subscription_reminder", ...res}));
+    return res;
+  }
+
+  const writer = new Batcher(db);
+  let notifications = 0;
+  for (const g of groups.values()) {
+    const doc = subscriptionReminderAlertDoc({
+      supervisorUid: g.supervisorUid,
+      organizationUID: g.organizationUID,
+      companyUID: g.companyUID,
+      endingPeriod: current,
+      nextPeriod: upcoming,
+      uncoveredCount: g.count,
+      reminderDays: publicCfg.reminderDays,
+    });
+    await writer.set(db.collection("notifications").doc(), {
+      ...doc,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    notifications++;
+  }
+  await writer.flush();
+  const res: ReminderResult = {
+    ...base,
+    supervisors: groups.size,
+    notifications,
+    uncoveredDelegates,
+  };
+  await runRef.set({...res, ranAt: FieldValue.serverTimestamp()}, {merge: true});
+  console.log(JSON.stringify({event: "subscription_reminder", ...res}));
+  return res;
+}
+
+function isoReminderDay(now: Date): string {
+  const d = cairoDate(now);
+  return `${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`;
 }
 
 
