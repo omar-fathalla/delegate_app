@@ -951,4 +951,158 @@ describe("firestore tightened rules", () => {
       comp.collection("notifications").where("delegateUid", "==", "supervisor_c1").get(),
     );
   });
+
+  describe("task proof photos", () => {
+    const DELEGATE2 = {
+      role: "delegate",
+      delegateId: "del-2",
+      delegateIds: ["del-2"],
+      orgId: "o1",
+      companyId: "c1",
+      phones: ["01033333333"],
+      firebase: {sign_in_provider: "custom"},
+    };
+    const seed = async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        const db = ctx.firestore();
+        await db.doc("organizations/o1/tasks/all-task").set({
+          companyId: "c1",
+          assignedTo: "all",
+          createdBy: "comp",
+          title: "All",
+          description: "Body",
+          status: "inProgress",
+        });
+        await db.doc("organizations/o1/companies/c1/delegates/del-2").set({
+          uid: "del-2",
+          role: "delegate",
+          organizationUID: "o1",
+          companyUID: "c1",
+          status: "approved",
+        });
+      });
+    };
+    const pathFor = (uid, token) =>
+      `task_proof/c1/${uid}/proof_${uid}_${token}.jpg`;
+
+    test("uploader can write up to 3 paths; a 4th and a foreign path are rejected", async () => {
+      await seed();
+      const del = dbFor("del-1", DELEGATE);
+      const ref = del.doc("organizations/o1/tasks/all-task/proofs/del-1");
+      const paths = [pathFor("del-1", "a"), pathFor("del-1", "b"), pathFor("del-1", "c")];
+      await assertSucceeds(ref.set({
+        uploadedBy: "del-1",
+        companyUID: "c1",
+        taskId: "all-task",
+        imagePaths: paths,
+      }));
+      await assertFails(ref.set({
+        uploadedBy: "del-1",
+        companyUID: "c1",
+        taskId: "all-task",
+        imagePaths: [...paths, pathFor("del-1", "d")],
+      }));
+      await assertFails(ref.set({
+        uploadedBy: "del-1",
+        companyUID: "c1",
+        taskId: "all-task",
+        imagePaths: [pathFor("del-2", "a")],
+      }));
+    });
+
+    test("proofs are per uploader: another assignee cannot read or write them", async () => {
+      await seed();
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await ctx.firestore().doc("organizations/o1/tasks/all-task/proofs/del-1").set({
+          uploadedBy: "del-1",
+          companyUID: "c1",
+          taskId: "all-task",
+          imagePaths: [pathFor("del-1", "a")],
+        });
+      });
+      const other = dbFor("del-2", DELEGATE2);
+      await assertFails(other.doc("organizations/o1/tasks/all-task/proofs/del-1").get());
+      await assertFails(other.doc("organizations/o1/tasks/all-task/proofs/del-1").set({
+        uploadedBy: "del-2",
+        companyUID: "c1",
+        taskId: "all-task",
+        imagePaths: [pathFor("del-2", "x")],
+      }));
+      await assertFails(other.doc("organizations/o1/tasks/all-task").collection("proofs").get());
+      const self = dbFor("del-1", DELEGATE);
+      await assertSucceeds(self.doc("organizations/o1/tasks/all-task/proofs/del-1").get());
+    });
+
+    test("sender and same-company supervisor can read; hr, marketing, tech, and other companies cannot", async () => {
+      await seed();
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await ctx.firestore().doc("organizations/o1/tasks/all-task/proofs/del-1").set({
+          uploadedBy: "del-1",
+          companyUID: "c1",
+          taskId: "all-task",
+          imagePaths: [pathFor("del-1", "a")],
+        });
+      });
+      const refPath = "organizations/o1/tasks/all-task/proofs/del-1";
+      await assertSucceeds(dbFor("comp").doc(refPath).get());
+      await assertSucceeds(dbFor("comp").doc("organizations/o1/tasks/all-task").collection("proofs").get());
+      await assertFails(dbFor("hr").doc(refPath).get());
+      await assertFails(dbFor("accountant").doc(refPath).get());
+      await assertFails(dbFor("marketing").doc(refPath).get());
+      await assertFails(dbFor("tech").doc(refPath).get());
+      await assertFails(dbFor("super").doc(refPath).get());
+      await assertFails(dbFor("comp2").doc(refPath).get());
+      await assertFails(dbFor("comp").doc(refPath).update({imagePaths: []}));
+    });
+
+    test("held delegate cannot write a new proof but can still read their existing one", async () => {
+      await seed();
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        const db = ctx.firestore();
+        await db.doc("organizations/o1/companies/c1/delegates/del-1").set({
+          uid: "del-1",
+          role: "delegate",
+          organizationUID: "o1",
+          companyUID: "c1",
+          status: "suspended",
+          holds: {admin_suspend: {at: "2026-11-12"}},
+        }, {merge: true});
+        await db.doc("organizations/o1/tasks/all-task/proofs/del-1").set({
+          uploadedBy: "del-1",
+          companyUID: "c1",
+          taskId: "all-task",
+          imagePaths: [pathFor("del-1", "a")],
+        });
+      });
+      const del = dbFor("del-1", DELEGATE);
+      const ref = del.doc("organizations/o1/tasks/all-task/proofs/del-1");
+      await assertSucceeds(ref.get());
+      await assertFails(ref.set({
+        uploadedBy: "del-1",
+        companyUID: "c1",
+        taskId: "all-task",
+        imagePaths: [pathFor("del-1", "a"), pathFor("del-1", "b")],
+      }));
+    });
+
+    test("a sender title-only edit does not need to touch proof docs", async () => {
+      await seed();
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await ctx.firestore().doc("organizations/o1/tasks/all-task/proofs/del-1").set({
+          uploadedBy: "del-1",
+          companyUID: "c1",
+          taskId: "all-task",
+          imagePaths: [pathFor("del-1", "a")],
+        });
+      });
+      await assertSucceeds(dbFor("comp").doc("organizations/o1/tasks/all-task").update({
+        title: "Renamed", editedAt: new Date(),
+      }));
+      const snap = await dbFor("comp").doc("organizations/o1/tasks/all-task/proofs/del-1").get();
+      await assertSucceeds(Promise.resolve(snap));
+      if (snap.data().imagePaths[0] !== pathFor("del-1", "a")) {
+        throw new Error("proof paths were wiped by a title-only edit");
+      }
+    });
+  });
 });

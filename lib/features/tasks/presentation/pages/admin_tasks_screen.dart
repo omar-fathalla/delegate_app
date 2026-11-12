@@ -374,6 +374,9 @@ class _TaskCard extends StatelessWidget {
               'isAdmin': true,
               'organizationId': adminDelegate.organizationUID,
               'currentUserId': adminDelegate.uid,
+              'currentUserRole': adminDelegate.role.name,
+              'currentUserCompanyId': adminDelegate.companyUID,
+              'currentUserName': adminDelegate.fullName,
             },
           );
           if (context.mounted) {

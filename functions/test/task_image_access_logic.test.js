@@ -187,3 +187,18 @@ test("legacy single imagePath still authorizes without an imagePaths list", () =
   });
   assert.deepEqual(r, {ok: true});
 });
+
+test("finalize token strip also covers proof-of-work paths", () => {
+  assert.equal(
+    L.shouldStripTaskImageDownloadToken("task_proof/coA/del1/proof_del1_171.jpg"),
+    true,
+  );
+  assert.equal(
+    L.shouldStripTaskImageDownloadToken("task_proof/coA/del1/proof_del1_2_171.jpg"),
+    false,
+  );
+  assert.equal(
+    L.shouldStripTaskImageDownloadToken("task_images/coA/sup1/task_sup1_1.jpg"),
+    true,
+  );
+});

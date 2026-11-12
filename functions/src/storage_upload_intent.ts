@@ -13,11 +13,14 @@ import {
   isInactiveStatus,
   isTaskImageFolderId,
   isTaskImagePurpose,
+  isTaskProofFolderId,
+  isTaskProofPurpose,
   isValidFolderId,
   normalizeFolderId,
   resolveOwningCompany,
   type OwnerHit,
 } from "./storage_upload_intent_logic";
+import {hasAnyHold, parseHolds} from "./holds";
 
 if (admin.apps.length === 0) admin.initializeApp();
 
@@ -75,14 +78,42 @@ export const ensureStorageUploadIntent = functions
     if (isTaskImagePurpose(purpose) && !isTaskImageFolderId(folderId, ctx.auth.uid)) {
       fail("invalid-argument", "folder_id_required");
     }
+    if (isTaskProofPurpose(purpose) && !isTaskProofFolderId(folderId, ctx.auth.uid)) {
+      fail("invalid-argument", "folder_id_required");
+    }
 
     const db = admin.firestore();
     const userSnap = await db.collection("users").doc(ctx.auth.uid).get();
-    if (!userSnap.exists) fail("permission-denied", "caller_not_staff");
-    const user = (userSnap.data() || {}) as Record<string, unknown>;
+    let user = (userSnap.data() || {}) as Record<string, unknown>;
+    if (!userSnap.exists) {
+      if (!isTaskProofPurpose(purpose)) fail("permission-denied", "caller_not_staff");
+      const orgHint = str(p.organizationId) || str(p.organizationUID);
+      const coHint = str(p.companyUID) || str(p.companyId);
+      let delSnap: FirebaseFirestore.DocumentSnapshot | null = null;
+      if (orgHint && coHint) {
+        delSnap = await db.doc(
+          `organizations/${orgHint}/companies/${coHint}/delegates/${ctx.auth.uid}`,
+        ).get();
+      }
+      if (!delSnap || !delSnap.exists) {
+        fail("permission-denied", "caller_not_staff");
+      }
+      const d = (delSnap.data() || {}) as Record<string, unknown>;
+      user = {
+        role: d.role || "delegate",
+        companyUID: d.companyUID || d.companyId || coHint,
+        organizationUID: d.organizationUID || d.organizationId || orgHint,
+        status: d.status,
+        holds: d.holds,
+        isActive: d.isActive,
+      };
+    }
     const authUser = await admin.auth().getUser(ctx.auth.uid);
     if (authUser.disabled || user.isActive === false || isInactiveStatus(user.status)) {
       fail("permission-denied", "caller_inactive");
+    }
+    if (isTaskProofPurpose(purpose) && hasAnyHold(parseHolds(user.holds))) {
+      fail("permission-denied", "caller_held");
     }
     const orgId = str(user.organizationUID) || str(user.organizationId);
     if (orgId) {
@@ -96,7 +127,7 @@ export const ensureStorageUploadIntent = functions
     // Task-image intents are a reserved object name for the caller's
     // company. Do not resolve them against request or delegate folders.
     let resolved: {companyUID: string | null; lockedByIntent: boolean};
-    if (isTaskImagePurpose(purpose)) {
+    if (isTaskImagePurpose(purpose) || isTaskProofPurpose(purpose)) {
       const existing = await db.collection("storage_upload_intents").doc(folderId).get();
       const co = companyOf(existing.data());
       resolved = existing.exists && co
@@ -138,6 +169,7 @@ export const ensureStorageUploadIntent = functions
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         source: "ensureStorageUploadIntent",
         ...(isTaskImagePurpose(purpose) ? {purpose: "task_image"} : {}),
+        ...(isTaskProofPurpose(purpose) ? {purpose: "task_proof_image"} : {}),
       });
     } catch (err: unknown) {
       const code = typeof err === "object" && err && "code" in err ?

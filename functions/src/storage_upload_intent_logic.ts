@@ -11,6 +11,7 @@ export const GLOBAL_STAFF_ROLES = new Set([
 ]);
 
 export const TASK_IMAGE_PURPOSE = "task_image";
+export const TASK_PROOF_PURPOSE = "task_proof_image";
 
 /** Roles that may send a task (and therefore attach an image). HR and accountant are out. */
 export const TASK_ASSIGNER_ROLES = new Set([
@@ -86,11 +87,41 @@ export function isTaskImagePurpose(purpose: unknown): boolean {
   return str(purpose) === TASK_IMAGE_PURPOSE;
 }
 
+export function isTaskProofPurpose(purpose: unknown): boolean {
+  return str(purpose) === TASK_PROOF_PURPOSE;
+}
+
+/** Intent / object name for a proof photo: exact proof_{callerUid}_{token}.ext (N1-r). */
+export function isTaskProofFolderId(folderId: string, callerUid: string): boolean {
+  const id = str(callerUid);
+  const name = str(folderId);
+  if (!id || !name) return false;
+  return new RegExp(`^proof_${escapeRegExp(id)}_[^_]+(\\.[A-Za-z0-9]+)?$`).test(name);
+}
+
+const TASK_PROOF_UPLOADER_ROLES = new Set([
+  "delegate", "promoter", "field_delegate", "field-delegate",
+  "marketing",
+  "marketingPromotion", "marketing_promotion", "marketing-promotion",
+  "marketingpromotion",
+  "branches_marketing_manager", "branches-marketing-manager",
+  "branches_marketing", "branchesMarketingManager",
+  "branches-marketing", "branchesmarketingmanager",
+]);
+
+export function isTaskProofUploaderRole(role: unknown): boolean {
+  return TASK_PROOF_UPLOADER_ROLES.has(str(role));
+}
+
 /**
  * Task-image intents are limited to assigner roles (not HR / accountant).
  * Document-folder intents keep the original staffKind list.
  */
 export function staffKindForPurpose(role: unknown, purpose: unknown): "global" | "company" | "none" {
+  if (isTaskProofPurpose(purpose)) {
+    // Tech support and super admin cannot mint proof uploads.
+    return isTaskProofUploaderRole(role) ? "company" : "none";
+  }
   if (isTaskImagePurpose(purpose)) {
     const r = str(role);
     if (GLOBAL_STAFF_ROLES.has(r)) return "global";
@@ -151,7 +182,7 @@ export function decideEnsureIntent(input: {
       if (!callerCo) {
         // Org-level marketing / org-admin may attach to a requested company
         // they already reserved; they cannot switch it.
-        if (isTaskImagePurpose(input.purpose) && requested && requested === owner) {
+        if ((isTaskImagePurpose(input.purpose) || isTaskProofPurpose(input.purpose)) && requested && requested === owner) {
           return {
             ok: true,
             action: input.lockedByIntent ? "reuse" : "create",
@@ -171,7 +202,7 @@ export function decideEnsureIntent(input: {
 
   // New folder: reserve for the caller's company. Global staff (and
   // org-level task assigners with no company) may pass a hint.
-  const orgLevelAssigner = isTaskImagePurpose(input.purpose) && kind === "company" && !callerCo;
+  const orgLevelAssigner = (isTaskImagePurpose(input.purpose) || isTaskProofPurpose(input.purpose)) && kind === "company" && !callerCo;
   const reserve = kind === "global" || orgLevelAssigner ? (requested || callerCo) : callerCo;
   if (!reserve) return {ok: false, reason: "company_required"};
   if (kind === "company" && callerCo && requested && requested !== callerCo) {

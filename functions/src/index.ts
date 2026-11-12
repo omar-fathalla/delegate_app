@@ -6,6 +6,7 @@ admin.initializeApp();
 
 export {onTaskCreated, onTaskUpdated} from "./task_notify";
 export {getTaskImage, onTaskImageFinalize} from "./task_image_access";
+export {getTaskProofImage, onTaskDeleted} from "./task_proof_access";
 
 
 /**

@@ -414,6 +414,43 @@ describe("storage.rules", () => {
     await assertSucceeds(deleteObject(path(sup, legacy)));
   });
 
+  test("task proof photos: upload requires intent and exact N1-r name; client reads are denied", async () => {
+    const imageBytes = Uint8Array.from(Buffer.from("fake-jpeg"));
+    const meta = {contentType: "image/jpeg"};
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "storage_upload_intents/proof_dlgA_1.jpg"), {
+        companyUID: "coA", createdBy: "callable", purpose: "task_proof_image",
+      });
+    });
+    const dlg = delegateTok("dlgA", "coA", {orgId: "o1"});
+    const other = delegateTok("dlgB", "coA", {orgId: "o1"});
+    const sup = storage("supA");
+    const owned = "task_proof/coA/dlgA/proof_dlgA_1.jpg";
+    const colliding = "task_proof/coA/dlgA/proof_dlgA_2_1.jpg";
+    const otherUid = "task_proof/coA/dlgA/proof_dlgB_1.jpg";
+    const otherCompany = "task_proof/coB/dlgA/proof_dlgA_1.jpg";
+    const noIntent = "task_proof/coA/dlgA/proof_dlgA_99.jpg";
+    const confused = "task_images/coA/dlgA/proof_dlgA_1.jpg";
+
+    await assertSucceeds(uploadBytes(path(dlg, owned), imageBytes, meta));
+    await assertFails(uploadBytes(path(dlg, colliding), imageBytes, meta));
+    await assertFails(uploadBytes(path(dlg, otherUid), imageBytes, meta));
+    await assertFails(uploadBytes(path(dlg, otherCompany), imageBytes, meta));
+    await assertFails(uploadBytes(path(dlg, noIntent), imageBytes, meta));
+    await assertFails(uploadBytes(path(other, owned), imageBytes, meta));
+    await assertFails(uploadBytes(path(sup, owned), imageBytes, meta));
+
+    await assertFails(getBytes(path(dlg, owned)));
+    await assertFails(getBytes(path(sup, owned)));
+    await assertFails(getBytes(path(other, owned)));
+    await assertFails(listAll(path(dlg, "task_proof/coA/dlgA")));
+
+    await assertFails(deleteObject(path(other, owned)));
+    await assertSucceeds(deleteObject(path(dlg, owned)));
+    await assertFails(uploadBytes(path(dlg, confused), imageBytes, meta));
+  });
+
 });
 
 // Keep a named export so node --test counts the file even if helpers grow.

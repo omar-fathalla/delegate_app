@@ -12,6 +12,7 @@ Future<String?> ensureStorageUploadIntent({
   required String folderId,
   required String companyUID,
   String? purpose,
+  String? organizationId,
   FirebaseFunctions? functions,
 }) async {
   final id = folderId.trim();
@@ -25,6 +26,8 @@ Future<String?> ensureStorageUploadIntent({
     final payload = <String, dynamic>{'folderId': id, 'companyUID': company};
     final kind = purpose?.trim() ?? '';
     if (kind.isNotEmpty) payload['purpose'] = kind;
+    final org = organizationId?.trim() ?? '';
+    if (org.isNotEmpty) payload['organizationId'] = org;
     await callable.call(payload);
     return null;
   } on FirebaseFunctionsException catch (e) {

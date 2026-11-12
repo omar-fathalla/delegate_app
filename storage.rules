@@ -277,6 +277,23 @@ service firebase.storage {
       allow delete: if isNonAnonymous() && request.auth.uid == uploaderUid;
     }
 
+    // Phase 4: delegate proof photos. Distinct root so clients cannot
+    // confuse them with supervisor task_images. Client get/list denied.
+    function isOwnedProofName(fileName, uid) {
+      return fileName.matches('proof_' + uid + '_[^_]+(\\.[A-Za-z0-9]+)?$');
+    }
+    match /task_proof/{compId}/{uploaderUid}/{fileName} {
+      allow get, list: if false;
+      allow create: if isNonAnonymous()
+        && request.auth.uid == uploaderUid
+        && isOwnedProofName(fileName, request.auth.uid)
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*')
+        && taskImageIntentMatchesCompany(fileName, compId);
+      allow update: if false;
+      allow delete: if isNonAnonymous() && request.auth.uid == uploaderUid;
+    }
+
     // Web stores ID documents at
     // organizations/{org}/companies/{co}/delegates/{uid}/...
     // Tenant-scope by the company segment so those paths stay usable
@@ -316,6 +333,7 @@ service firebase.storage {
     match /organizations/{orgId}/{segment}/{rest=**} {
       allow read, write: if segment != 'companies'
         && segment != 'task_images'
+        && segment != 'task_proof'
         && canAccessOrganization(orgId);
     }
 
@@ -433,7 +451,8 @@ service firebase.storage {
         && firstSegment != 'leave_attachments'
         && firstSegment != 'feedback_screenshots'
         && firstSegment != 'public'
-        && firstSegment != 'task_images';
+        && firstSegment != 'task_images'
+        && firstSegment != 'task_proof';
     }
     match /{singleFile} {
       allow read, write: if isStorageStaff();

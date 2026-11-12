@@ -287,4 +287,82 @@ void main() {
       verifyNever(() => storage.ref(newPath));
     },
   );
+  test(
+    'proof photos are stored per uploader and survive a title-only edit',
+    () async {
+      await db.doc('organizations/o1/tasks/t1').set(base.toFirestore());
+      await ds.saveTaskProof(
+        organizationId: 'o1',
+        taskId: 't1',
+        uploaderUid: 'del-1',
+        imagePaths: const [
+          'task_proof/c1/del-1/proof_del-1_a.jpg',
+          'task_proof/c1/del-1/proof_del-1_b.jpg',
+        ],
+        companyUID: 'c1',
+        uploadedByName: 'Del',
+      );
+      await ds.saveTaskProof(
+        organizationId: 'o1',
+        taskId: 't1',
+        uploaderUid: 'del-2',
+        imagePaths: const ['task_proof/c1/del-2/proof_del-2_a.jpg'],
+        companyUID: 'c1',
+      );
+      final mine = await ds.getTaskProof('o1', 't1', 'del-1');
+      expect(mine!.imagePaths.length, 2);
+      final all = await ds.listTaskProofs('o1', 't1');
+      expect(all.map((p) => p.uploaderUid).toSet(), {'del-1', 'del-2'});
+
+      await ds.updateTask(
+        'o1',
+        TaskModel.fromEntity(
+          base.copyWith(title: 'Renamed', editedAt: DateTime.now()),
+        ),
+      );
+      final after = await ds.getTaskProof('o1', 't1', 'del-1');
+      expect(after!.imagePaths, mine.imagePaths);
+
+      // Replace one of del-1's photos: the removed file is deleted, the
+      // other uploader's proof is untouched.
+      await ds.saveTaskProof(
+        organizationId: 'o1',
+        taskId: 't1',
+        uploaderUid: 'del-1',
+        imagePaths: const [
+          'task_proof/c1/del-1/proof_del-1_a.jpg',
+          'task_proof/c1/del-1/proof_del-1_c.jpg',
+        ],
+        companyUID: 'c1',
+      );
+      verify(
+        () => storage.ref('task_proof/c1/del-1/proof_del-1_b.jpg'),
+      ).called(1);
+      verify(() => ref.delete()).called(1);
+      final other = await ds.getTaskProof('o1', 't1', 'del-2');
+      expect(other!.imagePaths, ['task_proof/c1/del-2/proof_del-2_a.jpg']);
+    },
+  );
+
+  test("removing all of an uploader proofs deletes only their files", () async {
+    await db.doc('organizations/o1/tasks/t1').set(base.toFirestore());
+    await ds.saveTaskProof(
+      organizationId: 'o1',
+      taskId: 't1',
+      uploaderUid: 'del-1',
+      imagePaths: const ['task_proof/c1/del-1/proof_del-1_a.jpg'],
+      companyUID: 'c1',
+    );
+    await ds.saveTaskProof(
+      organizationId: 'o1',
+      taskId: 't1',
+      uploaderUid: 'del-1',
+      imagePaths: const [],
+      companyUID: 'c1',
+    );
+    expect(await ds.getTaskProof('o1', 't1', 'del-1'), isNull);
+    verify(
+      () => storage.ref('task_proof/c1/del-1/proof_del-1_a.jpg'),
+    ).called(1);
+  });
 }

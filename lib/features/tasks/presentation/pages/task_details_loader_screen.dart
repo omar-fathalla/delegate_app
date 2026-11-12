@@ -100,6 +100,9 @@ class _TaskDetailsLoaderScreenState extends State<TaskDetailsLoaderScreen> {
         isAdmin: taskNotificationOpensAsAdmin(delegate.role),
         organizationId: delegate.organizationUID,
         currentUserId: delegate.uid,
+        currentUserRole: delegate.role.name,
+        currentUserCompanyId: delegate.companyUID,
+        currentUserName: delegate.fullName,
       );
     }
     return Scaffold(

@@ -2799,6 +2799,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taskImageMaxReached => 'You can attach up to 3 images';
 
   @override
+  String get taskProofTitle => 'Proof of work';
+
+  @override
+  String get taskProofAttach => 'Attach proof';
+
+  @override
+  String taskProofBy(String name) {
+    return 'Proof of work — $name';
+  }
+
+  @override
+  String get taskProofSave => 'Save proof photos';
+
+  @override
   String get taskEditedLabel => 'Edited';
 
   @override
