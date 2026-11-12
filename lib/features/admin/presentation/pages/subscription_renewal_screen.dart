@@ -45,7 +45,8 @@ class SubscriptionRenewalScreen extends StatefulWidget {
       _SubscriptionRenewalScreenState();
 }
 
-class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> with WidgetsBindingObserver, PromoClockBinding {
+class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen>
+    with WidgetsBindingObserver, PromoClockBinding {
   late final SubscriptionRenewalRepository _repo =
       widget.repository ?? sl<SubscriptionRenewalRepository>();
   late final SubscriptionPaymentGateway _gateway =
@@ -61,7 +62,8 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> w
   SubscriptionPaymentStatus? _activeStatus;
   StreamSubscription<SubscriptionPaymentStatus>? _statusSub;
 
-  DateTime get _now => (widget.clock ?? () => SubscriptionCycleHelper.currentTime())();
+  DateTime get _now =>
+      (widget.clock ?? () => SubscriptionCycleHelper.currentTime())();
 
   String _selectedPeriod(String fallback) {
     final keys = _selection.selectedUids;
@@ -693,7 +695,11 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen> w
       ),
       isThreeLine: d.isSuspendedExpired && subtitle.isNotEmpty,
       secondary: d.isSuspendedExpired
-          ? Icon(Symbols.person_off_rounded, color: cs.onSurfaceVariant, fill: 0)
+          ? Icon(
+              Symbols.person_off_rounded,
+              color: cs.onSurfaceVariant,
+              fill: 0,
+            )
           : null,
       controlAffinity: ListTileControlAffinity.leading,
     );
@@ -785,15 +791,20 @@ class _PeriodBanner extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final months = SubscriptionCycleHelper.getRemainingMonthsInCycle(now);
     final String text;
-    final short = SubscriptionCycleHelper.getCycleShortTitleArabicForCode(periodCode);
+    final short = SubscriptionCycleHelper.getCycleShortTitleArabicForCode(
+      periodCode,
+    );
     if (advance) {
       // The selected-period isFree flag is false during the advance window,
       // so use the live promo clock. Drop the 2026 sentence after expiry.
       final promoNote = SubscriptionCycleHelper.isFreePromotionActive(now)
           ? ' ولا تُطبَّق مجانية 2026 على تلك الدورة.'
           : '';
+      final openFor = short.startsWith('ال')
+          ? 'ل${short.substring(1)}'
+          : 'ل$short';
       text =
-          'التجديد المقدَّم مفتوح ل$short. الرسوم 500 ج.م للمندوب عن الدورة الكاملة.$promoNote '
+          'التجديد المقدَّم مفتوح $openFor. الرسوم 500 ج.م للمندوب عن الدورة الكاملة.$promoNote '
           'الحد الأقصى ${SubscriptionCycleHelper.maxDelegatesPerRenewal} مندوبًا في طلب واحد.';
     } else if (isFree) {
       text = 'الاشتراك مجاني حتى 31/12/2026، لا حاجة للتجديد الآن.';

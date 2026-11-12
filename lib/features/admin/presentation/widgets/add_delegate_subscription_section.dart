@@ -84,11 +84,7 @@ class AddDelegateCycleBanner extends StatelessWidget {
 }
 
 class AddDelegatePaymobCard extends StatelessWidget {
-  const AddDelegatePaymobCard({
-    super.key,
-    this.companyUID,
-    this.colorScheme,
-  });
+  const AddDelegatePaymobCard({super.key, this.companyUID, this.colorScheme});
 
   final String? companyUID;
   final ColorScheme? colorScheme;
@@ -97,7 +93,10 @@ class AddDelegatePaymobCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = colorScheme ?? Theme.of(context).colorScheme;
     final months = SubscriptionCycleHelper.getRemainingMonthsInCycle();
-    final fee = SubscriptionCycleHelper.getProratedSubscriptionFee(null, companyUID);
+    final fee = SubscriptionCycleHelper.getProratedSubscriptionFee(
+      null,
+      companyUID,
+    );
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -134,7 +133,11 @@ class AddDelegatePaymobCard extends StatelessWidget {
             Text(
               'اشتراك $months ${months == 1 ? 'شهر' : 'أشهر'} حتى نهاية ${SubscriptionCycleHelper.getCycleShortTitleArabic()}. '
               'الاشتراك الواحد يغطي كل السلاسل. يتم تفعيل المندوب بعد تأكيد الدفع واعتماد المستندات.',
-              style: TextStyle(fontSize: 12, height: 1.5, color: cs.onSurfaceVariant),
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.5,
+                color: cs.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -158,36 +161,41 @@ class AddDelegateSubmitButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: FilledButton.icon(
-        style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-          minimumSize: const Size(48, 56),
-          shape: const StadiumBorder(),
-          elevation: 1,
-          iconAlignment: IconAlignment.start,
-        ),
-        onPressed: isBusy ? null : onSubmit,
-        icon: isBusy
-            ? SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: colorScheme.onPrimary,
-                ),
-              )
-            : const Icon(Symbols.send_rounded, size: 24, fill: 0),
-        label: Text(
-          isBusy
-              ? 'جاري رفع البيانات وإرسال الطلب...'
-              : (isFree ? 'إرسال طلب التسجيل (مجاناً)' : 'إرسال طلب التسجيل'),
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            height: 1.25,
+    // Force RTL so IconAlignment.start places the send icon on the right
+    // (RTL start), even when the ambient app direction is LTR (F12).
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: SizedBox(
+        width: double.infinity,
+        height: 56,
+        child: FilledButton.icon(
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            minimumSize: const Size(48, 56),
+            shape: const StadiumBorder(),
+            elevation: 1,
+            iconAlignment: IconAlignment.start,
+          ),
+          onPressed: isBusy ? null : onSubmit,
+          icon: isBusy
+              ? SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: colorScheme.onPrimary,
+                  ),
+                )
+              : const Icon(Symbols.send_rounded, size: 24, fill: 0),
+          label: Text(
+            isBusy
+                ? 'جاري رفع البيانات وإرسال الطلب...'
+                : (isFree ? 'إرسال طلب التسجيل (مجاناً)' : 'إرسال طلب التسجيل'),
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              height: 1.25,
+            ),
           ),
         ),
       ),
@@ -215,7 +223,10 @@ class AddDelegateSubscriptionSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final months = SubscriptionCycleHelper.getRemainingMonthsInCycle();
-    final fee = SubscriptionCycleHelper.getProratedSubscriptionFee(null, companyUID);
+    final fee = SubscriptionCycleHelper.getProratedSubscriptionFee(
+      null,
+      companyUID,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -234,7 +245,10 @@ class AddDelegateSubscriptionSection extends StatelessWidget {
                 isFree
                     ? 'الاشتراك والربط (مجاناً حتى 31/12)'
                     : 'الاشتراك والدفع الإلكتروني ($months أشهر - ${SubscriptionCycleHelper.formatEgp(fee)} ج.م)',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
               ),
             ),
           ],
@@ -243,10 +257,17 @@ class AddDelegateSubscriptionSection extends StatelessWidget {
         if (isFree)
           AddDelegateFreePromotionCard(colorScheme: colorScheme)
         else
-          AddDelegatePaymobCard(companyUID: companyUID, colorScheme: colorScheme),
+          AddDelegatePaymobCard(
+            companyUID: companyUID,
+            colorScheme: colorScheme,
+          ),
         if (showSubmit) ...[
           const SizedBox(height: 24),
-          AddDelegateSubmitButton(isFree: isFree, isBusy: isBusy, onSubmit: onSubmit),
+          AddDelegateSubmitButton(
+            isFree: isFree,
+            isBusy: isBusy,
+            onSubmit: onSubmit,
+          ),
         ],
       ],
     );
@@ -265,9 +286,7 @@ class AddDelegateFreePromotionCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark
-            ? cs.surfaceContainerLow
-            : const Color(0xFFF0FDF4),
+        color: isDark ? cs.surfaceContainerLow : const Color(0xFFF0FDF4),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: isDark
@@ -277,7 +296,9 @@ class AddDelegateFreePromotionCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF16A34A).withValues(alpha: isDark ? 0.05 : 0.08),
+            color: const Color(
+              0xFF16A34A,
+            ).withValues(alpha: isDark ? 0.05 : 0.08),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -292,14 +313,19 @@ class AddDelegateFreePromotionCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: isDark
                       ? const Color(0xFF166534).withValues(alpha: 0.4)
                       : const Color(0xFFDCFCE7),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: isDark ? const Color(0xFF16A34A) : const Color(0xFF86EFAC),
+                    color: isDark
+                        ? const Color(0xFF16A34A)
+                        : const Color(0xFF86EFAC),
                   ),
                 ),
                 child: Row(
@@ -316,14 +342,19 @@ class AddDelegateFreePromotionCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D),
+                        color: isDark
+                            ? const Color(0xFF86EFAC)
+                            : const Color(0xFF15803D),
                       ),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF16A34A),
                   borderRadius: BorderRadius.circular(10),
@@ -331,7 +362,11 @@ class AddDelegateFreePromotionCard extends StatelessWidget {
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.check_circle_rounded, size: 14, color: Colors.white),
+                    Icon(
+                      Icons.check_circle_rounded,
+                      size: 14,
+                      color: Colors.white,
+                    ),
                     SizedBox(width: 4),
                     Text(
                       'مجاناً 0 ج.م',
@@ -384,14 +419,10 @@ class AddDelegateFreePromotionCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: isDark
-                  ? cs.surfaceContainer
-                  : Colors.white,
+              color: isDark ? cs.surfaceContainer : Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isDark
-                    ? cs.outlineVariant
-                    : const Color(0xFFBBF7D0),
+                color: isDark ? cs.outlineVariant : const Color(0xFFBBF7D0),
               ),
             ),
             child: Row(
@@ -424,7 +455,8 @@ class AddDelegateFreePromotionCard extends StatelessWidget {
             cs,
             icon: Icons.storefront_rounded,
             title: 'إضافة غير محدودة لكافة السلاسل الشريكة',
-            subtitle: 'سجل مناديبك في زهران ماركت، جملة ماركت، كارفور، وبيت الجملة.',
+            subtitle:
+                'سجل مناديبك في زهران ماركت، جملة ماركت، كارفور، وبيت الجملة.',
             isDark: isDark,
           ),
           const SizedBox(height: 8),
@@ -432,7 +464,8 @@ class AddDelegateFreePromotionCard extends StatelessWidget {
             cs,
             icon: Icons.access_time_filled_rounded,
             title: 'متابعة لحظية للحضور والانصراف',
-            subtitle: 'تقارير ميدانية موحدة لضبط التواجد والالتزام بساعات العمل.',
+            subtitle:
+                'تقارير ميدانية موحدة لضبط التواجد والالتزام بساعات العمل.',
             isDark: isDark,
           ),
           const SizedBox(height: 8),
@@ -440,7 +473,8 @@ class AddDelegateFreePromotionCard extends StatelessWidget {
             cs,
             icon: Icons.camera_alt_rounded,
             title: 'رفع تقارير وأذونات التصوير الميداني',
-            subtitle: 'إدارة وتفعيل أذونات التصوير الشهرية ومراجعة معروضات المندوب.',
+            subtitle:
+                'إدارة وتفعيل أذونات التصوير الشهرية ومراجعة معروضات المندوب.',
             isDark: isDark,
           ),
           const SizedBox(height: 8),
@@ -448,7 +482,8 @@ class AddDelegateFreePromotionCard extends StatelessWidget {
             cs,
             icon: Icons.money_off_rounded,
             title: 'بدون أي إجراء مالي أو إيصالات',
-            subtitle: 'لا يلزم سداد أي مبالغ أو إرفاق إيصالات دفع خلال فترة العرض.',
+            subtitle:
+                'لا يلزم سداد أي مبالغ أو إرفاق إيصالات دفع خلال فترة العرض.',
             isDark: isDark,
           ),
           const SizedBox(height: 12),
@@ -457,9 +492,7 @@ class AddDelegateFreePromotionCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: isDark
-                  ? cs.surfaceContainerHigh
-                  : const Color(0xFFF8FAFC),
+              color: isDark ? cs.surfaceContainerHigh : const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: cs.outlineVariant.withValues(alpha: 0.5),
@@ -467,11 +500,7 @@ class AddDelegateFreePromotionCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.verified_user_rounded,
-                  size: 16,
-                  color: cs.primary,
-                ),
+                Icon(Icons.verified_user_rounded, size: 16, color: cs.primary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -531,7 +560,9 @@ class _AddDelegatePromotionBenefitItem extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.bold,
-                  color: isDark ? colorScheme.onSurface : const Color(0xFF1E293B),
+                  color: isDark
+                      ? colorScheme.onSurface
+                      : const Color(0xFF1E293B),
                 ),
               ),
               const SizedBox(height: 1),

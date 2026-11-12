@@ -1048,8 +1048,8 @@ class _SubscriptionRequestCard extends StatelessWidget {
                             color: colorScheme.primary.withValues(alpha: 0.3),
                           ),
                         ),
+                        width: double.infinity,
                         child: Row(
-                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               Icons.add_business_rounded,
@@ -1072,51 +1072,8 @@ class _SubscriptionRequestCard extends StatelessWidget {
                       ),
                     ],
 
-                    // Row 1: Badges (Org + Company + Status)
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer.withValues(alpha: 0.65),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.corporate_fare_rounded, size: 13, color: colorScheme.primary),
-                              const SizedBox(width: 4),
-                              Text(
-                                request.organizationName,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.primary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            request.companyName,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        SubscriptionRequestStatusBadge(request: request),
-                      ],
-                    ),
+                    // Row 1: Org + company chips + status badge (shrinks/wraps, F11).
+                    SubscriptionRequestCardHeader(request: request),
                     const SizedBox(height: 10),
 
                     // Row 2: Avatar + Delegate info
