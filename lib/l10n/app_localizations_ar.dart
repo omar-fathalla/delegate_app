@@ -2794,6 +2794,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get taskImageTooLarge => 'حجم الصورة كبير. اختر صورة أصغر.';
 
   @override
+  String get taskImageAttachAnother => 'إرفاق صورة أخرى';
+
+  @override
+  String get taskImageMaxReached => 'يمكن إرفاق حتى 3 صور';
+
+  @override
   String get taskEditedLabel => 'معدّلة';
 
   @override

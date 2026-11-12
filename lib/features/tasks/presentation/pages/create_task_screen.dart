@@ -29,7 +29,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   String _selectedAssignedTo = 'all';
   String _selectedAssignedToName = '';
-  TaskImageUpload? _image;
+  List<String> _images = [];
   bool _imageUploading = false;
   bool _createSubmitted = false;
 
@@ -48,8 +48,10 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   @override
   void dispose() {
     // Abandoning the create form must not leave an unreferenced upload.
-    if (!_createSubmitted && _image != null && _image!.path.isNotEmpty) {
-      TaskImageStorage().deleteQuietly(_image!.path);
+    if (!_createSubmitted) {
+      for (final path in _images) {
+        if (path.isNotEmpty) TaskImageStorage().deleteQuietly(path);
+      }
     }
     _titleController.dispose();
     _descriptionController.dispose();
@@ -211,10 +213,10 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                         keyboardType: TextInputType.multiline,
                       ),
                       const SizedBox(height: 16),
-                      TaskImagePickerField(
+                      TaskImagePickerList(
                         organizationId: widget.adminDelegate.organizationUID,
                         companyId: widget.adminDelegate.companyUID,
-                        onChanged: (upload) => setState(() => _image = upload),
+                        onChanged: (paths) => setState(() => _images = paths),
                         onUploadingChanged: (v) =>
                             setState(() => _imageUploading = v),
                       ),
@@ -468,7 +470,10 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                                           createdByName:
                                               '${widget.adminDelegate.firstName} ${widget.adminDelegate.lastName}',
                                           imageUrl: null,
-                                          imagePath: _image?.path,
+                                          imagePath: _images.isEmpty
+                                              ? null
+                                              : _images.first,
+                                          imagePaths: _images,
                                         ),
                                       );
                                     }

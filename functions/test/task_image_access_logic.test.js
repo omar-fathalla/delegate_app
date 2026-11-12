@@ -111,3 +111,79 @@ test("title-only or non-image edits do not affect path authorization", () => {
   });
   assert.deepEqual(r, {ok: true});
 });
+
+test("taskImagePathsFromTask prefers the list and falls back to imagePath, capped at 3", () => {
+  assert.deepEqual(L.taskImagePathsFromTask({
+    imagePath: "task_images/coA/sup1/task_sup1_1.jpg",
+  }), ["task_images/coA/sup1/task_sup1_1.jpg"]);
+  assert.deepEqual(L.taskImagePathsFromTask({
+    imagePath: "task_images/coA/sup1/task_sup1_1.jpg",
+    imagePaths: [
+      "task_images/coA/sup1/task_sup1_2.jpg",
+      "task_images/coA/sup1/task_sup1_3.jpg",
+    ],
+  }), [
+    "task_images/coA/sup1/task_sup1_2.jpg",
+    "task_images/coA/sup1/task_sup1_3.jpg",
+  ]);
+  const many = L.taskImagePathsFromTask({
+    imagePaths: [
+      "task_images/coA/sup1/task_sup1_1.jpg",
+      "task_images/coA/sup1/task_sup1_2.jpg",
+      "task_images/coA/sup1/task_sup1_3.jpg",
+      "task_images/coA/sup1/task_sup1_4.jpg",
+    ],
+  });
+  assert.equal(many.length, 3);
+  assert.equal(L.MAX_TASK_IMAGES, 3);
+});
+
+test("a recipient can read the second image on a multi-image task; a path not on the task is denied", () => {
+  const paths = [
+    "task_images/coA/sup1/task_sup1_1.jpg",
+    "task_images/coA/sup1/task_sup1_2.jpg",
+  ];
+  const grant2 = {
+    imagePath: paths[1],
+    createdBy: "sup1",
+    readerUids: ["sup1", "dlgA"],
+    companyUID: "coA",
+  };
+  const ok = L.decideAuthorizedTaskImageRead({
+    callerUid: "dlgA",
+    requestedPath: paths[1],
+    taskImagePath: paths[0],
+    taskImagePaths: paths,
+    taskCompanyId: "coA",
+    createdBy: "sup1",
+    grant: grant2,
+    fallbackRecipientIds: [],
+  });
+  assert.deepEqual(ok, {ok: true});
+  const denied = L.decideAuthorizedTaskImageRead({
+    callerUid: "dlgA",
+    requestedPath: "task_images/coA/sup1/task_sup1_9.jpg",
+    taskImagePath: paths[0],
+    taskImagePaths: paths,
+    taskCompanyId: "coA",
+    createdBy: "sup1",
+    grant: grant2,
+    fallbackRecipientIds: ["dlgA"],
+  });
+  assert.equal(denied.ok, false);
+  assert.equal(denied.reason, "path_mismatch");
+});
+
+test("legacy single imagePath still authorizes without an imagePaths list", () => {
+  const path = "task_images/coA/sup1/task_sup1_1.jpg";
+  const r = L.decideAuthorizedTaskImageRead({
+    callerUid: "dlgA",
+    requestedPath: path,
+    taskImagePath: path,
+    taskCompanyId: "coA",
+    createdBy: "sup1",
+    grant: {imagePath: path, createdBy: "sup1", readerUids: ["dlgA"], companyUID: "coA"},
+    fallbackRecipientIds: [],
+  });
+  assert.deepEqual(r, {ok: true});
+});

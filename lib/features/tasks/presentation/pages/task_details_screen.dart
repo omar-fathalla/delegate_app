@@ -48,10 +48,11 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   late TaskPriority _currentPriority;
   late DateTime _dueDate;
   bool _isEditing = false;
-  TaskImageUpload? _newImage;
-  bool _imageRemoved = false;
+  List<String> _editPaths = [];
+  final List<String> _sessionUploads = [];
   bool _imageUploading = false;
   bool _editSaved = false;
+  int _imageViewEpoch = 0;
 
   /// Only the supervisor who sent the task may edit or delete it.
   bool get _isSender {
@@ -77,33 +78,50 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
 
   @override
   void dispose() {
-    // Cancel / abandon must leave the original file intact. Only drop an
-    // uncommitted replacement upload.
-    if (!_editSaved &&
-        _newImage != null &&
-        _newImage!.path.isNotEmpty &&
-        _newImage!.path != _task.imagePath) {
-      TaskImageStorage().deleteQuietly(_newImage!.path);
-    }
+    // Cancel / abandon must leave already-saved images intact. Only drop
+    // uncommitted new uploads from this edit session.
+    _discardUncommittedUploads();
     _titleController.dispose();
     _descriptionController.dispose();
     _notesController.dispose();
     super.dispose();
   }
 
+  void _discardUncommittedUploads() {
+    if (_editSaved) return;
+    final keep = _task.resolvedImagePaths.toSet();
+    for (final path in _sessionUploads) {
+      if (path.isNotEmpty && !keep.contains(path)) {
+        TaskImageStorage().deleteQuietly(path);
+      }
+    }
+    _sessionUploads.clear();
+  }
+
+  void _beginEditing() {
+    _editPaths = List<String>.from(_task.resolvedImagePaths);
+    _sessionUploads.clear();
+    _editSaved = false;
+    _isEditing = true;
+  }
+
   void _saveChanges(BuildContext context) {
-    final imageChanged = _newImage != null || _imageRemoved;
+    final original = _task.resolvedImagePaths;
+    final imageChanged = _editPaths.join('\n') != original.join('\n');
     final contentChanged = imageChanged ||
         _titleController.text != _task.title ||
         _descriptionController.text != _task.description;
     var base = _task;
-    if (_newImage != null) {
-      base = base.copyWith(
-        imagePath: _newImage!.path,
-        clearImageUrl: true,
-      );
-    } else if (_imageRemoved) {
-      base = base.copyWith(clearImage: true);
+    if (imageChanged) {
+      if (_editPaths.isEmpty) {
+        base = base.copyWith(clearImage: true);
+      } else {
+        base = base.copyWith(
+          imagePath: _editPaths.first,
+          imagePaths: List<String>.from(_editPaths),
+          clearImageUrl: true,
+        );
+      }
     }
     if (contentChanged) base = base.copyWith(editedAt: DateTime.now());
     final updatedTask = base.copyWith(
@@ -135,8 +153,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       _task = updatedTask;
       _isEditing = false;
       _editSaved = true;
-      _newImage = null;
-      _imageRemoved = false;
+      _sessionUploads.clear();
+      _imageViewEpoch++;
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -182,7 +200,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                     icon: const Icon(Symbols.more_vert_rounded),
                     onSelected: (value) {
                       if (value == 'edit') {
-                        setState(() => _isEditing = true);
+                        setState(_beginEditing);
                       } else if (value == 'delete') {
                         _confirmDelete(context);
                       }
@@ -323,36 +341,45 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                   ),
                   if (_isEditing && _isSender) ...[
                     const SizedBox(height: 12),
-                    TaskImagePickerField(
+                    TaskImagePickerList(
                       organizationId: widget.organizationId,
                       companyId: _task.companyId,
-                      initialPath: _imageRemoved ? null : _task.imagePath,
+                      initialPaths: _editPaths,
                       initialTaskId: _task.uid,
                       deleteStorageImmediately: false,
-                      onChanged: (upload) {
-                        final previousNew = _newImage;
-                        setState(() {
-                          _newImage = upload;
-                          _imageRemoved = upload == null;
-                        });
-                        // A second uncommitted replacement can be dropped;
-                        // the original saved path is never deleted here.
-                        final previousPath = previousNew?.path;
-                        if (previousPath != null &&
-                            previousPath.isNotEmpty &&
-                            previousPath != _task.imagePath &&
-                            previousPath != upload?.path) {
-                          TaskImageStorage().deleteQuietly(previousPath);
+                      onChanged: (paths) {
+                        final previous = _editPaths.toSet();
+                        setState(() => _editPaths = paths);
+                        for (final path in paths) {
+                          if (!previous.contains(path) &&
+                              !_task.resolvedImagePaths.contains(path)) {
+                            _sessionUploads.add(path);
+                          }
+                        }
+                        // Drop an uncommitted replacement that was swapped
+                        // out before Save. Never delete a saved original.
+                        final keep = paths.toSet().union(
+                          _task.resolvedImagePaths.toSet(),
+                        );
+                        final leftover = [
+                          for (final path in previous)
+                            if (!keep.contains(path) &&
+                                _sessionUploads.contains(path))
+                              path,
+                        ];
+                        for (final path in leftover) {
+                          TaskImageStorage().deleteQuietly(path);
+                          _sessionUploads.remove(path);
                         }
                       },
                       onUploadingChanged: (v) =>
                           setState(() => _imageUploading = v),
                     ),
-                  ] else if (_task.imagePath != null &&
-                      _task.imagePath!.isNotEmpty) ...[
+                  ] else if (_task.hasImage) ...[
                     const SizedBox(height: 12),
-                    TaskImageThumbnail(
-                      imagePath: _task.imagePath!,
+                    TaskImageGallery(
+                      key: ValueKey('view-$_imageViewEpoch-${_task.resolvedImagePaths.join(",")}'),
+                      imagePaths: _task.resolvedImagePaths,
                       taskId: _task.uid,
                       organizationId: widget.organizationId,
                     ),

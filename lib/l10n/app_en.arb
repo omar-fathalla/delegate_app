@@ -2316,6 +2316,8 @@
   "taskImageLoadFailed": "Couldn't load the image",
   "taskImageAttached": "Attached image",
   "taskImageTooLarge": "The image is too large. Choose a smaller one.",
+  "taskImageAttachAnother": "Attach another image",
+  "taskImageMaxReached": "You can attach up to 3 images",
   "taskEditedLabel": "Edited",
   "taskEditAction": "Edit",
   "taskDeleteAction": "Delete",

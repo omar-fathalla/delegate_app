@@ -25,6 +25,7 @@ import {
   parseTaskImagePath,
   shouldStripTaskImageDownloadToken,
   str,
+  taskImagePathsFromTask,
 } from "./task_image_access_logic";
 
 if (admin.apps.length === 0) admin.initializeApp();
@@ -199,6 +200,71 @@ async function stripDownloadTokens(file: any): Promise<void> {
   }
 }
 
+/**
+ * Keep grants in sync with the task's image list. New paths inherit
+ * send-time readers from an existing grant on the same task when one
+ * exists, so later company members and held-at-send users are not added
+ * after the fact. Removed paths drop their grants. Unchanged paths are
+ * left alone.
+ */
+export async function syncTaskImageGrants(
+  db: FirebaseFirestore.Firestore,
+  opts: {
+    afterPaths: readonly string[];
+    beforePaths?: readonly string[];
+    createdBy: unknown;
+    recipientIds: readonly string[];
+    companyUID: unknown;
+    organizationId: unknown;
+    taskId: unknown;
+  },
+): Promise<void> {
+  const before = taskImagePathsFromTask({imagePaths: opts.beforePaths || []});
+  const after = taskImagePathsFromTask({imagePaths: opts.afterPaths});
+  const beforeSet = new Set(before);
+  const afterSet = new Set(after);
+  const removed = before.filter((path) => !afterSet.has(path));
+  const added = after.filter((path) => !beforeSet.has(path));
+
+  let inherited: string[] = [];
+  const inheritFrom = [...removed, ...before.filter((path) => afterSet.has(path))];
+  for (const path of inheritFrom) {
+    const name = fileNameFromImagePath(path);
+    if (!name) continue;
+    const snap = await db.collection("task_image_grants").doc(name).get();
+    if (!snap.exists) continue;
+    const raw = snap.data()?.readerUids;
+    if (Array.isArray(raw) && raw.length) {
+      inherited = raw.map((v) => str(v)).filter(Boolean);
+      break;
+    }
+  }
+
+  const readers = inherited.length ? inherited : opts.recipientIds;
+  for (const path of added) {
+    await upsertTaskImageGrant(db, {
+      imagePath: path,
+      createdBy: opts.createdBy,
+      recipientIds: readers,
+      companyUID: opts.companyUID,
+      organizationId: opts.organizationId,
+      taskId: opts.taskId,
+    });
+  }
+  for (const path of removed) {
+    await upsertTaskImageGrant(db, {
+      imagePath: "",
+      previousImagePath: path,
+      createdBy: opts.createdBy,
+      recipientIds: [],
+      companyUID: opts.companyUID,
+      organizationId: opts.organizationId,
+      taskId: opts.taskId,
+    });
+  }
+}
+
+
 async function readTaskImageBytes(imagePath: string): Promise<{contentType: string; data: string}> {
   const parsed = parseTaskImagePath(imagePath);
   if (!parsed) fail("invalid-argument", "invalid_path");
@@ -244,23 +310,41 @@ export const getTaskImage = functions
     const task = snap.data() || {};
     const companyId = str(task.companyId) || str(task.companyUID);
     const createdBy = str(task.createdBy);
-    const fileName = fileNameFromImagePath(str(task.imagePath) || imagePath);
+    const taskPaths = taskImagePathsFromTask(task);
+    const fileName = fileNameFromImagePath(imagePath);
     const grantSnap = fileName
       ? await db.collection("task_image_grants").doc(fileName).get()
       : null;
     const grant = grantSnap && grantSnap.exists ? (grantSnap.data() || {}) : null;
     let fallbackRecipientIds: string[] = [];
     if (!grant) {
-      fallbackRecipientIds = await resolveRecipientIds(db, task.assignedTo, {
-        companyId,
-        organizationId,
-        createdBy,
-      });
+      // Prefer sibling send-time grants over a live assignment set, so a
+      // later company member does not gain access after the fact.
+      for (const sibling of taskPaths) {
+        if (sibling === imagePath) continue;
+        const siblingName = fileNameFromImagePath(sibling);
+        if (!siblingName) continue;
+        const siblingSnap = await db.collection("task_image_grants").doc(siblingName).get();
+        if (!siblingSnap.exists) continue;
+        const raw = siblingSnap.data()?.readerUids;
+        if (Array.isArray(raw) && raw.length) {
+          fallbackRecipientIds = raw.map((v) => str(v)).filter(Boolean);
+          break;
+        }
+      }
+      if (fallbackRecipientIds.length === 0) {
+        fallbackRecipientIds = await resolveRecipientIds(db, task.assignedTo, {
+          companyId,
+          organizationId,
+          createdBy,
+        });
+      }
     }
     const decision = decideAuthorizedTaskImageRead({
       callerUid: caller,
       requestedPath: imagePath,
       taskImagePath: task.imagePath,
+      taskImagePaths: taskPaths,
       taskCompanyId: companyId,
       createdBy,
       grant,
@@ -272,7 +356,7 @@ export const getTaskImage = functions
     if (!grant) {
       try {
         await upsertTaskImageGrant(db, {
-          imagePath: task.imagePath,
+          imagePath,
           createdBy,
           recipientIds: fallbackRecipientIds,
           companyUID: companyId,

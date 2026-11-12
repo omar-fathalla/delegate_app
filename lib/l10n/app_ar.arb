@@ -1820,6 +1820,14 @@
   "@taskImageTooLarge": {
     "description": "Task image over size limit"
   },
+  "taskImageAttachAnother": "إرفاق صورة أخرى",
+  "@taskImageAttachAnother": {
+    "description": "Attach an additional task image, up to 3"
+  },
+  "taskImageMaxReached": "يمكن إرفاق حتى 3 صور",
+  "@taskImageMaxReached": {
+    "description": "Shown when the task already has 3 images"
+  },
   "taskEditedLabel": "معدّلة",
   "@taskEditedLabel": {
     "description": "Label on a task the sender edited"

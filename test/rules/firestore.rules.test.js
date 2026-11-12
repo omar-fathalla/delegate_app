@@ -686,6 +686,35 @@ describe("firestore tightened rules", () => {
       }));
     });
 
+    test("sender can create a task with up to 3 imagePaths; a 4th is rejected", async () => {
+      const comp = dbFor("comp");
+      const paths = [
+        "task_images/c1/comp/task_comp_a.jpg",
+        "task_images/c1/comp/task_comp_b.jpg",
+        "task_images/c1/comp/task_comp_c.jpg",
+      ];
+      await assertSucceeds(comp.doc("organizations/o1/tasks/new3imgs").set({
+        companyId: "c1", assignedTo: "del-1", createdBy: "comp", title: "T",
+        imagePath: paths[0],
+        imagePaths: paths,
+      }));
+      await assertFails(comp.doc("organizations/o1/tasks/new4imgs").set({
+        companyId: "c1", assignedTo: "del-1", createdBy: "comp", title: "T",
+        imagePath: paths[0],
+        imagePaths: [...paths, "task_images/c1/comp/task_comp_d.jpg"],
+      }));
+      await assertFails(comp.doc("organizations/o1/tasks/newBadList").set({
+        companyId: "c1", assignedTo: "del-1", createdBy: "comp", title: "T",
+        imagePath: paths[0],
+        imagePaths: [paths[0], "task_images/c1/hr/task_hr_x.jpg"],
+      }));
+      await assertFails(comp.doc("organizations/o1/tasks/newInconsistent").set({
+        companyId: "c1", assignedTo: "del-1", createdBy: "comp", title: "T",
+        imagePath: paths[1],
+        imagePaths: paths,
+      }));
+    });
+
     test("only the sender edits content; other staff can still change status", async () => {
       await seedSent();
       const comp = dbFor("comp");

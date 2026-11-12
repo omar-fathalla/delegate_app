@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:delegate_app/features/tasks/data/services/task_image_storage.dart';
+import 'package:delegate_app/features/tasks/domain/task_image_paths.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -50,14 +51,24 @@ class _TaskImageThumbnailState extends State<TaskImageThumbnail> {
     }
   }
 
-  Future<Uint8List> _load() {
+  Future<Uint8List> _load({bool retrying = false}) async {
     final fetcher =
         widget.fetcher ?? TaskImageFetcher.debugOverride ?? TaskImageFetcher();
-    return fetcher.load(
-      imagePath: widget.imagePath,
-      taskId: widget.taskId,
-      organizationId: widget.organizationId,
-    );
+    try {
+      return await fetcher.load(
+        imagePath: widget.imagePath,
+        taskId: widget.taskId,
+        organizationId: widget.organizationId,
+      );
+    } catch (e) {
+      if (!retrying &&
+          widget.taskId != null &&
+          !TaskImageFetcher.isAccessDenied(e)) {
+        await Future<void>.delayed(const Duration(milliseconds: 800));
+        return _load(retrying: true);
+      }
+      rethrow;
+    }
   }
 
   @override
@@ -91,6 +102,11 @@ class _TaskImageThumbnailState extends State<TaskImageThumbnail> {
                 );
               }
               if (snap.hasError) {
+                // Viewer can see the task but is not in the send-time grant:
+                // hide quietly instead of a broken-load error.
+                if (TaskImageFetcher.isAccessDenied(snap.error!)) {
+                  return const SizedBox.shrink();
+                }
                 return SizedBox(
                   height: widget.height,
                   child: Center(
@@ -180,6 +196,7 @@ class TaskImagePickerField extends StatefulWidget {
     this.initialPath,
     this.initialTaskId,
     this.deleteStorageImmediately = true,
+    this.attachLabel,
     this.storage,
     this.picker,
   });
@@ -192,6 +209,8 @@ class TaskImagePickerField extends StatefulWidget {
   /// When false (edit screen), picking a replacement or tapping Remove
   /// must not delete the saved object until the sender saves.
   final bool deleteStorageImmediately;
+  /// Overrides the empty-state attach button label.
+  final String? attachLabel;
   final ValueChanged<TaskImageUpload?> onChanged;
   final ValueChanged<bool>? onUploadingChanged;
   final TaskImageStorage? storage;
@@ -356,7 +375,7 @@ class _TaskImagePickerFieldState extends State<TaskImagePickerField> {
       return OutlinedButton.icon(
         onPressed: _chooseSource,
         icon: const Icon(Symbols.add_photo_alternate_rounded),
-        label: Text(l10n.taskImageAttach),
+        label: Text(widget.attachLabel ?? l10n.taskImageAttach),
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.fromHeight(48),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -493,6 +512,161 @@ class TaskCardMeta extends StatelessWidget {
           if (isEdited) const TaskEditedLabel(),
         ],
       ),
+    );
+  }
+}
+
+/// Shows every attached image. Tapping one opens the pinch-zoom viewer.
+class TaskImageGallery extends StatelessWidget {
+  const TaskImageGallery({
+    super.key,
+    required this.imagePaths,
+    this.taskId,
+    this.organizationId,
+    this.height = 200,
+    this.fetcher,
+  });
+
+  final List<String> imagePaths;
+  final String? taskId;
+  final String? organizationId;
+  final double height;
+  final TaskImageFetcher? fetcher;
+
+  @override
+  Widget build(BuildContext context) {
+    final paths = imagePaths
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (paths.isEmpty) return const SizedBox.shrink();
+    return Column(
+      children: [
+        for (var i = 0; i < paths.length; i++) ...[
+          if (i > 0) const SizedBox(height: 12),
+          TaskImageThumbnail(
+            key: ValueKey('${paths[i]}#$i'),
+            imagePath: paths[i],
+            taskId: taskId,
+            organizationId: organizationId,
+            height: height,
+            fetcher: fetcher,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Lets the sender attach, replace or remove up to [kMaxTaskImages] images.
+class TaskImagePickerList extends StatefulWidget {
+  const TaskImagePickerList({
+    super.key,
+    required this.organizationId,
+    required this.companyId,
+    required this.onChanged,
+    this.onUploadingChanged,
+    this.initialPaths = const [],
+    this.initialTaskId,
+    this.deleteStorageImmediately = true,
+    this.storage,
+    this.picker,
+  });
+
+  final String organizationId;
+  final String companyId;
+  final List<String> initialPaths;
+  final String? initialTaskId;
+  final bool deleteStorageImmediately;
+  final ValueChanged<List<String>> onChanged;
+  final ValueChanged<bool>? onUploadingChanged;
+  final TaskImageStorage? storage;
+  final ImagePicker? picker;
+
+  @override
+  State<TaskImagePickerList> createState() => _TaskImagePickerListState();
+}
+
+class _TaskImagePickerListState extends State<TaskImagePickerList> {
+  late List<String> _paths;
+  final _uploading = <int>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _paths = resolveTaskImagePaths(imagePaths: widget.initialPaths);
+  }
+
+  void _emit() => widget.onChanged(List<String>.from(_paths));
+
+  void _setUploading(int index, bool value) {
+    if (value) {
+      _uploading.add(index);
+    } else {
+      _uploading.remove(index);
+    }
+    widget.onUploadingChanged?.call(_uploading.isNotEmpty);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final canAdd = _paths.length < kMaxTaskImages;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < _paths.length; i++) ...[
+          if (i > 0) const SizedBox(height: 12),
+          TaskImagePickerField(
+            key: ValueKey('slot-$i-${_paths[i]}'),
+            organizationId: widget.organizationId,
+            companyId: widget.companyId,
+            initialPath: _paths[i],
+            initialTaskId: widget.initialTaskId,
+            deleteStorageImmediately: widget.deleteStorageImmediately,
+            storage: widget.storage,
+            picker: widget.picker,
+            onChanged: (upload) {
+              setState(() {
+                if (upload == null) {
+                  _paths = [..._paths]..removeAt(i);
+                } else if (upload.path != _paths[i]) {
+                  _paths = [..._paths]..[i] = upload.path;
+                }
+              });
+              _emit();
+            },
+            onUploadingChanged: (v) => _setUploading(i, v),
+          ),
+        ],
+        if (canAdd) ...[
+          if (_paths.isNotEmpty) const SizedBox(height: 12),
+          TaskImagePickerField(
+            key: ValueKey('slot-new-${_paths.length}'),
+            organizationId: widget.organizationId,
+            companyId: widget.companyId,
+            attachLabel: _paths.isEmpty ? null : l10n.taskImageAttachAnother,
+            deleteStorageImmediately: widget.deleteStorageImmediately,
+            storage: widget.storage,
+            picker: widget.picker,
+            onChanged: (upload) {
+              if (upload == null) return;
+              if (_paths.length >= kMaxTaskImages) return;
+              setState(() => _paths = [..._paths, upload.path]);
+              _emit();
+            },
+            onUploadingChanged: (v) => _setUploading(-1, v),
+          ),
+        ] else ...[
+          const SizedBox(height: 8),
+          Text(
+            l10n.taskImageMaxReached,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ],
+      ],
     );
   }
 }

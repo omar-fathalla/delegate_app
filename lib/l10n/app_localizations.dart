@@ -5004,6 +5004,18 @@ abstract class AppLocalizations {
   /// **'The image is too large. Choose a smaller one.'**
   String get taskImageTooLarge;
 
+  /// No description provided for @taskImageAttachAnother.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach another image'**
+  String get taskImageAttachAnother;
+
+  /// No description provided for @taskImageMaxReached.
+  ///
+  /// In en, this message translates to:
+  /// **'You can attach up to 3 images'**
+  String get taskImageMaxReached;
+
   /// No description provided for @taskEditedLabel.
   ///
   /// In en, this message translates to:

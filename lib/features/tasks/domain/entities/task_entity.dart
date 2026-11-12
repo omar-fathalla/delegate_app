@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/tasks/domain/task_image_paths.dart';
 import 'package:equatable/equatable.dart';
 
 enum TaskPriority { high, medium, low }
@@ -25,14 +26,23 @@ class TaskEntity extends Equatable {
   /// Download URL of the image the sender attached, if any.
   final String? imageUrl;
 
-  /// Storage path of the attached image. Display goes through getTaskImage.
+  /// Storage path of the first attached image (legacy single-image field).
+  /// Prefer [resolvedImagePaths] for display.
   final String? imagePath;
+
+  /// Storage paths of all attached images (Phase 3, max [kMaxTaskImages]).
+  /// Empty on old documents that only have [imagePath].
+  final List<String> imagePaths;
 
   /// Set when the sender edits the title, description or image.
   final DateTime? editedAt;
 
+  /// Paths to show or edit, from [imagePaths] or the legacy [imagePath].
+  List<String> get resolvedImagePaths =>
+      resolveTaskImagePaths(imagePath: imagePath, imagePaths: imagePaths);
+
   bool get hasImage =>
-      (imagePath != null && imagePath!.isNotEmpty) ||
+      resolvedImagePaths.isNotEmpty ||
       (imageUrl != null && imageUrl!.isNotEmpty);
   bool get isEdited => editedAt != null;
 
@@ -54,6 +64,7 @@ class TaskEntity extends Equatable {
     this.notes,
     this.imageUrl,
     this.imagePath,
+    this.imagePaths = const [],
     this.editedAt,
   });
 
@@ -75,6 +86,7 @@ class TaskEntity extends Equatable {
     String? notes,
     String? imageUrl,
     String? imagePath,
+    List<String>? imagePaths,
     DateTime? editedAt,
     bool clearImage = false,
     bool clearImageUrl = false,
@@ -99,6 +111,7 @@ class TaskEntity extends Equatable {
           ? null
           : (imageUrl ?? this.imageUrl),
       imagePath: clearImage ? null : (imagePath ?? this.imagePath),
+      imagePaths: clearImage ? const [] : (imagePaths ?? this.imagePaths),
       editedAt: editedAt ?? this.editedAt,
     );
   }
@@ -122,6 +135,7 @@ class TaskEntity extends Equatable {
     notes,
     imageUrl,
     imagePath,
+    imagePaths,
     editedAt,
   ];
 }

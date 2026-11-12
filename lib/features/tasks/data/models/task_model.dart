@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
+import 'package:delegate_app/features/tasks/domain/task_image_paths.dart';
 
 class TaskModel extends TaskEntity {
   const TaskModel({
@@ -20,6 +21,7 @@ class TaskModel extends TaskEntity {
     super.notes,
     super.imageUrl,
     super.imagePath,
+    super.imagePaths,
     super.editedAt,
   });
 
@@ -45,6 +47,7 @@ class TaskModel extends TaskEntity {
       notes: data['notes'],
       imageUrl: data['imageUrl'] as String?,
       imagePath: data['imagePath'] as String?,
+      imagePaths: _pathsFromFirestore(data['imagePaths']),
       editedAt: data['editedAt'] is Timestamp
           ? (data['editedAt'] as Timestamp).toDate()
           : null,
@@ -52,6 +55,10 @@ class TaskModel extends TaskEntity {
   }
 
   Map<String, dynamic> toFirestore() {
+    final paths = resolveTaskImagePaths(
+      imagePath: imagePath,
+      imagePaths: imagePaths,
+    );
     return {
       'title': title,
       'description': description,
@@ -72,7 +79,12 @@ class TaskModel extends TaskEntity {
       // Only written when present, so delegate status updates never touch
       // the sender-owned fields (the rules reject that).
       if (imageUrl != null) 'imageUrl': imageUrl,
-      if (imagePath != null) 'imagePath': imagePath,
+      if (paths.isNotEmpty) ...{
+        'imagePath': paths.first,
+        'imagePaths': paths,
+      } else if (imagePath != null) ...{
+        'imagePath': imagePath,
+      },
       if (editedAt != null) 'editedAt': Timestamp.fromDate(editedAt!),
     };
   }
@@ -103,6 +115,16 @@ class TaskModel extends TaskEntity {
     }
   }
 
+  static List<String> _pathsFromFirestore(dynamic raw) {
+    if (raw is! List) return const [];
+    return resolveTaskImagePaths(
+      imagePaths: [
+        for (final item in raw)
+          if (item is String) item,
+      ],
+    );
+  }
+
   factory TaskModel.fromEntity(TaskEntity entity) {
     return TaskModel(
       uid: entity.uid,
@@ -122,6 +144,7 @@ class TaskModel extends TaskEntity {
       notes: entity.notes,
       imageUrl: entity.imageUrl,
       imagePath: entity.imagePath,
+      imagePaths: entity.imagePaths,
       editedAt: entity.editedAt,
     );
   }
