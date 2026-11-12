@@ -609,6 +609,88 @@ test("M1 period-start promotion does not reactivate a legacy admin_suspend", asy
   assert.equal(d.nextSubscription, undefined);
 });
 
+test("subscription reminder targets company supervisor inbox, not request creator", async () => {
+  await db.doc("users/hr1").set({
+    role: "hr", organizationUID: "o1", companyUID: "c1", displayName: "HR One",
+  });
+  await db.doc("delegate_requests/app_hr").set({
+    requestType: "new_delegate", status: "approved", supervisorUid: "hr1", companyUID: "c1",
+    organizationUID: "o1", periodCode: "2026_H2", paymentStatus: "waived",
+  });
+  await db.doc(delegatePath("o1", "app_hr")).set({uid: "app_hr", status: "active", companyUID: "c1"});
+
+  const jun16 = L.cairoMidnight(2027, 6, 16);
+  const res = await J.runSubscriptionReminders(db, jun16);
+  assert.ok(res.notifications >= 1);
+
+  const inbox = await db.collection("notifications")
+    .where("type", "==", "subscription_renewal_reminder")
+    .where("companyUID", "==", "c1")
+    .where("delegateUid", "==", "sup1")
+    .get();
+  const hrMis = await db.collection("notifications")
+    .where("type", "==", "subscription_renewal_reminder")
+    .where("delegateUid", "==", "hr1")
+    .get();
+  assert.equal(hrMis.size, 0);
+  assert.ok(inbox.size >= 1);
+});
+
+test("subscription reminder fans out to every live company supervisor", async () => {
+  await db.doc("users/sup_b").set({
+    role: "company_supervisor", organizationUID: "o1", companyUID: "c1", status: "active",
+  });
+  await db.doc("users/sup_inact").set({
+    role: "supervisor", organizationUID: "o1", companyUID: "c1", isActive: false,
+  });
+  const jun16 = L.cairoMidnight(2027, 6, 16);
+  await db.doc("subscription_reminder_runs/2027_H1_2027-06-16").delete();
+  const res = await J.runSubscriptionReminders(db, jun16);
+  assert.ok(res.notifications >= 1);
+  for (const uid of ["sup1", "sup_b"]) {
+    const snap = await db.collection("notifications")
+      .where("type", "==", "subscription_renewal_reminder")
+      .where("companyUID", "==", "c1")
+      .where("delegateUid", "==", uid)
+      .get();
+    assert.ok(snap.size >= 1, uid);
+  }
+  const inactiveMis = await db.collection("notifications")
+    .where("type", "==", "subscription_renewal_reminder")
+    .where("delegateUid", "==", "sup_inact")
+    .get();
+  assert.equal(inactiveMis.size, 0);
+});
+
+test("subscription reminder uses replacement supervisor when request creator uid is stale", async () => {
+  await db.doc("users/old_sup").set({
+    role: "hr", organizationUID: "o1", companyUID: "c1", status: "active",
+  });
+  await db.doc("users/sup_repl").set({
+    role: "supervisor", organizationUID: "o1", companyUID: "c1", status: "active",
+  });
+  await db.doc("delegate_requests/stale_sup").set({
+    requestType: "new_delegate", status: "approved", supervisorUid: "old_sup", companyUID: "c1",
+    organizationUID: "o1", periodCode: "2026_H2", paymentStatus: "waived",
+  });
+  await db.doc(delegatePath("o1", "stale_sup")).set({uid: "stale_sup", status: "active", companyUID: "c1"});
+
+  const jun16 = L.cairoMidnight(2027, 6, 16);
+  await db.doc("subscription_reminder_runs/2027_H1_2027-06-16").delete();
+  await J.runSubscriptionReminders(db, jun16);
+
+  const oldMis = await db.collection("notifications")
+    .where("type", "==", "subscription_renewal_reminder")
+    .where("delegateUid", "==", "old_sup")
+    .get();
+  assert.equal(oldMis.size, 0);
+  const repl = await db.collection("notifications")
+    .where("type", "==", "subscription_renewal_reminder")
+    .where("delegateUid", "==", "sup_repl")
+    .get();
+  assert.ok(repl.size >= 1);
+});
+
 test("July grace then suspension on the 15th for H2", async () => {
   const jul1 = L.cairoMidnight(2027, 7, 1);
   const grace = await J.runSubscriptionSuspension(db, new Date(jul1.getTime() + 60 * 60 * 1000));
