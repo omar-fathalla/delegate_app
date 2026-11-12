@@ -30,7 +30,12 @@ import {
 } from "./subscription_logic";
 import {holdsMode} from "./holds";
 import {M1_SOURCE, M2_SOURCE, planExpiryHoldWrite, shouldShadowReactivateAfterExpiryClear} from "./subscription_holds";
-import {REMINDER_RUNS, subscriptionReminderAlertDoc} from "./subscription_reminder_logic";
+import {
+  REMINDER_RUNS,
+  subscriptionReminderAlertDoc,
+  userIdForSubscriptionInvoice,
+  type SubscriptionInvoiceUserCandidate,
+} from "./subscription_reminder_logic";
 
 type Db = admin.firestore.Firestore;
 type Data = Record<string, unknown>;
@@ -405,9 +410,10 @@ export interface ReminderResult {
 }
 
 /**
- * One notification per supervisor (per company) when today is exactly
- * `reminderDays` before the current period ends. Only app-added delegates
- * without paid coverage for the *next* period are counted. Idempotent per day.
+ * One notification per company when today is exactly `reminderDays` before
+ * the current period ends. Recipient is the live company supervisor (not
+ * `delegate_requests.supervisorUid`). Only app-added delegates without paid
+ * coverage for the *next* period are counted. Idempotent per day.
  */
 export async function runSubscriptionReminders(db: Db, now: Date): Promise<ReminderResult> {
   const publicCfg = await loadPublicSubscriptionConfig(db);
@@ -450,7 +456,6 @@ export async function runSubscriptionReminders(db: Db, now: Date): Promise<Remin
   const appAdded = await appAddedDelegateUids(db);
   const covered = await coveredDelegateUids(db, upcoming, publicCfg.freePromotionLastDay);
   const groups = new Map<string, {
-    supervisorUid: string;
     companyUID: string;
     organizationUID: string;
     count: number;
@@ -459,14 +464,13 @@ export async function runSubscriptionReminders(db: Db, now: Date): Promise<Remin
   for (const [uid, req] of appAdded) {
     if (covered.has(uid)) continue;
     uncoveredDelegates++;
-    const supervisorUid = str(req.supervisorUid);
     const companyUID = str(req.companyUID);
     const organizationUID = str(req.organizationUID || req.organizationId);
-    if (!supervisorUid || !companyUID) continue;
-    const key = `${supervisorUid}\0${companyUID}`;
+    if (!companyUID) continue;
+    const key = `${organizationUID}\0${companyUID}`;
     const g = groups.get(key);
     if (g) g.count++;
-    else groups.set(key, {supervisorUid, companyUID, organizationUID, count: 1});
+    else groups.set(key, {companyUID, organizationUID, count: 1});
   }
   if (groups.size === 0) {
     const res = {...base, uncoveredDelegates, skipped: "no_uncovered" as const};
@@ -475,11 +479,20 @@ export async function runSubscriptionReminders(db: Db, now: Date): Promise<Remin
     return res;
   }
 
+  const companyUIDs = [...new Set([...groups.values()].map((g) => g.companyUID))];
+  const supervisorsByCompany = await loadCompanySupervisorCandidates(db, companyUIDs);
+
   const writer = new Batcher(db);
   let notifications = 0;
   for (const g of groups.values()) {
+    const recipientUid = userIdForSubscriptionInvoice({
+      companyUID: g.companyUID,
+      organizationUID: g.organizationUID,
+      candidates: supervisorsByCompany.get(g.companyUID) || [],
+    });
+    if (!recipientUid) continue;
     const doc = subscriptionReminderAlertDoc({
-      supervisorUid: g.supervisorUid,
+      recipientUid,
       organizationUID: g.organizationUID,
       companyUID: g.companyUID,
       endingPeriod: current,
@@ -510,6 +523,37 @@ function isoReminderDay(now: Date): string {
   return `${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`;
 }
 
+const SUPERVISOR_ROLES_QUERY = ["supervisor", "company_supervisor"];
+
+async function loadCompanySupervisorCandidates(
+  db: Db,
+  companyUIDs: string[],
+): Promise<Map<string, SubscriptionInvoiceUserCandidate[]>> {
+  const out = new Map<string, SubscriptionInvoiceUserCandidate[]>();
+  for (const part of chunks([...new Set(companyUIDs.filter(Boolean))], IN_LIMIT)) {
+    const snap = await db.collection("users")
+      .where("companyUID", "in", part)
+      .where("role", "in", SUPERVISOR_ROLES_QUERY)
+      .get();
+    for (const doc of snap.docs) {
+      const co = str(doc.get("companyUID") || doc.get("companyId"));
+      if (!co) continue;
+      const list = out.get(co) || [];
+      list.push({
+        uid: doc.id,
+        role: doc.get("role"),
+        companyUID: doc.get("companyUID"),
+        companyId: doc.get("companyId"),
+        organizationUID: doc.get("organizationUID"),
+        organizationId: doc.get("organizationId"),
+        isActive: doc.get("isActive"),
+        status: doc.get("status"),
+      });
+      out.set(co, list);
+    }
+  }
+  return out;
+}
 
 /**
  * The request creator (users/{supervisorUid}) must belong to the request's

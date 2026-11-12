@@ -82,8 +82,13 @@ request and are never suspended.
   already suspended for another reason.
 - `remindSupervisorsBeforeSubscriptionPeriodEnd` (00:08 Africa/Cairo daily): on the
   reminder day (default **14** Cairo days before 30 Jun and 31 Dec, overridable via
-  `config/subscriptions.subscriptionReminderDays`) writes one notification per
-  supervisor with app-added delegates lacking paid coverage for the **next** period.
+  `config/subscriptions.subscriptionReminderDays`) writes **one notification per
+  company** (org + company) to the company supervisor inbox (`users/{uid}` with role
+  `supervisor` / `company_supervisor` who is active and not deleted/inactive/disabled,
+  else `delegateUid: supervisor_{companyUID}`), not the staff uid on
+  `delegate_requests.supervisorUid`. When several live supervisors exist, the lowest
+  uid (`localeCompare`) is chosen. Counts app-added delegates lacking paid coverage
+  for the **next** period.
   Skipped when that **next** period is still free (its end day is on or before
   `freePromotionLastDay`), not merely because “today” is inside the promo window —
   so **17 Dec 2026** can remind for **2027_H1** while **16 Jun 2026** still skips

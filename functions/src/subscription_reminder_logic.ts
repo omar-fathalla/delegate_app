@@ -7,8 +7,84 @@ import {
 export const SUBSCRIPTION_REMINDER_TYPE = "subscription_renewal_reminder";
 export const REMINDER_RUNS = "subscription_reminder_runs";
 
+const COMPANY_SUPERVISOR_ROLES = new Set([
+  "supervisor",
+  "company_supervisor",
+  "company-supervisor",
+]);
+
+function str(v: unknown): string {
+  return typeof v === "string" ? v.trim() : "";
+}
+
+function companyOf(u: SubscriptionInvoiceUserCandidate): string {
+  return str(u.companyUID) || str(u.companyId);
+}
+
+function orgOf(u: SubscriptionInvoiceUserCandidate): string {
+  return str(u.organizationUID) || str(u.organizationId);
+}
+
+function isCompanySupervisorRole(role: unknown): boolean {
+  const raw = str(role).toLowerCase().replace(/_/g, "-");
+  return COMPANY_SUPERVISOR_ROLES.has(str(role)) || COMPANY_SUPERVISOR_ROLES.has(raw);
+}
+
+/** Matches app staff inactive semantics (storage upload / task notify). */
+export function isExcludedSupervisorRecipient(u: SubscriptionInvoiceUserCandidate): boolean {
+  if (u.isActive === false) return true;
+  const s = str(u.status).toLowerCase().replace(/-/g, "_");
+  return s === "inactive" || s === "disabled" || s === "suspended" || s === "deleted"
+    || s === "pending" || s === "rejected";
+}
+
+/** Inbox fallback when no live supervisor user exists (matches leave / rules). */
+export function supervisorCompanyInboxKey(companyUID: string): string {
+  const company = str(companyUID);
+  return company ? `supervisor_${company}` : "";
+}
+
+export interface SubscriptionInvoiceUserCandidate {
+  uid: string;
+  role?: unknown;
+  companyUID?: unknown;
+  companyId?: unknown;
+  organizationUID?: unknown;
+  organizationId?: unknown;
+  isActive?: unknown;
+  status?: unknown;
+}
+
+/**
+ * Recipient for subscription renewal invoice / reminder: current company
+ * supervisor inbox, not the staff uid on `delegate_requests.supervisorUid`.
+ * When several live supervisors exist, pick the lowest uid (localeCompare).
+ */
+export function userIdForSubscriptionInvoice(opts: {
+  companyUID: string;
+  organizationUID?: string;
+  candidates: SubscriptionInvoiceUserCandidate[];
+}): string {
+  const company = str(opts.companyUID);
+  if (!company) return "";
+  const org = str(opts.organizationUID);
+  const matches = opts.candidates.filter((u) => {
+    if (isExcludedSupervisorRecipient(u)) return false;
+    if (!isCompanySupervisorRole(u.role)) return false;
+    if (companyOf(u) !== company) return false;
+    if (!org) return true;
+    const uOrg = orgOf(u);
+    return !uOrg || uOrg === org;
+  });
+  if (matches.length) {
+    matches.sort((a, b) => str(a.uid).localeCompare(str(b.uid)));
+    return str(matches[0].uid);
+  }
+  return supervisorCompanyInboxKey(company);
+}
+
 export function subscriptionReminderAlertDoc(opts: {
-  supervisorUid: string;
+  recipientUid: string;
   organizationUID: string;
   companyUID: string;
   endingPeriod: Period;
@@ -22,7 +98,7 @@ export function subscriptionReminderAlertDoc(opts: {
   const nextTitle = periodShortTitleArabic(opts.nextPeriod);
   const endAr = formatCairoDayArabic(opts.endingPeriod.endDay);
   return {
-    delegateUid: opts.supervisorUid,
+    delegateUid: opts.recipientUid,
     title: "تذكير بتجديد اشتراك المناديب",
     body:
       `تنتهي فترة ${endingTitle} في ${endAr}. ` +
