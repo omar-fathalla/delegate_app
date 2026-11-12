@@ -346,6 +346,7 @@ export {
   expireAbandonedSubscriptionRenewals,
   finalizeSubscriptionRenewalOnStatus,
   reconcileSubscriptionPaymentsScheduled,
+  remindSupervisorsBeforeSubscriptionPeriodEnd,
 } from "./subscription_schedule";
 export {
   createSubscriptionCheckout,

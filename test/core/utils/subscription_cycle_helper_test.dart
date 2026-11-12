@@ -6,6 +6,25 @@ void main() {
     setUp(SubscriptionCycleHelper.resetConfigForTest);
     tearDown(SubscriptionCycleHelper.resetConfigForTest);
 
+    test('isWithinSubscriptionGrace matches server Jan/Jul 1–14 rule', () {
+      expect(
+        SubscriptionCycleHelper.isWithinSubscriptionGrace(DateTime(2027, 1, 10)),
+        isTrue,
+      );
+      expect(
+        SubscriptionCycleHelper.isWithinSubscriptionGrace(DateTime(2027, 1, 15)),
+        isFalse,
+      );
+      expect(
+        SubscriptionCycleHelper.isWithinSubscriptionGrace(DateTime(2027, 7, 14)),
+        isTrue,
+      );
+      expect(
+        SubscriptionCycleHelper.isWithinSubscriptionGrace(DateTime(2027, 7, 15)),
+        isFalse,
+      );
+    });
+
     test('getCycleCode returns correct H1 and H2 codes', () {
       final h1Date = DateTime(2026, 3, 15);
       final h2Date = DateTime(2026, 8, 20);

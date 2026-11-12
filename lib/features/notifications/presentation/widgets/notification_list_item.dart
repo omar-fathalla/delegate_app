@@ -410,6 +410,8 @@ class _NotificationListItemState extends State<NotificationListItem> {
         return Icons.person_add_alt_1_rounded;
       case 'subscription_approved':
         return Icons.how_to_reg_rounded;
+      case 'subscription_renewal_reminder':
+        return Icons.event_available_rounded;
       case 'subscription_rejected':
         return Icons.person_off_rounded;
       case 'task':
@@ -444,6 +446,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
         return colorScheme.tertiary;
       case 'delegate_subscription_request':
       case 'subscription_approved':
+      case 'subscription_renewal_reminder':
       case 'task':
         return colorScheme.primary;
       case 'wallet_allocation':
@@ -474,6 +477,7 @@ class _NotificationListItemState extends State<NotificationListItem> {
         return colorScheme.tertiaryContainer;
       case 'delegate_subscription_request':
       case 'subscription_approved':
+      case 'subscription_renewal_reminder':
         return colorScheme.primaryContainer;
       case 'wallet_allocation':
       case 'wallet_payout':

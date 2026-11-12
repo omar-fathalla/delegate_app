@@ -116,6 +116,10 @@ export function nextPeriod(period: Period): Period {
 export const DEFAULT_ADVANCE_RENEWAL_DAYS = 30;
 /** tashil-dev window so User Test can exercise the path before late December. */
 export const DEV_ADVANCE_RENEWAL_DAYS = 60;
+/** Default supervisor reminder: Cairo calendar days before each period end day. */
+export const DEFAULT_SUBSCRIPTION_REMINDER_DAYS = 14;
+/** Grace after period end (30 Jun / 31 Dec Cairo) before unpaid app-added delegates suspend. */
+export const SUBSCRIPTION_GRACE_DAYS = 15;
 
 export interface AdvanceRenewalConfig {
   enabled: boolean;
@@ -126,6 +130,57 @@ export function parseAdvanceRenewalConfig(raw?: Record<string, unknown> | null):
   const n = Number(raw?.advanceRenewalDays);
   const days = Number.isFinite(n) && n >= 1 && n <= 180 ? Math.trunc(n) : DEFAULT_ADVANCE_RENEWAL_DAYS;
   return {enabled: raw?.advanceRenewalEnabled === true, days};
+}
+
+/** `config/subscriptions.subscriptionReminderDays`, else [DEFAULT_SUBSCRIPTION_REMINDER_DAYS]. */
+export function parseSubscriptionReminderDays(raw?: Record<string, unknown> | null): number {
+  const n = Number(raw?.subscriptionReminderDays);
+  return Number.isFinite(n) && n >= 1 && n <= 60 ? Math.trunc(n) : DEFAULT_SUBSCRIPTION_REMINDER_DAYS;
+}
+
+const AR_MONTHS = [
+  "", "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+  "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
+];
+
+/** Short Arabic label for a period code (mirrors Dart getCycleShortTitleArabic). */
+export function periodShortTitleArabic(period: Period): string {
+  return period.half === 1 ? `النصف الأول ${period.year}` : `النصف الثاني ${period.year}`;
+}
+
+export function formatCairoDayArabic(dayIso: string): string {
+  const [y, m, d] = dayIso.split("-").map(Number);
+  if (!y || !m || !d || m < 1 || m > 12) return dayIso;
+  return `${d} ${AR_MONTHS[m]}`;
+}
+
+/**
+ * True on 1–14 January (H1 grace) and 1–14 July (H2 grace) in Cairo time:
+ * unpaid app-added delegates are not suspended until the 15th.
+ */
+export function isWithinSubscriptionGrace(now: Date): boolean {
+  const d = cairoDate(now);
+  if (d.month === 1 && d.day < SUBSCRIPTION_GRACE_DAYS) return true;
+  if (d.month === 7 && d.day < SUBSCRIPTION_GRACE_DAYS) return true;
+  return false;
+}
+
+/** Cairo `YYYY-MM-DD` N days before [period.endDay] (N=14 → 16 Jun for H1). */
+export function subscriptionReminderCairoDay(period: Period, daysBeforeEnd: number): string {
+  const safe = Math.max(1, Math.min(60, Math.trunc(daysBeforeEnd) || DEFAULT_SUBSCRIPTION_REMINDER_DAYS));
+  const [y, m, d] = period.endDay.split("-").map(Number);
+  const remind = new Date(Date.UTC(y, m - 1, d - safe));
+  return isoDay({
+    year: remind.getUTCFullYear(),
+    month: remind.getUTCMonth() + 1,
+    day: remind.getUTCDate(),
+  });
+}
+
+export function isSubscriptionReminderDay(now: Date, daysBeforeEnd?: number): boolean {
+  const days = daysBeforeEnd ?? DEFAULT_SUBSCRIPTION_REMINDER_DAYS;
+  const current = periodOf(now);
+  return isoDay(cairoDate(now)) === subscriptionReminderCairoDay(current, days);
 }
 
 /** ISO calendar day `YYYY-MM-DD` from config, else [FREE_PROMOTION_LAST_DAY]. */

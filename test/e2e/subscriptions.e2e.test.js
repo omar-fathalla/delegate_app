@@ -14,6 +14,8 @@ if (admin.apps.length === 0) admin.initializeApp({projectId: process.env.GCLOUD_
 const db = admin.firestore();
 
 const JAN1_2027 = L.cairoMidnight(2027, 1, 1); // first paid period starts
+const JAN15_2027 = L.cairoMidnight(2027, 1, 15); // grace ends → suspension day
+const JUL15_2027 = L.cairoMidnight(2027, 7, 15);
 const FEB_2027 = new Date(Date.UTC(2027, 1, 10, 10));
 const delegatePath = (org, uid) => `organizations/${org}/companies/c1/delegates/${uid}`;
 
@@ -63,8 +65,16 @@ test("no suspension during the free promotion (2026)", async () => {
   assert.equal(await status("o1", "app1"), "active");
 });
 
-test("period end: app-added delegates get an expiry hold in every chain; web and pending untouched", async () => {
+test("grace: no new suspension during 1–14 Jan after period end", async () => {
   const res = await J.runSubscriptionSuspension(db, new Date(JAN1_2027.getTime() + 5 * 60 * 1000));
+  assert.equal(res.skipped, "grace_period");
+  assert.equal(res.suspendedDocs, 0);
+  assert.equal(await status("o1", "app1"), "active");
+  assert.equal(await expiryHold("o1", "app1"), null);
+});
+
+test("period end: app-added delegates get an expiry hold in every chain; web and pending untouched", async () => {
+  const res = await J.runSubscriptionSuspension(db, new Date(JAN15_2027.getTime() + 5 * 60 * 1000));
   assert.equal(res.periodCode, "2027_H1");
   // app1 x2, app2, app3, other (c2), plus stacking on the manual suspension.
   assert.equal(res.suspendedDocs, 6);
@@ -94,7 +104,7 @@ test("period end: app-added delegates get an expiry hold in every chain; web and
 });
 
 test("idempotent: a second run changes nothing", async () => {
-  const res = await J.runSubscriptionSuspension(db, new Date(JAN1_2027.getTime() + 60 * 60 * 1000));
+  const res = await J.runSubscriptionSuspension(db, new Date(JAN15_2027.getTime() + 60 * 60 * 1000));
   assert.equal(res.suspendedDocs, 0);
   assert.equal(res.suspendedUsers, 0);
   assert.equal(res.alreadySuspended, 6); // 5 app-added chains + the stacked manual
@@ -351,7 +361,7 @@ test("adding a chain does not itself grant coverage to an unpaid delegate", asyn
   await db.doc(delegatePath("o3", "app9")).set({
     uid: "app9", status: "active", companyUID: "c1",
   });
-  const res = await J.runSubscriptionSuspension(db, new Date(Date.UTC(2027, 1, 14, 10)));
+  const res = await J.runSubscriptionSuspension(db, new Date(JAN15_2027.getTime() + 60 * 60 * 1000));
   assert.ok(res.suspendedDocs >= 1); // o3 was written active without coverage
   assert.ok(await expiryHold("o1", "app9"));
   assert.ok(await expiryHold("o3", "app9"));
@@ -494,8 +504,9 @@ test("advance renewal: next-period quote is 500 and does not clear an expiry hol
   assert.equal(d.nextSubscription.paymentStatus, "paid");
 });
 
-test("advance renewal: on Jan 1 M1 skips prepaid uids and clears a leftover expiry hold", async () => {
+test("advance renewal: during January grace M1 skips prepaid uids and clears a leftover expiry hold", async () => {
   const res = await J.runSubscriptionSuspension(db, new Date(JAN1_2027.getTime() + 2 * 60 * 60 * 1000));
+  assert.equal(res.skipped, "grace_period");
   assert.ok((res.clearedHolds || 0) >= 1, `clearedHolds=${res.clearedHolds}`);
   const d = (await db.doc(delegatePath("o1", "appAdv1")).get()).data();
   assert.equal(d.holds && d.holds.subscription_expired, undefined);
@@ -593,6 +604,37 @@ test("M1 period-start promotion does not reactivate a legacy admin_suspend", asy
   assert.equal(d.statusReason, "admin_suspend");
   assert.equal(d.subscription.periodCode, "2027_H1");
   assert.equal(d.nextSubscription, undefined);
+});
+
+test("July grace then suspension on the 15th for H2", async () => {
+  const jul1 = L.cairoMidnight(2027, 7, 1);
+  const grace = await J.runSubscriptionSuspension(db, new Date(jul1.getTime() + 60 * 60 * 1000));
+  assert.equal(grace.skipped, "grace_period");
+  const jul15 = await J.runSubscriptionSuspension(db, new Date(JUL15_2027.getTime() + 60 * 60 * 1000));
+  assert.equal(jul15.periodCode, "2027_H2");
+  assert.ok(jul15.suspendedDocs >= 1);
+});
+
+test("supervisor reminder on 16 Jun for H1 end (default 14 days)", async () => {
+  const jun16 = L.cairoMidnight(2027, 6, 16);
+  const res = await J.runSubscriptionReminders(db, jun16);
+  assert.equal(res.skipped, undefined);
+  assert.equal(res.endingPeriodCode, "2027_H1");
+  assert.equal(res.nextPeriodCode, "2027_H2");
+  assert.ok(res.notifications >= 1);
+  const notifs = await db.collection("notifications")
+    .where("type", "==", "subscription_renewal_reminder")
+    .where("delegateUid", "==", "sup1")
+    .get();
+  assert.ok(notifs.size >= 1);
+  const body = notifs.docs[0].get("body");
+  assert.match(body, /تذكير|تجديد/);
+});
+
+test("reminder skipped on non-reminder day", async () => {
+  const jun10 = L.cairoMidnight(2027, 6, 10);
+  const res = await J.runSubscriptionReminders(db, jun10);
+  assert.equal(res.skipped, "not_reminder_day");
 });
 
 
