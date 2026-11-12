@@ -155,7 +155,9 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
                       Icon(
                         Icons.task_alt_rounded,
                         size: 72,
-                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                        color: theme.colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.3,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -400,6 +402,10 @@ class _TaskCard extends StatelessWidget {
               'task': task,
               'isAdmin': false,
               'organizationId': organizationId,
+              'currentUserId': delegate.uid,
+              'currentUserRole': delegate.role.name,
+              'currentUserCompanyId': delegate.companyUID,
+              'currentUserName': delegate.fullName,
             },
           );
           if (context.mounted) {

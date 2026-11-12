@@ -5,6 +5,8 @@ import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/features/tasks/data/models/task_model.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
 import 'package:delegate_app/features/tasks/domain/task_image_paths.dart';
+import 'package:delegate_app/features/tasks/domain/task_proof_paths.dart';
+import 'package:delegate_app/features/tasks/domain/entities/task_proof.dart';
 
 abstract class TaskRemoteDataSource {
   Future<TaskModel> createTask(String organizationId, TaskModel task);
@@ -46,6 +48,20 @@ abstract class TaskRemoteDataSource {
   Future<void> updateTask(String organizationId, TaskModel task);
 
   Future<void> deleteTask(String organizationId, String taskId);
+  Future<TaskProof?> getTaskProof(
+    String organizationId,
+    String taskId,
+    String uploaderUid,
+  );
+  Future<List<TaskProof>> listTaskProofs(String organizationId, String taskId);
+  Future<void> saveTaskProof({
+    required String organizationId,
+    required String taskId,
+    required String uploaderUid,
+    required List<String> imagePaths,
+    required String companyUID,
+    String uploadedByName = '',
+  });
 }
 
 class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
@@ -114,10 +130,13 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
     String? adminId,
     String? adminRoleName,
   }) async {
-    Query query = _taskCollection(organizationId)
-        .where('companyId', isEqualTo: companyId);
+    Query query = _taskCollection(
+      organizationId,
+    ).where('companyId', isEqualTo: companyId);
 
-    if (adminId != null && adminRoleName != null && adminRoleName == 'marketingPromotion') {
+    if (adminId != null &&
+        adminRoleName != null &&
+        adminRoleName == 'marketingPromotion') {
       query = query.where(
         Filter.or(
           Filter('createdBy', isEqualTo: adminId),
@@ -127,7 +146,7 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
         ),
       );
     }
-    
+
     query = query.orderBy('createdAt', descending: true);
 
     if (status != null) {
@@ -156,7 +175,10 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
         .orderBy('createdAt', descending: true)
         .limit(100)
         .snapshots(includeMetadataChanges: true)
-        .map((snapshot) => snapshot.docs.map((doc) => TaskModel.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) =>
+              snapshot.docs.map((doc) => TaskModel.fromFirestore(doc)).toList(),
+        );
   }
 
   @override
@@ -166,8 +188,9 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
     String companyId,
     String delegateRoleName,
   ) {
-    Query query = _taskCollection(organizationId)
-        .where('companyId', isEqualTo: companyId);
+    Query query = _taskCollection(
+      organizationId,
+    ).where('companyId', isEqualTo: companyId);
 
     if (delegateRoleName == 'marketing') {
       query = query.where(
@@ -198,7 +221,10 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
         .orderBy('createdAt', descending: true)
         .limit(100)
         .snapshots(includeMetadataChanges: true)
-        .map((snapshot) => snapshot.docs.map((doc) => TaskModel.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) =>
+              snapshot.docs.map((doc) => TaskModel.fromFirestore(doc)).toList(),
+        );
   }
 
   @override
@@ -211,8 +237,9 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
     int? limit,
     dynamic lastDoc,
   }) async {
-    Query query = _taskCollection(organizationId)
-        .where('companyId', isEqualTo: companyId);
+    Query query = _taskCollection(
+      organizationId,
+    ).where('companyId', isEqualTo: companyId);
 
     if (delegateRoleName == 'marketing') {
       query = query.where(
@@ -296,6 +323,93 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
     }
   }
 
+  TaskProof _proofFromDoc(DocumentSnapshot snap) {
+    final data = snap.data();
+    final map = data is Map<String, dynamic>
+        ? data
+        : (data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{});
+    final raw = map['imagePaths'];
+    return TaskProof(
+      uploaderUid: snap.id,
+      imagePaths: resolveTaskProofPaths(
+        raw is List
+            ? [
+                for (final item in raw)
+                  if (item is String) item,
+              ]
+            : const [],
+      ),
+      uploadedByName: (map['uploadedByName'] as String?) ?? '',
+      companyUID: (map['companyUID'] as String?) ?? '',
+    );
+  }
+
+  @override
+  Future<TaskProof?> getTaskProof(
+    String organizationId,
+    String taskId,
+    String uploaderUid,
+  ) async {
+    final snap = await _taskCollection(
+      organizationId,
+    ).doc(taskId).collection('proofs').doc(uploaderUid).get();
+    if (!snap.exists) return null;
+    return _proofFromDoc(snap);
+  }
+
+  @override
+  Future<List<TaskProof>> listTaskProofs(
+    String organizationId,
+    String taskId,
+  ) async {
+    final snap = await _taskCollection(
+      organizationId,
+    ).doc(taskId).collection('proofs').get();
+    return [for (final doc in snap.docs) _proofFromDoc(doc)];
+  }
+
+  @override
+  Future<void> saveTaskProof({
+    required String organizationId,
+    required String taskId,
+    required String uploaderUid,
+    required List<String> imagePaths,
+    required String companyUID,
+    String uploadedByName = '',
+  }) async {
+    final ref = _taskCollection(
+      organizationId,
+    ).doc(taskId).collection('proofs').doc(uploaderUid);
+    final paths = resolveTaskProofPaths(imagePaths);
+    if (paths.isEmpty) {
+      final existing = await ref.get();
+      final previous = existing.exists
+          ? _proofFromDoc(existing).imagePaths
+          : const <String>[];
+      await ref.delete();
+      for (final path in previous) {
+        await _deleteImageQuietly(path);
+      }
+      return;
+    }
+    List<String> previous = const [];
+    final existing = await ref.get();
+    if (existing.exists) previous = _proofFromDoc(existing).imagePaths;
+    await ref.set({
+      'uploadedBy': uploaderUid,
+      'uploadedByName': uploadedByName,
+      'companyUID': companyUID,
+      'taskId': taskId,
+      'imagePaths': paths,
+    });
+    final keep = paths.toSet();
+    for (final path in previous) {
+      if (!keep.contains(path)) {
+        await _deleteImageQuietly(path);
+      }
+    }
+  }
+
   @override
   Future<void> deleteTask(String organizationId, String taskId) async {
     final ref = _taskCollection(organizationId).doc(taskId);
@@ -304,7 +418,9 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       final snap = await ref.get();
       imagePaths = _pathsFromDoc(snap.data() as Map<String, dynamic>?);
     } catch (_) {}
-    // Hard delete, as before: the delegate's stream drops it immediately.
+    // Proof storage deletes are performed by onTaskDeleted (admin SDK);
+    // the sender cannot delete another user's proof objects. Drop the
+    // task document first so the trigger sees the remaining proof docs.
     await ref.delete();
     for (final path in imagePaths) {
       await _deleteImageQuietly(path);
@@ -317,7 +433,10 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
     return resolveTaskImagePaths(
       imagePath: data['imagePath'] as String?,
       imagePaths: raw is List
-          ? [for (final item in raw) if (item is String) item]
+          ? [
+              for (final item in raw)
+                if (item is String) item,
+            ]
           : const [],
     );
   }

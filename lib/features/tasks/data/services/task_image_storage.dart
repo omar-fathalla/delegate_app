@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:delegate_app/features/admin/data/datasources/storage_upload_intent.dart';
+import 'package:delegate_app/features/tasks/domain/task_proof_paths.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
@@ -35,9 +36,14 @@ class TaskImageStorage {
       required String folderId,
       required String companyUID,
       String? purpose,
+      String? organizationId,
       FirebaseFunctions? functions,
     })?
     ensureIntent,
+    this.purpose = 'task_image',
+    this.rootPrefix = 'task_images',
+    this.namePrefix = 'task',
+    this.organizationId,
   }) : _storage = storage,
        _auth = auth,
        _functions = functions,
@@ -50,9 +56,40 @@ class TaskImageStorage {
     required String folderId,
     required String companyUID,
     String? purpose,
+    String? organizationId,
     FirebaseFunctions? functions,
   })?
   _ensureIntent;
+
+  final String purpose;
+  final String rootPrefix;
+  final String namePrefix;
+  final String? organizationId;
+
+  /// Uploads a delegate proof photo under `task_proof/{company}/{uid}/`.
+  factory TaskImageStorage.proof({
+    FirebaseStorage? storage,
+    FirebaseAuth? auth,
+    FirebaseFunctions? functions,
+    String? organizationId,
+    Future<String?> Function({
+      required String folderId,
+      required String companyUID,
+      String? purpose,
+      String? organizationId,
+      FirebaseFunctions? functions,
+    })?
+    ensureIntent,
+  }) => TaskImageStorage(
+    storage: storage,
+    auth: auth,
+    functions: functions,
+    ensureIntent: ensureIntent,
+    purpose: kTaskProofPurpose,
+    rootPrefix: kTaskProofRoot,
+    namePrefix: 'proof',
+    organizationId: organizationId,
+  );
 
   static const int maxBytes = 5 * 1024 * 1024;
 
@@ -74,12 +111,15 @@ class TaskImageStorage {
     if (company.isEmpty) throw StateError('company_required');
     final token = DateTime.now().millisecondsSinceEpoch.toString();
     if (token.contains('_')) throw StateError('invalid-token');
-    final name = fileNameFor(uid, token);
-    final path = pathFor(company, uid, token);
+    // Re-encoding to JPEG in the picker drops EXIF / GPS so the upload
+    // does not leak the uploader's location or device metadata.
+    final name = '${namePrefix}_${uid}_$token.jpg';
+    final path = '$rootPrefix/$company/$uid/$name';
     final intentError = await (_ensureIntent ?? ensureStorageUploadIntent)(
       folderId: name,
       companyUID: company,
-      purpose: 'task_image',
+      purpose: purpose,
+      organizationId: organizationId,
       functions: _functions,
     );
     if (intentError != null) {
@@ -109,9 +149,17 @@ class TaskImageStorage {
 
 /// Loads task-image bytes through the [getTaskImage] callable.
 class TaskImageFetcher {
-  TaskImageFetcher({FirebaseFunctions? functions}) : _functions = functions;
+  TaskImageFetcher({
+    FirebaseFunctions? functions,
+    this.callableName = 'getTaskImage',
+  }) : _functions = functions;
+
+  /// Loads proof photos through [getTaskProofImage].
+  factory TaskImageFetcher.proof({FirebaseFunctions? functions}) =>
+      TaskImageFetcher(functions: functions, callableName: 'getTaskProofImage');
 
   final FirebaseFunctions? _functions;
+  final String callableName;
 
   /// Test/preview seam used by the thumbnail widget.
   @visibleForTesting
@@ -145,7 +193,7 @@ class TaskImageFetcher {
     }
     final callable =
         (_functions ?? FirebaseFunctions.instanceFor(region: 'us-central1'))
-            .httpsCallable('getTaskImage');
+            .httpsCallable(callableName);
     final result = await callable.call({
       'imagePath': path,
       if (taskId != null && taskId.trim().isNotEmpty) 'taskId': taskId.trim(),

@@ -188,6 +188,9 @@ final appRouter = GoRouter(
             isAdmin: extras['isAdmin'] as bool,
             organizationId: extras['organizationId'] as String,
             currentUserId: extras['currentUserId'] as String?,
+            currentUserRole: extras['currentUserRole'] as String?,
+            currentUserCompanyId: extras['currentUserCompanyId'] as String?,
+            currentUserName: extras['currentUserName'] as String?,
           ),
         );
       },

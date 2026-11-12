@@ -199,6 +199,7 @@ class TaskImagePickerField extends StatefulWidget {
     this.attachLabel,
     this.storage,
     this.picker,
+    this.fetcher,
   });
 
   final String organizationId;
@@ -209,12 +210,14 @@ class TaskImagePickerField extends StatefulWidget {
   /// When false (edit screen), picking a replacement or tapping Remove
   /// must not delete the saved object until the sender saves.
   final bool deleteStorageImmediately;
+
   /// Overrides the empty-state attach button label.
   final String? attachLabel;
   final ValueChanged<TaskImageUpload?> onChanged;
   final ValueChanged<bool>? onUploadingChanged;
   final TaskImageStorage? storage;
   final ImagePicker? picker;
+  final TaskImageFetcher? fetcher;
 
   /// Whether picking a replacement or tapping Remove should delete
   /// [previousPath] immediately. Edit screens pass false and wait for Save.
@@ -402,6 +405,7 @@ class _TaskImagePickerFieldState extends State<TaskImagePickerField> {
         imagePath: _path!,
         taskId: widget.initialTaskId,
         organizationId: widget.organizationId,
+        fetcher: widget.fetcher,
       );
     }
 
@@ -571,6 +575,9 @@ class TaskImagePickerList extends StatefulWidget {
     this.deleteStorageImmediately = true,
     this.storage,
     this.picker,
+    this.attachLabel,
+    this.attachAnotherLabel,
+    this.fetcher,
   });
 
   final String organizationId;
@@ -582,6 +589,9 @@ class TaskImagePickerList extends StatefulWidget {
   final ValueChanged<bool>? onUploadingChanged;
   final TaskImageStorage? storage;
   final ImagePicker? picker;
+  final String? attachLabel;
+  final String? attachAnotherLabel;
+  final TaskImageFetcher? fetcher;
 
   @override
   State<TaskImagePickerList> createState() => _TaskImagePickerListState();
@@ -626,6 +636,7 @@ class _TaskImagePickerListState extends State<TaskImagePickerList> {
             deleteStorageImmediately: widget.deleteStorageImmediately,
             storage: widget.storage,
             picker: widget.picker,
+            fetcher: widget.fetcher,
             onChanged: (upload) {
               setState(() {
                 if (upload == null) {
@@ -645,10 +656,13 @@ class _TaskImagePickerListState extends State<TaskImagePickerList> {
             key: ValueKey('slot-new-${_paths.length}'),
             organizationId: widget.organizationId,
             companyId: widget.companyId,
-            attachLabel: _paths.isEmpty ? null : l10n.taskImageAttachAnother,
+            attachLabel: _paths.isEmpty
+                ? widget.attachLabel
+                : (widget.attachAnotherLabel ?? l10n.taskImageAttachAnother),
             deleteStorageImmediately: widget.deleteStorageImmediately,
             storage: widget.storage,
             picker: widget.picker,
+            fetcher: widget.fetcher,
             onChanged: (upload) {
               if (upload == null) return;
               if (_paths.length >= kMaxTaskImages) return;
@@ -662,8 +676,8 @@ class _TaskImagePickerListState extends State<TaskImagePickerList> {
           Text(
             l10n.taskImageMaxReached,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ],

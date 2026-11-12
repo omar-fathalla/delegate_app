@@ -5016,6 +5016,30 @@ abstract class AppLocalizations {
   /// **'You can attach up to 3 images'**
   String get taskImageMaxReached;
 
+  /// No description provided for @taskProofTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Proof of work'**
+  String get taskProofTitle;
+
+  /// No description provided for @taskProofAttach.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach proof'**
+  String get taskProofAttach;
+
+  /// No description provided for @taskProofBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Proof of work — {name}'**
+  String taskProofBy(String name);
+
+  /// No description provided for @taskProofSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save proof photos'**
+  String get taskProofSave;
+
   /// No description provided for @taskEditedLabel.
   ///
   /// In en, this message translates to:

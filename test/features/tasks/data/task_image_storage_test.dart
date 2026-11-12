@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:delegate_app/features/tasks/data/services/task_image_storage.dart';
+import 'package:delegate_app/features/tasks/domain/task_proof_paths.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -101,4 +102,11 @@ void main() {
       verify(() => callable.call(any())).called(1);
     },
   );
+  test('proof storage uses a distinct purpose and N1-r path', () {
+    final storage = TaskImageStorage.proof();
+    expect(storage.purpose, kTaskProofPurpose);
+    expect(storage.rootPrefix, kTaskProofRoot);
+    expect(storage.namePrefix, 'proof');
+    expect(TaskImageFetcher.proof().callableName, 'getTaskProofImage');
+  });
 }

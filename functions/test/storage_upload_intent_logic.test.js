@@ -141,3 +141,34 @@ test("task-image folder id is exact N1-r ownership", () => {
   assert.equal(L.isTaskImageFolderId("task_sup1_2_171.jpg", "sup1"), false);
   assert.equal(L.isTaskImageFolderId("task_sup2_171.jpg", "sup1"), false);
 });
+
+test("proof purpose allows delegates and rejects staff who are not assignees", () => {
+  const d = L.decideEnsureIntent({
+    authenticated: true, anonymous: false, role: "delegate",
+    callerCompany: "co_a", requestedCompany: "co_a",
+    ownerCompany: null, lockedByIntent: false, purpose: "task_proof_image",
+  });
+  assert.deepEqual(d, {ok: true, action: "create", companyUID: "co_a"});
+  assert.equal(L.decideEnsureIntent({
+    authenticated: true, anonymous: false, role: "hr",
+    callerCompany: "co_a", requestedCompany: "co_a",
+    ownerCompany: null, lockedByIntent: false, purpose: "task_proof_image",
+  }).reason, "caller_not_staff");
+  assert.equal(L.decideEnsureIntent({
+    authenticated: true, anonymous: false, role: "super-admin",
+    callerCompany: "co_a", requestedCompany: "co_a",
+    ownerCompany: null, lockedByIntent: false, purpose: "task_proof_image",
+  }).reason, "caller_not_staff");
+  assert.equal(L.decideEnsureIntent({
+    authenticated: true, anonymous: false, role: "company-admin",
+    callerCompany: "co_a", requestedCompany: "co_a",
+    ownerCompany: null, lockedByIntent: false, purpose: "task_proof_image",
+  }).reason, "caller_not_staff");
+});
+
+test("proof folder id is exact N1-r ownership", () => {
+  assert.equal(L.isTaskProofFolderId("proof_del1_171.jpg", "del1"), true);
+  assert.equal(L.isTaskProofFolderId("proof_del1_2_171.jpg", "del1"), false);
+  assert.equal(L.isTaskProofFolderId("proof_del2_171.jpg", "del1"), false);
+  assert.equal(L.isTaskProofFolderId("task_del1_171.jpg", "del1"), false);
+});

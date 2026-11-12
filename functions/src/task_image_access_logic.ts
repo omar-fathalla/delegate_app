@@ -4,6 +4,8 @@
  * set resolved for new-task notifications). Other companies and
  * unrelated roles are denied. No I/O.
  */
+import {parseTaskProofPath} from "./task_proof_access_logic";
+
 export type ParsedTaskImagePath =
   | {
     kind: "new";
@@ -180,7 +182,8 @@ export function grantReaderUids(createdBy: unknown, recipientIds: readonly strin
 }
 
 export function shouldStripTaskImageDownloadToken(objectName: unknown): boolean {
-  return parseTaskImagePath(objectName) != null;
+  return parseTaskImagePath(objectName) != null
+    || parseTaskProofPath(objectName) != null;
 }
 
 export type TaskImageGrantView = {

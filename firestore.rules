@@ -1478,6 +1478,82 @@ service cloud.firestore {
         allow update: if signedIn() && taskCanUpdate();
         // Hard delete: the sender (or global staff). Delegates only their own.
         allow delete: if signedIn() && taskCanDelete();
+
+        // Phase 4: per-uploader proof photos. Isolated from supervisor
+        // imagePaths so a title-only or sender edit cannot wipe them.
+        match /proofs/{uploaderUid} {
+          function proofTask() {
+            return get(/databases/$(database)/documents/organizations/$(orgId)/tasks/$(taskId)).data;
+          }
+          function proofTaskCompany() {
+            return proofTask().get('companyId', '');
+          }
+          function isProofSender() {
+            return signedIn() && proofTask().get('createdBy', '') == request.auth.uid;
+          }
+          function isProofCompanySupervisor() {
+            return signedIn()
+              && isCompanyAdmin()
+              && callerCompany() == proofTaskCompany();
+          }
+          function proofPathOk(path) {
+            return path is string
+              && path.matches(
+                '^task_proof/' + proofTaskCompany() + '/' + request.auth.uid
+                  + '/proof_' + request.auth.uid + '_[^_]+$'
+              );
+          }
+          function incomingProofListOk() {
+            return request.resource.data.imagePaths is list
+              && request.resource.data.imagePaths.size() <= 3
+              && (request.resource.data.imagePaths.size() == 0
+                || proofPathOk(request.resource.data.imagePaths[0]))
+              && (request.resource.data.imagePaths.size() < 2
+                || proofPathOk(request.resource.data.imagePaths[1]))
+              && (request.resource.data.imagePaths.size() < 3
+                || proofPathOk(request.resource.data.imagePaths[2]));
+          }
+          function proofMetaOk() {
+            return request.resource.data.uploadedBy == request.auth.uid
+              && request.resource.data.companyUID == proofTaskCompany()
+              && request.resource.data.get('taskId', taskId) == taskId
+              && incomingProofListOk();
+          }
+          function proofCallerBlocked() {
+            let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+            let delPath = /databases/$(database)/documents/organizations/$(orgId)/companies/$(proofTaskCompany())/delegates/$(request.auth.uid);
+            let data = exists(userPath)
+              ? get(userPath).data
+              : (exists(delPath) ? get(delPath).data : {});
+            let status = data.get('status', 'active');
+            let holds = data.keys().hasAny(['holds']) && data.holds is map
+              ? data.holds
+              : {};
+            let held = holds.keys().hasAny(['admin_suspend'])
+              || holds.keys().hasAny(['subscription_expired'])
+              || holds.keys().hasAny(['billing_cycle_reset']);
+            return held
+              || data.get('isActive', true) == false
+              || status == 'pending'
+              || status == 'rejected'
+              || status == 'deleted'
+              || status == 'disabled'
+              || status == 'suspended'
+              || status == 'inactive';
+          }
+
+          allow get: if signedIn() && (
+            request.auth.uid == uploaderUid
+            || isProofSender()
+            || isProofCompanySupervisor()
+          );
+          allow list: if signedIn() && (isProofSender() || isProofCompanySupervisor());
+          allow create, update: if signedIn()
+            && request.auth.uid == uploaderUid
+            && !proofCallerBlocked()
+            && proofMetaOk();
+          allow delete: if signedIn() && request.auth.uid == uploaderUid;
+        }
       }
 
       match /attendance_logs/{logId} {

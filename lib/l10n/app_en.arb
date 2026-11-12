@@ -2318,6 +2318,15 @@
   "taskImageTooLarge": "The image is too large. Choose a smaller one.",
   "taskImageAttachAnother": "Attach another image",
   "taskImageMaxReached": "You can attach up to 3 images",
+  "taskProofTitle": "Proof of work",
+  "taskProofAttach": "Attach proof",
+  "taskProofBy": "Proof of work — {name}",
+  "@taskProofBy": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "taskProofSave": "Save proof photos",
   "taskEditedLabel": "Edited",
   "taskEditAction": "Edit",
   "taskDeleteAction": "Delete",

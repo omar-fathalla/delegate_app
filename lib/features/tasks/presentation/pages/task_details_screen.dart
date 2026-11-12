@@ -1,4 +1,8 @@
 import 'package:delegate_app/features/tasks/data/services/task_image_storage.dart';
+import 'package:delegate_app/features/tasks/data/datasources/task_remote_data_source.dart';
+import 'package:delegate_app/features/tasks/domain/entities/task_proof.dart';
+import 'package:delegate_app/features/tasks/domain/task_proof_paths.dart';
+
 import 'package:delegate_app/features/tasks/presentation/widgets/task_image_widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -26,6 +30,14 @@ class TaskDetailsScreen extends StatefulWidget {
   /// Test seam; defaults to the Firebase Auth uid.
   final String? authUidOverride;
 
+  /// Role / company of the signed-in viewer, used for proof-photo access.
+  final String? currentUserRole;
+  final String? currentUserCompanyId;
+  final String? currentUserName;
+
+  /// Test seam for proof-photo reads and writes.
+  final TaskRemoteDataSource? proofSource;
+
   const TaskDetailsScreen({
     super.key,
     required this.task,
@@ -33,6 +45,10 @@ class TaskDetailsScreen extends StatefulWidget {
     required this.organizationId,
     this.currentUserId,
     this.authUidOverride,
+    this.currentUserRole,
+    this.currentUserCompanyId,
+    this.currentUserName,
+    this.proofSource,
   });
 
   @override
@@ -53,6 +69,13 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   bool _imageUploading = false;
   bool _editSaved = false;
   int _imageViewEpoch = 0;
+  List<TaskProof> _visibleProofs = const [];
+  List<String> _ownProofPaths = [];
+  List<String> _savedOwnProofPaths = [];
+  final List<String> _sessionProofUploads = [];
+  bool _proofUploading = false;
+  bool _proofSaved = false;
+  int _proofViewEpoch = 0;
 
   /// Only the supervisor who sent the task may edit or delete it.
   bool get _isSender {
@@ -64,6 +87,36 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     return createdBy == authUid || createdBy == widget.currentUserId;
   }
 
+  String? get _viewerId =>
+      widget.currentUserId ??
+      widget.authUidOverride ??
+      FirebaseAuth.instance.currentUser?.uid;
+
+  bool get _canViewAllProofs {
+    if (_isSender) return true;
+    return isCompanySupervisorRole(widget.currentUserRole) &&
+        (widget.currentUserCompanyId ?? '') == _task.companyId;
+  }
+
+  bool get _canEditOwnProofs {
+    if (_viewerId == null || _viewerId!.isEmpty) return false;
+    if (_isSender) return false;
+    if (!isTaskProofUploaderRole(widget.currentUserRole)) return false;
+    return _currentStatus != TaskStatus.cancelled &&
+        _task.status != TaskStatus.cancelled;
+  }
+
+  bool get _proofsChanged =>
+      _ownProofPaths.join('\n') != _savedOwnProofPaths.join('\n');
+
+  TaskRemoteDataSource get _proofs =>
+      widget.proofSource ?? di.sl<TaskRemoteDataSource>();
+
+  TaskImageStorage get _proofStorage =>
+      TaskImageStorage.proof(organizationId: widget.organizationId);
+
+  TaskImageFetcher get _proofFetcher => TaskImageFetcher.proof();
+
   @override
   void initState() {
     super.initState();
@@ -74,6 +127,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     _currentStatus = _task.status;
     _currentPriority = _task.priority;
     _dueDate = _task.dueDate;
+    _loadProofs();
   }
 
   @override
@@ -81,6 +135,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     // Cancel / abandon must leave already-saved images intact. Only drop
     // uncommitted new uploads from this edit session.
     _discardUncommittedUploads();
+    _discardUncommittedProofUploads();
     _titleController.dispose();
     _descriptionController.dispose();
     _notesController.dispose();
@@ -98,6 +153,89 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     _sessionUploads.clear();
   }
 
+  void _discardUncommittedProofUploads() {
+    if (_proofSaved) return;
+    final keep = _savedOwnProofPaths.toSet();
+    for (final path in _sessionProofUploads) {
+      if (path.isNotEmpty && !keep.contains(path)) {
+        _proofStorage.deleteQuietly(path);
+      }
+    }
+    _sessionProofUploads.clear();
+  }
+
+  Future<void> _loadProofs() async {
+    final uid = _viewerId;
+    try {
+      if (_canViewAllProofs) {
+        final all = await _proofs.listTaskProofs(
+          widget.organizationId,
+          _task.uid,
+        );
+        if (!mounted) return;
+        final own = [
+          for (final p in all)
+            if (p.uploaderUid == uid) p,
+        ];
+        final others = [
+          for (final p in all)
+            if (p.uploaderUid != uid && p.imagePaths.isNotEmpty) p,
+        ];
+        setState(() {
+          _visibleProofs = others;
+          _ownProofPaths = own.isEmpty
+              ? []
+              : List<String>.from(own.first.imagePaths);
+          _savedOwnProofPaths = List<String>.from(_ownProofPaths);
+          _proofViewEpoch++;
+        });
+        return;
+      }
+      if (uid == null || uid.isEmpty) return;
+      final mine = await _proofs.getTaskProof(
+        widget.organizationId,
+        _task.uid,
+        uid,
+      );
+      if (!mounted) return;
+      setState(() {
+        _visibleProofs = const [];
+        _ownProofPaths = List<String>.from(mine?.imagePaths ?? const []);
+        _savedOwnProofPaths = List<String>.from(_ownProofPaths);
+        _proofViewEpoch++;
+      });
+    } catch (_) {
+      // Hide rather than show a broken-load error.
+      if (!mounted) return;
+      setState(() {
+        _visibleProofs = const [];
+      });
+    }
+  }
+
+  Future<bool> _saveProofs() async {
+    if (!_canEditOwnProofs || !_proofsChanged) return true;
+    final uid = _viewerId;
+    if (uid == null) return false;
+    try {
+      await _proofs.saveTaskProof(
+        organizationId: widget.organizationId,
+        taskId: _task.uid,
+        uploaderUid: uid,
+        imagePaths: List<String>.from(_ownProofPaths),
+        companyUID: _task.companyId,
+        uploadedByName: widget.currentUserName ?? '',
+      );
+      _savedOwnProofPaths = List<String>.from(_ownProofPaths);
+      _sessionProofUploads.clear();
+      _proofSaved = true;
+      _proofViewEpoch++;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   void _beginEditing() {
     _editPaths = List<String>.from(_task.resolvedImagePaths);
     _sessionUploads.clear();
@@ -105,10 +243,27 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     _isEditing = true;
   }
 
-  void _saveChanges(BuildContext context) {
+  Future<void> _saveChanges(BuildContext context) async {
+    if (_canEditOwnProofs && _proofsChanged) {
+      final ok = await _saveProofs();
+      if (!ok) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context)!.taskImageUploadFailed,
+              ),
+            ),
+          );
+        }
+        return;
+      }
+    }
+    if (!context.mounted) return;
     final original = _task.resolvedImagePaths;
     final imageChanged = _editPaths.join('\n') != original.join('\n');
-    final contentChanged = imageChanged ||
+    final contentChanged =
+        imageChanged ||
         _titleController.text != _task.title ||
         _descriptionController.text != _task.description;
     var base = _task;
@@ -218,10 +373,14 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                         value: 'delete',
                         child: ListTile(
                           contentPadding: EdgeInsets.zero,
-                          leading: Icon(Symbols.delete_rounded,
-                              color: theme.colorScheme.error),
-                          title: Text(l10n.taskDeleteAction,
-                              style: TextStyle(color: theme.colorScheme.error)),
+                          leading: Icon(
+                            Symbols.delete_rounded,
+                            color: theme.colorScheme.error,
+                          ),
+                          title: Text(
+                            l10n.taskDeleteAction,
+                            style: TextStyle(color: theme.colorScheme.error),
+                          ),
                         ),
                       ),
                     ],
@@ -378,7 +537,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                   ] else if (_task.hasImage) ...[
                     const SizedBox(height: 12),
                     TaskImageGallery(
-                      key: ValueKey('view-$_imageViewEpoch-${_task.resolvedImagePaths.join(",")}'),
+                      key: ValueKey(
+                        'view-$_imageViewEpoch-${_task.resolvedImagePaths.join(",")}',
+                      ),
                       imagePaths: _task.resolvedImagePaths,
                       taskId: _task.uid,
                       organizationId: widget.organizationId,
@@ -388,6 +549,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                     const SizedBox(height: 8),
                     const TaskEditedLabel(),
                   ],
+                  ..._buildProofSection(l10n, theme),
                   const SizedBox(height: 12),
                   _buildField(
                     label: l10n.taskPriority,
@@ -677,6 +839,16 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
+                  if (_canEditOwnProofs &&
+                      _proofsChanged &&
+                      !_proofUploading) ...[
+                    const SizedBox(height: 12),
+                    FilledButton.tonalIcon(
+                      onPressed: () => _saveChanges(context),
+                      icon: const Icon(Icons.photo_library_outlined),
+                      label: Text(l10n.taskProofSave),
+                    ),
+                  ],
                   if (_isSender && !_isEditing) ...[
                     const SizedBox(height: 16),
                     FilledButton.tonalIcon(
@@ -736,6 +908,92 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       case TaskPriority.low:
         return Icon(Icons.arrow_downward_rounded, color: color, size: 20);
     }
+  }
+
+  List<Widget> _buildProofSection(AppLocalizations l10n, ThemeData theme) {
+    final others = [
+      for (final proof in _visibleProofs)
+        if (proof.imagePaths.isNotEmpty) proof,
+    ];
+    final showOwnEditor = _canEditOwnProofs;
+    final showOwnViewer = !showOwnEditor && _ownProofPaths.isNotEmpty;
+    if (others.isEmpty && !showOwnEditor && !showOwnViewer) {
+      return const [];
+    }
+    final children = <Widget>[const SizedBox(height: 16)];
+    for (final proof in others) {
+      final name = proof.uploadedByName.trim();
+      children.add(
+        _buildField(
+          label: name.isEmpty ? l10n.taskProofTitle : l10n.taskProofBy(name),
+          child: TaskImageGallery(
+            key: ValueKey('proof-${proof.uploaderUid}-$_proofViewEpoch'),
+            imagePaths: proof.imagePaths,
+            taskId: _task.uid,
+            organizationId: widget.organizationId,
+            fetcher: _proofFetcher,
+          ),
+        ),
+      );
+      children.add(const SizedBox(height: 12));
+    }
+    if (showOwnEditor) {
+      children.add(
+        _buildField(
+          label: l10n.taskProofTitle,
+          child: TaskImagePickerList(
+            key: ValueKey('proof-edit-$_proofViewEpoch'),
+            organizationId: widget.organizationId,
+            companyId: _task.companyId,
+            initialPaths: _ownProofPaths,
+            initialTaskId: _task.uid,
+            deleteStorageImmediately: false,
+            storage: _proofStorage,
+            fetcher: _proofFetcher,
+            attachLabel: l10n.taskProofAttach,
+            attachAnotherLabel: l10n.taskImageAttachAnother,
+            onChanged: (paths) {
+              final previous = _ownProofPaths.toSet();
+              setState(() => _ownProofPaths = paths);
+              for (final path in paths) {
+                if (!previous.contains(path) &&
+                    !_savedOwnProofPaths.contains(path)) {
+                  _sessionProofUploads.add(path);
+                }
+              }
+              final keep = paths.toSet().union(_savedOwnProofPaths.toSet());
+              final leftover = [
+                for (final path in previous)
+                  if (!keep.contains(path) &&
+                      _sessionProofUploads.contains(path))
+                    path,
+              ];
+              for (final path in leftover) {
+                _proofStorage.deleteQuietly(path);
+                _sessionProofUploads.remove(path);
+              }
+            },
+            onUploadingChanged: (v) => setState(() => _proofUploading = v),
+          ),
+        ),
+      );
+    } else if (showOwnViewer) {
+      children.add(
+        _buildField(
+          label: l10n.taskProofTitle,
+          child: TaskImageGallery(
+            key: ValueKey(
+              'proof-own-$_proofViewEpoch-${_ownProofPaths.join(",")}',
+            ),
+            imagePaths: _ownProofPaths,
+            taskId: _task.uid,
+            organizationId: widget.organizationId,
+            fetcher: _proofFetcher,
+          ),
+        ),
+      );
+    }
+    return children;
   }
 
   Icon _getStatusIcon(TaskStatus status, {Color? color}) {
@@ -817,7 +1075,11 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     final colorScheme = theme.colorScheme;
     final isMobile = MediaQuery.of(context).size.width <= 768;
 
-    Widget buildSheetContent(BuildContext modalContext, StateSetter setModalState, bool isDeleting) {
+    Widget buildSheetContent(
+      BuildContext modalContext,
+      StateSetter setModalState,
+      bool isDeleting,
+    ) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         child: Column(
@@ -844,7 +1106,11 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                     color: colorScheme.errorContainer.withValues(alpha: 0.6),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(Icons.delete_outline_rounded, color: colorScheme.error, size: 24),
+                  child: Icon(
+                    Icons.delete_outline_rounded,
+                    color: colorScheme.error,
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -853,12 +1119,18 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                     children: [
                       Text(
                         l10n.deleteTask,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         _task.title,
-                        style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -870,7 +1142,11 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
             const SizedBox(height: 16),
             Text(
               l10n.deleteTaskConfirmation,
-              style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant, height: 1.4),
+              style: TextStyle(
+                fontSize: 13,
+                color: colorScheme.onSurfaceVariant,
+                height: 1.4,
+              ),
             ),
             const SizedBox(height: 24),
 
@@ -894,7 +1170,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        onTap: isDeleting ? null : () => Navigator.pop(modalContext),
+                        onTap: isDeleting
+                            ? null
+                            : () => Navigator.pop(modalContext),
                         child: Center(
                           child: Text(
                             l10n.cancel,
@@ -938,7 +1216,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                                   result.fold(
                                     (failure) {
                                       setModalState(() => isDeleting = false);
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         SnackBar(
                                           content: Text(failure.message),
                                           backgroundColor: colorScheme.error,
@@ -948,10 +1228,17 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                                     (_) {
                                       Navigator.pop(modalContext);
                                       Navigator.pop(context, true);
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         SnackBar(
-                                          content: Text(AppLocalizations.of(context)!.taskDeleted),
-                                          backgroundColor: Colors.green.shade700,
+                                          content: Text(
+                                            AppLocalizations.of(
+                                              context,
+                                            )!.taskDeleted,
+                                          ),
+                                          backgroundColor:
+                                              Colors.green.shade700,
                                         ),
                                       );
                                     },
@@ -961,7 +1248,11 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                                     setModalState(() => isDeleting = false);
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text(AppLocalizations.of(context)!.taskDeleteFailed(e)),
+                                        content: Text(
+                                          AppLocalizations.of(
+                                            context,
+                                          )!.taskDeleteFailed(e),
+                                        ),
                                         backgroundColor: colorScheme.error,
                                       ),
                                     );
@@ -981,7 +1272,11 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                               : Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.delete_forever_rounded, size: 18, color: colorScheme.onError),
+                                    Icon(
+                                      Icons.delete_forever_rounded,
+                                      size: 18,
+                                      color: colorScheme.onError,
+                                    ),
                                     const SizedBox(width: 6),
                                     Text(
                                       l10n.delete,
@@ -1015,7 +1310,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         builder: (modalCtx) {
           bool isDeleting = false;
           return StatefulBuilder(
-            builder: (ctx, setModalState) => buildSheetContent(modalCtx, setModalState, isDeleting),
+            builder: (ctx, setModalState) =>
+                buildSheetContent(modalCtx, setModalState, isDeleting),
           );
         },
       );
@@ -1026,11 +1322,14 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
           bool isDeleting = false;
           return Dialog(
             backgroundColor: colorScheme.surface,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
               child: StatefulBuilder(
-                builder: (ctx, setModalState) => buildSheetContent(modalCtx, setModalState, isDeleting),
+                builder: (ctx, setModalState) =>
+                    buildSheetContent(modalCtx, setModalState, isDeleting),
               ),
             ),
           );

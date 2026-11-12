@@ -2800,6 +2800,20 @@ class AppLocalizationsAr extends AppLocalizations {
   String get taskImageMaxReached => 'يمكن إرفاق حتى 3 صور';
 
   @override
+  String get taskProofTitle => 'إثبات العمل';
+
+  @override
+  String get taskProofAttach => 'إرفاق إثبات';
+
+  @override
+  String taskProofBy(String name) {
+    return 'إثبات العمل — $name';
+  }
+
+  @override
+  String get taskProofSave => 'حفظ إثبات العمل';
+
+  @override
   String get taskEditedLabel => 'معدّلة';
 
   @override

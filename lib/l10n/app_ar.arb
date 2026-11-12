@@ -1828,6 +1828,25 @@
   "@taskImageMaxReached": {
     "description": "Shown when the task already has 3 images"
   },
+  "taskProofTitle": "إثبات العمل",
+  "@taskProofTitle": {
+    "description": "Section title for delegate proof-of-work photos"
+  },
+  "taskProofAttach": "إرفاق إثبات",
+  "@taskProofAttach": {
+    "description": "Button to attach a proof photo"
+  },
+  "taskProofBy": "إثبات العمل — {name}",
+  "@taskProofBy": {
+    "description": "Read-only proof section labeled with the uploader name",
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "taskProofSave": "حفظ إثبات العمل",
+  "@taskProofSave": {
+    "description": "Save the delegate's proof photos"
+  },
   "taskEditedLabel": "معدّلة",
   "@taskEditedLabel": {
     "description": "Label on a task the sender edited"
