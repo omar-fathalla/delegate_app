@@ -2793,6 +2793,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'The image is too large. Choose a smaller one.';
 
   @override
+  String get taskImageAttachAnother => 'Attach another image';
+
+  @override
+  String get taskImageMaxReached => 'You can attach up to 3 images';
+
+  @override
   String get taskEditedLabel => 'Edited';
 
   @override

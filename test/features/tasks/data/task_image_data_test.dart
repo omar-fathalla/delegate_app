@@ -180,4 +180,111 @@ void main() {
       verify(() => ref.delete()).called(1);
     },
   );
+
+  test(
+    'createTask stores up to 3 imagePaths and keeps imagePath as the first',
+    () async {
+      const paths = [
+        'task_images/c1/sup-1/task_sup-1_1.jpg',
+        'task_images/c1/sup-1/task_sup-1_2.jpg',
+        'task_images/c1/sup-1/task_sup-1_3.jpg',
+      ];
+      final created = await ds.createTask(
+        'o1',
+        TaskModel.fromEntity(
+          base.copyWith(
+            imagePath: paths.first,
+            imagePaths: paths,
+            clearImageUrl: true,
+          ),
+        ),
+      );
+      final data = (await db.doc('organizations/o1/tasks/${created.uid}').get())
+          .data()!;
+      expect(data['imagePath'], paths.first);
+      expect(data['imagePaths'], paths);
+      expect(data.containsKey('imageUrl'), isFalse);
+      final back = TaskModel.fromFirestore(
+        await db.doc('organizations/o1/tasks/${created.uid}').get(),
+      );
+      expect(back.resolvedImagePaths, paths);
+    },
+  );
+
+  test(
+    'legacy single imagePath still loads when imagePaths is absent',
+    () async {
+      const path = 'task_images/c1/sup-1/task_sup-1_1.jpg';
+      await db.doc('organizations/o1/tasks/t1').set({
+        ...TaskModel.fromEntity(base.copyWith(clearImage: true)).toFirestore(),
+        'imagePath': path,
+      });
+      final back = TaskModel.fromFirestore(
+        await db.doc('organizations/o1/tasks/t1').get(),
+      );
+      expect(back.imagePath, path);
+      expect(back.resolvedImagePaths, [path]);
+      expect(back.hasImage, isTrue);
+    },
+  );
+
+  test('title-only edit keeps all images when imageUrl is absent', () async {
+    const paths = [
+      'task_images/c1/sup-1/task_sup-1_1.jpg',
+      'task_images/c1/sup-1/task_sup-1_2.jpg',
+    ];
+    final phase3 = TaskModel.fromEntity(
+      base.copyWith(
+        imagePath: paths.first,
+        imagePaths: paths,
+        clearImageUrl: true,
+      ),
+    );
+    await db.doc('organizations/o1/tasks/t1').set(phase3.toFirestore());
+    await ds.updateTask(
+      'o1',
+      TaskModel.fromEntity(
+        phase3.copyWith(title: 'T2', editedAt: DateTime(2026, 11, 12, 9)),
+      ),
+    );
+    final data = (await db.doc('organizations/o1/tasks/t1').get()).data()!;
+    expect(data['imagePath'], paths.first);
+    expect(data['imagePaths'], paths);
+    expect(data['title'], 'T2');
+    verifyNever(() => ref.delete());
+  });
+
+  test(
+    'replace + save of one of two images links the new file and deletes only the old one',
+    () async {
+      const kept = 'task_images/c1/sup-1/task_sup-1_1.jpg';
+      const oldPath = 'task_images/c1/sup-1/task_sup-1_2.jpg';
+      const newPath = 'task_images/c1/sup-1/task_sup-1_3.jpg';
+      final before = TaskModel.fromEntity(
+        base.copyWith(
+          imagePath: kept,
+          imagePaths: [kept, oldPath],
+          clearImageUrl: true,
+        ),
+      );
+      await db.doc('organizations/o1/tasks/t1').set(before.toFirestore());
+      await ds.updateTask(
+        'o1',
+        TaskModel.fromEntity(
+          before.copyWith(
+            imagePath: kept,
+            imagePaths: [kept, newPath],
+            editedAt: DateTime(2026, 11, 12, 9),
+          ),
+        ),
+      );
+      final data = (await db.doc('organizations/o1/tasks/t1').get()).data()!;
+      expect(data['imagePath'], kept);
+      expect(data['imagePaths'], [kept, newPath]);
+      verify(() => storage.ref(oldPath)).called(1);
+      verify(() => ref.delete()).called(1);
+      verifyNever(() => storage.ref(kept));
+      verifyNever(() => storage.ref(newPath));
+    },
+  );
 }

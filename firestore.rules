@@ -1367,7 +1367,7 @@ service cloud.firestore {
             : 0;
         }
         function taskSenderKeys() {
-          return ['title', 'description', 'imageUrl', 'imagePath', 'editedAt'];
+          return ['title', 'description', 'imageUrl', 'imagePath', 'imagePaths', 'editedAt'];
         }
         function taskTouchesSenderKeys() {
           return request.resource.data.diff(resource.data).affectedKeys().hasAny(taskSenderKeys());
@@ -1400,17 +1400,38 @@ service cloud.firestore {
         // An attached image must sit under the uploader's company folder
         // with an N1-r name: task_images/{companyId}/{uid}/task_{uid}_{token}.
         // Legacy org-level paths cannot be written on create or image change.
+        function incomingTaskImagePathOk(path) {
+          return path is string
+            && path.matches(
+              '^task_images/' + request.resource.data.get('companyId', '') + '/' + request.auth.uid + '/task_' + request.auth.uid + '_[^_]+$');
+        }
+        function incomingTaskImageListOk() {
+          return !request.resource.data.keys().hasAny(['imagePaths'])
+            || (request.resource.data.imagePaths is list
+              && request.resource.data.imagePaths.size() <= 3
+              && (request.resource.data.imagePaths.size() == 0
+                || incomingTaskImagePathOk(request.resource.data.imagePaths[0]))
+              && (request.resource.data.imagePaths.size() < 2
+                || incomingTaskImagePathOk(request.resource.data.imagePaths[1]))
+              && (request.resource.data.imagePaths.size() < 3
+                || incomingTaskImagePathOk(request.resource.data.imagePaths[2])));
+        }
         function incomingTaskImageOk() {
-          return !request.resource.data.keys().hasAny(['imagePath'])
-            || (request.resource.data.imagePath is string
-              && request.resource.data.imagePath.matches(
-                '^task_images/' + request.resource.data.get('companyId', '') + '/' + request.auth.uid + '/task_' + request.auth.uid + '_[^_]+$'));
+          let data = request.resource.data;
+          let pathOk = !data.keys().hasAny(['imagePath'])
+            || incomingTaskImagePathOk(data.imagePath);
+          let listOk = incomingTaskImageListOk();
+          let consistent = !data.keys().hasAny(['imagePath'])
+            || !data.keys().hasAny(['imagePaths'])
+            || data.imagePaths.size() == 0
+            || data.imagePath == data.imagePaths[0];
+          return pathOk && listOk && consistent;
         }
         // On update the path is only checked when the image changes, so other
         // staff can still change status on a task that carries an image.
         function taskImageChangeOk() {
-          return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['imagePath'])
-            || !request.resource.data.keys().hasAny(['imagePath'])
+          return !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['imagePath', 'imagePaths'])
             || incomingTaskImageOk();
         }
         function taskDelegateTarget() {

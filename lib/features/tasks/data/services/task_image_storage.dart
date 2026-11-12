@@ -117,6 +117,23 @@ class TaskImageFetcher {
   @visibleForTesting
   static TaskImageFetcher? debugOverride;
 
+  /// True when the caller can see the task but is not a grant reader.
+  static bool isAccessDenied(Object error) {
+    final text = error.toString().toLowerCase();
+    if (text.contains('permission-denied') ||
+        text.contains('permission_denied') ||
+        text.contains('not_allowed')) {
+      return true;
+    }
+    try {
+      final code = (error as dynamic).code?.toString().toLowerCase();
+      if (code == 'permission-denied' || code == 'permission_denied') {
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
   Future<Uint8List> load({
     required String imagePath,
     String? taskId,

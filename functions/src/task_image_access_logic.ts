@@ -74,13 +74,46 @@ export function parseTaskImagePath(imagePath: unknown): ParsedTaskImagePath | nu
   return null;
 }
 
-export function taskImagePathMatchesTask(
+export const MAX_TASK_IMAGES = 3;
+
+export function normalizeTaskImagePath(path: unknown): string {
+  return str(path).replace(/\\/g, "/").replace(/^\/+/, "");
+}
+
+/**
+ * Prefer the Phase 3 `imagePaths` list; fall back to the legacy single
+ * `imagePath` so one-image tasks keep working.
+ */
+export function taskImagePathsFromTask(task: {
+  imagePath?: unknown;
+  imagePaths?: unknown;
+}): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const add = (value: unknown) => {
+    const path = normalizeTaskImagePath(value);
+    if (!path || seen.has(path)) return;
+    seen.add(path);
+    out.push(path);
+  };
+  if (Array.isArray(task.imagePaths)) {
+    for (const value of task.imagePaths) add(value);
+  }
+  if (out.length === 0) add(task.imagePath);
+  return out.slice(0, MAX_TASK_IMAGES);
+}
+
+function taskImagePathMatchesTask(
   requestedPath: unknown,
   taskImagePath: unknown,
+  taskImagePaths?: readonly unknown[] | null,
 ): boolean {
-  const a = str(requestedPath).replace(/\\/g, "/").replace(/^\/+/, "");
-  const b = str(taskImagePath).replace(/\\/g, "/").replace(/^\/+/, "");
-  return !!a && a === b;
+  const a = normalizeTaskImagePath(requestedPath);
+  if (!a) return false;
+  const list = (taskImagePaths != null && taskImagePaths.length > 0)
+    ? taskImagePaths.map(normalizeTaskImagePath).filter(Boolean)
+    : [normalizeTaskImagePath(taskImagePath)].filter(Boolean);
+  return list.includes(a);
 }
 
 export function canReadTaskImage(input: {
@@ -89,11 +122,16 @@ export function canReadTaskImage(input: {
   recipientIds: readonly string[];
   requestedPath: unknown;
   taskImagePath: unknown;
+  taskImagePaths?: readonly unknown[] | null;
   taskCompanyId: unknown;
 }): {ok: true} | {ok: false; reason: string} {
   const caller = str(input.callerUid);
   if (!caller) return {ok: false, reason: "sign_in_required"};
-  if (!taskImagePathMatchesTask(input.requestedPath, input.taskImagePath)) {
+  if (!taskImagePathMatchesTask(
+    input.requestedPath,
+    input.taskImagePath,
+    input.taskImagePaths,
+  )) {
     return {ok: false, reason: "path_mismatch"};
   }
   const parsed = parseTaskImagePath(input.requestedPath);
@@ -161,15 +199,20 @@ export function decideAuthorizedTaskImageRead(input: {
   callerUid: unknown;
   requestedPath: unknown;
   taskImagePath: unknown;
+  taskImagePaths?: readonly unknown[] | null;
   taskCompanyId: unknown;
   createdBy: unknown;
   grant?: TaskImageGrantView | null;
   fallbackRecipientIds: readonly string[];
 }): {ok: true} | {ok: false; reason: string} {
+  const resolved = taskImagePathsFromTask({
+    imagePath: input.taskImagePath,
+    imagePaths: input.taskImagePaths,
+  });
+  const requested = normalizeTaskImagePath(input.requestedPath);
   const grant = input.grant;
-  const grantPath = grant ? str(grant.imagePath) : "";
-  const taskPath = str(input.taskImagePath);
-  const useGrant = !!(grant && grantPath && grantPath === taskPath);
+  const grantPath = grant ? normalizeTaskImagePath(grant.imagePath) : "";
+  const useGrant = !!(grant && grantPath && grantPath === requested);
   const readerIds = useGrant
     ? (Array.isArray(grant!.readerUids) ? grant!.readerUids.map((v) => str(v)).filter(Boolean) : [])
     : input.fallbackRecipientIds;
@@ -180,7 +223,8 @@ export function decideAuthorizedTaskImageRead(input: {
     createdBy,
     recipientIds: readerIds,
     requestedPath: input.requestedPath,
-    taskImagePath: taskPath,
+    taskImagePath: resolved[0] || input.taskImagePath,
+    taskImagePaths: resolved,
     taskCompanyId: company,
   });
 }

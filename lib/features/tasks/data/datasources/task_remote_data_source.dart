@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/features/tasks/data/models/task_model.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
+import 'package:delegate_app/features/tasks/domain/task_image_paths.dart';
 
 abstract class TaskRemoteDataSource {
   Future<TaskModel> createTask(String organizationId, TaskModel task);
@@ -79,6 +80,7 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       createdAt: task.createdAt,
       imageUrl: task.imageUrl,
       imagePath: task.imagePath,
+      imagePaths: task.imagePaths,
     );
     await docRef.set(taskWithId.toFirestore());
     return taskWithId;
@@ -259,47 +261,65 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
   Future<void> updateTask(String organizationId, TaskModel task) async {
     final ref = _taskCollection(organizationId).doc(task.uid);
     final data = task.toFirestore();
-    String? oldImagePath;
+    List<String> oldPaths = const [];
     if (task.editedAt != null) {
       // Phase 2 leaves imageUrl empty on purpose (no public URL). Never
       // treat a missing imageUrl as "remove the image". Only clear
-      // imagePath when the sender explicitly saved a removal.
+      // image fields when the sender explicitly saved a removal.
       final before = await ref.get();
       final beforeData = before.data() as Map<String, dynamic>?;
-      oldImagePath = beforeData?['imagePath'] as String?;
-      final newPath =
-          (task.imagePath != null && task.imagePath!.trim().isNotEmpty)
-              ? task.imagePath!.trim()
-              : null;
+      oldPaths = _pathsFromDoc(beforeData);
+      final newPaths = resolveTaskImagePaths(
+        imagePath: task.imagePath,
+        imagePaths: task.imagePaths,
+      );
       data['imageUrl'] = FieldValue.delete();
-      if (newPath == null) {
+      if (newPaths.isEmpty) {
         data['imagePath'] = FieldValue.delete();
+        data['imagePaths'] = FieldValue.delete();
       } else {
-        data['imagePath'] = newPath;
+        data['imagePath'] = newPaths.first;
+        data['imagePaths'] = newPaths;
       }
     }
     await ref.update(data);
-    final savedPath =
-        (task.imagePath != null && task.imagePath!.trim().isNotEmpty)
-            ? task.imagePath!.trim()
-            : null;
-    // Delete the previous object only after the new path (if any) is linked.
-    if (oldImagePath != null && oldImagePath != savedPath) {
-      await _deleteImageQuietly(oldImagePath);
+    final savedPaths = resolveTaskImagePaths(
+      imagePath: task.imagePath,
+      imagePaths: task.imagePaths,
+    );
+    final savedSet = savedPaths.toSet();
+    // Delete previous objects only after the new paths (if any) are linked.
+    for (final oldPath in oldPaths) {
+      if (!savedSet.contains(oldPath)) {
+        await _deleteImageQuietly(oldPath);
+      }
     }
   }
 
   @override
   Future<void> deleteTask(String organizationId, String taskId) async {
     final ref = _taskCollection(organizationId).doc(taskId);
-    String? imagePath;
+    var imagePaths = <String>[];
     try {
       final snap = await ref.get();
-      imagePath = (snap.data() as Map<String, dynamic>?)?['imagePath'] as String?;
+      imagePaths = _pathsFromDoc(snap.data() as Map<String, dynamic>?);
     } catch (_) {}
     // Hard delete, as before: the delegate's stream drops it immediately.
     await ref.delete();
-    if (imagePath != null) await _deleteImageQuietly(imagePath);
+    for (final path in imagePaths) {
+      await _deleteImageQuietly(path);
+    }
+  }
+
+  List<String> _pathsFromDoc(Map<String, dynamic>? data) {
+    if (data == null) return const [];
+    final raw = data['imagePaths'];
+    return resolveTaskImagePaths(
+      imagePath: data['imagePath'] as String?,
+      imagePaths: raw is List
+          ? [for (final item in raw) if (item is String) item]
+          : const [],
+    );
   }
 
   Future<void> _deleteImageQuietly(String path) async {

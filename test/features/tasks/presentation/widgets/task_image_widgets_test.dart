@@ -3,10 +3,22 @@ import 'dart:typed_data';
 import 'package:material_symbols_icons/symbols.dart';
 
 import 'package:delegate_app/features/tasks/data/services/task_image_storage.dart';
+import 'package:delegate_app/features/tasks/domain/task_image_paths.dart';
 import 'package:delegate_app/features/tasks/presentation/widgets/task_image_widgets.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+class _DeniedFetcher extends TaskImageFetcher {
+  @override
+  Future<Uint8List> load({
+    required String imagePath,
+    String? taskId,
+    String? organizationId,
+  }) async {
+    throw StateError('permission-denied: not_allowed');
+  }
+}
 
 class _RecordingFetcher extends TaskImageFetcher {
   _RecordingFetcher(this.bytes);
@@ -265,4 +277,85 @@ void main() {
     await tester.pumpAndSettle();
     expect(storage.deleted, [original]);
   });
+
+  testWidgets(
+    'gallery shows every attached image, including a legacy single path',
+    (tester) async {
+      final fetcher = _RecordingFetcher(_png);
+      const paths = [
+        'task_images/c1/sup-1/task_sup-1_1.jpg',
+        'task_images/c1/sup-1/task_sup-1_2.jpg',
+        'task_images/c1/sup-1/task_sup-1_3.jpg',
+      ];
+      await tester.pumpWidget(
+        _app(
+          SingleChildScrollView(
+            child: TaskImageGallery(
+              imagePaths: paths,
+              taskId: 't1',
+              organizationId: 'o1',
+              fetcher: fetcher,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(fetcher.calls, hasLength(3));
+      expect(fetcher.calls.map((c) => c['imagePath']).toList(), paths);
+      expect(find.byType(Image), findsNWidgets(3));
+    },
+  );
+
+  testWidgets(
+    'a viewer who is not in the grant does not see a broken-load error',
+    (tester) async {
+      await tester.pumpWidget(
+        _app(
+          TaskImageThumbnail(
+            imagePath: 'task_images/c1/sup-1/task_sup-1_1.jpg',
+            taskId: 't1',
+            organizationId: 'o1',
+            fetcher: _DeniedFetcher(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(Image), findsNothing);
+      expect(find.textContaining('تعذّر'), findsNothing);
+      expect(find.byType(SizedBox), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'picker list with 3 images shows the cap and no extra attach slot',
+    (tester) async {
+      final storage = _RecordingStorage();
+      _attachOverrides(storage);
+      const paths = [
+        'task_images/c1/sup-1/task_sup-1_1.jpg',
+        'task_images/c1/sup-1/task_sup-1_2.jpg',
+        'task_images/c1/sup-1/task_sup-1_3.jpg',
+      ];
+      expect(paths, hasLength(kMaxTaskImages));
+      await tester.pumpWidget(
+        _app(
+          SingleChildScrollView(
+            child: TaskImagePickerList(
+              organizationId: 'o1',
+              companyId: 'c1',
+              initialPaths: paths,
+              initialTaskId: 't1',
+              deleteStorageImmediately: false,
+              storage: storage,
+              onChanged: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('يمكن إرفاق حتى 3 صور'), findsOneWidget);
+      expect(find.text('إرفاق صورة'), findsNothing);
+      expect(find.text('إرفاق صورة أخرى'), findsNothing);
+    },
+  );
 }

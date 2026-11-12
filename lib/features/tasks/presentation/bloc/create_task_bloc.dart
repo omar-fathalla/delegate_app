@@ -55,6 +55,7 @@ class CreateTaskBloc extends Bloc<CreateTaskEvent, CreateTaskState> {
       createdAt: DateTime.now(),
       imageUrl: event.imageUrl,
       imagePath: event.imagePath,
+      imagePaths: event.imagePaths,
     );
 
     final result = await createTask(event.organizationId, task);

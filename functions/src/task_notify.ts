@@ -21,7 +21,8 @@ import {
   taskUsersFromDelegateDocs,
   TaskUser,
 } from "./task_notify_logic";
-import {upsertTaskImageGrant} from "./task_image_access";
+import {syncTaskImageGrants} from "./task_image_access";
+import {taskImagePathsFromTask} from "./task_image_access_logic";
 
 if (admin.apps.length === 0) admin.initializeApp();
 
@@ -240,8 +241,8 @@ export const onTaskCreated = functions.firestore
         createdBy,
       });
       try {
-        await upsertTaskImageGrant(admin.firestore(), {
-          imagePath: task.imagePath,
+        await syncTaskImageGrants(admin.firestore(), {
+          afterPaths: taskImagePathsFromTask(task),
           createdBy,
           recipientIds,
           companyUID: companyId,
@@ -284,17 +285,20 @@ export const onTaskUpdated = functions.firestore
     const createdBy = String(after.createdBy || "").trim();
 
     try {
+      const beforePaths = taskImagePathsFromTask(before);
+      const afterPaths = taskImagePathsFromTask(after);
+      const imagesChanged = beforePaths.join("\0") !== afterPaths.join("\0");
       if (before.assignedTo === after.assignedTo) {
-        if (String(before.imagePath || "") !== String(after.imagePath || "")) {
+        if (imagesChanged) {
           try {
             const {ids} = await resolveRecipients(admin.firestore(), after.assignedTo, {
               companyId,
               organizationId,
               createdBy,
             });
-            await upsertTaskImageGrant(admin.firestore(), {
-              imagePath: after.imagePath,
-              previousImagePath: before.imagePath,
+            await syncTaskImageGrants(admin.firestore(), {
+              afterPaths,
+              beforePaths,
               createdBy,
               recipientIds: ids,
               companyUID: companyId,
@@ -344,23 +348,28 @@ export const onTaskUpdated = functions.firestore
         senderRole: sender.senderRole,
       });
       console.log(`Created ${n} new-assignment notifications for ${taskId}`);
-      try {
-        const {ids} = await resolveRecipients(db, after.assignedTo, {
-          companyId,
-          organizationId,
-          createdBy,
-        });
-        await upsertTaskImageGrant(db, {
-          imagePath: after.imagePath,
-          previousImagePath: before.imagePath,
-          createdBy,
-          recipientIds: ids,
-          companyUID: companyId,
-          organizationId,
-          taskId,
-        });
-      } catch (grantErr) {
-        console.error("Error writing task image grant on assignment change:", grantErr);
+      // Grants stay frozen at send time: newly assigned users are notified
+      // but do not gain image access after the fact. Only sync if the
+      // image list itself changed (inherit existing readers).
+      if (imagesChanged) {
+        try {
+          const {ids} = await resolveRecipients(db, after.assignedTo, {
+            companyId,
+            organizationId,
+            createdBy,
+          });
+          await syncTaskImageGrants(db, {
+            afterPaths,
+            beforePaths,
+            createdBy,
+            recipientIds: ids,
+            companyUID: companyId,
+            organizationId,
+            taskId,
+          });
+        } catch (grantErr) {
+          console.error("Error writing task image grant on assignment change:", grantErr);
+        }
       }
       return null;
     } catch (error) {
