@@ -6033,48 +6033,6 @@
       "density": "SPARSE_ALL"
     },
     {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "nationalId",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "nationalityID",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "phoneNumber",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "leave_requests",
       "queryScope": "COLLECTION",
       "fields": [
