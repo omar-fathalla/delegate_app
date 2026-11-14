@@ -19,7 +19,7 @@ Staff password: Project store `internal/tashil-dev-test-accounts.txt` via env (`
 
 | Guard | Where |
 | --- | --- |
-| **Gradle 504 / network flake** — `gradle/actions/setup-gradle` cache + one automatic APK build retry | `.github/workflows/pr-user-test-builds.yml` (`android-prod-release`); use `scripts/ci_gradle_flutter_apk.sh` |
+| **Gradle 504 / network flake** — `setup-gradle` (wrapper version) + `ci_warm_gradle_distribution.sh` (Flutter cache gradlew + warm) + `ci_gradle_flutter_apk.sh` (up to 4 attempts, backoff) | `.github/workflows/pr-user-test-builds.yml` (`android-prod-release`) |
 | **Maestro `appId`** on every flow + subflow (including `runFlow` targets) | `scripts/maestro_check_flow_headers.sh` (+ optional `maestro check-syntax` when CLI present) |
 | **Patrol test titles** + non-zero integration targets | `scripts/patrol_check_integration_targets.sh` |
 | **Mac preflight** (sim boot, Tashil Dev installed, login-roles screenshot, shutdown) | `scripts/capture-dev-login-roles-screenshot.sh`, [mac-gate-preflight.md](./mac-gate-preflight.md), `scripts/mac_gate_preflight.sh` |
