@@ -25,7 +25,8 @@ appId: com.tashil.delegate.dev
     visible: "الملف الشخصي"
     timeout: 60000
 
-- back
+- runFlow:
+    file: ../subflows/pop-from-user-profile.yaml
 
 - runFlow:
     file: ../subflows/wait-for-main-menu-button.yaml

@@ -1,9 +1,21 @@
 // ignore_for_file: deprecated_member_use_from_same_package
 
+import 'dart:ui';
+
 import 'package:patrol/patrol.dart';
 
-const Duration patrolSavePasswordPollStep = Duration(milliseconds: 400);
-const Duration patrolSavePasswordPollWindow = Duration(seconds: 20);
+const Duration patrolSavePasswordPollStep = Duration(milliseconds: 350);
+const Duration patrolSavePasswordPollWindow = Duration(seconds: 24);
+
+const List<String> _iosSavePasswordDismissLabels = [
+  'Not Now',
+  'ليس الآن',
+  "Don't Save",
+  'Never',
+  'Never for This Website',
+  'أبداً',
+  'عدم الحفظ',
+];
 
 Future<void> patrolGrantVisibleOsPermission(PatrolIntegrationTester $) async {
   try {
@@ -25,12 +37,21 @@ Future<void> patrolOpenNotificationShade(PatrolIntegrationTester $) async {
 Future<void> patrolDismissIosSavePasswordSheet(PatrolIntegrationTester $) async {
   final end = DateTime.now().add(patrolSavePasswordPollWindow);
   while (DateTime.now().isBefore(end)) {
-    for (final label in const ['Not Now', 'ليس الآن', 'Never', 'أبداً']) {
+    for (final label in _iosSavePasswordDismissLabels) {
       try {
         await $.native.tap(
           Selector(text: label),
-          timeout: const Duration(milliseconds: 600),
+          timeout: const Duration(milliseconds: 450),
         );
+        await Future<void>.delayed(patrolSavePasswordPollStep);
+      } catch (_) {}
+    }
+    for (final offset in const [
+      Offset(120, 660),
+      Offset(280, 660),
+    ]) {
+      try {
+        await $.native.tapAt(offset);
         await Future<void>.delayed(patrolSavePasswordPollStep);
       } catch (_) {}
     }
