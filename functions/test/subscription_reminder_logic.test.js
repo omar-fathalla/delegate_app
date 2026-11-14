@@ -55,6 +55,15 @@ test("HR or former supervisor role on request creator uid is not a recipient", (
   assert.deepEqual(ids, ["new_sup"]);
 });
 
+test("company-supervisor role and companyId-only field are accepted", () => {
+  const ids = R.recipientUidsForSubscriptionReminder({
+    companyUID: "c1",
+    organizationUID: "o1",
+    candidates: [{uid: "hyphen", role: "company-supervisor", companyId: "c1"}],
+  });
+  assert.deepEqual(ids, ["hyphen"]);
+});
+
 test("deleted/inactive supervisors excluded from fan-out", () => {
   assert.deepEqual(
     R.recipientUidsForSubscriptionReminder({

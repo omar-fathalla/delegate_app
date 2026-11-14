@@ -738,4 +738,60 @@ test("Jun 16 2026 skips reminder because upcoming 2026_H2 is still free", async 
   assert.equal(res.nextPeriodCode, "2026_H2");
 });
 
+test("40 companies on reminder day: one notification per live supervisor, idempotent rerun", async () => {
+  const n = 40;
+  const jun16 = L.cairoMidnight(2027, 6, 16);
+  const runId = "2027_H1_2027-06-16";
+  await db.doc(`subscription_reminder_runs/${runId}`).delete();
+
+  for (let i = 0; i < n; i++) {
+    const co = `c_bulk_${i}`;
+    await db.doc(`users/sup_bulk_${i}`).set({
+      role: i % 3 === 0 ? "company-supervisor" : "supervisor",
+      organizationUID: "o1",
+      companyUID: co,
+      status: "active",
+    });
+    await db.doc(`delegate_requests/bulk_req_${i}`).set({
+      requestType: "new_delegate",
+      status: "approved",
+      supervisorUid: `sup_bulk_${i}`,
+      companyUID: co,
+      organizationUID: "o1",
+      periodCode: "2026_H2",
+      paymentStatus: "waived",
+    });
+    await db.doc(`organizations/o1/companies/c1/delegates/bulk_${i}`).set({
+      uid: `bulk_${i}`,
+      status: "active",
+      companyUID: co,
+      registeredVia: "mobile_app",
+    });
+  }
+
+  const res = await J.runSubscriptionReminders(db, jun16);
+  assert.ok(res.companies >= n);
+  assert.ok(res.supervisors >= n);
+  assert.ok(res.notifications >= n);
+
+  for (let i = 0; i < n; i++) {
+    const snap = await db.collection("notifications")
+      .where("type", "==", "subscription_renewal_reminder")
+      .where("delegateUid", "==", `sup_bulk_${i}`)
+      .get();
+    assert.equal(snap.size, 1, `sup_bulk_${i}`);
+  }
+
+  const res2 = await J.runSubscriptionReminders(db, jun16);
+  assert.equal(res2.notifications, res.notifications);
+  assert.equal(res2.supervisors, res.supervisors);
+  for (let i = 0; i < n; i++) {
+    const snap = await db.collection("notifications")
+      .where("type", "==", "subscription_renewal_reminder")
+      .where("delegateUid", "==", `sup_bulk_${i}`)
+      .get();
+    assert.equal(snap.size, 1, `rerun sup_bulk_${i}`);
+  }
+});
+
 

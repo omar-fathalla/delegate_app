@@ -17,8 +17,13 @@ function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
-function companyOf(u: SubscriptionInvoiceUserCandidate): string {
+/** Resolved company key for scoping (companyUID or legacy companyId). */
+export function companyKeyOfUser(u: Pick<SubscriptionInvoiceUserCandidate, "companyUID" | "companyId">): string {
   return str(u.companyUID) || str(u.companyId);
+}
+
+function companyOf(u: SubscriptionInvoiceUserCandidate): string {
+  return companyKeyOfUser(u);
 }
 
 function orgOf(u: SubscriptionInvoiceUserCandidate): string {
