@@ -101,7 +101,11 @@ request and are never suspended.
   with `companyUIDs`; `fallbackDueToLookupFailure: true` when the shared inbox is
   used because lookup failed). When a `companyUID` chunk fails but `companyId`
   chunk still loads supervisors, `subscription_reminder_supervisor_lookup_partial`
-  is logged (not silent). Inactive / disabled / suspended / deleted supervisors
+  is logged with `supervisorRecipientCount` (live supervisor inboxes, not raw
+  Firestore rows), and the job also writes one notification to
+  `supervisor_{companyUID}` in addition to personal supervisor uids so
+  company-keyed inboxes still see that day. Inactive / disabled / suspended /
+  deleted supervisors
   are skipped. Counts app-added delegates lacking paid coverage for the **next**
   period. Run metrics: `supervisors` = distinct recipients, `companies` = companies
   with uncovered delegates, `notifications` = writes.

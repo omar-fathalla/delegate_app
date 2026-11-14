@@ -84,7 +84,6 @@ test("loadCompanySupervisorCandidates merges companyId field and survives chunk 
 });
 
 test("loadCompanySupervisorCandidates logs partial success when companyId recovers", async () => {
-  let companyUidCalls = 0;
   const db = {
     collection() {
       return {
@@ -92,7 +91,6 @@ test("loadCompanySupervisorCandidates logs partial success when companyId recove
           return {
             async get() {
               if (field === "companyUID") {
-                companyUidCalls++;
                 if (part.includes("c_partial")) throw new Error("Too many disjunctions");
                 return {docs: []};
               }
@@ -112,9 +110,10 @@ test("loadCompanySupervisorCandidates logs partial success when companyId recove
       };
     },
   };
-  const {byCompany, companyUidFieldChunkFailed, companyIdFieldIngested} =
+  const {byCompany, companyUidFieldChunkFailed, companyIdFieldIngested, partialLookupCompanyUids} =
     await J.loadCompanySupervisorCandidates(db, ["c_partial"]);
   assert.ok(companyUidFieldChunkFailed.has("c_partial"));
   assert.ok(companyIdFieldIngested.has("c_partial"));
+  assert.ok(partialLookupCompanyUids.has("c_partial"));
   assert.equal(byCompany.get("c_partial")?.length, 1);
 });

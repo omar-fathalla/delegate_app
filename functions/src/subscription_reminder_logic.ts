@@ -152,6 +152,31 @@ export function recipientUidsForSubscriptionReminder(opts: {
   return fallback ? [fallback] : [];
 }
 
+/**
+ * Final notification targets for a company. When supervisor lookup used
+ * companyId after a companyUID chunk failure, also deliver to the shared inbox
+ * so supervisors who only listen on `supervisor_{companyUID}` still see the day.
+ */
+export function expandReminderDeliveryUids(opts: {
+  companyUID: string;
+  organizationUID?: string;
+  candidates: SubscriptionInvoiceUserCandidate[];
+  partialLookupRecovery?: boolean;
+}): string[] {
+  const inbox = supervisorCompanyInboxKey(opts.companyUID);
+  const primary = recipientUidsForSubscriptionReminder({
+    companyUID: opts.companyUID,
+    organizationUID: opts.organizationUID,
+    candidates: opts.candidates,
+  });
+  const deliver = new Set(primary);
+  const hasPersonalSupervisors = primary.some((u) => u !== inbox);
+  if (opts.partialLookupRecovery && inbox && hasPersonalSupervisors) {
+    deliver.add(inbox);
+  }
+  return [...deliver].sort((a, b) => a.localeCompare(b));
+}
+
 /** @deprecated Use recipientUidsForSubscriptionReminder */
 export function userIdForSubscriptionInvoice(opts: {
   companyUID: string;

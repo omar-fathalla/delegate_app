@@ -31,6 +31,15 @@ test("groupUncoveredDelegatesByCompany flags org conflict under one company", ()
   assert.deepEqual(g.organizationUIDs, ["o1", "o2"]);
 });
 
+test("partial lookup also targets shared supervisor_{companyUID} inbox", () => {
+  const uids = R.expandReminderDeliveryUids({
+    companyUID: "c_partial",
+    candidates: [{uid: "sup1", role: "supervisor", companyId: "c_partial", status: "active"}],
+    partialLookupRecovery: true,
+  });
+  assert.deepEqual(uids, ["sup1", "supervisor_c_partial"]);
+});
+
 test("every live supervisor on company is notified when orgs differ on requests", () => {
   const ids = R.recipientUidsForSubscriptionReminder({
     companyUID: "c1",

@@ -33,6 +33,7 @@ import {M1_SOURCE, M2_SOURCE, planExpiryHoldWrite, shouldShadowReactivateAfterEx
 import {
   REMINDER_RUNS,
   groupUncoveredDelegatesByCompany,
+  expandReminderDeliveryUids,
   recipientUidsForSubscriptionReminder,
   supervisorCompanyInboxKey,
   subscriptionReminderAlertDoc,
@@ -483,8 +484,11 @@ export async function runSubscriptionReminders(db: Db, now: Date): Promise<Remin
   }
 
   const companyUIDs = [...groups.keys()];
-  const {byCompany: supervisorsByCompany, lookupFailedCompanyUids} =
-    await loadCompanySupervisorCandidates(db, companyUIDs);
+  const {
+    byCompany: supervisorsByCompany,
+    lookupFailedCompanyUids,
+    partialLookupCompanyUids,
+  } = await loadCompanySupervisorCandidates(db, companyUIDs);
 
   const writer = new Batcher(db);
   let notifications = 0;
@@ -497,10 +501,12 @@ export async function runSubscriptionReminders(db: Db, now: Date): Promise<Remin
         organizationUIDs: g.organizationUIDs,
       }));
     }
-    const recipientUids = recipientUidsForSubscriptionReminder({
+    const candidates = supervisorsByCompany.get(g.companyUID) || [];
+    const recipientUids = expandReminderDeliveryUids({
       companyUID: g.companyUID,
       organizationUID: g.organizationUID,
-      candidates: supervisorsByCompany.get(g.companyUID) || [],
+      candidates,
+      partialLookupRecovery: partialLookupCompanyUids.has(g.companyUID),
     });
     const inboxKey = supervisorCompanyInboxKey(g.companyUID);
     if (
@@ -556,6 +562,8 @@ export interface SupervisorCandidateLookup {
   lookupFailedCompanyUids: Set<string>;
   companyUidFieldChunkFailed: Set<string>;
   companyIdFieldIngested: Set<string>;
+  /** companyUID chunk failed; supervisors recovered via companyId field. */
+  partialLookupCompanyUids: Set<string>;
 }
 
 /**
@@ -613,18 +621,23 @@ export async function loadCompanySupervisorCandidates(
       }
     }
   };
+  const partialLookupCompanyUids = new Set<string>();
   await runChunkedInQuery("companyUID");
   await runChunkedInQuery("companyId");
   for (const co of companyUidFieldChunkFailed) {
     const candidates = out.get(co);
     if (!candidates?.length) continue;
     if (!companyIdFieldIngested.has(co)) continue;
+    partialLookupCompanyUids.add(co);
+    const recipients = recipientUidsForSubscriptionReminder({companyUID: co, candidates});
+    const inbox = supervisorCompanyInboxKey(co);
+    const supervisorRecipientCount = recipients.filter((u) => u !== inbox).length;
     console.log(JSON.stringify({
       event: "subscription_reminder_supervisor_lookup_partial",
       companyUID: co,
       companyUIDChunkFailed: true,
       companyIdChunkSucceeded: true,
-      candidateCount: candidates.length,
+      supervisorRecipientCount,
     }));
   }
   return {
@@ -632,6 +645,7 @@ export async function loadCompanySupervisorCandidates(
     lookupFailedCompanyUids,
     companyUidFieldChunkFailed,
     companyIdFieldIngested,
+    partialLookupCompanyUids,
   };
 }
 
