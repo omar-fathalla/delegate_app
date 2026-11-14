@@ -556,20 +556,11 @@ service cloud.firestore {
       // support may activate, reactivate, suspend, or deactivate. The
       // account-status check stays on the non-techSignup branch so the
       // request-approval batch (4 document flips) stays under budget.
-      let saOrTech = r in [
-        'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN']
-        || tech;
-      // Exact plus Title-Case only (no lower(): 1000-expression budget).
-      let accountCh = stCh && st1 is string && (
-        st1 == 'active' || st1 == 'Active'
-        || st1 == 'approved' || st1 == 'Approved'
-        || st1 == 'suspended' || st1 == 'Suspended'
-        || st1 == 'inactive' || st1 == 'Inactive'
-        || st1 == 'deactivated' || st1 == 'Deactivated');
+      let saOrTech = r in superAdminRoleList() || tech;
       return !(stCh && st1 == 'pending' && !approver)
         && ((techSignup && techFlipOk(delegateId) && techReqOk(o1, c1, delegateId))
           || (!techSignup && (delegateDocsOk() || approver)
-            && (!accountCh || saOrTech)
+            && staffDelegateAccountFieldsOk(r, approver)
             && sourceStampKeysLocked()));
     }
 
@@ -1155,13 +1146,39 @@ service cloud.firestore {
       ));
     }
 
-    // Only global staff may set isActive to true (staff activate). Company staff
-    // may still deactivate; self-activation stays blocked on the self branch.
+    // H-1: only global staff may touch isActive on delegate/promoter user docs.
+    // Other staff accounts: company staff may still deactivate (not activate).
     function staffMaySetIsActiveActive(d, old, changed, r) {
       return !changed.hasAny(['isActive'])
-        || d.get('isActive', true) != true
         || r in superAdminRoleList()
-        || r in techRoleList();
+        || r in techRoleList()
+        || (!(roleOf(old) in fieldRoleList() || roleOf(d) in fieldRoleList())
+          && d.get('isActive', true) != true);
+    }
+
+    // H-1: company staff may not change status on delegate/promoter users docs.
+    function staffMaySetUserStatus(d, old, changed, r) {
+      return !changed.hasAny(['status'])
+        || r in superAdminRoleList()
+        || r in techRoleList()
+        || !(roleOf(old) in fieldRoleList() || roleOf(d) in fieldRoleList());
+    }
+
+    // H-1: company staff cannot activate/suspend delegates (any status spelling).
+    // Approvers may reset status to pending only (doc re-upload flow).
+    function delegatePendingStatusOnly(st1) {
+      return st1 is string && st1.lower().trim() == 'pending';
+    }
+
+    function staffDelegateAccountFieldsOk(r, approver) {
+      let ch = changedKeys();
+      let stCh = ch.hasAny(['status']);
+      let actCh = ch.hasAny(['isActive']);
+      let globalStaff = r in superAdminRoleList() || r in techRoleList();
+      return (!stCh && !actCh)
+        || globalStaff
+        || (stCh && !actCh && approver
+          && delegatePendingStatusOnly(request.resource.data.get('status', '')));
     }
 
     function usersUpdateOk(r, org, co, old, d, userId) {
@@ -1172,6 +1189,7 @@ service cloud.firestore {
         newRoleOk(nr)
         && !changed.hasAny(privilegeKeys())
         && staffMaySetIsActiveActive(d, old, changed, r)
+        && staffMaySetUserStatus(d, old, changed, r)
         && (!changed.hasAny(['role', 'organizationUID', 'companyUID', 'organizationId', 'companyId']) || companyPinned(d))
         && (
           (request.auth.uid == userId

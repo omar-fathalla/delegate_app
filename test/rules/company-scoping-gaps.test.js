@@ -32,6 +32,12 @@ describe("TA-8 security rules gaps", () => {
         role: "organization-admin", organizationUID: "o1", companyUID: "c1",
       });
       await db.doc("users/mk").set({role: "marketing", organizationUID: "o1", companyUID: "c1"});
+      await db.doc("users/d1").set({
+        role: "delegate", organizationUID: "o1", companyUID: "c1", uid: "d1", status: "active",
+      });
+      await db.doc("organizations/o1/companies/c1/delegates/d1").set({
+        organizationUID: "o1", companyUID: "c1", status: "active", phoneNumber: "01011111111",
+      });
       await db.doc("delegate_requests/r1").set({
         requestType: "renewal", status: "pending", organizationUID: "o1", companyUID: "c1",
         supervisorUid: "sup",
@@ -69,4 +75,26 @@ describe("TA-8 security rules gaps", () => {
 
   test("ALLOW org-admin may still deactivate staff", () =>
     assertSucceeds(updateDoc(doc(as("oa"), "users/sup"), {isActive: false})));
+
+  test("DENY H-1: supervisor cannot suspend delegate via status spelling bypass", () =>
+    assertFails(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
+      status: "SUSPENDED", updatedAt: "t",
+    })));
+
+  test("DENY H-1: HR cannot deactivate delegate via isActive on nested delegate", () =>
+    assertFails(updateDoc(doc(as("hr"), "organizations/o1/companies/c1/delegates/d1"), {
+      isActive: false, updatedAt: "t",
+    })));
+
+  for (const st of ["disabled", "blocked", "rejected", "active ", " ACTIVE"]) {
+    test(`DENY H-1: supervisor status variant '${st}' on delegate`, () =>
+      assertFails(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
+        status: st, updatedAt: "t",
+      })));
+  }
+
+  test("ALLOW H-1: supervisor may still set delegate status pending (re-upload)", () =>
+    assertSucceeds(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
+      status: "pending", updatedAt: "t",
+    })));
 });

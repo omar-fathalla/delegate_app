@@ -138,6 +138,10 @@ describe("adversarial", ()=>{
     for(const who of ["sa","ts","oa","mk"]) await rec(who+" updates nested delegate","allow",updateDoc(doc(as(who),"organizations/o1/companies/c1/delegates/d9"),{name:"z"}));
     await rec("hr updates other-company delegate","deny",setDoc(doc(as("hr"),"organizations/o1/companies/c2/delegates/x"),{name:"q"},{merge:true}));
     await rec("hr changes delegate device binding","deny",updateDoc(doc(as("hr"),"organizations/o1/companies/c1/delegates/d9"),{boundDeviceId:"x"}));
+    for(const [who,st] of [["sup","SUSPENDED"],["hr","disabled"],["ca","blocked"],["sup","active "],["hr"," ACTIVE"]])
+      await rec(`H1 ${who} delegate status bypass ${JSON.stringify(st)}`,"deny",updateDoc(doc(as(who),"organizations/o1/companies/c1/delegates/d9"),{status:st}));
+    await rec("H1 sup sets users delegate status approved","deny",updateDoc(doc(as("sup"),"users/d1"),{status:"approved"}));
+    await rec("H1 hr sets users delegate isActive false","deny",updateDoc(doc(as("hr"),"users/d1"),{isActive:false}));
     await rec("sa reads mail doc","deny",getDoc(doc(as("sa"),"mail/m1")));
     await rec("sa lists mail","deny",getDocs(collection(as("sa"),"mail")));
     await rec("anon get delegate","deny",getDoc(doc(anon(),"organizations/o1/companies/c1/delegates/d1")));});

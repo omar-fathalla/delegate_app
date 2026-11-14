@@ -157,7 +157,10 @@ describe("P0 users hardening", () => {
     await assertFails(as("sup").doc("users/d1").update({organizationUID: "o2"}));
     await assertFails(as("sup").doc("users/d1").update({companyUID: "c2"}));
     await assertFails(as("sup").doc("users/ca").update({role: "delegate"}));
-    await assertSucceeds(as("sup").doc("users/d1").update({status: "approved", displayName: "D"}));
+    await assertFails(as("sup").doc("users/d1").update({status: "suspended", displayName: "D"}));
+    await assertFails(as("hr").doc("users/d1").update({status: "SUSPENDED"}));
+    await assertFails(as("sup").doc("users/d1").update({isActive: false}));
+    await assertSucceeds(as("sup").doc("users/d1").update({displayName: "D"}));
     await assertFails(as("sup2").doc("users/d1").update({displayName: "x"}));
   });
 
