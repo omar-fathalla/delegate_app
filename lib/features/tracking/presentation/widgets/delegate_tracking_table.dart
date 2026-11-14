@@ -7,6 +7,7 @@ import '../../../../config/theme/app_motion.dart';
 import '../../../../core/widgets/app_avatar.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../domain/entities/delegate_tracking_session.dart';
+import '../../domain/utils/tracking_geofence_status.dart';
 
 /// جدول بيانات تفصيلي لعرض تتبع نطاق المناديب (Live Tracking Table)
 /// يدعم العرض المتجاوب على سطح المكتب والموبايل مع التمرير الأفقي السلس
@@ -420,39 +421,12 @@ class _DelegateTableRowState extends State<_DelegateTableRow> {
   Widget build(BuildContext context) {
     final session = widget.session;
     final colorScheme = widget.colorScheme;
-    final isOutside = session.isOutside;
-    final isOffline = session.isOffline;
-    final isInGrace = session.isInGracePeriod;
-
-    Color statusColor;
-    Color statusBgColor;
-    String statusTitle;
-    IconData statusIcon;
-
-    if (isOutside) {
-      statusColor = const Color(0xFFC65102);
-      statusBgColor = const Color(0xFFC65102).withValues(alpha: 0.1);
-      if (isInGrace) {
-        statusTitle = 'سماح (${session.remainingGraceSeconds}ث)';
-        statusIcon = Icons.hourglass_top_rounded;
-      } else {
-        final excess =
-            (session.currentDistanceMeters - session.geofenceRadius).toInt();
-        statusTitle = 'خارج (+$excessم)';
-        statusIcon = Icons.warning_amber_rounded;
-      }
-    } else if (isOffline) {
-      statusColor = const Color(0xFF757575);
-      statusBgColor =
-          colorScheme.surfaceContainerHighest.withValues(alpha: 0.4);
-      statusTitle = 'غير متصل';
-      statusIcon = Icons.cloud_off_rounded;
-    } else {
-      statusColor = const Color(0xFF2E7D32);
-      statusBgColor = const Color(0xFF2E7D32).withValues(alpha: 0.1);
-      statusTitle = 'داخل (${session.currentDistanceMeters.toInt()}م)';
-      statusIcon = Icons.check_circle_rounded;
-    }
+    final geofenceStatus =
+        TrackingGeofenceStatus.resolve(session, colorScheme);
+    final statusColor = geofenceStatus.color;
+    final statusBgColor = geofenceStatus.backgroundColor;
+    final statusTitle = geofenceStatus.title;
+    final statusIcon = geofenceStatus.icon;
 
     final checkInStr = session.checkInTime != null
         ? DateFormat('hh:mm a', 'ar').format(session.checkInTime!)

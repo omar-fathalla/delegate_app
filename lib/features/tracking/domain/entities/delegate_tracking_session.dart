@@ -4,6 +4,11 @@ enum TrackingStatus {
   insideZone,
   outsideZone,
   offline,
+  checkedOut,
+  /// حضور مفتوح — نسيان تسجيل الانصراف / التوقيع (يظهر ضمن الحاضرين).
+  forgotSignature,
+  /// حساب المندوب موقوف — لا يظهر في التتبع المباشر.
+  suspended,
 }
 
 class DelegateTrackingSession extends Equatable {
@@ -26,6 +31,7 @@ class DelegateTrackingSession extends Equatable {
   final DateTime? lastBreachAt;
   final DateTime? firstExitedAt;
   final DateTime? checkInTime;
+  final DateTime? checkOutTime;
   final bool isOnline;
   final bool isMockLocationDetected;
   final int offlineBreadcrumbsCount;
@@ -54,6 +60,7 @@ class DelegateTrackingSession extends Equatable {
     this.lastBreachAt,
     this.firstExitedAt,
     this.checkInTime,
+    this.checkOutTime,
     this.isOnline = true,
     this.isMockLocationDetected = false,
     this.offlineBreadcrumbsCount = 0,
@@ -63,9 +70,13 @@ class DelegateTrackingSession extends Equatable {
     this.avatarUrl,
   });
 
-  bool get isInside => currentStatus == TrackingStatus.insideZone;
+  bool get isInside =>
+      currentStatus == TrackingStatus.insideZone ||
+      currentStatus == TrackingStatus.forgotSignature;
   bool get isOutside => currentStatus == TrackingStatus.outsideZone;
   bool get isOffline => currentStatus == TrackingStatus.offline || !isOnline;
+
+  bool get isSuspended => currentStatus == TrackingStatus.suspended;
 
   bool get isInGracePeriod {
     if (firstExitedAt == null) return false;
@@ -100,6 +111,7 @@ class DelegateTrackingSession extends Equatable {
     DateTime? lastBreachAt,
     DateTime? firstExitedAt,
     DateTime? checkInTime,
+    DateTime? checkOutTime,
     bool? isOnline,
     bool? isMockLocationDetected,
     int? offlineBreadcrumbsCount,
@@ -128,6 +140,7 @@ class DelegateTrackingSession extends Equatable {
       lastBreachAt: lastBreachAt ?? this.lastBreachAt,
       firstExitedAt: firstExitedAt ?? this.firstExitedAt,
       checkInTime: checkInTime ?? this.checkInTime,
+      checkOutTime: checkOutTime ?? this.checkOutTime,
       isOnline: isOnline ?? this.isOnline,
       isMockLocationDetected:
           isMockLocationDetected ?? this.isMockLocationDetected,
@@ -161,6 +174,7 @@ class DelegateTrackingSession extends Equatable {
         lastBreachAt,
         firstExitedAt,
         checkInTime,
+        checkOutTime,
         isOnline,
         isMockLocationDetected,
         offlineBreadcrumbsCount,

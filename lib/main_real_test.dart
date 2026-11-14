@@ -10,6 +10,7 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
+import 'package:delegate_app/core/time/cairo_clock.dart';
 import 'package:delegate_app/core/services/app_bloc_observer.dart';
 import 'package:delegate_app/core/services/crashlytics_service.dart';
 import 'package:delegate_app/features/auth/domain/delegate_otp_config.dart';
@@ -46,6 +47,7 @@ const _favorites = <String>[
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  CairoClock.ensureInitialized();
   GoogleFonts.config.allowRuntimeFetching = false;
 
   if (_token.isEmpty) {
