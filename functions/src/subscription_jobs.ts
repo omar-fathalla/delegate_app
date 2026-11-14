@@ -32,7 +32,9 @@ import {holdsMode} from "./holds";
 import {M1_SOURCE, M2_SOURCE, planExpiryHoldWrite, shouldShadowReactivateAfterExpiryClear} from "./subscription_holds";
 import {
   REMINDER_RUNS,
+  groupUncoveredDelegatesByCompany,
   recipientUidsForSubscriptionReminder,
+  supervisorCompanyInboxKey,
   subscriptionReminderAlertDoc,
   type SubscriptionInvoiceUserCandidate,
 } from "./subscription_reminder_logic";
@@ -460,23 +462,19 @@ export async function runSubscriptionReminders(db: Db, now: Date): Promise<Remin
 
   const appAdded = await appAddedDelegateUids(db);
   const covered = await coveredDelegateUids(db, upcoming, publicCfg.freePromotionLastDay);
-  const groups = new Map<string, {
-    companyUID: string;
-    organizationUID: string;
-    count: number;
-  }>();
   let uncoveredDelegates = 0;
+  const uncoveredEntries: {companyUID: unknown; organizationUID?: unknown; organizationId?: unknown}[] = [];
   for (const [uid, req] of appAdded) {
     if (covered.has(uid)) continue;
     uncoveredDelegates++;
-    const companyUID = str(req.companyUID);
-    const organizationUID = str(req.organizationUID || req.organizationId);
-    if (!companyUID) continue;
-    const key = `${organizationUID}\0${companyUID}`;
-    const g = groups.get(key);
-    if (g) g.count++;
-    else groups.set(key, {companyUID, organizationUID, count: 1});
+    if (!str(req.companyUID)) continue;
+    uncoveredEntries.push({
+      companyUID: req.companyUID,
+      organizationUID: req.organizationUID,
+      organizationId: req.organizationId,
+    });
   }
+  const groups = groupUncoveredDelegatesByCompany(uncoveredEntries);
   if (groups.size === 0) {
     const res = {...base, uncoveredDelegates, skipped: "no_uncovered" as const};
     await runRef.set({...res, ranAt: FieldValue.serverTimestamp()}, {merge: true});
@@ -484,8 +482,9 @@ export async function runSubscriptionReminders(db: Db, now: Date): Promise<Remin
     return res;
   }
 
-  const companyUIDs = [...new Set([...groups.values()].map((g) => g.companyUID))];
-  const supervisorsByCompany = await loadCompanySupervisorCandidates(db, companyUIDs);
+  const companyUIDs = [...groups.keys()];
+  const {byCompany: supervisorsByCompany, lookupFailedCompanyUids} =
+    await loadCompanySupervisorCandidates(db, companyUIDs);
 
   const writer = new Batcher(db);
   let notifications = 0;
@@ -496,6 +495,19 @@ export async function runSubscriptionReminders(db: Db, now: Date): Promise<Remin
       organizationUID: g.organizationUID,
       candidates: supervisorsByCompany.get(g.companyUID) || [],
     });
+    const inboxKey = supervisorCompanyInboxKey(g.companyUID);
+    if (
+      recipientUids.length === 1 && recipientUids[0] === inboxKey &&
+      lookupFailedCompanyUids.has(g.companyUID)
+    ) {
+      console.error(JSON.stringify({
+        event: "subscription_reminder_supervisor_lookup_failed",
+        companyUID: g.companyUID,
+        companyUIDs: [g.companyUID],
+        fallbackInbox: inboxKey,
+        fallbackDueToLookupFailure: true,
+      }));
+    }
     for (const recipientUid of recipientUids) {
       uniqueRecipients.add(recipientUid);
       const doc = subscriptionReminderAlertDoc({
@@ -532,6 +544,11 @@ function isoReminderDay(now: Date): string {
   return `${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`;
 }
 
+export interface SupervisorCandidateLookup {
+  byCompany: Map<string, SubscriptionInvoiceUserCandidate[]>;
+  lookupFailedCompanyUids: Set<string>;
+}
+
 /**
  * Loads user docs that may be supervisor recipients. Avoids stacking two `in`
  * filters (company × role), which exceeds Firestore's 30-disjunction cap when
@@ -541,8 +558,9 @@ function isoReminderDay(now: Date): string {
 export async function loadCompanySupervisorCandidates(
   db: Db,
   companyUIDs: string[],
-): Promise<Map<string, SubscriptionInvoiceUserCandidate[]>> {
+): Promise<SupervisorCandidateLookup> {
   const out = new Map<string, SubscriptionInvoiceUserCandidate[]>();
+  const lookupFailedCompanyUids = new Set<string>();
   const seenDocIds = new Set<string>();
   const uniqueCompanies = [...new Set(companyUIDs.filter(Boolean))];
   const ingest = (doc: admin.firestore.QueryDocumentSnapshot) => {
@@ -569,10 +587,12 @@ export async function loadCompanySupervisorCandidates(
         const snap = await db.collection("users").where(field, "in", part).get();
         for (const doc of snap.docs) ingest(doc);
       } catch (err) {
+        for (const co of part) lookupFailedCompanyUids.add(co);
         console.error(JSON.stringify({
           event: "subscription_reminder_supervisor_lookup_failed",
           field,
-          companies: part.length,
+          companyUIDs: part,
+          fallbackDueToLookupFailure: false,
           error: String(err),
         }));
       }
@@ -580,7 +600,7 @@ export async function loadCompanySupervisorCandidates(
   };
   await runChunkedInQuery("companyUID");
   await runChunkedInQuery("companyId");
-  return out;
+  return {byCompany: out, lookupFailedCompanyUids};
 }
 
 /**

@@ -34,7 +34,7 @@ test("loadCompanySupervisorCandidates uses one in-filter per query (no role disj
     },
   };
   const companies = Array.from({length: 40}, (_, i) => `co_${i}`);
-  await J.loadCompanySupervisorCandidates(db, companies);
+  await J.loadCompanySupervisorCandidates(db, companies).then((r) => r.byCompany);
   assert.equal(queryFilters.length, 4);
   for (const filters of queryFilters) {
     const ins = filters.filter((x) => x.op === "in");
@@ -78,7 +78,7 @@ test("loadCompanySupervisorCandidates merges companyId field and survives chunk 
     },
   };
   const companies = [...Array.from({length: 35}, (_, i) => `co_${i}`), "c_legacy"];
-  const map = await J.loadCompanySupervisorCandidates(db, companies);
+  const {byCompany: map} = await J.loadCompanySupervisorCandidates(db, companies);
   assert.ok(map.get("c_legacy")?.some((u) => u.uid === "id_only"));
   assert.ok(map.get("co_0")?.length >= 1);
 });

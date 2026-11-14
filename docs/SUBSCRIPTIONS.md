@@ -83,13 +83,23 @@ request and are never suspended.
 - `remindSupervisorsBeforeSubscriptionPeriodEnd` (00:08 Africa/Cairo daily): on the
   reminder day (default **14** Cairo days before 30 Jun and 31 Dec, overridable via
   `config/subscriptions.subscriptionReminderDays`) writes **one notification per live
-  company supervisor** per company (org + company): each active `supervisor` /
-  `company_supervisor` on that company gets `delegateUid` set to their uid (not the
+  company supervisor per company per day**: uncovered delegates are grouped by
+  **`companyUID` only** (tenant), not by org chain, so mixed or missing
+  `organizationUID` on `delegate_requests` still yields a single reminder with the
+  full uncovered count. Each active `supervisor` / `company_supervisor` /
+  `company-supervisor` on that company gets `delegateUid` set to their uid (not the
   staff uid on `delegate_requests.supervisorUid`). Supervisors also read the shared
   inbox `delegateUid: supervisor_{companyUID}` in the app; when no live supervisor
-  exists, the job writes only that fallback key. Inactive / disabled / suspended /
-  deleted supervisors are skipped. Counts app-added delegates lacking paid coverage
-  for the **next** period.
+  exists, the job writes only that fallback key. Supervisor lookup uses chunked
+  Firestore `in` queries on `users.companyUID` and `users.companyId` (max 30 ids
+  per query, no stacked role `in`, to stay under the 30-disjunction cap when many
+  companies are due the same day); role and active-state filtering run in code.
+  Failed lookup chunks are logged (`subscription_reminder_supervisor_lookup_failed`
+  with `companyUIDs`; `fallbackDueToLookupFailure: true` when the shared inbox is
+  used because lookup failed). Inactive / disabled / suspended / deleted supervisors
+  are skipped. Counts app-added delegates lacking paid coverage for the **next**
+  period. Run metrics: `supervisors` = distinct recipients, `companies` = companies
+  with uncovered delegates, `notifications` = writes.
   Skipped when that **next** period is still free (its end day is on or before
   `freePromotionLastDay`), not merely because “today” is inside the promo window —
   so **17 Dec 2026** can remind for **2027_H1** while **16 Jun 2026** still skips

@@ -60,6 +60,36 @@ export interface SubscriptionInvoiceUserCandidate {
   status?: unknown;
 }
 
+/** Uncovered app-added delegates grouped for one reminder per company per day. */
+export interface UncoveredCompanyReminderGroup {
+  companyUID: string;
+  organizationUID: string;
+  count: number;
+}
+
+/**
+ * Groups uncovered delegates by company only (tenant). Mixed or missing
+ * `organizationUID` on requests must not fan out multiple reminders.
+ */
+export function groupUncoveredDelegatesByCompany(
+  entries: Iterable<{companyUID: unknown; organizationUID?: unknown; organizationId?: unknown}>,
+): Map<string, UncoveredCompanyReminderGroup> {
+  const groups = new Map<string, UncoveredCompanyReminderGroup>();
+  for (const e of entries) {
+    const companyUID = str(e.companyUID);
+    if (!companyUID) continue;
+    const organizationUID = str(e.organizationUID) || str(e.organizationId);
+    const g = groups.get(companyUID);
+    if (g) {
+      g.count++;
+      if (!g.organizationUID && organizationUID) g.organizationUID = organizationUID;
+    } else {
+      groups.set(companyUID, {companyUID, organizationUID, count: 1});
+    }
+  }
+  return groups;
+}
+
 function liveCompanySupervisors(opts: {
   companyUID: string;
   organizationUID?: string;
