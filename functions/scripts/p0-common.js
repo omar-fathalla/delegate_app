@@ -16,17 +16,21 @@ function normalizeProject(raw) {
 
 /**
  * @param {string[]} argv
- * @return {{project: string, apply: boolean, allowProd: string, rest: string[]}}
+ * @return {{project: string, apply: boolean, dryRun: boolean, allowProd: string, rest: string[]}}
  */
 function parseArgs(argv) {
-  const out = {project: "", apply: false, allowProd: "", rest: []};
+  const out = {project: "", apply: false, dryRun: false, allowProd: "", rest: []};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--apply") out.apply = true;
+    else if (a === "--dry-run") out.dryRun = true;
     else if (a.startsWith("--allow-prod-project=")) out.allowProd = normalizeProject(a.slice(21));
     else if (a === "--project") out.project = normalizeProject(argv[++i]);
     else if (a.startsWith("--project=")) out.project = normalizeProject(a.slice(10));
     else out.rest.push(a);
+  }
+  if (out.dryRun && out.apply) {
+    throw new Error("Cannot use --dry-run together with --apply.");
   }
   return out;
 }

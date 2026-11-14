@@ -34,7 +34,9 @@ duplicate, the request is not sent.
 Older requests without `organizationUIDs` are still read as
 `[organizationUID]`. The dry-run-first script
 `functions/scripts/backfill-organization-uids.js` can fill the list on
-tashil-dev (rollback file required; no prod apply without a written go).
+tashil-dev (`--dry-run` then `--apply`, rollback file required). Run order and
+GCP commands for Mohamed: `functions/scripts/README-organization-uids-backfill.md`.
+Never prod without a written go.
 
 ## Paid add-to-another-chain (Phase 1 item 4)
 

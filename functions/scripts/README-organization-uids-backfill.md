@@ -6,24 +6,86 @@ singular `organizationUID`. The app treats a missing list as
 `[organizationUID]`, so it keeps working without this script. The script
 exists so list queries and audit views see the same field on every doc.
 
-## Usage (tashil-dev only)
+## Safety
 
-Dry-run is the default. It always writes a rollback file first.
+- **Target:** `tashil-dev` only. `practice-firebase-72df1` (prod) is refused
+  unless a later written go passes `--allow-prod-project=` (not approved for
+  this backfill).
+- **Default mode is dry-run** (no writes). Pass `--apply` to write.
+- **`--dry-run`** may be passed explicitly (same as omitting `--apply`).
+- Never combine `--dry-run` with `--apply`.
+- Prints counts only in stdout (no personal data in logs).
+- Does not deploy functions or rules.
 
-```
+## Run order for Mohamed (tashil-dev only, never prod)
+
+Run from a clean checkout at the merge commit SHA printed in the PR (after CI
+is green). Record that SHA in your ops log before any live run.
+
+```bash
+cd /path/to/delegate_app
+git fetch origin dev
+git checkout <MERGE_SHA>   # full SHA from the PR merge commit
 cd functions
-node scripts/backfill-organization-uids.js --project tashil-dev \
+npm ci
+```
+
+Authenticate to GCP/Firebase Admin for **tashil-dev** (your usual
+`gcloud auth application-default login` or service account).
+
+### 1 — Dry-run first (required)
+
+Writes a rollback JSON and a report under `/tmp`; **no Firestore writes**.
+
+```bash
+node scripts/backfill-organization-uids.js \
+  --project tashil-dev \
+  --dry-run \
   --rollback /tmp/organization-uids-rollback.json
 ```
 
-Then apply, after the dry-run counts look right:
+Review `planned` vs `skipped` in the printed counts and the report file
+(`organization-uids-report-*.json`). Confirm the rollback file lists only
+`delegate_requests/*` paths you expect.
 
-```
-node scripts/backfill-organization-uids.js --project tashil-dev --apply \
+### 2 — Apply on tashil-dev only (after dry-run sign-off)
+
+Reuses the **same** rollback file from step 1:
+
+```bash
+node scripts/backfill-organization-uids.js \
+  --project tashil-dev \
+  --apply \
   --rollback /tmp/organization-uids-rollback.json
 ```
 
 The script sets `organizationUIDs = [organizationUID]` (and
 `organizationNames = [organizationName]` when the name is present) on
-documents that do not already have a non-empty list. It does not touch
-prod, does not deploy functions, and prints counts only (no personal data).
+documents that do not already have a non-empty list.
+
+### 3 — Rollback (optional)
+
+Dry-run restore (compare-before-write; skips docs changed after the backfill):
+
+```bash
+node scripts/backfill-organization-uids.js \
+  --project tashil-dev \
+  --dry-run \
+  --restore /tmp/organization-uids-rollback.json
+```
+
+Apply restore only if the dry-run restore counts look right:
+
+```bash
+node scripts/backfill-organization-uids.js \
+  --project tashil-dev \
+  --apply \
+  --restore /tmp/organization-uids-rollback.json
+```
+
+## Related app work
+
+Multi-chain request flows (picker, one fee, batch approval) are documented in
+`docs/SUBSCRIPTIONS.md` § Multi-chain new-delegate requests. No extra app
+deploy is required for this backfill alone; run the script when tashil-dev
+should show `organizationUIDs` on legacy `delegate_requests`.
