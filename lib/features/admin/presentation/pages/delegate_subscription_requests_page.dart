@@ -11,6 +11,7 @@ import 'package:delegate_app/features/admin/domain/repositories/delegate_subscri
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/features/admin/data/repositories/delegate_profile_edit_repository.dart';
+import 'package:delegate_app/features/admin/domain/entities/delegate_profile_edit_access.dart';
 import 'package:delegate_app/features/admin/presentation/pages/edit_delegate_profile_screen.dart';
 import 'super_admin_subscription_financial_report_screen.dart';
 
@@ -766,22 +767,6 @@ class _DelegateSubscriptionRequestsPageState
   }
 }
 
-bool _canSupervisorEditRequest(Delegate admin, DelegateSubscriptionRequest request) {
-  final isEditor = admin.role == UserRole.admin ||
-      admin.position == DelegatePosition.supervisor;
-  if (!isEditor) return false;
-  if (admin.companyUID.isEmpty || admin.companyUID != request.companyUID) {
-    return false;
-  }
-  if (request.requestType == 'delete_delegate' ||
-      request.isRenewalRequest ||
-      request.requestType == 'add_organization' ||
-      request.isNationalIdUpdateRequest) {
-    return false;
-  }
-  return request.status == SubscriptionRequestStatus.pending;
-}
-
 /// Live request card on this page, including the IntrinsicHeight + 3.5px
 /// status stripe. Tests must pump this widget (not only
 /// [SubscriptionRequestPaymentCard]) so LayoutBuilder/intrinsic bugs surface.
@@ -1273,7 +1258,11 @@ class SubscriptionRequestListCard extends StatelessWidget {
                         onApprove: onApprove,
                         onReject: onReject,
                       ),
-                      if (_canSupervisorEditRequest(currentAdmin, request)) ...[
+                      if (canSupervisorEditSubscriptionRequest(
+                        request,
+                        role: currentAdmin.role,
+                        callerCompanyUID: currentAdmin.companyUID,
+                      )) ...[
                         const SizedBox(height: 8),
                         OutlinedButton.icon(
                           onPressed: () async {
