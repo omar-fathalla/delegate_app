@@ -26,10 +26,6 @@ function companyOf(u: SubscriptionInvoiceUserCandidate): string {
   return companyKeyOfUser(u);
 }
 
-function orgOf(u: SubscriptionInvoiceUserCandidate): string {
-  return str(u.organizationUID) || str(u.organizationId);
-}
-
 function isCompanySupervisorRole(role: unknown): boolean {
   const raw = str(role).toLowerCase().replace(/_/g, "-");
   return COMPANY_SUPERVISOR_ROLES.has(str(role)) || COMPANY_SUPERVISOR_ROLES.has(raw);
@@ -63,8 +59,29 @@ export interface SubscriptionInvoiceUserCandidate {
 /** Uncovered app-added delegates grouped for one reminder per company per day. */
 export interface UncoveredCompanyReminderGroup {
   companyUID: string;
+  /** First non-empty org on a request in this company group (notification payload). */
   organizationUID: string;
+  organizationUIDs: string[];
+  /** True when requests under the same company reference more than one org. */
+  orgConflict: boolean;
   count: number;
+}
+
+function finalizeCompanyGroup(g: {
+  companyUID: string;
+  organizationUID: string;
+  orgs: Set<string>;
+  count: number;
+}): UncoveredCompanyReminderGroup {
+  const organizationUIDs = [...g.orgs].filter(Boolean).sort((a, b) => a.localeCompare(b));
+  const organizationUID = organizationUIDs[0] || g.organizationUID;
+  return {
+    companyUID: g.companyUID,
+    organizationUID,
+    organizationUIDs,
+    orgConflict: organizationUIDs.length > 1,
+    count: g.count,
+  };
 }
 
 /**
@@ -74,39 +91,45 @@ export interface UncoveredCompanyReminderGroup {
 export function groupUncoveredDelegatesByCompany(
   entries: Iterable<{companyUID: unknown; organizationUID?: unknown; organizationId?: unknown}>,
 ): Map<string, UncoveredCompanyReminderGroup> {
-  const groups = new Map<string, UncoveredCompanyReminderGroup>();
+  const internal = new Map<string, {
+    companyUID: string;
+    organizationUID: string;
+    orgs: Set<string>;
+    count: number;
+  }>();
   for (const e of entries) {
     const companyUID = str(e.companyUID);
     if (!companyUID) continue;
     const organizationUID = str(e.organizationUID) || str(e.organizationId);
-    const g = groups.get(companyUID);
+    const g = internal.get(companyUID);
     if (g) {
       g.count++;
+      if (organizationUID) g.orgs.add(organizationUID);
       if (!g.organizationUID && organizationUID) g.organizationUID = organizationUID;
     } else {
-      groups.set(companyUID, {companyUID, organizationUID, count: 1});
+      const orgs = new Set<string>();
+      if (organizationUID) orgs.add(organizationUID);
+      internal.set(companyUID, {companyUID, organizationUID, orgs, count: 1});
     }
+  }
+  const groups = new Map<string, UncoveredCompanyReminderGroup>();
+  for (const g of internal.values()) {
+    groups.set(g.companyUID, finalizeCompanyGroup(g));
   }
   return groups;
 }
 
 function liveCompanySupervisors(opts: {
   companyUID: string;
-  organizationUID?: string;
   candidates: SubscriptionInvoiceUserCandidate[];
 }): string[] {
   const company = str(opts.companyUID);
   if (!company) return [];
-  const org = str(opts.organizationUID);
   const uids = new Set<string>();
   for (const u of opts.candidates) {
     if (isExcludedSupervisorRecipient(u)) continue;
     if (!isCompanySupervisorRole(u.role)) continue;
     if (companyOf(u) !== company) continue;
-    if (org) {
-      const uOrg = orgOf(u);
-      if (uOrg && uOrg !== org) continue;
-    }
     const uid = str(u.uid);
     if (uid) uids.add(uid);
   }
@@ -123,7 +146,7 @@ export function recipientUidsForSubscriptionReminder(opts: {
   organizationUID?: string;
   candidates: SubscriptionInvoiceUserCandidate[];
 }): string[] {
-  const live = liveCompanySupervisors(opts);
+  const live = liveCompanySupervisors({companyUID: opts.companyUID, candidates: opts.candidates});
   if (live.length) return live;
   const fallback = supervisorCompanyInboxKey(opts.companyUID);
   return fallback ? [fallback] : [];

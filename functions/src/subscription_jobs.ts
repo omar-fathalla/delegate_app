@@ -490,6 +490,13 @@ export async function runSubscriptionReminders(db: Db, now: Date): Promise<Remin
   let notifications = 0;
   const uniqueRecipients = new Set<string>();
   for (const g of groups.values()) {
+    if (g.orgConflict) {
+      console.warn(JSON.stringify({
+        event: "subscription_reminder_org_conflict",
+        companyUID: g.companyUID,
+        organizationUIDs: g.organizationUIDs,
+      }));
+    }
     const recipientUids = recipientUidsForSubscriptionReminder({
       companyUID: g.companyUID,
       organizationUID: g.organizationUID,
@@ -547,6 +554,8 @@ function isoReminderDay(now: Date): string {
 export interface SupervisorCandidateLookup {
   byCompany: Map<string, SubscriptionInvoiceUserCandidate[]>;
   lookupFailedCompanyUids: Set<string>;
+  companyUidFieldChunkFailed: Set<string>;
+  companyIdFieldIngested: Set<string>;
 }
 
 /**
@@ -561,13 +570,16 @@ export async function loadCompanySupervisorCandidates(
 ): Promise<SupervisorCandidateLookup> {
   const out = new Map<string, SubscriptionInvoiceUserCandidate[]>();
   const lookupFailedCompanyUids = new Set<string>();
+  const companyUidFieldChunkFailed = new Set<string>();
+  const companyIdFieldIngested = new Set<string>();
   const seenDocIds = new Set<string>();
   const uniqueCompanies = [...new Set(companyUIDs.filter(Boolean))];
-  const ingest = (doc: admin.firestore.QueryDocumentSnapshot) => {
+  const ingest = (doc: admin.firestore.QueryDocumentSnapshot, viaField: "companyUID" | "companyId") => {
     if (seenDocIds.has(doc.id)) return;
     seenDocIds.add(doc.id);
     const co = str(doc.get("companyUID") || doc.get("companyId"));
     if (!co) return;
+    if (viaField === "companyId") companyIdFieldIngested.add(co);
     const list = out.get(co) || [];
     list.push({
       uid: doc.id,
@@ -585,9 +597,12 @@ export async function loadCompanySupervisorCandidates(
     for (const part of chunks(uniqueCompanies, IN_LIMIT)) {
       try {
         const snap = await db.collection("users").where(field, "in", part).get();
-        for (const doc of snap.docs) ingest(doc);
+        for (const doc of snap.docs) ingest(doc, field);
       } catch (err) {
-        for (const co of part) lookupFailedCompanyUids.add(co);
+        for (const co of part) {
+          lookupFailedCompanyUids.add(co);
+          if (field === "companyUID") companyUidFieldChunkFailed.add(co);
+        }
         console.error(JSON.stringify({
           event: "subscription_reminder_supervisor_lookup_failed",
           field,
@@ -600,7 +615,24 @@ export async function loadCompanySupervisorCandidates(
   };
   await runChunkedInQuery("companyUID");
   await runChunkedInQuery("companyId");
-  return {byCompany: out, lookupFailedCompanyUids};
+  for (const co of companyUidFieldChunkFailed) {
+    const candidates = out.get(co);
+    if (!candidates?.length) continue;
+    if (!companyIdFieldIngested.has(co)) continue;
+    console.log(JSON.stringify({
+      event: "subscription_reminder_supervisor_lookup_partial",
+      companyUID: co,
+      companyUIDChunkFailed: true,
+      companyIdChunkSucceeded: true,
+      candidateCount: candidates.length,
+    }));
+  }
+  return {
+    byCompany: out,
+    lookupFailedCompanyUids,
+    companyUidFieldChunkFailed,
+    companyIdFieldIngested,
+  };
 }
 
 /**

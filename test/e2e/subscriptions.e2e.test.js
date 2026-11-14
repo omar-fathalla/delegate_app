@@ -636,6 +636,36 @@ test("subscription reminder targets company supervisor inbox, not request creato
   assert.ok(inbox.size >= 1);
 });
 
+test("subscription reminder fans out to supervisors across org chains for one company", async () => {
+  await db.doc("users/sup_o1").set({
+    role: "supervisor", organizationUID: "o1", companyUID: "c_2org", status: "active",
+  });
+  await db.doc("users/sup_o2").set({
+    role: "supervisor", organizationUID: "o2", companyUID: "c_2org", status: "active",
+  });
+  for (const [id, org] of [["d_o1", "o1"], ["d_o2", "o2"]]) {
+    await db.doc(`delegate_requests/req_${id}`).set({
+      requestType: "new_delegate", status: "approved", supervisorUid: "sup_o1",
+      companyUID: "c_2org", organizationUID: org, periodCode: "2026_H2", paymentStatus: "waived",
+    });
+    await db.doc(`organizations/${org}/companies/c_2org/delegates/${id}`).set({
+      uid: id, status: "active", companyUID: "c_2org", registeredVia: "mobile_app",
+    });
+  }
+  const jun16 = L.cairoMidnight(2027, 6, 16);
+  await db.doc("subscription_reminder_runs/2027_H1_2027-06-16").delete();
+  await J.runSubscriptionReminders(db, jun16);
+  for (const uid of ["sup_o1", "sup_o2"]) {
+    const snap = await db.collection("notifications")
+      .where("type", "==", "subscription_renewal_reminder")
+      .where("delegateUid", "==", uid)
+      .where("companyUID", "==", "c_2org")
+      .get();
+    assert.equal(snap.size, 1, uid);
+    assert.equal(snap.docs[0].get("uncoveredDelegateCount"), 2);
+  }
+});
+
 test("subscription reminder one per supervisor when requests mix organizationUID", async () => {
   await db.doc("users/sup_one").set({
     role: "supervisor", organizationUID: "o1", companyUID: "c_mix", status: "active",
