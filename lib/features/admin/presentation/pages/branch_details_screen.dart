@@ -157,9 +157,12 @@ class _BranchDetailsViewState extends State<_BranchDetailsView> {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
 
+    final orgUid = _branch.organizationUID?.trim() ?? '';
     final qrData = jsonEncode({
-      "type": "attendance",
-      "branch": _branch.branchName,
+      'type': 'attendance',
+      'branch': _branch.branchName,
+      if (_branch.id.isNotEmpty) 'branchId': _branch.id,
+      if (orgUid.isNotEmpty) 'organizationUID': orgUid,
     });
 
     return BlocConsumer<BranchBloc, BranchState>(

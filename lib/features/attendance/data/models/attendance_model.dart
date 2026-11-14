@@ -12,6 +12,8 @@ class AttendanceModel extends Attendance {
     super.longitude,
     super.imageUrl,
     super.branchName,
+    super.branchId,
+    super.branchOrganizationUID,
     super.isSynced = true,
     super.localCheckInTime,
     super.localCheckOutTime,
@@ -36,6 +38,10 @@ class AttendanceModel extends Attendance {
           json['longitude']?.toDouble(),
       imageUrl: json['imageUrl'],
       branchName: json['branchName'],
+      branchId: json['branchId'] as String?,
+      branchOrganizationUID:
+          (json['branchOrganizationUID'] as String?) ??
+          json['organizationId'] as String?,
       isSynced: json['isSynced'] ?? true,
       localCheckInTime: DateTimeUtils.parseNullableDate(
         json['localCheckInTime'],
@@ -60,6 +66,9 @@ class AttendanceModel extends Attendance {
       'location': {'latitude': latitude, 'longitude': longitude},
       'imageUrl': imageUrl,
       'branchName': branchName,
+      if (branchId != null) 'branchId': branchId,
+      if (branchOrganizationUID != null)
+        'branchOrganizationUID': branchOrganizationUID,
       'isSynced': isSynced,
       'localCheckInTime': localCheckInTime?.toIso8601String(),
       'localCheckOutTime': localCheckOutTime?.toIso8601String(),
@@ -78,6 +87,8 @@ class AttendanceModel extends Attendance {
     double? longitude,
     String? imageUrl,
     String? branchName,
+    String? branchId,
+    String? branchOrganizationUID,
     bool? isSynced,
     DateTime? localCheckInTime,
     DateTime? localCheckOutTime,
@@ -94,6 +105,9 @@ class AttendanceModel extends Attendance {
       longitude: longitude ?? this.longitude,
       imageUrl: imageUrl ?? this.imageUrl,
       branchName: branchName ?? this.branchName,
+      branchId: branchId ?? this.branchId,
+      branchOrganizationUID:
+          branchOrganizationUID ?? this.branchOrganizationUID,
       isSynced: isSynced ?? this.isSynced,
       localCheckInTime: localCheckInTime ?? this.localCheckInTime,
       localCheckOutTime: localCheckOutTime ?? this.localCheckOutTime,

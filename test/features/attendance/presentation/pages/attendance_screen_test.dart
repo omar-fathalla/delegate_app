@@ -21,6 +21,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 class MockAttendanceRepository implements AttendanceRepository {
   @override
+  @override
   Future<Either<Failure, Attendance>> checkIn(
     String userId,
     double lat,
@@ -29,6 +30,8 @@ class MockAttendanceRepository implements AttendanceRepository {
     required String organizationId,
     required String deviceInfo,
     String? branchName,
+    String? branchId,
+    String? branchOrganizationUID,
     String? delegateName,
     String? phoneNumber,
     String? companyName,
@@ -154,6 +157,8 @@ class MockAttendanceRepository implements AttendanceRepository {
     required double latitude,
     required double longitude,
     required double geofenceRadius,
+    String? branchId,
+    String? organizationUID,
   }) async {
     return const Right(null);
   }

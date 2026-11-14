@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/attendance/attendance_branch_ref.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:bloc/bloc.dart';
 import 'package:bloc_concurrency/bloc_concurrency.dart';
@@ -83,7 +84,19 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
           activeAttendance.checkInTime.day == now.day;
 
       if (isToday) {
-        if (activeAttendance.branchName == event.branchName) {
+        final activeRef = AttendanceBranchRef.fromAttendanceLog({
+          'branchId': activeAttendance.branchId,
+          'branchOrganizationUID': activeAttendance.branchOrganizationUID,
+          'organizationId': activeAttendance.organizationId,
+          'branchName': activeAttendance.branchName,
+        });
+        final incomingRef = AttendanceBranchRef(
+          branchId: event.branchId,
+          branchOrganizationUID:
+              event.branchOrganizationUID ?? event.organizationId,
+          branchName: event.branchName ?? '',
+        );
+        if (attendanceSameBranch(activeRef, incomingRef)) {
           emit(const AttendanceError(
             message: 'أنت مسجل حضور بالفعل في هذا الفرع وما زالت الجلسة جارية.',
           ));
@@ -111,6 +124,8 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         lat: event.lat,
         long: event.long,
         branchName: event.branchName,
+        branchId: event.branchId,
+        branchOrganizationUID: event.branchOrganizationUID,
         currentHistory: currentHistory,
         delegateName: event.delegateName,
         phoneNumber: event.phoneNumber,
@@ -317,6 +332,8 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
             lat: event.lat,
             long: event.long,
             branchName: event.branchName,
+            branchId: event.branchId,
+            branchOrganizationUID: event.branchOrganizationUID,
             currentHistory: currentHistory,
             delegateName: event.delegateName,
             phoneNumber: event.phoneNumber,

@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/attendance/attendance_branch_ref.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:dartz/dartz.dart';
 import 'package:equatable/equatable.dart';
@@ -27,7 +28,19 @@ class CheckIn implements UseCase<Attendance, CheckInParams> {
             activeAttendance.checkInTime.day == now.day;
 
         if (isToday) {
-          if (activeAttendance.branchName == params.branchName) {
+          final activeRef = AttendanceBranchRef.fromAttendanceLog({
+            'branchId': activeAttendance.branchId,
+            'branchOrganizationUID': activeAttendance.branchOrganizationUID,
+            'organizationId': activeAttendance.organizationId,
+            'branchName': activeAttendance.branchName,
+          });
+          final incomingRef = AttendanceBranchRef(
+            branchId: params.branchId,
+            branchOrganizationUID:
+                params.branchOrganizationUID ?? params.organizationId,
+            branchName: params.branchName ?? '',
+          );
+          if (attendanceSameBranch(activeRef, incomingRef)) {
             return const Left(
               ServerFailure('أنت مسجل حضور بالفعل في هذا الفرع وما زالت الجلسة جارية.'),
             );
@@ -44,11 +57,24 @@ class CheckIn implements UseCase<Attendance, CheckInParams> {
       // 2. Guard against duplicate visits to the same branch on the same day
       if (params.branchName != null) {
         final now = DateTime.now();
+        final incomingRef = AttendanceBranchRef(
+          branchId: params.branchId,
+          branchOrganizationUID:
+              params.branchOrganizationUID ?? params.organizationId,
+          branchName: params.branchName!,
+        );
         final hasVisitedToday = params.currentHistory!.any((attendance) {
           final isSameDay = attendance.checkInTime.year == now.year &&
               attendance.checkInTime.month == now.month &&
               attendance.checkInTime.day == now.day;
-          return isSameDay && attendance.branchName == params.branchName;
+          if (!isSameDay) return false;
+          final logRef = AttendanceBranchRef.fromAttendanceLog({
+            'branchId': attendance.branchId,
+            'branchOrganizationUID': attendance.branchOrganizationUID,
+            'organizationId': attendance.organizationId,
+            'branchName': attendance.branchName,
+          });
+          return attendanceSameBranch(logRef, incomingRef);
         });
 
         if (hasVisitedToday) {
@@ -67,6 +93,8 @@ class CheckIn implements UseCase<Attendance, CheckInParams> {
       organizationId: params.organizationId,
       deviceInfo: params.deviceInfo,
       branchName: params.branchName,
+      branchId: params.branchId,
+      branchOrganizationUID: params.branchOrganizationUID,
       delegateName: params.delegateName,
       phoneNumber: params.phoneNumber,
       companyName: params.companyName,
@@ -83,6 +111,8 @@ class CheckInParams extends Equatable {
   final double lat;
   final double long;
   final String? branchName;
+  final String? branchId;
+  final String? branchOrganizationUID;
   final List<Attendance>? currentHistory;
   final String? delegateName;
   final String? phoneNumber;
@@ -97,6 +127,8 @@ class CheckInParams extends Equatable {
     required this.lat,
     required this.long,
     this.branchName,
+    this.branchId,
+    this.branchOrganizationUID,
     this.currentHistory,
     this.delegateName,
     this.phoneNumber,
@@ -113,6 +145,8 @@ class CheckInParams extends Equatable {
     lat,
     long,
     branchName,
+    branchId,
+    branchOrganizationUID,
     currentHistory,
     delegateName,
     phoneNumber,

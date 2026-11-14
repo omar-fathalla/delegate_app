@@ -12,6 +12,8 @@ abstract class AttendanceRepository {
     required String organizationId,
     required String deviceInfo,
     String? branchName,
+    String? branchId,
+    String? branchOrganizationUID,
     String? delegateName,
     String? phoneNumber,
     String? companyName,
@@ -62,5 +64,7 @@ abstract class AttendanceRepository {
     required double latitude,
     required double longitude,
     required double geofenceRadius,
+    String? branchId,
+    String? organizationUID,
   });
 }

@@ -6,6 +6,7 @@ import 'package:delegate_app/features/attendance/data/datasources/attendance_rem
 import 'package:delegate_app/features/attendance/data/models/attendance_model.dart';
 import 'package:delegate_app/core/models/pagination_response.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/attendance/attendance_branch_resolve.dart';
 import 'package:delegate_app/features/attendance/data/repositories/attendance_repository_impl.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -19,6 +20,8 @@ class MockAttendanceRemoteDataSource implements AttendanceRemoteDataSource {
     required String organizationId,
     required String deviceInfo,
     String? branchName,
+    String? branchId,
+    String? branchOrganizationUID,
     String? delegateName,
     String? phoneNumber,
     String? companyName,
@@ -38,11 +41,18 @@ class MockAttendanceRemoteDataSource implements AttendanceRemoteDataSource {
   Future<AttendanceModel?> Function(String, String)? findActiveAttendanceStub;
   Future<void> Function(List<Map<String, dynamic>>)? syncOfflineQueueStub;
   Future<Map<String, dynamic>?> Function(String)? getBranchByNameStub;
+  Future<ResolvedBranchDocument?> Function({
+    String? branchId,
+    String? organizationUID,
+    String? branchName,
+  })? resolveBranchStub;
   Future<void> Function({
     required String branchName,
     required double latitude,
     required double longitude,
     required double geofenceRadius,
+    String? branchId,
+    String? organizationUID,
   })?
   saveBranchStub;
 
@@ -58,6 +68,8 @@ class MockAttendanceRemoteDataSource implements AttendanceRemoteDataSource {
     required String organizationId,
     required String deviceInfo,
     String? branchName,
+    String? branchId,
+    String? branchOrganizationUID,
     String? delegateName,
     String? phoneNumber,
     String? companyName,
@@ -72,6 +84,8 @@ class MockAttendanceRemoteDataSource implements AttendanceRemoteDataSource {
         organizationId: organizationId,
         deviceInfo: deviceInfo,
         branchName: branchName,
+        branchId: branchId,
+        branchOrganizationUID: branchOrganizationUID,
         delegateName: delegateName,
         phoneNumber: phoneNumber,
         companyName: companyName,
@@ -169,11 +183,29 @@ class MockAttendanceRemoteDataSource implements AttendanceRemoteDataSource {
   }
 
   @override
+  Future<ResolvedBranchDocument?> resolveBranch({
+    String? branchId,
+    String? organizationUID,
+    String? branchName,
+  }) {
+    if (resolveBranchStub != null) {
+      return resolveBranchStub!(
+        branchId: branchId,
+        organizationUID: organizationUID,
+        branchName: branchName,
+      );
+    }
+    throw UnimplementedError();
+  }
+
+  @override
   Future<void> saveBranch({
     required String branchName,
     required double latitude,
     required double longitude,
     required double geofenceRadius,
+    String? branchId,
+    String? organizationUID,
   }) {
     if (saveBranchStub != null) {
       return saveBranchStub!(
@@ -384,6 +416,8 @@ void main() {
             required double latitude,
             required double longitude,
             required double geofenceRadius,
+            String? branchId,
+            String? organizationUID,
           }) async {};
 
       final result = await repository.saveBranch(
@@ -406,6 +440,8 @@ void main() {
               required double latitude,
               required double longitude,
               required double geofenceRadius,
+              String? branchId,
+              String? organizationUID,
             }) => throw tFailure;
 
         final result = await repository.saveBranch(

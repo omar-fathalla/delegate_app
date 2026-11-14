@@ -13,6 +13,7 @@ import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/tashil_button_group.dart';
 import 'package:delegate_app/core/widgets/tashil_icon_button.dart';
+import 'package:delegate_app/core/attendance/attendance_branch_resolve.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
@@ -294,11 +295,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       final Map<String, Branch> branchesMap = {};
       for (final doc in branchesSnap.docs) {
         final b = BranchModel.fromFirestore(doc);
-        final name = b.branchName.trim();
-        if (name.isNotEmpty) {
-          branchesMap[name.toLowerCase()] = b;
-        }
-        branchesMap[doc.id.toLowerCase().trim()] = b;
+        registerBranchInLookupMap(branchesMap, b);
       }
       _branchesByName = branchesMap;
 
@@ -599,17 +596,21 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
         Branch? matchedBranch;
 
         if (lat != null && lng != null) {
-          if (branch != null && branch.trim().isNotEmpty) {
-            final cleanBranch = branch.trim().toLowerCase();
-            matchedBranch = _branchesByName[cleanBranch];
-            if (matchedBranch == null) {
-              for (final entry in _branchesByName.entries) {
-                if (entry.key.contains(cleanBranch) || cleanBranch.contains(entry.key)) {
-                  matchedBranch = entry.value;
-                  break;
-                }
-              }
-            }
+          final checkInLog = logs.cast<Map<String, dynamic>?>().firstWhere(
+            (l) => (l?['type'] ?? '') == 'check_in',
+            orElse: () => null,
+          );
+          if (checkInLog != null) {
+            matchedBranch = lookupBranchForAttendanceLog(
+              branchesByName: _branchesByName,
+              log: checkInLog,
+              fallbackBranchName: branch,
+            );
+          } else if (branch != null && branch.trim().isNotEmpty) {
+            matchedBranch = lookupBranchForAttendanceLog(
+              branchesByName: _branchesByName,
+              log: {'branchName': branch},
+            );
           }
 
           // If still not matched by branch name, find the closest branch within 500m

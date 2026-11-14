@@ -1,6 +1,7 @@
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'dart:async';
+import 'package:delegate_app/core/attendance/attendance_branch_ref.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -2316,7 +2317,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       return;
     }
 
-    final branchName = branchToUse.branchName;
+    final branchRef = AttendanceBranchRef.fromBranch(
+      branchToUse,
+      fallbackOrganizationUID: widget.delegate.organizationUID,
+    );
+    final branchName = branchRef.branchName;
     final position = _currentPosition!;
 
     // Dynamically resolve latest active attendance to prevent stale closure state
@@ -2343,13 +2348,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         _showPreviousDayCheckoutDialog(
           parentContext,
           currentActive,
-          branchName,
+          branchRef,
           position,
           attendanceBloc,
           l10n,
         );
-      } else if (currentActive.branchName == branchName ||
-          currentActive.branchName == null) {
+      } else if (_isSameBranchAsActive(currentActive, branchRef)) {
         if (!await confirmEarlyCheckOutIfNeeded(
           parentContext,
           checkInTime: currentActive.checkInTime,
@@ -2370,14 +2374,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         _showForgotCheckoutDialog(
           parentContext,
           currentActive,
-          branchName,
+          branchRef,
           position,
           attendanceBloc,
           l10n,
         );
       }
     } else {
-      await _checkIn(attendanceBloc, branchName, position);
+      await _checkIn(attendanceBloc, branchRef, position);
       if (parentContext.mounted) {
         AppSnackBar.showInfo(
           parentContext,
@@ -2398,14 +2402,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     final parentContext = context;
     final action = isCheckedIn ? l10n.checkOut : l10n.checkIn;
 
-    return showModalBottomSheet<String>(
+    return showModalBottomSheet<AttendanceBranchRef?>(
       context: context,
       sheetAnimationStyle: m3SheetAnimation,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => _ScannerModal(action: action),
-    ).then((scannedBranch) async {
-      if (scannedBranch != null && scannedBranch.isNotEmpty) {
+      builder: (_) => _ScannerModal(
+        action: action,
+        delegateOrganizationUID: widget.delegate.organizationUID,
+      ),
+    ).then((scannedRef) async {
+      if (scannedRef != null && scannedRef.branchName.isNotEmpty) {
+        final scannedBranch = scannedRef.branchName;
         if (!parentContext.mounted) return;
         AppSnackBar.showInfo(parentContext, 'Fetching location...');
 
@@ -2439,13 +2447,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               _showPreviousDayCheckoutDialog(
                 parentContext,
                 currentActive,
-                scannedBranch,
+                scannedRef,
                 position,
                 attendanceBloc,
                 l10n,
               );
-            } else if (currentActive.branchName == scannedBranch ||
-                currentActive.branchName == null) {
+            } else if (_isSameBranchAsActive(currentActive, scannedRef)) {
               if (!await confirmEarlyCheckOutIfNeeded(
                 parentContext,
                 checkInTime: currentActive.checkInTime,
@@ -2466,14 +2473,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               _showForgotCheckoutDialog(
                 parentContext,
                 currentActive,
-                scannedBranch,
+                scannedRef,
                 position,
                 attendanceBloc,
                 l10n,
               );
             }
           } else {
-            await _checkIn(attendanceBloc, scannedBranch, position);
+            await _checkIn(attendanceBloc, scannedRef, position);
             if (parentContext.mounted) {
               AppSnackBar.showInfo(
                 parentContext,
@@ -2482,16 +2489,29 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             }
           }
         }
-      } else if (scannedBranch == "") {
+      } else if (scannedRef != null && scannedRef.branchName.isEmpty) {
         if (!parentContext.mounted) return;
         AppSnackBar.showError(parentContext, l10n.invalidQRCode);
       }
     });
   }
 
+  bool _isSameBranchAsActive(Attendance active, AttendanceBranchRef target) {
+    if (active.branchName == null || active.branchName!.trim().isEmpty) {
+      return true;
+    }
+    final activeRef = AttendanceBranchRef.fromAttendanceLog({
+      'branchId': active.branchId,
+      'branchOrganizationUID': active.branchOrganizationUID,
+      'organizationId': active.organizationId,
+      'branchName': active.branchName,
+    });
+    return attendanceSameBranch(activeRef, target);
+  }
+
   Future<void> _checkIn(
     AttendanceBloc bloc,
-    String branchName,
+    AttendanceBranchRef branchRef,
     Position position,
   ) async {
     final deviceInfo = await _getDeviceInfo();
@@ -2504,7 +2524,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         deviceInfo: deviceInfo,
         lat: position.latitude,
         long: position.longitude,
-        branchName: branchName,
+        branchName: branchRef.branchName,
+        branchId: branchRef.branchId,
+        branchOrganizationUID: branchRef.branchOrganizationUID,
         delegateName: widget.delegate.fullName.isNotEmpty
             ? widget.delegate.fullName
             : null,
@@ -2652,7 +2674,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   void _showForgotCheckoutDialog(
     BuildContext context,
     Attendance activeAttendance,
-    String newBranch,
+    AttendanceBranchRef newBranch,
     Position position,
     AttendanceBloc bloc,
     AppLocalizations l10n,
@@ -2663,7 +2685,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         return AlertDialog(
           title: Text(l10n.forgotCheckoutTitle),
           content: Text(
-            l10n.forgotCheckoutMessage(activeAttendance.branchName ?? l10n.unspecifiedBranch, newBranch),
+            l10n.forgotCheckoutMessage(
+              activeAttendance.branchName ?? l10n.unspecifiedBranch,
+              newBranch.branchName,
+            ),
           ),
           actions: [
             TextButton(
@@ -2683,7 +2708,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     deviceInfo: deviceInfo,
                     lat: position.latitude,
                     long: position.longitude,
-                    branchName: newBranch,
+                    branchName: newBranch.branchName,
+                    branchId: newBranch.branchId,
+                    branchOrganizationUID: newBranch.branchOrganizationUID,
                     delegateName: widget.delegate.fullName.isNotEmpty
                         ? widget.delegate.fullName
                         : null,
@@ -2708,7 +2735,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   void _showPreviousDayCheckoutDialog(
     BuildContext context,
     Attendance activeAttendance,
-    String newBranch,
+    AttendanceBranchRef newBranch,
     Position position,
     AttendanceBloc bloc,
     AppLocalizations l10n,
@@ -2719,7 +2746,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         return AlertDialog(
           title: Text(l10n.forgotCheckoutTitle),
           content: Text(
-            l10n.previousDayCheckoutMessage(activeAttendance.branchName ?? l10n.unspecifiedBranch, newBranch),
+            l10n.previousDayCheckoutMessage(
+              activeAttendance.branchName ?? l10n.unspecifiedBranch,
+              newBranch.branchName,
+            ),
           ),
           actions: [
             TextButton(
@@ -2739,7 +2769,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     deviceInfo: deviceInfo,
                     lat: position.latitude,
                     long: position.longitude,
-                    branchName: newBranch,
+                    branchName: newBranch.branchName,
+                    branchId: newBranch.branchId,
+                    branchOrganizationUID: newBranch.branchOrganizationUID,
                     delegateName: widget.delegate.fullName.isNotEmpty
                         ? widget.delegate.fullName
                         : null,
@@ -2866,8 +2898,12 @@ class _ShimmerCardState extends State<_ShimmerCard>
 
 class _ScannerModal extends StatefulWidget {
   final String action;
+  final String delegateOrganizationUID;
 
-  const _ScannerModal({required this.action});
+  const _ScannerModal({
+    required this.action,
+    required this.delegateOrganizationUID,
+  });
 
   @override
   State<_ScannerModal> createState() => _ScannerModalState();
@@ -2932,26 +2968,36 @@ class _ScannerModalState extends State<_ScannerModal>
               if (barcodes.isNotEmpty) {
                 HapticFeedback.mediumImpact();
                 final String rawValue = barcodes.first.rawValue ?? '';
-                String? scannedBranch;
+                AttendanceBranchRef? scannedRef;
                 try {
                   final dynamic decoded = jsonDecode(rawValue);
 
                   if (decoded is Map<String, dynamic> &&
                       decoded['type'] == 'attendance') {
-                    if (decoded.containsKey('branch') &&
+                    scannedRef = AttendanceBranchRef.fromQrMap(
+                      decoded,
+                      delegateOrganizationUID: widget.delegateOrganizationUID,
+                    );
+                    if (scannedRef.branchName.isEmpty &&
                         decoded['branch'] is String) {
-                      scannedBranch = decoded['branch'] as String;
+                      scannedRef = AttendanceBranchRef.legacyNameOnly(
+                        branchName: decoded['branch'] as String,
+                        delegateOrganizationUID: widget.delegateOrganizationUID,
+                      );
                     }
                   }
                 } catch (_) {
                   if (rawValue.isNotEmpty && !rawValue.startsWith('{')) {
-                    scannedBranch = rawValue.trim();
+                    scannedRef = AttendanceBranchRef.legacyNameOnly(
+                      branchName: rawValue.trim(),
+                      delegateOrganizationUID: widget.delegateOrganizationUID,
+                    );
                   }
                 }
 
                 if (mounted) {
                   _scannerController.stop();
-                  Navigator.pop(context, scannedBranch ?? "");
+                  Navigator.pop(context, scannedRef);
                 }
               } else {
                 _isProcessing = false;
