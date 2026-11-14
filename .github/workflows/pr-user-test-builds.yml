@@ -67,8 +67,10 @@ jobs:
     name: Android prod flavor (release, debug-signed CI)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: [self-hosted, macOS, ARM64, delegate-app]
-    timeout-minutes: 45
+    timeout-minutes: 180
     steps:
+      - name: Acquire Mac repo lock
+        run: bash ~/mac-resources/ci_delegate_app_lock_acquire.sh repo "${{ github.job }}" 90 150
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -111,6 +113,9 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper
       # delegate-ci has no Android SDK, and must not use another user's
       # /Users/fathalla/Library/Android/sdk (permission denied).
       # v3 defaults include the obsolete `tools` package, which sdkmanager
@@ -128,6 +133,11 @@ jobs:
           cache: false
       - name: Install dependencies
         run: flutter pub get
+      - name: Materialize Gradle wrapper
+        run: bash scripts/ci_materialize_gradle_wrapper.sh
+      - name: Warm Gradle distribution
+        working-directory: android
+        run: bash ../scripts/ci_gradlew_version_warm.sh
       - name: Build APK (prod flavor release; debug cert without key.properties)
         run: bash scripts/ci_gradle_flutter_apk.sh -- --release --flavor prod --dart-define=ENV=prod
       - name: Upload APK artifact
@@ -137,13 +147,18 @@ jobs:
           path: build/app/outputs/flutter-apk/app-prod-release.apk
           if-no-files-found: error
           retention-days: 14
+      - name: Release Mac repo lock
+        if: always()
+        run: bash ~/mac-resources/ci_delegate_app_lock_release.sh repo
 
   ios-prod-release:
     name: iOS prod flavor (release, no codesign)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: [self-hosted, macOS, ARM64, delegate-app]
-    timeout-minutes: 60
+    timeout-minutes: 180
     steps:
+      - name: Acquire Mac repo lock
+        run: bash ~/mac-resources/ci_delegate_app_lock_acquire.sh repo "${{ github.job }}" 90 150
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -218,3 +233,6 @@ jobs:
           path: build/ios/iphoneos/Runner.app
           if-no-files-found: error
           retention-days: 14
+      - name: Release Mac repo lock
+        if: always()
+        run: bash ~/mac-resources/ci_delegate_app_lock_release.sh repo
