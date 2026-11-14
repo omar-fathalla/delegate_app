@@ -32,7 +32,9 @@ import {holdsMode} from "./holds";
 import {M1_SOURCE, M2_SOURCE, planExpiryHoldWrite, shouldShadowReactivateAfterExpiryClear} from "./subscription_holds";
 import {
   REMINDER_RUNS,
+  groupUncoveredDelegatesByCompany,
   recipientUidsForSubscriptionReminder,
+  supervisorCompanyInboxKey,
   subscriptionReminderAlertDoc,
   type SubscriptionInvoiceUserCandidate,
 } from "./subscription_reminder_logic";
@@ -404,7 +406,10 @@ export interface ReminderResult {
   nextPeriodCode: string;
   skipped?: "free_promotion" | "not_reminder_day" | "no_uncovered";
   reminderDays: number;
+  /** Distinct reminder recipients (supervisor uids + fallback inbox keys). */
   supervisors: number;
+  /** Companies with at least one uncovered app-added delegate. */
+  companies?: number;
   notifications: number;
   uncoveredDelegates: number;
 }
@@ -447,6 +452,7 @@ export async function runSubscriptionReminders(db: Db, now: Date): Promise<Remin
       nextPeriodCode: String(prior.get("nextPeriodCode") || upcoming.code),
       reminderDays: Number(prior.get("reminderDays")) || publicCfg.reminderDays,
       supervisors: Number(prior.get("supervisors")) || 0,
+      companies: Number(prior.get("companies")) || undefined,
       notifications: Number(prior.get("notifications")) || 0,
       uncoveredDelegates: Number(prior.get("uncoveredDelegates")) || 0,
     };
@@ -456,23 +462,19 @@ export async function runSubscriptionReminders(db: Db, now: Date): Promise<Remin
 
   const appAdded = await appAddedDelegateUids(db);
   const covered = await coveredDelegateUids(db, upcoming, publicCfg.freePromotionLastDay);
-  const groups = new Map<string, {
-    companyUID: string;
-    organizationUID: string;
-    count: number;
-  }>();
   let uncoveredDelegates = 0;
+  const uncoveredEntries: {companyUID: unknown; organizationUID?: unknown; organizationId?: unknown}[] = [];
   for (const [uid, req] of appAdded) {
     if (covered.has(uid)) continue;
     uncoveredDelegates++;
-    const companyUID = str(req.companyUID);
-    const organizationUID = str(req.organizationUID || req.organizationId);
-    if (!companyUID) continue;
-    const key = `${organizationUID}\0${companyUID}`;
-    const g = groups.get(key);
-    if (g) g.count++;
-    else groups.set(key, {companyUID, organizationUID, count: 1});
+    if (!str(req.companyUID)) continue;
+    uncoveredEntries.push({
+      companyUID: req.companyUID,
+      organizationUID: req.organizationUID,
+      organizationId: req.organizationId,
+    });
   }
+  const groups = groupUncoveredDelegatesByCompany(uncoveredEntries);
   if (groups.size === 0) {
     const res = {...base, uncoveredDelegates, skipped: "no_uncovered" as const};
     await runRef.set({...res, ranAt: FieldValue.serverTimestamp()}, {merge: true});
@@ -480,18 +482,34 @@ export async function runSubscriptionReminders(db: Db, now: Date): Promise<Remin
     return res;
   }
 
-  const companyUIDs = [...new Set([...groups.values()].map((g) => g.companyUID))];
-  const supervisorsByCompany = await loadCompanySupervisorCandidates(db, companyUIDs);
+  const companyUIDs = [...groups.keys()];
+  const {byCompany: supervisorsByCompany, lookupFailedCompanyUids} =
+    await loadCompanySupervisorCandidates(db, companyUIDs);
 
   const writer = new Batcher(db);
   let notifications = 0;
+  const uniqueRecipients = new Set<string>();
   for (const g of groups.values()) {
     const recipientUids = recipientUidsForSubscriptionReminder({
       companyUID: g.companyUID,
       organizationUID: g.organizationUID,
       candidates: supervisorsByCompany.get(g.companyUID) || [],
     });
+    const inboxKey = supervisorCompanyInboxKey(g.companyUID);
+    if (
+      recipientUids.length === 1 && recipientUids[0] === inboxKey &&
+      lookupFailedCompanyUids.has(g.companyUID)
+    ) {
+      console.error(JSON.stringify({
+        event: "subscription_reminder_supervisor_lookup_failed",
+        companyUID: g.companyUID,
+        companyUIDs: [g.companyUID],
+        fallbackInbox: inboxKey,
+        fallbackDueToLookupFailure: true,
+      }));
+    }
     for (const recipientUid of recipientUids) {
+      uniqueRecipients.add(recipientUid);
       const doc = subscriptionReminderAlertDoc({
         recipientUid,
         organizationUID: g.organizationUID,
@@ -511,7 +529,8 @@ export async function runSubscriptionReminders(db: Db, now: Date): Promise<Remin
   await writer.flush();
   const res: ReminderResult = {
     ...base,
-    supervisors: groups.size,
+    supervisors: uniqueRecipients.size,
+    companies: groups.size,
     notifications,
     uncoveredDelegates,
   };
@@ -525,36 +544,63 @@ function isoReminderDay(now: Date): string {
   return `${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`;
 }
 
-const SUPERVISOR_ROLES_QUERY = ["supervisor", "company_supervisor"];
+export interface SupervisorCandidateLookup {
+  byCompany: Map<string, SubscriptionInvoiceUserCandidate[]>;
+  lookupFailedCompanyUids: Set<string>;
+}
 
-async function loadCompanySupervisorCandidates(
+/**
+ * Loads user docs that may be supervisor recipients. Avoids stacking two `in`
+ * filters (company × role), which exceeds Firestore's 30-disjunction cap when
+ * 16+ companies are due the same day. Role and active-state filtering happen in
+ * recipientUidsForSubscriptionReminder.
+ */
+export async function loadCompanySupervisorCandidates(
   db: Db,
   companyUIDs: string[],
-): Promise<Map<string, SubscriptionInvoiceUserCandidate[]>> {
+): Promise<SupervisorCandidateLookup> {
   const out = new Map<string, SubscriptionInvoiceUserCandidate[]>();
-  for (const part of chunks([...new Set(companyUIDs.filter(Boolean))], IN_LIMIT)) {
-    const snap = await db.collection("users")
-      .where("companyUID", "in", part)
-      .where("role", "in", SUPERVISOR_ROLES_QUERY)
-      .get();
-    for (const doc of snap.docs) {
-      const co = str(doc.get("companyUID") || doc.get("companyId"));
-      if (!co) continue;
-      const list = out.get(co) || [];
-      list.push({
-        uid: doc.id,
-        role: doc.get("role"),
-        companyUID: doc.get("companyUID"),
-        companyId: doc.get("companyId"),
-        organizationUID: doc.get("organizationUID"),
-        organizationId: doc.get("organizationId"),
-        isActive: doc.get("isActive"),
-        status: doc.get("status"),
-      });
-      out.set(co, list);
+  const lookupFailedCompanyUids = new Set<string>();
+  const seenDocIds = new Set<string>();
+  const uniqueCompanies = [...new Set(companyUIDs.filter(Boolean))];
+  const ingest = (doc: admin.firestore.QueryDocumentSnapshot) => {
+    if (seenDocIds.has(doc.id)) return;
+    seenDocIds.add(doc.id);
+    const co = str(doc.get("companyUID") || doc.get("companyId"));
+    if (!co) return;
+    const list = out.get(co) || [];
+    list.push({
+      uid: doc.id,
+      role: doc.get("role"),
+      companyUID: doc.get("companyUID"),
+      companyId: doc.get("companyId"),
+      organizationUID: doc.get("organizationUID"),
+      organizationId: doc.get("organizationId"),
+      isActive: doc.get("isActive"),
+      status: doc.get("status"),
+    });
+    out.set(co, list);
+  };
+  const runChunkedInQuery = async (field: "companyUID" | "companyId") => {
+    for (const part of chunks(uniqueCompanies, IN_LIMIT)) {
+      try {
+        const snap = await db.collection("users").where(field, "in", part).get();
+        for (const doc of snap.docs) ingest(doc);
+      } catch (err) {
+        for (const co of part) lookupFailedCompanyUids.add(co);
+        console.error(JSON.stringify({
+          event: "subscription_reminder_supervisor_lookup_failed",
+          field,
+          companyUIDs: part,
+          fallbackDueToLookupFailure: false,
+          error: String(err),
+        }));
+      }
     }
-  }
-  return out;
+  };
+  await runChunkedInQuery("companyUID");
+  await runChunkedInQuery("companyId");
+  return {byCompany: out, lookupFailedCompanyUids};
 }
 
 /**
