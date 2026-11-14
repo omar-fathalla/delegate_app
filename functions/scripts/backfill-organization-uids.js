@@ -2,11 +2,14 @@
  * Backfill organizationUIDs (and organizationNames) on existing
  * delegate_requests that only have the singular organizationUID.
  *
- * Dry-run is the default. Pass --apply to write. Always pass --project.
+ * Dry-run is the default. Pass --dry-run explicitly or omit --apply. Pass
+ * --apply to write. Always pass --project. See README-organization-uids-backfill.md
+ * for Mohamed run order (dry-run tashil-dev first, then --apply tashil-dev only;
+ * never prod).
  *
- *   node scripts/backfill-organization-uids.js --project tashil-dev --rollback /tmp/org-uids-rollback.json
+ *   node scripts/backfill-organization-uids.js --project tashil-dev --dry-run --rollback /tmp/org-uids-rollback.json
  *   node scripts/backfill-organization-uids.js --project tashil-dev --apply --rollback /tmp/org-uids-rollback.json
- *   node scripts/backfill-organization-uids.js --project tashil-dev --restore /tmp/org-uids-rollback.json
+ *   node scripts/backfill-organization-uids.js --project tashil-dev --dry-run --restore /tmp/org-uids-rollback.json
  *   node scripts/backfill-organization-uids.js --project tashil-dev --apply --restore /tmp/org-uids-rollback.json
  *
  * tashil-dev only unless a later written go passes --allow-prod-project.
