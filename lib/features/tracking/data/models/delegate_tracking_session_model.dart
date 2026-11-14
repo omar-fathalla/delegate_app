@@ -22,6 +22,7 @@ class DelegateTrackingSessionModel extends DelegateTrackingSession {
     super.lastBreachAt,
     super.firstExitedAt,
     super.checkInTime,
+    super.checkOutTime,
     super.isOnline = true,
     super.isMockLocationDetected = false,
     super.offlineBreadcrumbsCount = 0,
@@ -53,14 +54,30 @@ class DelegateTrackingSessionModel extends DelegateTrackingSession {
 
     final rawStatus = (json['currentStatus'] ?? json['status'] ?? 'inside')
         .toString()
-        .toLowerCase();
+        .toLowerCase()
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_');
     TrackingStatus status;
-    if (rawStatus.contains('outside') || rawStatus.contains('breach')) {
+    if (rawStatus.contains('checked_out') ||
+        rawStatus == 'checkout' ||
+        rawStatus == 'checkedout') {
+      status = TrackingStatus.checkedOut;
+    } else if (rawStatus.contains('suspended') || rawStatus.contains('موقوف')) {
+      status = TrackingStatus.suspended;
+    } else if (rawStatus.contains('forgot') ||
+        rawStatus.contains('نسيان') ||
+        rawStatus.contains('signature') ||
+        rawStatus.contains('توقيع')) {
+      status = TrackingStatus.forgotSignature;
+    } else if (rawStatus.contains('outside') || rawStatus.contains('breach')) {
       status = TrackingStatus.outsideZone;
     } else if (rawStatus.contains('offline')) {
       status = TrackingStatus.offline;
-    } else {
+    } else if (rawStatus.contains('inside')) {
       status = TrackingStatus.insideZone;
+    } else {
+      // Unknown statuses must not silently look like "inside".
+      status = TrackingStatus.offline;
     }
 
     final speedVal = json['speed'];
@@ -118,6 +135,7 @@ class DelegateTrackingSessionModel extends DelegateTrackingSession {
       lastBreachAt: parseNullableDate(json['lastBreachAt']),
       firstExitedAt: parseNullableDate(json['firstExitedAt']),
       checkInTime: parseNullableDate(json['checkInTime']),
+      checkOutTime: parseNullableDate(json['checkOutTime']),
       isOnline: json['isOnline'] != false,
       isMockLocationDetected: json['isMockLocationDetected'] == true,
       offlineBreadcrumbsCount:
@@ -137,6 +155,15 @@ class DelegateTrackingSessionModel extends DelegateTrackingSession {
         break;
       case TrackingStatus.offline:
         statusStr = 'offline';
+        break;
+      case TrackingStatus.checkedOut:
+        statusStr = 'checked_out';
+        break;
+      case TrackingStatus.forgotSignature:
+        statusStr = 'forgot_signature';
+        break;
+      case TrackingStatus.suspended:
+        statusStr = 'suspended';
         break;
       case TrackingStatus.insideZone:
         statusStr = 'inside';
@@ -166,6 +193,8 @@ class DelegateTrackingSessionModel extends DelegateTrackingSession {
         'firstExitedAt': Timestamp.fromDate(firstExitedAt!),
       if (checkInTime != null)
         'checkInTime': Timestamp.fromDate(checkInTime!),
+      if (checkOutTime != null)
+        'checkOutTime': Timestamp.fromDate(checkOutTime!),
       'isOnline': isOnline,
       'isMockLocationDetected': isMockLocationDetected,
       'offlineBreadcrumbsCount': offlineBreadcrumbsCount,

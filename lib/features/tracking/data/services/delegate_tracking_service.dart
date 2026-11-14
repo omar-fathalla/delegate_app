@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/time/cairo_clock.dart';
 import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'dart:async';
@@ -35,15 +36,27 @@ class DelegateTrackingService {
     Query<Map<String, dynamic>> query = _trackingCollection;
 
     if (companyId != null && companyId.isNotEmpty) {
-      query = query.where('companyId', isEqualTo: companyId);
+      query = query.where('companyUID', isEqualTo: companyId);
     } else if (organizationId != null && organizationId.isNotEmpty) {
       query = query.where('organizationId', isEqualTo: organizationId);
     }
 
     return query.snapshots().map((snapshot) {
-      return snapshot.docs
+      final sessions = snapshot.docs
           .map((doc) => DelegateTrackingSessionModel.fromFirestore(doc))
           .toList();
+      // Dual-layer company isolation (AGENTS.md): query + in-memory guard.
+      if (companyId != null && companyId.isNotEmpty) {
+        return sessions
+            .where((s) => s.companyId == companyId)
+            .toList(growable: false);
+      }
+      if (organizationId != null && organizationId.isNotEmpty) {
+        return sessions
+            .where((s) => s.organizationId == organizationId)
+            .toList(growable: false);
+      }
+      return sessions;
     });
   }
 
@@ -187,6 +200,7 @@ class DelegateTrackingService {
         'companyUID': companyId,
         'organizationId': organizationId,
         'organizationUID': organizationId,
+        'checkOutTime': FieldValue.delete(),
       }, SetOptions(merge: true));
 
       // تسجيل أول نقطة مسار (First Breadcrumb)
@@ -203,9 +217,13 @@ class DelegateTrackingService {
           'distanceMeters': distance,
           'isInside': isInside,
         });
-      } catch (_) {}
-    } catch (e) {
-      debugPrint('Error initializing tracking session: $e');
+      } catch (e, st) {
+        debugPrint(
+          'DelegateTrackingService: failed writing first breadcrumb: $e\n$st',
+        );
+      }
+    } catch (e, st) {
+      debugPrint('DelegateTrackingService: error initializing session: $e\n$st');
     }
   }
 
@@ -518,7 +536,11 @@ class DelegateTrackingService {
         'currentStatus': 'offline',
         'lastOfflineAt': FieldValue.serverTimestamp(),
       });
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint(
+        'DelegateTrackingService: failed marking delegate offline: $e\n$st',
+      );
+    }
   }
 
   /// 6. تخزين مسارات الـ GPS محلياً أثناء انقطاع الإنترنت (Offline Breadcrumbs)
@@ -538,7 +560,11 @@ class DelegateTrackingService {
         existing.removeRange(0, existing.length - 100);
       }
       await prefs.setStringList(key, existing);
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint(
+        'DelegateTrackingService: failed recording offline breadcrumb: $e\n$st',
+      );
+    }
   }
 
   /// 7. مزامنة البيانات والمسار المسجل أثناء انقطاع النت فور استعادة الاتصال
@@ -682,9 +708,8 @@ class DelegateTrackingService {
     required String? organizationId,
   }) async {
     try {
-      final now = DateTime.now();
-      final startOfDay = DateTime(now.year, now.month, now.day);
-      final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
+      CairoClock.ensureInitialized();
+      final nowUtc = DateTime.now().toUtc();
 
       // جلب الفروع للحصول على إحداثياتها ونصف قطر الزون
       final branchesSnap = await _firestore.collection('branches').get();
@@ -750,10 +775,9 @@ class DelegateTrackingService {
           logTime = DateTime.tryParse(data['createdAt'].toString());
         }
 
-        if (logTime != null) {
-          if (logTime.isBefore(startOfDay) || logTime.isAfter(endOfDay)) {
-            continue;
-          }
+        if (logTime != null &&
+            !CairoClock.isSameCairoCalendarDay(logTime, nowUtc)) {
+          continue;
         }
 
         if (type == 'check_out') {
@@ -866,7 +890,11 @@ class DelegateTrackingService {
                 }
               }
             }
-          } catch (_) {}
+          } catch (e, st) {
+            debugPrint(
+              'DelegateTrackingService: populate nested delegate lookup failed: $e\n$st',
+            );
+          }
 
           if (name.isEmpty || phone.isEmpty || avatarUrl.isEmpty) {
             try {
@@ -881,7 +909,11 @@ class DelegateTrackingService {
               if (avatarUrl.isEmpty) {
                 avatarUrl = extractPhotoUrl(userData);
               }
-            } catch (_) {}
+            } catch (e, st) {
+              debugPrint(
+                'DelegateTrackingService: populate users lookup failed: $e\n$st',
+              );
+            }
           }
         }
         if (name.isEmpty) name = 'مندوب';
@@ -895,7 +927,9 @@ class DelegateTrackingService {
         final outTime = latestCheckOuts[delegateId];
         if (checkInTime != null) {
           if (outTime != null && outTime.isAfter(checkInTime)) continue;
-          if (now.difference(checkInTime) >= kAttendanceAutoCloseAfter) continue;
+          if (nowUtc.difference(checkInTime.toUtc()) >= kAttendanceAutoCloseAfter) {
+            continue;
+          }
         }
 
         await initializeTrackingSession(
@@ -912,11 +946,13 @@ class DelegateTrackingService {
           geofenceRadius: geofenceRadius,
           currentLat: currentLat,
           currentLng: currentLng,
-          checkInTime: checkInTime ?? now,
+          checkInTime: checkInTime ?? nowUtc,
         );
       }
-    } catch (e) {
-      debugPrint('Error populating today attendance to tracking: $e');
+    } catch (e, st) {
+      debugPrint(
+        'DelegateTrackingService: error populating today attendance: $e\n$st',
+      );
     }
   }
 
