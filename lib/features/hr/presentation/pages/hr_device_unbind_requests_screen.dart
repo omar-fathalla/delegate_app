@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/services/device_binding_service.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -1123,8 +1124,8 @@ class _HRDeviceUnbindRequestsScreenState
       },
       borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
+        duration: AppMotionDurations.short4,
+        curve: AppMotionCurves.standardDefaultEffects,
         decoration: BoxDecoration(
           color: isSelected
               ? color.withValues(alpha: 0.08)
