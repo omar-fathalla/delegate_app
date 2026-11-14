@@ -17,6 +17,39 @@ test("groupUncoveredDelegatesByCompany merges mixed org fields into one company 
   const g = groups.get("c1");
   assert.equal(g.count, 3);
   assert.equal(g.organizationUID, "o1");
+  assert.equal(g.orgConflict, false);
+});
+
+test("groupUncoveredDelegatesByCompany flags org conflict under one company", () => {
+  const groups = R.groupUncoveredDelegatesByCompany([
+    {companyUID: "c1", organizationUID: "o1"},
+    {companyUID: "c1", organizationUID: "o2"},
+  ]);
+  const g = groups.get("c1");
+  assert.equal(g.count, 2);
+  assert.equal(g.orgConflict, true);
+  assert.deepEqual(g.organizationUIDs, ["o1", "o2"]);
+});
+
+test("partial lookup also targets shared supervisor_{companyUID} inbox", () => {
+  const uids = R.expandReminderDeliveryUids({
+    companyUID: "c_partial",
+    candidates: [{uid: "sup1", role: "supervisor", companyId: "c_partial", status: "active"}],
+    partialLookupRecovery: true,
+  });
+  assert.deepEqual(uids, ["sup1", "supervisor_c_partial"]);
+});
+
+test("every live supervisor on company is notified when orgs differ on requests", () => {
+  const ids = R.recipientUidsForSubscriptionReminder({
+    companyUID: "c1",
+    organizationUID: "o1",
+    candidates: [
+      {uid: "sup_o1", role: "supervisor", companyUID: "c1", organizationUID: "o1"},
+      {uid: "sup_o2", role: "supervisor", companyUID: "c1", organizationUID: "o2"},
+    ],
+  });
+  assert.deepEqual(ids, ["sup_o1", "sup_o2"]);
 });
 
 test("recipientUidsForSubscriptionReminder yields one uid set per company call", () => {

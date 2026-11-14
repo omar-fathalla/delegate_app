@@ -82,3 +82,38 @@ test("loadCompanySupervisorCandidates merges companyId field and survives chunk 
   assert.ok(map.get("c_legacy")?.some((u) => u.uid === "id_only"));
   assert.ok(map.get("co_0")?.length >= 1);
 });
+
+test("loadCompanySupervisorCandidates logs partial success when companyId recovers", async () => {
+  const db = {
+    collection() {
+      return {
+        where(field, op, part) {
+          return {
+            async get() {
+              if (field === "companyUID") {
+                if (part.includes("c_partial")) throw new Error("Too many disjunctions");
+                return {docs: []};
+              }
+              if (part.includes("c_partial")) {
+                return {
+                  docs: [mockDoc("sup_partial", {
+                    companyId: "c_partial",
+                    role: "supervisor",
+                    status: "active",
+                  })],
+                };
+              }
+              return {docs: []};
+            },
+          };
+        },
+      };
+    },
+  };
+  const {byCompany, companyUidFieldChunkFailed, companyIdFieldIngested, partialLookupCompanyUids} =
+    await J.loadCompanySupervisorCandidates(db, ["c_partial"]);
+  assert.ok(companyUidFieldChunkFailed.has("c_partial"));
+  assert.ok(companyIdFieldIngested.has("c_partial"));
+  assert.ok(partialLookupCompanyUids.has("c_partial"));
+  assert.equal(byCompany.get("c_partial")?.length, 1);
+});

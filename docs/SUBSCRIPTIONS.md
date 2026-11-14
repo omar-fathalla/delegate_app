@@ -86,7 +86,10 @@ request and are never suspended.
   company supervisor per company per day**: uncovered delegates are grouped by
   **`companyUID` only** (tenant), not by org chain, so mixed or missing
   `organizationUID` on `delegate_requests` still yields a single reminder with the
-  full uncovered count. Each active `supervisor` / `company_supervisor` /
+  full uncovered count. When one company has **multiple org chains** on requests,
+  every live supervisor on that company is notified once (no org filter on
+  supervisor selection); `subscription_reminder_org_conflict` is logged with the
+  org id set. Each active `supervisor` / `company_supervisor` /
   `company-supervisor` on that company gets `delegateUid` set to their uid (not the
   staff uid on `delegate_requests.supervisorUid`). Supervisors also read the shared
   inbox `delegateUid: supervisor_{companyUID}` in the app; when no live supervisor
@@ -96,7 +99,13 @@ request and are never suspended.
   companies are due the same day); role and active-state filtering run in code.
   Failed lookup chunks are logged (`subscription_reminder_supervisor_lookup_failed`
   with `companyUIDs`; `fallbackDueToLookupFailure: true` when the shared inbox is
-  used because lookup failed). Inactive / disabled / suspended / deleted supervisors
+  used because lookup failed). When a `companyUID` chunk fails but `companyId`
+  chunk still loads supervisors, `subscription_reminder_supervisor_lookup_partial`
+  is logged with `supervisorRecipientCount` (live supervisor inboxes, not raw
+  Firestore rows), and the job also writes one notification to
+  `supervisor_{companyUID}` in addition to personal supervisor uids so
+  company-keyed inboxes still see that day. Inactive / disabled / suspended /
+  deleted supervisors
   are skipped. Counts app-added delegates lacking paid coverage for the **next**
   period. Run metrics: `supervisors` = distinct recipients, `companies` = companies
   with uncovered delegates, `notifications` = writes.
