@@ -5827,6 +5827,10 @@
         {
           "fieldPath": "companyUID",
           "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nationalId",
+          "order": "ASCENDING"
         }
       ]
     },
@@ -5839,7 +5843,7 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "nationalId",
+          "fieldPath": "nationalityID",
           "order": "ASCENDING"
         }
       ]
