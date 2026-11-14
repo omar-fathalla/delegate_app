@@ -1,3 +1,4 @@
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/network/connectivity_status.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -41,8 +42,8 @@ class _OfflineBannerState extends State<OfflineBanner> {
       valueListenable: _status.isOffline,
       builder: (context, offline, _) {
         return AnimatedSize(
-          duration: reduce ? Duration.zero : const Duration(milliseconds: 250),
-          curve: Curves.easeInOutCubicEmphasized,
+          duration: reduce ? Duration.zero : AppMotionDurations.medium1,
+          curve: AppMotionCurves.emphasized,
           child: !offline
               ? const SizedBox(width: double.infinity)
               : Material(

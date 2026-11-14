@@ -1,3 +1,4 @@
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:flutter/material.dart';
 
 /// Extension for M3 Dynamic Primary-Derived Hover Engine
@@ -36,8 +37,7 @@ class TashilConnectedButtonItem<T> {
 /// Official Material Design 3 Expressive Connected Button Group
 ///
 /// Designed as a continuous capsule track (height 42-44dp, radius 24dp)
-/// with a floating inner thumb (height 35dp, radius 17.5dp) animating in 220ms
-/// with [Curves.easeInOutCubic].
+/// with a floating inner thumb (height 35dp, radius 17.5dp) using M3 motion tokens.
 /// Complies with:
 /// - Single-Icon Rule (maximum 1 icon per button, no emojis combined with icon widgets)
 /// - M3 Dynamic Hover State Layer
@@ -166,8 +166,8 @@ class _TashilConnectedButtonSegmentState<T>
         onTap: widget.onTap,
         behavior: HitTestBehavior.opaque,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeInOutCubic,
+          duration: AppMotionDurations.short4,
+          curve: AppMotionCurves.standardDefaultEffects,
           height: widget.height,
           padding: widget.padding ?? const EdgeInsets.symmetric(horizontal: 14.0),
           decoration: BoxDecoration(

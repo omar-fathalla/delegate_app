@@ -1,3 +1,4 @@
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:flutter/material.dart';
 import 'tashil_button_group.dart';
 
@@ -193,8 +194,8 @@ class _TashilIconButtonState extends State<TashilIconButton> {
         onTapCancel: () => setState(() => _isPressed = false),
         onTap: widget.onPressed,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeInOutCubic,
+          duration: AppMotionDurations.short4,
+          curve: AppMotionCurves.standardDefaultEffects,
           width: widget.size,
           height: widget.size,
           decoration: BoxDecoration(
@@ -216,7 +217,7 @@ class _TashilIconButtonState extends State<TashilIconButton> {
     if (widget.tooltip != null && widget.tooltip!.isNotEmpty) {
       button = Tooltip(
         message: widget.tooltip!,
-        waitDuration: const Duration(milliseconds: 400),
+        waitDuration: AppMotionDurations.medium4,
         child: button,
       );
     }
