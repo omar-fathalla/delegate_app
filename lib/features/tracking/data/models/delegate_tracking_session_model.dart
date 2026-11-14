@@ -62,6 +62,13 @@ class DelegateTrackingSessionModel extends DelegateTrackingSession {
         rawStatus == 'checkout' ||
         rawStatus == 'checkedout') {
       status = TrackingStatus.checkedOut;
+    } else if (rawStatus.contains('suspended') || rawStatus.contains('موقوف')) {
+      status = TrackingStatus.suspended;
+    } else if (rawStatus.contains('forgot') ||
+        rawStatus.contains('نسيان') ||
+        rawStatus.contains('signature') ||
+        rawStatus.contains('توقيع')) {
+      status = TrackingStatus.forgotSignature;
     } else if (rawStatus.contains('outside') || rawStatus.contains('breach')) {
       status = TrackingStatus.outsideZone;
     } else if (rawStatus.contains('offline')) {
@@ -151,6 +158,12 @@ class DelegateTrackingSessionModel extends DelegateTrackingSession {
         break;
       case TrackingStatus.checkedOut:
         statusStr = 'checked_out';
+        break;
+      case TrackingStatus.forgotSignature:
+        statusStr = 'forgot_signature';
+        break;
+      case TrackingStatus.suspended:
+        statusStr = 'suspended';
         break;
       case TrackingStatus.insideZone:
         statusStr = 'inside';

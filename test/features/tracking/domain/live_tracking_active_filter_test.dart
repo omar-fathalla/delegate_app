@@ -220,6 +220,34 @@ void main() {
       }
     });
 
+    test('excludes suspended status', () {
+      expect(
+        LiveTrackingActiveFilter.isCurrentlyCheckedIn(
+          _session(
+            id: 'susp',
+            status: TrackingStatus.suspended,
+            checkInTime: DateTime.utc(2026, 11, 6, 8),
+          ),
+          now: nowCairoEvening,
+        ),
+        isFalse,
+      );
+    });
+
+    test('keeps forgot_signature when checked in today', () {
+      expect(
+        LiveTrackingActiveFilter.isCurrentlyCheckedIn(
+          _session(
+            id: 'forgot',
+            status: TrackingStatus.forgotSignature,
+            checkInTime: DateTime.utc(2026, 11, 6, 8),
+          ),
+          now: nowCairoEvening,
+        ),
+        isTrue,
+      );
+    });
+
     test('excludes checked_out status', () {
       expect(
         LiveTrackingActiveFilter.isCurrentlyCheckedIn(

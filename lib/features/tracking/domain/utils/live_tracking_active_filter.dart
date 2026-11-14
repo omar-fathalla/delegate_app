@@ -28,7 +28,8 @@ class LiveTrackingActiveFilter {
     DelegateTrackingSession session, {
     required DateTime now,
   }) {
-    if (session.currentStatus == TrackingStatus.checkedOut) {
+    if (session.currentStatus == TrackingStatus.checkedOut ||
+        session.currentStatus == TrackingStatus.suspended) {
       return false;
     }
 

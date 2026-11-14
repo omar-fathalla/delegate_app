@@ -128,6 +128,23 @@ void main() {
       }
     });
 
+    test('maps forgot_signature and suspended without treating as inside', () {
+      for (final raw in ['forgot_signature', 'forgot-checkout', 'نسيان_توقيع']) {
+        final model = DelegateTrackingSessionModel.fromJson({
+          'delegateId': 'del_f',
+          'currentStatus': raw,
+        }, 'del_f');
+        expect(model.currentStatus, TrackingStatus.forgotSignature, reason: raw);
+        expect(model.isInside, isTrue, reason: raw);
+      }
+      final suspended = DelegateTrackingSessionModel.fromJson({
+        'delegateId': 'del_s',
+        'currentStatus': 'suspended',
+      }, 'del_s');
+      expect(suspended.currentStatus, TrackingStatus.suspended);
+      expect(suspended.isInside, isFalse);
+    });
+
     test('unknown status maps to offline, not inside', () {
       final model = DelegateTrackingSessionModel.fromJson({
         'delegateId': 'del_x',

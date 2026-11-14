@@ -5,6 +5,10 @@ enum TrackingStatus {
   outsideZone,
   offline,
   checkedOut,
+  /// حضور مفتوح — نسيان تسجيل الانصراف / التوقيع (يظهر ضمن الحاضرين).
+  forgotSignature,
+  /// حساب المندوب موقوف — لا يظهر في التتبع المباشر.
+  suspended,
 }
 
 class DelegateTrackingSession extends Equatable {
@@ -66,9 +70,13 @@ class DelegateTrackingSession extends Equatable {
     this.avatarUrl,
   });
 
-  bool get isInside => currentStatus == TrackingStatus.insideZone;
+  bool get isInside =>
+      currentStatus == TrackingStatus.insideZone ||
+      currentStatus == TrackingStatus.forgotSignature;
   bool get isOutside => currentStatus == TrackingStatus.outsideZone;
   bool get isOffline => currentStatus == TrackingStatus.offline || !isOnline;
+
+  bool get isSuspended => currentStatus == TrackingStatus.suspended;
 
   bool get isInGracePeriod {
     if (firstExitedAt == null) return false;

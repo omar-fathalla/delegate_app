@@ -142,8 +142,8 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
         companyId: widget.adminDelegate.companyUID,
         organizationId: widget.adminDelegate.organizationUID,
       );
-    } catch (e) {
-      debugPrint('Error populating tracking data: $e');
+    } catch (e, st) {
+      debugPrint('LiveTracking: error populating tracking data: $e\n$st');
     } finally {
       if (mounted) setState(() => _isSyncing = false);
     }
