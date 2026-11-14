@@ -855,11 +855,13 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
 
       // 3. Check collectionGroup('delegates') where receiptCode == cleanCode
       try {
-        final delSnap = await _firestore
+        Query<Map<String, dynamic>> delQuery = _firestore
             .collectionGroup('delegates')
-            .where('receiptCode', isEqualTo: cleanCode)
-            .limit(1)
-            .get();
+            .where('receiptCode', isEqualTo: cleanCode);
+        if (companyUID.isNotEmpty) {
+          delQuery = delQuery.where('companyUID', isEqualTo: companyUID);
+        }
+        final delSnap = await delQuery.limit(1).get();
         if (delSnap.docs.isNotEmpty) {
           return const Right(true);
         }
@@ -889,13 +891,21 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       query = query.where('companyUID', isEqualTo: companyUID);
     }
 
+    final tenantCompany = companyUID?.trim() ?? '';
     return query.snapshots().map((snapshot) {
-      final list = snapshot.docs.map((doc) {
+      var list = snapshot.docs.map((doc) {
         return DelegateSubscriptionRequest.fromMap(
           doc.data() as Map<String, dynamic>,
           doc.id,
         );
       }).toList();
+
+      if (tenantCompany.isNotEmpty) {
+        list = list.where((r) {
+          final co = r.companyUID.trim();
+          return co.isEmpty || co == tenantCompany;
+        }).toList();
+      }
 
       // Sort client-side by createdAt descending (newest first)
       // to avoid requiring composite indexes in Firestore

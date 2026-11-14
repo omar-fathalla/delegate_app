@@ -10,6 +10,7 @@ import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/profile/domain/entities/user_role.dart';
 import 'package:delegate_app/injection_container.dart';
 
 /// Aggregation model for company-level financial audit
@@ -172,7 +173,20 @@ class _SuperAdminSubscriptionFinancialReportScreenState
         ),
       ),
       body: StreamBuilder<List<DelegateSubscriptionRequest>>(
-        stream: repo.getSubscriptionRequestsStream(),
+        stream: repo.getSubscriptionRequestsStream(
+          companyUID: (widget.adminDelegate.role == UserRole.superAdmin ||
+                  widget.adminDelegate.role == UserRole.technicalSupport ||
+                  widget.adminDelegate.role == UserRole.organizationAdmin)
+              ? null
+              : (widget.adminDelegate.companyUID.isNotEmpty
+                  ? widget.adminDelegate.companyUID
+                  : null),
+          organizationUID: widget.adminDelegate.role == UserRole.organizationAdmin
+              ? (widget.adminDelegate.organizationUID.isNotEmpty
+                  ? widget.adminDelegate.organizationUID
+                  : null)
+              : null,
+        ),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator.adaptive());

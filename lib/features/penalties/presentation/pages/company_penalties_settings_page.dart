@@ -510,16 +510,17 @@ class _CompanyPenaltiesSettingsPageState
       return;
     }
     final canViewAll = widget.delegate.role == UserRole.superAdmin ||
-        widget.delegate.role == UserRole.technicalSupport ||
-        widget.delegate.role == UserRole.branchesMarketingManager ||
-        widget.delegate.role == UserRole.marketing;
+        widget.delegate.role == UserRole.technicalSupport;
     if (canViewAll) {
       context.read<PenaltyBloc>().add(const LoadAllPenaltiesEvent());
     } else {
       final companyId = widget.delegate.companyUID.isNotEmpty
           ? widget.delegate.companyUID
           : widget.delegate.organizationUID;
-      context.read<PenaltyBloc>().add(LoadCompanyPenaltiesEvent(companyId));
+      context.read<PenaltyBloc>().add(LoadCompanyPenaltiesEvent(
+        companyId,
+        organizationId: widget.delegate.organizationUID,
+      ));
     }
   }
 

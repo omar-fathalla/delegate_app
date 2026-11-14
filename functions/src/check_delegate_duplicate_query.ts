@@ -39,7 +39,13 @@ export async function findDuplicateDecision(
     value: string,
     kind: DuplicateField,
   ) => {
-    const snap = await db.collection("delegate_requests").where(field, "==", value).get();
+    const company = opts.companyUID.trim();
+    const snap = company
+      ? await db.collection("delegate_requests")
+        .where("companyUID", "==", company)
+        .where(field, "==", value)
+        .get()
+      : await db.collection("delegate_requests").where(field, "==", value).get();
     for (const doc of snap.docs) {
       if (isExcludableDelegateRecord(doc.data(), doc.id, opts.excludeDelegateUid, opts.companyUID)) continue;
       if (!isOpenRequestStatus(doc.data().status)) continue;
