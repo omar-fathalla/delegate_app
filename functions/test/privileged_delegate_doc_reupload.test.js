@@ -43,6 +43,55 @@ test("decidePrivilegedDocReupload allows SA and tech", () => {
   );
 });
 
+const BUCKET = "practice-firebase-72df1.appspot.com";
+const goodPath = (uid, file) =>
+  `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/delegate_documents%2F${uid}%2F${file}?alt=media`;
+
+test("resolveDelegateDocumentStorageObject accepts allowed bucket path", () => {
+  const r = L.resolveDelegateDocumentStorageObject(
+    goodPath("d1", "personalPhoto_1.jpg"),
+    "d1",
+  );
+  assert.equal(r.ok, true);
+  assert.equal(r.objectPath, "delegate_documents/d1/personalPhoto_1.jpg");
+});
+
+test("resolveDelegateDocumentStorageObject rejects foreign host", () => {
+  const r = L.resolveDelegateDocumentStorageObject("https://cdn.example/x.jpg", "d1");
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, "invalid_image_url");
+});
+
+test("resolveDelegateDocumentStorageObject rejects wrong delegate uid", () => {
+  const r = L.resolveDelegateDocumentStorageObject(
+    goodPath("d1", "personalPhoto_1.jpg"),
+    "d2",
+  );
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, "wrong_delegate_folder");
+});
+
+test("resolveDelegateDocumentStorageObject rejects evil bucket", () => {
+  const r = L.resolveDelegateDocumentStorageObject(
+    "https://firebasestorage.googleapis.com/v0/b/evil.appspot.com/o/delegate_documents%2Fd1%2Fx.jpg",
+    "d1",
+  );
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, "invalid_image_url");
+});
+
+test("applyPrivilegedDocumentReview approve and reject", () => {
+  const raw = [
+    {documentKey: "personalPhoto", documentStatus: "pending", documentURL: "u1"},
+  ];
+  const approved = L.applyPrivilegedDocumentReview(raw, "personalPhoto", true, "tech", undefined, "t");
+  assert.equal(approved[0].documentStatus, "approved");
+  assert.equal(approved[0].reviewedBy, "tech");
+  const rejected = L.applyPrivilegedDocumentReview(raw, "personalPhoto", false, "tech", "bad", "t");
+  assert.equal(rejected[0].documentStatus, "rejected");
+  assert.equal(rejected[0].rejectionReason, "bad");
+});
+
 test("decidePrivilegedDocReupload rejects org mismatch", () => {
   const target = {
     delegateUid: "d1",

@@ -12,6 +12,7 @@ import 'package:delegate_app/features/photo_permission/presentation/pages/super_
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_payment_receipts_report_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_collections_screen.dart';
 import 'package:delegate_app/features/wallet/presentation/pages/super_admin_wallets_screen.dart';
+import 'package:delegate_app/features/admin/presentation/utils/admin_privileged_staff_menu.dart';
 import 'package:delegate_app/features/admin/presentation/pages/add_branch_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_branches_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/create_admin_screen.dart';
@@ -855,12 +856,14 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                 title: l10n.createAdmin,
               ),
             ],
-            if (isTechnicalSupport) ...[
+            if (privilegedStaffMenuIncludesManageDelegates(delegate.role)) ...[
               buildPopupItem(
-                value: 'manage_delegates',
+                value: manageDelegatesMenuValue,
                 icon: Icons.groups_rounded,
-                title: 'المناديب — تعديل وإيقاف',
+                title: manageDelegatesMenuTitleAr,
               ),
+            ],
+            if (isTechnicalSupport) ...[
               buildPopupItem(
                 value: 'photo_permissions',
                 icon: Icons.photo_library_rounded,

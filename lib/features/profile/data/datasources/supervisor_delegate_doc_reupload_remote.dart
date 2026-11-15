@@ -229,6 +229,37 @@ class PrivilegedDelegateDocReuploadRemote {
   final FirebaseFunctions _functions;
   final FirebaseStorage? _storage;
 
+  Future<void> reviewDocument({
+    required String uid,
+    required String organizationUID,
+    required String companyUID,
+    required String docType,
+    required bool approve,
+    String? rejectionReason,
+  }) async {
+    try {
+      await _functions.httpsCallable('privilegedReuploadDelegateDocument').call({
+        'uid': uid,
+        'organizationUID': organizationUID,
+        'companyUID': companyUID,
+        'docType': docType,
+        'approve': approve,
+        if (rejectionReason != null && rejectionReason.isNotEmpty)
+          'rejectionReason': rejectionReason,
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw SupervisorDocReuploadException(
+        e.message?.trim().isNotEmpty == true
+            ? e.message!.trim()
+            : 'تعذر تحديث حالة المستند على الخادم. حاول مرة أخرى.',
+      );
+    } catch (_) {
+      throw SupervisorDocReuploadException(
+        'تعذر تحديث حالة المستند على الخادم. حاول مرة أخرى.',
+      );
+    }
+  }
+
   Future<void> reupload({
     required String uid,
     required String organizationUID,

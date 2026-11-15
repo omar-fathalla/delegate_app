@@ -553,13 +553,9 @@ service cloud.firestore {
       let st0 = resource.data.get('status', null);
       let st1 = request.resource.data.get('status', null);
       let stCh = changedKeys().hasAny(['status']);
-      let privDocServer = (r in superAdminRoleList() || r in techRoleList())
+      let privGlobalStaffDocsServer = (r in superAdminRoleList() || r in techRoleList())
         && !stCh
-        && changedKeys().hasAny(['documents'])
-        && changedKeys().hasAny(['profileImageUrl', 'personalPhotoURL', 'photoURL',
-          'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl'])
-        && delegateStatusLower(st0) == 'active'
-        && delegateStatusLower(request.resource.data.get('status', st0)) == 'active';
+        && changedKeys().hasAny(['documents']);
       let approver = request.auth.uid != delegateId && (
         r in ['super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN']
         || (c != '' && (c == c1 || c == c2) && r in [
@@ -576,9 +572,9 @@ service cloud.firestore {
       // account-status check stays on the non-techSignup branch so the
       // request-approval batch (4 document flips) stays under budget.
       // Supervisor active→pending doc replace is server-only (callable).
-      // SA / tech active doc+URL replace is server-only (privileged callable).
+      // SA / tech doc replace and pending review are server-only (privileged callable).
       return !(stCh && st1 == 'pending' && !approver)
-        && !privDocServer
+        && !privGlobalStaffDocsServer
         && ((techSignup && techFlipOk(delegateId) && techReqOk(o1, c1, delegateId))
           || (!techSignup && (delegateDocsOk() || approver)
             && staffDelegateAccountFieldsOk(r, approver)

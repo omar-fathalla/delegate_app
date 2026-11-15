@@ -17,6 +17,21 @@ const PHOTO_APPROVED = {
   reviewedBy: "sa",
   reviewedAt: "2026-01-01",
 };
+const PHOTO_PENDING = {
+  documentKey: "personalPhoto",
+  documentStatus: "pending",
+  documentURL: "https://cdn.example/p0.jpg",
+  uploadedAt: "2026-01-01",
+};
+const PENDING = {
+  uid: "d1",
+  organizationUID: "o1",
+  companyUID: "c1",
+  status: "pending",
+  phoneNumber: "01011111111",
+  profileImageUrl: "https://cdn.example/p0.jpg",
+  documents: [PHOTO_PENDING],
+};
 const ACTIVE = {
   uid: "d1",
   organizationUID: "o1",
@@ -74,4 +89,34 @@ describe("privileged staff doc reupload client deny", () => {
     test(`DENY ${uid} client privileged approved photo re-upload`, () =>
       assertFails(updateDoc(doc(as(uid), PATH), privilegedClientReupload(uid))));
   }
+
+  test("DENY sa client approves pending document (server callable only)", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(PATH).set(PENDING);
+    });
+    await assertFails(updateDoc(doc(as("sa"), PATH), {
+      updatedAt: "t",
+      documents: [{
+        ...PHOTO_PENDING,
+        documentStatus: "approved",
+        reviewedBy: "sa",
+        reviewedAt: "2026-11-15",
+      }],
+    }));
+  });
+
+  test("DENY ts client approves pending document", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(PATH).set(PENDING);
+    });
+    await assertFails(updateDoc(doc(as("ts"), PATH), {
+      updatedAt: "t",
+      documents: [{
+        ...PHOTO_PENDING,
+        documentStatus: "approved",
+        reviewedBy: "ts",
+        reviewedAt: "2026-11-15",
+      }],
+    }));
+  });
 });

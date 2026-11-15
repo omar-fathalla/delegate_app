@@ -984,51 +984,15 @@ class _ProfileBody extends StatelessWidget {
       if (reason == null || reason.isEmpty) return;
     }
     try {
-      final firestore = FirebaseFirestore.instance;
-      final refs = <DocumentReference<Map<String, dynamic>>>[];
-      if (delegate.companyUID.isNotEmpty) {
-        final orgsSnap = await firestore.collection('organizations').get();
-        for (final orgDoc in orgsSnap.docs) {
-          refs.add(firestore
-              .collection('organizations')
-              .doc(orgDoc.id)
-              .collection('companies')
-              .doc(delegate.companyUID)
-              .collection('delegates')
-              .doc(delegate.uid));
-        }
-      }
-      refs.add(firestore.collection('delegate_requests').doc(delegate.uid));
-      var updated = 0;
-      for (final ref in refs) {
-        try {
-          final changed = await firestore.runTransaction<bool>((tx) async {
-            final snap = await tx.get(ref);
-            if (!snap.exists) return false;
-            final docs = reviewDocumentEntry(
-              snap.data()?['documents'],
-              docType: item.docType,
-              approve: approve,
-              reviewerUid: reviewerUid,
-              rejectionReason: reason,
-            );
-            if (docs == null) return false;
-            tx.update(ref, {
-              'documents': docs,
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-            return true;
-          });
-          if (changed) updated++;
-        } catch (_) {
-          if (ref.parent.id != 'delegate_requests') rethrow;
-        }
-      }
+      await PrivilegedDelegateDocReuploadRemote().reviewDocument(
+        uid: delegate.uid,
+        organizationUID: delegate.organizationUID,
+        companyUID: delegate.companyUID,
+        docType: item.docType,
+        approve: approve,
+        rejectionReason: reason,
+      );
       if (!context.mounted) return;
-      if (updated == 0) {
-        AppSnackBar.showError(context, 'لم يتم العثور على المستند');
-        return;
-      }
       AppSnackBar.showSuccess(
         context,
         approve ? 'تم اعتماد ${item.title}' : 'تم رفض ${item.title}',
@@ -1042,7 +1006,7 @@ class _ProfileBody extends StatelessWidget {
       );
     } catch (e) {
       if (context.mounted) {
-        AppSnackBar.showError(context, 'فشل تحديث حالة المستند: $e');
+        AppSnackBar.showError(context, supervisorDocReplaceErrorMessage(e));
       }
     }
   }

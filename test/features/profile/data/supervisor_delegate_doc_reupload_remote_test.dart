@@ -120,6 +120,32 @@ void main() {
     verifyNever(() => reuploadCallable.call(any()));
   });
 
+  test('reviewDocument calls privilegedReuploadDelegateDocument with approve', () async {
+    final functions = _FakeFunctions();
+    final privilegedCallable = _FakeCallable();
+    when(
+      () => functions.httpsCallable('privilegedReuploadDelegateDocument'),
+    ).thenReturn(privilegedCallable);
+
+    Map? payload;
+    when(() => privilegedCallable.call(any())).thenAnswer((inv) async {
+      payload = inv.positionalArguments.first as Map;
+      return _FakeResult({'documentStatus': 'approved'});
+    });
+
+    await PrivilegedDelegateDocReuploadRemote(functions: functions).reviewDocument(
+      uid: 'd1',
+      organizationUID: 'o1',
+      companyUID: 'c1',
+      docType: 'personalPhoto',
+      approve: true,
+    );
+
+    expect(payload!['approve'], true);
+    expect(payload!.containsKey('newUrl'), false);
+    verify(() => privilegedCallable.call(any())).called(1);
+  });
+
   test('privileged replaceWithFile calls privilegedReuploadDelegateDocument', () async {
     final functions = _FakeFunctions();
     final privilegedCallable = _FakeCallable();

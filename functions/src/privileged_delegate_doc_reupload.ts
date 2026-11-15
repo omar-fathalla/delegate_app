@@ -1,6 +1,6 @@
 /**
  * Callable privilegedReuploadDelegateDocument — SA / technical support
- * approved document replace server-side (Mohamed 2026-11-15).
+ * approved document replace + pending doc review server-side (Mohamed 2026-11-15).
  *
  * Deploy: functions:tashil-mobile-notifications:privilegedReuploadDelegateDocument
  */
@@ -8,9 +8,11 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import {FieldValue} from "firebase-admin/firestore";
 import {
+  applyPrivilegedDocumentReview,
   decidePrivilegedDocReupload,
   isKnownSupervisorReuploadDocType,
   mergePrivilegedReuploadedDocument,
+  resolveDelegateDocumentStorageObject,
   urlFieldsForDocType,
 } from "./privileged_delegate_doc_reupload_logic";
 
@@ -18,6 +20,20 @@ const opts = {timeoutSeconds: 60, memory: "256MB" as const};
 
 function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
+}
+
+function storageErrorMessage(reason: string): string {
+  switch (reason) {
+    case "invalid_image_url":
+    case "invalid_storage_url":
+      return "رابط المستند غير صالح أو غير مسموح.";
+    case "wrong_delegate_folder":
+      return "مسار الملف لا يخص هذا المندوب.";
+    case "object_not_found":
+      return "الملف غير موجود في التخزين. أعد الرفع ثم حاول مرة أخرى.";
+    default:
+      return "تعذر التحقق من ملف المستند.";
+  }
 }
 
 async function loadCaller(uid: string) {
@@ -32,6 +48,24 @@ async function loadCaller(uid: string) {
   return {uid, role: d.role};
 }
 
+async function assertStorageObjectExists(objectPath: string, bucketName?: string) {
+  const bucket = bucketName
+    ? admin.storage().bucket(bucketName)
+    : admin.storage().bucket();
+  const file = bucket.file(objectPath);
+  try {
+    await file.getMetadata();
+  } catch {
+    const [exists] = await file.exists();
+    if (!exists) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        storageErrorMessage("object_not_found"),
+      );
+    }
+  }
+}
+
 export const privilegedReuploadDelegateDocument = functions
   .region("us-central1")
   .runWith(opts)
@@ -44,23 +78,27 @@ export const privilegedReuploadDelegateDocument = functions
     const organizationUID = str(p.organizationUID);
     const companyUID = str(p.companyUID);
     const docType = str(p.docType);
+    const reviewMode = typeof p.approve === "boolean";
     const newUrl = str(p.newUrl);
-    if (!delegateUid || !organizationUID || !companyUID || !docType || !newUrl) {
+    if (!delegateUid || !organizationUID || !companyUID || !docType) {
       throw new functions.https.HttpsError("invalid-argument", "بيانات الطلب غير مكتملة.");
     }
     if (!isKnownSupervisorReuploadDocType(docType)) {
       throw new functions.https.HttpsError("invalid-argument", "نوع المستند غير مدعوم.");
     }
+    if (!reviewMode && !newUrl) {
+      throw new functions.https.HttpsError("invalid-argument", "بيانات الطلب غير مكتملة.");
+    }
 
     const caller = await loadCaller(ctx.auth.uid);
     const db = admin.firestore();
     const delegateRef = db
-    .collection("organizations")
-    .doc(organizationUID)
-    .collection("companies")
-    .doc(companyUID)
-    .collection("delegates")
-    .doc(delegateUid);
+      .collection("organizations")
+      .doc(organizationUID)
+      .collection("companies")
+      .doc(companyUID)
+      .collection("delegates")
+      .doc(delegateUid);
     const snap = await delegateRef.get();
     if (!snap.exists) {
       throw new functions.https.HttpsError("not-found", "لم يتم العثور على المندوب.");
@@ -86,6 +124,57 @@ export const privilegedReuploadDelegateDocument = functions
     }
 
     const at = new Date().toISOString();
+
+    if (reviewMode) {
+      const approve = p.approve as boolean;
+      const rejectionReason = str(p.rejectionReason);
+      if (!approve && !rejectionReason) {
+        throw new functions.https.HttpsError("invalid-argument", "سبب الرفض مطلوب.");
+      }
+      const documents = applyPrivilegedDocumentReview(
+        delegateData.documents,
+        docType,
+        approve,
+        caller.uid,
+        rejectionReason || undefined,
+        at,
+      );
+      if (!documents) {
+        throw new functions.https.HttpsError("not-found", "لم يتم العثور على المستند.");
+      }
+      const batch = db.batch();
+      batch.update(delegateRef, {
+        documents,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      const reqRef = db.collection("delegate_requests").doc(delegateUid);
+      const reqSnap = await reqRef.get();
+      if (reqSnap.exists) {
+        const reqDocs = applyPrivilegedDocumentReview(
+          reqSnap.data()?.documents,
+          docType,
+          approve,
+          caller.uid,
+          rejectionReason || undefined,
+          at,
+        );
+        if (reqDocs) {
+          batch.set(reqRef, {
+            documents: reqDocs,
+            updatedAt: FieldValue.serverTimestamp(),
+          }, {merge: true});
+        }
+      }
+      await batch.commit();
+      return {ok: true, documentStatus: approve ? "approved" : "rejected"};
+    }
+
+    const resolved = resolveDelegateDocumentStorageObject(newUrl, delegateUid);
+    if (!resolved.ok) {
+      throw new functions.https.HttpsError("invalid-argument", storageErrorMessage(resolved.reason));
+    }
+    await assertStorageObjectExists(resolved.objectPath, resolved.bucket);
+
     const urlFields = urlFieldsForDocType(docType, newUrl);
     const documents = mergePrivilegedReuploadedDocument(
       delegateData.documents,
