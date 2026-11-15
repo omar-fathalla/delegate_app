@@ -2,6 +2,8 @@
  * Shared guards for the P0 users-write scripts. Not imported by index.js,
  * not deployed. Every script defaults to a dry run that prints counts only.
  */
+const fs = require("fs");
+const {randomBytes} = require("crypto");
 const PROD_PROJECTS = new Set(["practice-firebase-72df1"]);
 // Allow-list: only these targets run. Anything else (typos, case/space
 // variants, "projects/..." paths, project numbers) is refused.
@@ -71,4 +73,43 @@ function resetPriority(role) {
   return 1;
 }
 
-module.exports = {PROD_PROJECTS, ALLOWED_PROJECTS, normalizeProject, SECRET_KEYS, parseArgs, assertTarget, secretKeysPresent, roleKey, resetPriority};
+/** @param {string} prefix */
+function newBackfillRunId(prefix) {
+  const t = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+  return `${prefix}-${t}-${randomBytes(3).toString("hex")}`;
+}
+
+/**
+ * Refuses to clobber an on-disk artifact from a prior run.
+ * @param {string} filePath
+ * @param {"rollback"|"report"} kind
+ */
+function refuseExistingOutputFile(filePath, kind) {
+  if (!filePath) return;
+  if (fs.existsSync(filePath)) {
+    throw new Error(
+      `Refusing to overwrite existing ${kind} file (use a new path for each run): ${filePath}`,
+    );
+  }
+}
+
+/** @param {string} filePath @param {unknown} data */
+function writeJsonFileNew(filePath, data, kind = "rollback") {
+  refuseExistingOutputFile(filePath, kind);
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+}
+
+module.exports = {
+  PROD_PROJECTS,
+  ALLOWED_PROJECTS,
+  normalizeProject,
+  SECRET_KEYS,
+  parseArgs,
+  assertTarget,
+  secretKeysPresent,
+  roleKey,
+  resetPriority,
+  newBackfillRunId,
+  refuseExistingOutputFile,
+  writeJsonFileNew,
+};

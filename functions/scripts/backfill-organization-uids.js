@@ -17,7 +17,7 @@
  */
 const fs = require("fs");
 const path = require("path");
-const {parseArgs, assertTarget} = require("./p0-common");
+const {parseArgs, assertTarget, newBackfillRunId, writeJsonFileNew} = require("./p0-common");
 
 function str(v) {
   return typeof v === "string" ? v.trim() : "";
@@ -70,6 +70,33 @@ function isDeleteSentinel(value) {
 
 function valuesEqual(a, b) {
   return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+}
+
+/** Fields consulted by planPatch; captured at scan time for --apply guards. */
+function atReadOf(data) {
+  const d = data || {};
+  return {
+    organizationUID: d.organizationUID,
+    organizationName: d.organizationName,
+    organizationUIDs: d.organizationUIDs,
+    organizationNames: d.organizationNames,
+  };
+}
+
+function changedSinceRead(live, atRead) {
+  return !valuesEqual(atReadOf(live), atRead);
+}
+
+/** Skip apply when the doc changed after the initial collection scan. */
+function shouldApplyWrite(live, planned) {
+  if (changedSinceRead(live, planned.atRead)) {
+    return {ok: false, reason: "changed_since_read"};
+  }
+  const patch = planPatch(live || {});
+  if (!patch || !valuesEqual(patch, planned.patch)) {
+    return {ok: false, reason: "plan_changed"};
+  }
+  return {ok: true};
 }
 
 /**
@@ -135,7 +162,7 @@ async function restore(db, args) {
     planned.push(c);
   }
 
-  const runId = `org-uids-restore-${new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z")}`;
+  const runId = newBackfillRunId("org-uids-restore");
   const report = {
     project: args.project,
     mode: args.apply ? "restore-apply" : "restore-dry-run",
@@ -171,16 +198,22 @@ async function run(db, args) {
       skipped++;
       continue;
     }
-    planned.push({path: doc.ref.path, id: doc.id, patch, previous: previousOf(data)});
+    planned.push({
+      path: doc.ref.path,
+      id: doc.id,
+      patch,
+      previous: previousOf(data),
+      atRead: atReadOf(data),
+    });
   }
 
-  const runId = `org-uids-${new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z")}`;
+  const runId = newBackfillRunId("org-uids");
   const report = {
     project: args.project,
     mode: args.apply ? "apply" : "dry-run",
     runId,
     at: new Date().toISOString(),
-    counts: {docs: snap.size, planned: planned.length, skipped, written: 0},
+    counts: {docs: snap.size, planned: planned.length, skipped, written: 0, applySkipped: 0, applySkipReasons: {}},
   };
 
   const rollbackPath = args.rollback ||
@@ -191,7 +224,7 @@ async function run(db, args) {
     at: report.at,
     entries: planned.map((p) => ({path: p.path, previous: p.previous, fields: p.patch})),
   };
-  fs.writeFileSync(rollbackPath, JSON.stringify(rollback, null, 2));
+  writeJsonFileNew(rollbackPath, rollback, "rollback");
   report.rollbackFile = rollbackPath;
   console.log(`wrote rollback file ${rollbackPath} (${planned.length} entries)`);
 
@@ -199,10 +232,25 @@ async function run(db, args) {
     return report;
   }
 
+  const toWrite = [];
+  const applySkipReasons = {};
+  for (const p of planned) {
+    const snap = await db.doc(p.path).get();
+    const data = snap.exists ? (snap.data() || {}) : null;
+    const decision = shouldApplyWrite(data, p);
+    if (!decision.ok) {
+      report.counts.applySkipped++;
+      applySkipReasons[decision.reason] = (applySkipReasons[decision.reason] || 0) + 1;
+      continue;
+    }
+    toWrite.push(p);
+  }
+  report.counts.applySkipReasons = applySkipReasons;
+
   let written = 0;
-  for (let i = 0; i < planned.length; i += 400) {
+  for (let i = 0; i < toWrite.length; i += 400) {
     const batch = db.batch();
-    const slice = planned.slice(i, i + 400);
+    const slice = toWrite.slice(i, i + 400);
     for (const p of slice) {
       batch.update(db.doc(p.path), p.patch);
     }
@@ -250,7 +298,7 @@ async function main() {
     "/tmp",
     `organization-uids-report-${report.runId}.json`,
   );
-  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+  writeJsonFileNew(reportPath, report, "report");
   console.log(`wrote report ${reportPath}`);
   console.log(JSON.stringify(report.counts, null, 2));
   console.log(`mode=${report.mode} runId=${report.runId} project=${project}`);
@@ -263,4 +311,7 @@ if (require.main === module) {
   });
 }
 
-module.exports = {planPatch, previousOf, planRestore, restore, run, writtenFieldsOf, currentMatchesWritten, shouldRestore, isDeleteSentinel};
+module.exports = {
+  planPatch, previousOf, planRestore, restore, run, writtenFieldsOf, currentMatchesWritten,
+  shouldRestore, isDeleteSentinel, atReadOf, changedSinceRead, shouldApplyWrite,
+};
