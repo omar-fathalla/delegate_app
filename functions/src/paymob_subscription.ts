@@ -528,6 +528,7 @@ async function recordSupersededPayment(
     paidAt: Date;
     companyUID: string;
     organizationUID: string;
+    companyName?: string;
     messaging?: PaymobMessaging;
   },
 ): Promise<void> {
@@ -551,6 +552,7 @@ async function recordSupersededPayment(
     currency: p.currency,
     companyUID: p.companyUID,
     organizationUID: p.organizationUID,
+    companyName: p.companyName,
     messaging: p.messaging,
   });
   console.log(JSON.stringify({
@@ -621,6 +623,7 @@ export async function routePaymobAttemptBeforeApply(
       paidAt: p.paidAt,
       companyUID: str(data.companyUID) || str(data.companyId),
       organizationUID: str(data.organizationUID) || str(data.organizationId),
+      companyName: str(data.companyName) || str(data.company_name),
       messaging: p.messaging,
     });
     return "superseded_needs_refund";
