@@ -57,6 +57,60 @@ prod_pkgs = [
 ]
 if "com.tashil.delegate" not in prod_pkgs:
     raise SystemExit(f"prod google-services missing com.tashil.delegate (got {prod_pkgs})")
+
+# Per-flavor applicationId / suffix checks (build.gradle.kts).
+import re
+
+gradle = Path("android/app/build.gradle.kts").read_text(encoding="utf-8")
+base_m = re.search(r'defaultConfig\s*\{([^}]*)\}', gradle, re.DOTALL)
+if not base_m:
+    raise SystemExit("defaultConfig block not found in build.gradle.kts")
+base_block = base_m.group(1)
+base_id_m = re.search(r'applicationId\s*=\s*"([^"]+)"', base_block)
+if not base_id_m or base_id_m.group(1) != "com.tashil.delegate":
+    got = base_id_m.group(1) if base_id_m else None
+    raise SystemExit(
+        f"defaultConfig applicationId must be com.tashil.delegate (got {got!r}); "
+        "do not change base id while dev keeps applicationIdSuffix .dev"
+    )
+
+
+def flavor_block(name: str) -> str:
+    m = re.search(rf'create\("{re.escape(name)}"\)\s*\{{', gradle)
+    if not m:
+        raise SystemExit(f'product flavor "{name}" block not found')
+    start = m.end()
+    depth = 1
+    i = start
+    while i < len(gradle) and depth:
+        ch = gradle[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+        i += 1
+    return gradle[start : i - 1]
+
+
+dev_block = flavor_block("dev")
+prod_block = flavor_block("prod")
+
+if 'applicationIdSuffix = ".dev"' not in dev_block and "applicationIdSuffix = \".dev\"" not in dev_block:
+    if not re.search(r'applicationIdSuffix\s*=\s*"\.dev"', dev_block):
+        raise SystemExit('dev flavor must set applicationIdSuffix = ".dev"')
+
+dev_app_m = re.search(r'applicationId\s*=\s*"([^"]+)"', dev_block)
+if dev_app_m and not dev_app_m.group(1).endswith(".dev"):
+    raise SystemExit(
+        f'dev flavor applicationId must end with .dev or use suffix only (got {dev_app_m.group(1)!r})'
+    )
+
+if re.search(r'applicationIdSuffix\s*=\s*"\.dev"', prod_block):
+    raise SystemExit('prod flavor must not use applicationIdSuffix ".dev"')
+
+prod_app_m = re.search(r'applicationId\s*=\s*"([^"]+)"', prod_block)
+if prod_app_m and prod_app_m.group(1).endswith(".dev"):
+    raise SystemExit(f'prod flavor must not use .dev applicationId (got {prod_app_m.group(1)!r})')
 PY
 
 [[ -f "$ROOT/scripts/android_dev_distribute.sh" ]] || fail "missing scripts/android_dev_distribute.sh"

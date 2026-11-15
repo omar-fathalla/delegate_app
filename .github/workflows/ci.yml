@@ -199,7 +199,7 @@ jobs:
           echo "LANG=en_US.UTF-8" >> "$GITHUB_ENV"
           echo "LC_ALL=en_US.UTF-8" >> "$GITHUB_ENV"
       - name: Static checks (dev flavor, google-services, docs)
-        run: bash scripts/android_dev_config_check.sh
+        run: bash scripts/android_dev_config_check.sh && npm run test:scripts:android-dev-distribute-guard
 
   functions:
     name: Functions lint & test

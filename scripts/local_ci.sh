@@ -172,6 +172,8 @@ run_job p0-scripts 15 'cd functions && npm ci && bash ../scripts/emulators_exec.
 
 run_job build-web 30 'flutter pub get --enforce-lockfile && flutter build web --release'
 
+run_job android-dev-config-check 5 'bash scripts/android_dev_config_check.sh && npm run test:scripts:android-dev-distribute-guard'
+
 run_job ios-dev-config-check 5 'bash scripts/ios_dev_config_check.sh && bash scripts/maestro_check_flow_headers.sh && bash scripts/patrol_check_integration_targets.sh && bash scripts/holds_authority_mode_trap_test.sh && python3 scripts/holds_authority_mode_payload_test.py'
 
 wait_emulator_ports
