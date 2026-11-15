@@ -6,13 +6,13 @@
  */
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
+import {FieldValue} from "firebase-admin/firestore";
 import {
   decideSupervisorDocReupload,
+  isKnownSupervisorReuploadDocType,
   mergeReuploadedDocument,
   urlFieldsForDocType,
 } from "./supervisor_delegate_doc_reupload_logic";
-
-if (admin.apps.length === 0) admin.initializeApp();
 
 const opts = {timeoutSeconds: 60, memory: "256MB" as const};
 
@@ -32,21 +32,6 @@ async function loadCaller(uid: string) {
   };
 }
 
-async function delegateSnapshots(
-  db: FirebaseFirestore.Firestore,
-  delegateUid: string,
-  companyUID: string,
-): Promise<FirebaseFirestore.DocumentSnapshot[]> {
-  const orgs = await db.collection("organizations").get();
-  const out: FirebaseFirestore.DocumentSnapshot[] = [];
-  for (const org of orgs.docs) {
-    const ref = org.ref.collection("companies").doc(companyUID).collection("delegates").doc(delegateUid);
-    const snap = await ref.get();
-    if (snap.exists) out.push(snap);
-  }
-  return out;
-}
-
 export const supervisorReuploadDelegateDocument = functions
   .region("us-central1")
   .runWith(opts)
@@ -56,26 +41,42 @@ export const supervisorReuploadDelegateDocument = functions
     }
     const p = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
     const delegateUid = str(p.uid);
-    const organizationUID = str(p.organizationUID);
-    const companyUID = str(p.companyUID);
     const docType = str(p.docType);
     const newUrl = str(p.newUrl);
-    if (!delegateUid || !organizationUID || !companyUID || !docType || !newUrl) {
+    if (!delegateUid || !docType || !newUrl) {
       throw new functions.https.HttpsError("invalid-argument", "missing_fields");
+    }
+    if (!isKnownSupervisorReuploadDocType(docType)) {
+      throw new functions.https.HttpsError("invalid-argument", "unknown_doc_type");
     }
 
     const caller = await loadCaller(ctx.auth.uid);
+    const callerOrg = str(caller.organizationUID);
+    const callerCo = str(caller.companyUID);
+    if (!callerOrg || !callerCo) {
+      throw new functions.https.HttpsError("permission-denied", "out_of_scope");
+    }
+
     const db = admin.firestore();
-    const snaps = await delegateSnapshots(db, delegateUid, companyUID);
-    if (snaps.length === 0) {
+    const delegateRef = db
+      .collection("organizations")
+      .doc(callerOrg)
+      .collection("companies")
+      .doc(callerCo)
+      .collection("delegates")
+      .doc(delegateUid);
+    const snap = await delegateRef.get();
+    if (!snap.exists) {
       throw new functions.https.HttpsError("not-found", "delegate_not_found");
     }
-    const primary = snaps[0].data() || {};
+    const delegateData = snap.data() || {};
+    const delegateOrg = str(delegateData.organizationUID ?? delegateData.organizationId);
+    const delegateCo = str(delegateData.companyUID ?? delegateData.companyId);
     const decision = decideSupervisorDocReupload(caller, {
       delegateUid,
-      organizationUID,
-      companyUID,
-      status: primary.status,
+      organizationUID: delegateOrg || callerOrg,
+      companyUID: delegateCo || callerCo,
+      status: delegateData.status,
     });
     if (!decision.ok) {
       throw new functions.https.HttpsError("permission-denied", decision.reason);
@@ -83,25 +84,23 @@ export const supervisorReuploadDelegateDocument = functions
 
     const at = new Date().toISOString();
     const urlFields = urlFieldsForDocType(docType, newUrl);
+    const documents = mergeReuploadedDocument(delegateData.documents, docType, newUrl, at);
     const batch = db.batch();
-    for (const snap of snaps) {
-      const documents = mergeReuploadedDocument(snap.data()?.documents, docType, newUrl, at);
-      batch.update(snap.ref, {
-        ...urlFields,
-        status: "pending",
-        documents,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
+    batch.update(delegateRef, {
+      ...urlFields,
+      status: "pending",
+      documents,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
 
     const reqRef = db.collection("delegate_requests").doc(delegateUid);
     const reqSnap = await reqRef.get();
     if (reqSnap.exists) {
-      const documents = mergeReuploadedDocument(reqSnap.data()?.documents, docType, newUrl, at);
+      const reqDocs = mergeReuploadedDocument(reqSnap.data()?.documents, docType, newUrl, at);
       batch.set(reqRef, {
         ...urlFields,
-        documents,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        documents: reqDocs,
+        updatedAt: FieldValue.serverTimestamp(),
       }, {merge: true});
     }
 
@@ -111,7 +110,7 @@ export const supervisorReuploadDelegateDocument = functions
         {
           photoURL: newUrl,
           profileImageUrl: newUrl,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         },
         {merge: true},
       );

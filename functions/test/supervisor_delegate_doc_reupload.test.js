@@ -29,6 +29,11 @@ test("mergeReuploadedDocument nationalityId front and back", () => {
   assert.equal(back[1].secondaryURL, "https://cdn.example/nb.jpg");
 });
 
+test("isKnownSupervisorReuploadDocType", () => {
+  assert.equal(L.isKnownSupervisorReuploadDocType("personalPhoto"), true);
+  assert.equal(L.isKnownSupervisorReuploadDocType("bogus"), false);
+});
+
 test("decideSupervisorDocReupload scope and active delegate", () => {
   const sup = {uid: "s", role: "supervisor", organizationUID: "o1", companyUID: "c1"};
   assert.equal(L.decideSupervisorDocReupload(sup, {

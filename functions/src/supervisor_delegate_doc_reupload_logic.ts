@@ -2,6 +2,18 @@ import {normalizeRoleKey} from "./staff_phone_lookup_logic";
 
 const SUPERVISOR = new Set(["supervisor", "company_supervisor"]);
 
+/** Must match profile_screen doc types that supervisors may replace. */
+export const SUPERVISOR_REUPLOAD_DOC_TYPES = new Set([
+  "personalPhoto",
+  "nationalIdFront",
+  "nationalIdBack",
+  "paymentReceipt",
+]);
+
+export function isKnownSupervisorReuploadDocType(docType: string): boolean {
+  return SUPERVISOR_REUPLOAD_DOC_TYPES.has(docType);
+}
+
 export function documentKeyForDocType(docType: string): string {
   if (docType === "nationalIdFront" || docType === "nationalIdBack") return "nationalityId";
   return docType;
@@ -45,6 +57,7 @@ export function urlFieldsForDocType(
   docType: string,
   newUrl: string,
 ): Record<string, string> {
+  if (!isKnownSupervisorReuploadDocType(docType)) return {};
   switch (docType) {
     case "personalPhoto":
       return {profileImageUrl: newUrl, personalPhotoURL: newUrl, photoURL: newUrl};
@@ -81,9 +94,13 @@ export function decideSupervisorDocReupload(
   if (!SUPERVISOR.has(role)) return {ok: false, reason: "caller_not_supervisor"};
   const callerOrg = String(caller.organizationUID || "").trim();
   const callerCo = String(caller.companyUID || "").trim();
-  const targetOrg = String(target.organizationUID || "").trim();
-  const targetCo = String(target.companyUID || "").trim();
-  if (!callerOrg || !callerCo || callerOrg !== targetOrg || callerCo !== targetCo) {
+  // Target org/company come from the stored delegate doc (server), never the client.
+  const delegateOrg = String(target.organizationUID || "").trim();
+  const delegateCo = String(target.companyUID || "").trim();
+  if (!callerOrg || !callerCo || !delegateOrg || !delegateCo) {
+    return {ok: false, reason: "out_of_scope"};
+  }
+  if (callerOrg !== delegateOrg || callerCo !== delegateCo) {
     return {ok: false, reason: "out_of_scope"};
   }
   const st = String(target.status || "").trim().toLowerCase();
