@@ -64,7 +64,32 @@ void main() {
     });
   });
 
+  group('canClientLiftSuspendedDelegateStatus', () {
+    test('only super-admin and technical support', () {
+      expect(canClientLiftSuspendedDelegateStatus(UserRole.superAdmin), isTrue);
+      expect(canClientLiftSuspendedDelegateStatus(UserRole.technicalSupport), isTrue);
+      expect(canClientLiftSuspendedDelegateStatus(UserRole.admin), isFalse);
+      expect(canClientLiftSuspendedDelegateStatus(UserRole.organizationAdmin), isFalse);
+    });
+  });
+
   group('canCancelUnpaidNewDelegateRequest', () {
+    test('deny when paymentStatus PAID', () {
+      expect(
+        canCancelUnpaidNewDelegateRequest(
+          requestType: 'new_delegate',
+          paymentStatus: 'PAID',
+          callerUid: 'sup',
+          createdBy: 'admin1',
+          supervisorUid: 'sup',
+          callerFirestoreRole: 'supervisor',
+          callerCompanyUID: 'c1',
+          requestCompanyUID: 'c1',
+          callerMappedRole: UserRole.admin,
+        ),
+        isFalse,
+      );
+    });
     test('supervisor same company may cancel', () {
       expect(
         canCancelUnpaidNewDelegateRequest(

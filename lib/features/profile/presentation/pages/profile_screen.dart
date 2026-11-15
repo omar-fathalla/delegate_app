@@ -932,19 +932,17 @@ class _ProfileBody extends StatelessWidget {
     return list;
   }
 
-  /// uid of the signed-in user when they may approve this delegate's
-  /// documents: super-admin (any company) or company admin/supervisor
-  /// (UserRole.admin) of the same company. Null otherwise.
+  /// uid when the viewer may approve documents: super-admin or technical
+  /// support only (Mohamed 2026-11-15). Supervisors re-upload as pending;
+  /// SA/tech approve.
   String? _docApproverUid(BuildContext context) {
     try {
       final state = context.read<AuthBloc>().state;
       if (state is! AuthAuthenticated) return null;
       final me = state.delegate;
       if (me.uid == delegate.uid) return null;
-      if (me.role == UserRole.superAdmin) return me.uid;
-      if (me.role == UserRole.admin &&
-          me.companyUID.isNotEmpty &&
-          me.companyUID == delegate.companyUID) {
+      if (me.role == UserRole.superAdmin ||
+          me.role == UserRole.technicalSupport) {
         return me.uid;
       }
     } catch (_) {}

@@ -1,7 +1,6 @@
 /// Firestore-aligned guards for delegate status changes (Mohamed 2026-11-15).
 library;
 
-import 'package:delegate_app/features/auth/data/datasources/auth_remote_data_source.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 /// Company supervisor ([UserRole.admin] without company-admin approver path) may
@@ -45,7 +44,7 @@ bool canCancelUnpaidNewDelegateRequest({
   UserRole? callerMappedRole,
 }) {
   if (requestType != 'new_delegate') return true;
-  if (paymentStatus == 'paid') return false;
+  if ((paymentStatus ?? '').trim().toLowerCase() == 'paid') return false;
   if (callerMappedRole == UserRole.superAdmin ||
       callerMappedRole == UserRole.technicalSupport) {
     return true;

@@ -119,6 +119,22 @@ describe("delegate status guards (Mohamed 2026-11-15)", () => {
           uploadedAt: "2026-11-15",
         }],
       })));
+    test("ALLOW supervisor photo re-upload with all photo URL fields", () =>
+      assertSucceeds(updateDoc(doc(as("sup"), PATH), reuploadPending())));
+    test("ALLOW supervisor nationalityId re-upload with ID URL fields", () =>
+      assertSucceeds(updateDoc(doc(as("sup"), PATH), {
+        status: "pending",
+        updatedAt: "t",
+        nationalIdFrontUrl: "https://cdn.example/id-front.jpg",
+        nationalIdBackUrl: "https://cdn.example/id-back.jpg",
+        documents: [{
+          documentKey: "nationalityId",
+          documentStatus: "pending",
+          documentURL: "https://cdn.example/id-front.jpg",
+          secondaryURL: "https://cdn.example/id-back.jpg",
+          uploadedAt: "2026-11-15",
+        }],
+      })));
     test("DENY company_admin re-upload shape active→pending", () =>
       assertFails(updateDoc(doc(as("ca"), PATH), reuploadPending())));
   });
@@ -150,5 +166,19 @@ describe("delegate status guards (Mohamed 2026-11-15)", () => {
       assertSucceeds(updateDoc(doc(as("sup"), "delegate_requests/ren1"), {status: "cancelled"})));
     test("ALLOW HR cancel unpaid renewal (unchanged)", () =>
       assertSucceeds(updateDoc(doc(as("hr"), "delegate_requests/ren1"), {status: "cancelled"})));
+    test("DENY cancel new_delegate when paymentStatus is PAID (case)", async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(ctx.firestore().doc("delegate_requests/paid-case"), {
+          requestType: "new_delegate",
+          status: "approved",
+          paymentStatus: "PAID",
+          organizationUID: "o1",
+          companyUID: "c1",
+          supervisorUid: "sup",
+          createdBy: "admin1",
+        });
+      });
+      await assertFails(updateDoc(doc(as("sup"), "delegate_requests/paid-case"), {status: "cancelled"}));
+    });
   });
 });

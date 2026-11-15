@@ -172,9 +172,13 @@ test("decideSetDelegateHold: super / org / company scope and fail-closed company
   assert.equal(H.decideSetDelegateHold(hr, target, "admin_suspend", "add").reason, "caller_not_allowed");
   const sup = {uid: "v", role: "supervisor", organizationUID: "o1", companyUID: "c1"};
   assert.equal(H.decideSetDelegateHold(sup, target, "admin_suspend", "add").ok, true);
+  assert.equal(H.decideSetDelegateHold(sup, target, "admin_suspend", "remove").reason, "hold_not_allowed");
   assert.equal(H.decideSetDelegateHold(sup, target, "billing_cycle_reset", "add").reason, "hold_not_allowed");
   const supAlias = {uid: "v2", role: "company_supervisor", organizationUID: "o1", companyUID: "c1"};
   assert.equal(H.decideSetDelegateHold(supAlias, target, "admin_suspend", "add").ok, true);
+  assert.equal(H.decideSetDelegateHold(supAlias, target, "admin_suspend", "remove").reason, "hold_not_allowed");
+  assert.equal(H.decideSetDelegateHold(org, target, "admin_suspend", "remove").reason, "hold_not_allowed");
+  assert.equal(H.decideSetDelegateHold(co, target, "admin_suspend", "remove").reason, "hold_not_allowed");
   const tech = {uid: "t", role: "technical-support"};
   assert.equal(H.decideSetDelegateHold(tech, target, "admin_suspend", "add").ok, true);
   assert.equal(H.decideSetDelegateHold(tech, {orgId: "o2", companyId: "c9"}, "admin_suspend", "remove").ok, true);
