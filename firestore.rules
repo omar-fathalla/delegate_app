@@ -600,7 +600,9 @@ service cloud.firestore {
         || (r in orgAdminRoleList() && u.get('organizationUID', '') == orgId)
         || (r in companyPlaceholderCreateRoleList() && u.get('companyUID', '') == compId);
       let pendingOk = stl == 'pending' && cheapCreateDocsNotApproved(n);
-      return scopeOk && (
+      let pathDataOk = d.get('companyUID', '') == compId
+        && d.get('organizationUID', '') == orgId;
+      return pathDataOk && scopeOk && (
         sa || ((r in companyPlaceholderCreateRoleList() || r in orgAdminRoleList()) && pendingOk)
         || (r in techRoleList() && ((stl != 'active' && cheapCreateDocsNotApproved(n))
           || (techCreateBound(delegateId) && techReqOk(orgId, compId, delegateId)))));

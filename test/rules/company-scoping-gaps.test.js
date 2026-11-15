@@ -288,6 +288,39 @@ describe("TA-8 security rules gaps", () => {
     ));
   });
 
+  test("DENY supervisor placeholder when payload companyUID mismatches path", () =>
+    assertFails(setDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/bad-co"), {
+      ...pendingDelegatePlaceholderPayload("bad-co"),
+      companyUID: "c2",
+      companyName: "C2",
+    })));
+
+  test("DENY supervisor placeholder when payload organizationUID mismatches path", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("organizations/o2").set({name: "O2"});
+      await ctx.firestore().doc("organizations/o2/companies/c1").set({name: "C1"});
+    });
+    await assertFails(setDoc(doc(as("sup"), "organizations/o2/companies/c1/delegates/bad-org"), {
+      ...pendingDelegatePlaceholderPayload("bad-org"),
+      organizationUID: "o1",
+      organizationName: "O1",
+    }));
+  });
+
+  for (const [label, uid] of [
+    ["supervisor", "sup"],
+    ["company_supervisor", "csup"],
+    ["company_admin", "ca"],
+  ]) {
+    test(`ALLOW ${label} placeholder when path and payload company/org match`, () => {
+      const reqId = `match-${uid}`;
+      return assertSucceeds(setDoc(
+        doc(as(uid), "organizations/o1/companies/c1/delegates/" + reqId),
+        pendingDelegatePlaceholderPayload(reqId),
+      ));
+    });
+  }
+
   for (const [label, uid] of [
     ["supervisor", "sup"],
     ["company_supervisor", "csup"],
