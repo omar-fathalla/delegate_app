@@ -28,7 +28,10 @@ function storageErrorMessage(reason: string): string {
     case "invalid_storage_url":
       return "رابط المستند غير صالح أو غير مسموح.";
     case "wrong_delegate_folder":
+    case "path_traversal":
       return "مسار الملف لا يخص هذا المندوب.";
+    case "wrong_bucket":
+      return "رابط المستند من خارج تخزين التطبيق.";
     case "object_not_found":
       return "الملف غير موجود في التخزين. أعد الرفع ثم حاول مرة أخرى.";
     default:
@@ -48,10 +51,8 @@ async function loadCaller(uid: string) {
   return {uid, role: d.role};
 }
 
-async function assertStorageObjectExists(objectPath: string, bucketName?: string) {
-  const bucket = bucketName
-    ? admin.storage().bucket(bucketName)
-    : admin.storage().bucket();
+async function assertStorageObjectExists(objectPath: string) {
+  const bucket = admin.storage().bucket();
   const file = bucket.file(objectPath);
   try {
     await file.getMetadata();
@@ -131,7 +132,7 @@ export const privilegedReuploadDelegateDocument = functions
       if (!approve && !rejectionReason) {
         throw new functions.https.HttpsError("invalid-argument", "سبب الرفض مطلوب.");
       }
-      const documents = applyPrivilegedDocumentReview(
+      const review = applyPrivilegedDocumentReview(
         delegateData.documents,
         docType,
         approve,
@@ -139,18 +140,24 @@ export const privilegedReuploadDelegateDocument = functions
         rejectionReason || undefined,
         at,
       );
-      if (!documents) {
-        throw new functions.https.HttpsError("not-found", "لم يتم العثور على المستند.");
+      if (!review.ok) {
+        const reviewMsg = review.reason === "not_found"
+          ? "لم يتم العثور على المستند."
+          : review.reason === "already_approved"
+            ? "هذا المستند معتمد مسبقاً."
+            : "لا يمكن مراجعة هذا المستند في حالته الحالية.";
+        const code = review.reason === "not_found" ? "not-found" : "failed-precondition";
+        throw new functions.https.HttpsError(code, reviewMsg);
       }
       const batch = db.batch();
       batch.update(delegateRef, {
-        documents,
+        documents: review.documents,
         updatedAt: FieldValue.serverTimestamp(),
       });
       const reqRef = db.collection("delegate_requests").doc(delegateUid);
       const reqSnap = await reqRef.get();
       if (reqSnap.exists) {
-        const reqDocs = applyPrivilegedDocumentReview(
+        const reqReview = applyPrivilegedDocumentReview(
           reqSnap.data()?.documents,
           docType,
           approve,
@@ -158,9 +165,9 @@ export const privilegedReuploadDelegateDocument = functions
           rejectionReason || undefined,
           at,
         );
-        if (reqDocs) {
+        if (reqReview.ok) {
           batch.set(reqRef, {
-            documents: reqDocs,
+            documents: reqReview.documents,
             updatedAt: FieldValue.serverTimestamp(),
           }, {merge: true});
         }
@@ -169,11 +176,16 @@ export const privilegedReuploadDelegateDocument = functions
       return {ok: true, documentStatus: approve ? "approved" : "rejected"};
     }
 
-    const resolved = resolveDelegateDocumentStorageObject(newUrl, delegateUid);
+    const defaultBucket = admin.storage().bucket().name;
+    const resolved = resolveDelegateDocumentStorageObject(
+      newUrl,
+      delegateUid,
+      defaultBucket,
+    );
     if (!resolved.ok) {
       throw new functions.https.HttpsError("invalid-argument", storageErrorMessage(resolved.reason));
     }
-    await assertStorageObjectExists(resolved.objectPath, resolved.bucket);
+    await assertStorageObjectExists(resolved.objectPath);
 
     const urlFields = urlFieldsForDocType(docType, newUrl);
     const documents = mergePrivilegedReuploadedDocument(

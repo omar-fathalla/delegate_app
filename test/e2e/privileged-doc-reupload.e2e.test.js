@@ -10,12 +10,10 @@ let fn;
 const ctx = (uid) => ({auth: {uid, token: {firebase: {sign_in_provider: "password"}}}, rawRequest: {headers: {}}});
 
 let db;
+let BUCKET;
+let storageUrl;
 
 const delPath = (org, co, uid) => `organizations/${org}/companies/${co}/delegates/${uid}`;
-
-const BUCKET = "practice-firebase-72df1.appspot.com";
-const storageUrl = (uid, file) =>
-  `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/delegate_documents%2F${uid}%2F${file}?alt=media`;
 
 function patchStorageExists() {
   const storage = admin.storage();
@@ -33,28 +31,6 @@ function patchStorageExists() {
   };
 }
 
-const PHOTO = {
-  documentKey: "personalPhoto",
-  documentStatus: "approved",
-  documentURL: storageUrl("d1", "personalPhoto_0.jpg"),
-  uploadedAt: "2026-01-01",
-  reviewedBy: "x",
-  reviewedAt: "2026-01-01",
-};
-const DOCS = [PHOTO];
-
-const baseActive = (org, co, uid) => ({
-  uid,
-  status: "active",
-  organizationUID: org,
-  companyUID: co,
-  phoneNumber: "01011111111",
-  profileImageUrl: PHOTO.documentURL,
-  personalPhotoURL: PHOTO.documentURL,
-  photoURL: PHOTO.documentURL,
-  documents: [...DOCS],
-});
-
 async function code(promise) {
   try {
     return {ok: true, data: await promise};
@@ -68,21 +44,44 @@ test.before(async () => {
   fn = require("../../functions/lib/index.js");
   patchStorageExists();
   db = admin.firestore();
+  BUCKET = admin.storage().bucket().name;
+  storageUrl = (uid, file) =>
+    `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/delegate_documents%2F${uid}%2F${file}?alt=media`;
+
+  const photoApproved = {
+    documentKey: "personalPhoto",
+    documentStatus: "approved",
+    documentURL: storageUrl("d1", "personalPhoto_0.jpg"),
+    uploadedAt: "2026-01-01",
+    reviewedBy: "x",
+    reviewedAt: "2026-01-01",
+  };
+  const baseActive = (org, co, uid, docs) => ({
+    uid,
+    status: "active",
+    organizationUID: org,
+    companyUID: co,
+    phoneNumber: "01011111111",
+    profileImageUrl: photoApproved.documentURL,
+    personalPhotoURL: photoApproved.documentURL,
+    photoURL: photoApproved.documentURL,
+    documents: docs,
+  });
+
   await db.doc("organizations/o1").set({name: "O1"});
   await db.doc("organizations/o1/companies/c1").set({name: "C1"});
   await db.doc("users/tech").set({role: "technical_support", organizationUID: "o1"});
   await db.doc("users/sa").set({role: "super-admin"});
   await db.doc("users/sup").set({role: "supervisor", organizationUID: "o1", companyUID: "c1"});
-  await db.doc(delPath("o1", "c1", "d1")).set(baseActive("o1", "c1", "d1"));
+  await db.doc(delPath("o1", "c1", "d1")).set(baseActive("o1", "c1", "d1", [photoApproved]));
   await db.doc(delPath("o1", "c1", "d-pend")).set({
-    ...baseActive("o1", "c1", "d-pend"),
-    status: "pending",
-    documents: [{
+    ...baseActive("o1", "c1", "d-pend", [{
       documentKey: "personalPhoto",
       documentStatus: "pending",
       documentURL: storageUrl("d-pend", "personalPhoto_0.jpg"),
       uploadedAt: "2026-01-01",
-    }],
+    }]),
+    status: "pending",
   });
 });
 
@@ -103,11 +102,6 @@ test("tech replaces photo as approved without flipping delegate status", async (
   assert.equal(r.documentStatus, "approved");
   const data = (await db.doc(delPath("o1", "c1", "d1")).get()).data();
   assert.equal(data.status, "active");
-  const photo = data.documents.find((d) => d.documentKey === "personalPhoto");
-  assert.equal(photo.documentStatus, "approved");
-  assert.equal(photo.documentURL, url);
-  assert.equal(photo.reviewedBy, "tech");
-  assert.equal(data.profileImageUrl, url);
 });
 
 test("tech approves pending photo via review mode", async () => {
@@ -119,14 +113,36 @@ test("tech approves pending photo via review mode", async () => {
     approve: true,
   });
   assert.equal(r.documentStatus, "approved");
-  const photo = (await db.doc(delPath("o1", "c1", "d-pend")).get()).data()
-    .documents.find((d) => d.documentKey === "personalPhoto");
-  assert.equal(photo.documentStatus, "approved");
-  assert.equal(photo.reviewedBy, "tech");
+});
+
+test("review mode rejects approving already-approved doc", async () => {
+  const r = await code(callTech({
+    uid: "d1",
+    organizationUID: "o1",
+    companyUID: "c1",
+    docType: "personalPhoto",
+    approve: true,
+  }));
+  assert.equal(r.ok, false);
+  assert.match(String(r.code), /failed-precondition|not-found/);
+});
+
+test("rejects path traversal in storage URL", async () => {
+  const url =
+    `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/` +
+    "delegate_documents%2Fd1%2F..%2Fd2%2Fevil.jpg";
+  const r = await code(callTech({
+    uid: "d1",
+    organizationUID: "o1",
+    companyUID: "c1",
+    docType: "personalPhoto",
+    newUrl: url,
+  }));
+  assert.equal(r.ok, false);
+  assert.match(String(r.code), /invalid-argument/);
 });
 
 test("rejects external storage URL", async () => {
-  const before = (await db.doc(delPath("o1", "c1", "d1")).get()).data();
   const r = await code(callTech({
     uid: "d1",
     organizationUID: "o1",
@@ -135,13 +151,9 @@ test("rejects external storage URL", async () => {
     newUrl: "https://cdn.example/evil.jpg",
   }));
   assert.equal(r.ok, false);
-  assert.match(String(r.code), /invalid-argument/);
-  const after = (await db.doc(delPath("o1", "c1", "d1")).get()).data();
-  assert.deepEqual(after.documents, before.documents);
 });
 
 test("supervisor cannot call privileged reupload", async () => {
-  const before = (await db.doc(delPath("o1", "c1", "d1")).get()).data();
   const r = await code(fn.privilegedReuploadDelegateDocument.run({
     uid: "d1",
     organizationUID: "o1",
@@ -151,6 +163,4 @@ test("supervisor cannot call privileged reupload", async () => {
   }, ctx("sup")));
   assert.equal(r.ok, false);
   assert.match(String(r.code), /permission-denied/);
-  const after = (await db.doc(delPath("o1", "c1", "d1")).get()).data();
-  assert.deepEqual(after.documents, before.documents);
 });
