@@ -18,6 +18,7 @@ export const DELIBERATE_FIRESTORE_REGRESSIONS = new Set([
   'any staff users list all (private label perms: users get())',
   'anonymous (<=v1.14.1) CG delegates phone login query',
   'anonymous (<=v1.14.1) add attendance check-in',
+  'delegate list bell: delegateUid==all (limit 30) denied',
 ]);
 
 const ORG = 'orgA', CO = 'coA', CO2 = 'coB', ORG2 = 'orgB';
@@ -40,6 +41,7 @@ async function seed(env) {
     await u('sup', 'supervisor', ORG, CO, { phoneNumber: '01011111111' });
     await u('hr', 'hr', ORG, CO);
     await u('mkt', 'marketing', ORG, '');
+    await u('mp', 'marketing_promotion', ORG, '');
     await u('bm', 'branches_marketing', ORG, CO);
     await u('acc', 'accountant', ORG, CO);
     await setDoc(doc(db, 'organizations', ORG), { id: ORG, name: 'org a', admins: 1, companies: 2, status: 'active' });
@@ -68,6 +70,18 @@ async function seed(env) {
     await setDoc(doc(db, 'leave_requests/l1'), { delegateUid: 'dlg1', companyUID: CO, organizationUID: ORG, status: 'approved', startDate: NOW });
     await setDoc(doc(db, 'delegate_tracking/dlg1'), { delegateId: 'dlg1', companyId: CO, organizationId: ORG, currentStatus: 'inside' });
     await setDoc(doc(db, 'notifications/n1'), { delegateUid: 'dlg1', title: 'x', isRead: false, companyId: CO, organizationId: ORG, createdAt: NOW, deletedBy: [] });
+    const nb = (id, du, extra = {}) => setDoc(doc(db, `notifications/${id}`), {
+      delegateUid: du, title: 'bcast', isRead: false, companyId: CO, organizationId: ORG, createdAt: NOW, deletedBy: [], ...extra,
+    });
+    await nb('nbAll', 'all');
+    await nb('nbCo', `company_${CO}`);
+    await nb('nbSup', `supervisor_${CO}`);
+    await nb('nbAcs', 'all_company_supervisors');
+    await nb('nbHr', 'hr');
+    await nb('nbTs', 'technicalSupport');
+    await nb('nbMkt', 'marketing');
+    await nb('nbBmp', 'branchesMarketingManager');
+    await nb('nbDel', `delegates_${CO}`);
     await setDoc(doc(db, `organizations/${ORG}/tasks/t1`), { companyId: CO, assignedTo: 'dlg1', createdBy: 'sup', title: 't', createdAt: NOW, status: 'pending' });
     await setDoc(doc(db, 'penalties/p1'), { targetDelegateId: 'dlg1', delegateId: 'dlg1', companyId: CO, organizationId: ORG, amount: 10, createdAt: NOW });
     await setDoc(doc(db, 'branches/b1'), { branchName: 'B1', organizationUID: ORG, organizationId: ORG, latitude: 30, longitude: 31 });
@@ -87,6 +101,23 @@ const delegate = (env) => env.authenticatedContext('dlg1', {
 const anon = (env) => env.authenticatedContext('anon1', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
 
 const D = (o, c, id) => `organizations/${o}/companies/${c}/delegates/${id}`;
+const attDayStart = () => Timestamp.fromMillis(Date.now() - 86400000);
+const attDayEnd = () => Timestamp.fromMillis(Date.now() + 86400000);
+const notifList = (db, du) => getDocs(query(collection(db, 'notifications'), where('delegateUid', '==', du), limit(30)));
+const notifListAcs = (db) => getDocs(query(
+  collection(db, 'notifications'),
+  where('companyId', '==', CO),
+  where('delegateUid', '==', 'all_company_supervisors'),
+  limit(30),
+));
+const attOrgBranchToday = (db) => getDocs(query(
+  collection(db, 'attendance_logs'),
+  where('organizationId', '==', ORG),
+  where('branchName', 'in', ['B1']),
+  where('timestamp', '>=', attDayStart()),
+  where('timestamp', '<', attDayEnd()),
+  limit(2000),
+));
 const cases = [
   ['WEB', 'org-admin get own users doc', e => getDoc(doc(staff(e,'oa'), 'users/oa'))],
   ['WEB', 'org-admin get organization', e => getDoc(doc(staff(e,'oa'), `organizations/${ORG}`))],
@@ -233,6 +264,24 @@ const cases = [
   ['URG', 'org-admin CG delegates org + nationalityID (dup check)', e => getDocs(query(collectionGroup(staff(e,'oa'),'delegates'), where('organizationUID','==',ORG), where('nationalityID','==','29002020202020')))],
   ['URG', 'company-admin nested company notifications list', e => getDocs(collection(staff(e,'ca'), `organizations/${ORG}/companies/${CO}/notifications`))],
   ['URG', 'org-admin nested company notifications list', e => getDocs(collection(staff(e,'oa'), `organizations/${ORG}/companies/${CO}/notifications`))],
+  ...[
+    ['ts', 'technicalSupport'], ['oa', 'organizationAdmin'], ['ca', 'company-admin'],
+    ['sup', 'supervisor'], ['hr', 'hr'], ['acc', 'accountant'],
+    ['mkt', 'marketing'], ['mp', 'marketing_promotion'], ['bm', 'branchesMarketingManager'],
+  ].flatMap(([uid, alias]) => [
+    ['NOTIF-READ', `${uid} list bell: delegateUid==all (limit 30)`, e => notifList(staff(e, uid), 'all')],
+    ['NOTIF-READ', `${uid} list bell: delegateUid==${alias} (limit 30)`, e => notifList(staff(e, uid), alias)],
+    ['NOTIF-READ', `${uid} list bell: delegateUid==company_${CO} (limit 30)`, e => notifList(staff(e, uid), `company_${CO}`)],
+    ['NOTIF-READ', `${uid} list bell: companyId+all_company_supervisors (limit 30)`, e => notifListAcs(staff(e, uid))],
+    ['NOTIF-READ', `${uid} list bell: delegateUid==hr (limit 30)`, e => notifList(staff(e, uid), 'hr')],
+    ['NOTIF-READ', `${uid} list bell: delegateUid==delegates_${CO} (limit 30)`, e => notifList(staff(e, uid), `delegates_${CO}`)],
+  ]),
+  ['NOTIF-READ', 'delegate list bell: delegateUid==all (limit 30) denied', e => notifList(delegate(e), 'all')],
+  ['NOTIF-READ', 'delegate list bell: delegateUid==delegates_${CO} (limit 30)', e => notifList(delegate(e), `delegates_${CO}`)],
+  ['ATT-READ', 'marketing_promotion attendance org+branchName+today (limit 2000)', e => attOrgBranchToday(staff(e, 'mp'))],
+  ['ATT-READ', 'marketing attendance org+branchName+today (limit 2000, chain shape)', e => attOrgBranchToday(staff(e, 'mkt'))],
+  ['ATT-READ', 'branches_marketing attendance org+branchName+today (limit 2000)', e => attOrgBranchToday(staff(e, 'bm'))],
+  ['URG', 'tech support follow-up write admins/sup merge (approve step 2b)', e => setDoc(doc(staff(e,'ts'), `organizations/${ORG}/companies/${CO}/admins/sup`), { uid: 'sup', name: 'Sup', phone: '01011111111', role: 'company-admin', companyUID: CO, companyName: 'co a', organizationUID: ORG, organizationName: 'org a', updatedAt: serverTimestamp() }, { merge: true })],
   ['APP-OLD', 'anonymous (<=v1.14.1) CG delegates phone login query', e => getDocs(query(collectionGroup(anon(e), 'delegates'), where('phoneNumber','==','01000000001')))],
   ['APP-OLD', 'anonymous (<=v1.14.1) add attendance check-in', e => addDoc(collection(anon(e), 'attendance_logs'), { delegateId: 'dlg1', companyId: CO, organizationId: ORG, type: 'check_in', branchName: 'B1', timestamp: serverTimestamp() })],
 ];
