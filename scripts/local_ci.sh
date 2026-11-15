@@ -26,9 +26,6 @@ export PUB_ENVIRONMENT="${PUB_ENVIRONMENT:-flutter_bot}"
 
 FLUTTER_SDK="${LOCAL_CI_FLUTTER_SDK:-$HOME/toolchains/flutter-3.44.5}"
 NODE22_BIN="${LOCAL_CI_NODE22_BIN:-/Users/delegate-ci/actions-runner/_work/_tool/node/22.23.4/arm64/bin}"
-LOCAL_CI_FIRESTORE_PORT="${LOCAL_CI_FIRESTORE_PORT:-8080}"
-LOCAL_CI_FIRESTORE_HUB_PORT="${LOCAL_CI_FIRESTORE_HUB_PORT:-4400}"
-export LOCAL_CI_FIRESTORE_PORT LOCAL_CI_FIRESTORE_HUB_PORT
 
 if [[ ! -x "$FLUTTER_SDK/bin/flutter" ]]; then
   echo "local_ci: ERROR: Flutter 3.44.5 not found at $FLUTTER_SDK" >&2
@@ -45,6 +42,9 @@ export PATH="$FLUTTER_SDK/bin:$NODE22_BIN:$CLEAN_PATH"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# shellcheck source=emulator_ports.env.sh
+source "$SCRIPT_DIR/emulator_ports.env.sh"
 
 if [[ $# -lt 1 || -z "${1:-}" ]]; then
   echo "Usage: bash scripts/local_ci.sh <git-sha>" >&2
@@ -119,17 +119,9 @@ WORKTREE_STATUS="$(git -C "$SRC" status --porcelain || true)"
   fi
 } | tee -a "$OUT/full.log"
 
-# Wait for firestore/auth emulator ports to be free after a previous job.
+# Wait for emulator ports (firestore, hub, auth, storage, functions) to be free between jobs.
 wait_emulator_ports() {
-  local i
-  for i in 1 2 3 4 5 6 7 8; do
-    if ! lsof -nP -iTCP:"${LOCAL_CI_FIRESTORE_PORT}" -sTCP:LISTEN >/dev/null 2>&1 \
-      && ! lsof -nP -iTCP:"${LOCAL_CI_FIRESTORE_HUB_PORT}" -sTCP:LISTEN >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 2
-  done
-  return 0
+  wait_emulator_ports_free
 }
 
 run_job() {
@@ -172,7 +164,10 @@ run_job analyze 20 'flutter pub get --enforce-lockfile && flutter analyze --no-f
 run_job test 30 'flutter pub get --enforce-lockfile && flutter test --concurrency=1'
 
 wait_emulator_ports
-run_job p0-scripts 15 'cd functions && npm ci && npx --yes firebase-tools@14.15.1 emulators:exec --only auth,firestore --project demo-p0-scripts "node --test scripts/p0-scripts.emulator.test.js"'
+run_job emulator-ports 12 'npm install --no-audit --no-fund && npm run test:scripts:emulator-ports'
+
+wait_emulator_ports
+run_job p0-scripts 15 'cd functions && npm ci && bash ../scripts/emulators_exec.sh --only auth,firestore --project demo-p0-scripts "node --test scripts/p0-scripts.emulator.test.js"'
 
 run_job build-web 30 'flutter pub get --enforce-lockfile && flutter build web --release'
 
