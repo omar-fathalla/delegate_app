@@ -575,20 +575,33 @@ service cloud.firestore {
         && (n.size() <= 6 || !docIsApproved(n[6])) && (n.size() <= 7 || !docIsApproved(n[7]));
     }
 
-    function techCreateOk(orgId, compId, delegateId) {
-      let r = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '');
+    // add-delegate placeholder create: fixed slots only (personalPhoto, nationalityId,
+    // paymentReceipt) so nested create stays under the 1000-expression budget.
+    function cheapCreateDocsNotApproved(n) {
+      return !(n is list) || (n.size() <= 8
+        && (n.size() < 1 || n[0].get('documentStatus', '').lower() != 'approved')
+        && (n.size() < 2 || n[1].get('documentStatus', '').lower() != 'approved')
+        && (n.size() < 3 || n[2].get('documentStatus', '').lower() != 'approved')
+        && (n.size() < 4 || n[3].get('documentStatus', '').lower() != 'approved'));
+    }
+
+    // Single get() + scope gate for nested delegate placeholder creates.
+    function nestedDelegateCreateOk(orgId, compId, delegateId) {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
       let d = request.resource.data;
+      let stl = d.get('status', '') is string ? d.get('status', '').lower().trim() : '';
       let n = d.get('documents', []);
-      let act = d.get('status', '') is string && d.get('status', '').lower() == 'active';
-      let global = r in superAdminRoleList() || r in techRoleList();
-      let st = d.get('status', '');
-      let staffStatusOk = global
-        || (st is string && st.lower().trim() == 'pending'
-          && (!d.keys().hasAny(['documents']) || delegateDocsNoneApproved(n)));
-      return staffStatusOk && (
-        !(r in techRoleList())
-        || (!act && delegateDocsNoneApproved(n))
-        || (techCreateBound(delegateId) && techReqOk(orgId, compId, delegateId)));
+      let sa = r in superAdminRoleList();
+      let scopeOk = sa || r in techRoleList()
+        || (r in orgAdminRoleList() && u.get('organizationUID', '') == orgId)
+        || (r in companyStaffWriterRoleList()
+          && u.get('organizationUID', '') == orgId && u.get('companyUID', '') == compId);
+      let pendingOk = stl == 'pending' && cheapCreateDocsNotApproved(n);
+      return scopeOk && (
+        sa || ((r in companyStaffWriterRoleList() || r in orgAdminRoleList()) && pendingOk)
+        || (r in techRoleList() && ((stl != 'active' && cheapCreateDocsNotApproved(n))
+          || (techCreateBound(delegateId) && techReqOk(orgId, compId, delegateId)))));
     }
 
     function techCreateBound(delegateId) {
@@ -1161,7 +1174,8 @@ service cloud.firestore {
         && companyPinned(d)
         && (
           (r in techRoleList()) ||
-          (r in orgAdminRoleList() && org != '' && d.get('organizationUID', '') == org) ||
+          (r in orgAdminRoleList() && org != '' && d.get('organizationUID', '') == org
+            && companyStaffUsersCreateFieldOk(d)) ||
           (r in companyStaffWriterRoleList() && co != '' && org != ''
             && d.get('organizationUID', '') == org && d.get('companyUID', '') == co
             && companyCanGrant(r, nr)
@@ -1312,9 +1326,9 @@ service cloud.firestore {
 
         match /delegates/{delegateId} {
           allow read: if signedIn() && canReadNestedDelegate(orgId, compId, delegateId);
-          allow create: if canManageNestedDelegate(orgId, compId) && deviceBindingAbsent() && techCreateOk(orgId, compId, delegateId)
-            && sourceStampKeysLocked()
-            && exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId));
+          allow create: if deviceBindingAbsent() && sourceStampKeysLocked()
+            && exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId))
+            && nestedDelegateCreateOk(orgId, compId, delegateId);
           // sourceStampKeysLocked is not on this allow: the 4-flip tech
           // approval is already at the 1000-expression budget. Delegate
           // self-updates are hasOnly-gated by delegateFieldsSafe. Staff
@@ -1718,11 +1732,14 @@ service cloud.firestore {
       // (no short-circuit) and the 4-flip tech approval is already at the
       // 1000-expression budget. Nested updates are locked via
       // staffDocsApproveOk / delegateFieldsSafe instead.
-      allow create: if signedIn() && !onNestedDelegate() && deviceBindingAbsent() && (
+      allow create: if !onNestedDelegate() && signedIn() && deviceBindingAbsent() && (
         isGlobalStaff() ||
         (isOrgScopedStaff() && incomingOrgScoped()) ||
         (isCompanyScopedStaff() && incomingCompanyScoped())
-      ) && techCreateOk(request.resource.data.get('organizationUID', ''), request.resource.data.get('companyUID', ''), delegateId)
+      ) && nestedDelegateCreateOk(
+          request.resource.data.get('organizationUID', ''),
+          request.resource.data.get('companyUID', ''),
+          delegateId)
         && sourceStampKeysLocked();
       // r5 budget: a nested organizations/{o}/companies/{c}/delegates
       // update is decided by the nested match alone, for every role.

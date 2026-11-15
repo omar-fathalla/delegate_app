@@ -362,14 +362,22 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
           submitBatch.set(pendingRef, pendingDelegateDataFor(orgId, orgName));
         }
         await submitBatch.commit();
-      } catch (_) {
-        // Cross-organization: write the request alone so staff can still approve.
-        await docRef.set(request.toMap());
-        if (receiptRef != null && receiptData != null) {
-          try {
-            await receiptRef.set(receiptData);
-          } catch (_) {}
+      } on FirebaseException catch (e) {
+        // Cross-organization nested delegate only: keep request path for staff approval.
+        if (e.code == 'permission-denied' && resolveOrgs.length > 1) {
+          await docRef.set(request.toMap());
+          if (receiptRef != null && receiptData != null) {
+            try {
+              await receiptRef.set(receiptData!);
+            } catch (_) {}
+          }
+        } else {
+          return Left(ServerFailure(
+            e.message ?? 'تعذر حفظ بيانات المندوب المعلقة: ${e.code}',
+          ));
         }
+      } catch (e) {
+        return Left(ServerFailure('تعذر حفظ بيانات المندوب المعلقة: $e'));
       }
 
       // 8. Notify Technical Support and Super Admins ONLY (Restricted Targeting)

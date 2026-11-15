@@ -8,6 +8,67 @@ const {resolve} = require("path");
 const {initializeTestEnvironment, assertFails, assertSucceeds} = require("@firebase/rules-unit-testing");
 const {doc, updateDoc, setDoc, deleteDoc} = require("firebase/firestore");
 
+/** Mirrors `pendingDelegateDataFor` in delegate_subscription_repository_impl.dart */
+function pendingDelegatePlaceholderPayload(requestId) {
+  const uploadedAt = new Date().toISOString();
+  return {
+    uid: requestId,
+    firstName: "Ali",
+    secondName: "Hassan",
+    thirdName: "Omar",
+    fullName: "Ali Hassan Omar",
+    phoneNumber: "01077777777",
+    nationalId: "29001011234567",
+    nationalityID: "29001011234567",
+    organizationUID: "o1",
+    organizationName: "O1",
+    companyUID: "c1",
+    companyName: "C1",
+    profileImageUrl: "https://cdn.example/p.jpg",
+    nationalIdFrontUrl: "https://cdn.example/f.jpg",
+    nationalIdBackUrl: "https://cdn.example/b.jpg",
+    documents: [
+      {
+        documentKey: "personalPhoto",
+        documentStatus: "pending",
+        documentURL: "https://cdn.example/p.jpg",
+        uploadedAt,
+      },
+      {
+        documentKey: "nationalityId",
+        documentStatus: "pending",
+        documentURL: "https://cdn.example/f.jpg",
+        secondaryURL: "https://cdn.example/b.jpg",
+        uploadedAt,
+      },
+      {
+        documentKey: "paymentReceipt",
+        documentStatus: "pending",
+        documentURL: "https://cdn.example/r.jpg",
+        receiptCode: "12345",
+        uploadedAt,
+      },
+    ],
+    status: "pending",
+    position: "Promoter",
+    role: "delegate",
+    registeredVia: "mobile_app",
+    originOrganizationUID: "o1",
+    originOrganizationName: "O1",
+    isDeductedFromCompany: false,
+    receiptCode: "12345",
+    subscriptionCycle: "H1",
+    subscription: {
+      periodCode: "H1",
+      periodStart: 1,
+      periodEnd: 30,
+      amountDue: 100,
+      paymentStatus: "unpaid",
+      registrationRequestId: requestId,
+    },
+  };
+}
+
 describe("TA-8 security rules gaps", () => {
   let env;
   const as = (uid) => env.authenticatedContext(uid, {firebase: {sign_in_provider: "password"}}).firestore();
@@ -29,6 +90,9 @@ describe("TA-8 security rules gaps", () => {
       });
       await db.doc("users/ca").set({
         role: "company-admin", organizationUID: "o1", companyUID: "c1",
+      });
+      await db.doc("users/csup").set({
+        role: "company_supervisor", organizationUID: "o1", companyUID: "c1",
       });
       await db.doc("users/hr").set({role: "hr", organizationUID: "o1", companyUID: "c1"});
       await db.doc("users/oa").set({
@@ -130,6 +194,47 @@ describe("TA-8 security rules gaps", () => {
   test("DENY company staff cannot create users doc for active delegate", () =>
     assertFails(setDoc(doc(as("ca"), "users/new-del"), {
       role: "delegate", organizationUID: "o1", companyUID: "c1", status: "active", uid: "new-del",
+    })));
+
+  test("DENY org admin cannot create users doc for active delegate", () =>
+    assertFails(setDoc(doc(as("oa"), "users/new-del-oa"), {
+      role: "delegate", organizationUID: "o1", companyUID: "c1", status: "active", uid: "new-del-oa",
+    })));
+
+  test("ALLOW org admin may create pending delegate users doc", () =>
+    assertSucceeds(setDoc(doc(as("oa"), "users/new-del-oa2"), {
+      role: "delegate", organizationUID: "o1", companyUID: "c1", status: "pending", uid: "new-del-oa2",
+    })));
+
+  for (const [label, uid] of [
+    ["supervisor", "sup"],
+    ["company_supervisor", "csup"],
+    ["company_admin", "ca"],
+  ]) {
+    test(`ALLOW H-1: ${label} create pending delegate placeholder (Dart shape)`, () => {
+      const reqId = `req-${uid}`;
+      return assertSucceeds(setDoc(
+        doc(as(uid), "organizations/o1/companies/c1/delegates/" + reqId),
+        pendingDelegatePlaceholderPayload(reqId),
+      ));
+    });
+  }
+
+  test("DENY supervisor cannot create pending delegate with approved document entry", () =>
+    assertFails(setDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/bad-docs"), {
+      ...pendingDelegatePlaceholderPayload("bad-docs"),
+      documents: [
+        {
+          documentKey: "personalPhoto",
+          documentStatus: "approved",
+          documentURL: "https://cdn.example/p.jpg",
+        },
+        {
+          documentKey: "nationalityId",
+          documentStatus: "pending",
+          documentURL: "https://cdn.example/f.jpg",
+        },
+      ],
     })));
 
   test("DENY org admin cannot delete delegate_requests in another org", async () => {
