@@ -163,6 +163,26 @@ describe("backfill organizationUIDs apply precondition writes", () => {
     assert.deepEqual(updates[0].pre, {lastUpdateTime: ts});
   });
 
+  test("writePatchesWithPrecondition attaches partialWritten on hard failures", async () => {
+    let calls = 0;
+    const db = {
+      doc: () => ({
+        update: async () => {
+          calls++;
+          if (calls === 2) throw new Error("permission denied");
+        },
+      }),
+    };
+    const ts = {seconds: 1, nanoseconds: 0};
+    await assert.rejects(
+      () => writePatchesWithPrecondition(db, [
+        {path: "delegate_requests/r1", patch: {organizationUIDs: ["o1"]}, lastUpdateTime: ts},
+        {path: "delegate_requests/r2", patch: {organizationUIDs: ["o2"]}, lastUpdateTime: ts},
+      ]),
+      (e) => e.partialWritten === 1,
+    );
+  });
+
   test("writePatchesWithPrecondition skips precondition failures", async () => {
     const db = {
       doc: () => ({

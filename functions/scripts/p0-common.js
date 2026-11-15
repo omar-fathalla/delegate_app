@@ -108,6 +108,12 @@ function writeJsonFileNew(filePath, data, kind = "rollback") {
   }
 }
 
+/** Overwrite-safe report for failed or partial apply runs (TA-43). */
+function writeJsonFilePartial(filePath, data) {
+  if (!filePath) throw new Error("report file path is required");
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+}
+
 module.exports = {
   PROD_PROJECTS,
   ALLOWED_PROJECTS,
@@ -121,4 +127,5 @@ module.exports = {
   newBackfillRunId,
   refuseExistingOutputFile,
   writeJsonFileNew,
+  writeJsonFilePartial,
 };

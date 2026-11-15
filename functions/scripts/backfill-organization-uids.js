@@ -17,7 +17,9 @@
  */
 const fs = require("fs");
 const path = require("path");
-const {parseArgs, assertTarget, newBackfillRunId, writeJsonFileNew} = require("./p0-common");
+const {
+  parseArgs, assertTarget, newBackfillRunId, writeJsonFileNew, writeJsonFilePartial,
+} = require("./p0-common");
 
 function str(v) {
   return typeof v === "string" ? v.trim() : "";
@@ -167,10 +169,28 @@ async function writePatchesWithPrecondition(db, rows) {
         skipReasons.precondition_failed = (skipReasons.precondition_failed || 0) + 1;
         continue;
       }
-      throw e;
+      const err = e instanceof Error ? e : new Error(String(e));
+      err.partialWritten = written;
+      err.partialSkipReasons = skipReasons;
+      throw err;
     }
   }
   return {written, skipReasons};
+}
+
+function reportPathFor(runId) {
+  return path.join("/tmp", `organization-uids-report-${runId}.json`);
+}
+
+function persistReport(report, partial = false) {
+  const reportPath = reportPathFor(report.runId);
+  if (partial) {
+    writeJsonFilePartial(reportPath, report);
+  } else {
+    writeJsonFileNew(reportPath, report, "report");
+  }
+  console.log(`wrote ${partial ? "partial " : ""}report ${reportPath}`);
+  return reportPath;
 }
 
 /** Restore only when the doc still holds the backfill's written value. */
@@ -221,13 +241,24 @@ async function restore(db, args) {
   };
   if (!args.apply) return report;
 
-  const {written, skipReasons: preconditionSkips} = await writePatchesWithPrecondition(db, planned);
-  report.counts.written = written;
-  if (Object.keys(preconditionSkips).length) {
-    report.counts.applySkipReasons = {...(report.counts.skipReasons || {}), ...preconditionSkips};
-    report.counts.applySkipped = Object.values(preconditionSkips).reduce((a, b) => a + b, 0);
+  try {
+    const {written, skipReasons: preconditionSkips} = await writePatchesWithPrecondition(db, planned);
+    report.counts.written = written;
+    if (Object.keys(preconditionSkips).length) {
+      report.counts.applySkipReasons = {...(report.counts.skipReasons || {}), ...preconditionSkips};
+      report.counts.applySkipped = Object.values(preconditionSkips).reduce((a, b) => a + b, 0);
+    }
+    return report;
+  } catch (e) {
+    report.partial = true;
+    report.error = e.message || String(e);
+    report.counts.written = typeof e.partialWritten === "number" ? e.partialWritten : report.counts.written;
+    if (e.partialSkipReasons) {
+      report.counts.applySkipReasons = {...(report.counts.applySkipReasons || {}), ...e.partialSkipReasons};
+    }
+    persistReport(report, true);
+    throw e;
   }
-  return report;
 }
 
 async function run(db, args) {
@@ -297,14 +328,25 @@ async function run(db, args) {
     patch: p.patch,
     lastUpdateTime: p.lastUpdateTime,
   }));
-  const {written, skipReasons: preconditionSkips} = await writePatchesWithPrecondition(db, rows);
-  for (const [reason, n] of Object.entries(preconditionSkips)) {
-    report.counts.applySkipped += n;
-    applySkipReasons[reason] = (applySkipReasons[reason] || 0) + n;
+  try {
+    const {written, skipReasons: preconditionSkips} = await writePatchesWithPrecondition(db, rows);
+    for (const [reason, n] of Object.entries(preconditionSkips)) {
+      report.counts.applySkipped += n;
+      applySkipReasons[reason] = (applySkipReasons[reason] || 0) + n;
+    }
+    report.counts.applySkipReasons = applySkipReasons;
+    report.counts.written = written;
+    return report;
+  } catch (e) {
+    report.partial = true;
+    report.error = e.message || String(e);
+    report.counts.written = typeof e.partialWritten === "number" ? e.partialWritten : report.counts.written;
+    if (e.partialSkipReasons) {
+      report.counts.applySkipReasons = {...(report.counts.applySkipReasons || {}), ...e.partialSkipReasons};
+    }
+    persistReport(report, true);
+    throw e;
   }
-  report.counts.applySkipReasons = applySkipReasons;
-  report.counts.written = written;
-  return report;
 }
 
 async function main() {
@@ -340,12 +382,7 @@ async function main() {
   const report = parsed.restore
     ? await restore(admin.firestore(), parsed)
     : await run(admin.firestore(), parsed);
-  const reportPath = path.join(
-    "/tmp",
-    `organization-uids-report-${report.runId}.json`,
-  );
-  writeJsonFileNew(reportPath, report, "report");
-  console.log(`wrote report ${reportPath}`);
+  persistReport(report, false);
   console.log(JSON.stringify(report.counts, null, 2));
   console.log(`mode=${report.mode} runId=${report.runId} project=${project}`);
 }
