@@ -741,34 +741,65 @@ service cloud.firestore {
     // Own delegate profile reads do not require otp_verified so login can
     // load profiles before confirmDelegateOtp. Sensitive paths use isDelegate
     // / ownsDelegateId and stay blocked while otp_required is unset-verified.
-    function canReadDelegate() {
-      return signedIn() && (
-        (request.auth.token.keys().hasAll(['phones'])
-          && request.auth.token.phones is list
-          && resource.data.phoneNumber in request.auth.token.phones)
-        || (request.auth.token.keys().hasAll(['phones'])
-          && request.auth.token.phones is list
-          && resource.data.phone in request.auth.token.phones)
+    function delegateCgGlobalStaffListOk() {
+      return staffRole() in [
+        'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+        'technical_support', 'technical-support', 'technicalSupport'
+      ];
+    }
+
+    function delegateCgOrgStaffListOk() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let org = u.get('organizationUID', '');
+      return org != ''
+        && resource.data.get('organizationUID', '') == org
+        && u.get('role', '') in [
+          'organization-admin', 'organization_admin', 'organizationAdmin',
+          'marketing', 'marketing_promotion', 'marketingPromotion'
+        ];
+    }
+
+    function delegateCgCompanyStaffListOk() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let co = u.get('companyUID', u.get('companyId', ''));
+      return co != ''
+        && resource.data.get('companyUID', resource.data.get('companyId', '')) == co
+        && u.get('role', '') in [
+          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
+          'branches_marketing_manager', 'branchesMarketingManager'
+        ];
+    }
+
+    function delegateCgCompanyStaffOrgWideListOk() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let org = u.get('organizationUID', '');
+      return org != ''
+        && resource.data.get('organizationUID', '') == org
+        && u.get('role', '') in [
+          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor'
+        ];
+    }
+
+    function delegateCgDelegateOwnListOk() {
+      let phones = request.auth.token.keys().hasAll(['phones']) && request.auth.token.phones is list
+        ? request.auth.token.phones
+        : [];
+      let pn = resource.data.get('phoneNumber', resource.data.get('phone', ''));
+      return (phones.size() > 0 && pn != '' && pn in phones)
         || (request.auth.token.keys().hasAll(['delegateIds'])
           && request.auth.token.delegateIds is list
           && resource.id in request.auth.token.delegateIds)
         || resource.id == request.auth.uid
-        // Field uid (not document id) so a collection-group query
-        // where uid==auth.uid / delegateId is provable. Own data only.
-        || ownsDelegateId(resource.data.get('uid', ''))
-        || staffRole() in [
-          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-          'technical_support', 'technical-support', 'technicalSupport'
-        ]
-        || (staffRole() in [
-          'organization-admin', 'organization_admin', 'organizationAdmin',
-          'marketing', 'marketing_promotion'
-        ] && resource.data.organizationUID == callerOrg())
-        || (staffRole() in [
-          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
-          'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
-          'branches_marketing_manager', 'branchesMarketingManager'
-        ] && resource.data.companyUID == callerCompany())
+        || ownsDelegateId(resource.data.get('uid', ''));
+    }
+
+    function canReadDelegate() {
+      return signedIn() && (
+        delegateCgDelegateOwnListOk()
+        || delegateCgGlobalStaffListOk()
+        || delegateCgOrgStaffListOk()
+        || delegateCgCompanyStaffListOk()
       );
     }
 
@@ -1762,7 +1793,12 @@ service cloud.firestore {
     // tighter match and reopen the collection. Those duplicates are gone.
 
     match /{path=**}/delegates/{delegateId} {
-      allow read: if signedIn() && canReadDelegate();
+      allow list: if signedIn() && delegateCgGlobalStaffListOk();
+      allow list: if signedIn() && delegateCgOrgStaffListOk();
+      allow list: if signedIn() && delegateCgCompanyStaffListOk();
+      allow list: if signedIn() && delegateCgCompanyStaffOrgWideListOk();
+      allow list: if signedIn() && delegateCgDelegateOwnListOk();
+      allow get: if signedIn() && canReadDelegate();
       // r5 budget: a nested organizations/{o}/companies/{c}/delegates
       // create is decided by the nested match alone.
       // Lock source stamps on CG create (root / non-nested). Do not put the
@@ -1848,9 +1884,45 @@ service cloud.firestore {
       allow delete: if isGlobalStaff() || (isCompanyScopedStaff() && companyScoped());
     }
 
+    function requestsCgGlobalStaffListOk() {
+      return isGlobalStaff();
+    }
+
+    function requestsCgOrgStaffListOk() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let org = u.get('organizationUID', '');
+      let docOrg = resource.data.get('organizationUID', resource.data.get('organizationId', ''));
+      return org != ''
+        && docOrg == org
+        && u.get('role', '') in [
+          'organization-admin', 'organization_admin', 'organizationAdmin',
+          'marketing', 'marketing_promotion', 'marketingPromotion'
+        ];
+    }
+
+    function requestsCgCompanyStaffListOk() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let co = u.get('companyUID', u.get('companyId', ''));
+      let docCo = resource.data.get('companyUID', resource.data.get('companyId', ''));
+      return co != ''
+        && docCo == co
+        && u.get('role', '') in [
+          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'accountant'
+        ];
+    }
+
     match /{path=**}/requests/{requestId} {
-      allow read: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped()));
-      allow write: if isGlobalStaff() || (isOrgScopedStaff() && incomingOrgScoped()) || (isCompanyScopedStaff() && incomingCompanyScoped());
+      allow list: if signedIn() && requestsCgGlobalStaffListOk();
+      allow list: if signedIn() && requestsCgOrgStaffListOk();
+      allow list: if signedIn() && requestsCgCompanyStaffListOk();
+      allow get: if signedIn() && (
+        isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped())
+      );
+      allow create, update: if isGlobalStaff()
+        || (isOrgScopedStaff() && incomingOrgScoped())
+        || (isCompanyScopedStaff() && incomingCompanyScoped());
+      allow delete: if isGlobalStaff();
     }
 
     // ==================== WEB DASHBOARD ====================
@@ -2018,6 +2090,14 @@ service cloud.firestore {
         && resource.data.get('organizationId', '') == callerOrg();
     }
 
+    function attendanceSupervisorOrgBranchListOk() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let org = u.get('organizationUID', '');
+      return org != ''
+        && resource.data.get('organizationId', '') == org
+        && u.get('role', '') in ['supervisor', 'company_supervisor', 'company-admin', 'company_admin', 'admin'];
+    }
+
     function delegateAttendanceSelfReadOk() {
       return claimString('role') == 'delegate' && delegateOtpOk() && (
         ownsDelegateId(resource.data.delegateId)
@@ -2065,6 +2145,7 @@ service cloud.firestore {
     match /attendance_logs/{logId} {
       allow list: if attendanceCompanyStaffListOk();
       allow list: if attendanceMarketingOrgListOk();
+      allow list: if attendanceSupervisorOrgBranchListOk();
       allow list: if canReadOrgAdminAttendanceByOrgId();
       allow list: if signedIn() && isGlobalStaff();
       allow list: if signedIn() && isOrgScopedStaff() && orgScoped();
@@ -2310,6 +2391,14 @@ service cloud.firestore {
       );
     }
 
+    // Single list evaluation for staff bell broadcasts (under 1k expr vs many allow lines).
+    function canReadNotifStaffListReads() {
+      return canReadNotifCompanyStaffBroadcasts()
+        || canReadNotifOrgMarketingBroadcasts()
+        || canReadNotifRoleBroadcasts()
+        || canReadNotifOrgDocScoped();
+    }
+
     function notificationMarkReadOnlyOk() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead'])
         || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt'])
@@ -2348,21 +2437,33 @@ service cloud.firestore {
     function canDelegateCreateNotification() {
       let d = request.resource.data;
       let tokCo = claimString('companyId');
+      let coOk = (dataHasString(d, 'companyUID') && (tokCo == d.companyUID || claimListHas('companyIds', d.companyUID)))
+        || (dataHasString(d, 'companyId') && (tokCo == d.companyId || claimListHas('companyIds', d.companyId)));
+      let selfCreated = dataHasString(d, 'createdBy') && d.createdBy == request.auth.uid;
+      let attendancePing = d.get('type', '') == 'attendance_check_in' && coOk;
       return claimString('role') == 'delegate'
         && delegateOtpOk()
-        && dataHasString(d, 'createdBy')
-        && d.createdBy == request.auth.uid
-        && (
-          (dataHasString(d, 'companyUID') && (tokCo == d.companyUID || claimListHas('companyIds', d.companyUID)))
-          || (dataHasString(d, 'companyId') && (tokCo == d.companyId || claimListHas('companyIds', d.companyId)))
-        );
+        && coOk
+        && (selfCreated || attendancePing);
     }
 
-    function canCreateNotification() {
-      return signedIn() && (
-        isGlobalStaff()
-        || ((isOrgScopedStaff() || isCompanyScopedStaff()) && (incomingOrgScoped() || incomingCompanyScoped() || request.resource.data.createdBy == request.auth.uid))
-        || canDelegateCreateNotification()
+    // One users/{uid} get — keeps supervisor/delegate notify creates under expr budget.
+    function canStaffCreateNotification() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let d = request.resource.data;
+      let staffRole = r in [
+        'organization-admin', 'organization_admin', 'organizationAdmin',
+        'marketing', 'marketing_promotion', 'marketingPromotion',
+        'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+        'hr', 'company-hr', 'company_hr', 'accountant', 'accounting', 'account_admin',
+        'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+        'branchesMarketingManager'
+      ];
+      return signedIn() && staffRole && (
+        incomingOrgScoped() || incomingCompanyScoped()
+        || d.get('createdBy', '') == request.auth.uid
+        || d.get('createdById', '') == request.auth.uid
       );
     }
 
@@ -2399,8 +2500,16 @@ service cloud.firestore {
       allow read: if canReadNotifRoleBroadcasts();
       allow read: if canReadNotifOrgDocScoped();
       allow read: if canReadNotifPhoneMatch();
-      allow create: if canCreateNotification();
-      allow update: if notificationMarkReadOnlyOk() && notifUpdateReadOk();
+      allow create: if canDelegateCreateNotification()
+        || (signedIn() && isGlobalStaff())
+        || canStaffCreateNotification();
+      allow update: if notificationMarkReadOnlyOk() && canReadOwnNotification();
+      allow update: if notificationMarkReadOnlyOk() && canReadNotifGlobalStaff();
+      allow update: if notificationMarkReadOnlyOk() && canReadNotifCompanyStaffBroadcasts();
+      allow update: if notificationMarkReadOnlyOk() && canReadNotifOrgMarketingBroadcasts();
+      allow update: if notificationMarkReadOnlyOk() && canReadNotifRoleBroadcasts();
+      allow update: if notificationMarkReadOnlyOk() && canReadNotifDelegateDelegatesCo();
+      allow update: if notificationMarkReadOnlyOk() && canReadNotifDelegateCompanyCo();
       allow delete: if isSuperAdmin();
     }
 
@@ -2516,6 +2625,21 @@ service cloud.firestore {
         || penaltyMarketingReadOk();
     }
 
+    function penaltyCreateStaffOk() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let co = u.get('companyUID', u.get('companyId', ''));
+      let d = request.resource.data;
+      let docCo = d.get('companyId', d.get('companyUID', ''));
+      return co != '' && docCo == co
+        && r in [
+          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'accountant',
+          'organization-admin', 'organization_admin', 'organizationAdmin',
+          'marketing', 'marketing_promotion', 'marketingPromotion'
+        ];
+    }
+
     match /penalties/{penaltyId} {
       // List/get: delegate vs staff split (1k expr cap — avoid evaluating both paths).
       allow list: if signedIn() && (
@@ -2524,7 +2648,8 @@ service cloud.firestore {
       allow get: if signedIn() && (
         claimString('role') == 'delegate' ? delegatePenaltySelfReadOk() : penaltyStaffGetOk()
       );
-      allow create, update: if isGlobalStaff()
+      allow create: if signedIn() && (isGlobalStaff() || penaltyCreateStaffOk());
+      allow update: if isGlobalStaff()
         || (isCompanyScopedStaff() && (companyScoped() || incomingCompanyScoped()))
         || (isOrgScopedStaff() && (orgScoped() || incomingOrgScoped()));
       allow delete: if isGlobalStaff() || (isCompanyAdmin() && companyScoped()) || (isOrgAdmin() && orgScoped());
@@ -2767,8 +2892,35 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    function delegateRequestCompanyStaffListOk() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let co = u.get('companyUID', u.get('companyId', ''));
+      let docCo = resource.data.get('companyUID', resource.data.get('companyId', ''));
+      return co != '' && docCo == co
+        && u.get('role', '') in [
+          'company-admin', 'company_admin', 'companyadmin', 'admin',
+          'supervisor', 'company_supervisor', 'hr', 'company-hr', 'company_hr', 'human_resources'
+        ];
+    }
+
+    function delegateRequestOrgStaffListOk() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let org = u.get('organizationUID', '');
+      let docOrg = resource.data.get('organizationUID', resource.data.get('organizationId', ''));
+      return org != '' && docOrg == org
+        && u.get('role', '') in [
+          'organization-admin', 'organization_admin', 'organizationAdmin'
+        ];
+    }
+
     match /delegate_requests/{requestId} {
-      allow read: if signedIn() && delegateRequestReadOk();
+      allow list: if signedIn() && staffRole() in [
+        'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+        'technical_support', 'technical-support', 'technicalSupport'];
+      allow list: if signedIn() && delegateRequestOrgStaffListOk();
+      allow list: if signedIn() && delegateRequestCompanyStaffListOk();
+      allow list: if signedIn() && resource.data.get('supervisorUid', '') == request.auth.uid;
+      allow get: if signedIn() && delegateRequestReadOk();
       // Docs-pending: requests are created by staff only (supervisor flow).
       // The approved delegate's uid equals the request id, so the self path
       // is an allow-list of the upload fields and can never approve documents
