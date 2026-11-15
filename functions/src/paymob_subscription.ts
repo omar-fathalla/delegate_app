@@ -22,12 +22,72 @@ import {
 } from "./subscription_jobs";
 import {CHECKOUT_IN_PROGRESS_SECONDS, isAwaitingPaymentExpired} from "./subscription_logic";
 import {verifyTransactionPostHmac} from "./paymob_hmac";
+import {notifyPaymobSupersededPaymentRefund, PaymobMessaging} from "./paymob_superseded_alert";
 
 if (admin.apps.length === 0) admin.initializeApp();
 
 const opts = {timeoutSeconds: 60, memory: "256MB" as const};
 const EGYPT_BASE = "https://accept.paymob.com";
 const WEBHOOK_NAME = "paymobSubscriptionWebhook";
+/** Suffix delimiter: `{requestId}__{attemptId}` — legacy checkouts used bare `requestId`. */
+export const PAYMOB_SPECIAL_REF_DELIMITER = "__";
+const CHECKOUT_ATTEMPTS = "paymob_checkout_attempts";
+const SUPERSEDED_PAYMENTS = "paymob_superseded_payments";
+/** Matches `newCheckoutAttemptId()` (`{epochMs}_{base36}`). */
+export const CHECKOUT_ATTEMPT_ID_PATTERN = /^\d+_[a-z0-9]+$/;
+
+export class PaymobIntentionError extends Error {
+  readonly reason: string;
+  readonly httpStatus?: number;
+  constructor(reason: string, httpStatus?: number) {
+    super(reason);
+    this.name = "PaymobIntentionError";
+    this.reason = reason;
+    this.httpStatus = httpStatus;
+  }
+}
+
+export function newCheckoutAttemptId(at: Date = new Date()): string {
+  return `${at.getTime()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function buildPaymobSpecialReference(requestId: string, attemptId: string): string {
+  return `${requestId}${PAYMOB_SPECIAL_REF_DELIMITER}${attemptId}`;
+}
+
+export function isValidCheckoutAttemptId(attemptId: string): boolean {
+  return CHECKOUT_ATTEMPT_ID_PATTERN.test(str(attemptId));
+}
+
+export function splitPaymobReference(ref: string): {requestId: string; attemptId: string} {
+  const trimmed = str(ref);
+  if (trimmed === "") return {requestId: "", attemptId: ""};
+  const idx = trimmed.lastIndexOf(PAYMOB_SPECIAL_REF_DELIMITER);
+  if (idx < 0) return {requestId: trimmed, attemptId: ""};
+  const attemptId = trimmed.slice(idx + PAYMOB_SPECIAL_REF_DELIMITER.length);
+  const requestId = trimmed.slice(0, idx);
+  if (attemptId && !isValidCheckoutAttemptId(attemptId)) {
+    return {requestId: trimmed, attemptId: ""};
+  }
+  return {requestId, attemptId};
+}
+
+/** Maps Paymob `special_reference` / merchant order id back to `delegate_requests` doc id. */
+export function resolveRequestIdFromPaymobReference(ref: string): string {
+  return splitPaymobReference(ref).requestId;
+}
+
+export function attemptIdFromPaymobReference(ref: string): string {
+  return splitPaymobReference(ref).attemptId;
+}
+
+export function paymobReferenceFromObj(obj: Record<string, unknown>): string {
+  const order = (obj.order && typeof obj.order === "object")
+    ? obj.order as Record<string, unknown>
+    : {};
+  return str(order.merchant_order_id) || str(obj.merchant_order_id) ||
+    str(obj.special_reference) || str(order.special_reference);
+}
 
 /**
  * Paymob Accept **test** integration for tashil-dev User Test (Task H / Phase 3).
@@ -251,18 +311,22 @@ export async function createPaymobIntention(opts: {
   });
   const text = await res.text();
   if (!res.ok) {
-    console.error(JSON.stringify({event: "paymob_intention_failed", status: res.status}));
-    throw new Error("paymob_intention_failed");
+    const lower = text.toLowerCase();
+    const duplicateRef = res.status === 400 &&
+      (lower.includes("ref already exists") || lower.includes("already exists"));
+    const reason = duplicateRef ? "paymob_duplicate_reference" : "paymob_intention_failed";
+    console.error(JSON.stringify({event: "paymob_intention_failed", status: res.status, reason}));
+    throw new PaymobIntentionError(reason, res.status);
   }
   let data: Record<string, unknown>;
   try {
     data = JSON.parse(text) as Record<string, unknown>;
   } catch {
-    throw new Error("paymob_intention_failed");
+    throw new PaymobIntentionError("paymob_intention_failed");
   }
   const clientSecret = str(data.client_secret);
   const id = str(data.id);
-  if (!clientSecret || !id) throw new Error("paymob_intention_failed");
+  if (!clientSecret || !id) throw new PaymobIntentionError("paymob_intention_failed");
   return {
     id,
     clientSecret,
@@ -312,23 +376,46 @@ export const createSubscriptionCheckout = functions
     const projectId = str(admin.app().options.projectId) ||
       str(process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT) || "tashil-dev";
     const uids = Array.isArray(req.coveredDelegateUids) ? req.coveredDelegateUids.length : 1;
-    const intention = await createPaymobIntention({
-      env,
-      amountCents: quote.amountCents,
-      specialReference: requestId,
-      notificationUrl: webhookUrl(projectId),
-      billing: billingFromRequest(req, context.auth.uid),
-      itemName: `تجديد ${quote.periodCode}`,
-      itemCount: uids || 1,
-    });
-    await snap.ref.update({
-      paymobCheckout: {
-        intentionId: intention.id,
-        amountCents: intention.amountCents,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    const attemptId = newCheckoutAttemptId(now);
+    const specialReference = buildPaymobSpecialReference(requestId, attemptId);
+    let intention: IntentionResult;
+    try {
+      intention = await createPaymobIntention({
+        env,
+        amountCents: quote.amountCents,
+        specialReference,
+        notificationUrl: webhookUrl(projectId),
+        billing: billingFromRequest(req, context.auth.uid),
+        itemName: `تجديد ${quote.periodCode}`,
+        itemCount: uids || 1,
+      });
+    } catch (e) {
+      if (e instanceof PaymobIntentionError) {
+        if (e.reason === "paymob_duplicate_reference") {
+          fail(
+            "failed-precondition",
+            e.reason,
+            "توجد محاولة دفع قيد المعالجة لدى Paymob. انتظر قليلاً ثم أعد فتح الدفع.",
+          );
+        }
+        fail("internal", e.reason, "تعذر تجهيز صفحة الدفع. أعد المحاولة بعد قليل.");
+      }
+      fail("internal", "paymob_intention_failed", "تعذر تجهيز صفحة الدفع. أعد المحاولة بعد قليل.");
+    }
+    const attemptPayload = {
+      attemptId,
+      specialReference,
+      intentionId: intention.id,
+      amountCents: intention.amountCents,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    await Promise.all([
+      snap.ref.update({
+        paymobCheckout: attemptPayload,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }),
+      snap.ref.collection(CHECKOUT_ATTEMPTS).doc(attemptId).set(attemptPayload),
+    ]);
     return {
       checkoutUrl: intention.checkoutUrl,
       publicKey: intention.publicKey,
@@ -417,11 +504,128 @@ function quoteErrorMessage(reason: string): string {
 }
 
 export function requestIdFromPaymobObj(obj: Record<string, unknown>): string {
-  const order = (obj.order && typeof obj.order === "object")
-    ? obj.order as Record<string, unknown>
+  return resolveRequestIdFromPaymobReference(paymobReferenceFromObj(obj));
+}
+
+export function isPaymobIntegrationAllowed(
+  obj: Record<string, unknown>,
+  integrationIds: number[],
+): boolean {
+  const integrationId = Number(obj.integration_id);
+  return Number.isInteger(integrationId) && integrationId > 0 && integrationIds.includes(integrationId);
+}
+
+async function recordSupersededPayment(
+  db: admin.firestore.Firestore,
+  p: {
+    txId: string;
+    requestId: string;
+    attemptId: string;
+    paymobRef: string;
+    paymobOrderId: string;
+    amountCents: number;
+    currency: string;
+    paidAt: Date;
+    companyUID: string;
+    organizationUID: string;
+    messaging?: PaymobMessaging;
+  },
+): Promise<void> {
+  await db.collection(SUPERSEDED_PAYMENTS).doc(p.txId).set({
+    requestId: p.requestId,
+    attemptId: p.attemptId,
+    paymobTransactionId: p.txId,
+    paymobOrderId: p.paymobOrderId,
+    paymobReference: p.paymobRef,
+    amountCents: p.amountCents,
+    currency: p.currency,
+    needs_refund: true,
+    paidAt: admin.firestore.Timestamp.fromDate(p.paidAt),
+    receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, {merge: true});
+  await notifyPaymobSupersededPaymentRefund(db, {
+    requestId: p.requestId,
+    attemptId: p.attemptId,
+    txId: p.txId,
+    amountCents: p.amountCents,
+    currency: p.currency,
+    companyUID: p.companyUID,
+    organizationUID: p.organizationUID,
+    messaging: p.messaging,
+  });
+  console.log(JSON.stringify({
+    event: "paymob_superseded_payment",
+    requestId: p.requestId,
+    attemptId: p.attemptId,
+    txId: p.txId,
+    needs_refund: true,
+  }));
+}
+
+export type PaymobAttemptRoute =
+  | "apply"
+  | "ignored_stale_attempt"
+  | "rejected_foreign_attempt"
+  | "superseded_needs_refund";
+
+/**
+ * Validates checkout attempt before any subscription payment write.
+ * Legacy refs (bare requestId) bypass attempt checks.
+ */
+export async function routePaymobAttemptBeforeApply(
+  db: admin.firestore.Firestore,
+  p: {
+    requestId: string;
+    webhookAttemptId: string;
+    success: boolean;
+    paymobRef: string;
+    txId: string;
+    paymobOrderId: string;
+    amountCents: number;
+    currency: string;
+    paidAt: Date;
+    messaging?: PaymobMessaging;
+  },
+): Promise<PaymobAttemptRoute> {
+  if (p.webhookAttemptId === "") return "apply";
+  const reqRef = db.collection("delegate_requests").doc(p.requestId);
+  const attemptRef = reqRef.collection(CHECKOUT_ATTEMPTS).doc(p.webhookAttemptId);
+  const [reqSnap, attemptSnap] = await Promise.all([reqRef.get(), attemptRef.get()]);
+  if (!reqSnap.exists || !attemptSnap.exists) {
+    console.log(JSON.stringify({
+      event: "paymob_webhook_rejected",
+      reason: "foreign_attempt",
+      requestId: p.requestId,
+      attemptId: p.webhookAttemptId,
+      txId: p.txId,
+      requestExists: reqSnap.exists,
+      attemptExists: attemptSnap.exists,
+    }));
+    return "rejected_foreign_attempt";
+  }
+  const checkout = (reqSnap.get("paymobCheckout") && typeof reqSnap.get("paymobCheckout") === "object")
+    ? reqSnap.get("paymobCheckout") as Record<string, unknown>
     : {};
-  return str(order.merchant_order_id) || str(obj.merchant_order_id) ||
-    str(obj.special_reference) || str(order.special_reference);
+  const currentAttempt = str(checkout.attemptId);
+  if (currentAttempt === p.webhookAttemptId) return "apply";
+  if (p.success) {
+    const data = (reqSnap.data() || {}) as Record<string, unknown>;
+    await recordSupersededPayment(db, {
+      txId: p.txId,
+      requestId: p.requestId,
+      attemptId: p.webhookAttemptId,
+      paymobRef: p.paymobRef,
+      paymobOrderId: p.paymobOrderId,
+      amountCents: p.amountCents,
+      currency: p.currency,
+      paidAt: p.paidAt,
+      companyUID: str(data.companyUID) || str(data.companyId),
+      organizationUID: str(data.organizationUID) || str(data.organizationId),
+      messaging: p.messaging,
+    });
+    return "superseded_needs_refund";
+  }
+  return "ignored_stale_attempt";
 }
 
 export async function handlePaymobWebhook(opts: {
@@ -429,6 +633,8 @@ export async function handlePaymobWebhook(opts: {
   hmac: string;
   hmacSecret: string;
   db: admin.firestore.Firestore;
+  integrationIds?: number[];
+  messaging?: PaymobMessaging;
   now?: Date;
 }): Promise<{status: number; outcome: string}> {
   if (!opts.obj || !verifyTransactionPostHmac(opts.obj, opts.hmac, opts.hmacSecret)) {
@@ -436,7 +642,17 @@ export async function handlePaymobWebhook(opts: {
   }
   const pending = boolFlag(opts.obj.pending);
   if (pending) return {status: 200, outcome: "ignored_pending"};
-  const requestId = requestIdFromPaymobObj(opts.obj);
+  if (opts.integrationIds?.length && !isPaymobIntegrationAllowed(opts.obj, opts.integrationIds)) {
+    console.log(JSON.stringify({
+      event: "paymob_webhook_rejected",
+      reason: "integration_not_allowed",
+      integrationId: opts.obj.integration_id,
+    }));
+    return {status: 200, outcome: "rejected_integration"};
+  }
+  const paymobRef = paymobReferenceFromObj(opts.obj);
+  const requestId = resolveRequestIdFromPaymobReference(paymobRef);
+  const webhookAttemptId = attemptIdFromPaymobReference(paymobRef);
   const txId = idStr(opts.obj.id);
   if (!requestId || !txId) return {status: 200, outcome: "ignored_incomplete"};
   const order = (opts.obj.order && typeof opts.obj.order === "object")
@@ -448,6 +664,19 @@ export async function handlePaymobWebhook(opts: {
   const amountCents = Number(opts.obj.amount_cents);
   const currency = str(opts.obj.currency) || "EGP";
   const paidAt = opts.now || new Date();
+  const route = await routePaymobAttemptBeforeApply(opts.db, {
+    requestId,
+    webhookAttemptId,
+    success,
+    paymobRef,
+    txId,
+    paymobOrderId: idStr(order.id),
+    amountCents: Number.isFinite(amountCents) ? amountCents : 0,
+    currency,
+    paidAt,
+    messaging: opts.messaging,
+  });
+  if (route !== "apply") return {status: 200, outcome: route};
   const outcome = await applyVerifiedSubscriptionPayment(opts.db, {
     requestId,
     paymobTransactionId: txId,
@@ -490,6 +719,7 @@ export const paymobSubscriptionWebhook = functions
         obj,
         hmac,
         hmacSecret: env.hmacSecret,
+        integrationIds: env.integrationIds,
         db: admin.firestore(),
       });
       res.status(result.status).json({ok: result.status === 200, outcome: result.outcome});
