@@ -127,3 +127,4 @@ jobs:
         with:
           name: ios-release
           path: ios/build/Runner.ipa
+          retention-days: 7
