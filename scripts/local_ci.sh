@@ -7,6 +7,9 @@
 # Usage:
 #   bash scripts/local_ci.sh <git-sha>
 #
+# Emulator port overrides (TA-39, e.g. parallel local runs):
+#   LOCAL_CI_FIRESTORE_PORT=18080 LOCAL_CI_FIRESTORE_HUB_PORT=14400 bash scripts/local_ci.sh <sha>
+#
 # Creates a fresh detached worktree at the SHA, runs every CI job plus an
 # Android dev debug APK build, and writes logs + SUMMARY.md to
 #   /tmp/local-ci/<sha>/
@@ -23,6 +26,9 @@ export PUB_ENVIRONMENT="${PUB_ENVIRONMENT:-flutter_bot}"
 
 FLUTTER_SDK="${LOCAL_CI_FLUTTER_SDK:-$HOME/toolchains/flutter-3.44.5}"
 NODE22_BIN="${LOCAL_CI_NODE22_BIN:-/Users/delegate-ci/actions-runner/_work/_tool/node/22.23.4/arm64/bin}"
+LOCAL_CI_FIRESTORE_PORT="${LOCAL_CI_FIRESTORE_PORT:-8080}"
+LOCAL_CI_FIRESTORE_HUB_PORT="${LOCAL_CI_FIRESTORE_HUB_PORT:-4400}"
+export LOCAL_CI_FIRESTORE_PORT LOCAL_CI_FIRESTORE_HUB_PORT
 
 if [[ ! -x "$FLUTTER_SDK/bin/flutter" ]]; then
   echo "local_ci: ERROR: Flutter 3.44.5 not found at $FLUTTER_SDK" >&2
@@ -117,8 +123,8 @@ WORKTREE_STATUS="$(git -C "$SRC" status --porcelain || true)"
 wait_emulator_ports() {
   local i
   for i in 1 2 3 4 5 6 7 8; do
-    if ! lsof -nP -iTCP:8080 -sTCP:LISTEN >/dev/null 2>&1 \
-      && ! lsof -nP -iTCP:4400 -sTCP:LISTEN >/dev/null 2>&1; then
+    if ! lsof -nP -iTCP:"${LOCAL_CI_FIRESTORE_PORT}" -sTCP:LISTEN >/dev/null 2>&1 \
+      && ! lsof -nP -iTCP:"${LOCAL_CI_FIRESTORE_HUB_PORT}" -sTCP:LISTEN >/dev/null 2>&1; then
       return 0
     fi
     sleep 2
