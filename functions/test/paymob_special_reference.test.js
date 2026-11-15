@@ -103,6 +103,7 @@ async function seed(db, checkout = null) {
     companyUID: "co1",
     organizationUID: "org1",
   });
+  await db.doc("organizations/org1/companies/co1").set({name: "شركة الاختبار"});
   await db.doc("organizations/org1/companies/co1/delegates/d1").set({
     uid: "d1",
     fullName: "d1",
@@ -321,10 +322,21 @@ describe("paymob special_reference", () => {
       assert.equal(superseded.requestId, REQUEST_ID);
       assert.equal(superseded.attemptId, ATTEMPT_OLD);
       assert.equal(superseded.paymobTransactionId, "82001");
+      assert.equal(superseded.companyName, "شركة الاختبار");
       const alert = (await db.collection("admin_alerts").doc("82001").get()).data();
       assert.equal(alert.needs_refund, true);
       assert.equal(alert.type, "paymob_superseded_payment");
     });
+  });
+
+  it("resolveCompanyNameFromRequest loads organizations/companies when request omits name", async () => {
+    const db = new MemoryFirestore();
+    await db.doc("organizations/org1/companies/co1").set({companyName: "من السجل"});
+    const name = await paymob.resolveCompanyNameFromRequest(db, {
+      companyUID: "co1",
+      organizationUID: "org1",
+    });
+    assert.equal(name, "من السجل");
   });
 
   it("rejects unknown foreign attempts with no payment event", async () => {
