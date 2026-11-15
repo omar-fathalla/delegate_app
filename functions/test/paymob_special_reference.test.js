@@ -82,9 +82,17 @@ function hookOpts(db, obj) {
   };
 }
 
+async function seedPrivilegedStaff(db) {
+  await db.doc("users/sa1").set({role: "super-admin", organizationUID: "org1"});
+  await db.doc("users/ts1").set({role: "technical_support", organizationUID: "org1"});
+  await db.doc("fcm_tokens/sa1").set({token: "fcm_sa1"});
+  await db.doc("fcm_tokens/ts1").set({token: "fcm_ts1"});
+}
+
 async function seed(db, checkout = null) {
+  await seedPrivilegedStaff(db);
   await db.doc("users/sup1").set({
-    role: "super-admin",
+    role: "supervisor",
     organizationUID: "org1",
     companyUID: "co1",
   });
@@ -137,6 +145,29 @@ async function countPaymentEvents(db) {
 async function countSuperseded(db) {
   const snap = await db.collection("paymob_superseded_payments").get();
   return snap.size;
+}
+
+async function countNotifications(db) {
+  const snap = await db.collection("notifications").get();
+  return snap.size;
+}
+
+async function countAdminAlerts(db) {
+  const snap = await db.collection("admin_alerts").get();
+  return snap.size;
+}
+
+function mockMessaging() {
+  const sends = [];
+  return {
+    sends,
+    messaging: {
+      send: async (msg) => {
+        sends.push(msg);
+        return "mock_msg_id";
+      },
+    },
+  };
 }
 
 describe("paymob special_reference", () => {
@@ -276,15 +307,23 @@ describe("paymob special_reference", () => {
         id: 82001,
         order: {id: 5004, merchant_order_id: oldRef},
       });
-      const late = await paymob.handlePaymobWebhook(hookOpts(db, lateObj));
+      const {sends, messaging} = mockMessaging();
+      const late = await paymob.handlePaymobWebhook({...hookOpts(db, lateObj), messaging});
       assert.equal(late.outcome, "superseded_needs_refund");
       assert.equal(await countPaymentEvents(db), 1);
       assert.equal(await countSuperseded(db), 1);
+      assert.equal(await countAdminAlerts(db), 1);
+      assert.equal(await countNotifications(db), 2);
+      assert.equal(sends.length, 2);
+      assert.equal(sends[0].data.paymobTransactionId, "82001");
       const superseded = (await db.collection("paymob_superseded_payments").doc("82001").get()).data();
       assert.equal(superseded.needs_refund, true);
       assert.equal(superseded.requestId, REQUEST_ID);
       assert.equal(superseded.attemptId, ATTEMPT_OLD);
       assert.equal(superseded.paymobTransactionId, "82001");
+      const alert = (await db.collection("admin_alerts").doc("82001").get()).data();
+      assert.equal(alert.needs_refund, true);
+      assert.equal(alert.type, "paymob_superseded_payment");
     });
   });
 

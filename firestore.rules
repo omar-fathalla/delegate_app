@@ -2068,7 +2068,8 @@ service cloud.firestore {
     function isPrivilegedStaffAlert() {
       return resource.data.get('type', '') in [
         'delegate_profile_edit',
-        'delegate_national_id_request'
+        'delegate_national_id_request',
+        'paymob_superseded_payment'
       ];
     }
 
@@ -2803,7 +2804,13 @@ service cloud.firestore {
 
     // Superseded Paymob captures (non-current checkout attempt). Admin SDK only.
     match /paymob_superseded_payments/{txId} {
-      allow read, write: if false;
+      allow read: if isSuperAdmin() || isTechnicalSupport();
+      allow create, update, delete: if false;
+    }
+
+    match /admin_alerts/{alertId} {
+      allow read: if isSuperAdmin() || isTechnicalSupport();
+      allow create, update, delete: if false;
     }
 
     // TrustedTimeService writes a serverTimestamp probe, then reads it

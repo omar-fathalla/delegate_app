@@ -22,6 +22,7 @@ import {
 } from "./subscription_jobs";
 import {CHECKOUT_IN_PROGRESS_SECONDS, isAwaitingPaymentExpired} from "./subscription_logic";
 import {verifyTransactionPostHmac} from "./paymob_hmac";
+import {notifyPaymobSupersededPaymentRefund, PaymobMessaging} from "./paymob_superseded_alert";
 
 if (admin.apps.length === 0) admin.initializeApp();
 
@@ -525,6 +526,9 @@ async function recordSupersededPayment(
     amountCents: number;
     currency: string;
     paidAt: Date;
+    companyUID: string;
+    organizationUID: string;
+    messaging?: PaymobMessaging;
   },
 ): Promise<void> {
   await db.collection(SUPERSEDED_PAYMENTS).doc(p.txId).set({
@@ -539,6 +543,16 @@ async function recordSupersededPayment(
     paidAt: admin.firestore.Timestamp.fromDate(p.paidAt),
     receivedAt: admin.firestore.FieldValue.serverTimestamp(),
   }, {merge: true});
+  await notifyPaymobSupersededPaymentRefund(db, {
+    requestId: p.requestId,
+    attemptId: p.attemptId,
+    txId: p.txId,
+    amountCents: p.amountCents,
+    currency: p.currency,
+    companyUID: p.companyUID,
+    organizationUID: p.organizationUID,
+    messaging: p.messaging,
+  });
   console.log(JSON.stringify({
     event: "paymob_superseded_payment",
     requestId: p.requestId,
@@ -570,6 +584,7 @@ export async function routePaymobAttemptBeforeApply(
     amountCents: number;
     currency: string;
     paidAt: Date;
+    messaging?: PaymobMessaging;
   },
 ): Promise<PaymobAttemptRoute> {
   if (p.webhookAttemptId === "") return "apply";
@@ -594,6 +609,7 @@ export async function routePaymobAttemptBeforeApply(
   const currentAttempt = str(checkout.attemptId);
   if (currentAttempt === p.webhookAttemptId) return "apply";
   if (p.success) {
+    const data = (reqSnap.data() || {}) as Record<string, unknown>;
     await recordSupersededPayment(db, {
       txId: p.txId,
       requestId: p.requestId,
@@ -603,6 +619,9 @@ export async function routePaymobAttemptBeforeApply(
       amountCents: p.amountCents,
       currency: p.currency,
       paidAt: p.paidAt,
+      companyUID: str(data.companyUID) || str(data.companyId),
+      organizationUID: str(data.organizationUID) || str(data.organizationId),
+      messaging: p.messaging,
     });
     return "superseded_needs_refund";
   }
@@ -615,6 +634,7 @@ export async function handlePaymobWebhook(opts: {
   hmacSecret: string;
   db: admin.firestore.Firestore;
   integrationIds?: number[];
+  messaging?: PaymobMessaging;
   now?: Date;
 }): Promise<{status: number; outcome: string}> {
   if (!opts.obj || !verifyTransactionPostHmac(opts.obj, opts.hmac, opts.hmacSecret)) {
@@ -654,6 +674,7 @@ export async function handlePaymobWebhook(opts: {
     amountCents: Number.isFinite(amountCents) ? amountCents : 0,
     currency,
     paidAt,
+    messaging: opts.messaging,
   });
   if (route !== "apply") return {status: 200, outcome: route};
   const outcome = await applyVerifiedSubscriptionPayment(opts.db, {
