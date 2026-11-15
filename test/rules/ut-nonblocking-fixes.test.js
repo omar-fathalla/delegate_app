@@ -107,6 +107,18 @@ describe("UT non-blocking Firestore fixes", () => {
         timestamp: mid,
         type: "check_in",
       });
+      await db.doc("attendance_logs/sheet-o1-c2").set({
+        delegateId: "d8",
+        organizationId: "o1",
+        companyId: "c2",
+        timestamp: mid,
+        type: "check_in",
+      });
+      await db.doc("users/oa-c1").set({
+        role: "organization-admin",
+        organizationUID: "o1",
+        companyUID: "c1",
+      });
       // seed for cross-org deny probes
       global.__utNbTimes = {start, end};
     });
@@ -188,6 +200,20 @@ describe("UT non-blocking Firestore fixes", () => {
         ),
       ),
     );
+  });
+
+  test("org-admin may read same-org other-company attendance by organizationId", async () => {
+    const {start, end} = global.__utNbTimes;
+    const oaC1 = as("oa-c1");
+    await assertSucceeds(getDocs(
+      query(
+        collection(oaC1, "attendance_logs"),
+        where("organizationId", "==", "o1"),
+        where("companyId", "==", "c2"),
+        where("timestamp", ">=", start),
+        where("timestamp", "<", end),
+      ),
+    ));
   });
 
   test("org-admin today attendance sheet query shape (org + company + timestamp)", async () => {

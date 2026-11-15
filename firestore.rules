@@ -683,10 +683,8 @@ service cloud.firestore {
         'nationalIdFrontUrl', 'nationalIdBackUrl'];
     }
     function staffProfileFieldsOk(r) {
-      // Mohamed 2026-11-10 14:00 Cairo: only super-admin / tech may change
-      // or correct nationalId, including on pending / action_required records.
-      // Name / phone / image URLs: company editors must use editDelegateProfile
-      // (Admin SDK). Direct client writes of those fields are denied here.
+      // nationalId / nationalityID: reviewNationalIdUpdate + approve batches only
+      // (TA-32). Name / phone / image URLs: editDelegateProfile (Admin SDK).
       return !changedKeys().hasAny(identityFieldKeys())
         && !changedKeys().hasAny(profileEditKeys());
     }
@@ -695,10 +693,11 @@ service cloud.firestore {
       let r = u.get('role', '');
       let o = u.get('organizationUID', '');
       let c = u.get('companyUID', '');
-      return r in [
+      return (r in [
           'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
           'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport',
           'tech_support', 'techsupport']
+        && !changedKeys().hasAny(identityFieldKeys()))
         || (o != '' && o in orgId && r in [
           'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
           'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion']
