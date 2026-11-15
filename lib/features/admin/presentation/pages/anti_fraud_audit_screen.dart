@@ -253,7 +253,9 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
           _branchesList = list;
         });
       }
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('AntiFraudAudit: failed to load branches: $e\n$st');
+    }
   }
 
   String _resolveBranchName(Map<String, dynamic> item) {

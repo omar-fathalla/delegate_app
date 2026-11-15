@@ -4,126 +4,92 @@ description: Build and deploy the app using CI/CD (GitHub Actions or Codemagic) 
 
 # Deploy App (CI/CD)
 
-## 1. Local Build (Debug)
+## 1. Local build (debug)
 
-// turbo
-```
-flutter build apk --debug
-```
+Android **requires** a flavor (`prod` or `dev`). iOS uses matching schemes.
 
-## 2. Local Build (Release)
+```bash
+# Production Firebase (store package)
+flutter build apk --debug --flavor prod
 
-```
-flutter build apk --release
-```
-
-For App Bundle (recommended for Play Store):
-```
-flutter build appbundle --release
+# tashil-dev (side-by-side com.tashil.delegate.dev)
+flutter build apk --debug --flavor dev --dart-define=ENV=dev
 ```
 
-For iOS:
+Web / desktop: no flavor.
+
+## 2. Local build (release)
+
+```bash
+flutter build apk --release --flavor prod
+flutter build appbundle --release --flavor prod
 ```
-flutter build ipa --release
+
+Dev release (internal QA only):
+
+```bash
+flutter build apk --release --flavor dev --dart-define=ENV=dev
+```
+
+iOS:
+
+```bash
+flutter build ipa --release --flavor prod --dart-define=ENV=prod
+flutter build ios --release --flavor dev --dart-define=ENV=dev
 ```
 
 ## 3. GitHub Actions CI/CD
 
-Create `.github/workflows/ci.yml`:
+Primary pipelines live under `.github/workflows/` (`ci.yml`, `android-release.yml`, `pr-user-test-builds.yml`). They pin **Flutter 3.44.5** and pass `--flavor prod` for store artifacts.
+
+Example analyze/test job shape:
 
 ```yaml
-name: CI/CD Pipeline
-
-on:
-  push:
-    branches: [develop, main]
-  pull_request:
-    branches: [develop, main]
-
-jobs:
-  analyze-and-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - run: flutter pub get
-      - run: flutter analyze
-      - run: flutter test --coverage
-
-  build-android:
-    runs-on: ubuntu-latest
-    needs: analyze-and-test
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - run: flutter pub get
-
-      # Decode signing key from secrets
-      - name: Decode Keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
-
-      - name: Build App Bundle
-        run: flutter build appbundle --release
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-
-      - name: Upload to Play Console
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT }}
-          packageName: com.tashil.delegate
-          releaseFiles: build/app/outputs/bundle/release/app-release.aab
-          track: internal
+- uses: subosito/flutter-action@v2
+  with:
+    flutter-version: '3.44.5'
+- run: flutter pub get --enforce-lockfile
+- run: flutter analyze
+- run: flutter test
 ```
 
-## 4. Pre-deploy Checklist
+Release Android (from `main` only, prod flavor):
 
-- [ ] All tests pass: `flutter test`
-- [ ] No analysis issues: `flutter analyze`
-- [ ] Version bumped in `pubspec.yaml` (Semantic Versioning)
-- [ ] Conventional commit message: `feat:`, `fix:`, `release:`
-- [ ] No `print()` statements in code
-- [ ] No hardcoded API keys
-- [ ] Firebase configuration matches production project
-- [ ] Signing keys are in CI secrets (never in repo)
+```yaml
+- run: flutter build appbundle --release --flavor prod
+```
+
+## 4. Pre-deploy checklist
+
+- [ ] `flutter analyze` clean (Flutter **3.44.5**)
+- [ ] `flutter test` pass
+- [ ] Version bumped in `pubspec.yaml` when shipping
+- [ ] Android/iOS flavor matches `ENV` (`docs/DEV_WORKFLOW_RULES_AR.md`)
+- [ ] Firebase project matches flavor (prod vs tashil-dev)
+- [ ] Signing keys in CI secrets only (never in repo)
 
 ## 5. Versioning
 
-Follow Semantic Versioning in `pubspec.yaml`:
-
 ```yaml
 version: 1.2.3+45
-#        │ │ │  └── Build number (auto-increment in CI)
-#        │ │ └───── Patch (bug fixes)
-#        │ └─────── Minor (new features, backwards compatible)
-#        └───────── Major (breaking changes)
+#        │ │ │  └── Build number
+#        │ │ └───── Patch
+#        │ └─────── Minor
+#        └───────── Major
 ```
 
-## 6. Branch Strategy
+## 6. Branch strategy
 
 ```
 main      ← Production releases (protected)
-develop   ← Staging / integration
-feature/* ← Feature development
-hotfix/*  ← Urgent production fixes
+dev       ← Integration / User Test
+cursor/*  ← Agent feature branches → PR to dev
 ```
 
-## 7. Commit Convention
+## 7. Commit convention
 
 ```
 feat: add attendance check-in page
 fix: correct geo-fence radius calculation
-refactor: extract location verification to use case
-docs: update README with deployment steps
-test: add bloc tests for attendance feature
-chore: update dependencies
+chore: document Android --flavor in README
 ```

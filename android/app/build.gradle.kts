@@ -150,6 +150,26 @@ val dartEnv: String = (project.findProperty("dart-defines") as String?)
 
 gradle.taskGraph.whenReady {
     val requested = gradle.startParameter.taskNames
+    val taskNames = if (requested.isNotEmpty()) {
+        requested.map { it.substringAfterLast(':') }
+    } else {
+        allTasks.filter { it.project == project }.map { it.name }
+    }
+    val buildsDev = taskNames.any { Regex("Dev", RegexOption.IGNORE_CASE).containsMatchIn(it) }
+    val buildsProd = taskNames.any { Regex("Prod", RegexOption.IGNORE_CASE).containsMatchIn(it) }
+    val androidAppBuild = taskNames.any {
+        Regex(
+            "^(assemble|bundle|install|connected).*",
+            RegexOption.IGNORE_CASE,
+        ).containsMatchIn(it)
+    }
+    if (androidAppBuild && !buildsDev && !buildsProd) {
+        throw GradleException(
+            "Android builds require an explicit Flutter --flavor. " +
+                "Use: flutter run|build ... --flavor prod (store; ENV=prod or unset), or " +
+                "--flavor dev --dart-define=ENV=dev (tashil-dev). See README.md.",
+        )
+    }
     val runsProdInstrumented = requested.any {
         Regex(
             "(connected|device)Prod.*(AndroidTest|Test)|assembleProd.*AndroidTest",
@@ -162,8 +182,6 @@ gradle.taskGraph.whenReady {
                 "Use connectedDevDebugAndroidTest with --flavor dev --dart-define=ENV=dev.",
         )
     }
-    val buildsDev = requested.any { Regex("Dev", RegexOption.IGNORE_CASE).containsMatchIn(it) }
-    val buildsProd = requested.any { Regex("Prod", RegexOption.IGNORE_CASE).containsMatchIn(it) }
     if (buildsDev && dartEnv != "dev") {
         throw GradleException("Flavor 'dev' requires --dart-define=ENV=dev (got ENV=$dartEnv).")
     }

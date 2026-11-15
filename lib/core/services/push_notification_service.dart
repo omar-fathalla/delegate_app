@@ -75,17 +75,22 @@ class PushNotificationService {
       debugPrint('FCM: getInitialMessage error: $e');
     }
 
-    // 4. Request permission safely with timeout (non-blocking)
+    // 4. Request permission (firebase_messaging 16.7+: read settings first).
     try {
-      await _messaging
-          .requestPermission(
-            alert: true,
-            badge: true,
-            sound: true,
-          )
-          .timeout(const Duration(seconds: 4));
+      final settings = await _messaging
+          .getNotificationSettings()
+          .timeout(const Duration(seconds: 3));
+      if (settings.authorizationStatus == AuthorizationStatus.notDetermined) {
+        await _messaging
+            .requestPermission(
+              alert: true,
+              badge: true,
+              sound: true,
+            )
+            .timeout(const Duration(seconds: 4));
+      }
     } catch (e) {
-      debugPrint('FCM: Permission request timeout or error: $e');
+      debugPrint('FCM: getNotificationSettings/requestPermission error: $e');
     }
 
     // 5. Get and save FCM token safely with timeout
@@ -130,7 +135,9 @@ class PushNotificationService {
     try {
       await _tokenRefreshSub?.cancel();
       _tokenRefreshSub = null;
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('FCM: token refresh cancel error: $e');
+    }
     // Delete the Firestore token doc first, while still signed in. A 2s
     // timeout on this write (or on the whole cleanup) left a stale doc
     // (M31 f7dbcf37 TimeoutException).
