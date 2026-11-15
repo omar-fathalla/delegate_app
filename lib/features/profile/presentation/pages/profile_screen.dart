@@ -1139,12 +1139,6 @@ class _ProfileBody extends StatelessWidget {
 
     try {
       final file = File(picked.path);
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final storageRef = FirebaseStorage.instance.ref(
-        'delegate_documents/${delegate.uid}/${item.docType}_$timestamp.jpg',
-      );
-      final uploadTask = await storageRef.putFile(file);
-      final newUrl = await uploadTask.ref.getDownloadURL();
 
       final firestore = FirebaseFirestore.instance;
 
@@ -1159,12 +1153,12 @@ class _ProfileBody extends StatelessWidget {
       );
 
       if (supervisorPendingReupload) {
-        await SupervisorDelegateDocReuploadRemote().reupload(
+        await SupervisorDelegateDocReuploadRemote().replaceWithFile(
           uid: delegate.uid,
           organizationUID: delegate.organizationUID,
           companyUID: delegate.companyUID,
           docType: item.docType,
-          newUrl: newUrl,
+          file: file,
         );
         if (context.mounted) {
           Navigator.pop(context);
@@ -1179,6 +1173,17 @@ class _ProfileBody extends StatelessWidget {
         }
         return;
       }
+
+      final storagePath = delegateDocumentStoragePath(
+        delegateUid: delegate.uid,
+        docType: item.docType,
+      );
+      final newUrl = await uploadDelegateDocumentFile(
+        folderId: delegate.uid,
+        companyUID: delegate.companyUID,
+        storagePath: storagePath,
+        file: file,
+      );
 
       final Map<String, dynamic> updateFields = {
         'updatedAt': FieldValue.serverTimestamp(),
@@ -1270,7 +1275,10 @@ class _ProfileBody extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         Navigator.pop(context); // dismiss progress dialog
-        AppSnackBar.showError(context, 'فشل تحديث المستند: $e');
+        AppSnackBar.showError(
+          context,
+          supervisorDocReplaceErrorMessage(e),
+        );
       }
     }
   }

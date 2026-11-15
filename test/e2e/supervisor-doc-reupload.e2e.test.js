@@ -1,6 +1,11 @@
 /**
  * supervisorReuploadDelegateDocument against Firestore emulator (real admin).
  *   npm run test:e2e:supervisor-reupload
+ *
+ * App path (profile_screen supervisor «تعديل / استبدال»): ensureStorageUploadIntent
+ * for folderId=delegate uid + companyUID, then Storage upload under
+ * delegate_documents/{uid}/, then this callable with newUrl. Storage rules deny
+ * staff writes without a matching intent (see storage.rules + smoke_tashil_dev_storage_upload.js).
  */
 const test = require("node:test");
 const assert = require("node:assert/strict");
