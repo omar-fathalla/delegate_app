@@ -55,13 +55,15 @@ firebase appdistribution:distribute build/app/outputs/flutter-apk/app-dev-releas
   --release-notes "Android dev build (manual)"
 ```
 
-Or use the wrapper (same flags, optional env overrides):
+Or use the wrapper (targets locked to **tashil-dev**; pass-through Firebase CLI args such as `-P` / `--project` / `--app` are **not** accepted):
 
 ```bash
 bash scripts/android_dev_distribute.sh
+# Dry-run by default; confirm upload:
+bash scripts/android_dev_distribute.sh --no-dry-run --yes
 ```
 
-Tester groups / emails: configure in the [Firebase Console](https://console.firebase.google.com/project/tashil-dev/appdistribution) (App Distribution → testers). The CLI can add `--groups` or `--testers` when needed.
+Tester groups / emails: configure in the [Firebase Console](https://console.firebase.google.com/project/tashil-dev/appdistribution) (App Distribution → testers).
 
 ## SHA-1 fingerprints for Mohamed (Firebase Console)
 
