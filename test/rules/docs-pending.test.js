@@ -461,18 +461,16 @@ describe("docs-pending round 2", () => {
         await seed(path, {...BASE, status: "pending", documents: pendDocs});
         await no(updateDoc(doc(as("ts"), path), {documents: appr}));
       });
-      for (const w of ["ts", "hr", "oa", "acc", "sup2"]) {
-        test(`DENY non-approver ${w} sets status 'pending' on an existing doc`, async () => {
+      for (const w of ["ts", "hr", "oa", "acc", "sup2", "sup", "ca", "adm"]) {
+        test(`DENY ${w} sets status 'pending' on suspended delegate (lift blocked)`, async () => {
           await seed(path, {...BASE, status: "suspended", documents: pendDocs});
           await no(updateDoc(doc(as(w), path), {status: "pending"}));
         });
       }
-      for (const w of ["sa", "sup"]) {
-        test(`ALLOW approver ${w} sets status 'pending'`, async () => {
-          await seed(path, {...BASE, status: "suspended", documents: pendDocs});
-          await ok(updateDoc(doc(as(w), path), {status: "pending"}));
-        });
-      }
+      test("ALLOW super-admin sets suspended to pending (status-only)", async () => {
+        await seed(path, {...BASE, status: "suspended", documents: pendDocs});
+        await ok(updateDoc(doc(as("sa"), path), {status: "pending"}));
+      });
       test("ALLOW same-company sup approves re-upload on active delegate", async () => {
         await seed(path, {...BASE, documents: pendDocs});
         await ok(updateDoc(doc(as("sup"), path), {documents: appr}));

@@ -278,6 +278,9 @@ export function decideSetDelegateHold(
   if (hold === HOLD_BILLING_CYCLE_RESET && isCompany && !isSuper && !isOrg) {
     return {ok: false, reason: "hold_not_allowed"};
   }
+  if (hold === HOLD_ADMIN_SUSPEND && op === "remove" && !isSuper && !isTech) {
+    return {ok: false, reason: "hold_not_allowed"};
+  }
   return {ok: true};
 }
 

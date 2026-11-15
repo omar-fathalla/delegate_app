@@ -16,6 +16,7 @@ import 'package:delegate_app/core/services/session_management_service.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/features/admin/data/datasources/delegate_hold_remote.dart';
+import 'package:delegate_app/core/security/delegate_status_policy.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_hold_access.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/link_delegate_to_org_sheet.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/delete_delegate_request_sheet.dart';
@@ -930,6 +931,12 @@ class _CompactDelegateTile extends StatelessWidget {
         targetCompanyUID: delegate.companyUID,
       );
 
+  bool get _showHoldControl => delegateHoldShowsReactivate(
+        canSetHold: _canSetHold,
+        delegateSuspended: _isVisiblySuspended,
+        viewerRole: adminDelegate?.role,
+      );
+
   bool get _isVisiblySuspended => delegate.status == DelegateStatus.suspended;
 
   Future<void> _confirmSetHold(BuildContext context, {required bool suspend}) async {
@@ -1592,7 +1599,7 @@ class _CompactDelegateTile extends StatelessWidget {
           )
         : null;
 
-    final holdBtn = _canSetHold
+    final holdBtn = _showHoldControl
         ? _buildActionPill(
             context: context,
             icon: Icon(_isVisiblySuspended
@@ -1623,7 +1630,7 @@ class _CompactDelegateTile extends StatelessWidget {
       ?editBtn,
       if (canRequestDelete) ?deleteRequestBtn,
       if (isSuperAdmin) ?logoutBtn,
-      if (_canSetHold) ?holdBtn,
+      if (_showHoldControl) ?holdBtn,
     ];
     if (extras.isEmpty) return linkOrgBtn;
     return Column(
