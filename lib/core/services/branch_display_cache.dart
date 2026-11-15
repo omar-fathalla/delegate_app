@@ -59,15 +59,17 @@ class BranchDisplayCache {
     final FirebaseFirestore db;
     try {
       db = FirebaseFirestore.instance;
-    } catch (_) {
+    } catch (e, st) {
       // Firebase not initialised (e.g. widget tests): show raw names.
+      debugPrint('BranchDisplayCache: Firestore unavailable: $e\n$st');
       return Future.value();
     }
     return _loading ??= db
         .collection('branches')
         .get()
         .then(registerSnapshot)
-        .catchError((_) {
+        .catchError((Object e, StackTrace st) {
+      debugPrint('BranchDisplayCache: ensureLoaded failed: $e\n$st');
       _loading = null;
     });
   }
@@ -96,7 +98,8 @@ class BranchDisplayCache {
     final FirebaseFirestore db;
     try {
       db = FirebaseFirestore.instance;
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('BranchDisplayCache: org load Firestore unavailable: $e\n$st');
       return Future.value();
     }
     return _orgLoading ??= db
@@ -108,7 +111,9 @@ class BranchDisplayCache {
         if (n.isNotEmpty) _orgNames[d.id] = n;
       }
       version.value++;
-    }).catchError((_) {});
+    }).catchError((Object e, StackTrace st) {
+      debugPrint('BranchDisplayCache: ensureOrgsLoaded failed: $e\n$st');
+    });
   }
 
   /// Chain (organization) name for a branch, or '' if unknown.

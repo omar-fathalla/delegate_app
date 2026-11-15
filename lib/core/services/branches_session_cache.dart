@@ -28,7 +28,8 @@ class BranchesSessionCache {
       uid = debugSessionKey != null
           ? debugSessionKey!()
           : FirebaseAuth.instance.currentUser?.uid;
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('BranchesSessionCache: session key lookup failed: $e\n$st');
       uid = null;
     }
     return '${identityHashCode(firestore)}:${uid ?? '-'}';
@@ -48,9 +49,13 @@ class BranchesSessionCache {
           .getResilient(forceServer: true)
           .then((s) => s.docs);
       _pending = future;
-      future.catchError((Object _) {
+      future.catchError((Object error, StackTrace stackTrace) {
+        debugPrint('BranchesSessionCache: load failed: $error\n$stackTrace');
         if (identical(_pending, future)) _pending = null;
-        return <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+        Error.throwWithStackTrace(
+          error is Exception ? error : Exception('$error'),
+          stackTrace,
+        );
       });
     }
     return _pending!;

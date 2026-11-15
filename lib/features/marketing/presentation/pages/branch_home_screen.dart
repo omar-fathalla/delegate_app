@@ -3165,7 +3165,9 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
             orgs.add({'uid': uid.isNotEmpty ? uid : doc.id, 'name': name});
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        debugPrint('BranchPicker: organizations fetch failed: $e\n$st');
+      }
 
       // Ensure Fathalla Market exists and is placed at the top as default
       final hasFathalla = orgs.any((o) =>
