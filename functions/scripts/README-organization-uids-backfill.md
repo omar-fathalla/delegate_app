@@ -16,11 +16,14 @@ exists so list queries and audit views see the same field on every doc.
 - **`--dry-run`** may be passed explicitly (same as omitting `--apply`).
 - Never combine `--dry-run` with `--apply`.
 - **`--rollback` paths:** each run (dry-run or apply) must use a **new**
-  rollback file path. If the path already exists on disk, the script **refuses
-  to start** instead of overwriting a prior run’s rollback JSON.
-- **Apply guard:** `--apply` re-reads each planned document before write and
-  skips docs that changed since the scan (same idea as restore
-  compare-before-write).
+  rollback file path. The script **scans Firestore first**, builds the plan,
+  then—**before any write** (rollback JSON or Firestore)—creates the rollback
+  file with an exclusive `wx` create. If that path already exists, or the plan
+  is invalid, the run **stops there** and leaves Firestore untouched.
+- **Apply guard:** `--apply` re-reads each planned document before write, skips
+  docs whose fields changed since the scan (`changed_since_read` / `plan_changed`),
+  and applies remaining patches with a Firestore **`lastUpdateTime` precondition**
+  so a doc that changes between re-read and write is not overwritten.
 - Prints counts only in stdout (no personal data in logs).
 - Does not deploy functions or rules.
 
