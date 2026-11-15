@@ -29,6 +29,7 @@ import {
   classifyReviewTarget,
   usersProfileSyncPatch,
   reviewerIsSubmitter,
+  nationalIdFieldsForApprovedReview,
 } from "./delegate_profile_edit_logic";
 
 function asUpdate(patch: Record<string, unknown>): FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData> {
@@ -663,17 +664,27 @@ export const reviewNationalIdUpdate = functions
           "تعذر التحقق من المندوب المستهدف على الخادم.",
         );
       }
+      const userRef = db.collection("users").doc(delegateUid);
+      const userSnap = await tx.get(userRef);
+      const nidPatch = nationalIdFieldsForApprovedReview(newId);
+      if (!nidPatch) {
+        throw new functions.https.HttpsError("invalid-argument", "الرقم القومي يجب أن يكون 14 رقمًا.");
+      }
       for (const live of [...matchingDelegates, ...openRequests]) {
         tx.update(live.ref, asUpdate({
-          nationalId: newId,
-          nationalityID: newId,
+          ...nidPatch,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }));
+      }
+      if (userSnap.exists) {
+        tx.update(userRef, asUpdate({
+          ...nidPatch,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }));
       }
       tx.update(reqRef, {
         status: "approved",
-        nationalId: newId,
-        nationalityID: newId,
+        ...nidPatch,
         reviewedBy: uid,
         reviewedByName: caller.name,
         reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
