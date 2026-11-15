@@ -673,9 +673,6 @@ service cloud.firestore {
         'supervisor', 'company_supervisor'];
     }
 
-    function identityFieldKeys() {
-      return ['nationalId', 'nationalityID'];
-    }
     function profileEditKeys() {
       return ['fullName', 'firstName', 'secondName', 'thirdName', 'middleName', 'lastName',
         'phoneNumber', 'phone',
@@ -683,9 +680,9 @@ service cloud.firestore {
         'nationalIdFrontUrl', 'nationalIdBackUrl'];
     }
     function staffProfileFieldsOk(r) {
-      // nationalId / nationalityID: reviewNationalIdUpdate + approve batches only
-      // (TA-32). Name / phone / image URLs: editDelegateProfile (Admin SDK).
-      return !changedKeys().hasAny(identityFieldKeys())
+      // nationalId / nationalityID: company/org/marketing clients (TA-32).
+      // Name / phone / image URLs: editDelegateProfile (Admin SDK).
+      return !changedKeys().hasAny(['nationalId', 'nationalityID'])
         && !changedKeys().hasAny(profileEditKeys());
     }
     function staffManagesDelegate(orgId, compId, companyNeedsOrg) {
@@ -696,8 +693,7 @@ service cloud.firestore {
       return (r in [
           'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
           'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport',
-          'tech_support', 'techsupport']
-        && !changedKeys().hasAny(identityFieldKeys()))
+          'tech_support', 'techsupport'])
         || (o != '' && o in orgId && r in [
           'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
           'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion']
@@ -1275,8 +1271,9 @@ service cloud.firestore {
       let actCh = ch.hasAny(['isActive']);
       let globalStaff = r in superAdminRoleList() || r in techRoleList();
       let fromSuspended = delegateStatusLower(resource.data.get('status', '')) == 'suspended';
-      return (!stCh && !actCh)
-        || (globalStaff && (stCh || actCh));
+      let idClientLock = !(globalStaff && ch.hasAny(['nationalId', 'nationalityID']));
+      return idClientLock
+        && ((!stCh && !actCh) || (globalStaff && (stCh || actCh)));
     }
 
     function usersUpdateOk(r, org, co, old, d, userId) {
