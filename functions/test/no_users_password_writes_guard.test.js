@@ -2,9 +2,9 @@
  * Static guard: production function sources and operator scripts must not
  * write password / temporaryPassword / tempPassword onto users/* documents.
  *
- * Limitation: dynamic object keys (e.g. `const k = 'password'; doc[k] = x`) are
- * not detected; only literal property names, dotted `password.foo`, and
- * bracket literals like `['password']`.
+ * Limitation: computed keys (e.g. `{[k]: v}` with variable `k`) are not detected.
+ * Literal property names, dotted `password.foo`, quoted `"password.hash"`, and
+ * bracket literals like `['password']` are covered.
  */
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -33,6 +33,10 @@ const SECRET_BRACKET_ASSIGN = new RegExp(
   `\\[(['"])(?:${ESCAPED.join("|")})\\1\\]\\s*=`,
   "m",
 );
+const SECRET_QUOTED_DOTTED = new RegExp(
+  `['"](?:${ESCAPED.join("|")})\\.\\w+['"]\\s*:`,
+  "m",
+);
 
 const USERS_WRITE = /collection\(['"]users['"]\)|\.doc\(['"]users\/|users\/\$\{/;
 
@@ -43,7 +47,8 @@ const USERS_WRITE = /collection\(['"]users['"]\)|\.doc\(['"]users\/|users\/\$\{/
 function lineHasSecretKeyPattern(line) {
   return SECRET_LITERAL.test(line) ||
     SECRET_BRACKET_PROP.test(line) ||
-    SECRET_BRACKET_ASSIGN.test(line);
+    SECRET_BRACKET_ASSIGN.test(line) ||
+    SECRET_QUOTED_DOTTED.test(line);
 }
 
 /**
@@ -109,7 +114,9 @@ test("no users/* writes include secret password field keys", () => {
 
 test("guard helper matches dotted and bracket literal keys", () => {
   assert.ok(lineHasSecretKeyPattern("  password.legacy: x,"));
+  assert.ok(lineHasSecretKeyPattern('  "password.hash": x'));
   assert.ok(lineHasSecretKeyPattern("  ['temporaryPassword']: v"));
   assert.ok(lineHasSecretKeyPattern('  ["tempPassword"] = x'));
   assert.ok(!lineHasSecretKeyPattern("  data.password"));
+  assert.ok(!lineHasSecretKeyPattern("  {[key]: v"));
 });

@@ -246,13 +246,109 @@ async function queueSetupEmail(db, email, displayName) {
 /**
  * @param {FirebaseFirestore.Firestore} db
  * @param {string} email
- * @return {Promise<{id: string, data: Record<string, unknown>}|null>}
+ * @param {string} phone
+ * @return {Promise<{id: string, data: Record<string, unknown>}[]>}
  */
-async function findProfileByEmail(db, email) {
-  const snap = await db.collection("users").where("email", "==", email).limit(1).get();
-  if (snap.empty) return null;
-  const doc = snap.docs[0];
-  return {id: doc.id, data: doc.data()};
+async function lookupExistingProfiles(db, email, phone) {
+  /** @type {Map<string, {id: string, data: Record<string, unknown>}>} */
+  const byId = new Map();
+  const merge = (snap) => {
+    for (const doc of snap.docs) {
+      byId.set(doc.id, {id: doc.id, data: doc.data()});
+    }
+  };
+  merge(await db.collection("users").where("email", "==", email).limit(5).get());
+  merge(await db.collection("users").where("phoneNumber", "==", phone).limit(5).get());
+  merge(await db.collection("users").where("phone", "==", phone).limit(5).get());
+  return [...byId.values()];
+}
+
+/**
+ * Shared dry-run + apply guard for existing Firestore profiles and Auth uid alignment.
+ *
+ * @param {{id: string, data: Record<string, unknown>}[]} profiles
+ * @param {{allowRoleChange: boolean, authUid: string|null}} opts
+ * @return {{ok: boolean, reason?: string, changes: {field: string, from: unknown, to: unknown, profileId?: string}[]}}
+ */
+function assessProvisioningProfiles(profiles, opts) {
+  /** @type {{field: string, from: unknown, to: unknown, profileId?: string}[]} */
+  const changes = [];
+  for (const p of profiles) {
+    const a = assessExistingProfile(p.data, {allowRoleChange: opts.allowRoleChange});
+    for (const c of a.changes) {
+      changes.push({...c, profileId: p.id});
+    }
+    if (!a.ok) {
+      return {ok: false, reason: a.reason, changes};
+    }
+  }
+  if (profiles.length === 0) {
+    return {ok: true, changes};
+  }
+  if (!opts.authUid) {
+    for (const p of profiles) {
+      changes.push({
+        field: "uid",
+        from: p.id,
+        to: "(no Auth user for email/phone)",
+        profileId: p.id,
+      });
+    }
+    return {ok: false, reason: "orphan_profile", changes};
+  }
+  for (const p of profiles) {
+    if (p.id !== opts.authUid) {
+      changes.push({field: "uid", from: p.id, to: opts.authUid, profileId: p.id});
+      if (!opts.allowRoleChange) {
+        return {ok: false, reason: "uid_mismatch", changes};
+      }
+    }
+  }
+  return {ok: true, changes};
+}
+
+/**
+ * @param {import("firebase-admin").auth.Auth} auth
+ * @param {string} email
+ * @return {Promise<string|null>}
+ */
+async function resolveAuthUidByEmail(auth, email) {
+  try {
+    const user = await auth.getUserByEmail(email);
+    return user.uid;
+  } catch (e) {
+    if ((e).code === "auth/user-not-found") return null;
+    throw e;
+  }
+}
+
+/**
+ * @param {FirebaseFirestore.Firestore} db
+ * @param {import("firebase-admin").auth.Auth} auth
+ * @param {string} email
+ * @param {string} phone
+ * @param {boolean} allowRoleChange
+ */
+async function planProvisioning(db, auth, email, phone, allowRoleChange) {
+  const profiles = await lookupExistingProfiles(db, email, phone);
+  const authUid = auth ? await resolveAuthUidByEmail(auth, email) : null;
+  const assessment = assessProvisioningProfiles(profiles, {allowRoleChange, authUid});
+  const primaryProfile = profiles.find((p) => p.data.email === email) || profiles[0] || null;
+  return {profiles, authUid, assessment, primaryProfile};
+}
+
+/**
+ * @param {{ok: boolean, reason?: string}} assessment
+ * @param {string} mode
+ */
+function refuseProvisioning(assessment, mode) {
+  logPlannedChanges(assessment.changes);
+  const hint = assessment.reason === "orphan_profile" ?
+    "Firestore profile exists without matching Auth user" :
+    assessment.reason === "uid_mismatch" ?
+      "Firestore doc id does not match Auth uid" :
+      "existing profile has another role or companyUID";
+  throw new Error(`refusing ${mode}: ${hint} (use --allow-role-change)`);
 }
 
 /**
@@ -268,6 +364,7 @@ async function runCreateTechSupport(args, deps = {}) {
   const phone = String(args.phone || args.phoneNumber || "").trim();
   const displayName = args["display-name"] ? String(args["display-name"]).trim() : DEFAULT_DISPLAY_NAME;
   const apply = args.apply === true;
+  const allowRoleChange = args.allowRoleChange === true;
   const project = deps.project || resolveProjectTarget(args);
   console.log(`target project: ${project}`);
 
@@ -277,13 +374,15 @@ async function runCreateTechSupport(args, deps = {}) {
   const db = deps.db;
   const auth = deps.auth;
 
-  const profileByEmail = db ? await findProfileByEmail(db, email) : null;
-  const previewAssessment = assessExistingProfile(profileByEmail?.data, {
-    allowRoleChange: args.allowRoleChange === true,
-  });
+  if (!db) throw new Error("db is required");
+
+  const plan = await planProvisioning(db, auth, email, phone, allowRoleChange);
 
   if (!apply) {
-    const previewUid = profileByEmail?.id || "AUTH_UID_AFTER_APPLY";
+    if (!plan.assessment.ok) {
+      refuseProvisioning(plan.assessment, "dry-run");
+    }
+    const previewUid = plan.authUid || plan.primaryProfile?.id || "AUTH_UID_AFTER_APPLY";
     const doc = buildTechSupportUserDoc({
       uid: previewUid,
       email,
@@ -292,50 +391,49 @@ async function runCreateTechSupport(args, deps = {}) {
     });
     assertNoSecretFields(doc);
     console.log("dry-run: would ensure Auth user and write users/{uid}");
-    if (!previewAssessment.ok) {
-      logPlannedChanges(previewAssessment.changes);
-      throw new Error(
-        "refusing dry-run: existing profile has another role or companyUID (use --allow-role-change)",
-      );
-    }
-    logPlannedChanges(previewAssessment.changes);
+    logPlannedChanges(plan.assessment.changes);
     console.log(JSON.stringify(doc, null, 2));
-    const mailNote = profileByEmail &&
-      !shouldQueueSetupEmail(profileByEmail.data, args.forceSetupEmail === true) ?
+    const mailNote = plan.primaryProfile &&
+      !shouldQueueSetupEmail(plan.primaryProfile.data, args.forceSetupEmail === true) ?
       "skip password-setup mail (sent recently; use --force-setup-email)" :
       "queue password-setup mail (link not printed)";
     console.log(`Then ${mailNote}.`);
     return {mode: "dry-run", uid: previewUid, project, mailSkipped: mailNote.startsWith("skip")};
   }
 
-  if (!db || !auth) throw new Error("db and auth required when --apply");
+  if (!auth) throw new Error("auth required when --apply");
+
+  if (!plan.assessment.ok) {
+    refuseProvisioning(plan.assessment, "apply");
+  }
+  logPlannedChanges(plan.assessment.changes);
 
   let user;
-  try {
-    user = await auth.createUser({email, displayName, emailVerified: false, disabled: false});
-  } catch (e) {
-    if ((e).code === "auth/email-already-exists") {
-      user = await auth.getUserByEmail(email);
-    } else {
-      throw e;
+  if (plan.authUid) {
+    user = await auth.getUser(plan.authUid);
+  } else {
+    try {
+      user = await auth.createUser({email, displayName, emailVerified: false, disabled: false});
+    } catch (e) {
+      if ((e).code === "auth/email-already-exists") {
+        user = await auth.getUserByEmail(email);
+        const recheck = assessProvisioningProfiles(
+          await lookupExistingProfiles(db, email, phone),
+          {allowRoleChange, authUid: user.uid},
+        );
+        if (!recheck.ok) {
+          refuseProvisioning(recheck, "apply");
+        }
+      } else {
+        throw e;
+      }
     }
   }
 
   const userRef = db.collection("users").doc(user.uid);
   const existingSnap = await userRef.get();
-  const existingData = existingSnap.exists ? existingSnap.data() : profileByEmail?.id === user.uid ?
-    profileByEmail.data :
-    null;
-  const assessment = assessExistingProfile(existingData, {
-    allowRoleChange: args.allowRoleChange === true,
-  });
-  if (!assessment.ok) {
-    logPlannedChanges(assessment.changes);
-    throw new Error(
-      "refusing apply: existing profile has another role or companyUID (use --allow-role-change)",
-    );
-  }
-  logPlannedChanges(assessment.changes);
+  const existingData = existingSnap.exists ? existingSnap.data() :
+    (plan.primaryProfile?.id === user.uid ? plan.primaryProfile.data : undefined);
 
   const userDoc = buildTechSupportUserDoc({
     uid: user.uid,
@@ -351,8 +449,9 @@ async function runCreateTechSupport(args, deps = {}) {
 
   await userRef.set(payload, {merge: true});
 
+  const mailExisting = existingData || plan.primaryProfile?.data;
   let mailQueued = false;
-  if (shouldQueueSetupEmail(existingData, args.forceSetupEmail === true)) {
+  if (shouldQueueSetupEmail(mailExisting, args.forceSetupEmail === true)) {
     await queueSetupEmail(db, email, displayName);
     await userRef.set({
       lastPasswordSetupMailAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -386,6 +485,9 @@ module.exports = {
   runCreateTechSupport,
   resolveProjectTarget,
   assessExistingProfile,
+  assessProvisioningProfiles,
+  lookupExistingProfiles,
+  planProvisioning,
   shouldQueueSetupEmail,
   isTechSupportRole,
   DEFAULT_DISPLAY_NAME,
