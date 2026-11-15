@@ -9,7 +9,9 @@
 #
 # Emulator port overrides (TA-39, e.g. parallel local runs):
 #   LOCAL_CI_FIRESTORE_PORT=18080 LOCAL_CI_FIRESTORE_HUB_PORT=14400 \
-#   LOCAL_CI_FIRESTORE_WEBSOCKET_PORT=19150 LOCAL_CI_LOGGING_PORT=14500 bash scripts/local_ci.sh <sha>
+#   LOCAL_CI_AUTH_PORT=19099 LOCAL_CI_STORAGE_PORT=19199 \
+#   LOCAL_CI_FUNCTIONS_PORT=15001 LOCAL_CI_LOGGING_PORT=14500 \
+#   LOCAL_CI_FIRESTORE_WEBSOCKET_PORT=19150 bash scripts/local_ci.sh <sha>
 #
 # Creates a fresh detached worktree at the SHA, runs every CI job plus an
 # Android dev debug APK build, and writes logs + SUMMARY.md to

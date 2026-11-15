@@ -56,4 +56,28 @@ describe("listGlobalNotifyStaff", () => {
   it("GLOBAL_NOTIFY_STAFF_CAP is set", () => {
     assert.equal(mod.GLOBAL_NOTIFY_STAFF_CAP, 50);
   });
+
+  it("excludes isDeleted staff", async () => {
+    await db.doc("users/ts-del2").set({
+      role: "tech_support",
+      isDeleted: true,
+      phone: "01066666666",
+    });
+    const list = await mod.listGlobalNotifyStaffRows(db);
+    assert.equal(list.some((u) => u.uid === "ts-del2"), false);
+  });
+
+  it("sorts by uid before applying cap", async () => {
+    for (let i = 0; i < 55; i++) {
+      const id = `cap${String(i).padStart(2, "0")}`;
+      await db.doc(`users/${id}`).set({
+        role: "super-admin",
+        phoneNumber: `0109${String(i).padStart(6, "0")}`,
+      });
+    }
+    const list = await mod.listGlobalNotifyStaffRows(db);
+    assert.equal(list.length, 50);
+    const uids = list.map((u) => u.uid);
+    assert.deepEqual(uids, [...uids].sort());
+  });
 });

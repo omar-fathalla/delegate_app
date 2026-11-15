@@ -1,7 +1,7 @@
 # Project Rules and Policies
 
 ## Flutter SDK (3.44.5)
-- **Pinned version:** Flutter **3.44.5** everywhere — `.fvmrc`, `.github/workflows/ci.yml` / `pr-user-test-builds.yml` (`flutter-version: '3.44.5'`), and `scripts/local_ci.sh` (`LOCAL_CI_FLUTTER_SDK` defaults to a `flutter-3.44.5` toolchain).
+- **Pinned version:** Flutter **3.44.5** on app CI and local mirror — `.fvmrc`, `.github/workflows/ci.yml`, `pr-user-test-builds.yml` (`flutter-version: '3.44.5'`), and `scripts/local_ci.sh` (`LOCAL_CI_FLUTTER_SDK` defaults to a `flutter-3.44.5` toolchain). Release workflows (`android-release.yml`, `deploy-ios.yml`) intentionally leave Flutter on the action default channel or an older pinned iOS build version; do not “align” them to 3.44.5 unless a release PR explicitly bumps them.
 - **Local setup:** `fvm install && fvm use` (reads `.fvmrc`), or install Flutter 3.44.5 manually. `pubspec.yaml` requires Dart `^3.11.0` (bundled with this Flutter).
 - **Validation:** Run `flutter pub get --enforce-lockfile` before analyze/test when checking lock compatibility; on Mac billing lock use `bash scripts/local_ci.sh <sha>`.
 - **Do not** change `pubspec.lock` unless the Flutter/Dart bump truly requires it — keep it byte-identical when only pinning docs/tooling.

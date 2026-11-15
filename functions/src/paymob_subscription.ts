@@ -515,6 +515,22 @@ export function isPaymobIntegrationAllowed(
   return Number.isInteger(integrationId) && integrationId > 0 && integrationIds.includes(integrationId);
 }
 
+/** Company label on delegate_requests, else organizations/{org}/companies/{id}. */
+export async function resolveCompanyNameFromRequest(
+  db: admin.firestore.Firestore,
+  data: Record<string, unknown>,
+): Promise<string> {
+  const fromReq = str(data.companyName) || str(data.company_name);
+  if (fromReq) return fromReq;
+  const companyUID = str(data.companyUID) || str(data.companyId);
+  const orgUID = str(data.organizationUID) || str(data.organizationId);
+  if (!companyUID || !orgUID) return "";
+  const snap = await db.doc(`organizations/${orgUID}/companies/${companyUID}`).get();
+  if (!snap.exists) return "";
+  const company = snap.data() || {};
+  return str(company.name) || str(company.companyName) || str(company.title) || "";
+}
+
 async function recordSupersededPayment(
   db: admin.firestore.Firestore,
   p: {
@@ -532,6 +548,7 @@ async function recordSupersededPayment(
     messaging?: PaymobMessaging;
   },
 ): Promise<void> {
+  const companyName = str(p.companyName);
   await db.collection(SUPERSEDED_PAYMENTS).doc(p.txId).set({
     requestId: p.requestId,
     attemptId: p.attemptId,
@@ -541,6 +558,9 @@ async function recordSupersededPayment(
     amountCents: p.amountCents,
     currency: p.currency,
     needs_refund: true,
+    companyUID: p.companyUID,
+    organizationUID: p.organizationUID,
+    ...(companyName ? {companyName} : {}),
     paidAt: admin.firestore.Timestamp.fromDate(p.paidAt),
     receivedAt: admin.firestore.FieldValue.serverTimestamp(),
   }, {merge: true});
@@ -612,6 +632,7 @@ export async function routePaymobAttemptBeforeApply(
   if (currentAttempt === p.webhookAttemptId) return "apply";
   if (p.success) {
     const data = (reqSnap.data() || {}) as Record<string, unknown>;
+    const companyName = await resolveCompanyNameFromRequest(db, data);
     await recordSupersededPayment(db, {
       txId: p.txId,
       requestId: p.requestId,
@@ -623,7 +644,7 @@ export async function routePaymobAttemptBeforeApply(
       paidAt: p.paidAt,
       companyUID: str(data.companyUID) || str(data.companyId),
       organizationUID: str(data.organizationUID) || str(data.organizationId),
-      companyName: str(data.companyName) || str(data.company_name),
+      companyName,
       messaging: p.messaging,
     });
     return "superseded_needs_refund";

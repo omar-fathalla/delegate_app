@@ -17,6 +17,7 @@ const SUPER_DOC = {
   amountCents: 41667,
   companyUID: "c1",
   organizationUID: "o1",
+  companyName: "شركة الاختبار",
 };
 
 describe("paymob superseded collections", () => {
