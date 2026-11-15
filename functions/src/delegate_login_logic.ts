@@ -244,10 +244,19 @@ export function selectPrimaryDelegate(candidates: DelegateCandidate[]): Delegate
   return ordered[0];
 }
 
+function isSuspendedLoginStatus(status: unknown): boolean {
+  const s = String(status ?? "").toLowerCase().trim();
+  return s === "suspended" || s === "admin_suspend";
+}
+
 export function evaluateCandidates(candidates: DelegateCandidate[]): CandidateDecision {
   if (candidates.length === 0) return { outcome: "not_found" };
   const matched = candidates.filter((candidate) => candidate.nationalIdMatches);
   if (matched.length === 0) return { outcome: "bad_credentials" };
+  // H-1: do not allow login via a newer active doc when another profile is suspended.
+  if (matched.some((candidate) => isSuspendedLoginStatus(candidate.status))) {
+    return { outcome: "inactive" };
+  }
   const allowed = matched.filter((candidate) => !isLoginDenied(candidate.status));
   if (allowed.length === 0) return { outcome: "inactive" };
   const primary = selectPrimaryDelegate(allowed);

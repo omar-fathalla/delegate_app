@@ -2153,6 +2153,21 @@
           "order": "ASCENDING"
         },
         {
+          "fieldPath": "receiptCode",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
           "fieldPath": "organizationUID",
           "order": "ASCENDING"
         },

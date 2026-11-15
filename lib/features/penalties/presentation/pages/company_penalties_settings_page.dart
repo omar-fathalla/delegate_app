@@ -517,10 +517,8 @@ class _CompanyPenaltiesSettingsPageState
       final companyId = widget.delegate.companyUID.isNotEmpty
           ? widget.delegate.companyUID
           : widget.delegate.organizationUID;
-      context.read<PenaltyBloc>().add(LoadCompanyPenaltiesEvent(
-        companyId,
-        organizationId: widget.delegate.organizationUID,
-      ));
+      // Company-scoped roles: rules prove companyId lists only (not organizationId).
+      context.read<PenaltyBloc>().add(LoadCompanyPenaltiesEvent(companyId));
     }
   }
 

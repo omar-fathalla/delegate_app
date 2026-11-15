@@ -581,6 +581,16 @@ service cloud.firestore {
         || (techCreateBound(delegateId) && techReqOk(orgId, compId, delegateId));
     }
 
+    // H-1 create bypass: company/org staff may not mint active delegates.
+    // Missing status is treated as non-pending and denied for non-global staff.
+    function nonSaNonTechDelegateCreateOk() {
+      let r = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '');
+      let st = request.resource.data.get('status', '');
+      return r in superAdminRoleList()
+        || r in techRoleList()
+        || (st is string && st.lower().trim() == 'pending');
+    }
+
     function techCreateBound(delegateId) {
       let d = request.resource.data;
       let n = d.get('documents', []);
@@ -1128,7 +1138,11 @@ service cloud.firestore {
     function usersCreateOk(r, org, co, d) {
       let nr = roleOf(d);
       let isSA = r in superAdminRoleList();
-      return newRoleOk(nr) && (isSA || (
+      let globalWriter = isSA || r in techRoleList();
+      let st = d.get('status', '');
+      let fieldOk = !(nr in fieldRoleList()) || globalWriter
+        || (st is string && st.lower().trim() == 'pending');
+      return newRoleOk(nr) && fieldOk && (isSA || (
         !d.keys().hasAny(privilegeKeys())
         && !(nr in privilegedRoleList())
         && companyPinned(d)
@@ -1178,7 +1192,11 @@ service cloud.firestore {
       return (!stCh && !actCh)
         || globalStaff
         || (stCh && !actCh && approver
-          && delegatePendingStatusOnly(request.resource.data.get('status', '')));
+          && delegatePendingStatusOnly(request.resource.data.get('status', ''))
+          && (delegatePendingStatusOnly(resource.data.get('status', ''))
+            || (r in ['supervisor', 'company_supervisor', 'admin', 'company-admin', 'company_admin', 'companyadmin']
+              && resource.data.get('status', '') is string
+              && resource.data.get('status', '').lower().trim() == 'active')));
     }
 
     function usersUpdateOk(r, org, co, old, d, userId) {
@@ -1204,7 +1222,8 @@ service cloud.firestore {
                 && old.get('companyUID', '') == co && d.get('companyUID', '') == co
                 && old.get('organizationUID', '') == d.get('organizationUID', '')
                 && (!changed.hasAny(['role'])
-                  || (companyCanGrant(r, nr) && companyCanGrant(r, or))))
+                  || (!(or in fieldRoleList()) && !(nr in fieldRoleList())
+                    && companyCanGrant(r, nr) && companyCanGrant(r, or))))
             ))
         )
       );
@@ -1278,6 +1297,7 @@ service cloud.firestore {
         match /delegates/{delegateId} {
           allow read: if signedIn() && canReadNestedDelegate(orgId, compId, delegateId);
           allow create: if canManageNestedDelegate(orgId, compId) && deviceBindingAbsent() && techCreateOk(orgId, compId, delegateId)
+            && nonSaNonTechDelegateCreateOk()
             && sourceStampKeysLocked()
             && exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId));
           // sourceStampKeysLocked is not on this allow: the 4-flip tech
@@ -1688,6 +1708,7 @@ service cloud.firestore {
         (isOrgScopedStaff() && incomingOrgScoped()) ||
         (isCompanyScopedStaff() && incomingCompanyScoped())
       ) && techCreateOk(request.resource.data.get('organizationUID', ''), request.resource.data.get('companyUID', ''), delegateId)
+        && nonSaNonTechDelegateCreateOk()
         && sourceStampKeysLocked();
       // r5 budget: a nested organizations/{o}/companies/{c}/delegates
       // update is decided by the nested match alone, for every role.
@@ -2407,7 +2428,10 @@ service cloud.firestore {
           || (requestOrganizationUIDsOk() && requestPrimaryOrgBelongsToCompany()))
         && orgCompanyCheckKeysLocked()
         && requestApprovalOrgCheckOk();
-      allow delete: if isSuperAdmin() || isOrgAdmin();
+      allow delete: if isSuperAdmin()
+        || (isOrgAdmin()
+          && (resource.data.get('organizationUID', '') == callerOrg()
+            || resource.data.get('organizationId', '') == callerOrg()));
     }
 
     match /used_receipt_codes/{code} {

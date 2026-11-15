@@ -10,7 +10,6 @@ import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
-import 'package:delegate_app/features/profile/domain/entities/user_role.dart';
 import 'package:delegate_app/injection_container.dart';
 
 /// Aggregation model for company-level financial audit

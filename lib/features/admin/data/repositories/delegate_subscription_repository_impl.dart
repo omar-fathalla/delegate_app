@@ -840,18 +840,25 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
 
       // 2. Check delegate_requests where receiptCode == cleanCode and status != 'rejected'
       try {
-        final reqSnap = await _firestore
-            .collection('delegate_requests')
-            .where('companyUID', isEqualTo: companyUID)
-            .where('receiptCode', isEqualTo: cleanCode)
-            .get();
-        for (final doc in reqSnap.docs) {
-          final status = doc.data()['status'] as String?;
-          if (status != 'rejected') {
-            return const Right(true);
+        for (final companyField in ['companyUID', 'companyId']) {
+          if (companyUID.isEmpty) break;
+          final reqSnap = await _firestore
+              .collection('delegate_requests')
+              .where(companyField, isEqualTo: companyUID)
+              .where('receiptCode', isEqualTo: cleanCode)
+              .get();
+          for (final doc in reqSnap.docs) {
+            final status = doc.data()['status'] as String?;
+            if (status != 'rejected') {
+              return const Right(true);
+            }
           }
         }
-      } catch (_) {}
+      } on FirebaseException catch (e) {
+        if (e.code != 'permission-denied') {
+          return Left(ServerFailure('تعذر التحقق من كود الإيصال: ${e.message ?? e.code}'));
+        }
+      }
 
       // 3. Check collectionGroup('delegates') where receiptCode == cleanCode
       try {
@@ -865,7 +872,9 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         if (delSnap.docs.isNotEmpty) {
           return const Right(true);
         }
-      } catch (_) {}
+      } on FirebaseException catch (e) {
+        return Left(ServerFailure('تعذر التحقق من كود الإيصال: ${e.message ?? e.code}'));
+      }
 
       return const Right(false);
     } catch (e) {

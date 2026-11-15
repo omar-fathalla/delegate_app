@@ -73,6 +73,28 @@ test("evaluateCandidates never treats a national-id miss as success", () => {
   );
 });
 
+test("evaluateCandidates treats suspended plus active duplicate identity as inactive", () => {
+  const decision = logic.evaluateCandidates([
+    {
+      id: "old-suspended",
+      status: "suspended",
+      companyId: "c1",
+      orgId: "o1",
+      createdAtMillis: 1,
+      nationalIdMatches: true,
+    },
+    {
+      id: "new-active",
+      status: "active",
+      companyId: "c1",
+      orgId: "o1",
+      createdAtMillis: 99,
+      nationalIdMatches: true,
+    },
+  ]);
+  assert.equal(decision.outcome, "inactive");
+});
+
 test("evaluateCandidates keeps every allowed profile and picks a stable primary", () => {
   const decision = logic.evaluateCandidates([
     {
