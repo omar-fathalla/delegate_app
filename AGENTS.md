@@ -1,5 +1,11 @@
 # Project Rules and Policies
 
+## Flutter SDK (3.44.5)
+- **Pinned version:** Flutter **3.44.5** everywhere — `.fvmrc`, `.github/workflows/ci.yml` / `pr-user-test-builds.yml` (`flutter-version: '3.44.5'`), and `scripts/local_ci.sh` (`LOCAL_CI_FLUTTER_SDK` defaults to a `flutter-3.44.5` toolchain).
+- **Local setup:** `fvm install && fvm use` (reads `.fvmrc`), or install Flutter 3.44.5 manually. `pubspec.yaml` requires Dart `^3.11.0` (bundled with this Flutter).
+- **Validation:** Run `flutter pub get --enforce-lockfile` before analyze/test when checking lock compatibility; on Mac billing lock use `bash scripts/local_ci.sh <sha>`.
+- **Do not** change `pubspec.lock` unless the Flutter/Dart bump truly requires it — keep it byte-identical when only pinning docs/tooling.
+
 ## Binary Builds & Compilation
 - **Do NOT execute `flutter build apk` (or any build variant like `flutter build appbundle`, `flutter build ipa`) automatically or proactively.**
 - Only run build commands when the user explicitly and directly asks to build the APK/app.

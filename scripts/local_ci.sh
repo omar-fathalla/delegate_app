@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Local mirror of .github/workflows/ci.yml for the Mac (tashil-delegate-mac
 # machine), used when GitHub Actions cannot schedule jobs (e.g. billing lock).
+# Flutter version: 3.44.5 (same as repo .fvmrc and CI flutter-version).
 # Does not talk to the runner service, release workflows, or tashil-ci / tashil-mac.
 #
 # Usage:
