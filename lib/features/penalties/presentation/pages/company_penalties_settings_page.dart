@@ -96,7 +96,8 @@ class _CompanyPenaltiesSettingsPageState
         }
         _isLoadingBranches = false;
       });
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('CompanyPenalties: _loadBranchesAndPinned failed: $e\n$st');
       if (!mounted) return;
       setState(() {
         _isLoadingBranches = false;

@@ -21,18 +21,34 @@
 
 ## التشغيل
 
+**Flutter:** 3.44.5 (نفس نسخة CI — انظر `.github/workflows/ci.yml`).
+
 ```bash
 # تثبيت التبعيات
 flutter pub get
 
 # توليد الملفات (freezed, json_serializable)
 dart run build_runner build --delete-conflicting-outputs
+```
 
-# تشغيل التطبيق (مع إعدادات Admin)
-flutter run \
+### أندرويد / iOS — flavors إلزامية
+
+| الهدف | الأمر |
+|--------|--------|
+| إنتاج (متجر) | `flutter run --flavor prod` |
+| تطوير (tashil-dev) | `flutter run --flavor dev --dart-define=ENV=dev` |
+
+بدون `--flavor` يفشل بناء أندرويد برسالة واضحة من Gradle. التفاصيل: `docs/DEV_WORKFLOW_RULES_AR.md`.
+
+### ويب / تشغيل مع بيانات Admin
+
+```bash
+flutter run -d chrome \
   --dart-define=ADMIN_PHONE=رقم_الموبايل \
   --dart-define=ADMIN_PASSWORD=كلمة_المرور
 ```
+
+إعدادات VS Code: `.vscode/launch.json` (prod / dev).
 
 ## الاختبارات
 
