@@ -1196,6 +1196,13 @@ service cloud.firestore {
               && (!(docs is list) || delegateDocsNoneApproved(docs)))));
     }
 
+    // users/{uid}: nationalId / nationalityID are never client-writable (TA-32).
+    // Updates go through reviewNationalIdUpdate (Admin SDK) after
+    // submitNationalIdUpdate creates the request.
+    function usersIdentityClientLocked(changed) {
+      return !changed.hasAny(['nationalId', 'nationalityID']);
+    }
+
     function usersCreateOk(r, org, co, d) {
       let nr = roleOf(d);
       let isSA = r in superAdminRoleList();
@@ -1205,7 +1212,8 @@ service cloud.firestore {
         && !d.keys().hasAny(['status', 'organizationUID', 'companyUID', 'organizationId', 'companyId', 'isActive'])
         && !d.keys().hasAny(privilegeKeys())
         && !(nr in privilegedRoleList());
-      return newRoleOk(nr) && (isSA || selfCreate || (
+      return usersIdentityClientLocked(d.keys())
+        && newRoleOk(nr) && (isSA || selfCreate || (
         !d.keys().hasAny(privilegeKeys())
         && !(nr in privilegedRoleList())
         && companyPinned(d)
@@ -1248,7 +1256,9 @@ service cloud.firestore {
       let actCh = ch.hasAny(['isActive']);
       let globalStaff = r in superAdminRoleList() || r in techRoleList();
       let fromSuspended = delegateStatusLower(resource.data.get('status', '')) == 'suspended';
-      let idClientLock = !(globalStaff && ch.hasAny(['nationalId', 'nationalityID']));
+      // Explicit deny (TA-32): nationalId changes on delegate docs only via
+      // approval batches (techSignup skips this helper) or Admin SDK.
+      let idClientLock = !ch.hasAny(['nationalId', 'nationalityID']);
       return idClientLock
         && ((!stCh && !actCh) || (globalStaff && (stCh || actCh)));
     }
@@ -1257,7 +1267,7 @@ service cloud.firestore {
       let changed = d.diff(old).affectedKeys();
       let nr = roleOf(d);
       let or = roleOf(old);
-      return (r in superAdminRoleList() && newRoleOk(nr)) || (
+      return usersIdentityClientLocked(changed) && ((r in superAdminRoleList() && newRoleOk(nr)) || (
         newRoleOk(nr)
         && !changed.hasAny(privilegeKeys())
         && staffMaySetIsActiveActive(d, old, changed, r)
@@ -1280,7 +1290,7 @@ service cloud.firestore {
                     && companyCanGrant(r, nr) && companyCanGrant(r, or))))
             ))
         )
-      );
+      ));
     }
 
     function usersDeleteOk(r, org, co, old) {
