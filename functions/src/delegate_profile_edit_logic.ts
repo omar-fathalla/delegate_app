@@ -526,6 +526,39 @@ export function classifyReviewTarget(opts: {
   return "open_request";
 }
 
+/** National ID fields applied to delegate chain + users/{uid} on NID review approve (TA-57). */
+export function nationalIdFieldsForApprovedReview(
+  newNationalId: string,
+): {nationalId: string; nationalityID: string} | null {
+  const id = String(newNationalId || "").trim();
+  if (!id) return null;
+  return {nationalId: id, nationalityID: id};
+}
+
+export type NationalIdReviewDocSync = {
+  updateDelegateAndRequestFields: {nationalId: string; nationalityID: string} | null;
+  updateUserFields: {nationalId: string; nationalityID: string} | null;
+};
+
+/** Plans delegate/request/user patches for reviewNationalIdUpdate (TA-57). */
+export function planNationalIdReviewDocumentUpdates(opts: {
+  approve: boolean;
+  newId: string;
+  userExists: boolean;
+}): NationalIdReviewDocSync {
+  if (!opts.approve) {
+    return {updateDelegateAndRequestFields: null, updateUserFields: null};
+  }
+  const fields = nationalIdFieldsForApprovedReview(opts.newId);
+  if (!fields) {
+    return {updateDelegateAndRequestFields: null, updateUserFields: null};
+  }
+  return {
+    updateDelegateAndRequestFields: fields,
+    updateUserFields: opts.userExists ? fields : null,
+  };
+}
+
 /** Patch for users/{delegateUid} so login/wallet lookups stay in sync (N-5). */
 export function usersProfileSyncPatch(fields: ProfileEditInput): Record<string, string> | null {
   const patch: Record<string, string> = {};
