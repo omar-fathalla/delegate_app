@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:delegate_app/features/admin/data/datasources/storage_upload_intent.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class SupervisorDocReuploadException implements Exception {
   SupervisorDocReuploadException(this.message);
@@ -8,12 +12,139 @@ class SupervisorDocReuploadException implements Exception {
   String toString() => message;
 }
 
+/// User-facing message for profile document replace failures (intent / Storage / callable).
+String supervisorDocReplaceErrorMessage(Object error) {
+  if (error is SupervisorDocReuploadException) return error.message;
+  if (error is FirebaseException && error.plugin == 'firebase_storage') {
+    switch (error.code) {
+      case 'unauthorized':
+        return 'تعذر رفع المستند: صلاحية التخزين مرفوضة. '
+            'تأكد من تسجيل الدخول ثم أعد المحاولة.';
+      case 'canceled':
+        return 'تم إلغاء رفع المستند.';
+      case 'retry-limit-exceeded':
+        return 'تعذر رفع المستند بعد عدة محاولات. تحقق من الاتصال وأعد المحاولة.';
+      case 'unknown':
+        return 'تعذر رفع المستند إلى التخزين. أعد المحاولة.';
+      default:
+        return 'تعذر رفع المستند (${error.code}). أعد المحاولة.';
+    }
+  }
+  if (error is FirebaseFunctionsException) {
+    final raw = error.message?.trim();
+    if (raw != null && raw.isNotEmpty) return raw;
+    return 'تعذر تحديث المستند على الخادم. حاول مرة أخرى.';
+  }
+  final text = error.toString().replaceAll('Exception: ', '').trim();
+  if (text.isNotEmpty && text != error.runtimeType.toString()) {
+    return text;
+  }
+  return 'فشل تحديث المستند. حاول مرة أخرى.';
+}
+
+/// Storage path for a supervisor/delegate document JPEG under [delegateUid].
+String delegateDocumentStoragePath({
+  required String delegateUid,
+  required String docType,
+  int? timestampMs,
+}) {
+  final ts = timestampMs ?? DateTime.now().millisecondsSinceEpoch;
+  return 'delegate_documents/$delegateUid/${docType}_$ts.jpg';
+}
+
+/// Ensures upload intent, then writes [file] to [storagePath]. Used before
+/// client Firestore merges and before [SupervisorDelegateDocReuploadRemote.reupload].
+Future<String> uploadDelegateDocumentFile({
+  required String folderId,
+  required String companyUID,
+  required String storagePath,
+  required File file,
+  FirebaseFunctions? functions,
+  FirebaseStorage? storage,
+  Future<String?> Function({
+    required String folderId,
+    required String companyUID,
+    FirebaseFunctions? functions,
+  })? ensureIntent,
+}) async {
+  final intentError = await (ensureIntent ?? _defaultEnsureIntent)(
+    folderId: folderId,
+    companyUID: companyUID,
+    functions: functions,
+  );
+  if (intentError != null) {
+    throw SupervisorDocReuploadException(intentError);
+  }
+  try {
+    final ref = (storage ?? FirebaseStorage.instance).ref(storagePath);
+    final task = await ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
+    return task.ref.getDownloadURL();
+  } on FirebaseException catch (e) {
+    throw SupervisorDocReuploadException(storageUploadErrorMessage(e));
+  }
+}
+
+String storageUploadErrorMessage(FirebaseException e) {
+  if (e.plugin != 'firebase_storage') {
+    return supervisorDocReplaceErrorMessage(e);
+  }
+  switch (e.code) {
+    case 'unauthorized':
+      return 'تعذر رفع المستند: صلاحية التخزين مرفوضة. '
+          'تأكد من تسجيل الدخول ثم أعد المحاولة.';
+    case 'canceled':
+      return 'تم إلغاء رفع المستند.';
+    case 'retry-limit-exceeded':
+      return 'تعذر رفع المستند بعد عدة محاولات. تحقق من الاتصال وأعد المحاولة.';
+    default:
+      return 'تعذر رفع المستند (${e.code}). أعد المحاولة.';
+  }
+}
+
+Future<String> _uploadAfterIntent({
+  required String folderId,
+  required String companyUID,
+  required String path,
+  required File file,
+  required Future<String> Function(String path, File file) uploadFile,
+  Future<String?> Function({
+    required String folderId,
+    required String companyUID,
+    FirebaseFunctions? functions,
+  })? ensureIntent,
+}) async {
+  final intentError = await (ensureIntent ?? _defaultEnsureIntent)(
+    folderId: folderId,
+    companyUID: companyUID,
+  );
+  if (intentError != null) {
+    throw SupervisorDocReuploadException(intentError);
+  }
+  return uploadFile(path, file);
+}
+
+Future<String?> _defaultEnsureIntent({
+  required String folderId,
+  required String companyUID,
+  FirebaseFunctions? functions,
+}) =>
+    ensureStorageUploadIntent(
+      folderId: folderId,
+      companyUID: companyUID,
+      functions: functions,
+    );
+
 /// Server-side supervisor active→pending document replace (Mohamed 2026-11-15).
 class SupervisorDelegateDocReuploadRemote {
-  SupervisorDelegateDocReuploadRemote({FirebaseFunctions? functions})
-      : _functions = functions ?? FirebaseFunctions.instanceFor(region: 'us-central1');
+  SupervisorDelegateDocReuploadRemote({
+    FirebaseFunctions? functions,
+    FirebaseStorage? storage,
+  })  : _functions =
+            functions ?? FirebaseFunctions.instanceFor(region: 'us-central1'),
+        _storage = storage;
 
   final FirebaseFunctions _functions;
+  final FirebaseStorage? _storage;
 
   Future<void> reupload({
     required String uid,
@@ -34,10 +165,54 @@ class SupervisorDelegateDocReuploadRemote {
       throw SupervisorDocReuploadException(
         e.message?.trim().isNotEmpty == true
             ? e.message!.trim()
-            : 'تعذر تحديث المستند. حاول مرة أخرى.',
+            : 'تعذر تحديث المستند على الخادم. حاول مرة أخرى.',
       );
     } catch (_) {
-      throw SupervisorDocReuploadException('تعذر تحديث المستند. حاول مرة أخرى.');
+      throw SupervisorDocReuploadException(
+        'تعذر تحديث المستند على الخادم. حاول مرة أخرى.',
+      );
     }
+  }
+
+  /// Intent → Storage upload → supervisor callable (active→pending doc replace).
+  Future<void> replaceWithFile({
+    required String uid,
+    required String organizationUID,
+    required String companyUID,
+    required String docType,
+    required File file,
+    Future<String?> Function({
+      required String folderId,
+      required String companyUID,
+      FirebaseFunctions? functions,
+    })? ensureIntent,
+    Future<String> Function(String path, File file)? uploadFile,
+  }) async {
+    final path = delegateDocumentStoragePath(delegateUid: uid, docType: docType);
+    final newUrl = uploadFile != null
+        ? await _uploadAfterIntent(
+            folderId: uid,
+            companyUID: companyUID,
+            path: path,
+            file: file,
+            ensureIntent: ensureIntent,
+            uploadFile: uploadFile,
+          )
+        : await uploadDelegateDocumentFile(
+            folderId: uid,
+            companyUID: companyUID,
+            storagePath: path,
+            file: file,
+            functions: _functions,
+            storage: _storage,
+            ensureIntent: ensureIntent,
+          );
+    await reupload(
+      uid: uid,
+      organizationUID: organizationUID,
+      companyUID: companyUID,
+      docType: docType,
+      newUrl: newUrl,
+    );
   }
 }

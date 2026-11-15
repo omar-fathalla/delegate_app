@@ -22,4 +22,22 @@ void main() {
     expect(find.text('إعادة تفعيل'), findsNothing);
     expect(find.text('no-reactivate'), findsOneWidget);
   });
+
+  testWidgets('إعادة تفعيل visible for suspended delegate when viewer is technical support', (tester) async {
+    final show = delegateHoldShowsReactivate(
+      canSetHold: true,
+      delegateSuspended: true,
+      viewerRole: UserRole.technicalSupport,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: show
+              ? const Text('إعادة تفعيل')
+              : const Text('no-reactivate'),
+        ),
+      ),
+    );
+    expect(find.text('إعادة تفعيل'), findsOneWidget);
+  });
 }
