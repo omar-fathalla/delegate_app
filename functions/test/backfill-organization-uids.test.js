@@ -33,7 +33,12 @@ describe("backfill organizationUIDs planRestore", () => {
 
 const {
   writtenFieldsOf, currentMatchesWritten, shouldRestore, isDeleteSentinel,
+  atReadOf, changedSinceRead, shouldApplyWrite,
 } = require("../scripts/backfill-organization-uids");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const {writeJsonFileNew, refuseExistingOutputFile} = require("../scripts/p0-common");
 
 describe("backfill organizationUIDs restore compare-before-write", () => {
   test("restores only when the live doc still holds the backfill write", () => {
@@ -72,5 +77,43 @@ describe("backfill organizationUIDs restore compare-before-write", () => {
     const del = require("firebase-admin").firestore.FieldValue.delete();
     assert.equal(isDeleteSentinel(del), true);
     assert.equal(isDeleteSentinel(["o1"]), false);
+  });
+});
+
+describe("backfill organizationUIDs apply changed-since-read", () => {
+  test("shouldApplyWrite accepts an unchanged legacy doc", () => {
+    const data = {organizationUID: "o1", organizationName: "كارفور"};
+    const planned = {
+      patch: {organizationUIDs: ["o1"], organizationNames: ["كارفور"]},
+      atRead: atReadOf(data),
+    };
+    assert.equal(shouldApplyWrite(data, planned).ok, true);
+  });
+
+  test("shouldApplyWrite skips when organizationUIDs changed after scan", () => {
+    const atScan = {organizationUID: "o1", organizationName: "كارفور"};
+    const planned = {
+      patch: {organizationUIDs: ["o1"], organizationNames: ["كارفور"]},
+      atRead: atReadOf(atScan),
+    };
+    const live = {
+      organizationUID: "o1",
+      organizationName: "كارفور",
+      organizationUIDs: ["o1", "o2"],
+    };
+    assert.equal(changedSinceRead(live, planned.atRead), true);
+    const skip = shouldApplyWrite(live, planned);
+    assert.equal(skip.ok, false);
+    assert.equal(skip.reason, "changed_since_read");
+  });
+
+  test("rollback refuse guard blocks overwriting an existing file", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "org-uids-rb-"));
+    const rollbackPath = path.join(dir, "organization-uids-rollback.json");
+    writeJsonFileNew(rollbackPath, {entries: []}, "rollback");
+    assert.throws(
+      () => refuseExistingOutputFile(rollbackPath, "rollback"),
+      /use a new path for each run/,
+    );
   });
 });
