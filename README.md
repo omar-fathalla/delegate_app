@@ -40,6 +40,8 @@ dart run build_runner build --delete-conflicting-outputs
 
 بدون `--flavor` يفشل بناء أندرويد برسالة واضحة من Gradle. التفاصيل: `docs/DEV_WORKFLOW_RULES_AR.md`.
 
+**تطوير أندرويد (tashil-dev):** بناء وتوزيع يدوي على Firebase App Distribution وبصمات SHA-1 لإعدادات Firebase — انظر [`android/README_DEV_FLAVOR.md`](android/README_DEV_FLAVOR.md).
+
 ### ويب / تشغيل مع بيانات Admin
 
 ```bash

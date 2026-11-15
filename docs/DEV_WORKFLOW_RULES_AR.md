@@ -57,6 +57,8 @@ flutter build apk --flavor dev --dart-define=ENV=dev
 flutter build apk --flavor prod
 ```
 
+توزيع يدوي لنسخة dev على Firebase App Distribution وبصمات SHA-1 لمحمد: `android/README_DEV_FLAVOR.md`.
+
 ### iOS — لا توجد حماية مماثلة حتى الآن
 
 - يوجد ملف واحد فقط: `ios/Runner/GoogleService-Info.plist` (إعدادات **prod**).
