@@ -72,6 +72,7 @@ class _AddBranchViewState extends State<_AddBranchView> {
   String? _orgValidationError;
   List<Map<String, dynamic>> _organizations = [];
   bool _isLoadingOrgs = true;
+  String? _organizationsLoadError;
 
   LatLng? _selectedActionPoint;
   bool _isLocating = false;
@@ -114,6 +115,10 @@ class _AddBranchViewState extends State<_AddBranchView> {
   }
 
   Future<void> _loadOrganizations() async {
+    setState(() {
+      _isLoadingOrgs = true;
+      _organizationsLoadError = null;
+    });
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('organizations')
@@ -136,6 +141,7 @@ class _AddBranchViewState extends State<_AddBranchView> {
       setState(() {
         _organizations = orgs;
         _isLoadingOrgs = false;
+        _organizationsLoadError = null;
 
         if (_selectedOrgUID != null) {
           final found = _organizations.firstWhere(
@@ -147,9 +153,14 @@ class _AddBranchViewState extends State<_AddBranchView> {
           }
         }
       });
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('AddBranchScreen: _loadOrganizations failed: $e\n$st');
       if (mounted) {
-        setState(() => _isLoadingOrgs = false);
+        setState(() {
+          _isLoadingOrgs = false;
+          _organizationsLoadError =
+              'فشل في تحميل المنظمات. يرجى المحاولة مرة أخرى.';
+        });
       }
     }
   }
@@ -734,6 +745,38 @@ class _AddBranchViewState extends State<_AddBranchView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (_organizationsLoadError != null) ...[
+                      Material(
+                        color: colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.error_outline_rounded,
+                                color: colorScheme.onErrorContainer,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _organizationsLoadError!,
+                                  style: TextStyle(
+                                    color: colorScheme.onErrorContainer,
+                                  ),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: _loadOrganizations,
+                                child: const Text('إعادة المحاولة'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     // Organization Selection Field
                     FormField<String>(
                       initialValue: _selectedOrgUID,
