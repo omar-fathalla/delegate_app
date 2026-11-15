@@ -890,27 +890,6 @@ service cloud.firestore {
 
     // ==================== SHARED: USERS ====================
 
-    // Supervisor new-delegate flow: list global super-admin / tech-support
-    // users for targeted notifications only. Caller must be company staff;
-    // results are global role accounts only (no cross-company delegate reads).
-    function canCompanyStaffListGlobalNotifyUsers() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let r = resource.data.get('role', '');
-      return request.auth != null
-        && u.get('companyUID', '') != ''
-        && u.get('role', '') in [
-          'company-admin', 'company_admin', 'companyadmin', 'admin',
-          'supervisor', 'company_supervisor',
-          'hr', 'company-hr', 'company_hr', 'human_resources'
-        ]
-        && r in [
-          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-          'technical_support', 'technical-support', 'technicalSupport',
-          'technicalsupport', 'tech_support', 'techsupport',
-          'technicalSupport'
-        ];
-    }
-
     match /users/{userId} {
       allow get: if signedIn() && (
         request.auth.uid == userId ||
@@ -919,8 +898,6 @@ service cloud.firestore {
         (isOrgScopedStaff() && orgScoped()) ||
         (isCompanyScopedStaff() && companyScoped())
       );
-
-      allow list: if canCompanyStaffListGlobalNotifyUsers();
 
       // Phone/email lookups after sign-in, and the admin directory for
       // global staff. Unauthenticated list is denied (staffPhoneLookup).

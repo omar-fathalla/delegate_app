@@ -115,9 +115,9 @@ describe("UT non-blocking Firestore fixes", () => {
   const as = (uid) =>
     env.authenticatedContext(uid, {firebase: {sign_in_provider: "password"}}).firestore();
 
-  test("supervisor can list global staff users for post-submit notifications", async () => {
+  test("supervisor cannot list global staff users (TA-35 callable only)", async () => {
     const sup = as("sup");
-    await assertSucceeds(
+    await assertFails(
       getDocs(
         query(
           collection(sup, "users"),

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:dartz/dartz.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:delegate_app/core/constants/cloud_functions.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/admin/domain/services/delegate_duplicate.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
@@ -80,7 +81,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       final cleanNationalId = nationalId.trim();
       final cleanPhone = phoneNumber.trim();
       try {
-        final callable = _functions.httpsCallable('checkDelegateDuplicate');
+        final callable = _functions.httpsCallable(CloudCallableNames.checkDelegateDuplicate);
         final result = await callable.call({
           'nationalId': cleanNationalId,
           'phoneNumber': cleanPhone,
@@ -378,27 +379,23 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
           'قام المشرف $supervisorName ($companyName) بطلب تسجيل المندوب $fullName للمنظمات ${resolveNames.join("، ")}';
 
       try {
-        final targetUsersSnap = await _firestore
-            .collection('users')
-            .where('role', whereIn: [
-              'super-admin',
-              'super_admin',
-              'superAdmin',
-              'technicalSupport',
-              'technical-support',
-              'technical_support',
-            ])
-            .get();
+        final callable = _functions.httpsCallable(CloudCallableNames.listGlobalNotifyStaff);
+        final notifyResult = await callable.call<Map<String, dynamic>>({});
+        final rawUsers = notifyResult.data['users'];
+        final staffRows = rawUsers is List
+            ? rawUsers.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+            : const <Map<String, dynamic>>[];
 
         final batch = _firestore.batch();
 
         // 1. Direct notifications to individual Super Admin and Tech Support users
-        for (final doc in targetUsersSnap.docs) {
-          final data = doc.data();
+        for (final data in staffRows) {
+          final uid = (data['uid'] ?? '').toString();
+          if (uid.isEmpty) continue;
           final phone = (data['phoneNumber'] ?? data['phone'])?.toString();
           final ref = _firestore.collection('notifications').doc();
           batch.set(ref, {
-            'delegateUid': doc.id,
+            'delegateUid': uid,
             if (phone != null && phone.isNotEmpty) 'phoneNumber': phone,
             'title': notifTitle,
             'body': notifBody,
