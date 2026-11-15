@@ -575,14 +575,17 @@ service cloud.firestore {
         && (n.size() <= 6 || !docIsApproved(n[6])) && (n.size() <= 7 || !docIsApproved(n[7]));
     }
 
-    // add-delegate placeholder create: fixed slots only (personalPhoto, nationalityId,
-    // paymentReceipt) so nested create stays under the 1000-expression budget.
+    // add-delegate placeholder create: bounded list, all 8 slots, no approved entries.
     function cheapCreateDocsNotApproved(n) {
-      return !(n is list) || (n.size() <= 8
+      return n is list && n.size() <= 8
         && (n.size() < 1 || n[0].get('documentStatus', '').lower() != 'approved')
         && (n.size() < 2 || n[1].get('documentStatus', '').lower() != 'approved')
         && (n.size() < 3 || n[2].get('documentStatus', '').lower() != 'approved')
-        && (n.size() < 4 || n[3].get('documentStatus', '').lower() != 'approved'));
+        && (n.size() < 4 || n[3].get('documentStatus', '').lower() != 'approved')
+        && (n.size() < 5 || n[4].get('documentStatus', '').lower() != 'approved')
+        && (n.size() < 6 || n[5].get('documentStatus', '').lower() != 'approved')
+        && (n.size() < 7 || n[6].get('documentStatus', '').lower() != 'approved')
+        && (n.size() < 8 || n[7].get('documentStatus', '').lower() != 'approved');
     }
 
     // Single get() + scope gate for nested delegate placeholder creates.
@@ -595,11 +598,10 @@ service cloud.firestore {
       let sa = r in superAdminRoleList();
       let scopeOk = sa || r in techRoleList()
         || (r in orgAdminRoleList() && u.get('organizationUID', '') == orgId)
-        || (r in companyStaffWriterRoleList()
-          && u.get('organizationUID', '') == orgId && u.get('companyUID', '') == compId);
+        || (r in companyPlaceholderCreateRoleList() && u.get('companyUID', '') == compId);
       let pendingOk = stl == 'pending' && cheapCreateDocsNotApproved(n);
       return scopeOk && (
-        sa || ((r in companyStaffWriterRoleList() || r in orgAdminRoleList()) && pendingOk)
+        sa || ((r in companyPlaceholderCreateRoleList() || r in orgAdminRoleList()) && pendingOk)
         || (r in techRoleList() && ((stl != 'active' && cheapCreateDocsNotApproved(n))
           || (techCreateBound(delegateId) && techReqOk(orgId, compId, delegateId)))));
     }
@@ -1133,6 +1135,11 @@ service cloud.firestore {
     function companyStaffWriterRoleList() {
       return ['company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
         'hr', 'company-hr', 'company_hr', 'human_resources'];
+    }
+
+    // Multi-chain placeholder create: same companyUID, any org in the company.
+    function companyPlaceholderCreateRoleList() {
+      return ['company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor'];
     }
 
     // H1: roles company staff may grant. Supervisor/HR: field roles only.

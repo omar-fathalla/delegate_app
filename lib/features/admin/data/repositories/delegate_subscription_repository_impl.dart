@@ -363,21 +363,13 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         }
         await submitBatch.commit();
       } on FirebaseException catch (e) {
-        // Cross-organization nested delegate only: keep request path for staff approval.
-        if (e.code == 'permission-denied' && resolveOrgs.length > 1) {
-          await docRef.set(request.toMap());
-          if (receiptRef != null && receiptData != null) {
-            try {
-              await receiptRef.set(receiptData!);
-            } catch (_) {}
-          }
-        } else {
-          return Left(ServerFailure(
-            e.message ?? 'تعذر حفظ بيانات المندوب المعلقة: ${e.code}',
-          ));
-        }
+        final chains = resolveNames.join('، ');
+        return Left(ServerFailure(
+          'تعذر حفظ المندوب المعلق في السلاسل ($chains): ${e.message ?? e.code}',
+        ));
       } catch (e) {
-        return Left(ServerFailure('تعذر حفظ بيانات المندوب المعلقة: $e'));
+        final chains = resolveNames.join('، ');
+        return Left(ServerFailure('تعذر حفظ المندوب المعلق في السلاسل ($chains): $e'));
       }
 
       // 8. Notify Technical Support and Super Admins ONLY (Restricted Targeting)

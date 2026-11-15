@@ -69,6 +69,26 @@ function pendingDelegatePlaceholderPayload(requestId) {
   };
 }
 
+function pendingForOrg(requestId, orgId, orgName) {
+  return {
+    ...pendingDelegatePlaceholderPayload(requestId),
+    organizationUID: orgId,
+    organizationName: orgName,
+    originOrganizationUID: orgId,
+    originOrganizationName: orgName,
+  };
+}
+
+function eightPendingDocs() {
+  const uploadedAt = new Date().toISOString();
+  return Array.from({length: 8}, (_, i) => ({
+    documentKey: `doc${i}`,
+    documentStatus: "pending",
+    documentURL: `https://cdn.example/d${i}.jpg`,
+    uploadedAt,
+  }));
+}
+
 describe("TA-8 security rules gaps", () => {
   let env;
   const as = (uid) => env.authenticatedContext(uid, {firebase: {sign_in_provider: "password"}}).firestore();
@@ -236,6 +256,55 @@ describe("TA-8 security rules gaps", () => {
         },
       ],
     })));
+
+  test("DENY HR cannot create pending delegate placeholder", () =>
+    assertFails(setDoc(
+      doc(as("hr"), "organizations/o1/companies/c1/delegates/hr-ph"),
+      pendingDelegatePlaceholderPayload("hr-ph"),
+    )));
+
+  test("DENY placeholder create when documents is a map not a list", () =>
+    assertFails(setDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/map-docs"), {
+      ...pendingDelegatePlaceholderPayload("map-docs"),
+      documents: {personalPhoto: {documentStatus: "pending", documentURL: "https://cdn.example/p.jpg"}},
+    })));
+
+  test("DENY placeholder with approved document at slot index 5", () => {
+    const docs = eightPendingDocs();
+    docs[5] = {...docs[5], documentStatus: "approved"};
+    return assertFails(setDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/slot5"), {
+      ...pendingDelegatePlaceholderPayload("slot5"),
+      documents: docs,
+    }));
+  });
+
+  test("DENY supervisor placeholder in another company under same org", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("organizations/o1/companies/c2").set({name: "C2"});
+    });
+    await assertFails(setDoc(
+      doc(as("sup"), "organizations/o1/companies/c2/delegates/cross-co"),
+      {...pendingForOrg("cross-co", "o1", "O1"), companyUID: "c2", companyName: "C2"},
+    ));
+  });
+
+  for (const [label, uid] of [
+    ["supervisor", "sup"],
+    ["company_supervisor", "csup"],
+    ["company_admin", "ca"],
+  ]) {
+    test(`ALLOW ${label} second-chain same-company placeholder (o2)`, async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await ctx.firestore().doc("organizations/o2").set({name: "O2"});
+        await ctx.firestore().doc("organizations/o2/companies/c1").set({name: "C1"});
+      });
+      const reqId = `req-o2-${uid}`;
+      await assertSucceeds(setDoc(
+        doc(as(uid), "organizations/o2/companies/c1/delegates/" + reqId),
+        pendingForOrg(reqId, "o2", "O2"),
+      ));
+    });
+  }
 
   test("DENY org admin cannot delete delegate_requests in another org", async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
