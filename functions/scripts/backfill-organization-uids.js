@@ -125,6 +125,54 @@ function currentMatchesWritten(data, written) {
   return keys.every((k) => valuesEqual(data ? data[k] : undefined, written[k]));
 }
 
+/** Refuse after scan when any planned row is not a safe delegate_requests patch. */
+function assertValidBackfillPlan(planned) {
+  for (const p of planned) {
+    if (!p || typeof p.path !== "string" || !p.path.startsWith("delegate_requests/")) {
+      throw new Error(`Invalid backfill plan: bad path ${p && p.path}`);
+    }
+    if (!p.patch || typeof p.patch !== "object" || !Object.keys(p.patch).length) {
+      throw new Error(`Invalid backfill plan: empty patch for ${p.path}`);
+    }
+  }
+}
+
+/** @param {unknown} err */
+function isPreconditionFailure(err) {
+  const code = err && (err.code || err.status);
+  if (code === 9 || code === "failed-precondition" || code === "FAILED_PRECONDITION") return true;
+  const msg = String((err && err.message) || err || "");
+  return /precondition|last update time|ABORTED/i.test(msg);
+}
+
+/**
+ * Applies patches using Firestore lastUpdateTime preconditions (one failed
+ * precondition skips that doc; other errors propagate).
+ * @param {FirebaseFirestore.Firestore} db
+ * @param {{path: string, patch: object, lastUpdateTime: FirebaseFirestore.Timestamp}[]} rows
+ */
+async function writePatchesWithPrecondition(db, rows) {
+  let written = 0;
+  const skipReasons = {};
+  for (const row of rows) {
+    if (!row.lastUpdateTime) {
+      skipReasons.missing_update_time = (skipReasons.missing_update_time || 0) + 1;
+      continue;
+    }
+    try {
+      await db.doc(row.path).update(row.patch, {lastUpdateTime: row.lastUpdateTime});
+      written++;
+    } catch (e) {
+      if (isPreconditionFailure(e)) {
+        skipReasons.precondition_failed = (skipReasons.precondition_failed || 0) + 1;
+        continue;
+      }
+      throw e;
+    }
+  }
+  return {written, skipReasons};
+}
+
 /** Restore only when the doc still holds the backfill's written value. */
 function shouldRestore(data, entry) {
   const written = writtenFieldsOf(entry, data || {});
@@ -159,7 +207,7 @@ async function restore(db, args) {
       skipReasons[decision.reason] = (skipReasons[decision.reason] || 0) + 1;
       continue;
     }
-    planned.push(c);
+    planned.push({...c, lastUpdateTime: snap.updateTime});
   }
 
   const runId = newBackfillRunId("org-uids-restore");
@@ -173,17 +221,12 @@ async function restore(db, args) {
   };
   if (!args.apply) return report;
 
-  let written = 0;
-  for (let i = 0; i < planned.length; i += 400) {
-    const batch = db.batch();
-    const slice = planned.slice(i, i + 400);
-    for (const p of slice) {
-      batch.update(db.doc(p.path), p.patch);
-    }
-    await batch.commit();
-    written += slice.length;
-  }
+  const {written, skipReasons: preconditionSkips} = await writePatchesWithPrecondition(db, planned);
   report.counts.written = written;
+  if (Object.keys(preconditionSkips).length) {
+    report.counts.applySkipReasons = {...(report.counts.skipReasons || {}), ...preconditionSkips};
+    report.counts.applySkipped = Object.values(preconditionSkips).reduce((a, b) => a + b, 0);
+  }
   return report;
 }
 
@@ -206,6 +249,8 @@ async function run(db, args) {
       atRead: atReadOf(data),
     });
   }
+
+  assertValidBackfillPlan(planned);
 
   const runId = newBackfillRunId("org-uids");
   const report = {
@@ -243,20 +288,21 @@ async function run(db, args) {
       applySkipReasons[decision.reason] = (applySkipReasons[decision.reason] || 0) + 1;
       continue;
     }
-    toWrite.push(p);
+    toWrite.push({...p, lastUpdateTime: snap.updateTime});
   }
   report.counts.applySkipReasons = applySkipReasons;
 
-  let written = 0;
-  for (let i = 0; i < toWrite.length; i += 400) {
-    const batch = db.batch();
-    const slice = toWrite.slice(i, i + 400);
-    for (const p of slice) {
-      batch.update(db.doc(p.path), p.patch);
-    }
-    await batch.commit();
-    written += slice.length;
+  const rows = toWrite.map((p) => ({
+    path: p.path,
+    patch: p.patch,
+    lastUpdateTime: p.lastUpdateTime,
+  }));
+  const {written, skipReasons: preconditionSkips} = await writePatchesWithPrecondition(db, rows);
+  for (const [reason, n] of Object.entries(preconditionSkips)) {
+    report.counts.applySkipped += n;
+    applySkipReasons[reason] = (applySkipReasons[reason] || 0) + n;
   }
+  report.counts.applySkipReasons = applySkipReasons;
   report.counts.written = written;
   return report;
 }
@@ -314,4 +360,5 @@ if (require.main === module) {
 module.exports = {
   planPatch, previousOf, planRestore, restore, run, writtenFieldsOf, currentMatchesWritten,
   shouldRestore, isDeleteSentinel, atReadOf, changedSinceRead, shouldApplyWrite,
+  assertValidBackfillPlan, isPreconditionFailure, writePatchesWithPrecondition,
 };

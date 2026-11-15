@@ -95,8 +95,17 @@ function refuseExistingOutputFile(filePath, kind) {
 
 /** @param {string} filePath @param {unknown} data */
 function writeJsonFileNew(filePath, data, kind = "rollback") {
-  refuseExistingOutputFile(filePath, kind);
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+  if (!filePath) throw new Error(`${kind} file path is required`);
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), {flag: "wx"});
+  } catch (e) {
+    if (e && e.code === "EEXIST") {
+      throw new Error(
+        `Refusing to overwrite existing ${kind} file (use a new path for each run): ${filePath}`,
+      );
+    }
+    throw e;
+  }
 }
 
 module.exports = {

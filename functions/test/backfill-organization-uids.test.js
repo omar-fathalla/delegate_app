@@ -33,7 +33,8 @@ describe("backfill organizationUIDs planRestore", () => {
 
 const {
   writtenFieldsOf, currentMatchesWritten, shouldRestore, isDeleteSentinel,
-  atReadOf, changedSinceRead, shouldApplyWrite,
+  atReadOf, changedSinceRead, shouldApplyWrite, assertValidBackfillPlan,
+  isPreconditionFailure, writePatchesWithPrecondition,
 } = require("../scripts/backfill-organization-uids");
 const fs = require("fs");
 const os = require("os");
@@ -115,5 +116,69 @@ describe("backfill organizationUIDs apply changed-since-read", () => {
       () => refuseExistingOutputFile(rollbackPath, "rollback"),
       /use a new path for each run/,
     );
+    assert.throws(
+      () => writeJsonFileNew(rollbackPath, {entries: [{path: "x"}]}, "rollback"),
+      /Refusing to overwrite existing rollback/,
+    );
+  });
+});
+
+describe("backfill organizationUIDs apply precondition writes", () => {
+  test("assertValidBackfillPlan rejects bad paths or empty patches", () => {
+    assert.throws(
+      () => assertValidBackfillPlan([{path: "users/x", patch: {organizationUIDs: ["o1"]}}]),
+      /Invalid backfill plan/,
+    );
+    assert.throws(
+      () => assertValidBackfillPlan([{path: "delegate_requests/x", patch: {}}]),
+      /empty patch/,
+    );
+    assert.doesNotThrow(() => assertValidBackfillPlan([
+      {path: "delegate_requests/r1", patch: {organizationUIDs: ["o1"]}},
+    ]));
+  });
+
+  test("isPreconditionFailure recognizes Firestore failed-precondition", () => {
+    assert.equal(isPreconditionFailure({code: 9, message: "x"}), true);
+    assert.equal(isPreconditionFailure({code: "failed-precondition"}), true);
+    assert.equal(isPreconditionFailure(new Error("ABORTED: precondition")), true);
+    assert.equal(isPreconditionFailure(new Error("permission denied")), false);
+  });
+
+  test("writePatchesWithPrecondition writes when update succeeds", async () => {
+    const updates = [];
+    const ts = {seconds: 1, nanoseconds: 0};
+    const db = {
+      doc: (p) => ({
+        path: p,
+        update: async (patch, pre) => {
+          updates.push({path: p, patch, pre});
+        },
+      }),
+    };
+    const result = await writePatchesWithPrecondition(db, [
+      {path: "delegate_requests/r1", patch: {organizationUIDs: ["o1"]}, lastUpdateTime: ts},
+    ]);
+    assert.equal(result.written, 1);
+    assert.deepEqual(updates[0].pre, {lastUpdateTime: ts});
+  });
+
+  test("writePatchesWithPrecondition skips precondition failures", async () => {
+    const db = {
+      doc: () => ({
+        update: async () => {
+          const err = new Error("FAILED_PRECONDITION");
+          err.code = 9;
+          throw err;
+        },
+      }),
+    };
+    const ts = {seconds: 1, nanoseconds: 0};
+    const result = await writePatchesWithPrecondition(db, [
+      {path: "delegate_requests/r1", patch: {organizationUIDs: ["o1"]}, lastUpdateTime: ts},
+      {path: "delegate_requests/r2", patch: {organizationUIDs: ["o2"]}, lastUpdateTime: ts},
+    ]);
+    assert.equal(result.written, 0);
+    assert.equal(result.skipReasons.precondition_failed, 2);
   });
 });

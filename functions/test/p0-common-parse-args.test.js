@@ -57,4 +57,14 @@ describe("p0-common output file guards", () => {
       /Refusing to overwrite existing report/,
     );
   });
+
+  test("writeJsonFileNew uses exclusive wx create (EEXIST)", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "p0-wx-"));
+    const file = path.join(dir, "rollback.json");
+    fs.writeFileSync(file, "{}", {flag: "wx"});
+    assert.throws(
+      () => writeJsonFileNew(file, {entries: []}, "rollback"),
+      /Refusing to overwrite existing rollback/,
+    );
+  });
 });
