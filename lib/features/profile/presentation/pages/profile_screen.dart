@@ -17,6 +17,7 @@ import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/features/profile/data/datasources/supervisor_delegate_doc_reupload_remote.dart';
 import 'package:delegate_app/features/profile/presentation/utils/document_review.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -1147,21 +1148,41 @@ class _ProfileBody extends StatelessWidget {
 
       final firestore = FirebaseFirestore.instance;
 
-      final Map<String, dynamic> updateFields = {
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-
       final authState = context.read<AuthBloc>().state;
       final viewer = authState is AuthAuthenticated ? authState.delegate : null;
-      if (shouldSupervisorMarkDelegatePendingOnDocReplace(
+      final supervisorPendingReupload = shouldSupervisorMarkDelegatePendingOnDocReplace(
         target: delegate,
         viewerRole: viewer?.role,
         viewerUid: viewer?.uid ?? '',
         viewerCompanyUID: viewer?.companyUID,
         viewerIsDocApprover: approverUid != null,
-      )) {
-        updateFields['status'] = 'pending';
+      );
+
+      if (supervisorPendingReupload) {
+        await SupervisorDelegateDocReuploadRemote().reupload(
+          uid: delegate.uid,
+          organizationUID: delegate.organizationUID,
+          companyUID: delegate.companyUID,
+          docType: item.docType,
+          newUrl: newUrl,
+        );
+        if (context.mounted) {
+          Navigator.pop(context);
+          AppSnackBar.showSuccess(context, 'تم تحديث ${item.title} وسيُراجع من الإدارة.');
+          context.read<ProfileBloc>().add(
+            LoadProfile(
+              uid: delegate.uid,
+              organizationUID: delegate.organizationUID,
+              companyUID: delegate.companyUID,
+            ),
+          );
+        }
+        return;
       }
+
+      final Map<String, dynamic> updateFields = {
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
 
       if (item.docType == 'personalPhoto') {
         updateFields['profileImageUrl'] = newUrl;

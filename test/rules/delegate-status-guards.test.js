@@ -26,6 +26,31 @@ const ACTIVE = {
   documents: [PHOTO_APPROVED],
 };
 
+const MULTI_DOCS = [
+  PHOTO_APPROVED,
+  {
+    documentKey: "nationalityId",
+    documentStatus: "approved",
+    documentURL: "https://cdn.example/id-f.jpg",
+    secondaryURL: "https://cdn.example/id-b.jpg",
+    uploadedAt: "2026-01-01",
+  },
+  {
+    documentKey: "paymentReceipt",
+    documentStatus: "approved",
+    documentURL: "https://cdn.example/rcpt.jpg",
+    uploadedAt: "2026-01-01",
+  },
+];
+
+const ACTIVE_MULTI = {
+  ...ACTIVE,
+  nationalIdFrontUrl: "https://cdn.example/id-f.jpg",
+  nationalIdBackUrl: "https://cdn.example/id-b.jpg",
+  receiptImageUrl: "https://cdn.example/rcpt.jpg",
+  documents: MULTI_DOCS,
+};
+
 function reuploadPending(extra = {}) {
   return {
     status: "pending",
@@ -100,7 +125,7 @@ describe("delegate status guards (Mohamed 2026-11-15)", () => {
     });
   });
 
-  describe("rule 1: active→pending only supervisor doc re-upload", () => {
+  describe("rule 1: supervisor active→pending doc replace is server-only", () => {
     const denyBare = ["sup", "csup", "ca", "admin1", "hr"];
     for (const uid of denyBare) {
       test(`DENY ${uid} status-only active→pending`, () =>
@@ -108,8 +133,8 @@ describe("delegate status guards (Mohamed 2026-11-15)", () => {
     }
     test("ALLOW super-admin may set active delegate pending (status-only)", () =>
       assertSucceeds(updateDoc(doc(as("sa"), PATH), {status: "pending", updatedAt: "t"})));
-    test("ALLOW supervisor re-upload shape active→pending", () =>
-      assertSucceeds(updateDoc(doc(as("sup"), PATH), {
+    test("DENY supervisor client re-upload shape (callable replaces rules)", () =>
+      assertFails(updateDoc(doc(as("sup"), PATH), {
         status: "pending",
         updatedAt: "t",
         documents: [{
@@ -119,22 +144,48 @@ describe("delegate status guards (Mohamed 2026-11-15)", () => {
           uploadedAt: "2026-11-15",
         }],
       })));
-    test("ALLOW supervisor photo re-upload with all photo URL fields", () =>
-      assertSucceeds(updateDoc(doc(as("sup"), PATH), reuploadPending())));
-    test("ALLOW supervisor nationalityId re-upload with ID URL fields", () =>
-      assertSucceeds(updateDoc(doc(as("sup"), PATH), {
+    test("DENY supervisor photo re-upload with all photo URL fields", () =>
+      assertFails(updateDoc(doc(as("sup"), PATH), reuploadPending())));
+    test("DENY supervisor nationalityId re-upload on multi-entry documents", async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await ctx.firestore().doc(PATH).set(ACTIVE_MULTI);
+      });
+      const docs = MULTI_DOCS.map((e) => ({...e}));
+      docs[1] = {
+        ...docs[1],
+        documentStatus: "pending",
+        documentURL: "https://cdn.example/id-front-new.jpg",
+        secondaryURL: "https://cdn.example/id-back-new.jpg",
+        uploadedAt: "2026-11-15",
+      };
+      await assertFails(updateDoc(doc(as("sup"), PATH), {
         status: "pending",
         updatedAt: "t",
-        nationalIdFrontUrl: "https://cdn.example/id-front.jpg",
-        nationalIdBackUrl: "https://cdn.example/id-back.jpg",
-        documents: [{
-          documentKey: "nationalityId",
-          documentStatus: "pending",
-          documentURL: "https://cdn.example/id-front.jpg",
-          secondaryURL: "https://cdn.example/id-back.jpg",
-          uploadedAt: "2026-11-15",
-        }],
-      })));
+        nationalIdFrontUrl: "https://cdn.example/id-front-new.jpg",
+        nationalIdBackUrl: "https://cdn.example/id-back-new.jpg",
+        documents: docs,
+      }));
+    });
+    test("DENY supervisor photo re-upload when personalPhoto is not index 0", async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await ctx.firestore().doc(PATH).set(ACTIVE_MULTI);
+      });
+      const docs = MULTI_DOCS.map((e) => ({...e}));
+      docs[0] = {
+        ...docs[0],
+        documentStatus: "pending",
+        documentURL: "https://cdn.example/p1.jpg",
+        uploadedAt: "2026-11-15",
+      };
+      await assertFails(updateDoc(doc(as("sup"), PATH), {
+        status: "pending",
+        updatedAt: "t",
+        profileImageUrl: "https://cdn.example/p1.jpg",
+        personalPhotoURL: "https://cdn.example/p1.jpg",
+        photoURL: "https://cdn.example/p1.jpg",
+        documents: docs,
+      }));
+    });
     test("DENY company_admin re-upload shape active→pending", () =>
       assertFails(updateDoc(doc(as("ca"), PATH), reuploadPending())));
   });

@@ -25,6 +25,16 @@ bool canClientLiftSuspendedDelegateStatus(UserRole? role) {
   return role == UserRole.superAdmin || role == UserRole.technicalSupport;
 }
 
+/// Mirrors delegate hold pill visibility in admin delegates list.
+bool delegateHoldShowsReactivate({
+  required bool canSetHold,
+  required bool delegateSuspended,
+  required UserRole? viewerRole,
+}) {
+  return canSetHold &&
+      (!delegateSuspended || canClientLiftSuspendedDelegateStatus(viewerRole));
+}
+
 bool _isSupervisorFirestoreRole(String role) {
   final norm =
       role.trim().toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');

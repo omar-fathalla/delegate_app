@@ -336,6 +336,7 @@ export {
 // library functions for Engineering's Paymob webhook, not deployed endpoints.
 export {stampDelegateSource} from "./stamp_delegate_source";
 export {setDelegateHold} from "./set_delegate_hold";
+export {supervisorReuploadDelegateDocument} from "./supervisor_delegate_doc_reupload";
 export {ensureStorageUploadIntent} from "./storage_upload_intent";
 export {startBillingCycle} from "./start_billing_cycle";
 export {auditDelegateHoldShadow} from "./holds_shadow";

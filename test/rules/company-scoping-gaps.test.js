@@ -199,8 +199,8 @@ describe("TA-8 security rules gaps", () => {
       status: "pending", updatedAt: "t",
     })));
 
-  test("ALLOW H-1: supervisor re-upload shape may set active delegate to pending", () =>
-    assertSucceeds(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
+  test("DENY H-1: supervisor client re-upload (server callable only)", () =>
+    assertFails(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
       status: "pending",
       updatedAt: "t",
       documents: [{

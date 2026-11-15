@@ -931,14 +931,11 @@ class _CompactDelegateTile extends StatelessWidget {
         targetCompanyUID: delegate.companyUID,
       );
 
-  bool get _canLiftAdminSuspendHold =>
-      adminDelegate != null &&
-      _canSetHold &&
-      canClientLiftSuspendedDelegateStatus(adminDelegate!.role);
-
-  bool get _showHoldControl =>
-      _canSetHold &&
-      (!_isVisiblySuspended || _canLiftAdminSuspendHold);
+  bool get _showHoldControl => delegateHoldShowsReactivate(
+        canSetHold: _canSetHold,
+        delegateSuspended: _isVisiblySuspended,
+        viewerRole: adminDelegate?.role,
+      );
 
   bool get _isVisiblySuspended => delegate.status == DelegateStatus.suspended;
 

@@ -64,6 +64,37 @@ void main() {
     });
   });
 
+  group('delegateHoldShowsReactivate', () {
+    test('admin may suspend but not show reactivate pill', () {
+      expect(
+        delegateHoldShowsReactivate(
+          canSetHold: true,
+          delegateSuspended: true,
+          viewerRole: UserRole.admin,
+        ),
+        isFalse,
+      );
+      expect(
+        delegateHoldShowsReactivate(
+          canSetHold: true,
+          delegateSuspended: false,
+          viewerRole: UserRole.admin,
+        ),
+        isTrue,
+      );
+    });
+    test('super-admin sees reactivate on suspended delegate', () {
+      expect(
+        delegateHoldShowsReactivate(
+          canSetHold: true,
+          delegateSuspended: true,
+          viewerRole: UserRole.superAdmin,
+        ),
+        isTrue,
+      );
+    });
+  });
+
   group('canClientLiftSuspendedDelegateStatus', () {
     test('only super-admin and technical support', () {
       expect(canClientLiftSuspendedDelegateStatus(UserRole.superAdmin), isTrue);
