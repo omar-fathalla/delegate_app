@@ -872,6 +872,27 @@ service cloud.firestore {
 
     // ==================== SHARED: USERS ====================
 
+    // Supervisor new-delegate flow: list global super-admin / tech-support
+    // users for targeted notifications only. Caller must be company staff;
+    // results are global role accounts only (no cross-company delegate reads).
+    function canCompanyStaffListGlobalNotifyUsers() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = resource.data.get('role', '');
+      return request.auth != null
+        && u.get('companyUID', '') != ''
+        && u.get('role', '') in [
+          'company-admin', 'company_admin', 'companyadmin', 'admin',
+          'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'human_resources'
+        ]
+        && r in [
+          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+          'technical_support', 'technical-support', 'technicalSupport',
+          'technicalsupport', 'tech_support', 'techsupport',
+          'technicalSupport'
+        ];
+    }
+
     match /users/{userId} {
       allow get: if signedIn() && (
         request.auth.uid == userId ||
@@ -880,6 +901,8 @@ service cloud.firestore {
         (isOrgScopedStaff() && orgScoped()) ||
         (isCompanyScopedStaff() && companyScoped())
       );
+
+      allow list: if canCompanyStaffListGlobalNotifyUsers();
 
       // Phone/email lookups after sign-in, and the admin directory for
       // global staff. Unauthenticated list is denied (staffPhoneLookup).
@@ -1937,6 +1960,26 @@ service cloud.firestore {
           == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationUID;
     }
 
+    // Org-admin badge lists (leave / device unbind): one users/{uid} get, no
+    // isOrgScopedStaff/orgScoped OR — those blow the 1000-expression budget on
+    // status + organizationUID [+ companyUID] queries (UT non-blocking).
+    function canReadOrgAdminRequestInOwnOrg() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let org = u.get('organizationUID', '');
+      let co = u.get('companyUID', '');
+      let d = resource.data;
+      let docOrg = d.get('organizationUID', d.get('organizationId', ''));
+      let docCo = d.get('companyUID', d.get('companyId', ''));
+      return request.auth != null
+        && u.get('role', '') in [
+          'organization-admin', 'organization_admin', 'organizationadmin',
+          'organizationAdmin'
+        ]
+        && org != ''
+        && docOrg == org
+        && (co == '' || docCo == co);
+    }
+
     function canCreateAttendance() {
       return signedIn() && (
         isGlobalStaff()
@@ -2555,6 +2598,7 @@ service cloud.firestore {
     }
 
     match /device_unbind_requests/{requestId} {
+      allow read: if canReadOrgAdminRequestInOwnOrg();
       allow read: if signedIn() && (
         isGlobalStaff()
         || (isCompanyScopedStaff() && companyScoped())
@@ -2612,6 +2656,7 @@ service cloud.firestore {
       // Split allow rules so a company+status list is provable for HR
       // (a single OR with unconstrained own-id branches made that query
       // PERMISSION_DENIED). Own-id stays a separate rule for delegates.
+      allow read: if canReadOrgAdminRequestInOwnOrg();
       allow read: if signedIn() && isGlobalStaff();
       allow read: if signedIn() && isCompanyScopedStaff() && companyScoped();
       allow read: if signedIn() && isOrgScopedStaff() && orgScoped();
