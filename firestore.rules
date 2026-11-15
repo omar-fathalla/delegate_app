@@ -2590,6 +2590,10 @@ service cloud.firestore {
         || (isOrgAdmin()
           && (resource.data.get('organizationUID', '') == callerOrg()
             || resource.data.get('organizationId', '') == callerOrg()));
+
+      match /paymob_checkout_attempts/{attemptId} {
+        allow read, write: if false;
+      }
     }
 
     match /used_receipt_codes/{code} {
@@ -2794,6 +2798,11 @@ service cloud.firestore {
     // Server-only coverage claims written by quoteSubscriptionRequest /
     // applyVerifiedSubscriptionPayment. Clients cannot read or write them.
     match /subscription_coverage/{id} {
+      allow read, write: if false;
+    }
+
+    // Superseded Paymob captures (non-current checkout attempt). Admin SDK only.
+    match /paymob_superseded_payments/{txId} {
       allow read, write: if false;
     }
 

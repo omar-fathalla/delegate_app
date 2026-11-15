@@ -15,10 +15,13 @@ const jobs = require(path.join(__dirname, "../lib/subscription_jobs.js"));
 
 const SECRET = "test-hmac-secret-not-real";
 const TEST_INTEGRATION_ID = paymob.TASHIL_DEV_PAYMOB_INTEGRATION_ID;
+const ALLOWED_INTEGRATIONS = [TEST_INTEGRATION_ID];
 const AT = new Date("2027-02-10T10:00:00.000Z");
 const FEE = 416.67;
 const CENTS = 41667;
 const REQUEST_ID = "ren1";
+const ATTEMPT_NEW = "1700000000002_newabcd12";
+const ATTEMPT_OLD = "1700000000001_oldabcd12";
 
 function paymobEnv() {
   return {
@@ -28,14 +31,6 @@ function paymobEnv() {
     hmacSecret: SECRET,
     integrationIds: [TEST_INTEGRATION_ID],
   };
-}
-
-function intentionOk(id, secret = "csk_test_x") {
-  return async () => ({
-    ok: true,
-    status: 200,
-    text: async () => JSON.stringify({id, client_secret: secret}),
-  });
 }
 
 function intentionDuplicateRef() {
@@ -76,6 +71,17 @@ function sign(obj) {
     .digest("hex");
 }
 
+function hookOpts(db, obj) {
+  return {
+    obj,
+    hmac: sign(obj),
+    hmacSecret: SECRET,
+    integrationIds: ALLOWED_INTEGRATIONS,
+    db,
+    now: AT,
+  };
+}
+
 async function seed(db, checkout = null) {
   await db.doc("users/sup1").set({
     role: "super-admin",
@@ -114,6 +120,25 @@ async function seed(db, checkout = null) {
   await db.collection("delegate_requests").doc(REQUEST_ID).set(data);
 }
 
+async function seedAttempt(db, attemptId, specialReference) {
+  await db.collection("delegate_requests").doc(REQUEST_ID)
+    .collection("paymob_checkout_attempts").doc(attemptId).set({
+      attemptId,
+      specialReference,
+      createdAt: Timestamp.fromDate(AT),
+    });
+}
+
+async function countPaymentEvents(db) {
+  const snap = await db.collection("subscription_payment_events").get();
+  return snap.size;
+}
+
+async function countSuperseded(db) {
+  const snap = await db.collection("paymob_superseded_payments").get();
+  return snap.size;
+}
+
 describe("paymob special_reference", () => {
   it("builds and resolves composite references with legacy fallback", () => {
     const attempt = "1700000000000_abc12";
@@ -123,6 +148,14 @@ describe("paymob special_reference", () => {
     assert.equal(paymob.attemptIdFromPaymobReference(ref), attempt);
     assert.equal(paymob.resolveRequestIdFromPaymobReference(REQUEST_ID), REQUEST_ID);
     assert.equal(paymob.attemptIdFromPaymobReference(REQUEST_ID), "");
+  });
+
+  it("splits on the last delimiter when requestId contains __", () => {
+    const requestId = "req__with__parts";
+    const attempt = "1700000000009_suffix01";
+    const ref = paymob.buildPaymobSpecialReference(requestId, attempt);
+    assert.equal(paymob.resolveRequestIdFromPaymobReference(ref), requestId);
+    assert.equal(paymob.attemptIdFromPaymobReference(ref), attempt);
   });
 
   it("maps Paymob duplicate-reference errors to PaymobIntentionError", async () => {
@@ -178,8 +211,8 @@ describe("paymob special_reference", () => {
         return fetchImpl();
       },
     };
-    const attemptA = "a1";
-    const attemptB = "b2";
+    const attemptA = "1700000000003_aaaa1111";
+    const attemptB = "1700000000004_bbbb2222";
     await paymob.createPaymobIntention({
       ...base,
       specialReference: paymob.buildPaymobSpecialReference(REQUEST_ID, attemptA),
@@ -190,8 +223,14 @@ describe("paymob special_reference", () => {
     });
     assert.equal(refs.length, 2);
     assert.notEqual(refs[0], refs[1]);
-    assert.equal(paymob.resolveRequestIdFromPaymobReference(refs[0]), REQUEST_ID);
-    assert.equal(paymob.resolveRequestIdFromPaymobReference(refs[1]), REQUEST_ID);
+  });
+
+  it("rejects webhooks when integration_id is not configured", async () => {
+    const db = new MemoryFirestore();
+    const obj = sampleObj({integration_id: 999999});
+    const result = await paymob.handlePaymobWebhook(hookOpts(db, obj));
+    assert.equal(result.outcome, "rejected_integration");
+    assert.equal(await countPaymentEvents(db), 0);
   });
 
   describe("(b) two attempts and late webhook", () => {
@@ -199,64 +238,76 @@ describe("paymob special_reference", () => {
     beforeEach(async () => {
       db = new MemoryFirestore();
       await seed(db, {
-        attemptId: "attempt_new",
-        specialReference: paymob.buildPaymobSpecialReference(REQUEST_ID, "attempt_new"),
+        attemptId: ATTEMPT_NEW,
+        specialReference: paymob.buildPaymobSpecialReference(REQUEST_ID, ATTEMPT_NEW),
         createdAt: Timestamp.fromDate(AT),
       });
+      await seedAttempt(db, ATTEMPT_NEW,
+        paymob.buildPaymobSpecialReference(REQUEST_ID, ATTEMPT_NEW));
+      await seedAttempt(db, ATTEMPT_OLD,
+        paymob.buildPaymobSpecialReference(REQUEST_ID, ATTEMPT_OLD));
       await jobs.quoteSubscriptionRequest(db, REQUEST_ID, AT);
     });
 
     it("ignores a late failed webhook from a superseded attempt", async () => {
-      const oldRef = paymob.buildPaymobSpecialReference(REQUEST_ID, "attempt_old");
+      const oldRef = paymob.buildPaymobSpecialReference(REQUEST_ID, ATTEMPT_OLD);
       const obj = sampleObj({
         success: false,
         id: 9001,
         order: {id: 5002, merchant_order_id: oldRef},
       });
-      const result = await paymob.handlePaymobWebhook({
-        obj,
-        hmac: sign(obj),
-        hmacSecret: SECRET,
-        db,
-        now: AT,
-      });
+      const result = await paymob.handlePaymobWebhook(hookOpts(db, obj));
       assert.equal(result.outcome, "ignored_stale_attempt");
-      assert.equal((await db.collection("delegate_requests").doc(REQUEST_ID).get()).get("paymentStatus"), "pending");
+      assert.equal(await countPaymentEvents(db), 0);
     });
 
-    it("does not double-apply when a late success arrives after paid", async () => {
-      const paidRef = paymob.buildPaymobSpecialReference(REQUEST_ID, "attempt_new");
+    it("records superseded success without extra payment events", async () => {
+      const paidRef = paymob.buildPaymobSpecialReference(REQUEST_ID, ATTEMPT_NEW);
       const paidObj = sampleObj({
         success: true,
-        id: 9002,
+        id: 82002,
         order: {id: 5003, merchant_order_id: paidRef},
       });
-      assert.equal(
-        (await paymob.handlePaymobWebhook({
-          obj: paidObj,
-          hmac: sign(paidObj),
-          hmacSecret: SECRET,
-          db,
-          now: AT,
-        })).outcome,
-        "paid",
-      );
-      const oldRef = paymob.buildPaymobSpecialReference(REQUEST_ID, "attempt_old");
+      assert.equal((await paymob.handlePaymobWebhook(hookOpts(db, paidObj))).outcome, "paid");
+      assert.equal(await countPaymentEvents(db), 1);
+      const oldRef = paymob.buildPaymobSpecialReference(REQUEST_ID, ATTEMPT_OLD);
       const lateObj = sampleObj({
         success: true,
-        id: 9003,
+        id: 82001,
         order: {id: 5004, merchant_order_id: oldRef},
       });
-      const late = await paymob.handlePaymobWebhook({
-        obj: lateObj,
-        hmac: sign(lateObj),
-        hmacSecret: SECRET,
-        db,
-        now: AT,
-      });
-      assert.equal(late.outcome, "already_paid");
-      assert.equal((await db.collection("delegate_requests").doc(REQUEST_ID).get()).get("paymentStatus"), "paid");
+      const late = await paymob.handlePaymobWebhook(hookOpts(db, lateObj));
+      assert.equal(late.outcome, "superseded_needs_refund");
+      assert.equal(await countPaymentEvents(db), 1);
+      assert.equal(await countSuperseded(db), 1);
+      const superseded = (await db.collection("paymob_superseded_payments").doc("82001").get()).data();
+      assert.equal(superseded.needs_refund, true);
+      assert.equal(superseded.requestId, REQUEST_ID);
+      assert.equal(superseded.attemptId, ATTEMPT_OLD);
+      assert.equal(superseded.paymobTransactionId, "82001");
     });
+  });
+
+  it("rejects unknown foreign attempts with no payment event", async () => {
+    const db = new MemoryFirestore();
+    await seed(db, {
+      attemptId: ATTEMPT_NEW,
+      specialReference: paymob.buildPaymobSpecialReference(REQUEST_ID, ATTEMPT_NEW),
+    });
+    await seedAttempt(db, ATTEMPT_NEW,
+      paymob.buildPaymobSpecialReference(REQUEST_ID, ATTEMPT_NEW));
+    await jobs.quoteSubscriptionRequest(db, REQUEST_ID, AT);
+    const foreign = "1700000000999_forge8888";
+    const ref = paymob.buildPaymobSpecialReference(REQUEST_ID, foreign);
+    const obj = sampleObj({
+      success: true,
+      id: 88001,
+      order: {id: 5099, merchant_order_id: ref},
+    });
+    const result = await paymob.handlePaymobWebhook(hookOpts(db, obj));
+    assert.equal(result.outcome, "rejected_foreign_attempt");
+    assert.equal(await countPaymentEvents(db), 0);
+    assert.equal(await countSuperseded(db), 0);
   });
 
   it("(c) legacy bare requestId in webhook still resolves the request", async () => {
@@ -268,13 +319,7 @@ describe("paymob special_reference", () => {
       id: 7007,
       order: {id: 5010, merchant_order_id: REQUEST_ID},
     });
-    const result = await paymob.handlePaymobWebhook({
-      obj,
-      hmac: sign(obj),
-      hmacSecret: SECRET,
-      db,
-      now: AT,
-    });
+    const result = await paymob.handlePaymobWebhook(hookOpts(db, obj));
     assert.equal(paymob.requestIdFromPaymobObj(obj), REQUEST_ID);
     assert.equal(result.outcome, "paid");
   });

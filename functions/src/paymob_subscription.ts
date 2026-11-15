@@ -31,6 +31,9 @@ const WEBHOOK_NAME = "paymobSubscriptionWebhook";
 /** Suffix delimiter: `{requestId}__{attemptId}` — legacy checkouts used bare `requestId`. */
 export const PAYMOB_SPECIAL_REF_DELIMITER = "__";
 const CHECKOUT_ATTEMPTS = "paymob_checkout_attempts";
+const SUPERSEDED_PAYMENTS = "paymob_superseded_payments";
+/** Matches `newCheckoutAttemptId()` (`{epochMs}_{base36}`). */
+export const CHECKOUT_ATTEMPT_ID_PATTERN = /^\d+_[a-z0-9]+$/;
 
 export class PaymobIntentionError extends Error {
   readonly reason: string;
@@ -51,20 +54,30 @@ export function buildPaymobSpecialReference(requestId: string, attemptId: string
   return `${requestId}${PAYMOB_SPECIAL_REF_DELIMITER}${attemptId}`;
 }
 
+export function isValidCheckoutAttemptId(attemptId: string): boolean {
+  return CHECKOUT_ATTEMPT_ID_PATTERN.test(str(attemptId));
+}
+
+export function splitPaymobReference(ref: string): {requestId: string; attemptId: string} {
+  const trimmed = str(ref);
+  if (trimmed === "") return {requestId: "", attemptId: ""};
+  const idx = trimmed.lastIndexOf(PAYMOB_SPECIAL_REF_DELIMITER);
+  if (idx < 0) return {requestId: trimmed, attemptId: ""};
+  const attemptId = trimmed.slice(idx + PAYMOB_SPECIAL_REF_DELIMITER.length);
+  const requestId = trimmed.slice(0, idx);
+  if (attemptId && !isValidCheckoutAttemptId(attemptId)) {
+    return {requestId: trimmed, attemptId: ""};
+  }
+  return {requestId, attemptId};
+}
+
 /** Maps Paymob `special_reference` / merchant order id back to `delegate_requests` doc id. */
 export function resolveRequestIdFromPaymobReference(ref: string): string {
-  const trimmed = str(ref);
-  if (trimmed === "") return "";
-  const idx = trimmed.indexOf(PAYMOB_SPECIAL_REF_DELIMITER);
-  if (idx < 0) return trimmed;
-  return trimmed.slice(0, idx);
+  return splitPaymobReference(ref).requestId;
 }
 
 export function attemptIdFromPaymobReference(ref: string): string {
-  const trimmed = str(ref);
-  const idx = trimmed.indexOf(PAYMOB_SPECIAL_REF_DELIMITER);
-  if (idx < 0) return "";
-  return trimmed.slice(idx + PAYMOB_SPECIAL_REF_DELIMITER.length);
+  return splitPaymobReference(ref).attemptId;
 }
 
 export function paymobReferenceFromObj(obj: Record<string, unknown>): string {
@@ -493,11 +506,115 @@ export function requestIdFromPaymobObj(obj: Record<string, unknown>): string {
   return resolveRequestIdFromPaymobReference(paymobReferenceFromObj(obj));
 }
 
+export function isPaymobIntegrationAllowed(
+  obj: Record<string, unknown>,
+  integrationIds: number[],
+): boolean {
+  const integrationId = Number(obj.integration_id);
+  return Number.isInteger(integrationId) && integrationId > 0 && integrationIds.includes(integrationId);
+}
+
+async function recordSupersededPayment(
+  db: admin.firestore.Firestore,
+  p: {
+    txId: string;
+    requestId: string;
+    attemptId: string;
+    paymobRef: string;
+    paymobOrderId: string;
+    amountCents: number;
+    currency: string;
+    paidAt: Date;
+  },
+): Promise<void> {
+  await db.collection(SUPERSEDED_PAYMENTS).doc(p.txId).set({
+    requestId: p.requestId,
+    attemptId: p.attemptId,
+    paymobTransactionId: p.txId,
+    paymobOrderId: p.paymobOrderId,
+    paymobReference: p.paymobRef,
+    amountCents: p.amountCents,
+    currency: p.currency,
+    needs_refund: true,
+    paidAt: admin.firestore.Timestamp.fromDate(p.paidAt),
+    receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, {merge: true});
+  console.log(JSON.stringify({
+    event: "paymob_superseded_payment",
+    requestId: p.requestId,
+    attemptId: p.attemptId,
+    txId: p.txId,
+    needs_refund: true,
+  }));
+}
+
+export type PaymobAttemptRoute =
+  | "apply"
+  | "ignored_stale_attempt"
+  | "rejected_foreign_attempt"
+  | "superseded_needs_refund";
+
+/**
+ * Validates checkout attempt before any subscription payment write.
+ * Legacy refs (bare requestId) bypass attempt checks.
+ */
+export async function routePaymobAttemptBeforeApply(
+  db: admin.firestore.Firestore,
+  p: {
+    requestId: string;
+    webhookAttemptId: string;
+    success: boolean;
+    paymobRef: string;
+    txId: string;
+    paymobOrderId: string;
+    amountCents: number;
+    currency: string;
+    paidAt: Date;
+  },
+): Promise<PaymobAttemptRoute> {
+  if (p.webhookAttemptId === "") return "apply";
+  const reqRef = db.collection("delegate_requests").doc(p.requestId);
+  const attemptRef = reqRef.collection(CHECKOUT_ATTEMPTS).doc(p.webhookAttemptId);
+  const [reqSnap, attemptSnap] = await Promise.all([reqRef.get(), attemptRef.get()]);
+  if (!reqSnap.exists || !attemptSnap.exists) {
+    console.log(JSON.stringify({
+      event: "paymob_webhook_rejected",
+      reason: "foreign_attempt",
+      requestId: p.requestId,
+      attemptId: p.webhookAttemptId,
+      txId: p.txId,
+      requestExists: reqSnap.exists,
+      attemptExists: attemptSnap.exists,
+    }));
+    return "rejected_foreign_attempt";
+  }
+  const checkout = (reqSnap.get("paymobCheckout") && typeof reqSnap.get("paymobCheckout") === "object")
+    ? reqSnap.get("paymobCheckout") as Record<string, unknown>
+    : {};
+  const currentAttempt = str(checkout.attemptId);
+  if (currentAttempt === p.webhookAttemptId) return "apply";
+  if (p.success) {
+    await recordSupersededPayment(db, {
+      txId: p.txId,
+      requestId: p.requestId,
+      attemptId: p.webhookAttemptId,
+      paymobRef: p.paymobRef,
+      paymobOrderId: p.paymobOrderId,
+      amountCents: p.amountCents,
+      currency: p.currency,
+      paidAt: p.paidAt,
+    });
+    return "superseded_needs_refund";
+  }
+  return "ignored_stale_attempt";
+}
+
 export async function handlePaymobWebhook(opts: {
   obj: Record<string, unknown>;
   hmac: string;
   hmacSecret: string;
   db: admin.firestore.Firestore;
+  integrationIds?: number[];
   now?: Date;
 }): Promise<{status: number; outcome: string}> {
   if (!opts.obj || !verifyTransactionPostHmac(opts.obj, opts.hmac, opts.hmacSecret)) {
@@ -505,6 +622,14 @@ export async function handlePaymobWebhook(opts: {
   }
   const pending = boolFlag(opts.obj.pending);
   if (pending) return {status: 200, outcome: "ignored_pending"};
+  if (opts.integrationIds?.length && !isPaymobIntegrationAllowed(opts.obj, opts.integrationIds)) {
+    console.log(JSON.stringify({
+      event: "paymob_webhook_rejected",
+      reason: "integration_not_allowed",
+      integrationId: opts.obj.integration_id,
+    }));
+    return {status: 200, outcome: "rejected_integration"};
+  }
   const paymobRef = paymobReferenceFromObj(opts.obj);
   const requestId = resolveRequestIdFromPaymobReference(paymobRef);
   const webhookAttemptId = attemptIdFromPaymobReference(paymobRef);
@@ -516,21 +641,21 @@ export async function handlePaymobWebhook(opts: {
   const isVoided = boolFlag(opts.obj.is_voided);
   const isRefunded = boolFlag(opts.obj.is_refunded);
   const success = boolFlag(opts.obj.success) && !isVoided && !isRefunded;
-  if (webhookAttemptId) {
-    const reqSnap = await opts.db.collection("delegate_requests").doc(requestId).get();
-    if (reqSnap.exists) {
-      const checkout = (reqSnap.get("paymobCheckout") && typeof reqSnap.get("paymobCheckout") === "object")
-        ? reqSnap.get("paymobCheckout") as Record<string, unknown>
-        : {};
-      const currentAttempt = str(checkout.attemptId);
-      if (currentAttempt && currentAttempt !== webhookAttemptId && !success) {
-        return {status: 200, outcome: "ignored_stale_attempt"};
-      }
-    }
-  }
   const amountCents = Number(opts.obj.amount_cents);
   const currency = str(opts.obj.currency) || "EGP";
   const paidAt = opts.now || new Date();
+  const route = await routePaymobAttemptBeforeApply(opts.db, {
+    requestId,
+    webhookAttemptId,
+    success,
+    paymobRef,
+    txId,
+    paymobOrderId: idStr(order.id),
+    amountCents: Number.isFinite(amountCents) ? amountCents : 0,
+    currency,
+    paidAt,
+  });
+  if (route !== "apply") return {status: 200, outcome: route};
   const outcome = await applyVerifiedSubscriptionPayment(opts.db, {
     requestId,
     paymobTransactionId: txId,
@@ -573,6 +698,7 @@ export const paymobSubscriptionWebhook = functions
         obj,
         hmac,
         hmacSecret: env.hmacSecret,
+        integrationIds: env.integrationIds,
         db: admin.firestore(),
       });
       res.status(result.status).json({ok: result.status === 200, outcome: result.outcome});
