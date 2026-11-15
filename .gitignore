@@ -1,4 +1,5 @@
 # Miscellaneous
+firebase-emulator-*.json
 *.class
 *.log
 *.pyc

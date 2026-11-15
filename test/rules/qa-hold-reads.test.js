@@ -118,15 +118,11 @@ describe("qa hold supervisor reads and edit policy", () => {
     await assertFails(updateDoc(doc(as("org"), "organizations/o1/companies/c1/delegates/pending1"), patch));
   });
 
-  test("super-admin and tech may correct nationalId on a pending signup record", async () => {
-    await assertSucceeds(updateDoc(doc(as("sa"), "organizations/o1/companies/c1/delegates/pending1"), {
-      nationalId: "27701010101011", nationalityID: "27701010101011", updatedAt: "t",
-    }));
-    // reset via a second tech write after re-seeding is unnecessary; just
-    // confirm tech can also write identity fields on another pending-like patch
-    await assertSucceeds(updateDoc(doc(as("ts"), "organizations/o1/companies/c1/delegates/pending1"), {
-      nationalId: "26601010101011", nationalityID: "26601010101011", updatedAt: "t",
-    }));
+  test("super-admin and tech cannot client-write nationalId (TA-32)", async () => {
+    const patch = {nationalId: "27701010101011", nationalityID: "27701010101011", updatedAt: "t"};
+    await assertFails(updateDoc(doc(as("sa"), "organizations/o1/companies/c1/delegates/pending1"), patch));
+    await assertFails(updateDoc(doc(as("ts"), "organizations/o1/companies/c1/delegates/pending1"), patch));
+    await assertFails(updateDoc(doc(as("sa"), "organizations/o1/companies/c1/delegates/d1"), patch));
   });
 
   test("only super-admin and tech may activate or suspend a delegate", async () => {
