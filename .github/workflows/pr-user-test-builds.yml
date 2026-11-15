@@ -146,7 +146,7 @@ jobs:
           name: android-prod-flavor-release-debugsigned-${{ env.PR_HEAD_SHA }}
           path: build/app/outputs/flutter-apk/app-prod-release.apk
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 7
       - name: Release Mac repo lock
         if: always()
         run: bash ~/mac-resources/ci_delegate_app_lock_release.sh repo
@@ -232,7 +232,7 @@ jobs:
           name: ios-prod-flavor-release-nocodesign-${{ env.PR_HEAD_SHA }}
           path: build/ios/iphoneos/Runner.app
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 7
       - name: Release Mac repo lock
         if: always()
         run: bash ~/mac-resources/ci_delegate_app_lock_release.sh repo
