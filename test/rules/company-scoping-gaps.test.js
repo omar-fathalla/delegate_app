@@ -98,9 +98,14 @@ describe("TA-8 security rules gaps", () => {
       })));
   }
 
-  test("ALLOW H-1: supervisor may still set delegate status pending (re-upload)", () =>
+  test("ALLOW H-1: supervisor re-upload shape may set active delegate to pending", () =>
     assertSucceeds(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
       status: "pending", updatedAt: "t",
+    })));
+
+  test("DENY supervisor cannot set active delegate pending with extra fields", () =>
+    assertFails(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
+      status: "pending", updatedAt: "t", displayName: "x",
     })));
 
   test("DENY H-1: supervisor cannot create nested delegate with active status", () =>

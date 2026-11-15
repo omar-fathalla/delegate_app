@@ -309,12 +309,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
       // 1b. users doc is written after the delegate doc so a denied write
       // does not leave the two out of sync.
-      await firestore.collection('users').doc(effectiveUid).set({
-        'photoURL': downloadUrl,
-        'profileImageUrl': downloadUrl,
-        'personalPhotoURL': downloadUrl,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      try {
+        await firestore.collection('users').doc(effectiveUid).set({
+          'photoURL': downloadUrl,
+          'profileImageUrl': downloadUrl,
+          'personalPhotoURL': downloadUrl,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } on FirebaseException catch (e) {
+        throw Exception(e.message ?? 'فشل تحديث ملف المستخدم');
+      }
 
       // 3. تحديث delegate_requests إن وجد
       try {
