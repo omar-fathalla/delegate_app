@@ -66,15 +66,16 @@ jobs:
             }
 
             async function collectArtifacts() {
-              return paginate(async (page) => {
+              const raw = await paginate(async (page) => {
                 const { data } = await github.rest.actions.listArtifactsForRepo({
                   owner,
                   repo,
                   per_page: 100,
                   page,
                 });
-                return (data.artifacts ?? []).filter((a) => olderThanCutoff(a.created_at));
+                return data.artifacts ?? [];
               });
+              return raw.filter((a) => olderThanCutoff(a.created_at));
             }
 
             async function collectStartupFailureRuns() {
@@ -96,17 +97,16 @@ jobs:
             }
 
             async function collectCaches() {
-              return paginate(async (page) => {
+              const raw = await paginate(async (page) => {
                 const { data } = await github.rest.actions.getActionsCacheList({
                   owner,
                   repo,
                   per_page: 100,
                   page,
                 });
-                return (data.actions_caches ?? []).filter((c) =>
-                  olderThanCutoff(c.last_accessed_at)
-                );
+                return data.actions_caches ?? [];
               });
+              return raw.filter((c) => olderThanCutoff(c.last_accessed_at));
             }
 
             async function deleteArtifacts(candidates) {
