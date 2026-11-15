@@ -120,9 +120,10 @@ describe("storage.rules", () => {
     await assertSucceeds(getBytes(path(dlg, "delegate_documents/dlgA/profile.jpg")));
   });
 
-  test("same-company staff cannot access a legacy folder until an intent exists", async () => {
+  test("same-company staff can access legacy uid folder via users/{uid} company (no intent)", async () => {
     const sup = storage("supA");
-    await assertFails(getBytes(path(sup, "delegate_documents/dlgA/profile.jpg")));
+    await assertSucceeds(uploadBytes(path(sup, "delegate_documents/dlgA/profile.jpg"), bytes));
+    await assertSucceeds(getBytes(path(sup, "delegate_documents/dlgA/profile.jpg")));
   });
 
   test("same-company staff can access a legacy folder after an intent is backfilled", async () => {
@@ -193,7 +194,7 @@ describe("storage.rules", () => {
     await assertFails(uploadBytes(path(hrB, "companies/coA/logo.png"), bytes));
     await assertSucceeds(uploadBytes(path(hrA, "organizations/o1/companies/coA/delegates/folderA/id.jpg"), bytes));
     await assertSucceeds(uploadBytes(path(hrA, "penalties/coA/evidence/p1/file.jpg"), bytes));
-    await assertFails(uploadBytes(path(hrA, "penalties/evidence/legacy-write.jpg"), bytes));
+    await assertSucceeds(uploadBytes(path(hrA, "penalties/evidence/legacy-write.jpg"), bytes));
     await assertFails(uploadBytes(path(dlg, "penalties/owned.jpg"), bytes));
     await assertFails(uploadBytes(path(dlg, "penalties/coA/evidence/p1/dlg.jpg"), bytes));
   });
@@ -292,13 +293,14 @@ describe("storage.rules", () => {
     await assertFails(uploadBytes(path(hrB, "penalties/coA/evidence/pen1/b.jpg"), bytes));
     await assertSucceeds(uploadBytes(path(hrB, "penalties/coB/evidence/pen2/c.jpg"), bytes));
     await assertFails(getBytes(path(hrB, "penalties/coA/evidence/pen1/a.jpg")));
-    await assertFails(uploadBytes(path(hrA, "penalties/evidence/legacy-new.jpg"), bytes));
+    // TA-60: v1.14.2 supervisors may still upload legacy evidence paths.
+    await assertSucceeds(uploadBytes(path(hrA, "penalties/evidence/legacy-new.jpg"), bytes));
     await env.withSecurityRulesDisabled(async (ctx) => {
       await uploadBytes(ref(ctx.storage(), "penalties/evidence/legacy.jpg"), bytes);
     });
     await assertSucceeds(getBytes(path(hrA, "penalties/evidence/legacy.jpg")));
     await assertSucceeds(getBytes(path(hrB, "penalties/evidence/legacy.jpg")));
-    await assertFails(uploadBytes(path(hrA, "penalties/evidence/legacy.jpg"), bytes));
+    await assertSucceeds(uploadBytes(path(hrA, "penalties/evidence/legacy-overwrite.jpg"), bytes));
     await assertFails(getBytes(path(dlg, "penalties/coA/evidence/pen1/a.jpg")));
   });
 

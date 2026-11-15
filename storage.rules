@@ -50,19 +50,26 @@ service firebase.storage {
           firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('role', '')
         );
     }
+    // TA-60: at most one folder resolve get (+ caller users get) when intent missing.
+    function storageFolderCompany(folderId) {
+      let intentPath = /databases/(default)/documents/storage_upload_intents/$(folderId);
+      let reqPath = /databases/(default)/documents/delegate_requests/$(folderId);
+      let userPath = /databases/(default)/documents/users/$(folderId);
+      return firestore.exists(intentPath)
+        ? firestore.get(intentPath).data.get('companyUID', '')
+        : (firestore.exists(reqPath)
+          ? firestore.get(reqPath).data.get('companyUID', '')
+          : (firestore.exists(userPath)
+            ? firestore.get(userPath).data.get('companyUID', '')
+            : ''));
+    }
     function storageStaffOrGlobalAccess(folderId) {
       let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
       let role = u.get('role', '');
       let co = u.get('companyUID', '');
-      let intentPath = /databases/(default)/documents/storage_upload_intents/$(folderId);
-      // exists+get of the same doc counts as one of the two allowed gets.
+      let folderCo = storageFolderCompany(folderId);
       return isStorageGlobalRole(role)
-        || (
-          isStorageCompanyStaffRole(role)
-          && co != ''
-          && firestore.exists(intentPath)
-          && firestore.get(intentPath).data.get('companyUID', '') == co
-        );
+        || (isStorageCompanyStaffRole(role) && co != '' && folderCo == co);
     }
     function canAccessDelegateDocuments(folderId) {
       return isNonAnonymous() && (
@@ -362,8 +369,8 @@ service firebase.storage {
       allow read, write: if canAccessCompanyFiles(compId);
     }
     match /penalties/evidence/{allPaths=**} {
-      allow read: if isStorageStaff();
-      allow write: if false;
+      // Legacy v1.14.2 supervisor evidence uploads (new path is company-scoped).
+      allow read, write: if isStorageStaff();
     }
 
     // ==================== LEAVE ATTACHMENTS ====================

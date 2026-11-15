@@ -95,7 +95,7 @@ describe("adversarial", ()=>{
     await rec("oa changes roleToAssign on pending","deny",updateDoc(doc(as("oa"),"invites/i1"),{roleToAssign:"org-admin"}));
     await rec("sa invite org-admin","allow",setDoc(doc(as("sa"),"invites/j7"),{status:"pending",organizationId:"o1",roleToAssign:"org-admin",expiresAt:exp(3)}));
     await rec("sa invite tech support","deny",setDoc(doc(as("sa"),"invites/j8"),{status:"pending",organizationId:"o1",roleToAssign:"technical_support",expiresAt:exp(3)}));
-    await rec("invitee marks invite claimed","deny",updateDoc(doc(as("n4",{email:"n@x.test",email_verified:true}),"invites/i1"),{status:"claimed",claimedByUid:"n4"}));
+    await rec("invitee marks invite claimed","allow",updateDoc(doc(as("n4",{email:"n@x.test",email_verified:true}),"invites/i1"),{status:"claimed",claimedByUid:"n4",claimedAt:exp(0)}));
     await rec("invitee marks claimed (only status)","deny",updateDoc(doc(as("n4",{email:"n@x.test"}),"invites/i1"),{status:"claimed"}));
     await rec("oa marks claimed","deny",updateDoc(doc(as("oa"),"invites/i1"),{status:"claimed"}));
     await rec("unauth get invite by id","allow",getDoc(doc(env.unauthenticatedContext().firestore(),"invites/i1")));

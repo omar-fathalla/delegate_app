@@ -382,7 +382,6 @@ export const getTaskImage = functions
 export const onTaskImageFinalize = onObjectFinalized(
   {
     region: "europe-west4",
-    bucket: "tashil-dev.firebasestorage.app",
     memory: "256MiB",
     timeoutSeconds: 30,
   },
