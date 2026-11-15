@@ -85,6 +85,23 @@ describe("paymob env", () => {
     assert.equal(paymob.readPaymobEnv({}).error, "paymob_not_configured");
   });
 
+  it("refuses live Paymob integration IDs even with test keys", () => {
+    for (const liveId of paymob.PAYMOB_FORBIDDEN_LIVE_INTEGRATION_IDS) {
+      assert.equal(
+        paymob.readPaymobEnv({...base, PAYMOB_INTEGRATION_IDS: String(liveId)}).error,
+        "paymob_live_forbidden",
+      );
+    }
+    const mixed = paymob.readPaymobEnv({
+      ...base,
+      PAYMOB_INTEGRATION_IDS: [
+        paymob.TASHIL_DEV_PAYMOB_INTEGRATION_ID,
+        6033728,
+      ].join(","),
+    });
+    assert.equal(mixed.error, "paymob_live_forbidden");
+  });
+
   it("accepts regional and classic test keys and refuses live keys", () => {
     const regional = paymob.readPaymobEnv({
       ...base,

@@ -36,6 +36,12 @@ const WEBHOOK_NAME = "paymobSubscriptionWebhook";
  */
 export const TASHIL_DEV_PAYMOB_INTEGRATION_ID = 5882985;
 
+/** Live Accept integration IDs — must never be used on Cloud Functions (test keys only). */
+export const PAYMOB_FORBIDDEN_LIVE_INTEGRATION_IDS = new Set([
+  6033727,
+  6033728,
+]);
+
 function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
@@ -83,6 +89,9 @@ export function readPaymobEnv(env: NodeJS.ProcessEnv = process.env): PaymobEnv |
     return {error: "paymob_live_forbidden"};
   }
   if (PAYMOB_LIVE_SECRET_KEY.test(secretKey) || PAYMOB_LIVE_PUBLIC_KEY.test(publicKey)) {
+    return {error: "paymob_live_forbidden"};
+  }
+  if (integrationIds.some((id) => PAYMOB_FORBIDDEN_LIVE_INTEGRATION_IDS.has(id))) {
     return {error: "paymob_live_forbidden"};
   }
   if (!PAYMOB_TEST_SECRET_KEY.test(secretKey) || !PAYMOB_TEST_PUBLIC_KEY.test(publicKey)) {
