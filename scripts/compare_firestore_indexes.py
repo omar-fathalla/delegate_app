@@ -99,6 +99,14 @@ REQUIRED = [
         "fields": ["companyUID", "requestType", "status"],
         "why": "HR / company-admin renewal list (no organizationUID filter)",
     },
+    {
+        "id": "attendance_logs organizationId+companyId+timestamp",
+        "kind": "composite",
+        "collectionGroup": "attendance_logs",
+        "queryScope": "COLLECTION",
+        "fields": ["organizationId", "companyId", "timestamp"],
+        "why": "org-admin «سجل حضور وانصراف اليوم» sheet (admin_home_screen.dart)",
+    },
 ]
 
 
