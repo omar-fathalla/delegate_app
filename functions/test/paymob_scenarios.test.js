@@ -18,6 +18,7 @@ const paymob = require(path.join(__dirname, "../lib/paymob_subscription.js"));
 const jobs = require(path.join(__dirname, "../lib/subscription_jobs.js"));
 
 const SECRET = "test-hmac-secret-not-real";
+const TEST_INTEGRATION_ID = paymob.TASHIL_DEV_PAYMOB_INTEGRATION_ID;
 const AT = new Date("2027-02-10T10:00:00.000Z"); // Cairo noon Feb 10: 5 months, 416.67
 const FEE = 416.67;
 const CENTS = 41667;
@@ -30,7 +31,7 @@ function sampleObj(overrides = {}) {
     error_occured: false,
     has_parent_transaction: false,
     id: 1001,
-    integration_id: 4097558,
+    integration_id: TEST_INTEGRATION_ID,
     is_3d_secure: true,
     is_auth: false,
     is_capture: false,

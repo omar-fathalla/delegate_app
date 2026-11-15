@@ -1,6 +1,8 @@
 # مصفوفة سيناريوهات الدفع لتجديد المجموعة (Paymob)
 
-بيئة الاختبار `tashil-dev` فقط. المفاتيح سرية على الخادم، والاختبارات تستخدم حمولة HMAC مزيفة (`sk_test_` / سر اختبار محلي). لا مفاتيح حقيقية في المستودع ولا في التطبيق. المبلغ بالقرش (cents)، و`applyVerifiedSubscriptionPayment` لا يُستدعى إلا بعد التحقق من HMAC (20 حقلاً، SHA-512). مصدر الحقيقة هو الويب هوك. الـ idempotency بمفتاح معرّف معاملة / طلب Paymob (`subscription_payment_events/{transactionId}`). طلب الموافقة يبقى مخفياً حتى `paymentStatus=paid`. مهلة الانتظار الافتراضية 60 دقيقة من بدء الـ checkout (أو من `quotedAt` إن لم يبدأ)، مع تسوية مجدولة كل 15 دقيقة وقابل للاستدعاء عند الطلب (`reconcileSubscriptionPayments`).
+بيئة الاختبار `tashil-dev` فقط. **تكامل Paymob للاختبار فقط:** `PAYMOB_INTEGRATION_IDS=5882985` (ثابت `TASHIL_DEV_PAYMOB_INTEGRATION_ID` في `paymob_subscription.ts`). لا تستخدم معرّفات الإنتاج (`6033728` / `6033727`). المفاتيح سرية على الخادم، والاختبارات تستخدم حمولة HMAC مزيفة (`sk_test_` / سر اختبار محلي). لا مفاتيح حقيقية في المستودع ولا في التطبيق.
+
+**Phase 3 (اشتراكات + Paymob على dev):** تذكير 16 يونيو / 17 ديسمبر (14 يوماً قبل نهاية الدورة)، مهلة 15 يوماً ثم إيقاف 15 يناير / 15 يوليو؛ الوظائف المجدولة `remindSupervisorsBeforeSubscriptionPeriodEnd` و`suspendExpiredSubscriptions` **لا تُنشر** حتى موافقة محمد. سيناريوهات الدفع أدناه + `functions/test/paymob_scenarios.test.js`. المبلغ بالقرش (cents)، و`applyVerifiedSubscriptionPayment` لا يُستدعى إلا بعد التحقق من HMAC (20 حقلاً، SHA-512). مصدر الحقيقة هو الويب هوك. الـ idempotency بمفتاح معرّف معاملة / طلب Paymob (`subscription_payment_events/{transactionId}`). طلب الموافقة يبقى مخفياً حتى `paymentStatus=paid`. مهلة الانتظار الافتراضية 60 دقيقة من بدء الـ checkout (أو من `quotedAt` إن لم يبدأ)، مع تسوية مجدولة كل 15 دقيقة وقابل للاستدعاء عند الطلب (`reconcileSubscriptionPayments`).
 
 ## الحالات وحالة الطلب وواجهة المستخدم
 
