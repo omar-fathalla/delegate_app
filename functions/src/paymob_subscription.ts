@@ -29,6 +29,13 @@ const opts = {timeoutSeconds: 60, memory: "256MB" as const};
 const EGYPT_BASE = "https://accept.paymob.com";
 const WEBHOOK_NAME = "paymobSubscriptionWebhook";
 
+/**
+ * Paymob Accept **test** integration for tashil-dev User Test (Task H / Phase 3).
+ * Set `PAYMOB_INTEGRATION_IDS=5882985` on deployed functions (never commit keys).
+ * Do not use live integration IDs (`6033728` / `6033727`).
+ */
+export const TASHIL_DEV_PAYMOB_INTEGRATION_ID = 5882985;
+
 function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
