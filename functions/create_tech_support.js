@@ -7,7 +7,8 @@
  * With --apply: creates a Firebase Auth user (or reuses by email), writes
  * users/{uid} without secret fields, and may queue a password-setup email in
  * `mail` (same flow as createStaffUser). Does not change role or touch accounts
- * that already have another role or companyUID unless --allow-role-change.
+ * that already have another role or companyUID unless --allow-role-change (does
+ * not override uid mismatch or orphan Firestore without Auth).
  *
  * Never writes `password`, `temporaryPassword`, or `tempPassword` to Firestore.
  *
@@ -44,6 +45,36 @@ function roleKey(role) {
  */
 function isTechSupportRole(role) {
   return TECH_ROLES.has(roleKey(role));
+}
+
+/** @param {unknown} raw */
+function normalizeLookupEmail(raw) {
+  return String(raw || "").trim().toLowerCase();
+}
+
+/** @param {unknown} raw */
+function normalizeLookupPhone(raw) {
+  return String(raw || "").trim();
+}
+
+/**
+ * @param {unknown} stored
+ * @param {string} normTarget
+ */
+function emailsMatch(stored, normTarget) {
+  return normalizeLookupEmail(stored) === normTarget;
+}
+
+/**
+ * @param {string} normEmail
+ * @param {string} rawEmail
+ * @return {string[]}
+ */
+function emailLookupVariants(normEmail, rawEmail) {
+  const raw = String(rawEmail || "").trim();
+  const set = new Set([normEmail]);
+  if (raw) set.add(raw);
+  return [...set].filter(Boolean).slice(0, 10);
 }
 
 /**
@@ -138,6 +169,7 @@ function buildTechSupportUserDoc(input) {
   return {
     uid,
     email,
+    emailNormalized: email,
     phoneNumber,
     displayName,
     role,
@@ -245,11 +277,13 @@ async function queueSetupEmail(db, email, displayName) {
 
 /**
  * @param {FirebaseFirestore.Firestore} db
- * @param {string} email
+ * @param {string} normEmail
  * @param {string} phone
+ * @param {string} rawEmail
  * @return {Promise<{id: string, data: Record<string, unknown>}[]>}
  */
-async function lookupExistingProfiles(db, email, phone) {
+async function lookupExistingProfiles(db, normEmail, phone, rawEmail) {
+  const normPhone = normalizeLookupPhone(phone);
   /** @type {Map<string, {id: string, data: Record<string, unknown>}>} */
   const byId = new Map();
   const merge = (snap) => {
@@ -257,10 +291,31 @@ async function lookupExistingProfiles(db, email, phone) {
       byId.set(doc.id, {id: doc.id, data: doc.data()});
     }
   };
-  merge(await db.collection("users").where("email", "==", email).limit(5).get());
-  merge(await db.collection("users").where("phoneNumber", "==", phone).limit(5).get());
-  merge(await db.collection("users").where("phone", "==", phone).limit(5).get());
-  return [...byId.values()];
+  const variants = emailLookupVariants(normEmail, rawEmail);
+  if (variants.length === 1) {
+    merge(await db.collection("users").where("email", "==", variants[0]).limit(5).get());
+  } else if (variants.length > 1) {
+    merge(await db.collection("users").where("email", "in", variants).limit(10).get());
+  }
+  try {
+    merge(await db.collection("users").where("emailNormalized", "==", normEmail).limit(5).get());
+  } catch (indexErr) {
+    if (indexErr && typeof indexErr === "object") {
+      /* optional emailNormalized index */
+    }
+  }
+  merge(await db.collection("users").where("phoneNumber", "==", normPhone).limit(10).get());
+  merge(await db.collection("users").where("phone", "==", normPhone).limit(10).get());
+
+  /** @type {Map<string, {id: string, data: Record<string, unknown>}>} */
+  const matched = new Map();
+  for (const p of byId.values()) {
+    const docPhone = normalizeLookupPhone(p.data.phoneNumber || p.data.phone || "");
+    if (emailsMatch(p.data.email, normEmail) || docPhone === normPhone) {
+      matched.set(p.id, p);
+    }
+  }
+  return [...matched.values()];
 }
 
 /**
@@ -299,9 +354,7 @@ function assessProvisioningProfiles(profiles, opts) {
   for (const p of profiles) {
     if (p.id !== opts.authUid) {
       changes.push({field: "uid", from: p.id, to: opts.authUid, profileId: p.id});
-      if (!opts.allowRoleChange) {
-        return {ok: false, reason: "uid_mismatch", changes};
-      }
+      return {ok: false, reason: "uid_mismatch", changes};
     }
   }
   return {ok: true, changes};
@@ -329,11 +382,11 @@ async function resolveAuthUidByEmail(auth, email) {
  * @param {string} phone
  * @param {boolean} allowRoleChange
  */
-async function planProvisioning(db, auth, email, phone, allowRoleChange) {
-  const profiles = await lookupExistingProfiles(db, email, phone);
-  const authUid = auth ? await resolveAuthUidByEmail(auth, email) : null;
+async function planProvisioning(db, auth, normEmail, phone, rawEmail, allowRoleChange) {
+  const profiles = await lookupExistingProfiles(db, normEmail, phone, rawEmail);
+  const authUid = auth ? await resolveAuthUidByEmail(auth, normEmail) : null;
   const assessment = assessProvisioningProfiles(profiles, {allowRoleChange, authUid});
-  const primaryProfile = profiles.find((p) => p.data.email === email) || profiles[0] || null;
+  const primaryProfile = profiles.find((p) => emailsMatch(p.data.email, normEmail)) || profiles[0] || null;
   return {profiles, authUid, assessment, primaryProfile};
 }
 
@@ -346,9 +399,12 @@ function refuseProvisioning(assessment, mode) {
   const hint = assessment.reason === "orphan_profile" ?
     "Firestore profile exists without matching Auth user" :
     assessment.reason === "uid_mismatch" ?
-      "Firestore doc id does not match Auth uid" :
+      "Firestore doc id does not match Auth uid (migrate or delete the old doc first)" :
       "existing profile has another role or companyUID";
-  throw new Error(`refusing ${mode}: ${hint} (use --allow-role-change)`);
+  const suffix = assessment.reason === "existing_profile_scope" ?
+    " (use --allow-role-change)" :
+    "";
+  throw new Error(`refusing ${mode}: ${hint}${suffix}`);
 }
 
 /**
@@ -360,8 +416,9 @@ function refuseProvisioning(assessment, mode) {
  * }} deps
  */
 async function runCreateTechSupport(args, deps = {}) {
-  const email = String(args.email || "").trim().toLowerCase();
-  const phone = String(args.phone || args.phoneNumber || "").trim();
+  const rawEmail = String(args.email || "").trim();
+  const email = normalizeLookupEmail(rawEmail);
+  const phone = normalizeLookupPhone(args.phone || args.phoneNumber || "");
   const displayName = args["display-name"] ? String(args["display-name"]).trim() : DEFAULT_DISPLAY_NAME;
   const apply = args.apply === true;
   const allowRoleChange = args.allowRoleChange === true;
@@ -376,7 +433,7 @@ async function runCreateTechSupport(args, deps = {}) {
 
   if (!db) throw new Error("db is required");
 
-  const plan = await planProvisioning(db, auth, email, phone, allowRoleChange);
+  const plan = await planProvisioning(db, auth, email, phone, rawEmail, allowRoleChange);
 
   if (!apply) {
     if (!plan.assessment.ok) {
@@ -418,7 +475,7 @@ async function runCreateTechSupport(args, deps = {}) {
       if ((e).code === "auth/email-already-exists") {
         user = await auth.getUserByEmail(email);
         const recheck = assessProvisioningProfiles(
-          await lookupExistingProfiles(db, email, phone),
+          await lookupExistingProfiles(db, email, phone, rawEmail),
           {allowRoleChange, authUid: user.uid},
         );
         if (!recheck.ok) {
@@ -486,6 +543,9 @@ module.exports = {
   resolveProjectTarget,
   assessExistingProfile,
   assessProvisioningProfiles,
+  normalizeLookupEmail,
+  normalizeLookupPhone,
+  emailsMatch,
   lookupExistingProfiles,
   planProvisioning,
   shouldQueueSetupEmail,

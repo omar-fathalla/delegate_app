@@ -8,6 +8,8 @@ const {
   resolveProjectTarget,
   assessExistingProfile,
   assessProvisioningProfiles,
+  normalizeLookupEmail,
+  emailsMatch,
   shouldQueueSetupEmail,
   SETUP_MAIL_COOLDOWN_MS,
 } = require("../create_tech_support");
@@ -22,10 +24,22 @@ function mockUsersDb(profiles, writers = []) {
     collection: (name) => {
       if (name === "users") {
         return {
-          where: (field, _op, val) => ({
+          where: (field, op, val) => ({
             limit: () => ({
               get: async () => {
-                const docs = profiles.filter((p) => p.data[field] === val);
+                const docs = profiles.filter((p) => {
+                  if (op === "in" && Array.isArray(val)) {
+                    return val.includes(p.data[field]);
+                  }
+                  if (field === "email" && op === "==") {
+                    return p.data[field] === val || normalizeLookupEmail(p.data.email) === val;
+                  }
+                  if (field === "emailNormalized" && op === "==") {
+                    return normalizeLookupEmail(p.data.email) === val ||
+                      p.data.emailNormalized === val;
+                  }
+                  return p.data[field] === val;
+                });
                 return {
                   empty: docs.length === 0,
                   docs: docs.map((p) => ({id: p.id, data: () => p.data})),
@@ -101,6 +115,89 @@ test("assessProvisioningProfiles blocks uid mismatch", () => {
   );
   assert.equal(r.ok, false);
   assert.equal(r.reason, "uid_mismatch");
+});
+
+test("assessProvisioningProfiles blocks uid mismatch even with allow-role-change", () => {
+  const r = assessProvisioningProfiles(
+    [{id: "orphan-admin", data: {role: "company-admin", companyUID: "c1", email: "a@b.c"}}],
+    {allowRoleChange: true, authUid: "auth-other"},
+  );
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, "uid_mismatch");
+});
+
+test("emailsMatch is case and whitespace insensitive", () => {
+  assert.ok(emailsMatch(" User@X.COM ", "user@x.com"));
+  assert.ok(!emailsMatch("other@x.com", "user@x.com"));
+});
+
+test("apply refuses when stored email casing differs from CLI", async () => {
+  const emailCli = "user@x.com";
+  const writers = [];
+  let createCalled = false;
+  const args = parseArgs([
+    "--project", "tashil-dev",
+    "--email", "  User@X.COM ",
+    "--phone", "01111111111",
+    "--apply",
+  ]);
+  await assert.rejects(
+    () => runCreateTechSupport(args, {
+      project: "tashil-dev",
+      db: mockUsersDb([{
+        id: "orphan-admin",
+        data: {
+          role: "company-admin",
+          companyUID: "co-9",
+          email: " User@X.COM ",
+          phoneNumber: "01111111111",
+        },
+      }], writers),
+      auth: {
+        getUserByEmail: async () => { throw {code: "auth/user-not-found"}; },
+        createUser: async () => {
+          createCalled = true;
+          return {uid: "new-auth", email: emailCli};
+        },
+      },
+    }),
+    /refusing apply/,
+  );
+  assert.equal(createCalled, false);
+  assert.equal(writers.length, 0);
+});
+
+test("apply refuses uid mismatch with allow-role-change flag", async () => {
+  const email = "admin@example.com";
+  const writers = [];
+  let createCalled = false;
+  const args = parseArgs([
+    "--project", "tashil-dev",
+    "--email", email,
+    "--phone", "01111111111",
+    "--apply",
+    "--allow-role-change",
+  ]);
+  await assert.rejects(
+    () => runCreateTechSupport(args, {
+      project: "tashil-dev",
+      db: mockUsersDb([{
+        id: "orphan-admin",
+        data: {role: "company-admin", companyUID: "co-9", email, phoneNumber: "01111111111"},
+      }], writers),
+      auth: {
+        getUserByEmail: async () => ({uid: "auth-real"}),
+        getUser: async (uid) => ({uid, email}),
+        createUser: async () => {
+          createCalled = true;
+          return {uid: "auth-real"};
+        },
+      },
+    }),
+    /uid_mismatch|does not match Auth uid/,
+  );
+  assert.equal(createCalled, false);
+  assert.equal(writers.length, 0);
 });
 
 test("assessExistingProfile allows technical_support refresh", () => {

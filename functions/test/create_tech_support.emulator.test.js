@@ -59,8 +59,43 @@ test("apply refuses orphan company-admin (no Auth)", {skip: !live}, async () => 
   try {
     await auth.getUserByEmail(ORPHAN_EMAIL);
     assert.fail("expected no Auth user");
-  } catch (_) {
+  } catch (err) {
+    assert.ok(err);
   }
+
+  await Promise.all(admin.apps.map((a) => a && a.delete()));
+});
+
+test("apply refuses orphan when Firestore email casing differs from CLI", {skip: !live}, async () => {
+  admin.initializeApp({projectId: process.env.GCLOUD_PROJECT || "demo-create-tech-support"});
+  const db = admin.firestore();
+  const auth = admin.auth();
+
+  const storedEmail = " User@X.COM ";
+  await db.doc("users/orphan-admin").set({
+    role: "company-admin",
+    email: storedEmail,
+    phoneNumber: PHONE,
+    companyUID: "co-orphan",
+  });
+
+  const args = parseArgs([
+    "--project", "demo-create-tech-support",
+    "--email", "user@x.com",
+    "--phone", PHONE,
+    "--apply",
+  ]);
+
+  const usersBefore = (await db.collection("users").get()).size;
+  const mailBefore = (await db.collection("mail").get()).size;
+
+  await assert.rejects(
+    () => runCreateTechSupport(args, {project: "demo-create-tech-support", db, auth}),
+    /refusing apply/,
+  );
+
+  assert.equal((await db.collection("users").get()).size, usersBefore);
+  assert.equal((await db.collection("mail").get()).size, mailBefore);
 
   await Promise.all(admin.apps.map((a) => a && a.delete()));
 });
