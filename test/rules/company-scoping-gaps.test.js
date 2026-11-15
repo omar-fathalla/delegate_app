@@ -126,6 +126,13 @@ describe("TA-8 security rules gaps", () => {
       await db.doc("organizations/o1/companies/c1").set({name: "C1"});
       await db.doc("organizations/o1/companies/c1/delegates/d1").set({
         organizationUID: "o1", companyUID: "c1", status: "active", phoneNumber: "01011111111",
+        profileImageUrl: "https://cdn.example/p0.jpg",
+        personalPhotoURL: "https://cdn.example/p0.jpg",
+        photoURL: "https://cdn.example/p0.jpg",
+        documents: [{
+          documentKey: "personalPhoto", documentStatus: "approved",
+          documentURL: "https://cdn.example/p0.jpg", uploadedAt: "2026-01-01",
+        }],
       });
       await db.doc("delegate_requests/r1").set({
         requestType: "renewal", status: "pending", organizationUID: "o1", companyUID: "c1",
@@ -182,14 +189,33 @@ describe("TA-8 security rules gaps", () => {
       })));
   }
 
-  test("ALLOW H-1: supervisor re-upload shape may set active delegate to pending", () =>
-    assertSucceeds(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
+  test("DENY H-1: supervisor bare status-only active to pending", () =>
+    assertFails(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
       status: "pending", updatedAt: "t",
+    })));
+
+  test("DENY company_admin bare active to pending", () =>
+    assertFails(updateDoc(doc(as("ca"), "organizations/o1/companies/c1/delegates/d1"), {
+      status: "pending", updatedAt: "t",
+    })));
+
+  test("DENY H-1: supervisor client re-upload (server callable only)", () =>
+    assertFails(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
+      status: "pending",
+      updatedAt: "t",
+      documents: [{
+        documentKey: "personalPhoto", documentStatus: "pending",
+        documentURL: "https://cdn.example/p1.jpg", uploadedAt: "2026-11-15",
+      }],
     })));
 
   test("DENY supervisor cannot set active delegate pending with extra fields", () =>
     assertFails(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
-      status: "pending", updatedAt: "t", displayName: "x",
+      status: "pending", updatedAt: "t", fullName: "x",
+      documents: [{
+        documentKey: "personalPhoto", documentStatus: "pending",
+        documentURL: "https://cdn.example/p1.jpg", uploadedAt: "2026-11-15",
+      }],
     })));
 
   test("DENY H-1: supervisor cannot create nested delegate with active status", () =>

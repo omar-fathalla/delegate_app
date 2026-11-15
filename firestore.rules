@@ -457,6 +457,18 @@ service cloud.firestore {
           ['paymentReceipt', 'electronicPaymentReceipt', 'electronic_payment_receipt'], 'documentURL');
     }
 
+    function supervisorOnlyRole(r) {
+      return r in ['supervisor', 'company_supervisor'];
+    }
+
+    function delegatePendingStatusOnly(st1) {
+      return st1 is string && st1.lower().trim() == 'pending';
+    }
+
+    function delegateStatusLower(st) {
+      return st is string ? st.lower().trim() : '';
+    }
+
     // S1 (Mohamed): approving a document is super-admin (any company) or
     // company-admin / admin / supervisor of the SAME company. Other staff may
     // still write delegate docs but may not introduce 'approved'.
@@ -556,7 +568,7 @@ service cloud.firestore {
       // support may activate, reactivate, suspend, or deactivate. The
       // account-status check stays on the non-techSignup branch so the
       // request-approval batch (4 document flips) stays under budget.
-      let saOrTech = r in superAdminRoleList() || tech;
+      // Supervisor active→pending doc replace is server-only (callable).
       return !(stCh && st1 == 'pending' && !approver)
         && ((techSignup && techFlipOk(delegateId) && techReqOk(o1, c1, delegateId))
           || (!techSignup && (delegateDocsOk() || approver)
@@ -655,6 +667,7 @@ service cloud.firestore {
         'company-admin', 'company_admin', 'companyadmin', 'admin',
         'supervisor', 'company_supervisor'];
     }
+
     function identityFieldKeys() {
       return ['nationalId', 'nationalityID'];
     }
@@ -954,23 +967,38 @@ service cloud.firestore {
     // / company and organization ids stay blocked.
     // Company/org staff may only touch metadata (updatedAt/notes) or cancel an
     // unpaid renewal — not reassign supervisorUid, change requestType, etc.
-    function staffDelegateRequestMetaOnly() {
+    function unpaidRequestCancelOk(u) {
       let st = request.resource.data.get('status', '');
       let cancelKeys = changedKeys().hasOnly(['status'])
         || changedKeys().hasOnly(['status', 'updatedAt']);
-      let cancelUnpaid = cancelKeys
-        && st == 'cancelled'
-        && resource.data.get('paymentStatus', '') != 'paid';
+      let pay = resource.data.get('paymentStatus', '');
+      let paid = pay is string && pay.lower().trim() == 'paid';
+      let cancelUnpaid = cancelKeys && st == 'cancelled' && !paid;
+      let ty = resource.data.get('requestType', 'new_delegate');
+      let r = u.get('role', '');
+      return cancelUnpaid && (
+        ty != 'new_delegate'
+        || r in superAdminRoleList()
+        || r in techRoleList()
+        || request.auth.uid == resource.data.get('createdBy', '')
+        || request.auth.uid == resource.data.get('supervisorUid', '')
+        || (supervisorOnlyRole(r)
+          && u.get('companyUID', '') != ''
+          && u.get('companyUID', '') == resource.data.get('companyUID', '')));
+    }
+
+    function staffDelegateRequestMetaOnly(u) {
       let metaKeys = changedKeys().hasOnly(['updatedAt'])
         || changedKeys().hasOnly(['updatedAt', 'notes'])
         || changedKeys().hasOnly(['notes']);
-      return cancelUnpaid || (metaKeys && !changedKeys().hasAny(['status']));
+      return unpaidRequestCancelOk(u)
+        || (metaKeys && !changedKeys().hasAny(['status']));
     }
 
     function requestStaffUpdateOk(requestId) {
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
       let r = u.get('role', '');
-      let scopedSafe = staffDelegateRequestMetaOnly();
+      let scopedSafe = staffDelegateRequestMetaOnly(u);
       return signedIn() && (
         r in [
           'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN']
@@ -1235,30 +1263,16 @@ service cloud.firestore {
     }
 
     // H-1: company staff cannot activate/suspend delegates (any status spelling).
-    // Approvers may reset status to pending only (doc re-upload flow).
-    function delegatePendingStatusOnly(st1) {
-      return st1 is string && st1.lower().trim() == 'pending';
-    }
-
-    function staffDelegateReuploadStatusOk(r) {
-      let st1 = request.resource.data.get('status', '');
-      let st0l = resource.data.get('status', '') is string
-        ? resource.data.get('status', '').lower().trim() : '';
-      let ch = changedKeys();
-      let shapeOk = ch.hasOnly(['status']) || ch.hasOnly(['status', 'updatedAt']);
-      return delegatePendingStatusOnly(st1) && shapeOk && (
-        (st0l == 'suspended' && (r in superAdminRoleList() || companyEditorRole(r)))
-        || (st0l == 'active' && r in ['supervisor', 'company_supervisor']));
-    }
-
+    // Mohamed 2026-11-15: active→pending only via supervisor doc replace;
+    // suspension lift only super-admin / technical_support.
     function staffDelegateAccountFieldsOk(r, approver) {
       let ch = changedKeys();
       let stCh = ch.hasAny(['status']);
       let actCh = ch.hasAny(['isActive']);
       let globalStaff = r in superAdminRoleList() || r in techRoleList();
+      let fromSuspended = delegateStatusLower(resource.data.get('status', '')) == 'suspended';
       return (!stCh && !actCh)
-        || globalStaff
-        || (stCh && !actCh && approver && staffDelegateReuploadStatusOk(r));
+        || (globalStaff && (stCh || actCh));
     }
 
     function usersUpdateOk(r, org, co, old, d, userId) {
@@ -2210,16 +2224,77 @@ service cloud.firestore {
         && resource.data.organizationId == callerOrg();
     }
 
+    // One roleIs list so company staff list queries stay under the 1k expr cap.
+    function penaltyCompanyStaffReadOk() {
+      return callerCompany() != '' && companyScoped()
+        && roleIs([
+          'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor',
+          'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'human_resources',
+          'accountant', 'accounting', 'account_admin',
+          'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+          'branches-marketing-manager', 'branchesmarketingmanager',
+          'branchesMarketingManager',
+          'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion'
+        ]);
+    }
+
+    function penaltyMarketingOrgListOk() {
+      return callerCompany() == '' && orgScoped()
+        && roleIs([
+          'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion'
+        ]);
+    }
+
+    function penaltyMarketingReadOk() {
+      return penaltyCompanyStaffReadOk() || penaltyMarketingOrgListOk();
+    }
+
+    function delegatePenaltyTargetOk(targetId) {
+      return targetId is string && targetId != '' && (
+        targetId == request.auth.uid
+        || claimString('delegateId') == targetId
+        || claimListHas('delegateIds', targetId)
+      );
+    }
+
+    function delegatePenaltySelfReadOk() {
+      return claimString('role') == 'delegate' && delegateOtpOk() && (
+        delegatePenaltyTargetOk(resource.data.get('targetDelegateId', ''))
+        || delegatePenaltyTargetOk(resource.data.get('delegateUid', ''))
+      );
+    }
+
+    function delegatePenaltyListOk() {
+      return delegateOtpOk()
+        && resource.data.get('targetDelegateId', '') != ''
+        && (resource.data.get('targetDelegateId', '') == request.auth.uid
+          || claimListHas('delegateIds', resource.data.get('targetDelegateId', '')));
+    }
+
+    function penaltyStaffListOk() {
+      return canReadOrgAdminPenaltyByOrgId()
+        || penaltyCompanyStaffReadOk()
+        || penaltyMarketingOrgListOk()
+        || isGlobalStaff()
+        || (isOrgAdmin() && orgScoped());
+    }
+
+    function penaltyStaffGetOk() {
+      return canReadOrgAdminPenaltyByOrgId()
+        || isGlobalStaff()
+        || penaltyCompanyStaffReadOk()
+        || (isOrgAdmin() && orgScoped())
+        || penaltyMarketingReadOk();
+    }
+
     match /penalties/{penaltyId} {
-      allow read: if signedIn() && canReadOrgAdminPenaltyByOrgId();
-      allow read: if signedIn() && (
-        isGlobalStaff()
-        || (isCompanyScopedStaff() && companyScoped())
-        || (isOrgScopedStaff() && orgScoped())
-        || resource.data.targetDelegateId == request.auth.uid
-        || delegateOwns(resource.data.targetDelegateId)
-        || resource.data.delegateUid == request.auth.uid
-        || delegateOwns(resource.data.delegateUid)
+      // List/get: delegate vs staff split (1k expr cap — avoid evaluating both paths).
+      allow list: if signedIn() && (
+        claimString('role') == 'delegate' ? delegatePenaltyListOk() : penaltyStaffListOk()
+      );
+      allow get: if signedIn() && (
+        claimString('role') == 'delegate' ? delegatePenaltySelfReadOk() : penaltyStaffGetOk()
       );
       allow create, update: if isGlobalStaff()
         || (isCompanyScopedStaff() && (companyScoped() || incomingCompanyScoped()))

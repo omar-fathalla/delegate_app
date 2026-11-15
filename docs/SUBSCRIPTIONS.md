@@ -277,8 +277,9 @@ Named functions (codebase `tashil-mobile-notifications`):
 
 Set test-mode env on the two functions only (never commit values):
 `PAYMOB_SECRET_KEY` (`sk_test_…`), `PAYMOB_PUBLIC_KEY` (`pk_test_…`),
-`PAYMOB_HMAC_SECRET`, `PAYMOB_INTEGRATION_IDS` (comma-separated test Integration
-IDs), optional `PAYMOB_BASE_URL` (default `https://accept.paymob.com`).
+`PAYMOB_HMAC_SECRET`, `PAYMOB_INTEGRATION_IDS` (on tashil-dev use **5882985**
+only — see `TASHIL_DEV_PAYMOB_INTEGRATION_ID`; never live `6033728`/`6033727`),
+optional `PAYMOB_BASE_URL` (default `https://accept.paymob.com`).
 The Flutter `PaymobSubscriptionGateway` calls (1) and never holds keys or amounts.
 
 Nothing here is deployed. Before the scheduled function is deployed, the

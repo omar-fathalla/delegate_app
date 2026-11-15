@@ -8,6 +8,7 @@
     "test:rules:adv": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-adv \"node --test test/rules/adversarial.test.js\"",
     "test:rules:docs": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-docs-pending \"node --test test/rules/docs-pending.test.js\"",
     "test:e2e:subscriptions": "npm --prefix functions run build && npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-tashil-subs \"node --test --test-concurrency=1 test/e2e/subscriptions.e2e.test.js\"",
+    "test:e2e:supervisor-reupload": "npm --prefix functions run build && npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-supervisor-reupload \"node --test test/e2e/supervisor-doc-reupload.e2e.test.js\"",
     "test:rules:qa-hold": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-qa-hold-reads \"node --test test/rules/qa-hold-reads.test.js\"",
     "test:rules:profile": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-profile-edit \"node --test test/rules/delegate-profile-edit.test.js\"",
     "test:rules:m31": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-m31-delegate-own-reads \"node --test test/rules/m31-delegate-own-reads.test.js\"",
@@ -15,6 +16,8 @@
     "test:rules:source": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-delegate-source \"node --test test/rules/delegate-source-lock.test.js\"",
     "test:rules:gaps": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-ta8-gaps \"node --test test/rules/company-scoping-gaps.test.js\"",
     "test:rules:ut-nb": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-ut-nb \"node --test test/rules/ut-nonblocking-fixes.test.js\"",
+    "test:rules:status-guards": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-status-guards \"node --test test/rules/delegate-status-guards.test.js\"",
+    "test:rules:security": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-suspend-login-penalties \"node --test test/rules/suspend-login-penalties.test.js\"",
     "test:rules:storage": "npx --yes firebase-tools@14.15.1 emulators:exec --only storage,firestore --project demo-tashil-storage \"node --test test/rules/storage.rules.test.js\""
   },
   "devDependencies": {

@@ -175,7 +175,7 @@ wait_emulator_ports
 run_job functions 15 'cd functions && npm ci && npm run lint && npm test --if-present && cd .. && npm install --no-audit --no-fund && npm run test:e2e:staff'
 
 wait_emulator_ports
-run_job rules 20 'npm install --no-audit --no-fund && npm --prefix functions ci && npm run test:rules && npm run test:rules:interim && npm run test:rules:p0 && npm run test:rules:adv && npm run test:rules:docs && npm run test:rules:subs && npm run test:rules:qa-hold && npm run test:rules:profile && npm run test:rules:m31 && npm run test:rules:source && npm run test:rules:gaps && npm run test:rules:storage && npm run test:e2e:subscriptions && npm run test:e2e:delegate'
+run_job rules 20 'npm install --no-audit --no-fund && npm --prefix functions ci && npm run test:rules && npm run test:rules:interim && npm run test:rules:p0 && npm run test:rules:adv && npm run test:rules:docs && npm run test:rules:subs && npm run test:rules:qa-hold && npm run test:rules:profile && npm run test:rules:m31 && npm run test:rules:source && npm run test:rules:gaps && npm run test:rules:status-guards && npm run test:rules:security && npm run test:rules:ut-nb && npm run test:rules:storage && npm run test:e2e:subscriptions && npm run test:e2e:delegate && npm run test:e2e:supervisor-reupload'
 
 # Extra vs ci.yml: Android dev debug APK (requested for local machine CI).
 run_job android-dev-build 30 "flutter pub get --enforce-lockfile && flutter build apk --debug --flavor dev --dart-define=ENV=dev --dart-define=GIT_SHA=${SHA}"

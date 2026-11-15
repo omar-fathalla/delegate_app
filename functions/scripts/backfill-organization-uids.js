@@ -17,7 +17,7 @@
  */
 const fs = require("fs");
 const path = require("path");
-const {parseArgs, assertTarget} = require("./p0-common");
+const {parseArgs, assertTarget, newBackfillRunId, writeJsonFileNew} = require("./p0-common");
 
 function str(v) {
   return typeof v === "string" ? v.trim() : "";
@@ -72,6 +72,33 @@ function valuesEqual(a, b) {
   return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 }
 
+/** Fields consulted by planPatch; captured at scan time for --apply guards. */
+function atReadOf(data) {
+  const d = data || {};
+  return {
+    organizationUID: d.organizationUID,
+    organizationName: d.organizationName,
+    organizationUIDs: d.organizationUIDs,
+    organizationNames: d.organizationNames,
+  };
+}
+
+function changedSinceRead(live, atRead) {
+  return !valuesEqual(atReadOf(live), atRead);
+}
+
+/** Skip apply when the doc changed after the initial collection scan. */
+function shouldApplyWrite(live, planned) {
+  if (changedSinceRead(live, planned.atRead)) {
+    return {ok: false, reason: "changed_since_read"};
+  }
+  const patch = planPatch(live || {});
+  if (!patch || !valuesEqual(patch, planned.patch)) {
+    return {ok: false, reason: "plan_changed"};
+  }
+  return {ok: true};
+}
+
 /**
  * The fields the backfill wrote. Prefer `entry.fields` when the rollback
  * file has them; otherwise reconstruct from the pre-backfill `previous`
@@ -96,6 +123,54 @@ function currentMatchesWritten(data, written) {
   const keys = Object.keys(written).filter((k) => !isDeleteSentinel(written[k]));
   if (keys.length === 0) return false;
   return keys.every((k) => valuesEqual(data ? data[k] : undefined, written[k]));
+}
+
+/** Refuse after scan when any planned row is not a safe delegate_requests patch. */
+function assertValidBackfillPlan(planned) {
+  for (const p of planned) {
+    if (!p || typeof p.path !== "string" || !p.path.startsWith("delegate_requests/")) {
+      throw new Error(`Invalid backfill plan: bad path ${p && p.path}`);
+    }
+    if (!p.patch || typeof p.patch !== "object" || !Object.keys(p.patch).length) {
+      throw new Error(`Invalid backfill plan: empty patch for ${p.path}`);
+    }
+  }
+}
+
+/** @param {unknown} err */
+function isPreconditionFailure(err) {
+  const code = err && (err.code || err.status);
+  if (code === 9 || code === "failed-precondition" || code === "FAILED_PRECONDITION") return true;
+  const msg = String((err && err.message) || err || "");
+  return /precondition|last update time|ABORTED/i.test(msg);
+}
+
+/**
+ * Applies patches using Firestore lastUpdateTime preconditions (one failed
+ * precondition skips that doc; other errors propagate).
+ * @param {FirebaseFirestore.Firestore} db
+ * @param {{path: string, patch: object, lastUpdateTime: FirebaseFirestore.Timestamp}[]} rows
+ */
+async function writePatchesWithPrecondition(db, rows) {
+  let written = 0;
+  const skipReasons = {};
+  for (const row of rows) {
+    if (!row.lastUpdateTime) {
+      skipReasons.missing_update_time = (skipReasons.missing_update_time || 0) + 1;
+      continue;
+    }
+    try {
+      await db.doc(row.path).update(row.patch, {lastUpdateTime: row.lastUpdateTime});
+      written++;
+    } catch (e) {
+      if (isPreconditionFailure(e)) {
+        skipReasons.precondition_failed = (skipReasons.precondition_failed || 0) + 1;
+        continue;
+      }
+      throw e;
+    }
+  }
+  return {written, skipReasons};
 }
 
 /** Restore only when the doc still holds the backfill's written value. */
@@ -132,10 +207,10 @@ async function restore(db, args) {
       skipReasons[decision.reason] = (skipReasons[decision.reason] || 0) + 1;
       continue;
     }
-    planned.push(c);
+    planned.push({...c, lastUpdateTime: snap.updateTime});
   }
 
-  const runId = `org-uids-restore-${new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z")}`;
+  const runId = newBackfillRunId("org-uids-restore");
   const report = {
     project: args.project,
     mode: args.apply ? "restore-apply" : "restore-dry-run",
@@ -146,17 +221,12 @@ async function restore(db, args) {
   };
   if (!args.apply) return report;
 
-  let written = 0;
-  for (let i = 0; i < planned.length; i += 400) {
-    const batch = db.batch();
-    const slice = planned.slice(i, i + 400);
-    for (const p of slice) {
-      batch.update(db.doc(p.path), p.patch);
-    }
-    await batch.commit();
-    written += slice.length;
-  }
+  const {written, skipReasons: preconditionSkips} = await writePatchesWithPrecondition(db, planned);
   report.counts.written = written;
+  if (Object.keys(preconditionSkips).length) {
+    report.counts.applySkipReasons = {...(report.counts.skipReasons || {}), ...preconditionSkips};
+    report.counts.applySkipped = Object.values(preconditionSkips).reduce((a, b) => a + b, 0);
+  }
   return report;
 }
 
@@ -171,16 +241,24 @@ async function run(db, args) {
       skipped++;
       continue;
     }
-    planned.push({path: doc.ref.path, id: doc.id, patch, previous: previousOf(data)});
+    planned.push({
+      path: doc.ref.path,
+      id: doc.id,
+      patch,
+      previous: previousOf(data),
+      atRead: atReadOf(data),
+    });
   }
 
-  const runId = `org-uids-${new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z")}`;
+  assertValidBackfillPlan(planned);
+
+  const runId = newBackfillRunId("org-uids");
   const report = {
     project: args.project,
     mode: args.apply ? "apply" : "dry-run",
     runId,
     at: new Date().toISOString(),
-    counts: {docs: snap.size, planned: planned.length, skipped, written: 0},
+    counts: {docs: snap.size, planned: planned.length, skipped, written: 0, applySkipped: 0, applySkipReasons: {}},
   };
 
   const rollbackPath = args.rollback ||
@@ -191,7 +269,7 @@ async function run(db, args) {
     at: report.at,
     entries: planned.map((p) => ({path: p.path, previous: p.previous, fields: p.patch})),
   };
-  fs.writeFileSync(rollbackPath, JSON.stringify(rollback, null, 2));
+  writeJsonFileNew(rollbackPath, rollback, "rollback");
   report.rollbackFile = rollbackPath;
   console.log(`wrote rollback file ${rollbackPath} (${planned.length} entries)`);
 
@@ -199,16 +277,32 @@ async function run(db, args) {
     return report;
   }
 
-  let written = 0;
-  for (let i = 0; i < planned.length; i += 400) {
-    const batch = db.batch();
-    const slice = planned.slice(i, i + 400);
-    for (const p of slice) {
-      batch.update(db.doc(p.path), p.patch);
+  const toWrite = [];
+  const applySkipReasons = {};
+  for (const p of planned) {
+    const snap = await db.doc(p.path).get();
+    const data = snap.exists ? (snap.data() || {}) : null;
+    const decision = shouldApplyWrite(data, p);
+    if (!decision.ok) {
+      report.counts.applySkipped++;
+      applySkipReasons[decision.reason] = (applySkipReasons[decision.reason] || 0) + 1;
+      continue;
     }
-    await batch.commit();
-    written += slice.length;
+    toWrite.push({...p, lastUpdateTime: snap.updateTime});
   }
+  report.counts.applySkipReasons = applySkipReasons;
+
+  const rows = toWrite.map((p) => ({
+    path: p.path,
+    patch: p.patch,
+    lastUpdateTime: p.lastUpdateTime,
+  }));
+  const {written, skipReasons: preconditionSkips} = await writePatchesWithPrecondition(db, rows);
+  for (const [reason, n] of Object.entries(preconditionSkips)) {
+    report.counts.applySkipped += n;
+    applySkipReasons[reason] = (applySkipReasons[reason] || 0) + n;
+  }
+  report.counts.applySkipReasons = applySkipReasons;
   report.counts.written = written;
   return report;
 }
@@ -250,7 +344,7 @@ async function main() {
     "/tmp",
     `organization-uids-report-${report.runId}.json`,
   );
-  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+  writeJsonFileNew(reportPath, report, "report");
   console.log(`wrote report ${reportPath}`);
   console.log(JSON.stringify(report.counts, null, 2));
   console.log(`mode=${report.mode} runId=${report.runId} project=${project}`);
@@ -263,4 +357,8 @@ if (require.main === module) {
   });
 }
 
-module.exports = {planPatch, previousOf, planRestore, restore, run, writtenFieldsOf, currentMatchesWritten, shouldRestore, isDeleteSentinel};
+module.exports = {
+  planPatch, previousOf, planRestore, restore, run, writtenFieldsOf, currentMatchesWritten,
+  shouldRestore, isDeleteSentinel, atReadOf, changedSinceRead, shouldApplyWrite,
+  assertValidBackfillPlan, isPreconditionFailure, writePatchesWithPrecondition,
+};

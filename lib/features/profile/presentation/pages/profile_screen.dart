@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:delegate_app/core/security/delegate_status_policy.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
@@ -16,6 +17,7 @@ import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/features/profile/data/datasources/supervisor_delegate_doc_reupload_remote.dart';
 import 'package:delegate_app/features/profile/presentation/utils/document_review.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -931,19 +933,17 @@ class _ProfileBody extends StatelessWidget {
     return list;
   }
 
-  /// uid of the signed-in user when they may approve this delegate's
-  /// documents: super-admin (any company) or company admin/supervisor
-  /// (UserRole.admin) of the same company. Null otherwise.
+  /// uid when the viewer may approve documents: super-admin or technical
+  /// support only (Mohamed 2026-11-15). Supervisors re-upload as pending;
+  /// SA/tech approve.
   String? _docApproverUid(BuildContext context) {
     try {
       final state = context.read<AuthBloc>().state;
       if (state is! AuthAuthenticated) return null;
       final me = state.delegate;
       if (me.uid == delegate.uid) return null;
-      if (me.role == UserRole.superAdmin) return me.uid;
-      if (me.role == UserRole.admin &&
-          me.companyUID.isNotEmpty &&
-          me.companyUID == delegate.companyUID) {
+      if (me.role == UserRole.superAdmin ||
+          me.role == UserRole.technicalSupport) {
         return me.uid;
       }
     } catch (_) {}
@@ -1147,6 +1147,38 @@ class _ProfileBody extends StatelessWidget {
       final newUrl = await uploadTask.ref.getDownloadURL();
 
       final firestore = FirebaseFirestore.instance;
+
+      final authState = context.read<AuthBloc>().state;
+      final viewer = authState is AuthAuthenticated ? authState.delegate : null;
+      final supervisorPendingReupload = shouldSupervisorMarkDelegatePendingOnDocReplace(
+        target: delegate,
+        viewerRole: viewer?.role,
+        viewerUid: viewer?.uid ?? '',
+        viewerCompanyUID: viewer?.companyUID,
+        viewerIsDocApprover: approverUid != null,
+      );
+
+      if (supervisorPendingReupload) {
+        await SupervisorDelegateDocReuploadRemote().reupload(
+          uid: delegate.uid,
+          organizationUID: delegate.organizationUID,
+          companyUID: delegate.companyUID,
+          docType: item.docType,
+          newUrl: newUrl,
+        );
+        if (context.mounted) {
+          Navigator.pop(context);
+          AppSnackBar.showSuccess(context, 'تم تحديث ${item.title} وسيُراجع من الإدارة.');
+          context.read<ProfileBloc>().add(
+            LoadProfile(
+              uid: delegate.uid,
+              organizationUID: delegate.organizationUID,
+              companyUID: delegate.companyUID,
+            ),
+          );
+        }
+        return;
+      }
 
       final Map<String, dynamic> updateFields = {
         'updatedAt': FieldValue.serverTimestamp(),

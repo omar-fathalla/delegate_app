@@ -33,7 +33,13 @@ describe("backfill organizationUIDs planRestore", () => {
 
 const {
   writtenFieldsOf, currentMatchesWritten, shouldRestore, isDeleteSentinel,
+  atReadOf, changedSinceRead, shouldApplyWrite, assertValidBackfillPlan,
+  isPreconditionFailure, writePatchesWithPrecondition,
 } = require("../scripts/backfill-organization-uids");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const {writeJsonFileNew, refuseExistingOutputFile} = require("../scripts/p0-common");
 
 describe("backfill organizationUIDs restore compare-before-write", () => {
   test("restores only when the live doc still holds the backfill write", () => {
@@ -72,5 +78,107 @@ describe("backfill organizationUIDs restore compare-before-write", () => {
     const del = require("firebase-admin").firestore.FieldValue.delete();
     assert.equal(isDeleteSentinel(del), true);
     assert.equal(isDeleteSentinel(["o1"]), false);
+  });
+});
+
+describe("backfill organizationUIDs apply changed-since-read", () => {
+  test("shouldApplyWrite accepts an unchanged legacy doc", () => {
+    const data = {organizationUID: "o1", organizationName: "كارفور"};
+    const planned = {
+      patch: {organizationUIDs: ["o1"], organizationNames: ["كارفور"]},
+      atRead: atReadOf(data),
+    };
+    assert.equal(shouldApplyWrite(data, planned).ok, true);
+  });
+
+  test("shouldApplyWrite skips when organizationUIDs changed after scan", () => {
+    const atScan = {organizationUID: "o1", organizationName: "كارفور"};
+    const planned = {
+      patch: {organizationUIDs: ["o1"], organizationNames: ["كارفور"]},
+      atRead: atReadOf(atScan),
+    };
+    const live = {
+      organizationUID: "o1",
+      organizationName: "كارفور",
+      organizationUIDs: ["o1", "o2"],
+    };
+    assert.equal(changedSinceRead(live, planned.atRead), true);
+    const skip = shouldApplyWrite(live, planned);
+    assert.equal(skip.ok, false);
+    assert.equal(skip.reason, "changed_since_read");
+  });
+
+  test("rollback refuse guard blocks overwriting an existing file", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "org-uids-rb-"));
+    const rollbackPath = path.join(dir, "organization-uids-rollback.json");
+    writeJsonFileNew(rollbackPath, {entries: []}, "rollback");
+    assert.throws(
+      () => refuseExistingOutputFile(rollbackPath, "rollback"),
+      /use a new path for each run/,
+    );
+    assert.throws(
+      () => writeJsonFileNew(rollbackPath, {entries: [{path: "x"}]}, "rollback"),
+      /Refusing to overwrite existing rollback/,
+    );
+  });
+});
+
+describe("backfill organizationUIDs apply precondition writes", () => {
+  test("assertValidBackfillPlan rejects bad paths or empty patches", () => {
+    assert.throws(
+      () => assertValidBackfillPlan([{path: "users/x", patch: {organizationUIDs: ["o1"]}}]),
+      /Invalid backfill plan/,
+    );
+    assert.throws(
+      () => assertValidBackfillPlan([{path: "delegate_requests/x", patch: {}}]),
+      /empty patch/,
+    );
+    assert.doesNotThrow(() => assertValidBackfillPlan([
+      {path: "delegate_requests/r1", patch: {organizationUIDs: ["o1"]}},
+    ]));
+  });
+
+  test("isPreconditionFailure recognizes Firestore failed-precondition", () => {
+    assert.equal(isPreconditionFailure({code: 9, message: "x"}), true);
+    assert.equal(isPreconditionFailure({code: "failed-precondition"}), true);
+    assert.equal(isPreconditionFailure(new Error("ABORTED: precondition")), true);
+    assert.equal(isPreconditionFailure(new Error("permission denied")), false);
+  });
+
+  test("writePatchesWithPrecondition writes when update succeeds", async () => {
+    const updates = [];
+    const ts = {seconds: 1, nanoseconds: 0};
+    const db = {
+      doc: (p) => ({
+        path: p,
+        update: async (patch, pre) => {
+          updates.push({path: p, patch, pre});
+        },
+      }),
+    };
+    const result = await writePatchesWithPrecondition(db, [
+      {path: "delegate_requests/r1", patch: {organizationUIDs: ["o1"]}, lastUpdateTime: ts},
+    ]);
+    assert.equal(result.written, 1);
+    assert.deepEqual(updates[0].pre, {lastUpdateTime: ts});
+  });
+
+  test("writePatchesWithPrecondition skips precondition failures", async () => {
+    const db = {
+      doc: () => ({
+        update: async () => {
+          const err = new Error("FAILED_PRECONDITION");
+          err.code = 9;
+          throw err;
+        },
+      }),
+    };
+    const ts = {seconds: 1, nanoseconds: 0};
+    const result = await writePatchesWithPrecondition(db, [
+      {path: "delegate_requests/r1", patch: {organizationUIDs: ["o1"]}, lastUpdateTime: ts},
+      {path: "delegate_requests/r2", patch: {organizationUIDs: ["o2"]}, lastUpdateTime: ts},
+    ]);
+    assert.equal(result.written, 0);
+    assert.equal(result.skipReasons.precondition_failed, 2);
   });
 });

@@ -66,7 +66,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get delegateAccountInactive =>
-      'هذا الحساب قيد المراجعة أو موقوف. يرجى التواصل مع مسؤول الشركة.';
+      'هذا الحساب موقوف حاليًا. يرجى التواصل مع إدارة تسهيل.';
 
   @override
   String get tooManyLoginAttempts =>

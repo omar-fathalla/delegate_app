@@ -48,7 +48,23 @@ describe("delegate_requests: payment is server-only", () => {
       });
       await db.doc("delegate_requests/legacy").set({
         requestType: "new_delegate", status: "pending", orgCompanyCheck: "ok",
-        organizationUID: "o1", companyUID: "c1",
+        organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
+        paymentStatus: "pending", createdBy: "admin1",
+      });
+      await db.doc("delegate_requests/new-unpaid-sup").set({
+        requestType: "new_delegate", status: "pending", orgCompanyCheck: "ok",
+        organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
+        paymentStatus: "pending", createdBy: "admin1",
+      });
+      await db.doc("delegate_requests/new-unpaid-creator").set({
+        requestType: "new_delegate", status: "pending", orgCompanyCheck: "ok",
+        organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
+        paymentStatus: "pending", createdBy: "admin1",
+      });
+      await db.doc("delegate_requests/new-unpaid-hr-deny").set({
+        requestType: "new_delegate", status: "pending", orgCompanyCheck: "ok",
+        organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
+        paymentStatus: "pending", createdBy: "admin1",
       });
       await db.doc("delegate_requests/scoped").set({
         requestType: "renewal", status: "pending", organizationUID: "o1", companyUID: "c1", supervisorUid: "sup",
@@ -301,6 +317,14 @@ describe("delegate_requests: payment is server-only", () => {
       requestType: "new_delegate", updatedAt: "t",
     }));
     await assertFails(as("mk").doc("delegate_requests/scoped").update({updatedAt: "t"}));
+  });
+
+  test("new_delegate unpaid cancel: supervisor or createdBy only", async () => {
+    await assertSucceeds(as("sup").doc("delegate_requests/new-unpaid-sup").update({status: "cancelled"}));
+    await assertSucceeds(as("admin1").doc("delegate_requests/new-unpaid-creator").update({status: "cancelled"}));
+    await assertFails(as("hr1").doc("delegate_requests/new-unpaid-hr-deny").update({status: "cancelled"}));
+    await assertFails(as("mk").doc("delegate_requests/new-unpaid-hr-deny").update({status: "cancelled"}));
+    await assertFails(as("oa1").doc("delegate_requests/new-unpaid-hr-deny").update({status: "cancelled"}));
   });
 
   test("requestStaffUpdateOk is company-scoped and blocks approval fields", async () => {

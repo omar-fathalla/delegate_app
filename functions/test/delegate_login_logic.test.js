@@ -73,6 +73,117 @@ test("evaluateCandidates never treats a national-id miss as success", () => {
   );
 });
 
+test("evaluateCandidates blocks globally when same national id is suspended on a different phone", () => {
+  const decision = logic.evaluateCandidates([
+    {
+      id: "active-b",
+      status: "active",
+      companyId: "c2",
+      orgId: "o2",
+      createdAtMillis: 2,
+      nationalIdMatches: true,
+      phoneMatchesLogin: true,
+    },
+    {
+      id: "suspended-a",
+      status: "suspended",
+      companyId: "c1",
+      orgId: "o1",
+      createdAtMillis: 1,
+      nationalIdMatches: true,
+      phoneMatchesLogin: false,
+    },
+  ]);
+  assert.equal(decision.outcome, "inactive");
+});
+
+test("evaluateCandidates blocks globally when subscription_expired is enforced on another phone", () => {
+  const decision = logic.evaluateCandidates([
+    {
+      id: "active-b",
+      status: "active",
+      companyId: "c2",
+      orgId: "o2",
+      createdAtMillis: 2,
+      nationalIdMatches: true,
+      phoneMatchesLogin: true,
+    },
+    {
+      id: "expired-a",
+      status: "suspended",
+      statusReason: "subscription_expired",
+      holds: { subscription_expired: { at: "2026-01-01" } },
+      companyId: "c1",
+      orgId: "o1",
+      createdAtMillis: 1,
+      nationalIdMatches: true,
+      phoneMatchesLogin: false,
+    },
+  ]);
+  assert.equal(decision.outcome, "inactive");
+});
+
+test("evaluateCandidates does not sign in without a phone match even when national id matches elsewhere", () => {
+  const decision = logic.evaluateCandidates([
+    {
+      id: "other-phone",
+      status: "active",
+      companyId: "c1",
+      orgId: "o1",
+      createdAtMillis: 1,
+      nationalIdMatches: true,
+      phoneMatchesLogin: false,
+    },
+  ]);
+  assert.equal(decision.outcome, "inactive");
+});
+
+test("evaluateCandidates blocks login when any matched profile is suspended in another company", () => {
+  const base = {
+    companyId: "c1",
+    orgId: "o1",
+    createdAtMillis: 10,
+    nationalIdMatches: true,
+  };
+  const decision = logic.evaluateCandidates([
+    { ...base, id: "active-a", status: "active" },
+    { ...base, id: "suspended-b", status: "suspended", companyId: "c2", orgId: "o2" },
+  ]);
+  assert.equal(decision.outcome, "inactive");
+});
+
+test("evaluateCandidates ignores shadow subscription_expired holds when status is still active", () => {
+  const decision = logic.evaluateCandidates([
+    {
+      id: "active-a",
+      status: "active",
+      companyId: "c1",
+      orgId: "o1",
+      createdAtMillis: 1,
+      nationalIdMatches: true,
+    },
+    {
+      id: "shadow-b",
+      status: "active",
+      statusReason: "subscription_expired",
+      holds: { subscription_expired: { at: "2026-01-01" } },
+      companyId: "c2",
+      orgId: "o2",
+      createdAtMillis: 2,
+      nationalIdMatches: true,
+    },
+  ]);
+  assert.equal(decision.outcome, "ok");
+  assert.deepEqual(decision.ids, ["active-a", "shadow-b"]);
+});
+
+test("chunkQueryValues splits in-query phone variants", () => {
+  const values = Array.from({ length: 23 }, (_, index) => `010${String(index).padStart(8, "0")}`);
+  const chunks = logic.chunkQueryValues(values, 10);
+  assert.equal(chunks.length, 3);
+  assert.equal(chunks[0].length, 10);
+  assert.equal(chunks[2].length, 3);
+});
 test("evaluateCandidates keeps every allowed profile and picks a stable primary", () => {
   const decision = logic.evaluateCandidates([
     {

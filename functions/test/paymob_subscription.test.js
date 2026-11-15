@@ -16,7 +16,7 @@ function sampleObj(overrides = {}) {
     error_occured: false,
     has_parent_transaction: false,
     id: 192036465,
-    integration_id: 4097558,
+    integration_id: paymob.TASHIL_DEV_PAYMOB_INTEGRATION_ID,
     is_3d_secure: true,
     is_auth: false,
     is_capture: false,
@@ -54,7 +54,7 @@ describe("paymob hmac", () => {
     const obj = sampleObj();
     const expected = [
       41667, "2026-11-11T21:00:00.000000", "EGP", false, false, 192036465,
-      4097558, true, false, false, false, true, false, 217503754, 302852,
+      paymob.TASHIL_DEV_PAYMOB_INTEGRATION_ID, true, false, false, false, true, false, 217503754, 302852,
       false, "2346", "MasterCard", "card", true,
     ].map(String).join("");
     assert.equal(hmac.transactionPostHmacPayload(obj), expected);
@@ -73,10 +73,33 @@ describe("paymob env", () => {
     const ok = paymob.readPaymobEnv(base);
     assert.equal("error" in ok, false);
     assert.deepEqual(ok.integrationIds, [12345]);
+    const devInt = paymob.readPaymobEnv({
+      ...base,
+      PAYMOB_INTEGRATION_IDS: String(paymob.TASHIL_DEV_PAYMOB_INTEGRATION_ID),
+    });
+    assert.equal("error" in devInt, false);
+    assert.deepEqual(devInt.integrationIds, [paymob.TASHIL_DEV_PAYMOB_INTEGRATION_ID]);
     assert.equal(paymob.readPaymobEnv({...base, PAYMOB_SECRET_KEY: "sk_live_abc"}).error, "paymob_live_forbidden");
     assert.equal(paymob.readPaymobEnv({...base, PAYMOB_PUBLIC_KEY: "pk_live_def"}).error, "paymob_live_forbidden");
     assert.equal(paymob.readPaymobEnv({...base, PAYMOB_LIVE: "true"}).error, "paymob_live_forbidden");
     assert.equal(paymob.readPaymobEnv({}).error, "paymob_not_configured");
+  });
+
+  it("refuses live Paymob integration IDs even with test keys", () => {
+    for (const liveId of paymob.PAYMOB_FORBIDDEN_LIVE_INTEGRATION_IDS) {
+      assert.equal(
+        paymob.readPaymobEnv({...base, PAYMOB_INTEGRATION_IDS: String(liveId)}).error,
+        "paymob_live_forbidden",
+      );
+    }
+    const mixed = paymob.readPaymobEnv({
+      ...base,
+      PAYMOB_INTEGRATION_IDS: [
+        paymob.TASHIL_DEV_PAYMOB_INTEGRATION_ID,
+        6033728,
+      ].join(","),
+    });
+    assert.equal(mixed.error, "paymob_live_forbidden");
   });
 
   it("accepts regional and classic test keys and refuses live keys", () => {

@@ -9,11 +9,21 @@ exists so list queries and audit views see the same field on every doc.
 ## Safety
 
 - **Target:** `tashil-dev` only. `practice-firebase-72df1` (prod) is refused
-  unless a later written go passes `--allow-prod-project=` (not approved for
-  this backfill).
+  unless a later written go passes `--allow-prod-project=` with approval from
+  **Mohamed Fathallah** (required approver for any production run; not approved
+  for this backfill today).
 - **Default mode is dry-run** (no writes). Pass `--apply` to write.
 - **`--dry-run`** may be passed explicitly (same as omitting `--apply`).
 - Never combine `--dry-run` with `--apply`.
+- **`--rollback` paths:** each run (dry-run or apply) must use a **new**
+  rollback file path. The script **scans Firestore first**, builds the plan,
+  then—**before any write** (rollback JSON or Firestore)—creates the rollback
+  file with an exclusive `wx` create. If that path already exists, or the plan
+  is invalid, the run **stops there** and leaves Firestore untouched.
+- **Apply guard:** `--apply` re-reads each planned document before write, skips
+  docs whose fields changed since the scan (`changed_since_read` / `plan_changed`),
+  and applies remaining patches with a Firestore **`lastUpdateTime` precondition**
+  so a doc that changes between re-read and write is not overwritten.
 - Prints counts only in stdout (no personal data in logs).
 - Does not deploy functions or rules.
 
@@ -36,42 +46,46 @@ Authenticate to GCP/Firebase Admin for **tashil-dev** (your usual
 ### 1 — Dry-run first (required)
 
 Writes a rollback JSON and a report under `/tmp`; **no Firestore writes**.
+Use a dedicated rollback path for this run only.
 
 ```bash
 node scripts/backfill-organization-uids.js \
   --project tashil-dev \
   --dry-run \
-  --rollback /tmp/organization-uids-rollback.json
+  --rollback /tmp/organization-uids-rollback-dryrun-<runId>.json
 ```
 
 Review `planned` vs `skipped` in the printed counts and the report file
-(`organization-uids-report-*.json`). Confirm the rollback file lists only
-`delegate_requests/*` paths you expect.
+(`organization-uids-report-*.json`, unique suffix per run). Confirm the rollback
+file lists only `delegate_requests/*` paths you expect.
 
 ### 2 — Apply on tashil-dev only (after dry-run sign-off)
 
-Reuses the **same** rollback file from step 1:
+**Do not reuse the step 1 rollback path.** Choose a **new** `--rollback` path;
+apply writes a fresh rollback snapshot for that run, then writes Firestore.
 
 ```bash
 node scripts/backfill-organization-uids.js \
   --project tashil-dev \
   --apply \
-  --rollback /tmp/organization-uids-rollback.json
+  --rollback /tmp/organization-uids-rollback-apply-<runId>.json
 ```
 
 The script sets `organizationUIDs = [organizationUID]` (and
 `organizationNames = [organizationName]` when the name is present) on
-documents that do not already have a non-empty list.
+documents that do not already have a non-empty list. Check `applySkipped` /
+`applySkipReasons` in the report if any doc changed between scan and apply.
 
 ### 3 — Rollback (optional)
 
-Dry-run restore (compare-before-write; skips docs changed after the backfill):
+Use the rollback file from the **apply** run (not the dry-run file). Dry-run
+restore (compare-before-write; skips docs changed after the backfill):
 
 ```bash
 node scripts/backfill-organization-uids.js \
   --project tashil-dev \
   --dry-run \
-  --restore /tmp/organization-uids-rollback.json
+  --restore /tmp/organization-uids-rollback-apply-<runId>.json
 ```
 
 Apply restore only if the dry-run restore counts look right:
@@ -80,7 +94,7 @@ Apply restore only if the dry-run restore counts look right:
 node scripts/backfill-organization-uids.js \
   --project tashil-dev \
   --apply \
-  --restore /tmp/organization-uids-rollback.json
+  --restore /tmp/organization-uids-rollback-apply-<runId>.json
 ```
 
 ## Related app work

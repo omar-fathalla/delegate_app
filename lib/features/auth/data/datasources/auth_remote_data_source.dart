@@ -132,7 +132,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         );
       case 'account_inactive':
         return const DelegateAccountInactiveFailure(
-          'هذا الحساب قيد المراجعة أو موقوف. يرجى التواصل مع مسؤول الشركة.',
+          'هذا الحساب موقوف حاليًا. يرجى التواصل مع إدارة تسهيل.',
         );
       case 'rate_limited':
         return const DelegateRateLimitFailure(
