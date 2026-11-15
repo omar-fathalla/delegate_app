@@ -7,7 +7,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT/scripts/emulator_ports.env.sh"
 emulator_export_hosts
 
-CFG="$(mktemp "$ROOT/firebase-emulator-XXXXXX.json")"
+_cfg_base="$(mktemp "${TMPDIR:-/tmp}/firebase-emulator.XXXXXX")"
+CFG="${_cfg_base}.json"
+mv "${_cfg_base}" "${CFG}"
 trap 'rm -f "$CFG"' EXIT
 node "$ROOT/scripts/generate_emulator_firebase_config.js" "$CFG"
 
