@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:delegate_app/core/security/delegate_status_policy.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
@@ -1151,6 +1152,18 @@ class _ProfileBody extends StatelessWidget {
       final Map<String, dynamic> updateFields = {
         'updatedAt': FieldValue.serverTimestamp(),
       };
+
+      final authState = context.read<AuthBloc>().state;
+      final viewer = authState is AuthAuthenticated ? authState.delegate : null;
+      if (shouldSupervisorMarkDelegatePendingOnDocReplace(
+        target: delegate,
+        viewerRole: viewer?.role,
+        viewerUid: viewer?.uid ?? '',
+        viewerCompanyUID: viewer?.companyUID,
+        viewerIsDocApprover: approverUid != null,
+      )) {
+        updateFields['status'] = 'pending';
+      }
 
       if (item.docType == 'personalPhoto') {
         updateFields['profileImageUrl'] = newUrl;
