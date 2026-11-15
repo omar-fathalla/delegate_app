@@ -80,7 +80,7 @@
   "@invalidLoginCredentials": {
     "description": "Delegate credential mismatch"
   },
-  "delegateAccountInactive": "هذا الحساب قيد المراجعة أو موقوف. يرجى التواصل مع مسؤول الشركة.",
+  "delegateAccountInactive": "هذا الحساب موقوف حاليًا. يرجى التواصل مع إدارة تسهيل.",
   "@delegateAccountInactive": {
     "description": "Pending or blocked delegate login error"
   },

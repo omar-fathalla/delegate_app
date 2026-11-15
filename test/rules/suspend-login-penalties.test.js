@@ -80,4 +80,22 @@ describe("penalties company scope by role", () => {
     await assertSucceeds(db.doc("penalties/p-c2").get());
     await assertFails(db.doc("penalties/p-c1").get());
   });
+
+  test("delegate lists and gets only own penalties", async () => {
+    const delegateClaims = {
+      role: "delegate",
+      delegateId: "del-1",
+      delegateIds: ["del-1"],
+      orgId: "o1",
+      companyId: "c1",
+      firebase: {sign_in_provider: "custom"},
+    };
+    const delegate = env.authenticatedContext("del-1", delegateClaims).firestore();
+    await assertSucceeds(
+      delegate.collection("penalties").where("targetDelegateId", "==", "del-1").get(),
+    );
+    await assertSucceeds(delegate.doc("penalties/p-c1").get());
+    await assertFails(delegate.collection("penalties").get());
+    await assertFails(delegate.doc("penalties/p-c2").get());
+  });
 });

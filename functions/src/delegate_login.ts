@@ -14,7 +14,9 @@ import {
   idsFromDelegatePath,
   lockStatus,
   nationalIdsMatch,
+  normalizeNationalId,
   normalizePhone,
+  DELEGATE_LOGIN_LOOKUP_PAGE_SIZE,
   optionalDeviceLabel,
   parseOtpEnforcementEnabled,
   phoneQueryVariants,
@@ -403,7 +405,7 @@ async function findCandidates(
   nationalId: string,
 ): Promise<DelegateCandidate[]> {
   const variants = phoneQueryVariants(phone);
-  const docs = await queryDelegates(variants);
+  const docs = await queryDelegates(variants, nationalId);
   const candidates: DelegateCandidate[] = [];
   const seen = new Set<string>();
 
@@ -412,7 +414,8 @@ async function findCandidates(
     seen.add(doc.ref.path);
     const data = doc.data() as Record<string, unknown>;
     const storedPhone = normalizePhone(extractPhone(data));
-    if (storedPhone !== phone) continue;
+    const nationalIdMatches = nationalIdsMatch(extractNationalId(data), nationalId);
+    if (!nationalIdMatches && storedPhone !== phone) continue;
 
     const pathIds = idsFromDelegatePath(doc.ref.path);
     const companyId = pathIds.companyId || readString(data, ["companyUID", "companyId", "company_id"]);
@@ -421,6 +424,8 @@ async function findCandidates(
     candidates.push({
       id: doc.id,
       status: data.status,
+      statusReason: readString(data, ["statusReason", "status_reason"]),
+      holds: data.holds,
       companyId,
       orgId,
       phone: storedPhone,
@@ -429,7 +434,8 @@ async function findCandidates(
       boundDeviceModel: readString(data, ["boundDeviceModel"]),
       fullName: readString(data, ["fullName", "name"]),
       createdAtMillis: createdAtMillis(data.createdAt ?? data.hiredAt ?? data.startDate),
-      nationalIdMatches: nationalIdsMatch(extractNationalId(data), nationalId),
+      nationalIdMatches,
+      phoneMatchesLogin: storedPhone === phone,
     });
   }
 
@@ -438,27 +444,65 @@ async function findCandidates(
 
 async function queryDelegates(
   variants: string[],
+  nationalId: string,
 ): Promise<admin.firestore.QueryDocumentSnapshot[]> {
-  const byPhoneNumber = await queryField("phoneNumber", variants, true);
-  if (byPhoneNumber.length > 0) return byPhoneNumber;
-  return queryField("phone", variants, false);
+  const normalizedNationalId = normalizeNationalId(nationalId);
+  const merged = await mergeDelegateLookupDocs([
+    ...(await paginatedDelegatesPhoneField("phoneNumber", variants)),
+    ...(await paginatedDelegatesPhoneField("phone", variants)),
+    ...(await paginatedDelegatesEqual("nationalityID", normalizedNationalId)),
+    ...(await paginatedDelegatesEqual("nationalId", normalizedNationalId)),
+    ...(await paginatedDelegatesEqual("nationalID", normalizedNationalId)),
+    ...(await paginatedDelegatesEqual("nationalityId", normalizedNationalId)),
+    ...(await paginatedDelegatesEqual("national_id", normalizedNationalId)),
+    ...(await paginatedDelegatesEqual("idNumber", normalizedNationalId)),
+  ]);
+  return merged;
 }
 
-async function queryField(
-  field: string,
-  variants: string[],
-  required: boolean,
+async function mergeDelegateLookupDocs(
+  docs: admin.firestore.QueryDocumentSnapshot[],
 ): Promise<admin.firestore.QueryDocumentSnapshot[]> {
+  const byPath = new Map<string, admin.firestore.QueryDocumentSnapshot>();
+  for (const doc of docs) {
+    byPath.set(doc.ref.path, doc);
+  }
+  return Array.from(byPath.values());
+}
+
+async function paginatedDelegatesPhoneField(
+  field: string,
+  values: string[],
+): Promise<admin.firestore.QueryDocumentSnapshot[]> {
+  const out: admin.firestore.QueryDocumentSnapshot[] = [];
+  for (const value of new Set(values.filter((entry) => entry))) {
+    out.push(...(await paginatedDelegatesEqual(field, value)));
+  }
+  return out;
+}
+
+async function paginatedDelegatesEqual(
+  field: string,
+  value: string,
+): Promise<admin.firestore.QueryDocumentSnapshot[]> {
+  if (!value) return [];
+  const out: admin.firestore.QueryDocumentSnapshot[] = [];
+  const db = admin.firestore();
   try {
-    const snap = await admin.firestore()
-      .collectionGroup("delegates")
-      .where(field, "in", variants)
-      .limit(25)
-      .get();
-    return snap.docs;
+    let last: admin.firestore.QueryDocumentSnapshot | undefined;
+    for (;;) {
+      let query: admin.firestore.Query = db.collectionGroup("delegates")
+        .where(field, "==", value)
+        .orderBy(admin.firestore.FieldPath.documentId())
+        .limit(DELEGATE_LOGIN_LOOKUP_PAGE_SIZE);
+      if (last) query = query.startAfter(last);
+      const snap = await query.get();
+      out.push(...snap.docs);
+      if (snap.empty || snap.size < DELEGATE_LOGIN_LOOKUP_PAGE_SIZE) break;
+      last = snap.docs[snap.docs.length - 1];
+    }
   } catch (error) {
     console.error("delegateLoginV2 query failed", field);
-    if (required) throw error;
-    return [];
   }
+  return out;
 }
