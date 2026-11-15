@@ -6,9 +6,13 @@ description: Build and deploy the app using CI/CD (GitHub Actions or Codemagic) 
 
 ## 1. Local build (debug)
 
-Android **requires** a flavor (`prod` or `dev`). iOS uses matching schemes.
+Android **requires** a flavor (`prod` or `dev`). iOS uses matching schemes. Without `--flavor`, Gradle fails with an explicit hint (see `android/app/build.gradle.kts`).
 
 ```bash
+# Run on device/emulator
+flutter run --flavor prod
+flutter run --flavor dev --dart-define=ENV=dev
+
 # Production Firebase (store package)
 flutter build apk --debug --flavor prod
 

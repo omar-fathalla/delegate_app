@@ -4,6 +4,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:dartz/dartz.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:delegate_app/core/constants/cloud_functions.dart';
+import 'package:delegate_app/core/notifications/list_global_notify_staff_parse.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/admin/domain/services/delegate_duplicate.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
@@ -381,10 +382,9 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       try {
         final callable = _functions.httpsCallable(CloudCallableNames.listGlobalNotifyStaff);
         final notifyResult = await callable.call<Map<String, dynamic>>({});
-        final rawUsers = notifyResult.data['users'];
-        final staffRows = rawUsers is List
-            ? rawUsers.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
-            : const <Map<String, dynamic>>[];
+        final staffRows = parseListGlobalNotifyStaffUsers(
+          notifyResult.data['users'],
+        );
 
         final batch = _firestore.batch();
 

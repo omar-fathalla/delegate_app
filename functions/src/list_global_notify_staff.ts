@@ -42,6 +42,7 @@ function notifyTargetEligible(data: admin.firestore.DocumentData): boolean {
   }
   if (data.isActive === false) return false;
   if (data.deleted === true) return false;
+  if (data.isDeleted === true) return false;
   return true;
 }
 
@@ -64,9 +65,9 @@ export async function listGlobalNotifyStaffRows(
       phoneNumber: str(data.phoneNumber) || str(data.phone),
       role: str(data.role),
     });
-    if (rows.length >= GLOBAL_NOTIFY_STAFF_CAP) break;
   }
-  return rows;
+  rows.sort((a, b) => a.uid.localeCompare(b.uid));
+  return rows.slice(0, GLOBAL_NOTIFY_STAFF_CAP);
 }
 
 export const listGlobalNotifyStaff = functions

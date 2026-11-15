@@ -131,7 +131,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
           }
         },
       );
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('BranchHomeScreen: initState branch prefs/load failed: $e\n$st');
+    }
   }
 
   @override

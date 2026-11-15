@@ -4,7 +4,7 @@
 
 ## التقنيات المستخدمة
 
-- **Flutter 3.44.5** + Dart 3.11 (انظر `.fvmrc` و CI)
+- **Flutter 3.44.5** + Dart **3.12.2** (انظر `.fvmrc` و CI)
 - **Firebase:** Firestore, Authentication, Storage
 - **البنية:** Clean Architecture + BLoC + GetIt (DI)
 - **المنصات:** Android, iOS, Web, macOS

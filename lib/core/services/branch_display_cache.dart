@@ -64,14 +64,18 @@ class BranchDisplayCache {
       debugPrint('BranchDisplayCache: Firestore unavailable: $e\n$st');
       return Future.value();
     }
-    return _loading ??= db
-        .collection('branches')
-        .get()
-        .then(registerSnapshot)
-        .catchError((Object e, StackTrace st) {
+    final future = db.collection('branches').get().then(registerSnapshot);
+    late final Future<void> guarded;
+    guarded = future.catchError((Object e, StackTrace st) {
       debugPrint('BranchDisplayCache: ensureLoaded failed: $e\n$st');
-      _loading = null;
+      if (identical(_loading, guarded)) _loading = null;
+      Error.throwWithStackTrace(
+        e is Exception ? e : Exception('$e'),
+        st,
+      );
     });
+    _loading = guarded;
+    return _loading!;
   }
 
   BranchDisplayInfo? infoFor(String? branchName) =>
@@ -102,18 +106,24 @@ class BranchDisplayCache {
       debugPrint('BranchDisplayCache: org load Firestore unavailable: $e\n$st');
       return Future.value();
     }
-    return _orgLoading ??= db
-        .collection('organizations')
-        .get()
-        .then((snap) {
+    final future = db.collection('organizations').get().then((snap) {
       for (final d in snap.docs) {
         final n = (d.data()['name'] ?? '').toString().trim();
         if (n.isNotEmpty) _orgNames[d.id] = n;
       }
       version.value++;
-    }).catchError((Object e, StackTrace st) {
-      debugPrint('BranchDisplayCache: ensureOrgsLoaded failed: $e\n$st');
     });
+    late final Future<void> guarded;
+    guarded = future.catchError((Object e, StackTrace st) {
+      debugPrint('BranchDisplayCache: ensureOrgsLoaded failed: $e\n$st');
+      if (identical(_orgLoading, guarded)) _orgLoading = null;
+      Error.throwWithStackTrace(
+        e is Exception ? e : Exception('$e'),
+        st,
+      );
+    });
+    _orgLoading = guarded;
+    return _orgLoading!;
   }
 
   /// Chain (organization) name for a branch, or '' if unknown.

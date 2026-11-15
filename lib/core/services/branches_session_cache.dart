@@ -48,15 +48,16 @@ class BranchesSessionCache {
           .collection('branches')
           .getResilient(forceServer: true)
           .then((s) => s.docs);
-      _pending = future;
-      future.catchError((Object error, StackTrace stackTrace) {
+      late final Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> guarded;
+      guarded = future.catchError((Object error, StackTrace stackTrace) {
         debugPrint('BranchesSessionCache: load failed: $error\n$stackTrace');
-        if (identical(_pending, future)) _pending = null;
+        if (identical(_pending, guarded)) _pending = null;
         Error.throwWithStackTrace(
           error is Exception ? error : Exception('$error'),
           stackTrace,
         );
       });
+      _pending = guarded;
     }
     return _pending!;
   }

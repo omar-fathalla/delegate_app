@@ -2,6 +2,11 @@
 /**
  * Writes a firebase.json overlay with emulator ports from LOCAL_CI_* env.
  * Usage: node scripts/generate_emulator_firebase_config.js <outPath>
+ *
+ * Port env vars (see scripts/emulator_ports.env.sh):
+ *   LOCAL_CI_FIRESTORE_PORT, LOCAL_CI_FIRESTORE_HUB_PORT, LOCAL_CI_AUTH_PORT,
+ *   LOCAL_CI_STORAGE_PORT, LOCAL_CI_FUNCTIONS_PORT, LOCAL_CI_LOGGING_PORT,
+ *   LOCAL_CI_FIRESTORE_WEBSOCKET_PORT
  */
 const fs = require("fs");
 const path = require("path");
