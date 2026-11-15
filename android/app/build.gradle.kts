@@ -150,7 +150,7 @@ val dartEnv: String = (project.findProperty("dart-defines") as String?)
 
 gradle.taskGraph.whenReady {
     val requested = gradle.startParameter.taskNames
-    val taskNames = if (requested.isNotEmpty) {
+    val taskNames = if (requested.isNotEmpty()) {
         requested.map { it.substringAfterLast(':') }
     } else {
         allTasks.filter { it.project == project }.map { it.name }
