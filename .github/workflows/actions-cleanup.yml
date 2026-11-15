@@ -34,122 +34,223 @@ jobs:
           script: |
             const retentionDays = parseInt(process.env.RETENTION_DAYS, 10);
             const dryRun = process.env.DRY_RUN === 'true';
-            const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+            const cutoffMs = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+            const cutoffIso = new Date(cutoffMs).toISOString();
+            const createdBeforeDate = cutoffIso.slice(0, 10);
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+            const MAX_DELETES_PER_CATEGORY = 1000;
 
             const bytesToMb = (n) => (n / (1024 * 1024)).toFixed(2);
 
             const olderThanCutoff = (iso) => {
               if (!iso) return false;
-              return Date.parse(iso) < cutoff;
+              return Date.parse(iso) < cutoffMs;
             };
 
             console.log(
-              `Mode: ${dryRun ? 'DRY RUN (no deletions)' : 'LIVE DELETE'}; cutoff older than ${retentionDays}d (${new Date(cutoff).toISOString()})`
+              `Mode: ${dryRun ? 'DRY RUN (no deletions)' : 'LIVE DELETE'}; cutoff older than ${retentionDays}d (${cutoffIso}); run query created:<${createdBeforeDate}`
             );
 
-            // --- Artifacts (created_at) ---
-            let artifactCount = 0;
-            let artifactBytes = 0;
-            let artifactPage = 1;
-            while (true) {
-              const { data } = await github.rest.actions.listArtifactsForRepo({
-                owner,
-                repo,
-                per_page: 100,
-                page: artifactPage,
+            async function paginate(fetchPage) {
+              const all = [];
+              let page = 1;
+              while (true) {
+                const batch = await fetchPage(page);
+                if (!batch.length) break;
+                all.push(...batch);
+                if (batch.length < 100) break;
+                page += 1;
+              }
+              return all;
+            }
+
+            async function collectArtifacts() {
+              return paginate(async (page) => {
+                const { data } = await github.rest.actions.listArtifactsForRepo({
+                  owner,
+                  repo,
+                  per_page: 100,
+                  page,
+                });
+                return (data.artifacts ?? []).filter((a) => olderThanCutoff(a.created_at));
               });
-              if (!data.artifacts.length) break;
-              for (const art of data.artifacts) {
-                if (!olderThanCutoff(art.created_at)) continue;
-                artifactCount += 1;
-                artifactBytes += art.size_in_bytes ?? 0;
+            }
+
+            async function collectStartupFailureRuns() {
+              const raw = await paginate(async (page) => {
+                const { data } = await github.rest.actions.listWorkflowRunsForRepo({
+                  owner,
+                  repo,
+                  status: 'completed',
+                  created: `<${createdBeforeDate}`,
+                  per_page: 100,
+                  page,
+                });
+                return data.workflow_runs ?? [];
+              });
+              return raw.filter(
+                (run) =>
+                  run.conclusion === 'startup_failure' && olderThanCutoff(run.created_at)
+              );
+            }
+
+            async function collectCaches() {
+              return paginate(async (page) => {
+                const { data } = await github.rest.actions.getActionsCacheList({
+                  owner,
+                  repo,
+                  per_page: 100,
+                  page,
+                });
+                return (data.actions_caches ?? []).filter((c) =>
+                  olderThanCutoff(c.last_accessed_at)
+                );
+              });
+            }
+
+            async function deleteArtifacts(candidates) {
+              const totalMb = bytesToMb(
+                candidates.reduce((s, a) => s + (a.size_in_bytes ?? 0), 0)
+              );
+              const toDelete = dryRun ? [] : candidates.slice(0, MAX_DELETES_PER_CATEGORY);
+              const skipped = dryRun ? 0 : Math.max(0, candidates.length - toDelete.length);
+              let deleted = 0;
+              let failed = 0;
+
+              for (const art of candidates) {
                 console.log(
                   `[artifact] id=${art.id} name=${art.name} created=${art.created_at} size_mb=${bytesToMb(art.size_in_bytes ?? 0)}`
                 );
-                if (!dryRun) {
+              }
+
+              for (const art of toDelete) {
+                try {
                   await github.rest.actions.deleteArtifact({
                     owner,
                     repo,
                     artifact_id: art.id,
                   });
+                  deleted += 1;
+                } catch (err) {
+                  failed += 1;
+                  const status = err.status ?? err.response?.status;
+                  console.log(
+                    `[artifact delete failed] id=${art.id} status=${status} message=${err.message}`
+                  );
                 }
               }
-              if (data.artifacts.length < 100) break;
-              artifactPage += 1;
-            }
-            console.log(
-              `Artifacts >${retentionDays}d: count=${artifactCount} total_mb=${bytesToMb(artifactBytes)}`
-            );
 
-            // --- Workflow runs: startup_failure only (created_at) ---
-            let runCount = 0;
-            let runPage = 1;
-            while (true) {
-              const { data } = await github.rest.actions.listWorkflowRunsForRepo({
-                owner,
-                repo,
-                status: 'startup_failure',
-                per_page: 100,
-                page: runPage,
-              });
-              const runs = data.workflow_runs ?? [];
-              if (!runs.length) break;
-              for (const run of runs) {
-                if (!olderThanCutoff(run.created_at)) continue;
-                runCount += 1;
+              const summary = {
+                category: 'artifacts',
+                candidates: candidates.length,
+                deleted: dryRun ? 0 : deleted,
+                failed: dryRun ? 0 : failed,
+                skipped,
+                total_mb: totalMb,
+              };
+              console.log(`Artifacts summary: ${JSON.stringify(summary)}`);
+              return summary;
+            }
+
+            async function deleteRuns(candidates) {
+              const toDelete = dryRun ? [] : candidates.slice(0, MAX_DELETES_PER_CATEGORY);
+              const skipped = dryRun ? 0 : Math.max(0, candidates.length - toDelete.length);
+              let deleted = 0;
+              let failed = 0;
+
+              for (const run of candidates) {
                 console.log(
-                  `[startup_failure run] id=${run.id} workflow=${run.name} created=${run.created_at}`
+                  `[startup_failure run] id=${run.id} workflow=${run.name} created=${run.created_at} conclusion=${run.conclusion}`
                 );
-                if (!dryRun) {
+              }
+
+              for (const run of toDelete) {
+                try {
                   await github.rest.actions.deleteWorkflowRun({
                     owner,
                     repo,
                     run_id: run.id,
                   });
+                  deleted += 1;
+                } catch (err) {
+                  failed += 1;
+                  const status = err.status ?? err.response?.status;
+                  console.log(
+                    `[run delete failed] id=${run.id} status=${status} message=${err.message}`
+                  );
                 }
               }
-              if (runs.length < 100) break;
-              runPage += 1;
-            }
-            console.log(`startup_failure runs >${retentionDays}d: count=${runCount}`);
 
-            // --- Actions caches (last_accessed_at) ---
-            let cacheCount = 0;
-            let cacheBytes = 0;
-            let cachePage = 1;
-            while (true) {
-              const { data } = await github.rest.actions.getActionsCacheList({
-                owner,
-                repo,
-                per_page: 100,
-                page: cachePage,
-              });
-              const caches = data.actions_caches ?? [];
-              if (!caches.length) break;
-              for (const cache of caches) {
-                if (!olderThanCutoff(cache.last_accessed_at)) continue;
-                cacheCount += 1;
-                cacheBytes += cache.size_in_bytes ?? 0;
+              const summary = {
+                category: 'startup_failure_runs',
+                candidates: candidates.length,
+                deleted: dryRun ? 0 : deleted,
+                failed: dryRun ? 0 : failed,
+                skipped,
+                total_mb: '0.00',
+              };
+              console.log(`Runs summary: ${JSON.stringify(summary)}`);
+              return summary;
+            }
+
+            async function deleteCaches(candidates) {
+              const totalMb = bytesToMb(
+                candidates.reduce((s, c) => s + (c.size_in_bytes ?? 0), 0)
+              );
+              const toDelete = dryRun ? [] : candidates.slice(0, MAX_DELETES_PER_CATEGORY);
+              const skipped = dryRun ? 0 : Math.max(0, candidates.length - toDelete.length);
+              let deleted = 0;
+              let failed = 0;
+
+              for (const cache of candidates) {
                 console.log(
                   `[cache] id=${cache.id} key=${cache.key} last_accessed=${cache.last_accessed_at} size_mb=${bytesToMb(cache.size_in_bytes ?? 0)}`
                 );
-                if (!dryRun) {
+              }
+
+              for (const cache of toDelete) {
+                try {
                   await github.rest.actions.deleteActionsCacheById({
                     owner,
                     repo,
                     cache_id: cache.id,
                   });
+                  deleted += 1;
+                } catch (err) {
+                  failed += 1;
+                  const status = err.status ?? err.response?.status;
+                  console.log(
+                    `[cache delete failed] id=${cache.id} status=${status} message=${err.message}`
+                  );
                 }
               }
-              if (caches.length < 100) break;
-              cachePage += 1;
-            }
-            console.log(
-              `Caches last_accessed >${retentionDays}d: count=${cacheCount} total_mb=${bytesToMb(cacheBytes)}`
-            );
 
+              const summary = {
+                category: 'caches',
+                candidates: candidates.length,
+                deleted: dryRun ? 0 : deleted,
+                failed: dryRun ? 0 : failed,
+                skipped,
+                total_mb: totalMb,
+              };
+              console.log(`Caches summary: ${JSON.stringify(summary)}`);
+              return summary;
+            }
+
+            // Pass 1: collect all candidates (no deletes during pagination)
+            const artifactCandidates = await collectArtifacts();
+            const runCandidates = await collectStartupFailureRuns();
+            const cacheCandidates = await collectCaches();
+
+            // Pass 2: log + delete (or dry-run totals only)
+            const summaries = [
+              await deleteArtifacts(artifactCandidates),
+              await deleteRuns(runCandidates),
+              await deleteCaches(cacheCandidates),
+            ];
+
+            console.log(`All summaries: ${JSON.stringify(summaries)}`);
             console.log('Skipped by policy: releases, packages, branches, non-startup_failure runs.');
 
       - name: Summarize (gh api spot-check)
