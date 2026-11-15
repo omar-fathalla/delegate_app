@@ -9,6 +9,8 @@
     "test:rules:docs": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-docs-pending \"node --test test/rules/docs-pending.test.js\"",
     "test:e2e:subscriptions": "npm --prefix functions run build && npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-tashil-subs \"node --test --test-concurrency=1 test/e2e/subscriptions.e2e.test.js\"",
     "test:e2e:supervisor-reupload": "npm --prefix functions run build && npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-supervisor-reupload \"node --test test/e2e/supervisor-doc-reupload.e2e.test.js\"",
+    "test:e2e:privileged-reupload": "npm --prefix functions run build && npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-privileged-reupload \"node --test test/e2e/privileged-doc-reupload.e2e.test.js\"",
+    "test:rules:privileged-reupload": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-privileged-reupload-rules \"node --test test/rules/staff-privileged-doc-reupload.test.js\"",
     "test:rules:qa-hold": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-qa-hold-reads \"node --test test/rules/qa-hold-reads.test.js\"",
     "test:rules:profile": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-profile-edit \"node --test test/rules/delegate-profile-edit.test.js\"",
     "test:rules:m31": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-m31-delegate-own-reads \"node --test test/rules/m31-delegate-own-reads.test.js\"",

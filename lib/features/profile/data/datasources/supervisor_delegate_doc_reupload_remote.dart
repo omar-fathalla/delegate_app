@@ -216,3 +216,116 @@ class SupervisorDelegateDocReuploadRemote {
     );
   }
 }
+
+/// Server-side SA / technical support approved document replace.
+class PrivilegedDelegateDocReuploadRemote {
+  PrivilegedDelegateDocReuploadRemote({
+    FirebaseFunctions? functions,
+    FirebaseStorage? storage,
+  })  : _functions =
+            functions ?? FirebaseFunctions.instanceFor(region: 'us-central1'),
+        _storage = storage;
+
+  final FirebaseFunctions _functions;
+  final FirebaseStorage? _storage;
+
+  Future<void> reviewDocument({
+    required String uid,
+    required String organizationUID,
+    required String companyUID,
+    required String docType,
+    required bool approve,
+    String? rejectionReason,
+  }) async {
+    try {
+      await _functions.httpsCallable('privilegedReuploadDelegateDocument').call({
+        'uid': uid,
+        'organizationUID': organizationUID,
+        'companyUID': companyUID,
+        'docType': docType,
+        'approve': approve,
+        if (rejectionReason != null && rejectionReason.isNotEmpty)
+          'rejectionReason': rejectionReason,
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw SupervisorDocReuploadException(
+        e.message?.trim().isNotEmpty == true
+            ? e.message!.trim()
+            : 'تعذر تحديث حالة المستند على الخادم. حاول مرة أخرى.',
+      );
+    } catch (_) {
+      throw SupervisorDocReuploadException(
+        'تعذر تحديث حالة المستند على الخادم. حاول مرة أخرى.',
+      );
+    }
+  }
+
+  Future<void> reupload({
+    required String uid,
+    required String organizationUID,
+    required String companyUID,
+    required String docType,
+    required String newUrl,
+  }) async {
+    try {
+      await _functions.httpsCallable('privilegedReuploadDelegateDocument').call({
+        'uid': uid,
+        'organizationUID': organizationUID,
+        'companyUID': companyUID,
+        'docType': docType,
+        'newUrl': newUrl,
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw SupervisorDocReuploadException(
+        e.message?.trim().isNotEmpty == true
+            ? e.message!.trim()
+            : 'تعذر تحديث المستند على الخادم. حاول مرة أخرى.',
+      );
+    } catch (_) {
+      throw SupervisorDocReuploadException(
+        'تعذر تحديث المستند على الخادم. حاول مرة أخرى.',
+      );
+    }
+  }
+
+  Future<void> replaceWithFile({
+    required String uid,
+    required String organizationUID,
+    required String companyUID,
+    required String docType,
+    required File file,
+    Future<String?> Function({
+      required String folderId,
+      required String companyUID,
+      FirebaseFunctions? functions,
+    })? ensureIntent,
+    Future<String> Function(String path, File file)? uploadFile,
+  }) async {
+    final path = delegateDocumentStoragePath(delegateUid: uid, docType: docType);
+    final newUrl = uploadFile != null
+        ? await _uploadAfterIntent(
+            folderId: uid,
+            companyUID: companyUID,
+            path: path,
+            file: file,
+            ensureIntent: ensureIntent,
+            uploadFile: uploadFile,
+          )
+        : await uploadDelegateDocumentFile(
+            folderId: uid,
+            companyUID: companyUID,
+            storagePath: path,
+            file: file,
+            functions: _functions,
+            storage: _storage,
+            ensureIntent: ensureIntent,
+          );
+    await reupload(
+      uid: uid,
+      organizationUID: organizationUID,
+      companyUID: companyUID,
+      docType: docType,
+      newUrl: newUrl,
+    );
+  }
+}

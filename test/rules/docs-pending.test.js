@@ -136,8 +136,12 @@ describe("docs-pending rules", () => {
   describe("staff approval (S1)", () => {
     const pendPath = "organizations/o1/companies/c1/delegates/pend";
     const approveData = {documents: [{...PHOTO, documentStatus: "approved", reviewedBy: "x"}, {...NID, documentStatus: "pending"}]};
-    for (const who of ["sa", "ca", "adm", "sup"]) {
+    for (const who of ["ca", "adm", "sup"]) {
       test(`ALLOW ${who} approves`, () => assertSucceeds(updateDoc(doc(as(who), pendPath), approveData)));
+    }
+    for (const who of ["sa", "ts"]) {
+      test(`DENY ${who} client approves (privileged callable)`, () =>
+        assertFails(updateDoc(doc(as(who), pendPath), approveData)));
     }
     for (const who of ["hr", "acc", "bmm", "mk", "oa", "ts", "sup2"]) {
       test(`DENY ${who} approves`, () => assertFails(updateDoc(doc(as(who), pendPath), approveData)));
@@ -148,10 +152,10 @@ describe("docs-pending rules", () => {
       assertFails(updateDoc(doc(as("ts"), pendPath), {...approveData, status: "active"})));
     test("ALLOW super-admin signup approval (pending -> active with approved docs)", () =>
       assertSucceeds(updateDoc(doc(as("sa"), pendPath), {...approveData, status: "active"})));
-    test("ALLOW super-admin approves in another company", async () => {
+    test("DENY super-admin client approves in another company (privileged callable)", async () => {
       await env.withSecurityRulesDisabled((c) => c.firestore().doc("organizations/o1/companies/c2/delegates/z").set({
         ...BASE, uid: "z", companyUID: "c2", documents: [{...PHOTO, documentStatus: "pending"}]}));
-      await assertSucceeds(updateDoc(doc(as("sa"), "organizations/o1/companies/c2/delegates/z"), {documents: [PHOTO]}));
+      await assertFails(updateDoc(doc(as("sa"), "organizations/o1/companies/c2/delegates/z"), {documents: [PHOTO]}));
     });
     // Anti-fraud: company-level roles must not flip a delegate to active/approved.
     // The previous rule allowed a same-company supervisor/admin to set status
@@ -266,13 +270,13 @@ describe("docs-pending round 2", () => {
       // Mohamed 2026-11-10: only company admin/supervisor may edit name/phone/photo.
       test("DENY hr name edit (company editor policy)", () => no(updateDoc(doc(as("hr"), path), {fullName: "z"})));
       test("ALLOW hr plain non-profile edit (no emulator error)", () => ok(updateDoc(doc(as("hr"), path), {notes: "z"})));
-      for (const w of ["sa", "ca", "adm", "sup"]) {
+      for (const w of ["ca", "adm", "sup"]) {
         test(`ALLOW ${w} approves pending entry`, async () => {
           await seed(path, PEND); await ok(updateDoc(doc(as(w), path), APPROVE));
         });
       }
-      for (const w of ["sup2", "hr", "acc", "ts"]) {
-        test(`DENY ${w} approves pending entry`, async () => {
+      for (const w of ["sa", "ts", "sup2", "hr", "acc"]) {
+        test(`DENY ${w} approves pending entry (privileged callable)`, async () => {
           await seed(path, PEND); await no(updateDoc(doc(as(w), path), APPROVE));
         });
       }
