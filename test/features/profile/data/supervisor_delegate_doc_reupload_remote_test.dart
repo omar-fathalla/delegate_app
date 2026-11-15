@@ -120,6 +120,36 @@ void main() {
     verifyNever(() => reuploadCallable.call(any()));
   });
 
+  test('privileged replaceWithFile calls privilegedReuploadDelegateDocument', () async {
+    final functions = _FakeFunctions();
+    final privilegedCallable = _FakeCallable();
+    when(
+      () => functions.httpsCallable('privilegedReuploadDelegateDocument'),
+    ).thenReturn(privilegedCallable);
+
+    Map? payload;
+    when(() => privilegedCallable.call(any())).thenAnswer((inv) async {
+      payload = inv.positionalArguments.first as Map;
+      return _FakeResult({'documentStatus': 'approved'});
+    });
+
+    final file = File.fromRawPath(Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xD9]));
+    await PrivilegedDelegateDocReuploadRemote(functions: functions).replaceWithFile(
+      uid: 'd1',
+      organizationUID: 'o1',
+      companyUID: 'c1',
+      docType: 'nationalIdFront',
+      file: file,
+      ensureIntent: ({required folderId, required companyUID, functions}) async => null,
+      uploadFile: (path, f) async => 'https://cdn.example/id.jpg',
+    );
+
+    expect(payload!['uid'], 'd1');
+    expect(payload!['docType'], 'nationalIdFront');
+    expect(payload!['newUrl'], 'https://cdn.example/id.jpg');
+    verify(() => privilegedCallable.call(any())).called(1);
+  });
+
   test('supervisorDocReplaceErrorMessage maps storage unauthorized', () {
     expect(
       supervisorDocReplaceErrorMessage(

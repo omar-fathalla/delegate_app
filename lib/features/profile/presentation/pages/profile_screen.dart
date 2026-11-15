@@ -1174,6 +1174,28 @@ class _ProfileBody extends StatelessWidget {
         return;
       }
 
+      if (approverUid != null) {
+        await PrivilegedDelegateDocReuploadRemote().replaceWithFile(
+          uid: delegate.uid,
+          organizationUID: delegate.organizationUID,
+          companyUID: delegate.companyUID,
+          docType: item.docType,
+          file: file,
+        );
+        if (context.mounted) {
+          Navigator.pop(context);
+          AppSnackBar.showSuccess(context, 'تم تحديث ${item.title} بنجاح!');
+          context.read<ProfileBloc>().add(
+            LoadProfile(
+              uid: delegate.uid,
+              organizationUID: delegate.organizationUID,
+              companyUID: delegate.companyUID,
+            ),
+          );
+        }
+        return;
+      }
+
       final storagePath = delegateDocumentStoragePath(
         delegateUid: delegate.uid,
         docType: item.docType,
@@ -1201,9 +1223,7 @@ class _ProfileBody extends StatelessWidget {
       }
 
       // Docs-pending (Mohamed 2026-11-04): a delegate's own re-upload is
-      // written as 'pending'; only an approver (super-admin, or company
-      // admin/supervisor of the same company) uploads as 'approved'. All other
-      // entries are copied exactly as stored (Firestore rules enforce this).
+      // written as 'pending'; privileged staff use the server callable.
 
       // Update in all organizations where this company & delegate reside
       if (delegate.companyUID.isNotEmpty) {
@@ -1224,7 +1244,7 @@ class _ProfileBody extends StatelessWidget {
                 check.data()?['documents'],
                 docType: item.docType,
                 newUrl: newUrl,
-                approverUid: approverUid,
+                approverUid: null,
               ),
             }, SetOptions(merge: true));
           }
@@ -1250,7 +1270,7 @@ class _ProfileBody extends StatelessWidget {
               reqSnap.data()?['documents'],
               docType: item.docType,
               newUrl: newUrl,
-              approverUid: approverUid,
+              approverUid: null,
             ),
           }, SetOptions(merge: true));
         }
@@ -1260,9 +1280,7 @@ class _ProfileBody extends StatelessWidget {
         Navigator.pop(context); // dismiss progress dialog
         AppSnackBar.showSuccess(
           context,
-          approverUid != null
-              ? 'تم تحديث ${item.title} بنجاح!'
-              : 'تم رفع ${item.title}، بانتظار مراجعة المشرف',
+          'تم رفع ${item.title}، بانتظار مراجعة المشرف',
         );
         context.read<ProfileBloc>().add(
           LoadProfile(
