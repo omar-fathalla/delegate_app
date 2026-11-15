@@ -1,5 +1,14 @@
 # TA-39: configurable Firebase emulator ports (sourced, not executed).
-# Defaults match committed firebase.json (8080/9099/9199) plus hub 4400 and functions 5001.
+# Defaults match committed firebase.json plus hub 4400, functions 5001, logging 4500, ws 9150.
+#
+# Optional overrides (parallel local_ci / CI runs on one Mac):
+#   LOCAL_CI_FIRESTORE_PORT          (default 8080)
+#   LOCAL_CI_FIRESTORE_HUB_PORT      (default 4400)
+#   LOCAL_CI_AUTH_PORT               (default 9099)
+#   LOCAL_CI_STORAGE_PORT            (default 9199)
+#   LOCAL_CI_FUNCTIONS_PORT          (default 5001)
+#   LOCAL_CI_LOGGING_PORT            (default 4500)
+#   LOCAL_CI_FIRESTORE_WEBSOCKET_PORT (default 9150)
 
 LOCAL_CI_FIRESTORE_PORT="${LOCAL_CI_FIRESTORE_PORT:-8080}"
 LOCAL_CI_FIRESTORE_HUB_PORT="${LOCAL_CI_FIRESTORE_HUB_PORT:-4400}"

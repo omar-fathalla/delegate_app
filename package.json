@@ -19,6 +19,7 @@
     "test:rules:source": "bash scripts/emulators_exec.sh --only firestore --project demo-delegate-source \"node --test test/rules/delegate-source-lock.test.js\"",
     "test:rules:gaps": "bash scripts/emulators_exec.sh --only firestore --project demo-ta8-gaps \"node --test test/rules/company-scoping-gaps.test.js\"",
     "test:rules:ut-nb": "bash scripts/emulators_exec.sh --only firestore --project demo-ut-nb \"node --test test/rules/ut-nonblocking-fixes.test.js\"",
+    "test:rules:nationalid-scope": "bash scripts/emulators_exec.sh --only firestore --project demo-nationalid-scope \"node --test test/rules/nationalid-query-scope.test.js\"",
     "test:rules:paymob-superseded": "bash scripts/emulators_exec.sh --only firestore --project demo-paymob-super \"node --test test/rules/paymob-superseded.test.js\"",
     "test:rules:status-guards": "bash scripts/emulators_exec.sh --only firestore --project demo-status-guards \"node --test test/rules/delegate-status-guards.test.js\"",
     "test:rules:security": "bash scripts/emulators_exec.sh --only firestore --project demo-suspend-login-penalties \"node --test test/rules/suspend-login-penalties.test.js\"",
