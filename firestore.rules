@@ -2,2978 +2,687 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // =====================================================================
-    // Single source of truth for project practice-firebase-72df1.
-    //
-    // One database has one ruleset. The Angular repo YousseFathalla/tashil
-    // must stop deploying rules: remove its firebase.json "firestore" section
-    // and replace its firestore.rules with a pointer at this file. A web
-    // deploy that still publishes rules will overwrite this file.
-    //
-    // These rules are NOT deployed by this change.
-    //
-    // Old app versions that sign in anonymously lose every read and write.
-    // Deploy staffPhoneLookup and delegateLoginV2 before these rules. Until
-    // staffPhoneLookup is deployed, staff login falls back to a users query
-    // that these rules reject.
-    //
-    // Delegate custom tokens (delegateLoginV2) carry role "delegate",
-    // delegateId, delegateIds, orgId, companyId, optional orgIds/companyIds,
-    // and phones. When config/delegate_auth.otpEnforcementEnabled is true the
-    // token also carries otp_required=true and otp_verified=false until
-    // confirmDelegateOtp sets otp_verified=true. Rules require otp_verified
-    // only when otp_required is true, so existing tokens and enforcement-off
-    // logins keep working. Staff authority comes from users/{auth.uid}.role,
-    // never from a custom claim. Legacy role spellings are accepted on read
-    // until migrate-super-admin-role.js runs. New role writes must be
-    // canonical, and super-admin can only be written by an existing super-admin.
-    // =====================================================================
+    // ==================== HELPER FUNCTIONS ====================
 
-    // ==================== HELPERS ====================
-
-    function signedIn() {
-      return request.auth != null && !isAnonymous();
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    function isAnonymous() {
-      return request.auth != null
-        && request.auth.token.keys().hasAll(['firebase'])
-        && request.auth.token.firebase.keys().hasAll(['sign_in_provider'])
+    // Anonymous Firebase Auth (legacy mobile builds <= v1.14.1).
+    function isAnonymousAuth() {
+      return isAuthenticated()
         && request.auth.token.firebase.sign_in_provider == 'anonymous';
     }
 
-    function userExists() {
-      return signedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    // Helper function to get user document
+    // NOTE: Firestore rules cache get() calls within the same rule evaluation,
+    // so multiple calls to getUserDoc() in the same rule are efficient.
+    // However, we use getUserData() helper to access data more efficiently.
+    function getUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
-    function userDoc() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    // Helper function to get user data (optimized to reduce redundant .data access)
+    // This helps with code readability and ensures consistent access patterns
+    function getUserData() {
+      return getUserDoc().data;
     }
 
-    function userRole() {
-      return userExists() && userDoc().keys().hasAll(['role']) && userDoc().role is string
-        ? userDoc().role
-        : '';
-    }
-
-    function roleIs(roles) {
-      return userRole() in roles;
-    }
-
+    // Helper function to check if user is super admin
     function isSuperAdmin() {
-      return roleIs([
-        'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-        'Super-Admin', 'SUPER_ADMIN'
-      ]);
+      return isAuthenticated() &&
+             getUserData().role == 'super-admin';
     }
 
-    function isTechnicalSupport() {
-      return roleIs([
-        'technical_support', 'technical-support', 'technicalSupport',
-        'technicalsupport', 'tech_support', 'techsupport'
-      ]);
-    }
-
+    // Helper function to check if user is organization admin
     function isOrgAdmin() {
-      return roleIs([
-        'organization-admin', 'organization_admin', 'organizationadmin',
-        'organizationAdmin'
-      ]);
+      return isAuthenticated() &&
+             getUserData().role == 'organization-admin';
     }
 
+    // Helper function to check if user is company admin
     function isCompanyAdmin() {
-      return roleIs([
-        'company-admin', 'company_admin', 'companyadmin', 'admin',
-        'supervisor', 'company_supervisor'
-      ]);
+      return isAuthenticated() &&
+             getUserData().role == 'company-admin';
     }
 
-    // Company admin and company supervisor are one role (permissions + labels).
-    // Both may invite or edit company-admin invites in their company.
-    function isStrictCompanyAdmin() {
-      return roleIs([
-        'company-admin', 'company_admin', 'companyadmin', 'admin',
-        'supervisor', 'company_supervisor'
-      ]);
-    }
-
+    // Helper function to check if user is HR
     function isHR() {
-      return roleIs(['hr', 'company-hr', 'company_hr', 'human_resources']);
+      return isAuthenticated() &&
+             (getUserData().role == 'hr' || getUserData().role == 'company-hr' || getUserData().role == 'company_hr');
     }
 
+    // Helper function to check if user is marketing
     function isMarketing() {
-      return roleIs([
-        'marketing', 'marketing_promotion', 'marketingpromotion',
-        'marketingPromotion'
-      ]);
+      return isAuthenticated() &&
+             (getUserData().role == 'marketing' || getUserData().role == 'marketing_promotion');
     }
 
-    function isBranchesMarketing() {
-      return roleIs([
-        'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
-        'branches-marketing-manager', 'branchesmarketingmanager',
-        'branchesMarketingManager'
-      ]);
+    // Helper function to check if user belongs to organization
+    function belongsToOrganization(orgId) {
+      return isAuthenticated() &&
+             getUserData().organizationUID == orgId;
     }
 
-    function isAccountant() {
-      return roleIs(['accountant', 'accounting', 'account_admin']);
+    // Helper function to check if user belongs to company
+    function belongsToCompany(orgId, compId) {
+      return isAuthenticated() &&
+             getUserData().organizationUID == orgId &&
+             getUserData().companyUID == compId;
     }
 
-    // Cross-company readers. Organization admins are scoped to their org.
-    function isGlobalStaff() {
-      return isSuperAdmin() || isTechnicalSupport();
+    // Helper function to check if user can access organization (read + write)
+    function canAccessOrganization(orgId) {
+      return isSuperAdmin() ||
+             (isOrgAdmin() && belongsToOrganization(orgId));
     }
 
-    function isOrgScopedStaff() {
-      return isOrgAdmin() || isMarketing();
+    // Helper function to check if user can READ organization (includes marketing)
+    function canReadOrganization(orgId) {
+      return isSuperAdmin() ||
+             (isOrgAdmin() && belongsToOrganization(orgId)) ||
+             (isMarketing() && belongsToOrganization(orgId));
     }
 
-    function isCompanyScopedStaff() {
-      return isCompanyAdmin() || isHR() || isAccountant() || isBranchesMarketing();
+    // Helper function to check if user can access company (read + write)
+    function canAccessCompany(orgId, compId) {
+      return isSuperAdmin() ||
+             (isOrgAdmin() && belongsToOrganization(orgId)) ||
+             (isCompanyAdmin() && belongsToCompany(orgId, compId)) ||
+             (isHR() && belongsToCompany(orgId, compId));
     }
 
-    function isStaffWriter() {
-      return isGlobalStaff() || isOrgScopedStaff() || isCompanyScopedStaff();
+    // Helper function to check if the update is only incrementing the admin count
+    function isAdminCountIncrement() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['admins', 'updatedAt']) &&
+             request.resource.data.admins == resource.data.admins + 1;
     }
 
-    function claimString(key) {
-      return signedIn() && request.auth.token.keys().hasAll([key]) && request.auth.token[key] is string
-        ? request.auth.token[key]
-        : '';
+    // ==================== COLLECTION GROUP RULES ====================
+
+    // Requests collectionGroup (Web Dashboard queries)
+    match /{path=**}/requests/{requestId} {
+      allow read: if isAuthenticated() && canAccessCompany(resource.data.organizationUID, resource.data.companyUID);
     }
 
-    function claimListHas(key, value) {
-      return signedIn()
-        && request.auth.token.keys().hasAll([key])
-        && request.auth.token[key] is list
-        && value in request.auth.token[key];
+    // Delegates collectionGroup (Web Dashboard + Mobile App + Marketing Search)
+    // NOTE: Mobile app uses anonymous auth to query delegates by phone number for login.
+    // Anonymous users don't have a /users/{uid} document, so canAccessCompany() would fail.
+    // We allow authenticated reads but restrict to phone-based queries only for anonymous users.
+    // Authenticated admin users get full read access via canAccessCompany() in nested rules.
+    // Marketing users can read delegates for search purposes (read-only).
+    match /{path=**}/delegates/{delegateId} {
+      // Deliberate close: anonymous phone login (<= v1.14.1).
+      allow read: if isAuthenticated() && !isAnonymousAuth();
+      allow write: if isAuthenticated();
     }
 
-    // otp_required is only present when config/delegate_auth.otpEnforcementEnabled
-    // was on at login. Tokens without it (legacy / enforcement off) keep working.
-    // Inlined to stay under Firestore's 1000-expression evaluation budget.
-    function delegateOtpOk() {
-      return !(request.auth.token.keys().hasAll(['otp_required'])
-          && request.auth.token.otp_required == true)
-        || (request.auth.token.keys().hasAll(['otp_verified'])
-          && request.auth.token.otp_verified == true);
+    // Companies collectionGroup (Marketing Search + Delegate Supervisor Lookup)
+    match /{path=**}/companies/{companyId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
-    function isDelegate() {
-      return claimString('role') == 'delegate' && delegateOtpOk();
+    // Photo Permissions & Captured Photos collectionGroups
+    match /{path=**}/photo_permissions/{permissionId} {
+      allow read, delete: if isAuthenticated();
+    }
+    match /{path=**}/captured_photos/{photoId} {
+      allow read, delete: if isAuthenticated();
     }
 
-    // Own-id paths that skip isDelegate() (attendance / leave by uid).
-    // id must be non-empty: get(field, '') would otherwise make
-    // claimString('delegateId') == '' true for any staff token
-    // without that claim (company-admin could read another
-    // company's delegate; M31 #247 / 14ffd87 regression).
-    function ownsDelegateId(id) {
-      return signedIn() && delegateOtpOk() && id is string && id != '' && (
-        id == request.auth.uid ||
-        claimString('delegateId') == id ||
-        claimListHas('delegateIds', id)
+    // ==================== PENALTIES COLLECTION ====================
+    match /penalties/{penaltyId} {
+      allow read, create, update, delete: if isAuthenticated();
+    }
+
+    // ==================== DELEGATE SUBSCRIPTION REQUESTS & USED CODES ====================
+    match /delegate_requests/{requestId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /used_receipt_codes/{code} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ==================== INVITES COLLECTION ====================
+    match /invites/{inviteId} {
+      // Read: Allow unauthenticated reads for invite validation during signup
+      // SECURITY NOTE: This is secure because:
+      // 1. Invite IDs are generated using Firestore's doc().id which creates cryptographically random IDs
+      // 2. The inviteId itself acts as a secret token (UUID-like, unpredictable)
+      // 3. Email validation happens server-side during claimInvite
+      // 4. Enumeration attacks are impractical due to the large ID space (20 random characters)
+      // 5. Rate limiting should be implemented at the application level for additional protection
+      // Also allow authenticated admins to query invites for their organization
+      allow read: if true;
+
+      // Write: Org admins and super admins can create invites globally.
+      // Company admins can create invites scoped to their company (e.g., company-admin onboarding).
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() ||
+        isOrgAdmin() ||
+        (isCompanyAdmin() &&
+          request.resource.data.organizationId != null &&
+          request.resource.data.companyId != null &&
+          belongsToCompany(request.resource.data.organizationId, request.resource.data.companyId))
       );
-    }
 
-    function callerOrg() {
-      return userExists()
-        && userDoc().keys().hasAll(['organizationUID'])
-        && userDoc().organizationUID is string
-        && userDoc().organizationUID != ''
-          ? userDoc().organizationUID
-          : claimString('orgId');
-    }
-
-    function callerCompany() {
-      return userExists()
-        && userDoc().keys().hasAll(['companyUID'])
-        && userDoc().companyUID is string
-        && userDoc().companyUID != ''
-          ? userDoc().companyUID
-          : claimString('companyId');
-    }
-
-    function delegateInOrg(orgId) {
-      return isDelegate() && (claimString('orgId') == orgId || claimListHas('orgIds', orgId));
-    }
-
-    function delegateInCompany(compId) {
-      return isDelegate() && (claimString('companyId') == compId || claimListHas('companyIds', compId));
-    }
-
-    function delegateOwns(id) {
-      return isDelegate() && (
-        id == request.auth.uid ||
-        claimString('delegateId') == id ||
-        claimListHas('delegateIds', id)
+      // Update:
+      // - Super admins can update any invite (e.g., cancel invites)
+      // - Org admins can update invites for their organization
+      // - Company admins can update invites for their own company
+      // - Users can update their own invite when redeeming it (status to 'claimed')
+      allow update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (isOrgAdmin() && resource.data.organizationId != null && belongsToOrganization(resource.data.organizationId)) ||
+        (isCompanyAdmin() &&
+          resource.data.organizationId != null &&
+          resource.data.companyId != null &&
+          belongsToCompany(resource.data.organizationId, resource.data.companyId)) ||
+        (request.resource.data.status == 'claimed' && request.resource.data.claimedByUid == request.auth.uid)
       );
-    }
-
-    function companyScoped() {
-      return callerCompany() != '' && (
-        resource.data.get('companyUID', '') == callerCompany() ||
-        resource.data.get('companyId', '') == callerCompany()
-      );
-    }
-
-    function orgScoped() {
-      return callerOrg() != '' && (
-        resource.data.get('organizationUID', '') == callerOrg() ||
-        resource.data.get('organizationId', '') == callerOrg()
-      );
-    }
-
-    function incomingCompanyScoped() {
-      return callerCompany() != '' && (
-        request.resource.data.companyUID == callerCompany() ||
-        request.resource.data.companyId == callerCompany()
-      );
-    }
-
-    function incomingOrgScoped() {
-      return callerOrg() != '' && (
-        request.resource.data.organizationUID == callerOrg() ||
-        request.resource.data.organizationId == callerOrg()
-      );
-    }
-
-    // One user-doc get, used by org-admin create. Cheaper than chaining
-    // isOrgAdmin + incomingOrgScoped + incomingCompanyScoped (those
-    // re-read the user doc and can blow the 1000-expression budget on
-    // a large request payload).
-    function orgAdminCreatesOwnScopedRequest() {
-      let exists = signedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
-      let u = exists
-        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
-        : {};
-      let role = u.keys().hasAll(['role']) && u.role is string ? u.role : '';
-      let org = u.keys().hasAll(['organizationUID']) && u.organizationUID is string
-        && u.organizationUID != '' ? u.organizationUID : '';
-      let co = u.keys().hasAll(['companyUID']) && u.companyUID is string
-        && u.companyUID != '' ? u.companyUID : '';
-      let d = request.resource.data;
-      let incomingOrg = d.get('organizationUID', '') != ''
-        ? d.get('organizationUID', '') : d.get('organizationId', '');
-      let incomingCo = d.get('companyUID', '') != ''
-        ? d.get('companyUID', '') : d.get('companyId', '');
-      return role in [
-          'organization-admin', 'organization_admin', 'organizationadmin',
-          'organizationAdmin'
-        ]
-        && d.get('supervisorUid', '') == request.auth.uid
-        && org != ''
-        && co != ''
-        && incomingOrg == org
-        && incomingCo == co;
-    }
-
-    function delegatePhoneMatch() {
-      return isDelegate() && (
-        (resource.data.keys().hasAll(['phoneNumber'])
-          && resource.data.phoneNumber is string
-          && claimListHas('phones', resource.data.phoneNumber)) ||
-        (resource.data.keys().hasAll(['phone'])
-          && resource.data.phone is string
-          && claimListHas('phones', resource.data.phone))
-      );
-    }
-
-    function legacySuperAdminSpelling(role) {
-      return role in [
-        'super_admin', 'superadmin', 'superAdmin', 'Super_Admin', 'SUPER_ADMIN'
-      ];
-    }
-
-    // Owners cannot grant themselves super-admin, and nobody can persist a
-    // legacy super-admin spelling. Other canonical role strings stay writable
-    // by staff because the app still stores them (admin, technical_support,
-    // marketing_promotion, branches_marketing, hr).
-    function roleWriteAllowed() {
-      return !request.resource.data.keys().hasAll(['role'])
-        || (
-          request.resource.data.role is string
-          && !legacySuperAdminSpelling(request.resource.data.role)
-          && (request.resource.data.role != 'super-admin' || isSuperAdmin())
-        );
-    }
-
-    function escalationKeys() {
-      return [
-        'role', 'status', 'organizationUID', 'companyUID', 'uid',
-        'organizationId', 'companyId'
-      ];
-    }
-
-    function noSelfEscalation() {
-      return request.auth.uid != resource.id
-        || !request.resource.data.diff(resource.data).affectedKeys().hasAny(escalationKeys());
-    }
-
-    function ownerCreateSafe() {
-      return request.auth.uid == request.resource.id
-        && (
-          !request.resource.data.keys().hasAll(['role'])
-          || request.resource.data.role == 'delegate'
-          || request.resource.data.role == ''
-        )
-        && (
-          !request.resource.data.keys().hasAll(['uid'])
-          || request.resource.data.uid == request.auth.uid
-        );
-    }
-
-    // P0 (N4/NEW-2): delegate self-update is an ALLOW-LIST of the fields the
-    // app itself writes on a delegate's own doc (dev, v1.14.2 and
-    // release/1.14.x-supervisor): session re-login ack, own photo / ID image
-    // re-upload (profile_screen, user_profile_screen) and updatedAt.
-    // Everything else (role, scope, phone/NID, device binding, leave quota,
-    // payment, supervisor, origin ...) is denied. Unchanged values in a
-    // full-map write still pass. Delegate login (delegateLoginV2) is Admin SDK
-    // and not affected.
-    function delegateFieldsSafe() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-        'updatedAt', 'requireReLogin', 'reLoginCompletedAt',
-        'profileImageUrl', 'personalPhotoURL', 'photoURL',
-        'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'
-      ]) && request.resource.data.get('requireReLogin', false) == false
-        && delegateDocsOk() && delegateUrlsWithDocs();
-    }
-
-    // Docs-pending (Mohamed 2026-11-04): a delegate (re)upload is written as
-    // pending; only staff approve. An approved entry is allowed only when the
-    // identical entry (same documentKey, URLs and every other field) already
-    // exists anywhere in the old list: matching is by value, not index, so
-    // removing an earlier entry does not break a later approved one. Unknown
-    // keys can never be approved (the app parses unknown keys as personalPhoto).
-    function knownDocKeys() {
-      return ['personalPhoto', 'nationalityId', 'authorizationLetter', 'insuranceLetter',
-        'healthCertificate', 'paymentReceipt', 'electronicPaymentReceipt',
-        'electronic_payment_receipt'];
-    }
-
-    function docIsApproved(e) {
-      return e.get('documentStatus', '') is string
-        && e.get('documentStatus', '').lower() == 'approved';
-    }
-
-    // An entry carried over unchanged always passes (legacy unknown keys and
-    // odd types included). A new or changed entry must have a string
-    // documentStatus and must not be approved. A new approved value is never
-    // `in o`, so unknown keys can never be newly approved.
-    function newDocEntryOk(n, o, i) {
-      return i >= n.size() || n[i] in o
-        || (n[i].get('documentStatus', '') is string && !docIsApproved(n[i]));
-    }
-
-    // True when the write introduces no new 'approved' document entry.
-    function delegateDocsOk() {
-      let n = request.resource.data.get('documents', []);
-      let o = resource.data.get('documents', []);
-      return !changedKeys().hasAny(['documents']) || (
-        n is list && o is list && n.size() <= 8 && o.size() <= 8
-        && newDocEntryOk(n, o, 0) && newDocEntryOk(n, o, 1)
-        && newDocEntryOk(n, o, 2) && newDocEntryOk(n, o, 3)
-        && newDocEntryOk(n, o, 4) && newDocEntryOk(n, o, 5)
-        && newDocEntryOk(n, o, 6) && newDocEntryOk(n, o, 7));
-    }
-
-    // A delegate may change a photo / ID URL only together with `documents`
-    // (kept, not deleted: a URL-only photo would render as approved).
-    // B2: when a delegate sets a photo / ID / receipt URL to a non-empty
-    // value, the new documents list must hold an entry with the matching key,
-    // documentStatus exactly 'pending', and exactly that URL. Removing a URL
-    // (delete / null / '') stays allowed.
-    function pendingUrlAt(n, i, keys, field, url) {
-      return i < n.size() && n[i].get(field, '') == url
-        && n[i].get('documentStatus', '') == 'pending'
-        && n[i].get('documentKey', '') in keys;
-    }
-
-    function urlBacked(keys, field, url) {
-      let n = request.resource.data.get('documents', []);
-      return n is list && (
-        pendingUrlAt(n, 0, keys, field, url) || pendingUrlAt(n, 1, keys, field, url)
-        || pendingUrlAt(n, 2, keys, field, url) || pendingUrlAt(n, 3, keys, field, url)
-        || pendingUrlAt(n, 4, keys, field, url) || pendingUrlAt(n, 5, keys, field, url)
-        || pendingUrlAt(n, 6, keys, field, url) || pendingUrlAt(n, 7, keys, field, url));
-    }
-
-    function urlFieldOk(f, keys, field) {
-      let v = request.resource.data.get(f, null);
-      return !changedKeys().hasAny([f]) || v == null || v == ''
-        || (v is string && urlBacked(keys, field, v));
-    }
-
-    // The three photo fields are scanned once (budget): every changed photo
-    // field must be removed or equal the same value v, and v must be backed.
-    function photoSame(f, v) {
-      let x = request.resource.data.get(f, null);
-      return !changedKeys().hasAny([f]) || x == null || x == '' || x == v;
-    }
-
-    function photoUrlsOk() {
-      let ch = changedKeys();
-      let d = request.resource.data;
-      let v = ch.hasAny(['profileImageUrl']) ? d.get('profileImageUrl', null)
-        : (ch.hasAny(['personalPhotoURL']) ? d.get('personalPhotoURL', null) : d.get('photoURL', null));
-      return !ch.hasAny(['profileImageUrl', 'personalPhotoURL', 'photoURL'])
-        || (photoSame('profileImageUrl', v) && photoSame('personalPhotoURL', v) && photoSame('photoURL', v)
-          && (v == null || v == '' || (v is string && urlBacked(['personalPhoto'], 'documentURL', v))));
-    }
-
-    // ID front / back are checked in ONE scan (budget): the same pending
-    // nationalityId entry must carry every changed, non-empty ID URL.
-    function idAt(n, i, needF, fv, needB, bv) {
-      return i < n.size()
-        && (!needF || n[i].get('documentURL', '') == fv)
-        && (!needB || n[i].get('secondaryURL', '') == bv)
-        && n[i].get('documentStatus', '') == 'pending'
-        && n[i].get('documentKey', '') == 'nationalityId';
-    }
-
-    function idUrlsOk() {
-      let ch = changedKeys();
-      let d = request.resource.data;
-      let fv = d.get('nationalIdFrontUrl', null);
-      let bv = d.get('nationalIdBackUrl', null);
-      let needF = ch.hasAny(['nationalIdFrontUrl']) && fv != null && fv != '';
-      let needB = ch.hasAny(['nationalIdBackUrl']) && bv != null && bv != '';
-      let n = d.get('documents', []);
-      return !(needF || needB) || (n is list && (
-        idAt(n, 0, needF, fv, needB, bv) || idAt(n, 1, needF, fv, needB, bv)
-        || idAt(n, 2, needF, fv, needB, bv) || idAt(n, 3, needF, fv, needB, bv)
-        || idAt(n, 4, needF, fv, needB, bv) || idAt(n, 5, needF, fv, needB, bv)
-        || idAt(n, 6, needF, fv, needB, bv) || idAt(n, 7, needF, fv, needB, bv)));
-    }
-
-    function delegateUrlsWithDocs() {
-      return photoUrlsOk()
-        && idUrlsOk()
-        && urlFieldOk('receiptImageUrl',
-          ['paymentReceipt', 'electronicPaymentReceipt', 'electronic_payment_receipt'], 'documentURL');
-    }
-
-    function supervisorOnlyRole(r) {
-      return r in ['supervisor', 'company_supervisor'];
-    }
-
-    function delegatePendingStatusOnly(st1) {
-      return st1 is string && st1.lower().trim() == 'pending';
-    }
-
-    function delegateStatusLower(st) {
-      return st is string ? st.lower().trim() : '';
-    }
-
-    // S1 (Mohamed): approving a document is super-admin (any company) or
-    // company-admin / admin / supervisor of the SAME company. Other staff may
-    // still write delegate docs but may not introduce 'approved'.
-    // B1: c1 / c2 are plain strings (a two-element list argument errored in
-    // the collection-group match). M1: nobody approves their own doc.
-    // r4 F2/F3/R2: a tech support write that activates a delegate or carries
-    // an approved document must be in the same batch that moves the bound
-    // delegate_requests doc from exactly 'pending' to 'approved' (get vs
-    // getAfter). The request is the doc's approvedRequestId (add_organization)
-    // or the delegate id itself (new_delegate). Path and company/org fields
-    // are bound to the request; the new_delegate copy may also sit under the
-    // supervisor's own organization.
-    function techReqOk(orgId, compId, delegateId) {
-      let d = request.resource.data;
-      let rid = d.get('approvedRequestId', delegateId);
-      let R = /databases/$(database)/documents/delegate_requests/$(rid);
-      let a = getAfter(R).data;
-      let ex = a.get('existingDelegateUid', null);
-      let ty = a.get('requestType', 'new_delegate');
-      return get(R).data.get('status', '') == 'pending'
-        && a.get('status', '') == 'approved'
-        && ty in ['new_delegate', 'add_organization']
-        && ((ty == 'add_organization' && ex is string && ex == delegateId)
-          || (ty == 'new_delegate' && rid == delegateId))
-        && compId == a.get('companyUID', '')
-        && d.get('companyUID', '') == compId
-        && d.get('organizationUID', '') == orgId
-        && (orgId == a.get('organizationUID', '')
-          || (ty == 'new_delegate'
-            && (orgId == get(/databases/$(database)/documents/users/$(a.get('supervisorUid', ''))).data.get('organizationUID', '')
-              || a.get('organizationUIDs', []).hasAny([orgId]))));
-    }
-
-    function reqAfter(delegateId) {
-      return getAfter(/databases/$(database)/documents/delegate_requests/$(request.resource.data.get('approvedRequestId', delegateId))).data;
-    }
-
-    // r4 F4: by index, an entry is unchanged or flips pending -> approved with
-    // only documentStatus / reviewedBy / reviewedAt changed and the request's URL.
-    // r5 budget: the URL check reads a precomputed key -> URL map (m) instead
-    // of re-reading the request per entry; 4+ flips used to hit the
-    // 1000-expression limit.
-    function flipAt(n, o, i, m) {
-      return i >= n.size() || n[i] == o[i]
-        || (o[i].get('documentStatus', '') == 'pending'
-          && n[i].get('documentStatus', '') == 'approved'
-          && n[i].diff(o[i]).affectedKeys().hasOnly(['documentStatus', 'reviewedBy', 'reviewedAt'])
-          && m.get(n[i].get('documentKey', ''), null) == n[i].get('documentURL', '')
-          && (n[i].get('documentKey', '') != 'nationalityId' || n[i].get('secondaryURL', '') == m['#nidBack']));
-    }
-
-    // Request URL per document key; '#nidBack' is the national ID back URL
-    // (compared as the nationalityId entry's secondaryURL).
-    function reqUrlMap(a) {
-      return {
-        'personalPhoto': a.get('profileImageUrl', ''),
-        'nationalityId': a.get('nationalIdFrontUrl', ''),
-        '#nidBack': a.get('nationalIdBackUrl', ''),
-        'paymentReceipt': a.get('receiptImageUrl', ''),
-        'electronicPaymentReceipt': a.get('receiptImageUrl', ''),
-        'electronic_payment_receipt': a.get('receiptImageUrl', '')
-      };
-    }
-
-    // r4 F4: tech support activation of an existing doc is a status-only write.
-    function techFlipOk(delegateId) {
-      let n = request.resource.data.get('documents', []);
-      let o = resource.data.get('documents', []);
-      let m = reqUrlMap(reqAfter(delegateId));
-      return changedKeys().hasOnly(['status', 'documents', 'updatedAt', 'reviewedBy', 'reviewedAt', 'approvedRequestId'])
-        && resource.data.get('statusReason', '') != 'delete'
-        && (!changedKeys().hasAny(['documents'])
-          || (n is list && o is list && n.size() == o.size() && n.size() <= 8
-            && flipAt(n, o, 0, m) && flipAt(n, o, 1, m) && flipAt(n, o, 2, m) && flipAt(n, o, 3, m)
-            && flipAt(n, o, 4, m) && flipAt(n, o, 5, m) && flipAt(n, o, 6, m) && flipAt(n, o, 7, m)));
-    }
-
-    function staffDocsApproveOk(o1, c1, c2, delegateId) {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let r = u.get('role', '');
-      let c = u.get('companyUID', '');
-      let st0 = resource.data.get('status', null);
-      let st1 = request.resource.data.get('status', null);
-      let stCh = changedKeys().hasAny(['status']);
-      let privGlobalStaffDocsServer = (r in superAdminRoleList() || r in techRoleList())
-        && !stCh
-        && changedKeys().hasAny(['documents']);
-      let approver = request.auth.uid != delegateId && (
-        r in ['super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN']
-        || (c != '' && (c == c1 || c == c2) && r in [
-          'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor']));
-      let tech = r in techRoleList();
-      // H1 (a) + r4: tech support activates only 'pending' -> 'active', as a
-      // status-only write batched with the request approval.
-      // Exact plus Title-Case only (no lower(): 4-flip budget). Unbatched
-      // pending/Pending -> active/Active still requires the request batch.
-      let techSignup = tech && (st0 == 'pending' || st0 == 'Pending')
-        && (st1 == 'active' || st1 == 'Active');
-      // Mohamed 2026-11-10 14:00 Cairo: only super-admin and technical
-      // support may activate, reactivate, suspend, or deactivate. The
-      // account-status check stays on the non-techSignup branch so the
-      // request-approval batch (4 document flips) stays under budget.
-      // Supervisor active→pending doc replace is server-only (callable).
-      // SA / tech doc replace and pending review are server-only (privileged callable).
-      return !(stCh && st1 == 'pending' && !approver)
-        && !privGlobalStaffDocsServer
-        && ((techSignup && techFlipOk(delegateId) && techReqOk(o1, c1, delegateId))
-          || (!techSignup && (delegateDocsOk() || approver)
-            && staffDelegateAccountFieldsOk(r, approver)
-            && sourceStampKeysLocked()));
-    }
-
-    // r4: tech support may create a delegate that is active or carries an
-    // approved document only inside the request-approval batch (techReqOk),
-    // with the request's URLs, name and national id.
-    function delegateDocsNoneApproved(n) {
-      return n is list && n.size() <= 8
-        && (n.size() <= 0 || !docIsApproved(n[0])) && (n.size() <= 1 || !docIsApproved(n[1]))
-        && (n.size() <= 2 || !docIsApproved(n[2])) && (n.size() <= 3 || !docIsApproved(n[3]))
-        && (n.size() <= 4 || !docIsApproved(n[4])) && (n.size() <= 5 || !docIsApproved(n[5]))
-        && (n.size() <= 6 || !docIsApproved(n[6])) && (n.size() <= 7 || !docIsApproved(n[7]));
-    }
-
-    // add-delegate placeholder create: bounded list, all 8 slots, no approved entries.
-    function cheapCreateDocsNotApproved(n) {
-      return n is list && n.size() <= 8
-        && (n.size() < 1 || n[0].get('documentStatus', '').lower() != 'approved')
-        && (n.size() < 2 || n[1].get('documentStatus', '').lower() != 'approved')
-        && (n.size() < 3 || n[2].get('documentStatus', '').lower() != 'approved')
-        && (n.size() < 4 || n[3].get('documentStatus', '').lower() != 'approved')
-        && (n.size() < 5 || n[4].get('documentStatus', '').lower() != 'approved')
-        && (n.size() < 6 || n[5].get('documentStatus', '').lower() != 'approved')
-        && (n.size() < 7 || n[6].get('documentStatus', '').lower() != 'approved')
-        && (n.size() < 8 || n[7].get('documentStatus', '').lower() != 'approved');
-    }
-
-    // Single get() + scope gate for nested delegate placeholder creates.
-    function nestedDelegateCreateOk(orgId, compId, delegateId) {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let r = u.get('role', '');
-      let d = request.resource.data;
-      let stl = d.get('status', '') is string ? d.get('status', '').lower().trim() : '';
-      let n = d.get('documents', []);
-      let sa = r in superAdminRoleList();
-      let scopeOk = sa || r in techRoleList()
-        || (r in orgAdminRoleList() && u.get('organizationUID', '') == orgId)
-        || (r in companyPlaceholderCreateRoleList() && u.get('companyUID', '') == compId);
-      let pendingOk = stl == 'pending' && cheapCreateDocsNotApproved(n);
-      let pathDataOk = d.get('companyUID', '') == compId
-        && d.get('organizationUID', '') == orgId;
-      return pathDataOk && scopeOk && (
-        sa || ((r in companyPlaceholderCreateRoleList() || r in orgAdminRoleList()) && pendingOk)
-        || (r in techRoleList() && ((stl != 'active' && cheapCreateDocsNotApproved(n))
-          || (techCreateBound(delegateId) && techReqOk(orgId, compId, delegateId)))));
-    }
-
-    function techCreateBound(delegateId) {
-      let d = request.resource.data;
-      let n = d.get('documents', []);
-      let a = reqAfter(delegateId);
-      let m = reqUrlMap(a);
-      return d.get('status', '') == 'active'
-        && [d.get('fullName', ''), d.get('nationalId', ''), d.get('profileImageUrl', ''),
-            // r5: phone and the other top-level URLs are bound too (absent is
-            // ok for the ones the app does not write).
-            d.get('phoneNumber', ''), d.get('nationalIdFrontUrl', ''), d.get('nationalIdBackUrl', ''),
-            d.get('receiptImageUrl', m['paymentReceipt']), d.get('personalPhotoURL', m['personalPhoto']),
-            d.get('photoURL', m['personalPhoto'])]
-          == [a.get('fullName', ''), a.get('nationalId', ''), m['personalPhoto'],
-            a.get('phoneNumber', ''), m['nationalityId'], m['#nidBack'],
-            m['paymentReceipt'], m['personalPhoto'], m['personalPhoto']]
-        && n is list && n.size() <= 8
-        && (n.size() <= 0 || entryOk(n[0], m)) && (n.size() <= 1 || entryOk(n[1], m))
-        && (n.size() <= 2 || entryOk(n[2], m)) && (n.size() <= 3 || entryOk(n[3], m))
-        && (n.size() <= 4 || entryOk(n[4], m)) && (n.size() <= 5 || entryOk(n[5], m))
-        && (n.size() <= 6 || entryOk(n[6], m)) && (n.size() <= 7 || entryOk(n[7], m));
-    }
-
-    // r5 budget: an approved entry written by tech support must carry the
-    // request's URL for its key (m = reqUrlMap of the request).
-    function entryOk(e, m) {
-      return !docIsApproved(e)
-        || (m.get(e.get('documentKey', ''), null) == e.get('documentURL', '')
-          && (e.get('documentKey', '') != 'nationalityId' || e.get('secondaryURL', '') == m['#nidBack']));
-    }
-
-    // Budget-flat staff check for delegate docs: one users/{uid} get, literal
-    // role lists, no nested role helpers (REGRESSION: HR on a nested delegate
-    // hit the 1000-expression limit because both delegate matches ran the
-    // nested helpers).
-    // Company staff may act on any chain of their own company (companyNeedsOrg
-    // is kept for callers that still want an org pin, but nested writes pass
-    // false so a second chain is reachable). Name, phone, and image URLs are
-    // not direct client writes for company/org staff — those edits go only
-    // through the editDelegateProfile callable. National ID is never a
-    // direct client edit by company/org/marketing staff, including on
-    // pending / action_required records (Mohamed 2026-11-10). Super-admin
-    // and tech support remain unrestricted (approval batches / Admin SDK).
-    function companyEditorRole(r) {
-      return r in [
-        'company-admin', 'company_admin', 'companyadmin', 'admin',
-        'supervisor', 'company_supervisor'];
-    }
-
-    function profileEditKeys() {
-      return ['fullName', 'firstName', 'secondName', 'thirdName', 'middleName', 'lastName',
-        'phoneNumber', 'phone',
-        'profileImageUrl', 'personalPhotoURL', 'personalPhotoUrl', 'photoURL',
-        'nationalIdFrontUrl', 'nationalIdBackUrl'];
-    }
-    function staffProfileFieldsOk(r) {
-      // nationalId / nationalityID: company/org/marketing clients (TA-32).
-      // Name / phone / image URLs: editDelegateProfile (Admin SDK).
-      return !changedKeys().hasAny(['nationalId', 'nationalityID'])
-        && !changedKeys().hasAny(profileEditKeys());
-    }
-    function staffManagesDelegate(orgId, compId, companyNeedsOrg) {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let r = u.get('role', '');
-      let o = u.get('organizationUID', '');
-      let c = u.get('companyUID', '');
-      return (r in [
-          'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
-          'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport',
-          'tech_support', 'techsupport'])
-        || (o != '' && o in orgId && r in [
-          'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
-          'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion']
-          && staffProfileFieldsOk(r))
-        || (c != '' && c in compId && (!companyNeedsOrg || o in orgId) && r in [
-          'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
-          'hr', 'company-hr', 'company_hr', 'human_resources',
-          'accountant', 'accounting', 'account_admin',
-          'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
-          'branches-marketing-manager', 'branchesmarketingmanager']
-          && staffProfileFieldsOk(r)
-          && !changedKeys().hasAny([
-            'reviewedBy', 'reviewedAt', 'reviewedByName', 'rejectionReason',
-            'approvedRequestId', 'approvedBy', 'approvedByName', 'approvedAt',
-            'paymentStatus', 'paymentMethod', 'amountDue', 'amountPaid', 'paidAt',
-            'organizationUID', 'organizationId', 'companyUID', 'companyId']));
-    }
-
-    function deviceBindingKeys() {
-      return [
-        'boundDeviceId', 'boundDeviceModel', 'boundDeviceBrand', 'boundDeviceOs',
-        'deviceBoundAt', 'deviceLastSeenAt', 'isDeviceLocked', 'deviceResetAt', 'deviceResetBy'
-      ];
-    }
-
-    // delegateLoginV2 is the only writer. Admins approve device_unbind_requests
-    // and the next login rebinds. A client, including an admin, cannot change
-    // these fields.
-    function deviceBindingUntouched() {
-      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(deviceBindingKeys());
-    }
-
-    function deviceBindingAbsent() {
-      return !request.resource.data.keys().hasAny(deviceBindingKeys());
-    }
-
-    // Flat on purpose. Collection-group queries evaluate every delegates
-    // match, and the nested helper form exceeds the 1000-expression limit.
-    function staffRole() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
-        : '';
-    }
-
-    // Own delegate profile reads do not require otp_verified so login can
-    // load profiles before confirmDelegateOtp. Sensitive paths use isDelegate
-    // / ownsDelegateId and stay blocked while otp_required is unset-verified.
-    function canReadDelegate() {
-      return signedIn() && (
-        (request.auth.token.keys().hasAll(['phones'])
-          && request.auth.token.phones is list
-          && resource.data.phoneNumber in request.auth.token.phones)
-        || (request.auth.token.keys().hasAll(['phones'])
-          && request.auth.token.phones is list
-          && resource.data.phone in request.auth.token.phones)
-        || (request.auth.token.keys().hasAll(['delegateIds'])
-          && request.auth.token.delegateIds is list
-          && resource.id in request.auth.token.delegateIds)
-        || resource.id == request.auth.uid
-        // Field uid (not document id) so a collection-group query
-        // where uid==auth.uid / delegateId is provable. Own data only.
-        || ownsDelegateId(resource.data.get('uid', ''))
-        || staffRole() in [
-          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-          'technical_support', 'technical-support', 'technicalSupport'
-        ]
-        || (staffRole() in [
-          'organization-admin', 'organization_admin', 'organizationAdmin',
-          'marketing', 'marketing_promotion'
-        ] && resource.data.organizationUID == callerOrg())
-        || (staffRole() in [
-          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
-          'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
-          'branches_marketing_manager', 'branchesMarketingManager'
-        ] && resource.data.companyUID == callerCompany())
-      );
-    }
 
-    function canManageDelegate() {
-      return isGlobalStaff()
-        || (isOrgScopedStaff() && orgScoped())
-        || (isCompanyScopedStaff() && companyScoped());
+      // Delete: Only super admins can delete invites
+      allow delete: if isAuthenticated() && isSuperAdmin();
     }
 
-    function canManageNestedDelegate(orgId, compId) {
-      return isGlobalStaff()
-        || (isOrgScopedStaff() && callerOrg() == orgId)
-        || (isCompanyScopedStaff() && callerCompany() != '' && callerCompany() == compId);
+    // ==================== USERS COLLECTION ====================
+    function callerIsMarketingStaff() {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && getUserDoc().data.get('role', '') == 'marketing';
     }
-
-    function canReadNestedDelegate(orgId, compId, delegateId) {
-      return signedIn() && (
-        delegateId == request.auth.uid
-        || (request.auth.token.keys().hasAll(['delegateIds'])
-          && request.auth.token.delegateIds is list
-          && delegateId in request.auth.token.delegateIds)
-        || (delegateOtpOk()
-          && request.auth.token.keys().hasAll(['orgId'])
-          && request.auth.token.orgId == orgId
-          && request.auth.token.keys().hasAll(['companyId'])
-          && request.auth.token.companyId == compId)
-        || staffRole() in [
-          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-          'technical_support', 'technical-support', 'technicalSupport'
-        ]
-        || (callerCompany() != '' && callerCompany() == compId && staffRole() in [
-          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
-          'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
-          'branches_marketing_manager', 'branchesMarketingManager'
-        ])
-        || (callerOrg() == orgId && staffRole() in [
-          'organization-admin', 'organization_admin', 'marketing', 'marketing_promotion'
-        ])
-      );
-    }
-
-    // ==================== P0 USERS HARDENING ====================
-    // FIX_PLAN_USERS_WRITE rev 3.2 (P0). Delegate login is unchanged: the
-    // delegates matches and delegateLoginV2 are not touched here.
-
-    function superAdminRoleList() {
-      return ['super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN'];
-    }
-
-    function orgAdminRoleList() {
-      return ['organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin', 'org-admin'];
-    }
-
-    // Roles only a super-admin may grant, edit or hold-and-be-edited.
-    function privilegedRoleList() {
-      return superAdminRoleList().concat(orgAdminRoleList()).concat([
-        'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport',
-        'tech_support', 'techsupport'
-      ]);
-    }
-
-    function companyAdminRoleList() {
-      return ['company-admin', 'company_admin', 'companyadmin', 'admin'];
-    }
-
-    function fieldRoleList() {
-      return ['delegate', 'promoter', ''];
-    }
-
-    function roleOf(d) {
-      return d.get('role', '') is string ? d.get('role', '') : '';
-    }
-
-    // Never stored by a client. The purge script removes legacy values with
-    // the Admin SDK; updates that leave them untouched still pass (S1).
-    function secretKeys() {
-      return ['password', 'temporaryPassword', 'tempPassword'];
-    }
-
-    function privilegeKeys() {
-      return ['permissions', 'isSuperAdmin', 'claims', 'customClaims'];
-    }
-
-    function changedKeys() {
-      return request.resource.data.diff(resource.data).affectedKeys();
-    }
-
-    function noSecretsCreate() {
-      return !request.resource.data.keys().hasAny(secretKeys());
-    }
-
-    function noSecretsUpdate() {
-      return !changedKeys().hasAny(secretKeys());
-    }
-
-    function orgSegment(d) {
-      return d.get('organizationUID', '') is string && d.get('organizationUID', '') != ''
-        ? d.get('organizationUID', '') : '_none';
-    }
-
-    // N3: a doc that names a company must name a company of its own org.
-    // H4: the alt keys companyId / organizationId are pinned the same way.
-    function companyPinned(d) {
-      return (!(d.get('companyUID', '') is string) || d.get('companyUID', '') == ''
-        || exists(/databases/$(database)/documents/organizations/$(orgSegment(d))/companies/$(d.get('companyUID', ''))))
-        && (!(d.get('companyId', '') is string) || d.get('companyId', '') == ''
-        || exists(/databases/$(database)/documents/organizations/$(orgSegment(d))/companies/$(d.get('companyId', ''))))
-        && (d.get('organizationId', '') == '' || d.get('organizationId', '') == d.get('organizationUID', ''));
-    }
-
-    function pinKeysChanged() {
-      return changedKeys().hasAny(['role', 'organizationUID', 'companyUID', 'organizationId', 'companyId']);
-    }
-
-    // ==================== SHARED: USERS ====================
 
     match /users/{userId} {
-      allow get: if signedIn() && (
-        request.auth.uid == userId ||
-        ownsDelegateId(userId) ||
-        isGlobalStaff() ||
-        (isOrgScopedStaff() && orgScoped()) ||
-        (isCompanyScopedStaff() && companyScoped())
+      // Deliberate close: unscoped staff directory list (e.g. marketing private-label perms).
+      allow read: if isAuthenticated() && (
+        userId == request.auth.uid
+        || isSuperAdmin()
+        || !callerIsMarketingStaff()
       );
 
-      // Phone/email lookups after sign-in, and the admin directory for
-      // global staff. Unauthenticated list is denied (staffPhoneLookup).
-      allow list: if signedIn() && (
-        isGlobalStaff() ||
-        (isOrgScopedStaff() && orgScoped()) ||
-        (isCompanyScopedStaff() && companyScoped()) ||
-        (userExists()
-          && userDoc().keys().hasAll(['phoneNumber'])
-          && resource.data.phoneNumber == userDoc().phoneNumber) ||
-        (userExists()
-          && userDoc().keys().hasAll(['email'])
-          && resource.data.email == userDoc().email)
-      );
+      // Create:
+      allow create: if isAuthenticated();
 
-      // New staff accounts come from the createStaffUser function (Admin SDK).
-      // Client creates stay for delegate approval (M6) and legacy screens.
-      // Caller role/org/company are read once and passed in (1000-expression budget).
-      allow create: if signedIn() && noSecretsCreate()
-        && usersCreateOk(userRole(), callerOrg(), callerCompany(), request.resource.data);
+      // Update:
+      allow update: if isAuthenticated();
 
-      allow update: if signedIn() && noSecretsUpdate()
-        && usersUpdateOk(userRole(), callerOrg(), callerCompany(), resource.data, request.resource.data, userId);
-
-      // Mohamed 2026-11-04: deletes are super-admin, plus the company
-      // supervisor/company-admin for delegates/promoters of its own company.
-      allow delete: if signedIn() && request.auth.uid != userId
-        && usersDeleteOk(userRole(), callerOrg(), callerCompany(), resource.data);
+      // Delete:
+      allow delete: if isAuthenticated();
     }
 
-    // r5: one users/{uid} get and literal role lists (budget: the four role
-    // helpers cost ~80 expressions, shared with the delegate writes of the
-    // approval batch). Super-admin, org-admin, company-admin / supervisor and
-    // HR update freely (unchanged).
-    // r4 F1 + H1 (a): tech support only reviews: status/review fields,
-    // approve only from exactly 'pending', never into 'pending', and never a
-    // request it created or supervises. Delete requests included (Q3).
-    // r5: a tech approval of new_delegate / add_organization must leave the
-    // target delegate doc (request org/company, id = request id or
-    // existingDelegateUid) 'active' in the same batch, so an old build that
-    // approves the request in its own write is denied instead of leaving an
-    // approved request with no delegate.
-    // Company/org staff may update only a request in their own tenant, and
-    // may not change status (except cancel), approval, payment, national ID,
-    // or org/company ids. Only super-admin / technical support may approve
-    // or otherwise change status. One users/{uid} get (expression budget).
-    // Supervisors may change only profile fields (name, phone, photos, ID
-    // images, documents, updatedAt). nationalId / status / approval / payment
-    // / company and organization ids stay blocked.
-    // Company/org staff may only touch metadata (updatedAt/notes) or cancel an
-    // unpaid renewal — not reassign supervisorUid, change requestType, etc.
-    function unpaidRequestCancelOk(u) {
-      let st = request.resource.data.get('status', '');
-      let cancelKeys = changedKeys().hasOnly(['status'])
-        || changedKeys().hasOnly(['status', 'updatedAt']);
-      let pay = resource.data.get('paymentStatus', '');
-      let paid = pay is string && pay.lower().trim() == 'paid';
-      let cancelUnpaid = cancelKeys && st == 'cancelled' && !paid;
-      let ty = resource.data.get('requestType', 'new_delegate');
-      let r = u.get('role', '');
-      return cancelUnpaid && (
-        ty != 'new_delegate'
-        || r in superAdminRoleList()
-        || r in techRoleList()
-        || request.auth.uid == resource.data.get('createdBy', '')
-        || request.auth.uid == resource.data.get('supervisorUid', '')
-        || (supervisorOnlyRole(r)
-          && u.get('companyUID', '') != ''
-          && u.get('companyUID', '') == resource.data.get('companyUID', '')));
-    }
-
-    function staffDelegateRequestMetaOnly(u) {
-      let metaKeys = changedKeys().hasOnly(['updatedAt'])
-        || changedKeys().hasOnly(['updatedAt', 'notes'])
-        || changedKeys().hasOnly(['notes']);
-      return unpaidRequestCancelOk(u)
-        || (metaKeys && !changedKeys().hasAny(['status']));
-    }
-
-    function requestStaffUpdateOk(requestId) {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let r = u.get('role', '');
-      let scopedSafe = staffDelegateRequestMetaOnly(u);
-      return signedIn() && (
-        r in [
-          'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN']
-        || (r in techRoleList() && techRequestReviewOk(requestId))
-        || (r in [
-            'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
-            'hr', 'company-hr', 'company_hr', 'human_resources']
-          && u.get('companyUID', '') != ''
-          && u.get('companyUID', '') == resource.data.get('companyUID', '')
-          && scopedSafe)
-        || (r in [
-            'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin']
-          && u.get('organizationUID', '') != ''
-          && u.get('organizationUID', '') == resource.data.get('organizationUID', '')
-          && scopedSafe));
-    }
-
-    function techRequestReviewOk(requestId) {
-      let d = request.resource.data;
-      let st = d.get('status', '');
-      let ty = d.get('requestType', 'new_delegate');
-      let created = getAfter(/databases/$(database)/documents/organizations/$(d.get('organizationUID', ''))/companies/$(d.get('companyUID', ''))/delegates/$(ty == 'add_organization' ? d.get('existingDelegateUid', '') : requestId));
-      let reviewKeysOnly = changedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason', 'updatedAt']);
-      // Add-org approval may also write nationalId/nationalityID when those
-      // values equal the national ID on the created (live) delegate doc in
-      // the same batch. Any other ID is denied.
-      let addOrgLiveIdHeal = ty == 'add_organization'
-        && st == 'approved'
-        && changedKeys().hasOnly([
-          'status', 'reviewedBy', 'reviewedAt', 'rejectionReason', 'updatedAt',
-          'nationalId', 'nationalityID'])
-        && d.get('nationalId', '') != ''
-        && d.get('nationalId', '') == d.get('nationalityID', '')
-        && d.get('nationalId', '') == created.data.get('nationalId', '');
-      return (reviewKeysOnly || addOrgLiveIdHeal)
-        && resource.data.get('supervisorUid', '') != request.auth.uid
-        && resource.data.get('createdBy', '') != request.auth.uid
-        && !(changedKeys().hasAny(['status']) && st == 'pending')
-        && !(st == 'approved' && resource.data.get('status', '') != 'pending')
-        && (st != 'approved' || !(ty in ['new_delegate', 'add_organization'])
-          || created.data.get('status', '') == 'active');
-    }
-
-    // True for a write to organizations/{o}/companies/{c}/delegates/{id}.
-    // The collection-group delegates match defers those writes to the nested
-    // match so the 1000-expression budget is not spent twice, for every role
-    // (not only technical support).
-    function onNestedDelegate() {
-      return request.path[3] == 'organizations' && request.path[5] == 'companies';
-    }
-
-
-    // Photo-permission schedule edits (dates/branches) for marketing,
-    // marketing-promotion, org-admin, and branches-marketing. One get() of
-    // users/{uid} — no roleIs loop — so a branches-marketing user with a
-    // companyUID stays under the 1000-expression budget (N-2/L-3).
-    function photoScheduleKeysOnly() {
-      return changedKeys().hasOnly([
-        'startDate', 'endDate', 'branchIds', 'branchNames', 'updatedAt']);
-    }
-
-    function photoScheduleStaffRole(role) {
-      return role in [
-        'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion',
-        'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
-        'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
-        'branches-marketing-manager', 'branchesmarketingmanager',
-        'branchesMarketingManager'
-      ];
-    }
-
-    function photoScheduleStaffFromUser(u, orgId, compId) {
-      let role = u.keys().hasAll(['role']) && u.role is string ? u.role : '';
-      let org = u.keys().hasAll(['organizationUID']) && u.organizationUID is string
-        ? u.organizationUID : '';
-      let co = u.keys().hasAll(['companyUID']) && u.companyUID is string
-        ? u.companyUID : '';
-      return photoScheduleStaffRole(role)
-        && org != '' && org == orgId
-        && (co == '' || co == compId);
-    }
-
-    function photoScheduleEditOnNested(orgId, compId) {
-      return photoScheduleKeysOnly()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && photoScheduleStaffFromUser(
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data,
-          orgId, compId);
-    }
-
-    // Mohamed 2026-11-10 22:14: marketing-promotion may approve, reject,
-    // and toggle isSupervisorEnabled, scoped like their date edits:
-    // own org, and own company when they have a companyUID.
-    function photoPromotionReviewerRole(role) {
-      return role in [
-        'marketing_promotion', 'marketingpromotion', 'marketingPromotion'
-      ];
-    }
-
-    function photoReviewKeysOnly() {
-      return changedKeys().hasOnly([
-        'status', 'isSupervisorEnabled', 'approvedBy', 'approvedAt',
-        'rejectedBy', 'rejectedAt', 'reviewedBy', 'reviewedAt',
-        'rejectionReason', 'approvedByName',
-        'startDate', 'endDate', 'branchIds', 'branchNames', 'updatedAt']);
-    }
-
-    function photoPromotionReviewFromUser(u, orgId, compId) {
-      let role = u.keys().hasAll(['role']) && u.role is string ? u.role : '';
-      let org = u.keys().hasAll(['organizationUID']) && u.organizationUID is string
-        ? u.organizationUID : '';
-      let co = u.keys().hasAll(['companyUID']) && u.companyUID is string
-        ? u.companyUID : '';
-      return photoPromotionReviewerRole(role)
-        && org != '' && org == orgId
-        && (co == '' || co == compId);
-    }
-
-    function photoReviewStatusOk() {
-      return !changedKeys().hasAny(['status'])
-        || request.resource.data.get('status', '') in ['approved', 'rejected'];
-    }
-
-    function photoPromotionReviewOnNested(orgId, compId) {
-      return photoReviewKeysOnly()
-        && photoReviewStatusOk()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && photoPromotionReviewFromUser(
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data,
-          orgId, compId);
-    }
-
-    // Delete is a review action (Mohamed 2026-11-10 22:14 + UT F2): only
-    // super-admin, technical support, and marketing-promotion, with the
-    // same org / company scope as approve. Marketing, org-admin and
-    // branches-marketing may not delete.
-    function photoPromotionDeleteOnNested(orgId, compId) {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && photoPromotionReviewFromUser(
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data,
-          orgId, compId);
-    }
-
-    // Phase 1 item 1: clients cannot set or change source stamps.
-    // The Admin SDK (stampDelegateSource / backfill) bypasses rules.
-    // Do not use these keys in read helpers — keep this off the
-    // company-admin read path another worker is fixing.
-    function sourceStampKeys() {
-      return ['delegateSource', 'chainOrigin', 'delegateSourceInferredBy',
-        'delegateSourceAt', 'delegateSourceRunId', 'delegateSourceRevertRunId',
-        // Phase 2 item 1: hold authority fields are server-only (Admin SDK).
-        'holds', 'statusVersion', 'holdsAuthorityAt', 'rejectionReason',
-        'holdsBackfillRunId'];
-    }
-    function sourceStampKeysLocked() {
-      return request.method == 'create'
-        ? !request.resource.data.keys().hasAny(sourceStampKeys())
-        : !changedKeys().hasAny(sourceStampKeys());
-    }
-
-    // MED-2: the auditDelegateRequestOrgs stamp is server-only. Clients
-    // (including HR and org-admin) cannot flip failed -> ok.
-    function orgCompanyCheckKeys() {
-      return ['orgCompanyCheck', 'orgCompanyCheckReason',
-        'orgCompanyCheckMissing', 'orgCompanyCheckAt'];
-    }
-    function orgCompanyCheckKeysLocked() {
-      return request.method == 'create'
-        ? !request.resource.data.keys().hasAny(orgCompanyCheckKeys())
-        : !changedKeys().hasAny(orgCompanyCheckKeys());
-    }
-    // Approving a new_delegate / add_organization request requires the
-    // existing server mark to be ok. The incoming write cannot supply it.
-    function requestApprovalOrgCheckOk() {
-      return request.resource.data.get('status', '') != 'approved'
-        || resource.data.get('status', '') == 'approved'
-        || !(resource.data.get('requestType', 'new_delegate')
-          in ['new_delegate', 'add_organization'])
-        || resource.data.get('orgCompanyCheck', '') == 'ok';
-    }
-
-
-    function techRoleList() {
-      return ['technical_support', 'technical-support', 'technicalSupport', 'technicalsupport', 'tech_support', 'techsupport'];
-    }
-
-    function companyStaffWriterRoleList() {
-      return ['company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
-        'hr', 'company-hr', 'company_hr', 'human_resources'];
-    }
-
-    // Multi-chain placeholder create: same companyUID, any org in the company.
-    function companyPlaceholderCreateRoleList() {
-      return ['company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor'];
-    }
-
-    // H1: roles company staff may grant. Supervisor/HR: field roles only.
-    // Company admin: field roles plus company-level supervisor/HR. Never
-    // marketing / branches marketing (org-scoped readers) or any admin role.
-    function companyCanGrant(r, nr) {
-      return nr in ['delegate', 'promoter', '']
-        || (r in ['company-admin', 'company_admin', 'companyadmin', 'admin']
-          && nr in ['supervisor', 'company_supervisor', 'hr', 'company-hr', 'company_hr', 'human_resources']);
-    }
-
-    function newRoleOk(r) {
-      return r == 'super-admin' || !(r in superAdminRoleList());
-    }
-
-    function companyStaffUsersCreateFieldOk(d) {
-      let nr = roleOf(d);
-      let docs = d.get('documents', []);
-      let st = d.get('status', '');
-      return !(nr in fieldRoleList())
-        || ((!d.keys().hasAny(['isActive']) || d.get('isActive', false) != true)
-          && (!d.keys().hasAny(['status'])
-            || (st is string && st.lower().trim() == 'pending'
-              && (!(docs is list) || delegateDocsNoneApproved(docs)))));
-    }
-
-    // users/{uid}: nationalId / nationalityID are never client-writable (TA-32).
-    // Updates go through reviewNationalIdUpdate (Admin SDK) after
-    // submitNationalIdUpdate creates the request.
-    function usersIdentityClientLocked(changed) {
-      return !changed.hasAny(['nationalId', 'nationalityID']);
-    }
-
-    function usersCreateOk(r, org, co, d) {
-      let nr = roleOf(d);
-      let isSA = r in superAdminRoleList();
-      let selfCreate = request.auth.uid == request.resource.id
-        && nr in ['delegate', '']
-        && d.get('uid', request.auth.uid) == request.auth.uid
-        && !d.keys().hasAny(['status', 'organizationUID', 'companyUID', 'organizationId', 'companyId', 'isActive'])
-        && !d.keys().hasAny(privilegeKeys())
-        && !(nr in privilegedRoleList());
-      return usersIdentityClientLocked(d.keys())
-        && newRoleOk(nr) && (isSA || selfCreate || (
-        !d.keys().hasAny(privilegeKeys())
-        && !(nr in privilegedRoleList())
-        && companyPinned(d)
-        && (
-          (r in techRoleList()) ||
-          (r in orgAdminRoleList() && org != '' && d.get('organizationUID', '') == org
-            && companyStaffUsersCreateFieldOk(d)) ||
-          (r in companyStaffWriterRoleList() && co != '' && org != ''
-            && d.get('organizationUID', '') == org && d.get('companyUID', '') == co
-            && companyCanGrant(r, nr)
-            && companyStaffUsersCreateFieldOk(d))
-        )
-      ));
-    }
-
-    // H-1: only global staff may touch isActive on delegate/promoter user docs.
-    // Other staff accounts: company staff may still deactivate (not activate).
-    function staffMaySetIsActiveActive(d, old, changed, r) {
-      return !changed.hasAny(['isActive'])
-        || r in superAdminRoleList()
-        || r in techRoleList()
-        || (!(roleOf(old) in fieldRoleList() || roleOf(d) in fieldRoleList())
-          && d.get('isActive', true) != true);
-    }
-
-    // H-1: company staff may not change status on delegate/promoter users docs.
-    function staffMaySetUserStatus(d, old, changed, r) {
-      return !changed.hasAny(['status'])
-        || r in superAdminRoleList()
-        || r in techRoleList()
-        || !(roleOf(old) in fieldRoleList() || roleOf(d) in fieldRoleList());
-    }
-
-    // H-1: company staff cannot activate/suspend delegates (any status spelling).
-    // Mohamed 2026-11-15: active→pending only via supervisor doc replace;
-    // suspension lift only super-admin / technical_support.
-    function staffDelegateAccountFieldsOk(r, approver) {
-      let ch = changedKeys();
-      let stCh = ch.hasAny(['status']);
-      let actCh = ch.hasAny(['isActive']);
-      let globalStaff = r in superAdminRoleList() || r in techRoleList();
-      let fromSuspended = delegateStatusLower(resource.data.get('status', '')) == 'suspended';
-      // Explicit deny (TA-32): nationalId changes on delegate docs only via
-      // approval batches (techSignup skips this helper) or Admin SDK.
-      let idClientLock = !ch.hasAny(['nationalId', 'nationalityID']);
-      return idClientLock
-        && ((!stCh && !actCh) || (globalStaff && (stCh || actCh)));
-    }
-
-    function usersUpdateOk(r, org, co, old, d, userId) {
-      let changed = d.diff(old).affectedKeys();
-      let nr = roleOf(d);
-      let or = roleOf(old);
-      return usersIdentityClientLocked(changed) && ((r in superAdminRoleList() && newRoleOk(nr)) || (
-        newRoleOk(nr)
-        && !changed.hasAny(privilegeKeys())
-        && staffMaySetIsActiveActive(d, old, changed, r)
-        && staffMaySetUserStatus(d, old, changed, r)
-        && (!changed.hasAny(['role', 'organizationUID', 'companyUID', 'organizationId', 'companyId']) || companyPinned(d))
-        && (
-          (request.auth.uid == userId
-            && !changed.hasAny(escalationKeys().concat(['isActive']))) ||
-          (request.auth.uid != userId
-            && !(or in privilegedRoleList()) && !(nr in privilegedRoleList())
-            && (
-              (r in techRoleList()) ||
-              (r in orgAdminRoleList() && org != ''
-                && old.get('organizationUID', '') == org && d.get('organizationUID', '') == org) ||
-              (r in companyStaffWriterRoleList() && co != ''
-                && old.get('companyUID', '') == co && d.get('companyUID', '') == co
-                && old.get('organizationUID', '') == d.get('organizationUID', '')
-                && (!changed.hasAny(['role'])
-                  || (!(or in fieldRoleList()) && !(nr in fieldRoleList())
-                    && companyCanGrant(r, nr) && companyCanGrant(r, or))))
-            ))
-        )
-      ));
-    }
-
-    function usersDeleteOk(r, org, co, old) {
-      return r in superAdminRoleList() || (
-        r in ['company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor']
-        && co != '' && org != ''
-        && old.get('companyUID', '') == co && old.get('organizationUID', '') == org
-        && roleOf(old) in fieldRoleList()
-      );
-    }
-
-    // ==================== SHARED: ORGANIZATIONS AND COMPANIES ====================
-
+    // ==================== ORGANIZATIONS COLLECTION ====================
     match /organizations/{orgId} {
-      allow read: if signedIn();
-      allow create: if isSuperAdmin();
-      allow update: if isSuperAdmin()
-        || (isOrgAdmin() && callerOrg() == orgId)
-        || (signedIn() && callerOrg() == orgId && isStaffWriter()
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['admins', 'updatedAt'])
-            && request.resource.data.admins == resource.data.admins + 1);
-      allow delete: if isSuperAdmin();
+      // Read: Allow read for all clients (needed for mobile app delegates & admins)
+      allow read: if true;
 
+      // Write: Only super admins can create/delete organizations.
+      // Org admins can update their own organization (e.g. company counts).
+      allow create: if isAuthenticated() && isSuperAdmin();
+      allow update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (isOrgAdmin() && belongsToOrganization(orgId)) ||
+        isAdminCountIncrement()
+      );
+      allow delete: if isAuthenticated() && isSuperAdmin();
+
+      // Branches subcollection (Organization level)
       match /branches/{branchId} {
-        allow read: if signedIn();
-        allow write: if isGlobalStaff() || (isOrgScopedStaff() && callerOrg() == orgId)
-          || (isCompanyScopedStaff() && callerOrg() == orgId);
+        allow read: if true;
+        allow write: if isAuthenticated();
       }
 
+      // Sent Notifications subcollection (Organization level)
       match /sent_notifications/{notificationId} {
-        allow read: if isGlobalStaff() || (signedIn() && callerOrg() == orgId && (isOrgScopedStaff() || isCompanyScopedStaff()));
-        allow create, update, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
-      }
+        // Read: Org Admins, Super Admins, and Marketing (read-only)
+        allow read: if isAuthenticated() && canReadOrganization(orgId);
 
-      match /members/{memberId} {
-        allow read: if signedIn() && (request.auth.uid == memberId || isGlobalStaff() || callerOrg() == orgId);
-        // Self writes removed (forged invite claim). claimInvite writes via Admin SDK.
-        allow create, update, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
-      }
-
-      match /admins/{adminId} {
-        allow read: if isGlobalStaff() || (signedIn() && callerOrg() == orgId && isStaffWriter());
-        allow create, update, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
-      }
-
-      match /companies/{compId} {
-        allow read: if signedIn();
-        allow create, update, delete: if isGlobalStaff()
-          || (isOrgAdmin() && callerOrg() == orgId)
-          || (isCompanyScopedStaff() && callerOrg() == orgId && callerCompany() == compId);
-
-        match /admins/{adminId} {
-          allow read: if signedIn() && (
-            isGlobalStaff() || callerOrg() == orgId || request.auth.uid == adminId
-          );
-          allow create, update, delete: if isSuperAdmin()
-            || (isOrgAdmin() && callerOrg() == orgId)
-            || (isCompanyAdmin() && callerOrg() == orgId && callerCompany() == compId && request.auth.uid == adminId);
-        }
-
-        match /members/{memberId} {
-          allow read: if signedIn() && (
-            request.auth.uid == memberId || isGlobalStaff() || canManageNestedDelegate(orgId, compId)
-          );
-          allow create, update, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
-        }
-
-        match /delegates/{delegateId} {
-          allow read: if signedIn() && canReadNestedDelegate(orgId, compId, delegateId);
-          allow create: if deviceBindingAbsent() && sourceStampKeysLocked()
-            && exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId))
-            && nestedDelegateCreateOk(orgId, compId, delegateId);
-          // sourceStampKeysLocked is not on this allow: the 4-flip tech
-          // approval is already at the 1000-expression budget. Delegate
-          // self-updates are hasOnly-gated by delegateFieldsSafe. Staff
-          // updates take staffDocsApproveOk, which locks source keys on
-          // the non-techSignup branch only (techFlipOk already hasOnly).
-          allow update: if delegateOwns(delegateId)
-            ? delegateFieldsSafe()
-            : (deviceBindingUntouched() && signedIn()
-              && staffManagesDelegate([orgId], [compId], false)
-              && staffDocsApproveOk(orgId, compId, compId, delegateId));
-          allow delete: if canManageNestedDelegate(orgId, compId);
-        }
-
-        match /requests/{requestId} {
-          allow read: if signedIn() && (
-            isGlobalStaff() || canManageNestedDelegate(orgId, compId) || delegateInCompany(compId)
-          );
-          allow create, update, delete: if canManageNestedDelegate(orgId, compId);
-        }
-
-        match /notifications/{notificationId} {
-          allow read: if signedIn() && (isGlobalStaff() || canManageNestedDelegate(orgId, compId) || delegateInCompany(compId));
-          allow create, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
-          allow update: if signedIn() && (isGlobalStaff() || canManageNestedDelegate(orgId, compId) || delegateInCompany(compId));
-        }
-
-        match /photo_permissions/{permissionId} {
-          // Path-scoped read (no resource.data) so an unfiltered nested list
-          // is authorized without a companyUID query constraint. The
-          // collection-group rule below covers cross-chain / org / global reads.
-          allow read: if signedIn() && callerCompany() != '' && callerCompany() == compId;
-          allow create: if signedIn() && (
-            canManageNestedDelegate(orgId, compId)
-            || (delegateInOrg(orgId) && delegateInCompany(compId))
-          );
-          // Approving or toggling isSupervisorEnabled is super-admin,
-          // technical support, or marketing-promotion (Mohamed 2026-11-10
-          // 22:14), with marketing-promotion scoped to their org and to
-          // their company when they have a companyUID. Date/branch edits
-          // stay available to marketing, marketing-promotion, org-admin
-          // and branches-marketing in that same scope. Delegates may
-          // create a request but cannot update the permission doc.
-          // Schedule-edit and promotion-review each use one users/{uid}
-          // get() so a branches-marketing user with a companyUID stays
-          // under the 1000-expression budget (N-2/L-3).
-          allow update: if signedIn() && (
-            photoScheduleEditOnNested(orgId, compId)
-            || photoPromotionReviewOnNested(orgId, compId)
-            || isGlobalStaff()
-          );
-          allow delete: if isGlobalStaff() || photoPromotionDeleteOnNested(orgId, compId);
-
-          match /captured_photos/{photoId} {
-            allow create: if signedIn() && (
-              canManageNestedDelegate(orgId, compId)
-              || (delegateInOrg(orgId) && delegateInCompany(compId))
-            );
-            allow update: if false;
-            allow delete: if canManageNestedDelegate(orgId, compId);
-          }
-        }
-      }
-
-      match /companyRequests/{requestId} {
-        allow read: if signedIn() && (isGlobalStaff() || callerOrg() == orgId);
-        allow create, update, delete: if isSuperAdmin()
-          || (isOrgAdmin() && callerOrg() == orgId)
-          || (isCompanyAdmin() && callerOrg() == orgId && callerCompany() != '');
-      }
-
-      match /tasks/{taskId} {
-        // Task rules read the caller's users doc once (let) to stay inside
-        // the 1000-expression budget. Role lists mirror the shared helpers.
-        // 0 = none, 1 = global, 2 = org-scoped, 3 = company-scoped staff.
-        function taskStaffLevel(role) {
-          return role in ['super-admin', 'super_admin', 'superadmin', 'superAdmin',
-              'Super-Admin', 'SUPER_ADMIN', 'technical_support', 'technical-support',
-              'technicalSupport', 'technicalsupport', 'tech_support', 'techsupport'] ? 1
-            : role in ['organization-admin', 'organization_admin', 'organizationadmin',
-              'organizationAdmin', 'marketing', 'marketing_promotion',
-              'marketingpromotion', 'marketingPromotion'] ? 2
-            : role in ['company-admin', 'company_admin', 'companyadmin', 'admin',
-              'supervisor', 'company_supervisor', 'hr', 'company-hr', 'company_hr',
-              'human_resources', 'accountant', 'accounting', 'account_admin',
-              'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
-              'branches-marketing-manager', 'branchesmarketingmanager'] ? 3
-            : 0;
-        }
-        function taskUserData() {
-          return signedIn()
-            && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-              ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
-              : {};
-        }
-        function taskOrgOf(ud) {
-          return ud.get('organizationUID', '') is string && ud.get('organizationUID', '') != ''
-            ? ud.organizationUID : claimString('orgId');
-        }
-        function taskCompanyOf(ud) {
-          return ud.get('companyUID', '') is string && ud.get('companyUID', '') != ''
-            ? ud.companyUID : claimString('companyId');
-        }
-        // Staff level if the caller may act on a task of company `taskCompany`.
-        function taskStaffScope(taskCompany) {
-          let ud = taskUserData();
-          let role = ud.get('role', '') is string ? ud.get('role', '') : '';
-          let level = taskStaffLevel(role);
-          let org = taskOrgOf(ud);
-          let comp = taskCompanyOf(ud);
-          return level == 1 ? 1
-            : level == 2 && org == orgId ? 2
-            : level == 3 && org == orgId && comp != '' && comp == taskCompany ? 3
-            : 0;
-        }
-        function taskSenderKeys() {
-          return ['title', 'description', 'imageUrl', 'imagePath', 'imagePaths', 'editedAt'];
-        }
-        function taskTouchesSenderKeys() {
-          return request.resource.data.diff(resource.data).affectedKeys().hasAny(taskSenderKeys());
-        }
-        // Assignment fields: only the supervisor/admin roles that create
-        // tasks (not hr, accountant, or delegates).
-        function taskAssignerLevel(role) {
-          let level = taskStaffLevel(role);
-          return role in ['hr', 'company-hr', 'company_hr', 'human_resources',
-              'accountant', 'accounting', 'account_admin'] ? 0 : level;
-        }
-        function taskAssignerScope(taskCompany) {
-          let ud = taskUserData();
-          let role = ud.get('role', '') is string ? ud.get('role', '') : '';
-          let level = taskAssignerLevel(role);
-          let org = taskOrgOf(ud);
-          let comp = taskCompanyOf(ud);
-          return level == 1 ? 1
-            : level == 2 && org == orgId ? 2
-            : level == 3 && org == orgId && comp != '' && comp == taskCompany ? 3
-            : 0;
-        }
-        function taskAssignmentKeys() {
-          return ['assignedTo', 'assignedToName', 'companyId', 'companyUID'];
-        }
-        function taskTouchesAssignmentKeys() {
-          return request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(taskAssignmentKeys());
-        }
-        // An attached image must sit under the uploader's company folder
-        // with an N1-r name: task_images/{companyId}/{uid}/task_{uid}_{token}.
-        // Legacy org-level paths cannot be written on create or image change.
-        function incomingTaskImagePathOk(path) {
-          return path is string
-            && path.matches(
-              '^task_images/' + request.resource.data.get('companyId', '') + '/' + request.auth.uid + '/task_' + request.auth.uid + '_[^_]+$');
-        }
-        function incomingTaskImageListOk() {
-          return !request.resource.data.keys().hasAny(['imagePaths'])
-            || (request.resource.data.imagePaths is list
-              && request.resource.data.imagePaths.size() <= 3
-              && (request.resource.data.imagePaths.size() == 0
-                || incomingTaskImagePathOk(request.resource.data.imagePaths[0]))
-              && (request.resource.data.imagePaths.size() < 2
-                || incomingTaskImagePathOk(request.resource.data.imagePaths[1]))
-              && (request.resource.data.imagePaths.size() < 3
-                || incomingTaskImagePathOk(request.resource.data.imagePaths[2])));
-        }
-        function incomingTaskImageOk() {
-          let data = request.resource.data;
-          let pathOk = !data.keys().hasAny(['imagePath'])
-            || incomingTaskImagePathOk(data.imagePath);
-          let listOk = incomingTaskImageListOk();
-          let consistent = !data.keys().hasAny(['imagePath'])
-            || !data.keys().hasAny(['imagePaths'])
-            || data.imagePaths.size() == 0
-            || data.imagePath == data.imagePaths[0];
-          return pathOk && listOk && consistent;
-        }
-        // On update the path is only checked when the image changes, so other
-        // staff can still change status on a task that carries an image.
-        function taskImageChangeOk() {
-          return !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['imagePath', 'imagePaths'])
-            || incomingTaskImageOk();
-        }
-        function taskDelegateTarget() {
-          return delegateInOrg(orgId) && (
-            ownsDelegateId(resource.data.assignedTo)
-            || resource.data.assignedTo == 'all'
-            || resource.data.assignedTo == 'all_marketing_promotion'
-            || resource.data.assignedTo == 'all_branch_marketing'
-            || ownsDelegateId(resource.data.createdBy)
-          );
-        }
-        function taskCanUpdate() {
-          let scope = taskStaffScope(resource.data.get('companyId', ''));
-          let isSender = resource.data.get('createdBy', '') == request.auth.uid;
-          let canAssign = !taskTouchesAssignmentKeys()
-            || taskAssignerScope(resource.data.get('companyId', '')) > 0;
-          return (scope > 0
-              && (scope == 1 || isSender || !taskTouchesSenderKeys())
-              && taskImageChangeOk()
-              && canAssign)
-            || (taskDelegateTarget()
-              && (ownsDelegateId(resource.data.createdBy) || !taskTouchesSenderKeys())
-              && !taskTouchesAssignmentKeys());
-        }
-        function taskCanDelete() {
-          let scope = taskStaffScope(resource.data.get('companyId', ''));
-          return (scope > 0 && (scope == 1 || resource.data.get('createdBy', '') == request.auth.uid))
-            || (delegateInOrg(orgId) && ownsDelegateId(resource.data.createdBy));
-        }
-
-        allow read: if signedIn() && (
-          taskStaffScope(resource.data.get('companyId', '')) > 0
-          || (delegateInOrg(orgId) && (
-            resource.data.companyId == claimString('companyId')
-            || claimListHas('companyIds', resource.data.companyId)
-          ))
+        // Write: Org Admins and Super Admins only (no marketing)
+        allow create: if isAuthenticated() && (
+          isSuperAdmin() ||
+          (isOrgAdmin() && belongsToOrganization(orgId))
         );
-        allow create: if signedIn()
-          && taskStaffScope(request.resource.data.get('companyId', '')) > 0
-          && incomingTaskImageOk();
-        // Staff keep status/priority edits; message content and the image
-        // only by the sender (global staff keep moderation access).
-        // Delegates: status/notes only, never the sender's content.
-        allow update: if signedIn() && taskCanUpdate();
-        // Hard delete: the sender (or global staff). Delegates only their own.
-        allow delete: if signedIn() && taskCanDelete();
 
-        // Phase 4: per-uploader proof photos. Isolated from supervisor
-        // imagePaths so a title-only or sender edit cannot wipe them.
-        match /proofs/{uploaderUid} {
-          function proofTask() {
-            return get(/databases/$(database)/documents/organizations/$(orgId)/tasks/$(taskId)).data;
-          }
-          function proofTaskCompany() {
-            return proofTask().get('companyId', '');
-          }
-          function isProofSender() {
-            return signedIn() && proofTask().get('createdBy', '') == request.auth.uid;
-          }
-          function isProofCompanySupervisor() {
-            return signedIn()
-              && isCompanyAdmin()
-              && callerCompany() == proofTaskCompany();
-          }
-          // Each path must be the caller's own N1-r name under the task's
-          // company: task_proof/{taskCo}/{uid}/proof_{uid}_{token}.
-          function proofPathsOk(paths, pattern) {
-            return paths is list
-              && paths.size() <= 3
-              && (paths.size() == 0 || (paths[0] is string && paths[0].matches(pattern)))
-              && (paths.size() < 2 || (paths[1] is string && paths[1].matches(pattern)))
-              && (paths.size() < 3 || (paths[2] is string && paths[2].matches(pattern)));
-          }
-          // uploadedByName is set by the onTaskProofWritten trigger from
-          // the uploader's profile. A client may not add or change it.
-          function proofNameOk(data) {
-            return !data.keys().hasAny(['uploadedByName'])
-              || (resource != null
-                && resource.data.get('uploadedByName', null) == data.uploadedByName);
-          }
-          // Held / inactive callers cannot write (users doc, else the
-          // company delegate doc). Reads of existing proofs stay allowed.
-          function proofCallerBlocked(taskCo, ud) {
-            let delPath = /databases/$(database)/documents/organizations/$(orgId)/companies/$(taskCo)/delegates/$(request.auth.uid);
-            let data = ud.size() > 0 ? ud : (exists(delPath) ? get(delPath).data : {});
-            let holds = data.get('holds', {});
-            return (holds is map
-                && holds.keys().hasAny(['admin_suspend', 'subscription_expired', 'billing_cycle_reset']))
-              || data.get('isActive', true) == false
-              || data.get('status', 'active') in
-                ['pending', 'rejected', 'deleted', 'disabled', 'suspended', 'inactive'];
-          }
-          // Field delegate (login token) of this org and the task's company.
-          function proofDelegateIn(taskCo) {
-            return claimString('role') == 'delegate'
-              && delegateOtpOk()
-              && (claimString('orgId') == orgId || claimListHas('orgIds', orgId))
-              && (claimString('companyId') == taskCo || claimListHas('companyIds', taskCo));
-          }
-          function proofStaffCoOk(taskCo, ud) {
-            return taskOrgOf(ud) == orgId
-              && (taskCompanyOf(ud) == taskCo
-                || (ud.get('companyIds', []) is list && taskCo in ud.get('companyIds', [])));
-          }
-          // Org-level sector staff (no company) also get company sector tasks.
-          function proofSectorCoOk(taskCo, ud) {
-            return proofStaffCoOk(taskCo, ud)
-              || (taskOrgOf(ud) == orgId && taskCompanyOf(ud) == '');
-          }
-          // B1: only the task's assignee or its intended recipients.
-          // «الكل» is company field delegates only (as for notifications);
-          // sector tokens accept the matching users-doc role.
-          function proofAssignedOk(assigned, taskCo, ud) {
-            let role = ud.get('role', '');
-            return !(assigned is string) || assigned == '' ? false
-              : assigned == 'all' || assigned == 'الكل' ? proofDelegateIn(taskCo)
-              : assigned == 'all_branch_marketing' ? (role in [
-                  'marketing', 'branches_marketing', 'branches-marketing',
-                  'branchesmarketing', 'branches_marketing_manager',
-                  'branches-marketing-manager', 'branchesmarketingmanager',
-                  'branchesMarketingManager']
-                && proofSectorCoOk(taskCo, ud))
-              : assigned == 'all_marketing_promotion' ? (role in [
-                  'marketingPromotion', 'marketing_promotion',
-                  'marketing-promotion', 'marketingpromotion']
-                && proofSectorCoOk(taskCo, ud))
-              : assigned == request.auth.uid && role in [
-                  'delegate', 'promoter', 'field_delegate', 'field-delegate',
-                  'marketing', 'marketingPromotion', 'marketing_promotion',
-                  'marketing-promotion', 'marketingpromotion',
-                  'branches_marketing_manager', 'branches-marketing-manager',
-                  'branches_marketing', 'branchesMarketingManager',
-                  'branches-marketing', 'branchesmarketingmanager']
-                ? proofStaffCoOk(taskCo, ud)
-              : proofDelegateIn(taskCo) && ownsDelegateId(assigned);
-          }
-          // Own doc, not held, path shape, at most 3, and (B1) the caller
-          // is an assignee/recipient in the task's org and company, the task
-          // is not cancelled, and the uploader label is not client-set.
-          function proofWriteOk() {
-            let task = proofTask();
-            let taskCo = task.get('companyId', '');
-            let data = request.resource.data;
-            let uid = request.auth.uid;
-            let ud = taskUserData();
-            return task.get('status', '') != 'cancelled'
-              && taskCo is string && taskCo != ''
-              && data.keys().hasOnly(
-                ['uploadedBy', 'uploadedByName', 'companyUID', 'taskId', 'imagePaths'])
-              && data.get('uploadedBy', '') == uid
-              && data.get('companyUID', '') == taskCo
-              && data.get('taskId', taskId) == taskId
-              && proofNameOk(data)
-              && proofPathsOk(data.get('imagePaths', null),
-                '^task_proof/' + taskCo + '/' + uid + '/proof_' + uid + '_[^_]+$')
-              && proofAssignedOk(task.get('assignedTo', ''), taskCo, ud)
-              && !proofCallerBlocked(taskCo, ud);
-          }
+        // Update/Delete: Org Admins and Super Admins
+        allow update, delete: if isAuthenticated() && (
+          isSuperAdmin() ||
+          (isOrgAdmin() && belongsToOrganization(orgId))
+        );
+      }
 
-          allow get: if signedIn() && (
-            request.auth.uid == uploaderUid
-            || isProofSender()
-            || isProofCompanySupervisor()
+      // Members subcollection
+      match /members/{userId} {
+        allow read: if isAuthenticated() && (
+          request.auth.uid == userId ||
+          canReadOrganization(orgId)
+        );
+
+        allow create: if isAuthenticated() &&
+                         request.auth.uid == userId;
+
+        allow update: if isAuthenticated() &&
+                         request.auth.uid == userId;
+      }
+
+      // Admins subcollection
+      match /admins/{adminId} {
+        allow read: if isAuthenticated() && canReadOrganization(orgId);
+
+        allow create, update, delete: if isAuthenticated() && (
+          isSuperAdmin() ||
+          (isOrgAdmin() && belongsToOrganization(orgId))
+        );
+      }
+
+      // Companies subcollection
+      match /companies/{compId} {
+        // Read: Allow all users (including delegates) to read company info & supervisor details
+        allow read: if true;
+
+        // Write: Allow authenticated users (super admins, org admins, company supervisors)
+        allow create, update, delete: if isAuthenticated();
+
+        // Admins subcollection under company
+        match /admins/{adminId} {
+          allow read, write: if isAuthenticated();
+        }
+
+        // Members subcollection
+        match /members/{userId} {
+          allow read: if isAuthenticated() && (
+            request.auth.uid == userId ||
+            canAccessCompany(orgId, compId)
           );
-          allow list: if signedIn() && (isProofSender() || isProofCompanySupervisor());
-          allow create, update: if signedIn()
-            && request.auth.uid == uploaderUid
-            && proofWriteOk();
-          allow delete: if signedIn() && request.auth.uid == uploaderUid;
+
+          allow create: if isAuthenticated() &&
+                           request.auth.uid == userId;
+
+          allow update: if isAuthenticated() &&
+                           request.auth.uid == userId;
+
+          allow delete: if isAuthenticated() && (
+            isSuperAdmin() ||
+            (isOrgAdmin() && belongsToOrganization(orgId))
+          );
+        }
+
+        // Delegates subcollection
+        match /delegates/{delegateId} {
+          allow read: if isAuthenticated();
+          allow create, delete: if isAuthenticated();
+          // Deliberate close: supervisor client-side suspend.
+          allow update: if isAuthenticated() && !(
+            getUserData().role == 'supervisor'
+            && request.resource.data.get('status', '') == 'suspended'
+          );
+        }
+
+        // Requests subcollection
+        match /requests/{requestId} {
+          allow read, write: if isAuthenticated();
+        }
+
+        // Notifications subcollection
+        match /notifications/{notificationId} {
+          allow read: if isAuthenticated();
+
+          allow create: if isAuthenticated() && (
+            isSuperAdmin() ||
+            (isOrgAdmin() && belongsToOrganization(orgId))
+          );
+
+          allow update: if isAuthenticated();
+
+          allow delete: if isAuthenticated() && (
+            isSuperAdmin() ||
+            (isOrgAdmin() && belongsToOrganization(orgId))
+          );
+        }
+
+        // Admins subcollection
+        match /admins/{adminId} {
+          allow read: if isAuthenticated();
+
+          allow create, update, delete: if isAuthenticated() && (
+            isSuperAdmin() ||
+            (isOrgAdmin() && belongsToOrganization(orgId)) ||
+            (isCompanyAdmin() && belongsToCompany(orgId, compId) && request.auth.uid == adminId)
+          );
+        }
+
+        // Photo Permissions subcollection
+        match /photo_permissions/{permissionId} {
+          allow read, create, update: if isAuthenticated();
+          allow delete: if isAuthenticated();
+
+          // Captured Photos subcollection
+          match /captured_photos/{photoId} {
+            allow read, create: if isAuthenticated();
+            allow update: if false; 
+            allow delete: if isAuthenticated(); // Allow supervisors and super admin to delete photos
+          }
         }
       }
 
+      // Company Requests subcollection (for organization-level company requests)
+      match /companyRequests/{requestId} {
+        allow read: if isAuthenticated();
+
+        allow create: if isAuthenticated() && (
+          canAccessOrganization(orgId) ||
+          (isCompanyAdmin() &&
+            request.resource.data.targetCompanyId != null &&
+            belongsToCompany(orgId, request.resource.data.targetCompanyId))
+        );
+        allow update: if isAuthenticated() && (
+          canAccessOrganization(orgId) ||
+          (isCompanyAdmin() &&
+            resource.data.targetCompanyId != null &&
+            belongsToCompany(orgId, resource.data.targetCompanyId))
+        );
+        allow delete: if isAuthenticated() && (
+          canAccessOrganization(orgId) ||
+          (isCompanyAdmin() &&
+            resource.data.targetCompanyId != null &&
+            belongsToCompany(orgId, resource.data.targetCompanyId))
+        );
+      }
+      
+      // ==================== TASKS COLLECTION ====================
+      // NOTE: Mobile app uses anonymous auth, so we allow any authenticated user
+      // to read/write tasks. Security is enforced by app logic (filtering by delegateId).
+      match /tasks/{taskId} {
+        allow read: if isAuthenticated();
+        allow create, update, delete: if isAuthenticated();
+      }
+
+      // ==================== ATTENDANCE LOGS ====================
+      // Attendance logs scoped to the organization
       match /attendance_logs/{logId} {
-        allow read: if canReadAttendance();
-        allow create: if canCreateAttendance();
-        allow update: if canUpdateAttendance();
+        // INTERIM HARDENING (2026-11-04): require Firebase Auth (incl. anonymous).
+        allow read, update: if isAuthenticated();
+        // Deliberate close: anonymous check-in (<= v1.14.1).
+        allow create: if isAuthenticated() && !isAnonymousAuth();
+        // Prevent deletion of attendance logs
         allow delete: if false;
       }
 
+      // ==================== BRANCHES ====================
+      // Branches scoped to the organization
+      match /branches/{branchId} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+      }
+
+      // ==================== PRIVATE LABEL (Fathalla) ====================
+      // Daily product + price-tag documentation by branch marketing and its review
+      // by marketing promotion. Mobile app uses anonymous auth, so access is
+      // enforced by app logic (org + delegateUid scoping), like tasks above.
       match /private_label_audits/{auditId} {
-        allow read: if signedIn() && (isGlobalStaff() || callerOrg() == orgId || delegateInOrg(orgId));
-        allow create: if signedIn() && (
-          (isGlobalStaff() || (isStaffWriter() && callerOrg() == orgId))
-          || (delegateInOrg(orgId) && (
-            request.resource.data.delegateUid == request.auth.uid
-            || delegateOwns(request.resource.data.delegateUid)
-          ))
-        );
-        allow update: if signedIn() && (
-          isGlobalStaff() || (isStaffWriter() && callerOrg() == orgId)
-          || (delegateInOrg(orgId) && delegateOwns(resource.data.delegateUid))
-        );
-        allow delete: if isGlobalStaff() || ((isOrgAdmin() || isMarketing()) && callerOrg() == orgId);
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() &&
+                         request.resource.data.organizationUID == orgId &&
+                         request.resource.data.delegateUid is string &&
+                         request.resource.data.productPhotoUrl is string &&
+                         request.resource.data.pricePhotoUrl is string;
+        allow update: if isAuthenticated();
+        // Allowed for authorized marketing promotion and admins
+        allow delete: if isAuthenticated();
       }
 
+      // One summary doc per marketer per day ({uid}_{yyyy-MM-dd}): worked / rest.
       match /private_label_days/{dayId} {
-        allow read: if signedIn() && (isGlobalStaff() || callerOrg() == orgId || delegateInOrg(orgId));
-        allow create, update: if signedIn() && (
-          isGlobalStaff() || (isStaffWriter() && callerOrg() == orgId) || delegateInOrg(orgId)
-        );
-        allow delete: if isGlobalStaff() || ((isOrgAdmin() || isMarketing()) && callerOrg() == orgId);
+        allow read: if isAuthenticated();
+        allow create, update: if isAuthenticated();
+        allow delete: if isAuthenticated();
       }
 
+      // Product catalog (reference prices) managed by marketing promotion.
       match /private_label_products/{productId} {
-        allow read: if signedIn() && (isGlobalStaff() || callerOrg() == orgId || delegateInOrg(orgId));
-        allow create, update, delete: if isGlobalStaff()
-          || ((isOrgAdmin() || isMarketing() || isBranchesMarketing()) && callerOrg() == orgId);
+        allow read: if isAuthenticated();
+        allow create, update: if isAuthenticated();
+        allow delete: if isAuthenticated();
       }
     }
 
-    // ==================== COLLECTION GROUP OVERLAPS ====================
-    // One match per collection group. A later "if true" used to OR with the
-    // tighter match and reopen the collection. Those duplicates are gone.
-
-    match /{path=**}/delegates/{delegateId} {
-      allow read: if signedIn() && canReadDelegate();
-      // r5 budget: a nested organizations/{o}/companies/{c}/delegates
-      // create is decided by the nested match alone.
-      // Lock source stamps on CG create (root / non-nested). Do not put the
-      // lock on CG update: that allow is also evaluated on nested-path writes
-      // (no short-circuit) and the 4-flip tech approval is already at the
-      // 1000-expression budget. Nested updates are locked via
-      // staffDocsApproveOk / delegateFieldsSafe instead.
-      allow create: if !onNestedDelegate() && signedIn() && deviceBindingAbsent() && (
-        isGlobalStaff() ||
-        (isOrgScopedStaff() && incomingOrgScoped()) ||
-        (isCompanyScopedStaff() && incomingCompanyScoped())
-      ) && nestedDelegateCreateOk(
-          request.resource.data.get('organizationUID', ''),
-          request.resource.data.get('companyUID', ''),
-          delegateId)
-        && sourceStampKeysLocked();
-      // r5 budget: a nested organizations/{o}/companies/{c}/delegates
-      // update is decided by the nested match alone, for every role.
-      allow update: if signedIn() && !onNestedDelegate()
-        && (delegateOwns(delegateId)
-        ? delegateFieldsSafe()
-        : (deviceBindingUntouched() && staffManagesDelegate(
-            [resource.data.get('organizationUID', ''), resource.data.get('organizationId', '')],
-            [resource.data.get('companyUID', ''), resource.data.get('companyId', '')], false)
-          && staffDocsApproveOk(resource.data.get('organizationUID', ''), resource.data.get('companyUID', ''), resource.data.get('companyId', ''), delegateId)));
-      allow delete: if signedIn() && !onNestedDelegate() && canManageDelegate();
-    }
-
-    match /{path=**}/companies/{companyId} {
-      allow read: if signedIn();
-      allow write: if isGlobalStaff() || isOrgAdmin() || (isCompanyScopedStaff() && callerCompany() == companyId);
-    }
-
-    // Nested photo_permissions / captured_photos have no allow-read of their
-    // own; a list on the chain path is decided only by these collection-group
-    // rules so the 1000-expression budget is not spent twice.
-    match /{path=**}/photo_permissions/{permissionId} {
-      // companyUID / organizationUID equality first so a constrained
-      // collection-group query stays well under the 1000-expression budget.
-      // Use get() so an unfiltered list does not evaluation-error on missing fields.
-      allow read: if signedIn() && (
-        companyScoped()
-        || orgScoped()
-        || isGlobalStaff()
-        || (isDelegate() && resource.data.get('organizationUID', '') == claimString('orgId'))
-      );
-      allow create: if signedIn() && (
-        isGlobalStaff()
-        || (isCompanyScopedStaff() && incomingCompanyScoped())
-        || (isOrgScopedStaff() && incomingOrgScoped())
-        || (isDelegate() && (
-          delegateInOrg(request.resource.data.organizationUID)
-          || delegateOwns(request.resource.data.delegateUid)
-        ))
-      );
-      // No allow update here. Nested photo_permissions updates are
-      // decided only by the path-scoped match above. Overlapping
-      // collection-group update rules are OR'd and would re-evaluate
-      // role helpers, pushing a branches-marketing user with a
-      // companyUID over the 1000-expression budget (N-2/L-3).
-      // Nested photo_permissions deletes are decided only by the
-      // path-scoped match (review-scoped). A collection-group delete
-      // for org-scoped staff was OR'd with the nested rule and let
-      // company-bound marketing-promotion delete another company in
-      // its org (UT F2). Keep only isGlobalStaff() here.
-      allow delete: if isGlobalStaff();
-    }
-
-    match /{path=**}/captured_photos/{photoId} {
-      // Own-id first so a collection-group query where delegateUID==uid
-      // is provable without an organizationUID constraint. Still own data only.
-      allow read: if signedIn() && (
-        ownsDelegateId(resource.data.get('delegateUID', ''))
-        || delegateOwns(resource.data.get('delegateUID', ''))
-        || isGlobalStaff() || orgScoped() || companyScoped() || delegateInOrg(resource.data.organizationUID)
-      );
-      allow create: if signedIn() && (
-        isGlobalStaff()
-        || (isCompanyScopedStaff() && incomingCompanyScoped())
-        || (isDelegate() && delegateInOrg(request.resource.data.organizationUID))
-      );
-      allow update: if false;
-      allow delete: if isGlobalStaff() || (isCompanyScopedStaff() && companyScoped());
-    }
-
-    match /{path=**}/requests/{requestId} {
-      allow read: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped()));
-      allow write: if isGlobalStaff() || (isOrgScopedStaff() && incomingOrgScoped()) || (isCompanyScopedStaff() && incomingCompanyScoped());
-    }
-
-    // ==================== WEB DASHBOARD ====================
-
-    // TA-60: single cheap claim path (prod + website). No role helpers.
-    function inviteClientClaimOk() {
-      let d = request.resource.data;
-      let b = resource.data;
-      return resource.data.get('status', '') == 'pending'
-        && !b.keys().hasAny(['claimedBy', 'claimedByUid', 'claimedAt'])
-        && d.get('status', '') == 'claimed'
-        && d.get('claimedByUid', '') == request.auth.uid
-        && changedKeys().hasOnly(['status', 'claimedByUid', 'claimedAt', 'claimedBy', 'claimedByEmail']);
-    }
-
-    // Staff may extend expiry or revoke; cannot forge a claim (H3 terminal state).
-    function inviteStaffEditOk() {
-      return signedIn()
-        && resource.data.get('status', '') == 'pending'
-        && !resource.data.keys().hasAny(['claimedBy', 'claimedByUid', 'claimedAt'])
-        && request.resource.data.get('status', '') != 'claimed'
-        && !changedKeys().hasAny(['claimedBy', 'claimedByUid', 'claimedByEmail', 'claimedAt', 'role', 'roleToAssign'])
-        && (!changedKeys().hasAny(['expiresAt']) || (
-          request.resource.data.expiresAt is timestamp
-          && request.resource.data.expiresAt <= request.time + duration.value(7, 'd') + duration.value(10, 'm')))
-        && (
-          isSuperAdmin() ||
-          (isOrgAdmin() && (resource.data.get('organizationId', '') == callerOrg() || resource.data.get('organizationUID', '') == callerOrg())
-            && request.resource.data.get('organizationId', '') == resource.data.get('organizationId', '')
-            && request.resource.data.get('roleToAssign', '') == resource.data.get('roleToAssign', '')) ||
-          (isStrictCompanyAdmin() && companyScoped()
-            && request.resource.data.get('organizationId', '') == resource.data.get('organizationId', '')
-            && request.resource.data.get('companyId', '') == resource.data.get('companyId', '')
-            && request.resource.data.get('roleToAssign', '') == resource.data.get('roleToAssign', ''))
-        );
-    }
-
-    match /invites/{inviteId} {
-      // Signup still resolves one invite by its unguessable id.
-      allow get: if true;
-      allow list: if signedIn() && (
-        isGlobalStaff() ||
-        ((isOrgAdmin() || isCompanyAdmin() || isHR()) && (
-          resource.data.organizationId == callerOrg() ||
-          resource.data.organizationUID == callerOrg()
-        ))
-      );
-
-      // E1: no super-admin invites; org-admin invites only from a super-admin;
-      // expiresAt required and at most 7 days out; org must exist.
-      allow create: if signedIn() && roleWriteAllowed()
-        && !(request.resource.data.get('roleToAssign', '') in superAdminRoleList())
-        && !(request.resource.data.get('role', '') in superAdminRoleList())
-        && request.resource.data.get('status', '') == 'pending'
-        && request.resource.data.get('expiresAt', null) is timestamp
-        && request.resource.data.expiresAt <= request.time + duration.value(7, 'd') + duration.value(10, 'm')
-        && request.resource.data.get('organizationId', '') is string
-        && request.resource.data.get('organizationId', '') != ''
-        && exists(/databases/$(database)/documents/organizations/$(request.resource.data.organizationId))
-        // H2: explicit invitable roles; an extra `role` key must equal
-        // roleToAssign (claimInvite reads roleToAssign only).
-        && request.resource.data.get('role', request.resource.data.get('roleToAssign', ''))
-          == request.resource.data.get('roleToAssign', '')
-        && (
-          (isSuperAdmin() && request.resource.data.get('roleToAssign', '') in ['org-admin', 'company-admin']) || (
-            request.resource.data.get('roleToAssign', '') == 'company-admin'
-            && request.resource.data.get('companyId', null) is string
-            && exists(/databases/$(database)/documents/organizations/$(request.resource.data.organizationId)/companies/$(request.resource.data.companyId))
-            && (
-              (isOrgAdmin() && request.resource.data.organizationId == callerOrg()) ||
-              (isStrictCompanyAdmin() && request.resource.data.organizationId == callerOrg()
-                && request.resource.data.companyId == callerCompany())
-            )
-          )
-        );
-
-      // Website v1.14.2 still claims client-side; claimInvite callable is additive.
-      // Cheap branch first (TA-60 prod compat); staff edit stays on the slow path.
-      allow update: if inviteClientClaimOk() || inviteStaffEditOk();
-
-      allow delete: if isSuperAdmin();
-    }
-
-    // #205 review: mail docs carry set-password / reset links. No client may
-    // read or edit them (the Trigger Email extension uses the Admin SDK).
+    // ==================== MAIL COLLECTION ====================
+    // Used by Firebase Extensions for sending emails
+    // Create allowed for any authenticated user (mobile app super admin uses anonymous auth to send activation emails)
     match /mail/{mailId} {
-      allow read, update: if false;
-      allow delete: if isSuperAdmin();
-      allow create: if isSuperAdmin() || isTechnicalSupport() || isOrgAdmin() || isCompanyAdmin() || isHR();
+      allow read: if isAuthenticated() && isSuperAdmin();
+
+      allow create: if isAuthenticated();
+
+      allow update: if isAuthenticated() && isSuperAdmin();
+      allow delete: if isAuthenticated() && isSuperAdmin();
     }
 
+    // ==================== GUIDE VIDEOS COLLECTION ====================
     match /guide_videos/{videoId} {
-      allow read: if signedIn();
+      allow read: if isAuthenticated();
       allow write: if isSuperAdmin();
     }
 
+    // ==================== APP UPDATES ====================
     match /app_updates/{updateId} {
-      allow read: if signedIn();
+      // Anyone logged in can read updates
+      allow read: if isAuthenticated();
+      // Only super admin can create/edit/delete updates from dashboard
       allow write: if isSuperAdmin();
     }
 
-    // ==================== MOBILE: ATTENDANCE ====================
+    // ==================== MOBILE APP (Tashil Delegate) ====================
 
-    function canReadAttendance() {
-      return signedIn() && (
-        isGlobalStaff()
-        || (isCompanyScopedStaff() && companyScoped())
-        || (isOrgScopedStaff() && orgScoped())
-        || ownsDelegateId(resource.data.delegateId)
-        || ownsDelegateId(resource.data.userId)
-        || delegateOwns(resource.data.delegateId)
-        || delegateOwns(resource.data.userId)
-      );
-    }
-
-    // Minimal expressions (raw get, no callerOrg/isOrgAdmin) so this
-    // separate allow stays under the path budget and the organizationId
-    // list used by getTodayCheckedInCount is provable (L1).
-    function canReadOrgAdminAttendanceByOrgId() {
-      return request.auth != null
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in [
-          'organization-admin', 'organization_admin', 'organizationadmin',
-          'organizationAdmin'
-        ]
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationUID is string
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationUID != ''
-        && resource.data.organizationId
-          == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationUID;
-    }
-
-    // Org-admin badge lists (leave / device unbind): one users/{uid} get, no
-    // isOrgScopedStaff/orgScoped OR — those blow the 1000-expression budget on
-    // status + organizationUID [+ companyUID] queries (UT non-blocking).
-    function canReadOrgAdminRequestInOwnOrg() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let org = u.get('organizationUID', '');
-      let co = u.get('companyUID', '');
-      let d = resource.data;
-      let docOrg = d.get('organizationUID', d.get('organizationId', ''));
-      let docCo = d.get('companyUID', d.get('companyId', ''));
-      return request.auth != null
-        && u.get('role', '') in [
-          'organization-admin', 'organization_admin', 'organizationadmin',
-          'organizationAdmin'
-        ]
-        && org != ''
-        && docOrg == org
-        && (co == '' || docCo == co);
-    }
-
-    function canCreateAttendance() {
-      return signedIn() && (
-        isGlobalStaff()
-        || (isCompanyScopedStaff() && incomingCompanyScoped())
-        || (isOrgScopedStaff() && incomingOrgScoped())
-        || (
-          (ownsDelegateId(request.resource.data.delegateId)
-            || ownsDelegateId(request.resource.data.userId)
-            || delegateOwns(request.resource.data.delegateId)
-            || delegateOwns(request.resource.data.userId))
-          && (delegateInOrg(request.resource.data.organizationId)
-            || delegateInOrg(request.resource.data.organizationUID)
-            || incomingOrgScoped())
-        )
-      );
-    }
-
-    function canUpdateAttendance() {
-      // Same principals as read. Avoid nesting an extra AND of staff/owner
-      // checks (duplicate of canReadAttendance) so checkout denormalize updates
-      // stay under the Firestore rules expression budget.
-      return canReadAttendance();
-    }
-
-    // TA-60: one read allow (multiple OR'd allows each blow the 1k budget).
-    function attendanceCompanyListOk() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let r = u.get('role', '');
-      let co = u.get('companyUID', '');
-      let docCo = resource.data.get('companyId', resource.data.get('companyUID', ''));
-      return co != '' && docCo == co && r in [
-        'company-admin', 'company_admin', 'companyadmin', 'admin',
-        'supervisor', 'company_supervisor',
-        'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion',
-        'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
-        'branches-marketing-manager', 'branchesmarketingmanager', 'branchesMarketingManager',
-        'hr', 'company-hr', 'company_hr', 'human_resources',
-        'accountant', 'accounting', 'account_admin'];
-    }
-
-    match /attendance_logs/{logId} {
-      allow read: if attendanceCompanyListOk()
-        || canReadOrgAdminAttendanceByOrgId()
-        || canReadAttendance();
-      allow create: if canCreateAttendance();
-      allow update: if canUpdateAttendance();
+    // Attendance Logs (New System) - Authenticated / HR Adjustments
+    match /attendance_logs/{document=**} {
+      // INTERIM HARDENING (2026-11-04): require Firebase Auth (incl. anonymous).
+      allow read, update: if isAuthenticated();
+      allow create: if isAuthenticated() && !isAnonymousAuth();
       allow delete: if false;
     }
 
-    match /attendance_logs_testing/{logId} {
-      allow read: if canReadAttendance();
-      allow create: if canCreateAttendance();
-      allow update: if canUpdateAttendance();
-      allow delete: if false;
+    // Attendance Logs Testing (Dev Environment)
+    match /attendance_logs_testing/{document=**} {
+      allow read, write: if true;
     }
 
+    // Attendance (Legacy collection) - Authenticated
     match /attendance/{attendanceId} {
-      allow read: if canReadAttendance();
-      allow create: if canCreateAttendance();
-      allow update: if canUpdateAttendance();
+      allow read, create, update: if isAuthenticated();
       allow delete: if false;
     }
 
-    match /attendance_adjustment_logs/{logId} {
-      allow read: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped()));
-      allow create: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && incomingCompanyScoped()) || (isOrgScopedStaff() && incomingOrgScoped()));
-      allow update, delete: if isGlobalStaff() || (isHR() && companyScoped());
-    }
-
-    match /attendance_adjustment_logs_testing/{logId} {
-      allow read: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped()));
-      allow create: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && incomingCompanyScoped()));
-      allow update, delete: if isGlobalStaff() || (isHR() && companyScoped());
-    }
-
-    // ==================== MOBILE: BRANCHES, NOTIFICATIONS, TOKENS ====================
-
+    // Branches (Mobile app admin feature + delegate branch geofence lookup)
     match /branches/{branchId} {
-      allow read: if signedIn();
-      allow create, update, delete: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isBranchesMarketing();
+      // Allow read for all clients (needed for delegate geofence lookup)
+      allow read: if true;
+      allow create, update: if isAuthenticated();
+      allow delete: if isAuthenticated();
     }
 
+    // Counters (System collection for auto-increment IDs)
     match /counters/{counterId} {
-      allow read, write: if isStaffWriter();
+      allow read, write: if isAuthenticated();
     }
 
-    // SA/tech profile-edit and national-ID request alerts are not readable
-    // by company or org staff, even when the doc carries their companyUID.
-    function isPrivilegedStaffAlert() {
-      return resource.data.get('type', '') in [
-        'delegate_profile_edit',
-        'delegate_national_id_request',
-        'paymob_superseded_payment'
-      ];
-    }
-
-    // Own-data path is a tiny function so list queries stay under the
-    // 1000-expression cap (M31 3ff8e5d). Staff/broadcast stay in
-    // canReadNotification and are a separate allow so the evaluator
-    // does not fold them into the delegate query budget.
-    function canReadOwnNotification() {
-      return signedIn() && !isPrivilegedStaffAlert() && (
-        ownsDelegateId(resource.data.get('delegateUid', ''))
-        || ownsDelegateId(resource.data.get('userId', ''))
-        || delegateOwns(resource.data.get('delegateUid', ''))
-        || (isDelegate() && claimListHas('phones', resource.data.get('phoneNumber', '')))
-        || (isDelegate() && claimListHas('phones', resource.data.get('delegateUid', '')))
-      );
-    }
-
-    function canReadNotification() {
-      return signedIn() && (
-        isGlobalStaff()
-        || (
-        !isPrivilegedStaffAlert() && (
-        resource.data.get('delegateUid', '') == 'all'
-        || resource.data.get('delegateUid', '') == 'delegates'
-        || (isDelegate() && resource.data.get('delegateUid', '') == 'delegates_' + callerCompany())
-        || (isDelegate() && resource.data.get('delegateUid', '') == 'company_' + callerCompany())
-        || (isCompanyScopedStaff() && resource.data.delegateUid == 'company_' + callerCompany())
-        || (isCompanyScopedStaff() && resource.data.delegateUid == 'supervisor_' + callerCompany())
-        || (isCompanyScopedStaff() && resource.data.delegateUid == 'all_company_supervisors' && companyScoped())
-        || (isCompanyScopedStaff() && companyScoped())
-        || (isOrgScopedStaff() && orgScoped())
-        || (userExists() && userDoc().keys().hasAll(['phoneNumber']) && resource.data.phoneNumber == userDoc().phoneNumber)
-        || (isSuperAdmin() && resource.data.delegateUid in ['super-admin', 'super_admin', 'superAdmin', 'role_super_admin'])
-        || (isTechnicalSupport() && resource.data.delegateUid in ['technicalSupport', 'technical-support', 'technical_support', 'role_technical_support'])
-        || (isOrgAdmin() && resource.data.delegateUid in ['organizationAdmin', 'organization-admin', 'organization_admin'])
-        || (isHR() && resource.data.delegateUid in ['hr', 'company-hr', 'company_hr'])
-        || (isMarketing() && resource.data.delegateUid in ['marketing', 'marketing_promotion', 'marketingPromotion'])
-        || (isBranchesMarketing() && resource.data.delegateUid in ['branchesMarketingManager', 'branches_marketing', 'branches-marketing'])
-        || (isCompanyAdmin() && resource.data.delegateUid in ['company-admin', 'admin', 'supervisor', 'company_admin'])
-        ))
-      );
-    }
-
-    // Guarded field access so a missing organizationId does not fail the
-    // whole OR (leave submit writes organizationUID + createdBy, and was
-    // denied when organizationId was absent).
-    function dataHasString(d, key) {
-      return d.keys().hasAll([key]) && d[key] is string && d[key] != '';
-    }
-
-    // Delegate may notify a same-company supervisor: createdBy is the
-    // caller and the payload is scoped to a company in the token.
-    // A held-account get() is not applied here: it blows the 1000-expression
-    // budget. Storage writes and the app status listener cover M3 instead.
-    function canDelegateCreateNotification() {
-      let d = request.resource.data;
-      return isDelegate()
-        && dataHasString(d, 'createdBy')
-        && d.createdBy == request.auth.uid
-        && (
-          (dataHasString(d, 'companyUID') && delegateInCompany(d.companyUID))
-          || (dataHasString(d, 'companyId') && delegateInCompany(d.companyId))
-        );
-    }
-
-    function canCreateNotification() {
-      return signedIn() && (
-        isGlobalStaff()
-        || ((isOrgScopedStaff() || isCompanyScopedStaff()) && (incomingOrgScoped() || incomingCompanyScoped() || request.resource.data.createdBy == request.auth.uid))
-        || canDelegateCreateNotification()
-      );
-    }
-
-    // Cheap, org-admin-only allow so a list query on
-    // delegateUid == 'organizationAdmin' (etc.) is provable without
-    // folding isPrivilegedStaffAlert into the query, and without
-    // adding every staff roleIs() to the get() budget (M-7).
-    function canReadOrgAdminRoleBroadcast() {
-      return isOrgAdmin() && resource.data.get('delegateUid', '') in [
-        'organizationAdmin', 'organization-admin', 'organization_admin'
-      ];
-    }
-
-    // Cheap allow so a list query on delegateUid == 'supervisor_' +
-    // company is provable for company admins and supervisors (I2 leave
-    // fallback). Folding this into canReadNotification hits the cap.
-    function canReadCompanySupervisorBroadcast() {
-      return isCompanyAdmin()
-        && callerCompany() != ''
-        && resource.data.delegateUid == 'supervisor_' + callerCompany();
-    }
-
-    function notificationMarkReadKeysOk() {
-      let ch = request.resource.data.diff(resource.data).affectedKeys();
-      return ch.hasOnly(['isRead'])
-        || ch.hasOnly(['isRead', 'readAt'])
-        || ch.hasOnly(['deletedBy'])
-        || ch.hasOnly(['isRead', 'readAt', 'read']);
-    }
-
-    // TA-60: one users/{uid} get; PenaltyModel + attendance payloads omit createdBy.
-    function notificationDelegateCreateOk() {
-      let d = request.resource.data;
-      let inCo = d.get('companyUID', d.get('companyId', ''));
-      return isDelegate() && inCo != '' && delegateInCompany(inCo) && (
-        (dataHasString(d, 'createdBy') && d.createdBy == request.auth.uid)
-        || d.get('type', '') in ['attendance_check_in', 'attendance_check_out']
-      );
-    }
-
-    function notificationCompanyStaffCreateOk() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let r = u.get('role', '');
-      let co = u.get('companyUID', '');
-      let org = u.get('organizationUID', '');
-      let d = request.resource.data;
-      let inCo = d.get('companyUID', d.get('companyId', ''));
-      let inOrg = d.get('organizationUID', d.get('organizationId', ''));
-      return co != '' && inCo == co && r in [
-          'company-admin', 'company_admin', 'companyadmin', 'admin',
-          'supervisor', 'company_supervisor',
-          'hr', 'company-hr', 'company_hr', 'human_resources',
-          'accountant', 'accounting', 'account_admin',
-          'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
-          'branches-marketing-manager', 'branchesmarketingmanager', 'branchesMarketingManager']
-        || (org != '' && inOrg == org && r in [
-          'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin']);
-    }
-
-    function notificationGlobalStaffCreateOk() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let r = u.get('role', '');
-      return r in [
-        'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
-        'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport',
-        'tech_support', 'techsupport'];
-    }
-
-    function notificationCreateOk() {
-      return notificationDelegateCreateOk()
-        || notificationCompanyStaffCreateOk()
-        || notificationGlobalStaffCreateOk();
-    }
-
-    // Flat read for company broadcasts (supervisor company_ / all_company_supervisors).
-    function companyStaffBroadcastReadOk() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let r = u.get('role', '');
-      let co = u.get('companyUID', '');
-      let du = resource.data.get('delegateUid', '');
-      let docCo = resource.data.get('companyUID', resource.data.get('companyId', ''));
-      return co != '' && r in [
-          'company-admin', 'company_admin', 'companyadmin', 'admin',
-          'supervisor', 'company_supervisor',
-          'hr', 'company-hr', 'company_hr', 'human_resources',
-          'accountant', 'accounting', 'account_admin',
-          'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
-          'branches-marketing-manager', 'branchesmarketingmanager', 'branchesMarketingManager']
-        && (
-          du == 'company_' + co
-          || du == 'supervisor_' + co
-          || du == 'all_company_supervisors'
-          || docCo == co
-        );
-    }
-
-    function notificationReadCheapOk() {
-      return companyStaffBroadcastReadOk()
-        || canReadCompanySupervisorBroadcast()
-        || canReadOrgAdminRoleBroadcast()
-        || canReadOwnNotification()
-        || canReadNotification();
-    }
-
+    // ==================== NOTIFICATIONS COLLECTION ====================
+    // Global notifications collection for push notifications
+    // NOTE: Mobile app uses anonymous auth, so we can't match request.auth.uid to delegateUid
+    // Instead, we allow any authenticated user to read/write notifications
+    // Security is enforced by the app logic and Cloud Functions
     match /notifications/{notificationId} {
-      allow read: if notificationReadCheapOk();
-      allow create: if notificationCreateOk();
-      allow update: if notificationMarkReadKeysOk() && notificationReadCheapOk();
-      allow delete: if isSuperAdmin();
+      // Read: Any authenticated user can read notifications
+      allow read: if isAuthenticated();
+      
+      // Create: Any authenticated user can create (Cloud Functions will create these)
+      allow create: if isAuthenticated();
+      
+      // Update: Any authenticated user can mark notifications as read
+      allow update: if isAuthenticated() &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+      
+      // Delete: Only super admins can delete notifications
+      allow delete: if isAuthenticated() && isSuperAdmin();
     }
 
-    match /sent_notifications/{docId} {
-      allow read: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin();
-      // The app's log payload carries senderUid (no supervisorUid); the
-      // r4 delegate_requests F1 clause does not apply here (r5 B-r4-1).
-      allow create: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR();
-      allow update, delete: if isSuperAdmin() || isOrgAdmin();
+    // ==================== FCM TOKENS COLLECTION ====================
+    // Stores FCM tokens for push notifications
+    // NOTE: Mobile app uses anonymous auth, so we can't match request.auth.uid to delegateUid
+    // Instead, we allow any authenticated user to read/write tokens
+    // Security is enforced by the app logic
+    match /fcm_tokens/{delegateUid} {
+      // Read: Any authenticated user can read tokens
+      allow read: if isAuthenticated();
+      
+      // Write: Any authenticated user can write tokens (create/update)
+      allow create, update: if isAuthenticated();
+      
+      // Delete: Any authenticated user can delete tokens
+      allow delete: if isAuthenticated();
     }
 
-    match /fcm_tokens/{tokenId} {
-      allow read: if signedIn() && (
-        ownsDelegateId(tokenId) || delegateOwns(tokenId) || isGlobalStaff()
-      );
-      allow create, update, delete: if signedIn() && (
-        ownsDelegateId(tokenId) || delegateOwns(tokenId)
-      );
-    }
-
-    // ==================== MOBILE: FEEDBACK, PENALTIES, SUBSCRIPTIONS ====================
-
+    // ==================== FEEDBACKS COLLECTION ====================
+    // User feedbacks and suggestions system
+    // Delegates and supervisors can submit feedbacks
+    // Super Admin has full control over all feedbacks
     match /feedbacks/{feedbackId} {
-      allow read: if signedIn() && (
-        isGlobalStaff()
-        || resource.data.userId == request.auth.uid
-        || delegateOwns(resource.data.userId)
-        || (isOrgAdmin() && orgScoped())
-        || (isCompanyScopedStaff() && companyScoped())
-      );
-      allow create: if signedIn() && (
-        request.resource.data.userId == request.auth.uid
-        || delegateOwns(request.resource.data.userId)
-        || isGlobalStaff()
-      );
-      allow update, delete: if signedIn() && (
-        isGlobalStaff()
-        || resource.data.userId == request.auth.uid
-        || delegateOwns(resource.data.userId)
-      );
+      allow read, write: if isAuthenticated();
     }
 
-    // Cheap, org-admin-only allow so a list query on
-    // organizationId == callerOrg() is provable without the
-    // organizationUID/organizationId OR inside orgScoped().
-    function canReadOrgAdminPenaltyByOrgId() {
-      return isOrgAdmin()
-        && callerOrg() != ''
-        && resource.data.organizationId == callerOrg();
-    }
-
-    // One roleIs list so company staff list queries stay under the 1k expr cap.
-    function penaltyCompanyStaffReadOk() {
-      return callerCompany() != '' && companyScoped()
-        && roleIs([
-          'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor',
-          'company_supervisor',
-          'hr', 'company-hr', 'company_hr', 'human_resources',
-          'accountant', 'accounting', 'account_admin',
-          'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
-          'branches-marketing-manager', 'branchesmarketingmanager',
-          'branchesMarketingManager',
-          'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion'
-        ]);
-    }
-
-    function penaltyMarketingOrgListOk() {
-      return callerCompany() == '' && orgScoped()
-        && roleIs([
-          'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion'
-        ]);
-    }
-
-    function penaltyMarketingReadOk() {
-      return penaltyCompanyStaffReadOk() || penaltyMarketingOrgListOk();
-    }
-
-    function delegatePenaltyTargetOk(targetId) {
-      return targetId is string && targetId != '' && (
-        targetId == request.auth.uid
-        || claimString('delegateId') == targetId
-        || claimListHas('delegateIds', targetId)
-      );
-    }
-
-    function delegatePenaltySelfReadOk() {
-      return claimString('role') == 'delegate' && delegateOtpOk() && (
-        delegatePenaltyTargetOk(resource.data.get('targetDelegateId', ''))
-        || delegatePenaltyTargetOk(resource.data.get('delegateUid', ''))
-      );
-    }
-
-    function delegatePenaltyListOk() {
-      return delegateOtpOk()
-        && resource.data.get('targetDelegateId', '') != ''
-        && (resource.data.get('targetDelegateId', '') == request.auth.uid
-          || claimListHas('delegateIds', resource.data.get('targetDelegateId', '')));
-    }
-
-    function penaltyStaffListOk() {
-      return canReadOrgAdminPenaltyByOrgId()
-        || penaltyCompanyStaffReadOk()
-        || penaltyMarketingOrgListOk()
-        || isGlobalStaff()
-        || (isOrgAdmin() && orgScoped());
-    }
-
-    function penaltyStaffGetOk() {
-      return canReadOrgAdminPenaltyByOrgId()
-        || isGlobalStaff()
-        || penaltyCompanyStaffReadOk()
-        || (isOrgAdmin() && orgScoped())
-        || penaltyMarketingReadOk();
-    }
-
-    // TA-60: PenaltyModel create (set) must not call companyScoped() (no resource).
-    function penaltyStaffWriteOk() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let r = u.get('role', '');
-      let co = u.get('companyUID', '');
-      let org = u.get('organizationUID', '');
-      let d = request.resource.data;
-      let inCo = d.get('companyUID', d.get('companyId', ''));
-      let inOrg = d.get('organizationUID', d.get('organizationId', ''));
-      let coOk = co != '' && inCo == co
-        && (resource == null
-          || resource.data.get('companyUID', resource.data.get('companyId', '')) == co);
-      return r in [
-          'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
-          'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport',
-          'tech_support', 'techsupport']
-        || (org != '' && inOrg == org && r in [
-          'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin'])
-        || (coOk && r in [
-          'company-admin', 'company_admin', 'companyadmin', 'admin',
-          'supervisor', 'company_supervisor',
-          'hr', 'company-hr', 'company_hr', 'human_resources',
-          'accountant', 'accounting', 'account_admin',
-          'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
-          'branches-marketing-manager', 'branchesmarketingmanager', 'branchesMarketingManager']);
-    }
-
+    // ==================== PENALTIES COLLECTION ====================
+    // Penalties & Infractions system
+    // Allows read and write for penalties collection
     match /penalties/{penaltyId} {
-      // List/get: delegate vs staff split (1k expr cap — avoid evaluating both paths).
-      allow list: if signedIn() && (
-        claimString('role') == 'delegate' ? delegatePenaltyListOk() : penaltyStaffListOk()
-      );
-      allow get: if signedIn() && (
-        claimString('role') == 'delegate' ? delegatePenaltySelfReadOk() : penaltyStaffGetOk()
-      );
-      allow create, update: if penaltyStaffWriteOk();
-      allow delete: if isGlobalStaff() || (isCompanyAdmin() && companyScoped()) || (isOrgAdmin() && orgScoped());
+      allow read, write: if true;
     }
-
     match /penalty_rules/{ruleId} {
-      allow read: if signedIn();
-      allow create, update, delete: if isStaffWriter();
+      allow read, write: if true;
+    }
+    match /{path=**}/penalty_rules/{ruleId} {
+      allow read, write: if true;
     }
 
-    // SUBSCRIPTIONS (PR feat/subscription-cycles): only the server (verified
-    // Paymob webhook, Admin SDK) may mark a request paid or write Paymob data,
-    // and a paid request's coverage/amount can no longer change. Requests that
-    // never touch these fields (Angular, delete, approve/reject) are unaffected.
-    function subscriptionPaymentUntouched() {
-      let incoming = request.resource.data;
-      let before = resource == null ? {} : resource.data;
-      let wasPaid = before.get('paymentStatus', '') == 'paid';
-      return (incoming.get('paymentStatus', '') != 'paid' || wasPaid)
-        && incoming.get('paymob', null) == before.get('paymob', null)
-        && incoming.get('applyState', '') == before.get('applyState', '')
-        && incoming.get('paymentError', null) == before.get('paymentError', null)
-        && incoming.get('needsReview', false) == before.get('needsReview', false)
-        && incoming.get('quotedAt', null) == before.get('quotedAt', null)
-        && (!wasPaid || !incoming.diff(before).affectedKeys().hasAny([
-          'paymentStatus', 'paymob', 'paidAt', 'amountPaid', 'amountDue',
-          'coveredDelegateUids', 'items', 'periodCode', 'requestType', 'applyState',
-          'paymentError', 'needsReview', 'paymentMethod', 'status', 'quotedAt'
-        ]))
-        && waivedWriteOk()
-        && newDelegateApprovalPaymentOk();
+    // ==================== NOTIFICATIONS COLLECTIONS ====================
+    match /notifications/{notificationId} {
+      allow read, write: if true;
+    }
+    match /sent_notifications/{docId} {
+      allow read, write: if true;
     }
 
-    // Create path only: no resource.diff, no before. Cheaper on large payloads.
-    function subscriptionPaymentCreateOk() {
-      let d = request.resource.data;
-      return d.get('paymentStatus', '') != 'paid'
-        && d.get('paymob', null) == null
-        && d.get('applyState', '') == ''
-        && d.get('paymentError', null) == null
-        && d.get('needsReview', false) == false
-        && d.get('quotedAt', null) == null
-        && waivedWriteOk()
-        && d.get('amountPaid', 0) == 0
-        && (!d.keys().hasAll(['coveredDelegateUids'])
-          || (d.coveredDelegateUids is list
-            && d.coveredDelegateUids.size() >= 1
-            && d.coveredDelegateUids.size() <= 100));
+    // ==================== DELEGATE SUBSCRIPTION REQUESTS & USED CODES ====================
+    match /delegate_requests/{requestId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /used_receipt_codes/{code} {
+      allow read, write: if isAuthenticated();
     }
 
-    // Default last free instant: 2027-01-01 00:00 Africa/Cairo = 2026-12-31 22:00:00Z
-    // (EET, UTC+2). Must stay aligned with FREE_PROMOTION_LAST_DAY fallback.
-    function freePromotionEnded() {
-      return request.time >= (timestamp.date(2026, 12, 31) + duration.value(22, 'h'));
+    // ==================== MONTHLY COLLECTIONS & BILLING ====================
+    // Monthly collections, deductions, and invoicing records
+    match /monthly_collections/{periodId} {
+      allow read, write: if true;
+      match /transactions/{transactionId} {
+        allow read, write: if true;
+      }
+      match /allocations/{allocationId} {
+        allow read, write: if true;
+      }
+    }
+    match /{path=**}/monthly_collections/{periodId} {
+      allow read, write: if true;
+    }
+    match /{path=**}/transactions/{transactionId} {
+      allow read, write: if true;
+    }
+    match /{path=**}/allocations/{allocationId} {
+      allow read, write: if true;
     }
 
-    // Clients may not newly mark a request waived after the promo ends.
-    // Existing waived docs can keep their status.
-    function waivedWriteOk() {
-      let incoming = request.resource.data.get('paymentStatus', '');
-      let before = resource == null ? '' : resource.data.get('paymentStatus', '');
-      return incoming != 'waived' || before == 'waived' || !freePromotionEnded();
+    // ==================== USER WALLETS & ALLOCATIONS ====================
+    // User wallets and financial dues allocations
+    match /user_wallets/{userId} {
+      allow read, write: if true;
+      match /transactions/{transactionId} {
+        allow read, write: if true;
+      }
+    }
+    match /{path=**}/user_wallets/{userId} {
+      allow read, write: if true;
     }
 
-    // Staff may not approve a Paymob new_delegate or renewal whose
-    // subscription is unpaid (F14). paid / waived / not_required are settled.
-    // Legacy docs (no paymentMethod) stay approvable.
-    function newDelegateApprovalPaymentOk() {
-      let incoming = request.resource.data;
-      let before = resource == null ? {} : resource.data;
-      let ty = incoming.get('requestType', before.get('requestType', ''));
-      let st = incoming.get('status', '');
-      let method = incoming.get('paymentMethod', before.get('paymentMethod', ''));
-      let pay = incoming.get('paymentStatus', before.get('paymentStatus', ''));
-      return st != 'approved'
-        || (ty != 'new_delegate' && ty != 'renewal')
-        || method != 'paymob'
-        || pay == 'paid'
-        || pay == 'waived'
-        || pay == 'not_required';
+    // ==================== PRIVATE LABEL PERMISSIONS ====================
+    match /private_label_permissions/{userId} {
+      allow read, write: if true;
     }
-    // TA-60 prod compat: v1.14.2 let org/company staff list delegate_requests
-    // without per-doc scope (tighter doc checks stay on get). Loosening doc'd.
-    function delegateRequestProdStaffListOk() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let r = u.get('role', '');
-      return r in [
-          'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
-          'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport',
-          'tech_support', 'techsupport']
-        || r in [
-          'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin']
-        || r in [
-          'company-admin', 'company_admin', 'companyadmin', 'admin',
-          'supervisor', 'company_supervisor', 'hr', 'company-hr', 'company_hr', 'human_resources'];
+    match /{path=**}/private_label_permissions/{userId} {
+      allow read, write: if true;
     }
 
-  // TA-60: scoped read for get/self paths. No resource.id on list.
-    function delegateRequestListScopedOk() {
-      let d = resource.data;
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let r = u.get('role', '');
-      let org = u.get('organizationUID', '');
-      let co = u.get('companyUID', '');
-      let docOrg = d.get('organizationUID', d.get('organizationId', ''));
-      let docCo = d.get('companyUID', d.get('companyId', ''));
-      return r in [
-          'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
-          'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport',
-          'tech_support', 'techsupport']
-        || (r in [
-          'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin']
-          && org != '' && docOrg == org)
-        || (r in [
-          'company-admin', 'company_admin', 'companyadmin', 'admin',
-          'supervisor', 'company_supervisor', 'hr', 'company-hr', 'company_hr', 'human_resources']
-          && co != '' && docCo == co)
-        || d.get('supervisorUid', '') == request.auth.uid
-        || d.get('delegateUid', '') == request.auth.uid;
+    // ==================== ATTENDANCE ADJUSTMENT AUDIT LOGS ====================
+    match /attendance_adjustment_logs/{logId} {
+      allow read, write: if true;
+    }
+    match /{path=**}/attendance_adjustment_logs/{logId} {
+      allow read, write: if true;
+    }
+    match /attendance_adjustment_logs_testing/{logId} {
+      allow read, write: if true;
+    }
+    match /{path=**}/attendance_adjustment_logs_testing/{logId} {
+      allow read, write: if true;
     }
 
-    function delegateRequestGetOk() {
-      return delegateRequestListScopedOk()
-        || resource.id == request.auth.uid;
+    // ==================== SECURITY AUDIT LOGS ====================
+    match /security_audit_logs/{logId} {
+      allow read, write: if true;
     }
 
-
-    // Phase 1 item 3: organizationUIDs is optional (legacy docs omit it).
-    // When present it must include organizationUID and stay within 1–10.
-    function requestOrganizationUIDsOk() {
-      return !request.resource.data.keys().hasAll(['organizationUIDs'])
-        || (request.resource.data.organizationUIDs is list
-          && request.resource.data.organizationUIDs.size() >= 1
-          && request.resource.data.organizationUIDs.size() <= 10
-          && request.resource.data.organizationUIDs.hasAll([
-            request.resource.data.get('organizationUID', '')
-          ]));
+    // ==================== DEVICE UNBIND REQUESTS ====================
+    match /device_unbind_requests/{requestId} {
+      allow read, write: if true;
     }
 
-    // When organizationUIDs is present, the primary chain must be a company
-    // under that organization. Checking every secondary here overflows the
-    // 1000-expression budget (org-admin add_organization already sat at the
-    // limit). Secondaries are enforced server-side and logged.
-    function requestPrimaryOrgBelongsToCompany() {
-      let d = request.resource.data;
-      let org = d.get('organizationUID', '');
-      let co = d.get('companyUID', '');
-      return !d.keys().hasAll(['organizationUIDs'])
-        || org == ''
-        || co == ''
-        || exists(/databases/$(database)/documents/organizations/$(org)/companies/$(co));
+    // ==================== DELEGATE LIVE TRACKING ====================
+    match /delegate_tracking/{delegateId} {
+      // INTERIM HARDENING (2026-11-04): require Firebase Auth (incl. anonymous).
+      allow read, write: if isAuthenticated();
+
+      match /breadcrumbs/{breadcrumbId} {
+        allow read, write: if isAuthenticated();
+      }
     }
 
-
-    // One users/{uid} get for create. Avoids isSuperAdmin + orgAdminCreatesOwnScopedRequest
-    // each re-reading the caller, which blew the 1000-expression budget on
-    // org-admin add_organization payloads. Policy unchanged: org-admin may
-    // only create for their own org and company (not another org of the
-    // same company); company staff must match companyUID; fail-closed on
-    // an empty companyUID.
-    function createDelegateRequestOk() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let r = u.get('role', '');
-      let org = u.get('organizationUID', '');
-      let co = u.get('companyUID', '');
-      let d = request.resource.data;
-      let incomingOrg = d.get('organizationUID', '') != ''
-        ? d.get('organizationUID', '') : d.get('organizationId', '');
-      let incomingCo = d.get('companyUID', '') != ''
-        ? d.get('companyUID', '') : d.get('companyId', '');
-      let isSa = r in [
-        'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-        'Super-Admin', 'SUPER_ADMIN'
-      ];
-      let isOa = r in [
-          'organization-admin', 'organization_admin', 'organizationadmin',
-          'organizationAdmin'
-        ]
-        && d.get('supervisorUid', '') == request.auth.uid
-        && org != '' && co != ''
-        && incomingOrg == org
-        && incomingCo == co;
-      let isCoStaff = r in [
-          'company-admin', 'company_admin', 'companyadmin', 'admin',
-          'supervisor', 'company_supervisor',
-          'hr', 'company-hr', 'company_hr', 'human_resources'
-        ]
-        && d.get('supervisorUid', '') == request.auth.uid
-        && co != ''
-        && incomingCo == co;
-      return signedIn() && (isSa || isOa || isCoStaff)
-        && d.get('requestType', '') != 'update_national_id'
-        && d.get('actionType', '') != 'update_national_id'
-        && subscriptionPaymentCreateOk()
-        && requestOrganizationUIDsOk()
-        && requestPrimaryOrgBelongsToCompany();
+    // ==================== LEAVE REQUESTS ====================
+    match /leave_requests/{requestId} {
+      // INTERIM HARDENING (2026-11-04): require Firebase Auth (incl. anonymous).
+      allow read, write: if isAuthenticated();
     }
 
-    // L1: org-admin may only include their own organization in
-    // organizationUIDs (decision 3). Supervisor/HR may span orgs of
-    // their company. Kept out of createDelegateRequestOk (max 10 lets).
-    function orgAdminSecondaryOrgsOwnOnly() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let r = u.get('role', '');
-      let org = u.get('organizationUID', '');
-      return !(r in [
-          'organization-admin', 'organization_admin', 'organizationadmin',
-          'organizationAdmin'
-        ])
-        || !request.resource.data.keys().hasAll(['organizationUIDs'])
-        || (org != ''
-          && request.resource.data.organizationUIDs is list
-          && request.resource.data.organizationUIDs.size() >= 1
-          && request.resource.data.organizationUIDs.hasOnly([org]));
+    // ==================== FLOOR CHECKS / VERIFICATION ====================
+    match /floor_checks/{checkId} {
+      allow read, write: if isAuthenticated();
     }
 
-    // F2: a client-chosen request id must not squat a folder already
-    // reserved by another company's intent. Defined next to the match
-    // so `requestId` stays a path argument, not a 11th local in
-    // createDelegateRequestOk (max 10 lets).
-    function requestIdNotReservedByOtherCompany(id) {
-      let intentPath = /databases/$(database)/documents/storage_upload_intents/$(id);
-      let reservedCo = exists(intentPath)
-        ? get(intentPath).data.get('companyUID', '')
-        : '';
-      let requestCo = request.resource.data.get('companyUID', '') != ''
-        ? request.resource.data.get('companyUID', '')
-        : request.resource.data.get('companyId', '');
-      return reservedCo == '' || reservedCo == requestCo;
+    // ==================== COMPANY PAYROLL CONFIGS ====================
+    match /company_payroll_configs/{companyId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /{path=**}/company_payroll_configs/{companyId} {
+      allow read, write: if isAuthenticated();
     }
 
-      // Subscription Phase 0: the company is the tenant for company staff
-      // (admin / supervisor / HR). They may read and list requests for any
-      // organization/chain under their companyUID. Org-admin stays org-scoped.
-      // Super-admin and technical support remain global. Cross-company denied.
-      // One users/{uid} read (budget).
-    // Written by staff immediately before a Storage upload to
-    // delegate_documents/{id}. Immutable to clients. companyUID is the
-    // tenant key used by Storage rules (one get).
-    // Clients cannot mint intents (that was the first-come claim race).
-    // ensureStorageUploadIntent (Admin SDK) creates them after verifying
-    // the folder's owning company. Missing and other-company reads both
-    // deny, so 404 vs 403 cannot leak another company's folder.
-    function intentCompanyScoped() {
-      return callerCompany() != '' && resource.data.companyUID == callerCompany();
-    }
-    // Written only by Admin SDK (onTaskCreated / onTaskUpdated /
-    // getTaskImage). Clients cannot read or write grants.
+    // ==================== DEV-ONLY (client deny; Admin SDK / callables) ====================
     match /task_image_grants/{grantId} {
       allow read, write: if false;
     }
-
     match /storage_upload_intents/{intentId} {
-      // Missing and other-company docs both deny, so a 404 vs 403
-      // cannot leak whether another company's folder exists.
-      // The app uses the callable and no longer get()s a missing intent.
-      allow read: if signedIn() && (
-        isGlobalStaff()
-        || ((isCompanyAdmin() || isHR() || isOrgAdmin()) && resource != null && intentCompanyScoped())
-      );
-      allow create, update, delete: if false;
-    }
-
-    match /delegate_requests/{requestId} {
-      allow get: if signedIn() && delegateRequestGetOk();
-      allow list: if signedIn() && delegateRequestProdStaffListOk();
-      // Docs-pending: requests are created by staff only (supervisor flow).
-      // The approved delegate's uid equals the request id, so the self path
-      // is an allow-list of the upload fields and can never approve documents
-      // or change status.
-      // r4 F1: tech support no longer creates requests; every other creator
-      // must name itself as supervisorUid (all app flows pass the signed-in
-      // user). Super-admin is exempt. Company staff (admin / supervisor / HR)
-      // must also set request.companyUID to their own companyUID.
-      // Org-admin create is org- and company-scoped: an org-admin of o1
-      // cannot create a request for a company in o2, and an org-admin
-      // with no companyUID is denied (incomingCompanyScoped fail-closes
-      // on an empty caller company). Roles that may create renewals are
-      // unchanged.
-      // update_national_id requests are created only by submitNationalIdUpdate
-      // (Admin SDK). Clients cannot mint them.
-      allow create: if createDelegateRequestOk()
-        && requestIdNotReservedByOtherCompany(requestId)
-        && orgAdminSecondaryOrgsOwnOnly()
-        && orgCompanyCheckKeysLocked();
-      // Self clause first: the staff role helpers are expensive and would
-      // otherwise eat the 1000-expression budget before the docs checks.
-      // update_national_id requests are immutable after create: clients
-      // cannot change existingDelegateUid, delegateUid, proposedNationalId,
-      // status, or any other field. Review fields are written only by
-      // reviewNationalIdUpdate (Admin SDK). Clients also cannot convert
-      // another request into update_national_id.
-      allow update: if ((signedIn() && request.auth.uid == requestId
-          && changedKeys().hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
-            'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'])
-          && delegateDocsOk() && delegateUrlsWithDocs())
-        || (requestStaffUpdateOk(requestId) && subscriptionPaymentUntouched()))
-        && !changedKeys().hasAny(['proposedNationalId'])
-        && (resource.data.get('requestType', '') == 'update_national_id'
-          || request.resource.data.get('requestType', '') != 'update_national_id')
-        && (resource.data.get('actionType', '') == 'update_national_id'
-          || request.resource.data.get('actionType', '') != 'update_national_id')
-        // N-1: once created, an update_national_id request is immutable to
-        // clients (including existingDelegateUid, delegateUid, status, notes).
-        // Only Admin SDK review/submit callables write review fields.
-        && resource.data.get('requestType', '') != 'update_national_id'
-        && resource.data.get('actionType', '') != 'update_national_id'
-        && (!changedKeys().hasAny(['organizationUIDs', 'organizationUID', 'organizationId', 'companyUID', 'companyId'])
-          || (requestOrganizationUIDsOk() && requestPrimaryOrgBelongsToCompany()))
-        && orgCompanyCheckKeysLocked()
-        && requestApprovalOrgCheckOk();
-      allow delete: if isSuperAdmin()
-        || (isOrgAdmin()
-          && (resource.data.get('organizationUID', '') == callerOrg()
-            || resource.data.get('organizationId', '') == callerOrg()));
-
-      match /paymob_checkout_attempts/{attemptId} {
-        allow read, write: if false;
-      }
-    }
-
-    match /used_receipt_codes/{code} {
-      allow read: if signedIn() && (isStaffWriter() || isDelegate());
-      allow create, update, delete: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR();
-    }
-
-    // ==================== MOBILE: BILLING ====================
-    // Web and super-admin screens list these collections without a company
-    // filter. Company accountants and org admins can read and write them.
-    // Delegates can read and update only their own wallet.
-
-    match /monthly_collections/{periodId} {
-      allow read, write: if isGlobalStaff() || isAccountant() || isOrgAdmin();
-      match /transactions/{transactionId} {
-        allow read, write: if isGlobalStaff() || isAccountant() || isOrgAdmin();
-      }
-      match /allocations/{allocationId} {
-        allow read, write: if isGlobalStaff() || isAccountant() || isOrgAdmin();
-      }
-    }
-
-    match /user_wallets/{walletId} {
-      allow read: if signedIn() && (
-        walletId == request.auth.uid || delegateOwns(walletId) || isGlobalStaff() || isAccountant() || isOrgAdmin()
-      );
-      allow create, update: if signedIn() && (
-        walletId == request.auth.uid || delegateOwns(walletId) || isGlobalStaff() || isAccountant() || isOrgAdmin()
-      );
-      allow delete: if isGlobalStaff() || isAccountant();
-      match /transactions/{transactionId} {
-        allow read, write: if signedIn() && (
-          walletId == request.auth.uid || delegateOwns(walletId) || isGlobalStaff() || isAccountant() || isOrgAdmin()
-        );
-      }
-    }
-
-    match /private_label_permissions/{userId} {
-      allow get: if signedIn() && (
-        userId == request.auth.uid || delegateOwns(userId) || isGlobalStaff() || isMarketing() || isOrgAdmin()
-      );
-      allow list: if isGlobalStaff() || isOrgAdmin();
-      allow create, update, delete: if isGlobalStaff() || isOrgAdmin();
-    }
-
-    // ==================== MOBILE: SECURITY AND DEVICES ====================
-
-    // Append-only profile-edit audit. Clients cannot write entries; only
-    // the Admin SDK callables may create them. Company staff may read their
-    // own company's records. Super-admin / tech may read globally.
-    // Entries are immutable.
-    match /delegate_profile_audit_logs/{logId} {
-      allow read: if signedIn() && (
-        isGlobalStaff()
-        || (isCompanyScopedStaff()
-          && resource.data.get('companyUID', '') == callerCompany())
-      );
-      allow create, update, delete: if false;
-    }
-
-    match /security_audit_logs/{logId} {
-      allow read: if signedIn() && (
-        isGlobalStaff()
-        || (isCompanyScopedStaff() && companyScoped())
-        || (isOrgScopedStaff() && orgScoped())
-        || resource.data.delegateUid == request.auth.uid
-        || delegateOwns(resource.data.delegateUid)
-      );
-      allow create: if signedIn() && (
-        (
-          (request.resource.data.delegateUid == request.auth.uid || delegateOwns(request.resource.data.delegateUid))
-          && (delegateInOrg(request.resource.data.organizationUID) || incomingOrgScoped() || isDelegate())
-        )
-        || (isCompanyScopedStaff() && incomingCompanyScoped())
-        || isGlobalStaff()
-      );
-      allow update: if isGlobalStaff()
-        || (isCompanyScopedStaff() && companyScoped())
-        || (isOrgScopedStaff() && orgScoped());
-      allow delete: if isGlobalStaff() || (isCompanyScopedStaff() && companyScoped());
-    }
-
-    match /device_unbind_requests/{requestId} {
-      allow read: if canReadOrgAdminRequestInOwnOrg();
-      allow read: if signedIn() && (
-        isGlobalStaff()
-        || (isCompanyScopedStaff() && companyScoped())
-        || (isOrgScopedStaff() && orgScoped())
-        || resource.data.delegateUid == request.auth.uid
-        || delegateOwns(resource.data.delegateUid)
-      );
-      allow create: if signedIn() && (
-        (
-          request.resource.data.status == 'pending'
-          && (request.resource.data.delegateUid == request.auth.uid || delegateOwns(request.resource.data.delegateUid))
-          && (delegateInOrg(request.resource.data.organizationUID) || incomingOrgScoped())
-        )
-        || (
-          request.resource.data.status == 'approved'
-          && (
-            isGlobalStaff()
-            || (isOrgScopedStaff() && incomingOrgScoped())
-            || (isCompanyScopedStaff() && incomingCompanyScoped())
-          )
-        )
-      );
-      allow update: if (isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped()))
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-          'delegateUid', 'organizationUID', 'companyUID', 'id'
-        ]);
-      allow delete: if false;
-    }
-
-    match /delegate_tracking/{delegateId} {
-      allow read: if signedIn() && (
-        delegateOwns(delegateId) || isGlobalStaff()
-        || (isCompanyScopedStaff() && (companyScoped() || resource.data.companyUID == callerCompany()))
-        || (isOrgScopedStaff() && orgScoped())
-      );
-      allow create, update: if signedIn() && (
-        delegateOwns(delegateId) || isGlobalStaff() || (isHR() && incomingCompanyScoped()) || (isCompanyAdmin() && incomingCompanyScoped())
-      );
-      allow delete: if isGlobalStaff();
-
-      match /breadcrumbs/{breadcrumbId} {
-        allow read, create: if signedIn() && (
-          delegateOwns(delegateId)
-          || isGlobalStaff()
-          || (
-            (isCompanyScopedStaff() || isOrgScopedStaff())
-            && get(/databases/$(database)/documents/delegate_tracking/$(delegateId)).data.companyUID == callerCompany()
-          )
-        );
-        allow update, delete: if isGlobalStaff();
-      }
-    }
-
-    match /leave_requests/{requestId} {
-      // Split allow rules so a company+status list is provable for HR
-      // (a single OR with unconstrained own-id branches made that query
-      // PERMISSION_DENIED). Own-id stays a separate rule for delegates.
-      allow read: if canReadOrgAdminRequestInOwnOrg();
-      allow read: if signedIn() && isGlobalStaff();
-      allow read: if signedIn() && isCompanyScopedStaff() && companyScoped();
-      allow read: if signedIn() && isOrgScopedStaff() && orgScoped();
-      allow read: if signedIn() && (
-        ownsDelegateId(resource.data.delegateUid)
-        || delegateOwns(resource.data.delegateUid)
-      );
-      allow create: if signedIn() && (
-        ownsDelegateId(request.resource.data.delegateUid)
-        || delegateOwns(request.resource.data.delegateUid)
-        || (isCompanyScopedStaff() && incomingCompanyScoped())
-        || isGlobalStaff()
-      );
-      allow update: if isGlobalStaff()
-        || (isCompanyScopedStaff() && companyScoped())
-        || (ownsDelegateId(resource.data.delegateUid) && resource.data.status == 'pending')
-        || (delegateOwns(resource.data.delegateUid) && resource.data.status == 'pending');
-      allow delete: if isGlobalStaff()
-        || (isCompanyScopedStaff() && companyScoped())
-        || (ownsDelegateId(resource.data.delegateUid) && resource.data.status == 'pending')
-        || (delegateOwns(resource.data.delegateUid) && resource.data.status == 'pending');
-    }
-
-    match /floor_checks/{checkId} {
-      allow read: if signedIn() && (isStaffWriter() || isDelegate());
-      allow create, update: if isGlobalStaff() || isMarketing() || isBranchesMarketing() || isCompanyAdmin()
-        || (isDelegate() && (
-          request.resource.data.delegateId == request.auth.uid
-          || delegateOwns(request.resource.data.delegateId)
-        ));
-      allow delete: if isGlobalStaff() || isMarketing() || isBranchesMarketing() || isCompanyAdmin();
-    }
-
-    match /company_payroll_configs/{companyId} {
-      allow read, write: if isGlobalStaff()
-        || (companyId == callerCompany() && (isHR() || isAccountant() || isCompanyAdmin() || isOrgAdmin()));
-    }
-
-    // Server-only device binding written by delegateLoginV2. Clients read the
-    // mirrored boundDeviceId on the delegate document, which they cannot write.
-    match /deviceBindings/{bindingId} {
-      allow read, write: if false;
-    }
-
-    // Server-only OTP enforcement switch read by Cloud Functions
-    // (config/delegate_auth.otpEnforcementEnabled). Clients cannot touch it.
-    // config/subscription_dev (tashil-dev free-period bypass list) is also
-    // server-only; the Admin SDK honors it only when projectId is tashil-dev.
-    // Public subscription flags (advance renewal, etc.). Clients may read
-    // only this doc; every other config/* stays deny-all. Do not put secrets
-    // or bypass lists here.
-    match /config/subscriptions {
-      allow read: if signedIn();
-      allow write: if false;
-    }
-    match /config/{docId} {
-      allow read, write: if false;
-    }
-
-    // Server-only coverage claims written by quoteSubscriptionRequest /
-    // applyVerifiedSubscriptionPayment. Clients cannot read or write them.
-    match /subscription_coverage/{id} {
-      allow read, write: if false;
-    }
-
-    // Superseded Paymob captures (non-current checkout attempt). Admin SDK only.
-    match /paymob_superseded_payments/{txId} {
-      allow read: if isSuperAdmin() || isTechnicalSupport();
-      allow create, update, delete: if false;
-    }
-
-    match /admin_alerts/{alertId} {
-      allow read: if isSuperAdmin() || isTechnicalSupport();
-      allow create, update, delete: if false;
-    }
-
-    // TrustedTimeService writes a serverTimestamp probe, then reads it
-    // back. Signed-in clients may only touch this one doc and the probe field.
-    match /_system_metadata/{docId} {
-      allow get: if signedIn() && docId == 'time_probe';
-      allow create, update: if signedIn()
-        && docId == 'time_probe'
-        && request.resource.data.keys().hasOnly(['probe']);
-      allow delete: if false;
-    }
-
-    // Server-only billing-cycle runs written by startBillingCycle.
-    // Clients cannot read or write them. Default-deny would also cover
-    // this path; the named match documents the contract for the web.
-    match /billing_cycles/{runId} {
       allow read, write: if false;
     }
 
     // ==================== DEFAULT DENY ====================
-    // Rate-limit collections (delegate_login_rate_limits, staff_login_rate_limits)
-    // and every other unnamed path fall through to this match.
+    // Any collection not explicitly matched above will be denied
     match /{document=**} {
       allow read, write: if false;
     }

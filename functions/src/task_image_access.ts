@@ -379,12 +379,19 @@ export const getTaskImage = functions
  * Deploy: functions:tashil-mobile-notifications:onTaskImageFinalize
  *   --project tashil-dev
  */
+const taskImageFinalizeOpts: Parameters<typeof onObjectFinalized>[0] = {
+  region: "europe-west4",
+  memory: "256MiB",
+  timeoutSeconds: 30,
+};
+// Prod default GCS bucket is multi-region (not europe-west4-only). Set
+// TASK_IMAGE_FINALIZE_BUCKET on first prod deploy; omit to use project default.
+if (process.env.TASK_IMAGE_FINALIZE_BUCKET) {
+  taskImageFinalizeOpts.bucket = process.env.TASK_IMAGE_FINALIZE_BUCKET;
+}
+
 export const onTaskImageFinalize = onObjectFinalized(
-  {
-    region: "europe-west4",
-    memory: "256MiB",
-    timeoutSeconds: 30,
-  },
+  taskImageFinalizeOpts,
   async (event) => {
     const name = String(event.data?.name || "");
     const bucketName = String(event.data?.bucket || "");
