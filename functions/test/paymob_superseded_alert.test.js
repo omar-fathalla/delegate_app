@@ -44,4 +44,29 @@ describe("paymob superseded admin alert", () => {
     assert.equal((await db.collection("admin_alerts").doc("82001").get()).get("requestId"), "ren1");
     assert.match(String(fcmSends[0].notification.title), /استرجاع/);
   });
+
+  it("does not duplicate notifications or FCM when the same txId is replayed", async () => {
+    await db.doc("users/sa1").set({role: "super-admin"});
+    await db.doc("fcm_tokens/sa1").set({token: "tok1"});
+    const opts = {
+      requestId: "ren1",
+      attemptId: "1700000000001_oldabcd12",
+      txId: "82001",
+      amountCents: 41667,
+      currency: "EGP",
+      companyUID: "co1",
+      organizationUID: "org1",
+      messaging: {
+        send: async () => "id",
+      },
+    };
+    const first = await alerts.notifyPaymobSupersededPaymentRefund(db, opts);
+    assert.equal(first.notifications, 1);
+    assert.equal(first.fcmSent, 1);
+    const replay = await alerts.notifyPaymobSupersededPaymentRefund(db, opts);
+    assert.equal(replay.notifications, 0);
+    assert.equal(replay.fcmSent, 0);
+    assert.equal((await db.collection("notifications").get()).size, 1);
+    assert.equal((await db.collection("admin_alerts").doc("82001").get()).exists, true);
+  });
 });

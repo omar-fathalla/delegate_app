@@ -106,8 +106,8 @@ export async function notifyPaymobSupersededPaymentRefund(
     `محاولة قديمة: ${opts.attemptId}`,
   ].join(" ");
   const ts = admin.firestore.FieldValue.serverTimestamp();
-
-  await db.collection(ADMIN_ALERTS).doc(opts.txId).set({
+  const alertRef = db.collection(ADMIN_ALERTS).doc(opts.txId);
+  const alertData = {
     type: PAYMOB_SUPERSEDED_NOTIFICATION_TYPE,
     requestId: opts.requestId,
     attemptId: opts.attemptId,
@@ -119,7 +119,17 @@ export async function notifyPaymobSupersededPaymentRefund(
     currency: opts.currency,
     needs_refund: true,
     createdAt: ts,
-  }, {merge: true});
+  };
+
+  const created = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(alertRef);
+    if (snap.exists) return false;
+    tx.create(alertRef, alertData);
+    return true;
+  });
+  if (!created) {
+    return {adminAlert: true, notifications: 0, fcmSent: 0};
+  }
 
   const recipientIds = await privilegedRecipientUids(db);
   if (!recipientIds.length) {
