@@ -378,27 +378,23 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
           'قام المشرف $supervisorName ($companyName) بطلب تسجيل المندوب $fullName للمنظمات ${resolveNames.join("، ")}';
 
       try {
-        final targetUsersSnap = await _firestore
-            .collection('users')
-            .where('role', whereIn: [
-              'super-admin',
-              'super_admin',
-              'superAdmin',
-              'technicalSupport',
-              'technical-support',
-              'technical_support',
-            ])
-            .get();
+        final callable = _functions.httpsCallable('listGlobalNotifyStaff');
+        final notifyResult = await callable.call<Map<String, dynamic>>({});
+        final rawUsers = notifyResult.data['users'];
+        final staffRows = rawUsers is List
+            ? rawUsers.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+            : const <Map<String, dynamic>>[];
 
         final batch = _firestore.batch();
 
         // 1. Direct notifications to individual Super Admin and Tech Support users
-        for (final doc in targetUsersSnap.docs) {
-          final data = doc.data();
+        for (final data in staffRows) {
+          final uid = (data['uid'] ?? '').toString();
+          if (uid.isEmpty) continue;
           final phone = (data['phoneNumber'] ?? data['phone'])?.toString();
           final ref = _firestore.collection('notifications').doc();
           batch.set(ref, {
-            'delegateUid': doc.id,
+            'delegateUid': uid,
             if (phone != null && phone.isNotEmpty) 'phoneNumber': phone,
             'title': notifTitle,
             'body': notifBody,
