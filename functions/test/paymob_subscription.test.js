@@ -194,6 +194,13 @@ describe("paymob env", () => {
   it("reads requestId from merchant_order_id", () => {
     assert.equal(paymob.requestIdFromPaymobObj(sampleObj()), "req1");
   });
+
+  it("reads requestId from composite special_reference", () => {
+    const ref = paymob.buildPaymobSpecialReference("req1", "1700000_x");
+    const obj = sampleObj({order: {id: 1, merchant_order_id: ref}});
+    assert.equal(paymob.requestIdFromPaymobObj(obj), "req1");
+    assert.equal(paymob.paymobReferenceFromObj(obj), ref);
+  });
 });
 
 describe("paymob webhook handler", () => {
