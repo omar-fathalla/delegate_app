@@ -10,6 +10,7 @@ const {
   assessProvisioningProfiles,
   normalizeLookupEmail,
   emailsMatch,
+  lookupExistingProfiles,
   shouldQueueSetupEmail,
   SETUP_MAIL_COOLDOWN_MS,
 } = require("../create_tech_support");
@@ -24,6 +25,14 @@ function mockUsersDb(profiles, writers = []) {
     collection: (name) => {
       if (name === "users") {
         return {
+          get: async () => ({
+            size: profiles.length,
+            docs: profiles.map((p) => ({
+              id: p.id,
+              data: () => p.data,
+              get: (field) => p.data[field],
+            })),
+          }),
           where: (field, op, val) => ({
             limit: () => ({
               get: async () => {
@@ -129,6 +138,48 @@ test("assessProvisioningProfiles blocks uid mismatch even with allow-role-change
 test("emailsMatch is case and whitespace insensitive", () => {
   assert.ok(emailsMatch(" User@X.COM ", "user@x.com"));
   assert.ok(!emailsMatch("other@x.com", "user@x.com"));
+});
+
+test("normalizeLookupEmail handles NBSP, zero-width, trailing dot", () => {
+  const messy = `\u00A0User\u200B@X.COM.\u00A0`;
+  assert.equal(normalizeLookupEmail(messy), "user@x.com");
+  assert.equal(normalizeLookupEmail("user@x.com."), "user@x.com");
+});
+
+test("apply finds company-admin via full scan when phone differs", async () => {
+  const writers = [];
+  let createCalled = false;
+  const storedEmail = `\u00A0User\u200B@X.COM.`;
+  const args = parseArgs([
+    "--project", "tashil-dev",
+    "--email", "user@x.com",
+    "--phone", "01111111111",
+    "--apply",
+  ]);
+  await assert.rejects(
+    () => runCreateTechSupport(args, {
+      project: "tashil-dev",
+      db: mockUsersDb([{
+        id: "orphan-email-only",
+        data: {
+          role: "company-admin",
+          companyUID: "co-1",
+          email: storedEmail,
+          phoneNumber: "09999999999",
+        },
+      }], writers),
+      auth: {
+        getUserByEmail: async () => { throw {code: "auth/user-not-found"}; },
+        createUser: async () => {
+          createCalled = true;
+          return {uid: "new-auth"};
+        },
+      },
+    }),
+    /refusing apply/,
+  );
+  assert.equal(createCalled, false);
+  assert.equal(writers.length, 0);
 });
 
 test("apply refuses when stored email casing differs from CLI", async () => {

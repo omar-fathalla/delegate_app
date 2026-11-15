@@ -47,9 +47,23 @@ function isTechSupportRole(role) {
   return TECH_ROLES.has(roleKey(role));
 }
 
-/** @param {unknown} raw */
+/** Unicode zero-width characters stripped before email comparison. */
+const EMAIL_ZERO_WIDTH_RE = /[\u200B-\u200D\uFEFF\u2060]/g;
+
+/**
+ * Operator-script email canonical form: trim, NFKC, strip NBSP/zero-width, lowercase,
+ * drop trailing dots (legacy data like `user@x.com.`).
+ * @param {unknown} raw
+ */
 function normalizeLookupEmail(raw) {
-  return String(raw || "").trim().toLowerCase();
+  let s = String(raw || "");
+  s = s.replace(/\u00A0/g, " ");
+  s = s.replace(EMAIL_ZERO_WIDTH_RE, "");
+  s = s.trim().normalize("NFKC").trim().toLowerCase();
+  while (s.endsWith(".")) {
+    s = s.slice(0, -1);
+  }
+  return s;
 }
 
 /** @param {unknown} raw */
@@ -286,11 +300,18 @@ async function lookupExistingProfiles(db, normEmail, phone, rawEmail) {
   const normPhone = normalizeLookupPhone(phone);
   /** @type {Map<string, {id: string, data: Record<string, unknown>}>} */
   const byId = new Map();
+  const addDoc = (doc) => {
+    byId.set(doc.id, {id: doc.id, data: doc.data()});
+  };
   const merge = (snap) => {
     for (const doc of snap.docs) {
-      byId.set(doc.id, {id: doc.id, data: doc.data()});
+      addDoc(doc);
     }
   };
+
+  merge(await db.collection("users").where("phoneNumber", "==", normPhone).limit(10).get());
+  merge(await db.collection("users").where("phone", "==", normPhone).limit(10).get());
+
   const variants = emailLookupVariants(normEmail, rawEmail);
   if (variants.length === 1) {
     merge(await db.collection("users").where("email", "==", variants[0]).limit(5).get());
@@ -304,18 +325,28 @@ async function lookupExistingProfiles(db, normEmail, phone, rawEmail) {
       /* optional emailNormalized index */
     }
   }
-  merge(await db.collection("users").where("phoneNumber", "==", normPhone).limit(10).get());
-  merge(await db.collection("users").where("phone", "==", normPhone).limit(10).get());
 
-  /** @type {Map<string, {id: string, data: Record<string, unknown>}>} */
-  const matched = new Map();
+  // Read-only full collection scan (~700 user docs in prod-sized tenants; no index).
+  const scan = await db.collection("users").get();
+  const scanCap = 2500;
+  if (scan.size > scanCap) {
+    console.warn(`users scan: ${scan.size} docs exceeds warn cap ${scanCap}; email match may be incomplete`);
+  }
+  for (const doc of scan.docs) {
+    if (emailsMatch(doc.get("email"), normEmail)) {
+      addDoc(doc);
+    }
+  }
+
+  /** @type {{id: string, data: Record<string, unknown>}[]} */
+  const matched = [];
   for (const p of byId.values()) {
     const docPhone = normalizeLookupPhone(p.data.phoneNumber || p.data.phone || "");
     if (emailsMatch(p.data.email, normEmail) || docPhone === normPhone) {
-      matched.set(p.id, p);
+      matched.push(p);
     }
   }
-  return [...matched.values()];
+  return matched;
 }
 
 /**
