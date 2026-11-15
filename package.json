@@ -13,6 +13,7 @@
     "test:rules:m31": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-m31-delegate-own-reads \"node --test test/rules/m31-delegate-own-reads.test.js\"",
     "test:rules:subs": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-tashil-subs-rules \"node --test test/rules/subscriptions.test.js\"",
     "test:rules:source": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-delegate-source \"node --test test/rules/delegate-source-lock.test.js\"",
+    "test:rules:gaps": "npx --yes firebase-tools@14.15.1 emulators:exec --only firestore --project demo-ta8-gaps \"node --test test/rules/company-scoping-gaps.test.js\"",
     "test:rules:storage": "npx --yes firebase-tools@14.15.1 emulators:exec --only storage,firestore --project demo-tashil-storage \"node --test test/rules/storage.rules.test.js\""
   },
   "devDependencies": {

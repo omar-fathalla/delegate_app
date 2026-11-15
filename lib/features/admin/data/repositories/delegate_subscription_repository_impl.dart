@@ -362,14 +362,14 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
           submitBatch.set(pendingRef, pendingDelegateDataFor(orgId, orgName));
         }
         await submitBatch.commit();
-      } catch (_) {
-        // Cross-organization: write the request alone so staff can still approve.
-        await docRef.set(request.toMap());
-        if (receiptRef != null && receiptData != null) {
-          try {
-            await receiptRef.set(receiptData);
-          } catch (_) {}
-        }
+      } on FirebaseException catch (e) {
+        final chains = resolveNames.join('، ');
+        return Left(ServerFailure(
+          'تعذر حفظ المندوب المعلق في السلاسل ($chains): ${e.message ?? e.code}',
+        ));
+      } catch (e) {
+        final chains = resolveNames.join('، ');
+        return Left(ServerFailure('تعذر حفظ المندوب المعلق في السلاسل ($chains): $e'));
       }
 
       // 8. Notify Technical Support and Super Admins ONLY (Restricted Targeting)
@@ -840,30 +840,41 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
 
       // 2. Check delegate_requests where receiptCode == cleanCode and status != 'rejected'
       try {
-        final reqSnap = await _firestore
-            .collection('delegate_requests')
-            .where('companyUID', isEqualTo: companyUID)
-            .where('receiptCode', isEqualTo: cleanCode)
-            .get();
-        for (final doc in reqSnap.docs) {
-          final status = doc.data()['status'] as String?;
-          if (status != 'rejected') {
-            return const Right(true);
+        for (final companyField in ['companyUID', 'companyId']) {
+          if (companyUID.isEmpty) break;
+          final reqSnap = await _firestore
+              .collection('delegate_requests')
+              .where(companyField, isEqualTo: companyUID)
+              .where('receiptCode', isEqualTo: cleanCode)
+              .get();
+          for (final doc in reqSnap.docs) {
+            final status = doc.data()['status'] as String?;
+            if (status != 'rejected') {
+              return const Right(true);
+            }
           }
         }
-      } catch (_) {}
+      } on FirebaseException catch (e) {
+        if (e.code != 'permission-denied') {
+          return Left(ServerFailure('تعذر التحقق من كود الإيصال: ${e.message ?? e.code}'));
+        }
+      }
 
       // 3. Check collectionGroup('delegates') where receiptCode == cleanCode
       try {
-        final delSnap = await _firestore
+        Query<Map<String, dynamic>> delQuery = _firestore
             .collectionGroup('delegates')
-            .where('receiptCode', isEqualTo: cleanCode)
-            .limit(1)
-            .get();
+            .where('receiptCode', isEqualTo: cleanCode);
+        if (companyUID.isNotEmpty) {
+          delQuery = delQuery.where('companyUID', isEqualTo: companyUID);
+        }
+        final delSnap = await delQuery.limit(1).get();
         if (delSnap.docs.isNotEmpty) {
           return const Right(true);
         }
-      } catch (_) {}
+      } on FirebaseException catch (e) {
+        return Left(ServerFailure('تعذر التحقق من كود الإيصال: ${e.message ?? e.code}'));
+      }
 
       return const Right(false);
     } catch (e) {
@@ -889,13 +900,21 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       query = query.where('companyUID', isEqualTo: companyUID);
     }
 
+    final tenantCompany = companyUID?.trim() ?? '';
     return query.snapshots().map((snapshot) {
-      final list = snapshot.docs.map((doc) {
+      var list = snapshot.docs.map((doc) {
         return DelegateSubscriptionRequest.fromMap(
           doc.data() as Map<String, dynamic>,
           doc.id,
         );
       }).toList();
+
+      if (tenantCompany.isNotEmpty) {
+        list = list.where((r) {
+          final co = r.companyUID.trim();
+          return co.isEmpty || co == tenantCompany;
+        }).toList();
+      }
 
       // Sort client-side by createdAt descending (newest first)
       // to avoid requiring composite indexes in Firestore

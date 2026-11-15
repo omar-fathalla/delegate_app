@@ -171,15 +171,16 @@ void main() {
       expect(result, equals([tPenaltyModel]));
     });
 
-    test('should return empty list on generic exception', () async {
+    test('should propagate generic exception', () async {
       when(() => mockCollectionReference.where('companyId', isEqualTo: 'company_123'))
           .thenReturn(mockQuery);
       when(() => mockQuery.get(any()))
           .thenThrow(Exception('generic'));
 
-      final result = await dataSource.getCompanyPenalties('company_123');
-
-      expect(result, equals([]));
+      expect(
+        () => dataSource.getCompanyPenalties('company_123'),
+        throwsA(isA<Exception>()),
+      );
     });
 
     test('should throw ServerException on FirebaseException', () async {

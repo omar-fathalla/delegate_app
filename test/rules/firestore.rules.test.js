@@ -64,6 +64,8 @@ describe("firestore tightened rules", () => {
         marketing: {role: "marketing", organizationUID: "o1", companyUID: "c1"},
         tech: {role: "technical_support", organizationUID: "o1"},
         accountant: {role: "accountant", organizationUID: "o1", companyUID: "c1"},
+        supervisor: {role: "supervisor", organizationUID: "o1", companyUID: "c1"},
+        bmm: {role: "branches-marketing-manager", organizationUID: "o1", companyUID: "c1"},
         owner: {
           role: "delegate",
           status: "approved",

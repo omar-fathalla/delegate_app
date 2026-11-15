@@ -1195,13 +1195,11 @@ class _ProfileBody extends StatelessWidget {
       }
 
       if (item.docType == 'personalPhoto') {
-        try {
-          await firestore.collection('users').doc(delegate.uid).set({
-            'photoURL': newUrl,
-            'profileImageUrl': newUrl,
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-        } catch (_) {}
+        await firestore.collection('users').doc(delegate.uid).set({
+          'photoURL': newUrl,
+          'profileImageUrl': newUrl,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
       }
 
       try {

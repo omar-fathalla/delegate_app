@@ -556,38 +556,56 @@ service cloud.firestore {
       // support may activate, reactivate, suspend, or deactivate. The
       // account-status check stays on the non-techSignup branch so the
       // request-approval batch (4 document flips) stays under budget.
-      let saOrTech = r in [
-        'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN']
-        || tech;
-      // Exact plus Title-Case only (no lower(): 1000-expression budget).
-      let accountCh = stCh && st1 is string && (
-        st1 == 'active' || st1 == 'Active'
-        || st1 == 'approved' || st1 == 'Approved'
-        || st1 == 'suspended' || st1 == 'Suspended'
-        || st1 == 'inactive' || st1 == 'Inactive'
-        || st1 == 'deactivated' || st1 == 'Deactivated');
+      let saOrTech = r in superAdminRoleList() || tech;
       return !(stCh && st1 == 'pending' && !approver)
         && ((techSignup && techFlipOk(delegateId) && techReqOk(o1, c1, delegateId))
           || (!techSignup && (delegateDocsOk() || approver)
-            && (!accountCh || saOrTech)
+            && staffDelegateAccountFieldsOk(r, approver)
             && sourceStampKeysLocked()));
     }
 
     // r4: tech support may create a delegate that is active or carries an
     // approved document only inside the request-approval batch (techReqOk),
     // with the request's URLs, name and national id.
-    function techCreateOk(orgId, compId, delegateId) {
-      let r = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '');
+    function delegateDocsNoneApproved(n) {
+      return n is list && n.size() <= 8
+        && (n.size() <= 0 || !docIsApproved(n[0])) && (n.size() <= 1 || !docIsApproved(n[1]))
+        && (n.size() <= 2 || !docIsApproved(n[2])) && (n.size() <= 3 || !docIsApproved(n[3]))
+        && (n.size() <= 4 || !docIsApproved(n[4])) && (n.size() <= 5 || !docIsApproved(n[5]))
+        && (n.size() <= 6 || !docIsApproved(n[6])) && (n.size() <= 7 || !docIsApproved(n[7]));
+    }
+
+    // add-delegate placeholder create: bounded list, all 8 slots, no approved entries.
+    function cheapCreateDocsNotApproved(n) {
+      return n is list && n.size() <= 8
+        && (n.size() < 1 || n[0].get('documentStatus', '').lower() != 'approved')
+        && (n.size() < 2 || n[1].get('documentStatus', '').lower() != 'approved')
+        && (n.size() < 3 || n[2].get('documentStatus', '').lower() != 'approved')
+        && (n.size() < 4 || n[3].get('documentStatus', '').lower() != 'approved')
+        && (n.size() < 5 || n[4].get('documentStatus', '').lower() != 'approved')
+        && (n.size() < 6 || n[5].get('documentStatus', '').lower() != 'approved')
+        && (n.size() < 7 || n[6].get('documentStatus', '').lower() != 'approved')
+        && (n.size() < 8 || n[7].get('documentStatus', '').lower() != 'approved');
+    }
+
+    // Single get() + scope gate for nested delegate placeholder creates.
+    function nestedDelegateCreateOk(orgId, compId, delegateId) {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
       let d = request.resource.data;
+      let stl = d.get('status', '') is string ? d.get('status', '').lower().trim() : '';
       let n = d.get('documents', []);
-      let act = d.get('status', '') is string && d.get('status', '').lower() == 'active';
-      return !(r in techRoleList())
-        || (!act && n is list && n.size() <= 8
-          && (n.size() <= 0 || !docIsApproved(n[0])) && (n.size() <= 1 || !docIsApproved(n[1]))
-          && (n.size() <= 2 || !docIsApproved(n[2])) && (n.size() <= 3 || !docIsApproved(n[3]))
-          && (n.size() <= 4 || !docIsApproved(n[4])) && (n.size() <= 5 || !docIsApproved(n[5]))
-          && (n.size() <= 6 || !docIsApproved(n[6])) && (n.size() <= 7 || !docIsApproved(n[7])))
-        || (techCreateBound(delegateId) && techReqOk(orgId, compId, delegateId));
+      let sa = r in superAdminRoleList();
+      let scopeOk = sa || r in techRoleList()
+        || (r in orgAdminRoleList() && u.get('organizationUID', '') == orgId)
+        || (r in companyPlaceholderCreateRoleList() && u.get('companyUID', '') == compId);
+      let pendingOk = stl == 'pending' && cheapCreateDocsNotApproved(n);
+      let pathDataOk = d.get('companyUID', '') == compId
+        && d.get('organizationUID', '') == orgId;
+      return pathDataOk && scopeOk && (
+        sa || ((r in companyPlaceholderCreateRoleList() || r in orgAdminRoleList()) && pendingOk)
+        || (r in techRoleList() && ((stl != 'active' && cheapCreateDocsNotApproved(n))
+          || (techCreateBound(delegateId) && techReqOk(orgId, compId, delegateId)))));
     }
 
     function techCreateBound(delegateId) {
@@ -911,25 +929,25 @@ service cloud.firestore {
     // Supervisors may change only profile fields (name, phone, photos, ID
     // images, documents, updatedAt). nationalId / status / approval / payment
     // / company and organization ids stay blocked.
+    // Company/org staff may only touch metadata (updatedAt/notes) or cancel an
+    // unpaid renewal — not reassign supervisorUid, change requestType, etc.
+    function staffDelegateRequestMetaOnly() {
+      let st = request.resource.data.get('status', '');
+      let cancelKeys = changedKeys().hasOnly(['status'])
+        || changedKeys().hasOnly(['status', 'updatedAt']);
+      let cancelUnpaid = cancelKeys
+        && st == 'cancelled'
+        && resource.data.get('paymentStatus', '') != 'paid';
+      let metaKeys = changedKeys().hasOnly(['updatedAt'])
+        || changedKeys().hasOnly(['updatedAt', 'notes'])
+        || changedKeys().hasOnly(['notes']);
+      return cancelUnpaid || (metaKeys && !changedKeys().hasAny(['status']));
+    }
+
     function requestStaffUpdateOk(requestId) {
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
       let r = u.get('role', '');
-      let scopedSafe = !changedKeys().hasAny([
-          'reviewedBy', 'reviewedAt', 'reviewedByName', 'rejectionReason',
-          'approvedRequestId', 'approvedBy', 'approvedByName', 'approvedAt',
-          'paymentStatus', 'paymentMethod', 'amountDue', 'amountPaid', 'paidAt',
-          'coveredDelegateUids', 'items', 'periodCode', 'paymob', 'applyState',
-          'paymentError', 'needsReview', 'receiptCode', 'quotedAt',
-          'organizationUIDs', 'organizationNames',
-          'nationalId', 'nationalityID', 'proposedNationalId',
-          'fullName', 'firstName', 'secondName', 'thirdName', 'middleName', 'lastName',
-          'phoneNumber', 'phone',
-          'profileImageUrl', 'personalPhotoURL', 'personalPhotoUrl', 'photoURL',
-          'nationalIdFrontUrl', 'nationalIdBackUrl',
-          'organizationUID', 'organizationId', 'companyUID', 'companyId'])
-        && (!changedKeys().hasAny(['status'])
-          || (request.resource.data.get('status', '') == 'cancelled'
-            && resource.data.get('paymentStatus', '') != 'paid'));
+      let scopedSafe = staffDelegateRequestMetaOnly();
       return signedIn() && (
         r in [
           'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN']
@@ -1121,6 +1139,11 @@ service cloud.firestore {
         'hr', 'company-hr', 'company_hr', 'human_resources'];
     }
 
+    // Multi-chain placeholder create: same companyUID, any org in the company.
+    function companyPlaceholderCreateRoleList() {
+      return ['company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor'];
+    }
+
     // H1: roles company staff may grant. Supervisor/HR: field roles only.
     // Company admin: field roles plus company-level supervisor/HR. Never
     // marketing / branches marketing (org-scoped readers) or any admin role.
@@ -1134,25 +1157,85 @@ service cloud.firestore {
       return r == 'super-admin' || !(r in superAdminRoleList());
     }
 
+    function companyStaffUsersCreateFieldOk(d) {
+      let nr = roleOf(d);
+      let docs = d.get('documents', []);
+      let st = d.get('status', '');
+      return !(nr in fieldRoleList())
+        || ((!d.keys().hasAny(['isActive']) || d.get('isActive', false) != true)
+          && (!d.keys().hasAny(['status'])
+            || (st is string && st.lower().trim() == 'pending'
+              && (!(docs is list) || delegateDocsNoneApproved(docs)))));
+    }
+
     function usersCreateOk(r, org, co, d) {
       let nr = roleOf(d);
       let isSA = r in superAdminRoleList();
-      return newRoleOk(nr) && (isSA || (
+      let selfCreate = request.auth.uid == request.resource.id
+        && nr in ['delegate', '']
+        && d.get('uid', request.auth.uid) == request.auth.uid
+        && !d.keys().hasAny(['status', 'organizationUID', 'companyUID', 'organizationId', 'companyId', 'isActive'])
+        && !d.keys().hasAny(privilegeKeys())
+        && !(nr in privilegedRoleList());
+      return newRoleOk(nr) && (isSA || selfCreate || (
         !d.keys().hasAny(privilegeKeys())
         && !(nr in privilegedRoleList())
         && companyPinned(d)
         && (
-          (request.auth.uid == request.resource.id
-            && nr in ['delegate', '']
-            && d.get('uid', request.auth.uid) == request.auth.uid
-            && !d.keys().hasAny(['status', 'organizationUID', 'companyUID', 'organizationId', 'companyId', 'isActive'])) ||
           (r in techRoleList()) ||
-          (r in orgAdminRoleList() && org != '' && d.get('organizationUID', '') == org) ||
+          (r in orgAdminRoleList() && org != '' && d.get('organizationUID', '') == org
+            && companyStaffUsersCreateFieldOk(d)) ||
           (r in companyStaffWriterRoleList() && co != '' && org != ''
             && d.get('organizationUID', '') == org && d.get('companyUID', '') == co
-            && companyCanGrant(r, nr))
+            && companyCanGrant(r, nr)
+            && companyStaffUsersCreateFieldOk(d))
         )
       ));
+    }
+
+    // H-1: only global staff may touch isActive on delegate/promoter user docs.
+    // Other staff accounts: company staff may still deactivate (not activate).
+    function staffMaySetIsActiveActive(d, old, changed, r) {
+      return !changed.hasAny(['isActive'])
+        || r in superAdminRoleList()
+        || r in techRoleList()
+        || (!(roleOf(old) in fieldRoleList() || roleOf(d) in fieldRoleList())
+          && d.get('isActive', true) != true);
+    }
+
+    // H-1: company staff may not change status on delegate/promoter users docs.
+    function staffMaySetUserStatus(d, old, changed, r) {
+      return !changed.hasAny(['status'])
+        || r in superAdminRoleList()
+        || r in techRoleList()
+        || !(roleOf(old) in fieldRoleList() || roleOf(d) in fieldRoleList());
+    }
+
+    // H-1: company staff cannot activate/suspend delegates (any status spelling).
+    // Approvers may reset status to pending only (doc re-upload flow).
+    function delegatePendingStatusOnly(st1) {
+      return st1 is string && st1.lower().trim() == 'pending';
+    }
+
+    function staffDelegateReuploadStatusOk(r) {
+      let st1 = request.resource.data.get('status', '');
+      let st0l = resource.data.get('status', '') is string
+        ? resource.data.get('status', '').lower().trim() : '';
+      let ch = changedKeys();
+      let shapeOk = ch.hasOnly(['status']) || ch.hasOnly(['status', 'updatedAt']);
+      return delegatePendingStatusOnly(st1) && shapeOk && (
+        (st0l == 'suspended' && (r in superAdminRoleList() || companyEditorRole(r)))
+        || (st0l == 'active' && r in ['supervisor', 'company_supervisor']));
+    }
+
+    function staffDelegateAccountFieldsOk(r, approver) {
+      let ch = changedKeys();
+      let stCh = ch.hasAny(['status']);
+      let actCh = ch.hasAny(['isActive']);
+      let globalStaff = r in superAdminRoleList() || r in techRoleList();
+      return (!stCh && !actCh)
+        || globalStaff
+        || (stCh && !actCh && approver && staffDelegateReuploadStatusOk(r));
     }
 
     function usersUpdateOk(r, org, co, old, d, userId) {
@@ -1162,6 +1245,8 @@ service cloud.firestore {
       return (r in superAdminRoleList() && newRoleOk(nr)) || (
         newRoleOk(nr)
         && !changed.hasAny(privilegeKeys())
+        && staffMaySetIsActiveActive(d, old, changed, r)
+        && staffMaySetUserStatus(d, old, changed, r)
         && (!changed.hasAny(['role', 'organizationUID', 'companyUID', 'organizationId', 'companyId']) || companyPinned(d))
         && (
           (request.auth.uid == userId
@@ -1176,7 +1261,8 @@ service cloud.firestore {
                 && old.get('companyUID', '') == co && d.get('companyUID', '') == co
                 && old.get('organizationUID', '') == d.get('organizationUID', '')
                 && (!changed.hasAny(['role'])
-                  || (companyCanGrant(r, nr) && companyCanGrant(r, or))))
+                  || (!(or in fieldRoleList()) && !(nr in fieldRoleList())
+                    && companyCanGrant(r, nr) && companyCanGrant(r, or))))
             ))
         )
       );
@@ -1249,9 +1335,9 @@ service cloud.firestore {
 
         match /delegates/{delegateId} {
           allow read: if signedIn() && canReadNestedDelegate(orgId, compId, delegateId);
-          allow create: if canManageNestedDelegate(orgId, compId) && deviceBindingAbsent() && techCreateOk(orgId, compId, delegateId)
-            && sourceStampKeysLocked()
-            && exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId));
+          allow create: if deviceBindingAbsent() && sourceStampKeysLocked()
+            && exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId))
+            && nestedDelegateCreateOk(orgId, compId, delegateId);
           // sourceStampKeysLocked is not on this allow: the 4-flip tech
           // approval is already at the 1000-expression budget. Delegate
           // self-updates are hasOnly-gated by delegateFieldsSafe. Staff
@@ -1655,11 +1741,14 @@ service cloud.firestore {
       // (no short-circuit) and the 4-flip tech approval is already at the
       // 1000-expression budget. Nested updates are locked via
       // staffDocsApproveOk / delegateFieldsSafe instead.
-      allow create: if signedIn() && !onNestedDelegate() && deviceBindingAbsent() && (
+      allow create: if !onNestedDelegate() && signedIn() && deviceBindingAbsent() && (
         isGlobalStaff() ||
         (isOrgScopedStaff() && incomingOrgScoped()) ||
         (isCompanyScopedStaff() && incomingCompanyScoped())
-      ) && techCreateOk(request.resource.data.get('organizationUID', ''), request.resource.data.get('companyUID', ''), delegateId)
+      ) && nestedDelegateCreateOk(
+          request.resource.data.get('organizationUID', ''),
+          request.resource.data.get('companyUID', ''),
+          delegateId)
         && sourceStampKeysLocked();
       // r5 budget: a nested organizations/{o}/companies/{c}/delegates
       // update is decided by the nested match alone, for every role.
@@ -2379,7 +2468,10 @@ service cloud.firestore {
           || (requestOrganizationUIDsOk() && requestPrimaryOrgBelongsToCompany()))
         && orgCompanyCheckKeysLocked()
         && requestApprovalOrgCheckOk();
-      allow delete: if isSuperAdmin() || isOrgAdmin();
+      allow delete: if isSuperAdmin()
+        || (isOrgAdmin()
+          && (resource.data.get('organizationUID', '') == callerOrg()
+            || resource.data.get('organizationId', '') == callerOrg()));
     }
 
     match /used_receipt_codes/{code} {

@@ -516,9 +516,11 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
       final confidentialTitles = await _getConfidentialRuleTitles();
       return _enrichPenaltiesWithConfidentiality(list, confidentialTitles);
     } on FirebaseException catch (e) {
-      throw ServerException(e.message ?? 'فشل في جلب قائمة المخالفات.');
-    } catch (_) {
-      return [];
+      throw ServerException(
+        e.message?.isNotEmpty == true
+            ? e.message!
+            : 'فشل في جلب قائمة المخالفات (${e.code}).',
+      );
     }
   }
 

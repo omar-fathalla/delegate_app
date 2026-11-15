@@ -143,6 +143,12 @@ describe("P0 users hardening", () => {
     await assertFails(as("oa2").doc("users/hr").update({displayName: "x"}));
   });
 
+  test("company staff cannot activate isActive on staff accounts (TA-8)", async () => {
+    await assertFails(as("oa").doc("users/hr").update({isActive: true}));
+    await assertFails(as("sup").doc("users/hr").update({isActive: true}));
+    await assertFails(as("ca").doc("users/sup").update({isActive: true}));
+  });
+
   test("company staff: own company, field roles + non-admin staff only, pinned", async () => {
     await assertSucceeds(as("sup").doc("users/d9").set({role: "delegate", organizationUID: "o1", companyUID: "c1", uid: "d9"}));
     await assertFails(as("sup").doc("users/d10").set({role: "delegate", organizationUID: "o1", companyUID: "c2"}));
@@ -151,7 +157,10 @@ describe("P0 users hardening", () => {
     await assertFails(as("sup").doc("users/d1").update({organizationUID: "o2"}));
     await assertFails(as("sup").doc("users/d1").update({companyUID: "c2"}));
     await assertFails(as("sup").doc("users/ca").update({role: "delegate"}));
-    await assertSucceeds(as("sup").doc("users/d1").update({status: "approved", displayName: "D"}));
+    await assertFails(as("sup").doc("users/d1").update({status: "suspended", displayName: "D"}));
+    await assertFails(as("hr").doc("users/d1").update({status: "SUSPENDED"}));
+    await assertFails(as("sup").doc("users/d1").update({isActive: false}));
+    await assertSucceeds(as("sup").doc("users/d1").update({displayName: "D"}));
     await assertFails(as("sup2").doc("users/d1").update({displayName: "x"}));
   });
 

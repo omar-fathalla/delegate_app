@@ -39,11 +39,29 @@ export async function findDuplicateDecision(
     value: string,
     kind: DuplicateField,
   ) => {
-    const snap = await db.collection("delegate_requests").where(field, "==", value).get();
-    for (const doc of snap.docs) {
-      if (isExcludableDelegateRecord(doc.data(), doc.id, opts.excludeDelegateUid, opts.companyUID)) continue;
-      if (!isOpenRequestStatus(doc.data().status)) continue;
-      addHit(doc.data(), kind);
+    const company = opts.companyUID.trim();
+    const scans: Promise<FirebaseFirestore.QuerySnapshot>[] = [];
+    if (company) {
+      scans.push(
+        db.collection("delegate_requests")
+          .where("companyUID", "==", company)
+          .where(field, "==", value)
+          .get(),
+        db.collection("delegate_requests")
+          .where("companyId", "==", company)
+          .where(field, "==", value)
+          .get(),
+      );
+    } else {
+      scans.push(db.collection("delegate_requests").where(field, "==", value).get());
+    }
+    const results = await Promise.all(scans);
+    for (const snap of results) {
+      for (const doc of snap.docs) {
+        if (isExcludableDelegateRecord(doc.data(), doc.id, opts.excludeDelegateUid, opts.companyUID)) continue;
+        if (!isOpenRequestStatus(doc.data().status)) continue;
+        addHit(doc.data(), kind);
+      }
     }
   };
 

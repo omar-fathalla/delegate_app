@@ -30,6 +30,7 @@ describe("delegate_requests: payment is server-only", () => {
       await db.doc("users/oa2").set({role: "organization-admin", organizationUID: "o2", companyUID: "c2"});
       await db.doc("users/sa").set({role: "super-admin"});
       await db.doc("users/tech").set({role: "technical_support"});
+      await db.doc("users/mk").set({role: "marketing", organizationUID: "o1", companyUID: "c1"});
       await db.doc("users/d1").set({role: "delegate", organizationUID: "o1", companyUID: "c1", uid: "d1"});
       await db.doc("organizations/o1/companies/c1").set({companyUID: "c1"});
       await db.doc("organizations/o2/companies/c2").set({companyUID: "c2"});
@@ -290,6 +291,16 @@ describe("delegate_requests: payment is server-only", () => {
       requestType: "new_delegate", status: "pending", supervisorUid: "sup",
       organizationUID: "o1",
     }));
+  });
+
+  test("company staff cannot reassign supervisorUid or change requestType (TA-8)", async () => {
+    await assertFails(as("sup").doc("delegate_requests/scoped").update({
+      supervisorUid: "hr1", updatedAt: "t",
+    }));
+    await assertFails(as("hr1").doc("delegate_requests/scoped").update({
+      requestType: "new_delegate", updatedAt: "t",
+    }));
+    await assertFails(as("mk").doc("delegate_requests/scoped").update({updatedAt: "t"}));
   });
 
   test("requestStaffUpdateOk is company-scoped and blocks approval fields", async () => {
