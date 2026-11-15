@@ -27,6 +27,7 @@ describe("paymob superseded admin alert", () => {
       currency: "EGP",
       companyUID: "co1",
       organizationUID: "org1",
+      companyName: "شركة الاختبار",
       messaging: {
         send: async (msg) => {
           fcmSends.push(msg);
@@ -42,6 +43,10 @@ describe("paymob superseded admin alert", () => {
     assert.equal(notifs.docs[0].get("type"), alerts.PAYMOB_SUPERSEDED_NOTIFICATION_TYPE);
     assert.equal(notifs.docs[0].get("needs_refund"), true);
     assert.equal((await db.collection("admin_alerts").doc("82001").get()).get("requestId"), "ren1");
+    const alert = (await db.collection("admin_alerts").doc("82001").get()).data();
+    assert.equal(alert.companyName, "شركة الاختبار");
+    assert.match(String(notifs.docs[0].get("body")), /شركة الاختبار/);
+    assert.match(String(fcmSends[0].notification.body), /شركة الاختبار/);
     assert.match(String(fcmSends[0].notification.title), /استرجاع/);
   });
 
@@ -56,6 +61,7 @@ describe("paymob superseded admin alert", () => {
       currency: "EGP",
       companyUID: "co1",
       organizationUID: "org1",
+      companyName: "شركة الاختبار",
       messaging: {
         send: async () => "id",
       },

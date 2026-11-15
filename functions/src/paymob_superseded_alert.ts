@@ -93,13 +93,16 @@ export async function notifyPaymobSupersededPaymentRefund(
     currency: string;
     companyUID: string;
     organizationUID: string;
+    companyName?: string;
     messaging?: PaymobMessaging;
   },
 ): Promise<PaymobSupersededAlertResult> {
   const title = "دفعة مكررة — استرجاع مطلوب";
   const amountLabel = formatAmountEgp(opts.amountCents, opts.currency);
+  const companyLabel = str(opts.companyName) || "شركة غير محددة";
   const body = [
     "دفعة مكررة محتاجة استرجاع.",
+    `الشركة: ${companyLabel}`,
     `الطلب: ${opts.requestId}`,
     `المبلغ: ${amountLabel}`,
     `معاملة Paymob: ${opts.txId}`,
@@ -113,6 +116,7 @@ export async function notifyPaymobSupersededPaymentRefund(
     attemptId: opts.attemptId,
     paymobTransactionId: opts.txId,
     companyUID: opts.companyUID,
+    companyName: companyLabel,
     organizationUID: opts.organizationUID,
     organizationId: opts.organizationUID,
     amountCents: opts.amountCents,
