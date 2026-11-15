@@ -1,6 +1,10 @@
 /**
  * Static guard: production function sources and operator scripts must not
  * write password / temporaryPassword / tempPassword onto users/* documents.
+ *
+ * Limitation: dynamic object keys (e.g. `const k = 'password'; doc[k] = x`) are
+ * not detected; only literal property names, dotted `password.foo`, and
+ * bracket literals like `['password']`.
  */
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -16,12 +20,31 @@ const ALLOWLIST = new Set([
   path.normalize("test/list_global_notify_staff.test.js"),
 ]);
 
-const SECRET_PROP = new RegExp(
-  `\\b(?:${SECRET_KEYS.join("|")})\\s*:`,
+const ESCAPED = SECRET_KEYS.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+const SECRET_LITERAL = new RegExp(
+  `\\b(?:${ESCAPED.join("|")})(?:\\.\\w+)?\\s*:`,
+  "m",
+);
+const SECRET_BRACKET_PROP = new RegExp(
+  `\\[(['"])(?:${ESCAPED.join("|")})\\1\\]\\s*:`,
+  "m",
+);
+const SECRET_BRACKET_ASSIGN = new RegExp(
+  `\\[(['"])(?:${ESCAPED.join("|")})\\1\\]\\s*=`,
   "m",
 );
 
 const USERS_WRITE = /collection\(['"]users['"]\)|\.doc\(['"]users\/|users\/\$\{/;
+
+/**
+ * @param {string} line
+ * @return {boolean}
+ */
+function lineHasSecretKeyPattern(line) {
+  return SECRET_LITERAL.test(line) ||
+    SECRET_BRACKET_PROP.test(line) ||
+    SECRET_BRACKET_ASSIGN.test(line);
+}
 
 /**
  * @param {string} dir
@@ -36,7 +59,8 @@ function walkJsTs(dir, acc) {
       continue;
     }
     if (!/\.(js|ts)$/.test(ent.name)) continue;
-    if (ent.name.endsWith(".test.js") && !ALLOWLIST.has(path.relative(ROOT, full).split(path.sep).join("/"))) {
+    const rel = path.relative(ROOT, full).split(path.sep).join("/");
+    if (ent.name.endsWith(".test.js") && !ALLOWLIST.has(rel)) {
       continue;
     }
     acc.push(full);
@@ -59,15 +83,16 @@ test("no users/* writes include secret password field keys", () => {
     const rel = path.relative(ROOT, file).split(path.sep).join("/");
     if (ALLOWLIST.has(rel)) continue;
     const text = fs.readFileSync(file, "utf8");
-    if (!USERS_WRITE.test(text) || !SECRET_PROP.test(text)) continue;
+    if (!USERS_WRITE.test(text)) continue;
+    if (!lineHasSecretKeyPattern(text)) continue;
 
     const lines = text.split("\n");
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      if (!SECRET_PROP.test(line)) continue;
+      if (!lineHasSecretKeyPattern(line)) continue;
       if (/auth\(\)\.updateUser|\.updateUser\(/.test(line)) continue;
       if (/\.(get|log|hasOwnProperty)|data\./.test(line)) continue;
-      if (/SECRET_KEYS|forbidden field|stores no password|never writes/i.test(line)) continue;
+      if (/SECRET_KEYS|forbidden field|stores no password|never writes|Variable-key/i.test(line)) continue;
       const slice = lines.slice(Math.max(0, i - 25), Math.min(lines.length, i + 10)).join("\n");
       if (!USERS_WRITE.test(slice)) continue;
       if (!/\.(set|update|add|create)\(|tx\.(set|update)\(/m.test(slice)) continue;
@@ -80,4 +105,11 @@ test("no users/* writes include secret password field keys", () => {
     [],
     violations.map((v) => `${v.file}:${v.line} ${v.text}`).join("\n"),
   );
+});
+
+test("guard helper matches dotted and bracket literal keys", () => {
+  assert.ok(lineHasSecretKeyPattern("  password.legacy: x,"));
+  assert.ok(lineHasSecretKeyPattern("  ['temporaryPassword']: v"));
+  assert.ok(lineHasSecretKeyPattern('  ["tempPassword"] = x'));
+  assert.ok(!lineHasSecretKeyPattern("  data.password"));
 });
