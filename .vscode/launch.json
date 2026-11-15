@@ -23,24 +23,61 @@
             ]
         },
         {
-            "name": "Tashil Mobile (Device / Emulator)",
+            "name": "Tashil Mobile prod (Device / Emulator)",
             "request": "launch",
             "type": "dart",
-            "program": "lib/main.dart"
+            "program": "lib/main.dart",
+            "args": [
+                "--flavor",
+                "prod"
+            ]
         },
         {
-            "name": "Tashil Mobile (Device / Emulator 2)",
+            "name": "Tashil Mobile dev (Device / Emulator)",
             "request": "launch",
             "type": "dart",
-            "program": "lib/main.dart"
+            "program": "lib/main.dart",
+            "args": [
+                "--flavor",
+                "dev",
+                "--dart-define=ENV=dev"
+            ]
+        },
+        {
+            "name": "Tashil Mobile prod 2 (Device / Emulator)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "args": [
+                "--flavor",
+                "prod"
+            ]
+        },
+        {
+            "name": "Tashil Mobile dev 2 (Device / Emulator)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "args": [
+                "--flavor",
+                "dev",
+                "--dart-define=ENV=dev"
+            ]
         }
     ],
     "compounds": [
         {
-            "name": "Tashil Both Mobiles (Run 1 & 2)",
+            "name": "Tashil Both Mobiles prod (Run 1 & 2)",
             "configurations": [
-                "Tashil Mobile (Device / Emulator)",
-                "Tashil Mobile (Device / Emulator 2)"
+                "Tashil Mobile prod (Device / Emulator)",
+                "Tashil Mobile prod 2 (Device / Emulator)"
+            ]
+        },
+        {
+            "name": "Tashil Both Mobiles dev (Run 1 & 2)",
+            "configurations": [
+                "Tashil Mobile dev (Device / Emulator)",
+                "Tashil Mobile dev 2 (Device / Emulator)"
             ]
         }
     ]

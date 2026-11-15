@@ -2130,7 +2130,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         for (final doc in snap.docs) {
           nested.add(BranchModel.fromMap(doc.data(), id: doc.id));
         }
-      } catch (_) {}
+      } catch (e, st) {
+        debugPrint('Attendance: nested branches fetch failed: $e\n$st');
+      }
 
       // 2. Always also fetch root branches. A stub nested doc (name
       // only, no coordinates) must not hide the geo-enabled root
@@ -2143,7 +2145,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         for (final doc in snap.docs) {
           root.add(BranchModel.fromMap(doc.data(), id: doc.id));
         }
-      } catch (_) {}
+      } catch (e, st) {
+        debugPrint('Attendance: root branches fetch failed: $e\n$st');
+      }
 
       final branchesList = mergeOrgBranches(nested, root);
       for (final b in branchesList) {
@@ -2169,7 +2173,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           _detectNearestBranch(showSnackBar: false, silent: true);
         }
       }
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('Attendance: _loadBranches failed: $e\n$st');
       if (mounted) setState(() => _isLoadingBranches = false);
     }
   }

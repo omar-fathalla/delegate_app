@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
@@ -117,7 +118,8 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
         }
         _isLoadingBranches = false;
       });
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('AdminPenalties: _loadBranchesAndPinned failed: $e\n$st');
       if (!mounted) return;
       setState(() {
         _isLoadingBranches = false;
