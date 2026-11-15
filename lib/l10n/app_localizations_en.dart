@@ -66,7 +66,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get delegateAccountInactive =>
-      'This account is pending or suspended. Contact your company admin.';
+      'This account is pending or suspended. Please contact Tashil management.';
 
   @override
   String get tooManyLoginAttempts =>
