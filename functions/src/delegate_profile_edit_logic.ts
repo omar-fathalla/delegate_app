@@ -385,6 +385,7 @@ export function assertImageFields(fields: ProfileEditInput, delegateUid?: string
 export const PRIVILEGED_ALERT_TYPES = [
   "delegate_profile_edit",
   "delegate_national_id_request",
+  "paymob_superseded_payment",
 ] as const;
 
 /** One alert payload per recipient. No phone numbers. */

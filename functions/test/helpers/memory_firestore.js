@@ -86,8 +86,16 @@ class MemRef {
   async get() {
     return new MemSnap(this, this._db._store.get(this.path));
   }
-  async set(data) {
+  async set(data, _options) {
     this._db._store.set(this.path, applySentinels(data, this._db.now()));
+  }
+  async create(data) {
+    if (this._db._store.has(this.path)) {
+      const err = new Error(`Document already exists: ${this.path}`);
+      err.code = 6;
+      throw err;
+    }
+    await this.set(data);
   }
   async update(data) {
     if (!this._db._store.has(this.path)) {
@@ -162,8 +170,11 @@ class MemTx {
   get(ref) {
     return ref.get();
   }
-  set(ref, data) {
-    return ref.set(data);
+  set(ref, data, options) {
+    return ref.set(data, options);
+  }
+  create(ref, data) {
+    return ref.create(data);
   }
   update(ref, data) {
     return ref.update(data);
