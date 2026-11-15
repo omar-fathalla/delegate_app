@@ -48,10 +48,17 @@ export interface RateLimitState {
 export interface DelegateCandidate {
   id: string;
   status: unknown;
+  statusReason?: string;
+  holds?: unknown;
   companyId: string;
   orgId: string;
   createdAtMillis: number | null;
   nationalIdMatches: boolean;
+  /**
+   * False when the profile was found via national-id lookup and the stored
+   * phone does not match the login phone (global block only, not sign-in).
+   */
+  phoneMatchesLogin?: boolean;
   /** Normalized phone. Copied into the custom token so rules can scope phone queries. */
   phone?: string;
   /** Firestore path of the delegate document, used to mirror the bound device. */
@@ -155,6 +162,24 @@ export function isLoginDenied(status: unknown): boolean {
   return DENIED_STATUSES.has(value);
 }
 
+/** Enforced suspend in any company blocks sign-in everywhere (not shadow holds alone). */
+export function isGlobalLoginBlockedProfile(candidate: DelegateCandidate): boolean {
+  return String(candidate.status ?? "").trim().toLowerCase() === "suspended";
+}
+
+export const DELEGATE_LOGIN_LOOKUP_PAGE_SIZE = 200;
+export const DELEGATE_LOGIN_IN_QUERY_MAX = 10;
+
+export function chunkQueryValues(values: string[], maxSize = DELEGATE_LOGIN_IN_QUERY_MAX): string[][] {
+  const unique = Array.from(new Set(values.filter((value) => value)));
+  if (unique.length === 0) return [];
+  const chunks: string[][] = [];
+  for (let index = 0; index < unique.length; index += maxSize) {
+    chunks.push(unique.slice(index, index + maxSize));
+  }
+  return chunks;
+}
+
 export function nationalIdsMatch(stored: string, provided: string): boolean {
   const left = Buffer.from(normalizeNationalId(stored), "utf8");
   const right = Buffer.from(normalizeNationalId(provided), "utf8");
@@ -247,8 +272,18 @@ export function selectPrimaryDelegate(candidates: DelegateCandidate[]): Delegate
 export function evaluateCandidates(candidates: DelegateCandidate[]): CandidateDecision {
   if (candidates.length === 0) return { outcome: "not_found" };
   const matched = candidates.filter((candidate) => candidate.nationalIdMatches);
-  if (matched.length === 0) return { outcome: "bad_credentials" };
-  const allowed = matched.filter((candidate) => !isLoginDenied(candidate.status));
+  if (matched.length === 0) {
+    if (candidates.some((candidate) => candidate.phoneMatchesLogin !== false)) {
+      return { outcome: "bad_credentials" };
+    }
+    return { outcome: "not_found" };
+  }
+  if (matched.some((candidate) => isGlobalLoginBlockedProfile(candidate))) {
+    return { outcome: "inactive" };
+  }
+  const allowed = matched.filter(
+    (candidate) => candidate.phoneMatchesLogin !== false && !isLoginDenied(candidate.status),
+  );
   if (allowed.length === 0) return { outcome: "inactive" };
   const primary = selectPrimaryDelegate(allowed);
   const ids = allowed.map((candidate) => candidate.id).sort();

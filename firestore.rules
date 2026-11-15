@@ -2210,16 +2210,77 @@ service cloud.firestore {
         && resource.data.organizationId == callerOrg();
     }
 
+    // One roleIs list so company staff list queries stay under the 1k expr cap.
+    function penaltyCompanyStaffReadOk() {
+      return callerCompany() != '' && companyScoped()
+        && roleIs([
+          'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor',
+          'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'human_resources',
+          'accountant', 'accounting', 'account_admin',
+          'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+          'branches-marketing-manager', 'branchesmarketingmanager',
+          'branchesMarketingManager',
+          'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion'
+        ]);
+    }
+
+    function penaltyMarketingOrgListOk() {
+      return callerCompany() == '' && orgScoped()
+        && roleIs([
+          'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion'
+        ]);
+    }
+
+    function penaltyMarketingReadOk() {
+      return penaltyCompanyStaffReadOk() || penaltyMarketingOrgListOk();
+    }
+
+    function delegatePenaltyTargetOk(targetId) {
+      return targetId is string && targetId != '' && (
+        targetId == request.auth.uid
+        || claimString('delegateId') == targetId
+        || claimListHas('delegateIds', targetId)
+      );
+    }
+
+    function delegatePenaltySelfReadOk() {
+      return claimString('role') == 'delegate' && delegateOtpOk() && (
+        delegatePenaltyTargetOk(resource.data.get('targetDelegateId', ''))
+        || delegatePenaltyTargetOk(resource.data.get('delegateUid', ''))
+      );
+    }
+
+    function delegatePenaltyListOk() {
+      return delegateOtpOk()
+        && resource.data.get('targetDelegateId', '') != ''
+        && (resource.data.get('targetDelegateId', '') == request.auth.uid
+          || claimListHas('delegateIds', resource.data.get('targetDelegateId', '')));
+    }
+
+    function penaltyStaffListOk() {
+      return canReadOrgAdminPenaltyByOrgId()
+        || penaltyCompanyStaffReadOk()
+        || penaltyMarketingOrgListOk()
+        || isGlobalStaff()
+        || (isOrgAdmin() && orgScoped());
+    }
+
+    function penaltyStaffGetOk() {
+      return canReadOrgAdminPenaltyByOrgId()
+        || isGlobalStaff()
+        || penaltyCompanyStaffReadOk()
+        || (isOrgAdmin() && orgScoped())
+        || penaltyMarketingReadOk();
+    }
+
     match /penalties/{penaltyId} {
-      allow read: if signedIn() && canReadOrgAdminPenaltyByOrgId();
-      allow read: if signedIn() && (
-        isGlobalStaff()
-        || (isCompanyScopedStaff() && companyScoped())
-        || (isOrgScopedStaff() && orgScoped())
-        || resource.data.targetDelegateId == request.auth.uid
-        || delegateOwns(resource.data.targetDelegateId)
-        || resource.data.delegateUid == request.auth.uid
-        || delegateOwns(resource.data.delegateUid)
+      // List/get: delegate vs staff split (1k expr cap — avoid evaluating both paths).
+      allow list: if signedIn() && (
+        claimString('role') == 'delegate' ? delegatePenaltyListOk() : penaltyStaffListOk()
+      );
+      allow get: if signedIn() && (
+        claimString('role') == 'delegate' ? delegatePenaltySelfReadOk() : penaltyStaffGetOk()
       );
       allow create, update: if isGlobalStaff()
         || (isCompanyScopedStaff() && (companyScoped() || incomingCompanyScoped()))

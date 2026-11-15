@@ -97,3 +97,108 @@ test("wrong national ID is refused by delegateLoginV2", async () => {
   const r = await callLogin({phone: "01099990000", nationalId: "29001010000000", deviceId: "e2e-device-0002"});
   assert.notEqual(r.status, 200);
 });
+
+test("cross-company suspended profile blocks delegateLoginV2 for entire identity", async () => {
+  const fs = admin.firestore();
+  const crossPhone = "01077776666";
+  const crossNid = "29007776655443";
+  await fs.doc("organizations/o1/companies/c2").set({name: "C2"});
+  await fs.doc("organizations/o1/companies/c2/delegates/e2e-cross-active").set({
+    phoneNumber: crossPhone,
+    nationalityID: crossNid,
+    organizationUID: "o1",
+    companyUID: "c2",
+    status: "active",
+    fullName: "Cross Active",
+  });
+  await fs.doc("organizations/o2/companies/c9").set({name: "C9"});
+  await fs.doc("organizations/o2/companies/c9/delegates/e2e-cross-suspended").set({
+    phoneNumber: crossPhone,
+    nationalityID: crossNid,
+    organizationUID: "o2",
+    companyUID: "c9",
+    status: "suspended",
+    statusReason: "admin_suspend",
+    fullName: "Cross Suspended",
+  });
+
+  const r = await callLogin({
+    phone: crossPhone,
+    nationalId: crossNid,
+    deviceId: "e2e-device-cross-1",
+    deviceModel: "E2E",
+  });
+  assert.notEqual(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.error && r.body.error.reason, "account_inactive");
+});
+
+test("suspended profile on another phone with same national id blocks login", async () => {
+  const fs = admin.firestore();
+  const loginPhone = "01055554444";
+  const suspendedPhone = "01033332222";
+  const sharedNid = "29005554443322";
+  await fs.doc("organizations/o3/companies/c3").set({name: "C3"});
+  await fs.doc("organizations/o3/companies/c3/delegates/e2e-diffphone-active").set({
+    phoneNumber: loginPhone,
+    nationalityID: sharedNid,
+    organizationUID: "o3",
+    companyUID: "c3",
+    status: "active",
+    fullName: "Company B Active",
+  });
+  await fs.doc("organizations/o4/companies/c4").set({name: "C4"});
+  await fs.doc("organizations/o4/companies/c4/delegates/e2e-diffphone-suspended").set({
+    phone: suspendedPhone,
+    nationalityID: sharedNid,
+    organizationUID: "o4",
+    companyUID: "c4",
+    status: "suspended",
+    statusReason: "admin_suspend",
+    fullName: "Company A Suspended",
+  });
+
+  const r = await callLogin({
+    phone: loginPhone,
+    nationalId: sharedNid,
+    deviceId: "e2e-device-diffphone-1",
+    deviceModel: "E2E",
+  });
+  assert.notEqual(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.error && r.body.error.reason, "account_inactive");
+});
+
+test("subscription_expired on another phone with same national id blocks login", async () => {
+  const fs = admin.firestore();
+  const loginPhone = "01088887777";
+  const expiredPhone = "01066665555";
+  const sharedNid = "29008887776655";
+  await fs.doc("organizations/o5/companies/c5").set({name: "C5"});
+  await fs.doc("organizations/o5/companies/c5/delegates/e2e-expdiff-active").set({
+    phoneNumber: loginPhone,
+    nationalityID: sharedNid,
+    organizationUID: "o5",
+    companyUID: "c5",
+    status: "active",
+    fullName: "Company B Active",
+  });
+  await fs.doc("organizations/o6/companies/c6").set({name: "C6"});
+  await fs.doc("organizations/o6/companies/c6/delegates/e2e-expdiff-expired").set({
+    phoneNumber: expiredPhone,
+    nationalityID: sharedNid,
+    organizationUID: "o6",
+    companyUID: "c6",
+    status: "suspended",
+    statusReason: "subscription_expired",
+    holds: { subscription_expired: { at: "2026-01-01T00:00:00.000Z" } },
+    fullName: "Company A Expired",
+  });
+
+  const r = await callLogin({
+    phone: loginPhone,
+    nationalId: sharedNid,
+    deviceId: "e2e-device-expdiff-1",
+    deviceModel: "E2E",
+  });
+  assert.notEqual(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.error && r.body.error.reason, "account_inactive");
+});

@@ -72,7 +72,7 @@
   "@invalidLoginCredentials": {
     "description": "Delegate credential mismatch"
   },
-  "delegateAccountInactive": "This account is pending or suspended. Contact your company admin.",
+  "delegateAccountInactive": "This account is pending or suspended. Please contact Tashil management.",
   "@delegateAccountInactive": {
     "description": "Pending or blocked delegate login error"
   },
