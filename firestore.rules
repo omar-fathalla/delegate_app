@@ -673,9 +673,6 @@ service cloud.firestore {
         'supervisor', 'company_supervisor'];
     }
 
-    function identityFieldKeys() {
-      return ['nationalId', 'nationalityID'];
-    }
     function profileEditKeys() {
       return ['fullName', 'firstName', 'secondName', 'thirdName', 'middleName', 'lastName',
         'phoneNumber', 'phone',
@@ -683,11 +680,9 @@ service cloud.firestore {
         'nationalIdFrontUrl', 'nationalIdBackUrl'];
     }
     function staffProfileFieldsOk(r) {
-      // Mohamed 2026-11-10 14:00 Cairo: only super-admin / tech may change
-      // or correct nationalId, including on pending / action_required records.
-      // Name / phone / image URLs: company editors must use editDelegateProfile
-      // (Admin SDK). Direct client writes of those fields are denied here.
-      return !changedKeys().hasAny(identityFieldKeys())
+      // nationalId / nationalityID: company/org/marketing clients (TA-32).
+      // Name / phone / image URLs: editDelegateProfile (Admin SDK).
+      return !changedKeys().hasAny(['nationalId', 'nationalityID'])
         && !changedKeys().hasAny(profileEditKeys());
     }
     function staffManagesDelegate(orgId, compId, companyNeedsOrg) {
@@ -695,10 +690,10 @@ service cloud.firestore {
       let r = u.get('role', '');
       let o = u.get('organizationUID', '');
       let c = u.get('companyUID', '');
-      return r in [
+      return (r in [
           'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
           'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport',
-          'tech_support', 'techsupport']
+          'tech_support', 'techsupport'])
         || (o != '' && o in orgId && r in [
           'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
           'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion']
@@ -1253,8 +1248,9 @@ service cloud.firestore {
       let actCh = ch.hasAny(['isActive']);
       let globalStaff = r in superAdminRoleList() || r in techRoleList();
       let fromSuspended = delegateStatusLower(resource.data.get('status', '')) == 'suspended';
-      return (!stCh && !actCh)
-        || (globalStaff && (stCh || actCh));
+      let idClientLock = !(globalStaff && ch.hasAny(['nationalId', 'nationalityID']));
+      return idClientLock
+        && ((!stCh && !actCh) || (globalStaff && (stCh || actCh)));
     }
 
     function usersUpdateOk(r, org, co, old, d, userId) {
