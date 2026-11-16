@@ -2645,9 +2645,30 @@ service cloud.firestore {
           du == 'all'
           || du == 'delegates'
           || du == request.auth.uid
+          || du == 'phone_' + request.auth.uid
           || claimListHas('phones', du)
           || (co != '' && (du == 'delegates_' + co || du == 'company_' + co))
         );
+    }
+
+    // Provable list on where(phoneNumber == own) — get() only; list must use resource.
+    function notifListDelegatePhoneFieldOk() {
+      return notifStaffBroadcastOk()
+        && delegateOtpOk()
+        && claimListHas('phones', resource.data.get('phoneNumber', ''));
+    }
+
+    function notifListStaffSelfUidOk() {
+      return notifStaffBroadcastOk() && notifDu() == request.auth.uid;
+    }
+
+    function notifListStaffPhoneTagOk(u) {
+      let du = notifDu();
+      let ph = u.get('phoneNumber', '');
+      return notifStaffBroadcastOk() && (
+        du == 'phone_' + request.auth.uid
+        || (ph != '' && (du == 'phone_' + ph || du == ph))
+      );
     }
 
     function notifListSupervisor(u) {
@@ -2850,7 +2871,9 @@ service cloud.firestore {
     function notifListStaffShapeDispatcher(u) {
       let du = notifDu();
       let r = u.get('role', '');
-      return du == 'all' ? notifListShapeAll(u, r)
+      return notifListStaffSelfUidOk()
+        || notifListStaffPhoneTagOk(u)
+        || (du == 'all' ? notifListShapeAll(u, r)
         : du == 'hr' ? notifListShapeHr(u, r)
         : du == 'all_company_supervisors' ? notifListShapeAcs(u, r)
         : du.matches('^company_.*') ? notifListShapeCompany(u, r)
@@ -2864,13 +2887,13 @@ service cloud.firestore {
             'branchesMarketingManager', 'branches_marketing', 'branches-marketing',
             'technicalSupport', 'technical-support', 'technical_support']
           ? notifListShapeRoleInbox(u, r)
-        : notifListStaffFromUser(u);
+        : notifListStaffFromUser(u));
     }
 
     function notifListDispatcher() {
       return signedIn() && (
         claimString('role') == 'delegate'
-          ? notifListDelegate()
+          ? (notifListDelegate() || notifListDelegatePhoneFieldOk())
           : notifListStaffShapeDispatcher(
             get(/databases/$(database)/documents/users/$(request.auth.uid)).data));
     }

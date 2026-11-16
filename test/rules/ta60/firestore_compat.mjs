@@ -103,6 +103,18 @@ async function seed(env) {
     await nb('nbMkt', 'marketing');
     await nb('nbBmp', 'branchesMarketingManager');
     await nb('nbDel', `delegates_${CO}`);
+    await nb('nbPhoneDlg', `phone_dlg1`);
+    await setDoc(doc(db, 'notifications/nPhoneDlg'), {
+      phoneNumber: '01000000001', delegateUid: 'dlg1', title: 'phone-row', isRead: false,
+      companyId: CO, organizationId: ORG, createdAt: NOW, deletedBy: [],
+    });
+    const staffPhoneTag = (uid) => setDoc(doc(db, `notifications/nbPhone_${uid}`), {
+      delegateUid: `phone_${uid}`, title: 'phone-tag', isRead: false,
+      companyId: CO, organizationId: ORG, createdAt: NOW, deletedBy: [],
+    });
+    for (const uid of ['sa', 'ts', 'oa', 'ca', 'sup', 'hr', 'acc', 'mkt', 'mp', 'bm']) {
+      await staffPhoneTag(uid);
+    }
     await setDoc(doc(db, `organizations/${ORG}/tasks/t1`), { companyId: CO, assignedTo: 'dlg1', createdBy: 'sup', title: 't', createdAt: NOW, status: 'pending' });
     await setDoc(doc(db, 'penalties/p1'), { targetDelegateId: 'dlg1', delegateId: 'dlg1', companyId: CO, organizationId: ORG, amount: 10, createdAt: NOW });
     await setDoc(doc(db, 'branches/b1'), { branchName: 'B1', organizationUID: ORG, organizationId: ORG, latitude: 30, longitude: 31 });
@@ -127,6 +139,11 @@ const D = (o, c, id) => `organizations/${o}/companies/${c}/delegates/${id}`;
 const attDayStart = () => Timestamp.fromMillis(Date.now() - 86400000);
 const attDayEnd = () => Timestamp.fromMillis(Date.now() + 86400000);
 const notifList = (db, du) => getDocs(query(collection(db, 'notifications'), where('delegateUid', '==', du), limit(30)));
+const notifListPhoneField = (db, ph) => getDocs(query(
+  collection(db, 'notifications'),
+  where('phoneNumber', '==', ph),
+  limit(30),
+));
 const notifListAcs = (db) => getDocs(query(
   collection(db, 'notifications'),
   where('companyId', '==', CO),
@@ -293,10 +310,12 @@ const cases = [
   ['URG', 'company-admin nested company notifications list', e => getDocs(collection(staff(e,'ca'), `organizations/${ORG}/companies/${CO}/notifications`))],
   ['URG', 'org-admin nested company notifications list', e => getDocs(collection(staff(e,'oa'), `organizations/${ORG}/companies/${CO}/notifications`))],
   ...[
-    ['ts', 'technicalSupport'], ['oa', 'organizationAdmin'], ['ca', 'company-admin'],
+    ['sa', 'superAdmin'], ['ts', 'technicalSupport'], ['oa', 'organizationAdmin'], ['ca', 'company-admin'],
     ['sup', 'supervisor'], ['hr', 'hr'], ['acc', 'accountant'],
     ['mkt', 'marketing'], ['mp', 'marketing_promotion'], ['bm', 'branchesMarketingManager'],
   ].flatMap(([uid, alias]) => [
+    ['NOTIF-READ', `${uid} list bell: delegateUid==own uid (limit 30)`, e => notifList(staff(e, uid), uid)],
+    ['NOTIF-READ', `${uid} list bell: delegateUid==phone_<uid> (limit 30)`, e => notifList(staff(e, uid), `phone_${uid}`)],
     ['NOTIF-READ', `${uid} list bell: delegateUid==all (limit 30)`, e => notifList(staff(e, uid), 'all')],
     ['NOTIF-READ', `${uid} list bell: delegateUid==${alias} (limit 30)`, e => notifList(staff(e, uid), alias)],
     ['NOTIF-READ', `${uid} list bell: delegateUid==company_${CO} (limit 30)`, e => notifList(staff(e, uid), `company_${CO}`)],
@@ -304,8 +323,12 @@ const cases = [
     ['NOTIF-READ', `${uid} list bell: delegateUid==hr (limit 30)`, e => notifList(staff(e, uid), 'hr')],
     ['NOTIF-READ', `${uid} list bell: delegateUid==delegates_${CO} (limit 30)`, e => notifList(staff(e, uid), `delegates_${CO}`)],
   ]),
+  ['NOTIF-READ', 'delegate list bell: delegateUid==own uid (limit 50)', e => notifList(delegate(e), 'dlg1')],
+  ['NOTIF-READ', 'delegate list bell: delegateUid==phone_<uid> (limit 30)', e => notifList(delegate(e), 'phone_dlg1')],
+  ['NOTIF-READ', 'delegate list bell: phoneNumber==own phone (limit 30)', e => notifListPhoneField(delegate(e), '01000000001')],
   ['NOTIF-READ', 'delegate list bell: delegateUid==all (limit 30)', e => notifList(delegate(e), 'all')],
   ['NOTIF-READ', 'delegate list bell: delegateUid==delegates_${CO} (limit 30)', e => notifList(delegate(e), `delegates_${CO}`)],
+  ['NOTIF-READ', 'supervisor list bell: delegateUid==supervisor_${CO} (limit 30)', e => notifList(staff(e, 'sup'), `supervisor_${CO}`)],
   ['ATT-READ', 'marketing_promotion attendance org+branchName+today (limit 2000)', e => attOrgBranchToday(staff(e, 'mp'))],
   ['ATT-READ', 'marketing attendance org+branchName+today (limit 2000, chain shape)', e => attOrgBranchToday(staff(e, 'mkt'))],
   ['ATT-READ', 'branches_marketing attendance org+branchName+today (limit 2000)', e => attOrgBranchToday(staff(e, 'bm'))],
