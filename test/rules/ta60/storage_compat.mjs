@@ -12,23 +12,13 @@ const LIVE_RULES = path.join(ROOT, 'test/rules/ta60/live.storage.rules');
 const CAND_RULES = process.env.SCAND || path.join(ROOT, 'storage.rules');
 const FS_RULES = path.join(ROOT, 'firestore.rules');
 
-function emulatorProjectId() {
-  try {
-    const cfg = process.env.FIREBASE_CONFIG && JSON.parse(process.env.FIREBASE_CONFIG);
-    if (cfg?.projectId) return cfg.projectId;
-  } catch {
-    // ignore
-  }
-  return process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'demo-ta60st';
-}
-const PID = emulatorProjectId();
 const ORG = 'orgA', CO = 'coA';
 const img = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
 const meta = { contentType: 'image/jpeg' };
 
-async function mkEnv(storageRulesFile) {
+async function mkEnv(storageRulesFile, projectId) {
   return initializeTestEnvironment({
-    projectId: PID,
+    projectId,
     firestore: { rules: fs.readFileSync(FS_RULES, 'utf8'), host: '127.0.0.1', port: FS_PORT },
     storage: { rules: fs.readFileSync(storageRulesFile, 'utf8'), host: '127.0.0.1', port: ST_PORT },
   });
@@ -98,28 +88,32 @@ const cases = [
   ['WEB', 'super-admin guide-videos upload', e => uploadBytes(ref(st(e, 'sa'), 'guide-videos/1_v.mp4'), img, { contentType: 'video/mp4' })],
 ];
 
-async function runAll(storageRulesFile) {
-  const env = await mkEnv(storageRulesFile);
-  const out = [];
-  for (const [, , f] of cases) {
-    await seed(env);
-    try {
-      await f(env);
-      out.push(['ALLOW', '']);
-    } catch (e) {
-      out.push([
-        String(e.code || '').includes('unauthorized') ? 'DENY' : 'ERR',
-        String(e.message).replace(/\s+/g, ' ').slice(0, 200),
-      ]);
-    }
+async function runOne(env, fn) {
+  await seed(env);
+  try {
+    await fn(env);
+    return ['ALLOW', ''];
+  } catch (e) {
+    return [
+      String(e.code || '').includes('unauthorized') ? 'DENY' : 'ERR',
+      String(e.message).replace(/\s+/g, ' ').slice(0, 200),
+    ];
   }
-  await env.cleanup();
-  return out;
 }
 
 export async function runStorageCompatHarness() {
-  const live = await runAll(LIVE_RULES);
-  const cand = await runAll(CAND_RULES);
+  // Two emulator projects in parallel so live vs candidate storage rules both load
+  // (sequential re-init on one projectId left candidate on stale live rules — false green).
+  const liveEnv = await mkEnv(LIVE_RULES, 'demo-ta60-st-live');
+  const candEnv = await mkEnv(CAND_RULES, 'demo-ta60-st-cand');
+  const live = [];
+  const cand = [];
+  for (const [, , f] of cases) {
+    live.push(await runOne(liveEnv, f));
+    cand.push(await runOne(candEnv, f));
+  }
+  await liveEnv.cleanup();
+  await candEnv.cleanup();
   const rows = cases.map((c, i) => ({
     area: c[0],
     name: c[1],
