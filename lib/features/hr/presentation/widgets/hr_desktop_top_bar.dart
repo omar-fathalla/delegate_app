@@ -15,6 +15,14 @@ class HRDesktopTopBar extends StatelessWidget {
   final ValueChanged<String> onMenuSelected;
   final List<PopupMenuEntry<String>> menuItems;
 
+  /// Web only: notifications bell shown beside the theme button. Null keeps
+  /// the mobile header unchanged.
+  final Widget? webBell;
+
+  /// Web only: account chip. Receives whether the bar is wide enough for the
+  /// name. Null keeps the mobile popup menu.
+  final Widget Function(bool showName)? webAccount;
+
   const HRDesktopTopBar({
     super.key,
     required this.delegate,
@@ -22,6 +30,8 @@ class HRDesktopTopBar extends StatelessWidget {
     required this.onRefresh,
     required this.onMenuSelected,
     required this.menuItems,
+    this.webBell,
+    this.webAccount,
   });
 
   String _getTitle(int index) {
@@ -111,6 +121,25 @@ class HRDesktopTopBar extends StatelessWidget {
     final now = DateTime.now();
     final arabicDate = DateFormat('EEEE، d MMMM y', 'ar').format(now);
 
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 1024px windows still show the name (content bar is about 760px
+        // beside a 260px sidebar). Tighter desktop bars keep the avatar and
+        // move the name to the tooltip.
+        final showName = constraints.maxWidth >= 640;
+        return _bar(context, colorScheme, l10n, arabicDate, showName);
+      },
+    );
+  }
+
+  Widget _bar(
+    BuildContext context,
+    ColorScheme colorScheme,
+    AppLocalizations l10n,
+    String arabicDate,
+    bool showName,
+  ) {
+    final account = webAccount?.call(showName);
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -231,12 +260,17 @@ class HRDesktopTopBar extends StatelessWidget {
                   color: colorScheme.primary,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  arabicDate,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.onSurface,
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 220),
+                  child: Text(
+                    arabicDate,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                    ),
                   ),
                 ),
               ],
@@ -247,6 +281,7 @@ class HRDesktopTopBar extends StatelessWidget {
 
           // ── Refresh Button ──
           IconButton(
+            key: const ValueKey('hr_web_header_refresh'),
             tooltip: 'تحديث البيانات',
             icon: const Icon(Icons.refresh_rounded, size: 20),
             onPressed: onRefresh,
@@ -290,35 +325,40 @@ class HRDesktopTopBar extends StatelessWidget {
             },
           ),
 
+          if (webBell != null) ...[const SizedBox(width: 10), webBell!],
+
           const SizedBox(width: 10),
 
-          // ── User Menu Popup (Settings is ALWAYS the last item) ──
-          PopupMenuButton<String>(
-            tooltip: l10n.profile,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            offset: const Offset(0, 48),
-            onSelected: onMenuSelected,
-            itemBuilder: (_) => menuItems,
-            child: Container(
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: colorScheme.primary.withValues(alpha: 0.4),
-                  width: 1.5,
+          if (account != null)
+            account
+          else
+            // ── User Menu Popup (Settings is ALWAYS the last item) ──
+            PopupMenuButton<String>(
+              tooltip: l10n.profile,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              offset: const Offset(0, 48),
+              onSelected: onMenuSelected,
+              itemBuilder: (_) => menuItems,
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: colorScheme.primary.withValues(alpha: 0.4),
+                    width: 1.5,
+                  ),
+                ),
+                child: AppAvatar(
+                  imageUrl: delegate.personalPhotoUrl,
+                  fallbackText: delegate.fullName.isNotEmpty
+                      ? delegate.fullName[0]
+                      : 'H',
+                  radius: 16,
                 ),
               ),
-              child: AppAvatar(
-                imageUrl: delegate.personalPhotoUrl,
-                fallbackText: delegate.fullName.isNotEmpty
-                    ? delegate.fullName[0]
-                    : 'H',
-                radius: 16,
-              ),
             ),
-          ),
         ],
       ),
     );

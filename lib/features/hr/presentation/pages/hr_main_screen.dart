@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +18,8 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
+import 'package:delegate_app/web/hr_system/hr_web_account_button.dart';
+import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
 
 class HRMainScreen extends StatefulWidget {
   final Delegate delegate;
@@ -34,12 +38,25 @@ class _HRMainScreenState extends State<HRMainScreen> {
   late final Set<int> _loadedTabs;
   bool _isSidebarExpanded = true;
   final int _homeIndex = hrShellHomeTab(isWeb: WebRuntimePolicy.isWeb);
+  final HrWebHeaderBridge _headerBridge = HrWebHeaderBridge();
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex ?? _homeIndex;
     _loadedTabs = {_currentIndex};
+  }
+
+  @override
+  void dispose() {
+    _headerBridge.dispose();
+    super.dispose();
+  }
+
+  void _refreshHome() {
+    setState(() {});
+    final reload = _headerBridge.reloadHome;
+    if (reload != null) unawaited(reload());
   }
 
   void _onTabSelected(int index) {
@@ -426,118 +443,156 @@ class _HRMainScreenState extends State<HRMainScreen> {
     final isArabic = localeProvider.isArabic;
     final menuItems = _buildMenuItems(context, l10n, colorScheme);
 
+    final web = WebRuntimePolicy.isWeb;
     return Directionality(
       textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
-      child: PopScope(
-        canPop: isWideScreen || _currentIndex == _homeIndex,
-        onPopInvokedWithResult: (didPop, result) {
-          if (didPop) return;
-          if (_currentIndex != _homeIndex) {
-            _onTabSelected(_homeIndex);
-          }
-        },
-        child: Scaffold(
-          backgroundColor: colorScheme.surfaceContainerLowest,
-          appBar: isWideScreen
-              ? null
-              : UniversalAppHeader(
-                  delegate: delegate,
-                  onMenuSelected: _onMenuSelected,
-                  menuItems: menuItems,
-                ),
-          body: isWideScreen
-              ? Row(
-                  textDirection: isArabic
-                      ? TextDirection.rtl
-                      : TextDirection.ltr,
-                  children: [
-                    HRDesktopSidebar(
-                      delegate: delegate,
-                      selectedIndex: _currentIndex,
-                      isExpanded: _isSidebarExpanded,
-                      onToggleExpanded: () {
-                        setState(
-                          () => _isSidebarExpanded = !_isSidebarExpanded,
-                        );
-                      },
-                      onItemSelected: _onTabSelected,
-                      onOpenProfile: () => _onMenuSelected('profile'),
-                      onOpenSettings: () => _onMenuSelected('settings'),
-                      onLogout: () => _onMenuSelected('logout'),
-                    ),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          HRDesktopTopBar(
-                            delegate: delegate,
-                            activeIndex: _currentIndex,
-                            onRefresh: () => setState(() {}),
-                            onMenuSelected: _onMenuSelected,
-                            menuItems: menuItems,
-                          ),
-                          Expanded(child: _buildIndexedStack(delegate)),
-                        ],
+      child: HrWebHeaderBridgeScope(
+        bridge: _headerBridge,
+        child: PopScope(
+          canPop: isWideScreen || _currentIndex == _homeIndex,
+          onPopInvokedWithResult: (didPop, result) {
+            if (didPop) return;
+            if (_currentIndex != _homeIndex) {
+              _onTabSelected(_homeIndex);
+            }
+          },
+          child: Scaffold(
+            backgroundColor: colorScheme.surfaceContainerLowest,
+            appBar: isWideScreen
+                ? null
+                : UniversalAppHeader(
+                    delegate: delegate,
+                    onMenuSelected: _onMenuSelected,
+                    menuItems: menuItems,
+                    extraActions: web ? _narrowWebHeaderActions() : null,
+                  ),
+            body: isWideScreen
+                ? Row(
+                    textDirection: isArabic
+                        ? TextDirection.rtl
+                        : TextDirection.ltr,
+                    children: [
+                      HRDesktopSidebar(
+                        delegate: delegate,
+                        selectedIndex: _currentIndex,
+                        isExpanded: _isSidebarExpanded,
+                        onToggleExpanded: () {
+                          setState(
+                            () => _isSidebarExpanded = !_isSidebarExpanded,
+                          );
+                        },
+                        onItemSelected: _onTabSelected,
+                        onOpenProfile: () => _onMenuSelected('profile'),
+                        onOpenSettings: () => _onMenuSelected('settings'),
+                        onLogout: () => _onMenuSelected('logout'),
                       ),
-                    ),
-                  ],
-                )
-              : _buildIndexedStack(delegate),
-          bottomNavigationBar: isWideScreen
-              ? null
-              : NavigationBar(
-                  selectedIndex: _getBottomNavIndex(_currentIndex),
-                  onDestinationSelected: _onBottomNavSelected,
-                  destinations: [
-                    if (WebRuntimePolicy.isWeb)
+                      Expanded(
+                        child: Column(
+                          children: [
+                            HRDesktopTopBar(
+                              delegate: delegate,
+                              activeIndex: _currentIndex,
+                              onRefresh: _refreshHome,
+                              onMenuSelected: _onMenuSelected,
+                              menuItems: menuItems,
+                              webBell: web
+                                  ? ListenableBuilder(
+                                      listenable: _headerBridge,
+                                      builder: (context, _) => HrWebHeaderBell(
+                                        unread: _headerBridge.unread,
+                                        onPressed:
+                                            _headerBridge.openNotifications,
+                                      ),
+                                    )
+                                  : null,
+                              webAccount: web
+                                  ? (showName) => HrWebAccountButton(
+                                      delegate: delegate,
+                                      showName: showName,
+                                    )
+                                  : null,
+                            ),
+                            Expanded(child: _buildIndexedStack(delegate)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                : _buildIndexedStack(delegate),
+            bottomNavigationBar: isWideScreen
+                ? null
+                : NavigationBar(
+                    selectedIndex: _getBottomNavIndex(_currentIndex),
+                    onDestinationSelected: _onBottomNavSelected,
+                    destinations: [
+                      if (WebRuntimePolicy.isWeb)
+                        const NavigationDestination(
+                          icon: Icon(Icons.home_outlined),
+                          selectedIcon: Icon(Icons.home_rounded),
+                          label: 'الرئيسية',
+                        )
+                      else
+                        const NavigationDestination(
+                          icon: Icon(Icons.how_to_reg_outlined),
+                          selectedIcon: Icon(Icons.how_to_reg_rounded),
+                          label: 'الحضور',
+                        ),
                       const NavigationDestination(
-                        icon: Icon(Icons.home_outlined),
-                        selectedIcon: Icon(Icons.home_rounded),
-                        label: 'الرئيسية',
-                      )
-                    else
+                        icon: Icon(Icons.badge_outlined),
+                        selectedIcon: Icon(Icons.badge_rounded),
+                        label: 'المناديب',
+                      ),
                       const NavigationDestination(
-                        icon: Icon(Icons.how_to_reg_outlined),
-                        selectedIcon: Icon(Icons.how_to_reg_rounded),
-                        label: 'الحضور',
+                        icon: Icon(Icons.radar_outlined),
+                        selectedIcon: Icon(Icons.radar_rounded),
+                        label: 'الخريطة',
                       ),
-                    const NavigationDestination(
-                      icon: Icon(Icons.badge_outlined),
-                      selectedIcon: Icon(Icons.badge_rounded),
-                      label: 'المناديب',
-                    ),
-                    const NavigationDestination(
-                      icon: Icon(Icons.radar_outlined),
-                      selectedIcon: Icon(Icons.radar_rounded),
-                      label: 'الخريطة',
-                    ),
-                    NavigationDestination(
-                      icon: _buildLeaveRequestsBadge(
-                        const Icon(Icons.event_note_outlined),
-                        colorScheme,
+                      NavigationDestination(
+                        icon: _buildLeaveRequestsBadge(
+                          const Icon(Icons.event_note_outlined),
+                          colorScheme,
+                        ),
+                        selectedIcon: _buildLeaveRequestsBadge(
+                          const Icon(Icons.event_note_rounded),
+                          colorScheme,
+                        ),
+                        label: 'الطلبات',
                       ),
-                      selectedIcon: _buildLeaveRequestsBadge(
-                        const Icon(Icons.event_note_rounded),
-                        colorScheme,
+                      NavigationDestination(
+                        icon: _buildDeviceRequestsBadge(
+                          const Icon(Icons.grid_view_outlined),
+                          colorScheme,
+                        ),
+                        selectedIcon: _buildDeviceRequestsBadge(
+                          const Icon(Icons.grid_view_rounded),
+                          colorScheme,
+                        ),
+                        label: 'المزيد',
                       ),
-                      label: 'الطلبات',
-                    ),
-                    NavigationDestination(
-                      icon: _buildDeviceRequestsBadge(
-                        const Icon(Icons.grid_view_outlined),
-                        colorScheme,
-                      ),
-                      selectedIcon: _buildDeviceRequestsBadge(
-                        const Icon(Icons.grid_view_rounded),
-                        colorScheme,
-                      ),
-                      label: 'المزيد',
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+          ),
         ),
       ),
     );
   }
+
+  List<Widget> _narrowWebHeaderActions() => [
+    ListenableBuilder(
+      listenable: _headerBridge,
+      builder: (context, _) => HrWebHeaderBell(
+        unread: _headerBridge.unread,
+        onPressed: _headerBridge.openNotifications,
+        toolbar: false,
+      ),
+    ),
+    IconButton(
+      key: const ValueKey('hr_web_header_refresh'),
+      tooltip: 'تحديث البيانات',
+      onPressed: _refreshHome,
+      icon: const Icon(Icons.refresh_rounded),
+    ),
+  ];
 
   Widget _buildIndexedStack(Delegate delegate) {
     return IndexedStack(

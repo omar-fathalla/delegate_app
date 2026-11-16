@@ -3,6 +3,7 @@
 // only admit company supervisors and HR. Mobile lists stay as they were.
 import 'package:delegate_app/config/routes/app_router.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
+import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
@@ -153,7 +154,13 @@ void main() {
 
       test('$role sidebar lists the same tools except the footer settings', () {
         final titles = _titles(_delegate(role), HrShellPlacement.sidebar);
-        expect(titles, _supervisorMenu.where((title) => title != 'الإعدادات'));
+        expect(
+          titles,
+          _supervisorMenu.where(
+            (title) => title != 'الإعدادات' && title != 'الملف الشخصي',
+          ),
+        );
+        expect(titles, isNot(contains('الملف الشخصي')));
       });
     }
 
@@ -260,10 +267,14 @@ void main() {
         web: true,
         onSelect: (index) => selected = index,
       );
-      for (final title in _supervisorMenu.where((t) => t != 'الإعدادات')) {
+      for (final title in _supervisorMenu.where(
+        (t) => t != 'الإعدادات' && t != 'الملف الشخصي',
+      )) {
         expect(find.text(title), findsWidgets, reason: title);
       }
+      expect(find.text('الملف الشخصي'), findsNothing);
       expect(find.text('الإعدادات'), findsOneWidget);
+      expect(find.byType(AppAvatar), findsNothing);
       expect(find.text('الحضور والانصراف'), findsNothing);
       await tester.tap(find.text('المهام'));
       expect(selected, kHrTabTasks);
@@ -292,15 +303,15 @@ void main() {
     testWidgets(
       'web more sheet lists the tools that are not in the bottom bar',
       (tester) async {
-      WebRuntimePolicy.debugIsWebOverride = true;
-      tester.view.physicalSize = const Size(400, 1600);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: HRMoreBottomSheet(
+        WebRuntimePolicy.debugIsWebOverride = true;
+        tester.view.physicalSize = const Size(400, 1600);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: HRMoreBottomSheet(
                 hrDelegate: _delegate(UserRole.hr),
                 currentIndex: 0,
                 onSelectTab: (_) {},

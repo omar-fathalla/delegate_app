@@ -235,7 +235,20 @@ class HrCardTitle extends StatelessWidget {
   }
 }
 
-/// «السلاسل التابع لها مناديبك»: one chip per chain; tapping filters the table.
+/// Short title for the chains card.
+///
+/// «السلاسل التابع لها مناديبك» doesn't agree (السلاسل is plural, التابع is
+/// singular). «سلاسل مناديبك» is the grammatical short form.
+const String kHrHomeChainsTitle = 'سلاسل مناديبك';
+
+/// Columns of equal-width chain chips for a card's inner width.
+int hrChainGridColumns(double width) {
+  if (width >= 720) return 4;
+  if (width >= 480) return 3;
+  return 2;
+}
+
+/// «سلاسل مناديبك»: one equal-width chip per chain; tapping filters the table.
 class HrHomeChainsCard extends StatelessWidget {
   final List<String> chains;
   final String? selected;
@@ -261,7 +274,7 @@ class HrHomeChainsCard extends StatelessWidget {
         children: [
           const HrCardTitle(
             icon: Icons.storefront_rounded,
-            text: 'السلاسل التابع لها مناديبك',
+            text: kHrHomeChainsTitle,
           ),
           const SizedBox(height: 16),
           if (chains.isEmpty)
@@ -270,42 +283,96 @@ class HrHomeChainsCard extends StatelessWidget {
               style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
             )
           else
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                for (final chain in chains)
-                  FilterChip(
-                    key: ValueKey('hr_home_chain_chip_$chain'),
-                    avatar: HrChainAvatar(chain: chain, size: 24),
-                    label: Text(chain),
-                    labelStyle: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: selected == chain
-                          ? cs.onSecondaryContainer
-                          : cs.onSurface,
-                    ),
-                    selected: selected == chain,
-                    showCheckmark: false,
-                    selectedColor: cs.secondaryContainer,
-                    backgroundColor: cs.surfaceContainerLowest,
-                    side: BorderSide(
-                      color: selected == chain
-                          ? Colors.transparent
-                          : cs.outlineVariant,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    materialTapTargetSize: MaterialTapTargetSize.padded,
-                    onSelected: enabled
-                        ? (on) => onSelected(on ? chain : null)
-                        : null,
-                  ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const gap = 8.0;
+                final columns = hrChainGridColumns(constraints.maxWidth);
+                final itemWidth =
+                    (constraints.maxWidth - gap * (columns - 1)) / columns;
+                return Wrap(
+                  key: const ValueKey('hr_home_chain_grid'),
+                  spacing: gap,
+                  runSpacing: gap,
+                  children: [
+                    for (final chain in chains)
+                      _ChainGridChip(
+                        chain: chain,
+                        width: itemWidth,
+                        selected: selected == chain,
+                        enabled: enabled,
+                        onSelected: onSelected,
+                      ),
+                  ],
+                );
+              },
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _ChainGridChip extends StatelessWidget {
+  final String chain;
+  final double width;
+  final bool selected;
+  final bool enabled;
+  final ValueChanged<String?> onSelected;
+
+  const _ChainGridChip({
+    required this.chain,
+    required this.width,
+    required this.selected,
+    required this.enabled,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final fg = selected ? cs.onSecondaryContainer : cs.onSurface;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: chain,
+      child: SizedBox(
+        key: ValueKey('hr_home_chain_chip_$chain'),
+        width: width,
+        height: 48,
+        child: Material(
+          color: selected ? cs.secondaryContainer : cs.surfaceContainerLowest,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(
+              color: selected ? Colors.transparent : cs.outlineVariant,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: enabled ? () => onSelected(selected ? null : chain) : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(
+                children: [
+                  HrChainAvatar(chain: chain, size: 24),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      chain,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: enabled ? fg : fg.withValues(alpha: 0.38),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

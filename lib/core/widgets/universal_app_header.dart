@@ -104,7 +104,6 @@ class UniversalAppHeader extends StatelessWidget
   /// يحوّل دور المستخدم إلى تسمية عربية قصيرة تظهر تحت الاسم في الهيدر.
   /// Company admin and company supervisor are one UserRole.admin: the label
   /// does not depend on the raw Firestore role string or job-title position.
-  @visibleForTesting
   static String roleLabelFor(
     UserRole role, {
     DelegatePosition? position,

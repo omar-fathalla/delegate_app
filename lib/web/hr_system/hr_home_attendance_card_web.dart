@@ -239,7 +239,6 @@ class HrHomeAttendanceCard extends StatelessWidget {
           _FilterBar(
             enabled: _enabled,
             compact: _compact,
-            inline: windowClass == HrWindowClass.expanded,
             summary: summary,
             chains: chains,
             presence: presence,
@@ -496,7 +495,6 @@ class _StatTile extends StatelessWidget {
 class _FilterBar extends StatelessWidget {
   final bool enabled;
   final bool compact;
-  final bool inline;
   final HrAttendanceSummary summary;
   final List<String> chains;
   final HrPresenceFilter presence;
@@ -509,7 +507,6 @@ class _FilterBar extends StatelessWidget {
   const _FilterBar({
     required this.enabled,
     required this.compact,
-    required this.inline,
     required this.summary,
     required this.chains,
     required this.presence,
@@ -538,33 +535,24 @@ class _FilterBar extends StatelessWidget {
       enabled: enabled,
       onChanged: onSearchChanged,
     );
-    if (inline) {
-      return Row(
-        children: [
-          Expanded(child: Wrap(spacing: 8, runSpacing: 8, children: chips)),
-          const SizedBox(width: 12),
-          SizedBox(width: 280, child: field),
-        ],
-      );
-    }
+    // One line of chips + chain. When the card is narrow the row scrolls
+    // instead of wrapping the chain filter onto a second line. Search is
+    // always the full width underneath.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (compact)
-          SingleChildScrollView(
-            key: const ValueKey('hr_home_chip_scroller'),
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (var i = 0; i < chips.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 8),
-                  chips[i],
-                ],
+        SingleChildScrollView(
+          key: compact ? const ValueKey('hr_home_chip_scroller') : null,
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (var i = 0; i < chips.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                chips[i],
               ],
-            ),
-          )
-        else
-          Wrap(spacing: 8, runSpacing: 8, children: chips),
+            ],
+          ),
+        ),
         const SizedBox(height: 12),
         field,
       ],
@@ -1071,11 +1059,30 @@ class _Pagination extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    // Previous sits on the right in RTL and points right; next sits on the
+    // left and points left. The glyphs are chosen for the direction instead
+    // of flipped, so they are not mirrored a second time.
+    final prevIcon = Icon(
+      rtl ? Icons.chevron_right_rounded : Icons.chevron_left_rounded,
+      textDirection: TextDirection.ltr,
+    );
+    final nextIcon = Icon(
+      rtl ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+      textDirection: TextDirection.ltr,
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          IconButton(
+            key: const ValueKey('hr_home_page_prev'),
+            tooltip: 'الصفحة السابقة',
+            onPressed: page > 0 ? () => onPageChanged(page - 1) : null,
+            icon: prevIcon,
+          ),
+          const SizedBox(width: 4),
           Text(
             '${start + 1}–$end من $total',
             key: const ValueKey('hr_home_page_label'),
@@ -1085,18 +1092,12 @@ class _Pagination extends StatelessWidget {
               fontFeatures: kHrTabularFigures,
             ),
           ),
-          const SizedBox(width: 8),
-          IconButton(
-            key: const ValueKey('hr_home_page_prev'),
-            tooltip: 'الصفحة السابقة',
-            onPressed: page > 0 ? () => onPageChanged(page - 1) : null,
-            icon: const M3DirIcon(Icons.chevron_left_rounded),
-          ),
+          const SizedBox(width: 4),
           IconButton(
             key: const ValueKey('hr_home_page_next'),
             tooltip: 'الصفحة التالية',
             onPressed: page < pages - 1 ? () => onPageChanged(page + 1) : null,
-            icon: const M3DirIcon(Icons.chevron_right_rounded),
+            icon: nextIcon,
           ),
         ],
       ),

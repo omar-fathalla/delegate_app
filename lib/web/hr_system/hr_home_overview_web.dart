@@ -19,6 +19,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/web/hr_system/hr_home_attendance_card_web.dart';
 import 'package:delegate_app/web/hr_system/hr_home_side_cards_web.dart';
+import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
 
 /// Width of the side column next to the attendance card.
 const double kHrOverviewSideColumnWidth = 352;
@@ -98,6 +99,10 @@ class HrHomeOverviewWeb extends StatelessWidget {
   @visibleForTesting
   static DateTime Function()? debugClock;
 
+  /// Test hook: the reload the header refresh button runs for [debugData].
+  @visibleForTesting
+  static Future<void> Function()? debugOnReload;
+
   HrHomeOverviewActions _actions(
     BuildContext context, {
     required Future<void> Function() onReload,
@@ -134,7 +139,9 @@ class HrHomeOverviewWeb extends StatelessWidget {
         clock: clock,
         actions: _actions(
           context,
-          onReload: () async {},
+          onReload: () async {
+            await debugOnReload?.call();
+          },
           month: clock(),
           branchesByName: fake.branchesByName,
         ),
@@ -268,6 +275,7 @@ class _HrHomeOverviewViewState extends State<HrHomeOverviewView> {
   bool _showAllRows = false;
   DateTime? _lastUpdated;
   Timer? _ticker;
+  HrWebHeaderBridge? _headerBridge;
 
   @override
   void initState() {
@@ -276,6 +284,15 @@ class _HrHomeOverviewViewState extends State<HrHomeOverviewView> {
     _ticker = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) setState(() {});
     });
+    _publishHeader();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _headerBridge = context
+        .getInheritedWidgetOfExactType<HrWebHeaderBridgeScope>()
+        ?.notifier;
   }
 
   @override
@@ -287,13 +304,27 @@ class _HrHomeOverviewViewState extends State<HrHomeOverviewView> {
     if (_chain != null && !widget.data.chains.contains(_chain)) {
       _chain = null;
     }
+    _publishHeader();
   }
 
   @override
   void dispose() {
+    _headerBridge?.release();
     _ticker?.cancel();
     _search.dispose();
     super.dispose();
+  }
+
+  /// Hands the greeting row's reload and notifications actions to the header.
+  void _publishHeader() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _headerBridge?.attach(
+        unread: widget.data.unreadNotifications,
+        reloadHome: widget.actions.onReload,
+        openNotifications: widget.actions.onOpenNotifications,
+      );
+    });
   }
 
   void _resetPaging() {
@@ -410,15 +441,13 @@ class _HrHomeOverviewViewState extends State<HrHomeOverviewView> {
             children: [
               attendance,
               SizedBox(height: gap),
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(child: chains),
-                    SizedBox(width: gap),
-                    Expanded(child: feature),
-                  ],
-                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: chains),
+                  SizedBox(width: gap),
+                  Expanded(child: feature),
+                ],
               ),
               SizedBox(height: gap),
               duties,
@@ -453,10 +482,6 @@ class _HrHomeOverviewViewState extends State<HrHomeOverviewView> {
                       delegate: widget.data.delegate,
                       compact: compact,
                       lastUpdated: _lastUpdated,
-                      unread: widget.data.unreadNotifications,
-                      onRefresh: widget.actions.onReload,
-                      onOpenNotifications: widget.actions.onOpenNotifications,
-                      onOpenProfile: widget.actions.onOpenProfile,
                     ),
                     SizedBox(height: gap),
                     body,
@@ -533,19 +558,11 @@ class _WelcomeHeader extends StatelessWidget {
   final Delegate delegate;
   final bool compact;
   final DateTime? lastUpdated;
-  final int unread;
-  final Future<void> Function() onRefresh;
-  final VoidCallback onOpenNotifications;
-  final VoidCallback onOpenProfile;
 
   const _WelcomeHeader({
     required this.delegate,
     required this.compact,
     required this.lastUpdated,
-    required this.unread,
-    required this.onRefresh,
-    required this.onOpenNotifications,
-    required this.onOpenProfile,
   });
 
   @override
@@ -553,118 +570,68 @@ class _WelcomeHeader extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final name = delegate.fullName.trim();
     final isSupervisor = delegate.role == UserRole.admin;
-    Widget action({
-      required Key key,
-      required String tooltip,
-      required IconData icon,
-      required VoidCallback onPressed,
-    }) => IconButton(
-      key: key,
-      tooltip: tooltip,
-      onPressed: onPressed,
-      icon: Icon(icon),
-      style: IconButton.styleFrom(
-        minimumSize: const Size(48, 48),
-        foregroundColor: cs.onSurfaceVariant,
-      ).copyWith(overlayColor: hrStateLayer(cs.onSurfaceVariant)),
-    );
-    return Row(
+    return Column(
       key: const ValueKey('hr_home_welcome'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name.isEmpty ? 'أهلاً بك' : 'أهلاً بك، $name',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: compact ? 22 : 28,
-                  height: 1.3,
-                  fontWeight: FontWeight.w700,
-                  color: cs.onSurface,
-                ),
+        Text(
+          name.isEmpty ? 'أهلاً بك' : 'أهلاً بك، $name',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: compact ? 22 : 28,
+            height: 1.3,
+            fontWeight: FontWeight.w700,
+            color: cs.onSurface,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 12,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Container(
+              key: const ValueKey('hr_home_role_chip'),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: cs.secondaryContainer,
+                borderRadius: BorderRadius.circular(8),
               ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 12,
-                runSpacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    key: const ValueKey('hr_home_role_chip'),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: cs.secondaryContainer,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isSupervisor
-                              ? Icons.supervisor_account_rounded
-                              : Icons.badge_rounded,
-                          size: 16,
-                          color: cs.onSecondaryContainer,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          isSupervisor ? 'مشرف الشركة' : 'HR',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: cs.onSecondaryContainer,
-                          ),
-                        ),
-                      ],
-                    ),
+                  Icon(
+                    isSupervisor
+                        ? Icons.supervisor_account_rounded
+                        : Icons.badge_rounded,
+                    size: 16,
+                    color: cs.onSecondaryContainer,
                   ),
+                  const SizedBox(width: 6),
                   Text(
-                    lastUpdated == null
-                        ? 'آخر تحديث —'
-                        : 'آخر تحديث ${hrFormatTime(lastUpdated!)}',
-                    key: const ValueKey('hr_home_last_updated'),
+                    isSupervisor ? 'مشرف الشركة' : 'HR',
                     style: TextStyle(
                       fontSize: 13,
-                      color: cs.onSurfaceVariant,
-                      fontFeatures: kHrTabularFigures,
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSecondaryContainer,
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 8),
-        action(
-          key: const ValueKey('hr_home_refresh'),
-          tooltip: 'تحديث',
-          icon: Icons.refresh_rounded,
-          onPressed: onRefresh,
-        ),
-        Badge(
-          key: const ValueKey('hr_home_notifications_badge'),
-          isLabelVisible: unread > 0,
-          label: Text('$unread'),
-          offset: const Offset(-4, 4),
-          child: action(
-            key: const ValueKey('hr_home_notifications'),
-            tooltip: 'الإشعارات',
-            icon: Icons.notifications_outlined,
-            onPressed: onOpenNotifications,
-          ),
-        ),
-        action(
-          key: const ValueKey('hr_home_account'),
-          tooltip: 'الحساب',
-          icon: Icons.account_circle_outlined,
-          onPressed: onOpenProfile,
+            ),
+            Text(
+              lastUpdated == null
+                  ? 'آخر تحديث —'
+                  : 'آخر تحديث ${hrFormatTime(lastUpdated!)}',
+              key: const ValueKey('hr_home_last_updated'),
+              style: TextStyle(
+                fontSize: 13,
+                color: cs.onSurfaceVariant,
+                fontFeatures: kHrTabularFigures,
+              ),
+            ),
+          ],
         ),
       ],
     );
