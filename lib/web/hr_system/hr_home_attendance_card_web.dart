@@ -195,6 +195,14 @@ class HrHomeAttendanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    // Forward sits at the end of the label and points that way. The glyph is
+    // drawn in LTR so RTL does not mirror arrow_forward a second time.
+    final forwardIcon = Icon(
+      rtl ? Icons.arrow_back_rounded : Icons.arrow_forward_rounded,
+      size: 18,
+      textDirection: TextDirection.ltr,
+    );
     return HrOverviewCard(
       key: const ValueKey('hr_home_attendance_card'),
       padding: EdgeInsets.all(_compact ? 16 : 24),
@@ -211,8 +219,9 @@ class HrHomeAttendanceCard extends StatelessWidget {
               style: TextButton.styleFrom(
                 minimumSize: const Size(48, 48),
                 shape: const StadiumBorder(),
+                iconAlignment: IconAlignment.end,
               ).copyWith(overlayColor: hrStateLayer(cs.primary)),
-              icon: const M3DirIcon(Icons.arrow_forward_rounded, size: 18),
+              icon: forwardIcon,
               label: const Text(
                 'كل سجل الحضور',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
@@ -1060,9 +1069,9 @@ class _Pagination extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final rtl = Directionality.of(context) == TextDirection.rtl;
-    // Previous sits on the right in RTL and points right; next sits on the
-    // left and points left. The glyphs are chosen for the direction instead
-    // of flipped, so they are not mirrored a second time.
+    // The row is [previous, label, next], so RTL puts next on the left and
+    // previous on the right. The glyph is drawn in LTR: chevron_left is ‹
+    // and chevron_right is ›. Ambient RTL must not mirror it again.
     final prevIcon = Icon(
       rtl ? Icons.chevron_right_rounded : Icons.chevron_left_rounded,
       textDirection: TextDirection.ltr,

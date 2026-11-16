@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 /// Web shell bridge between «الرئيسية» and the desktop header.
 ///
@@ -10,15 +11,33 @@ class HrWebHeaderBridge extends ChangeNotifier {
   Future<void> Function()? reloadHome;
   VoidCallback? openNotifications;
 
+  /// Bell focus, restored when the notifications sheet closes.
+  FocusNode? notificationsFocus;
+
+  /// While the sheet is open the bell badge hides, so the unread count is
+  /// shown once — inside the sheet.
+  bool sheetOpen = false;
+
   void attach({
     required int unread,
     required Future<void> Function() reloadHome,
     required VoidCallback openNotifications,
   }) {
+    final changed =
+        this.unread != unread ||
+        this.reloadHome != reloadHome ||
+        this.openNotifications != openNotifications;
     this.reloadHome = reloadHome;
     this.openNotifications = openNotifications;
-    if (this.unread == unread) return;
     this.unread = unread;
+    // The header builds before the overview attaches. Skipping the notify
+    // when the count is unchanged left the bell disabled (onPressed null).
+    if (changed) notifyListeners();
+  }
+
+  void setSheetOpen(bool open) {
+    if (sheetOpen == open) return;
+    sheetOpen = open;
     notifyListeners();
   }
 
@@ -39,7 +58,7 @@ class HrWebHeaderBridgeScope extends InheritedNotifier<HrWebHeaderBridge> {
 }
 
 /// Notifications control moved out of the home greeting row.
-class HrWebHeaderBell extends StatelessWidget {
+class HrWebHeaderBell extends StatefulWidget {
   final int unread;
   final VoidCallback? onPressed;
 
@@ -55,25 +74,73 @@ class HrWebHeaderBell extends StatelessWidget {
   });
 
   @override
+  State<HrWebHeaderBell> createState() => _HrWebHeaderBellState();
+}
+
+class _HrWebHeaderBellState extends State<HrWebHeaderBell> {
+  final FocusNode _focus = FocusNode(debugLabel: 'hr_notifications_bell');
+  HrWebHeaderBridge? _bridge;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final next = context
+        .getInheritedWidgetOfExactType<HrWebHeaderBridgeScope>()
+        ?.notifier;
+    if (identical(_bridge, next)) return;
+    if (_bridge?.notificationsFocus == _focus) {
+      _bridge!.notificationsFocus = null;
+    }
+    _bridge = next;
+    _bridge?.notificationsFocus = _focus;
+  }
+
+  @override
+  void dispose() {
+    if (_bridge?.notificationsFocus == _focus) {
+      _bridge!.notificationsFocus = null;
+    }
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final bridge = _bridge;
+    if (bridge == null) return _button(context, hideCount: false);
+    return ListenableBuilder(
+      listenable: bridge,
+      builder: (context, _) => _button(context, hideCount: bridge.sheetOpen),
+    );
+  }
+
+  Widget _button(BuildContext context, {required bool hideCount}) {
     final cs = Theme.of(context).colorScheme;
+    final iconColor = cs.onSurfaceVariant;
+    final unread = widget.unread;
     return Badge(
       key: const ValueKey('hr_web_header_notifications_badge'),
-      isLabelVisible: unread > 0,
+      isLabelVisible: unread > 0 && !hideCount,
       label: Text('$unread'),
       child: IconButton(
         key: const ValueKey('hr_web_header_notifications'),
+        focusNode: _focus,
         tooltip: 'الإشعارات',
-        onPressed: onPressed,
-        icon: Icon(Icons.notifications_outlined, size: toolbar ? 20 : 24),
-        style: toolbar
+        onPressed: widget.onPressed,
+        icon: Icon(
+          Symbols.notifications_rounded,
+          size: widget.toolbar ? 20 : 24,
+          color: iconColor,
+        ),
+        style: widget.toolbar
             ? IconButton.styleFrom(
+                foregroundColor: iconColor,
                 backgroundColor: cs.surfaceContainerHigh.withValues(alpha: 0.5),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
               )
-            : null,
+            : IconButton.styleFrom(foregroundColor: iconColor),
       ),
     );
   }
