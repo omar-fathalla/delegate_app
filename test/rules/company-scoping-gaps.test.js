@@ -172,9 +172,14 @@ describe("TA-8 security rules gaps", () => {
   test("ALLOW org-admin may still deactivate staff", () =>
     assertSucceeds(updateDoc(doc(as("oa"), "users/sup"), {isActive: false})));
 
+  test("ALLOW FS-09: supervisor active→suspended with statusReason same company", () =>
+    assertSucceeds(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
+      status: "suspended", statusReason: "policy", updatedAt: "t",
+    })));
+
   test("DENY H-1: supervisor cannot suspend delegate via status spelling bypass", () =>
     assertFails(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
-      status: "SUSPENDED", updatedAt: "t",
+      status: "SUSPENDED", statusReason: "policy", updatedAt: "t",
     })));
 
   test("DENY H-1: HR cannot deactivate delegate via isActive on nested delegate", () =>

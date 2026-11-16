@@ -10,7 +10,9 @@ service firebase.storage {
     match /feedback_screenshots/{fileName} {
       allow create: if request.auth != null
         && request.auth.token.get('role', '') == 'delegate'
-        && fileName.matches('^feedback_(ts|[0-9]+)(\\.[A-Za-z0-9]+)?$');
+        && fileName.matches('^feedback_(ts|[0-9]+)(\\.[A-Za-z0-9]+)?$')
+        && request.resource != null
+        && request.resource.size < 5 * 1024 * 1024;
     }
     match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
       // v1.14.x legacy fresh upload (token-only; separate from overwrite).

@@ -13,25 +13,19 @@ const FS_PORT = Number(process.env.LOCAL_CI_FIRESTORE_PORT || 8080);
 const LIVE_RULES = path.join(ROOT, 'test/rules/ta60/live.rules');
 const CAND_RULES = process.env.CAND || path.join(ROOT, 'firestore.rules');
 
+// Silent (d) + (c) only — W1 audit @ dd78b97 (see ta60-prod-compat.md).
 export const DELIBERATE_FIRESTORE_REGRESSIONS = new Set([
-  'supervisor update delegate doc status (suspend)',
   'any staff users list all (private label perms: users get())',
   'anonymous (<=v1.14.1) CG delegates phone login query',
   'anonymous (<=v1.14.1) add attendance check-in',
   'delegate CG delegates where nationalityID == own (identifier resolve, try/catch)',
   'delegate users where phoneNumber == supervisorPhone',
-  'supervisor CG delegates phoneNumber dup-check (try/catch)',
-  'supervisor CG delegates nationalId dup-check (try/catch)',
-  'supervisor CG delegates receiptCode dup-check (try/catch)',
   'supervisor delegate_requests where receiptCode (try/catch)',
   'supervisor users where role in [super-admin...] (notify, try/catch)',
-  'supervisor read company broadcast notifications (delegateUid in [supervisor_co, company_co])',
-  'supervisor registration nationalId dup-check listen (nationalId query)',
   'tech support approve request (update status approved)',
   'super-admin approve request (update status approved, main step 1)',
   'tech support provision delegate set(merge) status active (main step 2c, unbatched)',
   'super-admin provision delegate set(merge) status active (main step 2c, unbatched)',
-  'supervisor read company broadcasts delegateUid in [supervisor_co, company_co, all_company_supervisors]',
   'ts approve new delegate step1 update delegate_requests approved',
   'ts approve step2c delegate set(merge) active',
   'sa approve new delegate step1 update delegate_requests approved',
@@ -40,7 +34,6 @@ export const DELIBERATE_FIRESTORE_REGRESSIONS = new Set([
 /** Documented dev-security closures (REQUEST CHANGES); not silent prod widenings. */
 export function isDeliberateFirestoreRegression(name) {
   if (DELIBERATE_FIRESTORE_REGRESSIONS.has(name)) return true;
-  if (name.includes('list bell:')) return true; // M1/M2: listGlobalNotifyStaff + scoped notif rules
   if (name.endsWith(' approve step2c delegate set(merge) active')) return true; // H1/H2 batch path
   if (name.includes('approve step1 update delegate_requests approved')) return true;
   return false;
