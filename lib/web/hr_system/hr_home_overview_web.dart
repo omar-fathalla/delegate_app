@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_home_screen.dart';
@@ -19,6 +20,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/web/hr_system/hr_home_attendance_card_web.dart';
 import 'package:delegate_app/web/hr_system/hr_home_side_cards_web.dart';
+import 'package:delegate_app/web/hr_system/hr_notifications_side_sheet.dart';
 import 'package:delegate_app/web/hr_system/hr_overlay_scrollbar.dart';
 import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
 
@@ -111,7 +113,13 @@ class HrHomeOverviewWeb extends StatelessWidget {
     required Map<String, Branch> branchesByName,
   }) => HrHomeOverviewActions(
     onReload: onReload,
-    onOpenNotifications: () => context.push('/notifications', extra: delegate),
+    onOpenNotifications: () {
+      if (!WebRuntimePolicy.isWeb) {
+        context.push('/notifications', extra: delegate);
+        return;
+      }
+      showHrNotificationsSideSheet(context, delegate: delegate);
+    },
     onOpenProfile: () => context.push('/user-profile', extra: delegate),
     onOpenAttendanceLog: () => onNavigateToTab(kHrTabAttendance),
     onOpenDelegates: () => onNavigateToTab(kHrTabDelegates),
