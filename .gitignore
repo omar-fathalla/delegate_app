@@ -102,3 +102,10 @@ ios/config/dev/GoogleService-Info.plist
 # Never commit 1st-gen Functions runtime config (may hold secrets).
 functions/.runtimeconfig.json
 .runtimeconfig.json
+
+# Fake tashil-dev HR account passwords. Generated locally by
+# functions/scripts/hr-web-fake-accounts.js. Never commit.
+functions/scripts/.hr-web-fake-accounts.local.json
+functions/scripts/.hr-web-fake-accounts.local.json.tmp
+**/.hr-web-fake-accounts.local.json
+**/.hr-web-fake-accounts.local.json.tmp
