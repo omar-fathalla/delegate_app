@@ -278,6 +278,12 @@ service firebase.storage {
       // owner even if a client upload is classified as create.
       allow read: if isStorageStaff()
         || feedbackDelegateMayAccess(fileName);
+      // Legacy timestamp filenames (prod v1.14.x): keep a cheap create
+      // rule so evaluation stays under the storage rules expression cap.
+      allow create: if isNonAnonymous()
+        && request.auth.token.get('role', '') == 'delegate'
+        && resource == null
+        && fileName.matches('feedback_(ts|[0-9]+)(\\.[A-Za-z0-9]+)?$');
       allow create, update: if isStorageStaff()
         || (
           isDelegateToken()
@@ -323,6 +329,12 @@ service firebase.storage {
     match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
       allow read: if canAccessOrgCompanyFiles(orgId, compId)
         || delegateTokenOwnsCompany(compId);
+      allow create: if isNonAnonymous()
+        && request.auth.token.get('role', '') == 'delegate'
+        && request.auth.token.get('companyId', '') == compId
+        && resource == null
+        && photoId.matches('photo_(ts|[0-9]+)(\\.[A-Za-z0-9]+)?$')
+        && !permissionPhotoNameOwnedByOther(photoId);
       // Filename photo_{uid}_* is treated as owned by that uid so a
       // create-classified overwrite cannot steal a colleague's object.
       allow create, update: if canAccessOrgCompanyFiles(orgId, compId)
@@ -405,7 +417,9 @@ service firebase.storage {
     // match .../delegates/{uid}/** or canAccessWebIdDocs is undone and
     // accountant/marketing would regain ID-doc access.
     match /organizations/{orgId}/companies/{compId}/{segment}/{rest=**} {
-      allow read, write: if segment != 'delegates' && canAccessOrgCompanyFiles(orgId, compId);
+      allow read, write: if segment != 'delegates'
+        && segment != 'permissions'
+        && canAccessOrgCompanyFiles(orgId, compId);
     }
 
     // ==================== ORGANIZATION FILES ====================

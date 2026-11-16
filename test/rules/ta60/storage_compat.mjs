@@ -12,7 +12,17 @@ const LIVE_RULES = path.join(ROOT, 'test/rules/ta60/live.storage.rules');
 const CAND_RULES = process.env.SCAND || path.join(ROOT, 'storage.rules');
 const FS_RULES = path.join(ROOT, 'firestore.rules');
 
-const PID = 'demo-ta60st', ORG = 'orgA', CO = 'coA';
+function emulatorProjectId() {
+  try {
+    const cfg = process.env.FIREBASE_CONFIG && JSON.parse(process.env.FIREBASE_CONFIG);
+    if (cfg?.projectId) return cfg.projectId;
+  } catch {
+    // ignore
+  }
+  return process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'demo-ta60st';
+}
+const PID = emulatorProjectId();
+const ORG = 'orgA', CO = 'coA';
 const img = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
 const meta = { contentType: 'image/jpeg' };
 
@@ -43,6 +53,7 @@ async function seed(env) {
     await setDoc(doc(db, `organizations/${ORG}`), { name: 'o' });
     await setDoc(doc(db, `organizations/${ORG}/companies/${CO}`), { name: 'c', organizationUID: ORG });
     await setDoc(doc(db, `organizations/${ORG}/companies/${CO}/delegates/dlg1`), { uid: 'dlg1', status: 'active', companyUID: CO, organizationUID: ORG });
+    await setDoc(doc(db, 'users/dlg1'), { uid: 'dlg1', role: 'delegate', organizationUID: ORG, companyUID: CO, status: 'approved' });
     await setDoc(doc(db, `organizations/${ORG}/companies/${CO}/requests/webReq1`), { uid: 'webReq1', companyUID: CO, organizationUID: ORG, status: 'pending', actionType: 'create' });
     await setDoc(doc(db, 'delegate_requests/oldReq'), { companyUID: CO, organizationUID: ORG, supervisorUid: 'sup', status: 'pending' });
     const s = c.storage();
@@ -50,6 +61,11 @@ async function seed(env) {
     await uploadBytes(ref(s, `organizations/${ORG}/companies/${CO}/delegates/dlg1/personalPhoto/p.jpg`), img, meta);
     await uploadBytes(ref(s, 'delegate_documents/dlg1/profile.jpg'), img, meta);
     await uploadBytes(ref(s, 'penalties/evidence/p1/e.jpg'), img, meta);
+    await setDoc(doc(db, 'storage_upload_intents/dlg1'), { companyUID: CO, createdBy: 'seed' });
+    await setDoc(doc(db, 'storage_upload_intents/newReq1'), { companyUID: CO, createdBy: 'sup' });
+    await setDoc(doc(db, 'storage_upload_intents/oldReq'), { companyUID: CO, createdBy: 'sup' });
+    await setDoc(doc(db, 'storage_upload_intents/webReq1'), { companyUID: CO, createdBy: 'ca' });
+    await setDoc(doc(db, 'storage_upload_intents/webNew'), { companyUID: CO, createdBy: 'ca' });
   });
 }
 
