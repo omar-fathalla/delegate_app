@@ -14,6 +14,11 @@ abstract class PenaltyRepository {
     String? phoneNumber,
     String? fullName,
   });
+  Future<Either<Failure, List<PenaltyEntity>>> getOwnPenalties({
+    required String uid,
+    required String companyId,
+    String? phoneNumber,
+  });
   Future<Either<Failure, List<PenaltyEntity>>> getAllPenalties();
   Future<Either<Failure, Unit>> updatePenaltyStatus({
     required String penaltyId,

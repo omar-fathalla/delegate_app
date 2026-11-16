@@ -245,6 +245,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
 
       final Map<String, Map<String, dynamic>> walletConfigByDelegateId = {};
       for (final doc in walletsSnap.docs) {
+        if (doc.data()['companyUID'] != widget.hrDelegate.companyUID) continue;
         walletConfigByDelegateId[doc.id] = doc.data();
       }
 

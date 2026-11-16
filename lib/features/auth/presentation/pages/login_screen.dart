@@ -91,6 +91,7 @@ class _LoginScreenState extends State<LoginScreen>
         );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _applyDelegateNotice();
       if (M3Motion.reduced(context)) {
         _animationController.value = 1;
       } else {
@@ -101,6 +102,21 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   bool get _isStaff => _mode == LoginMode.staff;
+
+  /// `/login?notice=delegate` is where the HR-shell guard sends a delegate
+  /// who opened the system on web. Force the delegate tab so the blocked
+  /// notice is what's on screen, even if staff mode was saved.
+  void _applyDelegateNotice() {
+    String? notice;
+    try {
+      notice = GoRouterState.of(context).uri.queryParameters['notice'];
+    } catch (_) {
+      notice = null;
+    }
+    if (notice == 'delegate' && _mode != LoginMode.delegate) {
+      setState(() => _mode = LoginMode.delegate);
+    }
+  }
 
   /// Delegate sign-in binds the calling device on the server, so it stays
   /// in the mobile app; the web tab only explains that.
@@ -843,7 +859,7 @@ class _LoginScreenState extends State<LoginScreen>
         '🚀 LoginScreen: AuthAuthenticated received! name=${delegate.fullName}, role=${delegate.role}, uid=${delegate.uid}',
       );
       try {
-        final path = homePathForRole(delegate.role);
+        final path = landingPathForRole(delegate.role);
         debugPrint('🚀 LoginScreen: Navigating to $path');
         context.go(path, extra: delegate);
       } catch (e, stack) {

@@ -5,8 +5,9 @@
  * hr-web-fake-accounts.js is the only writer. Shapes follow the fields the
  * app reads today: users/{uid} for staff phone login, and
  * organizations/{org}/companies/{company}/delegates/{uid} for the HR list
- * (TA-8 company scope). Role strings are the canonical values in
- * DelegateModel.roleToString / firestore.rules.
+ * (TA-8 company scope). The first 22 accounts use the canonical role strings
+ * in DelegateModel.roleToString / firestore.rules; ROLE_SHAPE_ACCOUNTS add the
+ * other supervisor / HR spellings and company fields found in production.
  */
 
 const fs = require("fs");
@@ -22,6 +23,103 @@ const ORG_NAME = "Fake Test Organization";
 const ORG_NAME_AR = "منظمة وهمية للاختبار";
 const PASSWORD_FILE_NAME = ".hr-web-fake-accounts.local.json";
 const EMAIL_DOMAIN = "@example.com";
+
+const HR_ROLES = new Set(["hr", "company-hr", "company_hr", "human_resources"]);
+
+/**
+ * Extra supervisor / HR accounts, one per users/{uid} shape seen in
+ * production: the Angular invite (claimInvite writes company-admin),
+ * createStaffUser, client grants and legacy imports. Fake data only.
+ * Appended after the original 22 accounts so their phones do not move.
+ */
+const ROLE_SHAPE_ACCOUNTS = [
+  {
+    uid: "seed-fake-company-admin-invite-alpha",
+    email: "fake.companyadmin.invite.alpha@example.com",
+    role: "company-admin",
+    displayName: "Fake Company Admin Invite alpha",
+    company: "alpha",
+    extra: {emailVerified: true, status: "Approved"},
+    shape: "Angular invite (claimInvite)",
+  },
+  {
+    uid: "seed-fake-company-admin-legacy-alpha",
+    email: "fake.companyadmin.legacy.alpha@example.com",
+    role: "company_admin",
+    displayName: "Fake Company Admin Legacy alpha",
+    company: "alpha",
+    shape: "createStaffUser / legacy",
+  },
+  {
+    uid: "seed-fake-companyadmin-companyid-alpha",
+    email: "fake.companyadmin.companyid.alpha@example.com",
+    role: "companyadmin",
+    displayName: "Fake Company Admin CompanyId alpha",
+    company: "alpha",
+    companyField: "companyId",
+    shape: "legacy companyId field only",
+  },
+  {
+    uid: "seed-fake-admin-position-alpha",
+    email: "fake.admin.position.alpha@example.com",
+    role: "admin",
+    displayName: "Fake Admin Supervisor alpha",
+    company: "alpha",
+    extra: {position: "supervisor"},
+    shape: "admin + position supervisor",
+  },
+  {
+    uid: "seed-fake-company-supervisor-beta",
+    email: "fake.company-supervisor.beta@example.com",
+    role: "company_supervisor",
+    displayName: "Fake Company Supervisor Underscore beta",
+    company: "beta",
+    extra: {jobTitle: "Company Supervisor"},
+    shape: "createStaffUser company_supervisor",
+  },
+  {
+    uid: "seed-fake-admin-usertype-hr-beta",
+    email: "fake.admin.usertype-hr.beta@example.com",
+    role: "admin",
+    displayName: "Fake Admin UserType HR beta",
+    company: "beta",
+    extra: {userType: "HR"},
+    shape: "admin + legacy userType HR",
+  },
+  {
+    uid: "seed-fake-company-hr-alpha",
+    email: "fake.company-hr.alpha@example.com",
+    role: "company-hr",
+    displayName: "Fake Company HR Hyphen alpha",
+    company: "alpha",
+    shape: "legacy company-hr",
+  },
+  {
+    uid: "seed-fake-company-hr-beta",
+    email: "fake.company_hr.beta@example.com",
+    role: "company_hr",
+    displayName: "Fake Company HR Underscore beta",
+    company: "beta",
+    shape: "company_hr",
+  },
+  {
+    uid: "seed-fake-human-resources-beta",
+    email: "fake.human-resources.beta@example.com",
+    role: "human_resources",
+    displayName: "Fake Human Resources beta",
+    company: "beta",
+    extra: {jobTitle: "HR"},
+    shape: "human_resources",
+  },
+  {
+    uid: "seed-fake-admin-no-company",
+    email: "fake.admin.nocompany@example.com",
+    role: "admin",
+    displayName: "Fake Legacy Admin No Company",
+    company: null,
+    shape: "legacy admin without a company",
+  },
+];
 
 const COMPANIES = [
   {
@@ -341,10 +439,14 @@ function buildPlan() {
    *   status?: string,
    *   isActive?: boolean,
    *   delegate?: Record<string, unknown>|null,
+   *   companyField?: "companyUID"|"companyId",
+   *   extra?: Record<string, unknown>,
+   *   shape?: string,
    * }} spec
    */
   function addAccount(spec) {
     const company = spec.omitCompany ? null : spec.company || null;
+    const companyField = spec.companyField || "companyUID";
     const phoneNumber = nextPhone();
     const status = spec.status || "approved";
     const isActive = spec.isActive !== undefined ? spec.isActive : status !== "suspended";
@@ -368,20 +470,23 @@ function buildPlan() {
       organizationName: ORG_NAME,
     };
     if (company) {
-      user.companyUID = company.id;
+      user[companyField] = company.id;
       user.companyName = company.name;
     }
+    if (spec.extra) Object.assign(user, spec.extra);
     const account = {
       uid: spec.uid,
       email: spec.email,
       phoneNumber,
       role: spec.role,
       displayName: spec.displayName,
-      companyUID: company ? company.id : "",
+      companyUID: company && companyField === "companyUID" ? company.id : "",
       companyName: company ? company.name : "",
       status,
       isActive,
     };
+    if (company && companyField === "companyId") account.companyId = company.id;
+    if (spec.shape) account.shape = spec.shape;
     if (spec.delegate) {
       Object.assign(user, spec.delegate);
       user.uid = spec.uid;
@@ -504,6 +609,11 @@ function buildPlan() {
     }
   }
 
+  for (const spec of ROLE_SHAPE_ACCOUNTS) {
+    const company = spec.company ? COMPANIES.find((c) => c.id.endsWith(spec.company)) : null;
+    addAccount({...spec, company, omitCompany: !company});
+  }
+
   assertPlanSafe({seedTag: SEED_TAG, organizationId: ORG_ID, accounts, writes});
   return {seedTag: SEED_TAG, organizationId: ORG_ID, accounts, writes};
 }
@@ -528,7 +638,7 @@ function assertPlanSafe(plan) {
     if (account.phoneNumber === "01508899965") {
       throw new Error("refusing a known real phone number");
     }
-    if (account.role === "hr" && !account.companyUID) {
+    if (HR_ROLES.has(account.role) && !account.companyUID && !account.companyId) {
       throw new Error(`HR account ${account.email} must belong to a company`);
     }
   }
@@ -630,14 +740,17 @@ function formatDryRun(plan) {
   ];
   for (const write of plan.writes) {
     const company = write.data.companyUID ? ` companyUID=${write.data.companyUID}` : "";
+    const legacyCompany = write.data.companyId ? ` companyId=${write.data.companyId}` : "";
     const role = write.data.role ? ` role=${write.data.role}` : "";
-    lines.push(`  ${write.kind} ${write.path}${role}${company}`);
+    lines.push(`  ${write.kind} ${write.path}${role}${company}${legacyCompany}`);
   }
   lines.push("accounts (no passwords):");
   for (const account of plan.accounts) {
     const company = account.companyUID || "(none)";
+    const legacyCompany = account.companyId ? ` companyId=${account.companyId}` : "";
+    const shape = account.shape ? ` shape="${account.shape}"` : "";
     lines.push(
-      `  ${account.role} ${account.email} phone=${account.phoneNumber} companyUID=${company} status=${account.status}`,
+      `  ${account.role} ${account.email} phone=${account.phoneNumber} companyUID=${company}${legacyCompany} status=${account.status}${shape}`,
     );
   }
   lines.push("passwords: not generated in dry-run.");
@@ -912,7 +1025,9 @@ function publicCatalog(plan = buildPlan()) {
     email: account.email,
     phoneNumber: account.phoneNumber,
     companyUID: account.companyUID || "",
+    ...(account.companyId ? {companyId: account.companyId} : {}),
     status: account.status,
+    ...(account.shape ? {shape: account.shape} : {}),
   }));
 }
 
@@ -923,6 +1038,8 @@ module.exports = {
   ORG_ID,
   PASSWORD_FILE_NAME,
   COMPANIES,
+  HR_ROLES,
+  ROLE_SHAPE_ACCOUNTS,
   normalizeProject,
   assertDevProject,
   assertCredentialProject,
@@ -935,6 +1052,7 @@ module.exports = {
   passwordFromBytes,
   assertPasswordFilePath,
   buildPlan,
+  assertPlanSafe,
   assertNoSecretKeys,
   docDeletable,
   decideUserCleanup,

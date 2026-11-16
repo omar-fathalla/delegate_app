@@ -65,6 +65,26 @@ class PenaltyRepositoryImpl implements PenaltyRepository {
   }
 
   @override
+  Future<Either<Failure, List<PenaltyEntity>>> getOwnPenalties({
+    required String uid,
+    required String companyId,
+    String? phoneNumber,
+  }) async {
+    try {
+      final list = await remoteDataSource.getOwnPenalties(
+        uid: uid,
+        companyId: companyId,
+        phoneNumber: phoneNumber,
+      );
+      return Right(list);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (_) {
+      return const Left(ServerFailure('حدث خطأ أثناء جلب مخالفاتك.'));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<PenaltyEntity>>> getAllPenalties() async {
     try {
       final list = await remoteDataSource.getAllPenalties();

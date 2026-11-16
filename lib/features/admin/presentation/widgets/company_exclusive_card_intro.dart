@@ -11,6 +11,14 @@ class CompanyExclusiveCardIntro extends StatelessWidget {
   final bool isArabic;
   final bool isFreePromotion;
 
+  static const String badgeAr = 'ميزة حصرية للشركات';
+  static const String freeUntilAr = 'مجاناً حتى 31/12';
+  static const String titleAr = 'متابعة مناديبك في كافة السلاسل من مكان واحد';
+  static const String bodyFreeAr =
+      'يمكنك الآن إضافة المناديب للسلاسل والمنظمات الأخرى ومتابعة حضورهم وانصرافهم ورفع التصوير مجاناً بالكامل حتى 31/12 بدون أي رسوم اشتراك.';
+  static const String bodyAr =
+      'الآن يمكن لشركتك إضافة ومتابعة حضور وانصراف مناديبها المتواجدين في فروع السلاسل التجارية والمنظمات الأخرى، مع تقارير انضباط ميداني موحدة ولحظية.';
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -37,7 +45,7 @@ class CompanyExclusiveCardIntro extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    isArabic ? 'ميزة حصرية للشركات' : 'Exclusive for Companies',
+                    isArabic ? badgeAr : 'Exclusive for Companies',
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.bold,
@@ -50,7 +58,10 @@ class CompanyExclusiveCardIntro extends StatelessWidget {
             if (isFreePromotion) ...[
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFDCFCE7),
                   borderRadius: BorderRadius.circular(20),
@@ -66,7 +77,7 @@ class CompanyExclusiveCardIntro extends StatelessWidget {
                     ),
                     SizedBox(width: 5),
                     Text(
-                      'مجاناً حتى 31/12',
+                      freeUntilAr,
                       style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.bold,
@@ -100,7 +111,7 @@ class CompanyExclusiveCardIntro extends StatelessWidget {
             Expanded(
               child: Text(
                 isArabic
-                    ? 'متابعة مناديبك في كافة السلاسل من مكان واحد'
+                    ? titleAr
                     : 'Track Your Delegates Across All Retail Chains',
                 style: TextStyle(
                   fontSize: 15.5,
@@ -117,9 +128,7 @@ class CompanyExclusiveCardIntro extends StatelessWidget {
         // نص الوصف
         Text(
           isArabic
-              ? (isFreePromotion
-                  ? 'يمكنك الآن إضافة المناديب للسلاسل والمنظمات الأخرى ومتابعة حضورهم وانصرافهم ورفع التصوير مجاناً بالكامل حتى 31/12 بدون أي رسوم اشتراك.'
-                  : 'الآن يمكن لشركتك إضافة ومتابعة حضور وانصراف مناديبها المتواجدين في فروع السلاسل التجارية والمنظمات الأخرى، مع تقارير انضباط ميداني موحدة ولحظية.')
+              ? (isFreePromotion ? bodyFreeAr : bodyAr)
               : 'Your company can now add and track delegate attendance across partner retail chains and organizations in real time from this dashboard.',
           style: TextStyle(
             fontSize: 13,
@@ -128,7 +137,6 @@ class CompanyExclusiveCardIntro extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-
       ],
     );
   }

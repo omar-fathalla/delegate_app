@@ -185,6 +185,13 @@ class HRAttendanceViewData {
   final ValueChanged<String> onBranchChanged;
   final Future<void> Function() onRefresh;
 
+  /// Every company delegate's record for [selectedDate], before filters.
+  final List<HRAttendanceRecord> allRecords;
+  final Map<String, Branch> branchesByName;
+
+  /// Reloads delegates, branches and attendance and clears [errorMessage].
+  final Future<void> Function()? onReload;
+
   const HRAttendanceViewData({
     required this.isLoading,
     required this.errorMessage,
@@ -203,6 +210,9 @@ class HRAttendanceViewData {
     required this.onChainChanged,
     required this.onBranchChanged,
     required this.onRefresh,
+    this.allRecords = const [],
+    this.branchesByName = const {},
+    this.onReload,
   });
 }
 
@@ -835,6 +845,9 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
         },
         onBranchChanged: (val) => setState(() => _selectedBranch = val),
         onRefresh: _fetchAttendanceForSelectedDate,
+        allRecords: _records,
+        branchesByName: _branchesByName,
+        onReload: _loadInitialData,
       );
 
   List<HRAttendanceRecord> get _filteredRecords {

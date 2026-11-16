@@ -38,6 +38,16 @@ class LoadAllPenaltiesEvent extends PenaltyEvent {
   const LoadAllPenaltiesEvent();
 }
 
+/// Penalties issued to [user] (a staff member such as HR), never anyone else's.
+class LoadOwnPenaltiesEvent extends PenaltyEvent {
+  final Delegate user;
+
+  const LoadOwnPenaltiesEvent(this.user);
+
+  @override
+  List<Object?> get props => [user.uid, user.companyUID, user.phoneNumber];
+}
+
 class CreatePenaltyRequestedEvent extends PenaltyEvent {
   final PenaltyEntity penalty;
   final List<File> evidenceFilesToUpload;

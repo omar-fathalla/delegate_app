@@ -8,6 +8,7 @@ import 'package:delegate_app/features/profile/presentation/pages/profile_screen.
 import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_main_screen.dart';
 import 'package:delegate_app/web/admin_desktop/admin_desktop_shell_web.dart';
+import 'package:delegate_app/web/hr_system/web_hr_system_redirect_web.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/admin/presentation/pages/branch_details_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/company_details_screen.dart';
@@ -15,9 +16,8 @@ import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/admin/domain/entities/company.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/marketing_main_screen.dart';
 import 'package:delegate_app/features/accountant/presentation/pages/accountant_main_screen.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_access_gate.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_login_screen.dart';
-import 'package:delegate_app/features/hr/presentation/pages/hr_main_screen.dart';
-import 'package:delegate_app/features/hr/presentation/pages/hr_delegate_attendance_detail_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/privacy_policy_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
@@ -86,6 +86,12 @@ final appRouter = GoRouter(
             child: const SplashScreen(),
           );
         }
+        if (WebHrSystemRedirect.appliesTo(delegate)) {
+          return AppMotionPage.fadeThrough(
+            state: state,
+            child: WebHrSystemRedirect(delegate: delegate),
+          );
+        }
         return AppMotionPage.fadeThrough(
           state: state,
           child: MainScreen(
@@ -112,6 +118,13 @@ final appRouter = GoRouter(
           return AppMotionPage.fadeThrough(
             state: state,
             child: const SplashScreen(),
+          );
+        }
+        if (WebHrSystemRedirect.appliesTo(delegate)) {
+          AdminDesktopShellWeb.clearPendingPage();
+          return AppMotionPage.fadeThrough(
+            state: state,
+            child: WebHrSystemRedirect(delegate: delegate),
           );
         }
         return AppMotionPage.fadeThrough(
@@ -179,7 +192,7 @@ final appRouter = GoRouter(
         }
         return AppMotionPage.fadeThrough(
           state: state,
-          child: HRMainScreen(delegate: delegate),
+          child: hrHomeRouteChild(delegate),
         );
       },
     ),
@@ -195,7 +208,7 @@ final appRouter = GoRouter(
         }
         return AppMotionPage.fadeThrough(
           state: state,
-          child: HRDelegateAttendanceDetailScreen(delegate: delegate),
+          child: hrAttendanceDetailRouteChild(context, delegate),
         );
       },
     ),

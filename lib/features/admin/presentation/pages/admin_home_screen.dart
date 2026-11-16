@@ -1222,6 +1222,64 @@ class AdminHomeChainChips extends StatelessWidget with _AdminHomeHelpers {
   }
 }
 
+/// One «دليل المهام والمسؤوليات» entry.
+class AdminHomeDuty {
+  final IconData icon;
+  final String title;
+  final String desc;
+
+  const AdminHomeDuty({
+    required this.icon,
+    required this.title,
+    required this.desc,
+  });
+}
+
+/// Duty texts for [delegate]'s role (organization admin or company staff).
+List<AdminHomeDuty> adminHomeDuties(Delegate delegate, {required bool isArabic}) {
+  if (delegate.role == UserRole.organizationAdmin) {
+    return [
+      AdminHomeDuty(
+        icon: Icons.corporate_fare_rounded,
+        title: isArabic ? '1. الإشراف العام على العمليات والفروع:' : '1. Overall Operations & Branch Oversight:',
+        desc: isArabic ? 'متابعة تقارير الفروع وسير العمل اليومي للمناديب والشركات على مستوى المؤسسة بالكامل.' : 'Monitor branch performance and delegate attendance across all operating companies.',
+      ),
+      AdminHomeDuty(
+        icon: Icons.gavel_rounded,
+        title: isArabic ? '2. الاعتماد النهائي للمخالفات والغرامات:' : '2. Final Approval on Significant Penalties:',
+        desc: isArabic ? 'مراجعة واعتماد الغرامات والمخالفات الميدانية الكبرى المحالة من إدارة التسويق (> 1000 ج.م).' : 'Review and grant final authorization on large penalties escalated by marketing (> 1000 EGP).',
+      ),
+      AdminHomeDuty(
+        icon: Icons.analytics_rounded,
+        title: isArabic ? '3. متابعة تقارير الحضور والإنجاز:' : '3. Performance & Attendance Analytics:',
+        desc: isArabic ? 'تحليل مؤشرات الأداء ونسب حضور المناديب والتقارير الشهرية المصورة على مستوى الفروع.' : 'Analyze key performance metrics, check-in compliance, and monthly photo reports.',
+      ),
+    ];
+  }
+  return [
+      AdminHomeDuty(
+        icon: Icons.groups_rounded,
+        title: isArabic ? '1. متابعة حضور وانضباط مناديب الشركة:' : '1. Delegate Attendance & Compliance Tracking:',
+        desc: isArabic ? 'الإشراف اليومي على تسجيل حضور وغياب مناديب شركتكم بالفرع ومتابعة نسب التواجد والالتزام بمواعيد العمل.' : 'Daily oversight of vendor delegates check-ins, attendance rates, and adherence to working hours.',
+      ),
+      AdminHomeDuty(
+        icon: Icons.camera_enhance_rounded,
+        title: isArabic ? '2. إدارة وتفعيل أذونات التصوير:' : '2. Manage & Activate Photo Permissions:',
+        desc: isArabic ? 'تقديم طلبات إذن التصوير، وتفعيل أو تعطيل الأذونات لمناديب الشركة، ومتابعة رفع التقارير الشهرية المصورة.' : 'Request, activate, or disable photo permits for delegates, and inspect monthly uploaded photo reports.',
+      ),
+      AdminHomeDuty(
+        icon: Icons.gavel_rounded,
+        title: isArabic ? '3. متابعة وضبط المخالفات والغرامات:' : '3. Track Penalties & Rule Enforcement:',
+        desc: isArabic ? 'مراجعة المخالفات والغرامات المسجلة على مناديب الشركة، والتحقق من تفاصيلها لتلافي الخصومات وضمان الالتزام.' : 'Review penalties recorded on vendor delegates, verify incident details, and prevent fine deductions.',
+      ),
+      AdminHomeDuty(
+        icon: Icons.assignment_turned_in_rounded,
+        title: isArabic ? '4. توجيه وتكليف مهام العمل:' : '4. Assign & Supervise Field Tasks:',
+        desc: isArabic ? 'توزيع المهام الميدانية والتعليمات الترويجية على المناديب ومتابعة نسب الإنجاز عبر تبويب المهام.' : 'Distribute field assignments to company delegates and monitor task completion status in real time.',
+      ),
+  ];
+}
+
 /// «دليل المهام والمسؤوليات» list.
 class AdminHomeDutiesGuide extends StatelessWidget with _AdminHomeHelpers {
   @override
@@ -1258,78 +1316,16 @@ class AdminHomeDutiesGuide extends StatelessWidget with _AdminHomeHelpers {
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final isOrgAdmin = adminDelegate.role == UserRole.organizationAdmin;
     final fg = foreground;
+    final duties = adminHomeDuties(adminDelegate, isArabic: isArabic);
     final bullets = <Widget>[
-          if (isOrgAdmin) ...[
-            _buildDuty(
-              icon: Icons.corporate_fare_rounded,
-              title: isArabic
-                  ? '1. الإشراف العام على العمليات والفروع:'
-                  : '1. Overall Operations & Branch Oversight:',
-              desc: isArabic
-                  ? 'متابعة تقارير الفروع وسير العمل اليومي للمناديب والشركات على مستوى المؤسسة بالكامل.'
-                  : 'Monitor branch performance and delegate attendance across all operating companies.',
-            ),
-            const SizedBox(height: 8),
-            _buildDuty(
-              icon: Icons.gavel_rounded,
-              title: isArabic
-                  ? '2. الاعتماد النهائي للمخالفات والغرامات:'
-                  : '2. Final Approval on Significant Penalties:',
-              desc: isArabic
-                  ? 'مراجعة واعتماد الغرامات والمخالفات الميدانية الكبرى المحالة من إدارة التسويق (> 1000 ج.م).'
-                  : 'Review and grant final authorization on large penalties escalated by marketing (> 1000 EGP).',
-            ),
-            const SizedBox(height: 8),
-            _buildDuty(
-              icon: Icons.analytics_rounded,
-              title: isArabic
-                  ? '3. متابعة تقارير الحضور والإنجاز:'
-                  : '3. Performance & Attendance Analytics:',
-              desc: isArabic
-                  ? 'تحليل مؤشرات الأداء ونسب حضور المناديب والتقارير الشهرية المصورة على مستوى الفروع.'
-                  : 'Analyze key performance metrics, check-in compliance, and monthly photo reports.',
-            ),
-          ] else ...[
-            _buildDuty(
-              icon: Icons.groups_rounded,
-              title: isArabic
-                  ? '1. متابعة حضور وانضباط مناديب الشركة:'
-                  : '1. Delegate Attendance & Compliance Tracking:',
-              desc: isArabic
-                  ? 'الإشراف اليومي على تسجيل حضور وغياب مناديب شركتكم بالفرع ومتابعة نسب التواجد والالتزام بمواعيد العمل.'
-                  : 'Daily oversight of vendor delegates check-ins, attendance rates, and adherence to working hours.',
-            ),
-            const SizedBox(height: 8),
-            _buildDuty(
-              icon: Icons.camera_enhance_rounded,
-              title: isArabic
-                  ? '2. إدارة وتفعيل أذونات التصوير:'
-                  : '2. Manage & Activate Photo Permissions:',
-              desc: isArabic
-                  ? 'تقديم طلبات إذن التصوير، وتفعيل أو تعطيل الأذونات لمناديب الشركة، ومتابعة رفع التقارير الشهرية المصورة.'
-                  : 'Request, activate, or disable photo permits for delegates, and inspect monthly uploaded photo reports.',
-            ),
-            const SizedBox(height: 8),
-            _buildDuty(
-              icon: Icons.gavel_rounded,
-              title: isArabic
-                  ? '3. متابعة وضبط المخالفات والغرامات:'
-                  : '3. Track Penalties & Rule Enforcement:',
-              desc: isArabic
-                  ? 'مراجعة المخالفات والغرامات المسجلة على مناديب الشركة، والتحقق من تفاصيلها لتلافي الخصومات وضمان الالتزام.'
-                  : 'Review penalties recorded on vendor delegates, verify incident details, and prevent fine deductions.',
-            ),
-            const SizedBox(height: 8),
-            _buildDuty(
-              icon: Icons.assignment_turned_in_rounded,
-              title: isArabic
-                  ? '4. توجيه وتكليف مهام العمل:'
-                  : '4. Assign & Supervise Field Tasks:',
-              desc: isArabic
-                  ? 'توزيع المهام الميدانية والتعليمات الترويجية على المناديب ومتابعة نسب الإنجاز عبر تبويب المهام.'
-                  : 'Distribute field assignments to company delegates and monitor task completion status in real time.',
-            ),
-          ],
+      for (var i = 0; i < duties.length; i++) ...[
+        if (i > 0) const SizedBox(height: 8),
+        _buildDuty(
+          icon: duties[i].icon,
+          title: duties[i].title,
+          desc: duties[i].desc,
+        ),
+      ],
     ];
     final title = <Widget>[
           // دليل المهام والمسؤوليات
@@ -1393,6 +1389,33 @@ class AdminHomePromoCard extends StatelessWidget with _AdminHomeHelpers {
       isArabic,
     );
   }
+}
+
+/// The promo card's «إضافة مندوب» action.
+void openAdminHomeAddDelegate(BuildContext context, Delegate supervisor) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => AddDelegateFormScreen(supervisor: supervisor),
+    ),
+  );
+}
+
+/// The promo card's «كيفية الربط» dialog.
+void showAdminHomeLinkingGuide(BuildContext context, Delegate supervisor) {
+  final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+  _AdminHomeActions(supervisor)._showHowItWorksDialog(
+    context,
+    Theme.of(context).colorScheme,
+    isArabic,
+  );
+}
+
+class _AdminHomeActions with _AdminHomeHelpers {
+  _AdminHomeActions(this.adminDelegate);
+
+  @override
+  final Delegate adminDelegate;
 }
 
 /// «نظرة عامة اليوم»: title, date and the summary cards (AdminDashboardBloc).

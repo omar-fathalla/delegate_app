@@ -119,7 +119,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
               '🚀 HrLoginScreen: AuthAuthenticated received! name=${delegate.fullName}, role=${delegate.role}, uid=${delegate.uid}',
             );
             try {
-              final path = homePathForRole(delegate.role);
+              final path = landingPathForRole(delegate.role);
               debugPrint('🚀 HrLoginScreen: Navigating to $path');
               context.go(path, extra: delegate);
             } catch (e, stack) {

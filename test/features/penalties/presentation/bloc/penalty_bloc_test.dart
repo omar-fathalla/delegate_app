@@ -295,4 +295,84 @@ void main() {
       ],
     );
   });
+
+  group('LoadOwnPenaltiesEvent', () {
+    final tHr = Delegate(
+      uid: 'seed-fake-hr-006',
+      firstName: 'موارد',
+      middleName: '',
+      lastName: 'وهمي',
+      fullName: 'موارد وهمي',
+      nationalityID: '',
+      motherName: '',
+      city: '',
+      phoneNumber: '01000000006',
+      gender: DelegateGender.male,
+      position: DelegatePosition.supervisor,
+      paymentAmount: 0.0,
+      birthDate: DateTime(1990, 1, 1),
+      organizationUID: 'org_123',
+      organizationName: 'Org',
+      companyUID: 'company_123',
+      companyName: 'Direct',
+      status: DelegateStatus.active,
+      delegatePublicId: '',
+      allReceiptCodes: const [],
+      createdAt: DateTime(2023, 1, 1),
+      createdBy: 'admin',
+      hasPendingUpdate: false,
+      isDeductedFromCompany: false,
+      isPrinted: false,
+      isProfileComplete: true,
+      numberOfDocuments: 0,
+      version: 1,
+      documents: const [],
+      role: UserRole.hr,
+    );
+
+    blocTest<PenaltyBloc, PenaltyState>(
+      'loads only the user\'s own penalties by uid, company and phone',
+      build: () {
+        when(() => mockPenaltyRepository.getOwnPenalties(
+              uid: any(named: 'uid'),
+              companyId: any(named: 'companyId'),
+              phoneNumber: any(named: 'phoneNumber'),
+            )).thenAnswer((_) async => Right([tPenaltyEntity]));
+        return bloc;
+      },
+      act: (bloc) => bloc.add(LoadOwnPenaltiesEvent(tHr)),
+      expect: () => [
+        isA<PenaltyLoadingState>(),
+        isA<PenaltyLoadedState>()
+            .having((s) => s.penalties, 'penalties', [tPenaltyEntity])
+            .having((s) => s.totalFineAmount, 'totalFineAmount', 50.0),
+      ],
+      verify: (_) {
+        verify(() => mockPenaltyRepository.getOwnPenalties(
+              uid: 'seed-fake-hr-006',
+              companyId: 'company_123',
+              phoneNumber: '01000000006',
+            )).called(1);
+        verifyNever(() => mockGetAllPenaltiesUseCase());
+        verifyNever(() => mockGetCompanyPenaltiesUseCase(
+              any(),
+              organizationId: any(named: 'organizationId'),
+            ));
+      },
+    );
+
+    blocTest<PenaltyBloc, PenaltyState>(
+      'emits an error state when the own query fails',
+      build: () {
+        when(() => mockPenaltyRepository.getOwnPenalties(
+              uid: any(named: 'uid'),
+              companyId: any(named: 'companyId'),
+              phoneNumber: any(named: 'phoneNumber'),
+            )).thenAnswer((_) async => const Left(ServerFailure('Error')));
+        return bloc;
+      },
+      act: (bloc) => bloc.add(LoadOwnPenaltiesEvent(tHr)),
+      expect: () => [isA<PenaltyLoadingState>(), isA<PenaltyErrorState>()],
+    );
+  });
 }
