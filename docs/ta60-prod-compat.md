@@ -56,7 +56,9 @@ Regenerate closure table (requires Firestore emulator): `node scripts/ta60_closu
 | `test:rules:prod-compat` | **2/2** (FS **0** unexpected, ST **0**) |
 | `functions` `invite_email_index_logic` unit | pass (after `npm run build`) |
 
-Expr-budget: URG approve paths may log “maximum of 1000 expressions” on denied candidate writes — counted as deliberate/denied compat, not harness failures.## Firestore deliberate closures (59) — classification @ harness `9f86350`
+Expr-budget: URG approve paths may log “maximum of 1000 expressions” on denied candidate writes — counted as deliberate/denied compat, not harness failures.
+
+## Firestore deliberate closures (59) — classification @ harness `9f86350`
 
 **Harness:** `test/rules/ta60/firestore_compat.mjs` vs `live.rules` (ruleset 4daaee78). Deliberate = `isDeliberateFirestoreRegression()` (20 named + 39 `list bell:`).
 
@@ -67,11 +69,44 @@ Expr-budget: URG approve paths may log “maximum of 1000 expressions” on deni
 | **(c)** | **≤1.14.1** / anonymous only | 2 |
 | **(d)** | Silent / partial degrade (try/catch, unbatched harness-only; **not** bell lists) | 15 |
 
+### Visibility audit — class **(d)** rows (15)
+
+Code references: `lib/features/notifications/data/datasources/notification_remote_data_source.dart` (`queryAllSettled`), `lib/features/admin/data/datasources/delegate_hold_remote.dart` (`setDelegateHold` callable), `lib/features/admin/data/chain_duplicate_lookup.dart` (fail-closed), `delegate_subscription_repository_impl.dart` (`WriteBatch` approve).
+
+| ID | Harness case | Web visible? | App 1.14.3 visible? | Verdict | Action |
+|----|--------------|--------------|---------------------|---------|--------|
+| FS-01 | delegate CG `nationalityID` (try/catch) | No (web N/A) | No — login is phone CG + `delegate_login_api`; harness is secondary | **OK (d)** | None |
+| FS-02 | delegate `users` by supervisor phone | No | No — attendance loops company `users` queries in `catch (_) {}` (`attendance_remote_data_source.dart`) | **OK (d)** | None |
+| FS-03 | supervisor CG phone dup-check | No | **Yes** — `DuplicateChainLookupException` snackbar | **MISCLASS → (b)** | Stream 2 **P2** org-scoped dup list |
+| FS-04 | supervisor CG nationalId dup-check | No | **Yes** | **MISCLASS → (b)** | Stream 2 **P2** |
+| FS-05 | supervisor CG receiptCode dup-check | No | **Yes** | **MISCLASS → (b)** | Stream 2 **P2** |
+| FS-06 | supervisor `delegate_requests` receiptCode | No | **Yes** | **MISCLASS → (b)** | Stream 2 **P3a** |
+| FS-07 | supervisor `users` role notify | No | No — penalty notify wrapped in `catch (_) {}`; primary staff path is `listGlobalNotifyStaff` (TA-35) | **OK (d)** | None |
+| FS-08 | supervisor company broadcast notif **read** | **Yes** (partial bell) | **Yes** (partial bell) | **MISCLASS → (a,b)** | Stream 2 **P0-A** (same as NOTIF bell) |
+| FS-09 | supervisor delegate **suspend** update | Depends on web direct write | No — **1.14.3 uses `setDelegateHold` callable**, not client `update` | **Harness/web (b)**; app OK at **(d)** | **Stream 2** narrow nested **ALLOW** (removes Mohamed blocker) |
+| FS-11 | TS approve unbatched | No | No — prod uses `WriteBatch` (`approveSubscriptionRequest`) | **OK (d)** | None (H1/H2 closure) |
+| FS-12 | SA approve unbatched | No | No | **OK (d)** | None |
+| FS-13 | TS provision step2c unbatched | No | No | **OK (d)** | None |
+| FS-15 | URG supervisor broadcast notif **read** | **Yes** | **Yes** | **MISCLASS → (a,b)** | Stream 2 **P0-A** |
+| FS-16 | URG TS approve step1 unbatched | No | No | **OK (d)** | None |
+| FS-17 | URG TS step2c unbatched | No | No | **OK (d)** | None |
+| FS-18 | URG SA approve step1 unbatched | No | No | **OK (d)** | None |
+
+**Audit summary**
+
+| Verdict | IDs | Count |
+|---------|-----|------:|
+| Confirmed silent **(d)** | FS-01, FS-02, FS-07, FS-11–13, FS-16–18 | **9** |
+| **Misclassified** (need Firebase fix, not silent) | FS-03–06 → **(b)**; FS-08, FS-15 → **(a,b)** | **6** |
+| FS-09 | Callable-safe on app; rules **ALLOW** landing in Stream 2 for harness/web suspend write | **1** |
+
+Keep main table **(d)** labels until integrator merges Stream 2; use this audit for fix priority.
+
 ### Mohamed decision — unsafe (a)/(b) without safe Firebase-only path (**no widen**)
 
 | ID | Harness case | Screen / flow | Blocker |
 |----|--------------|---------------|---------|
-| FS-09 | supervisor update delegate doc status (suspend) | Supervisor delegate suspend/hold | Expr-budget / nested delegate update; narrow supervisor status allow in company **or** accept closure / future callable — **no** H1 global delegate write reopen. |
+| FS-09 | supervisor update delegate doc status (suspend) | Supervisor delegate suspend/hold | **Stream 2 in progress:** narrow nested status ALLOW. App **1.14.3** already uses `setDelegateHold` (callable) — not blocked by rules deny on client `update`. |
 
 ### Full closure table
 
@@ -85,7 +120,7 @@ Expr-budget: URG approve paths may log “maximum of 1000 expressions” on deni
 | FS-06 | APP-S | supervisor delegate_requests where receiptCode (try/catch) | (d) | Supervisor registration receiptCode dup | Yes — narrow org-scoped CG/delegate_requests list (Stream 2 / P2–P3a; no REQUEST CHANGES widen) | — |
 | FS-07 | APP-S | supervisor users where role in [super-admin...] (notify, try/catch) | (d) | Penalty fan-out staff lookup | Yes — `listGlobalNotifyStaff` callable (live TA-35); rules deny client enumerate | — |
 | FS-08 | APP-S | supervisor read company broadcast notifications (delegateUid in [supervisor_co, company_co]) | (d) | Supervisor notification bell (company broadcasts) | Yes — P0-A notification list wiring; bell merges via `queryAllSettled` (other uid queries may still succeed) | — |
-| FS-09 | APP-S | supervisor update delegate doc status (suspend) | (b) | Supervisor delegate suspend/hold | Maybe — narrow supervisor status-only update in company; expr-budget risk if nested helpers run | YES — if Stream 2 cannot land narrow suspend without HR/delegate write widen |
+| FS-09 | APP-S | supervisor update delegate doc status (suspend) | (b) | Supervisor delegate suspend/hold | Stream 2 narrow nested ALLOW; app uses `setDelegateHold` callable (see visibility audit) | Stream 2 ALLOW (callable covers app) |
 | FS-10 | RC | supervisor registration nationalId dup-check listen (nationalId query) | (b) | Supervisor registration realtime dup listener | Yes — org-scoped CG dup list (P2) | — |
 | FS-11 | APP-S | tech support approve request (update status approved) | (d) | TS approve subscription request (unbatched harness) | Yes — 1.14.3 approval uses WriteBatch; harness tests forbidden unbatched path (H1/H2). No client widen. | — |
 | FS-12 | APP-S | super-admin approve request (update status approved, main step 1) | (d) | SA approve subscription request (unbatched harness) | Yes — 1.14.3 approval uses WriteBatch; harness tests forbidden unbatched path (H1/H2). No client widen. | — |
@@ -140,7 +175,8 @@ Expr-budget: URG approve paths may log “maximum of 1000 expressions” on deni
 **Notes**
 - **NOTIF-READ (39):** All classified **(a,b)** — denied bell queries are **user-visible** (missing broadcasts on live web + app 1.14.3). **Stream 2** delivers P0-A scoped list ALLOW fixes; no reclassify as **(d)**.
 - **Approve / provision (6):** **(d)** for 1.14.3 — app uses `WriteBatch`; harness closes unbatched paths (**H1/H2**).
-- **Dup-check try/catch (5):** UI fails closed on total deny; Stream 2 **P2/P3a** restores org-scoped lists.
+- **Dup-check try/catch (5):** UI fails closed on total deny — audit marks **(b)**, not **(d)**; Stream 2 **P2/P3a** restores org-scoped lists.
+- **FS-08 / FS-15:** Supervisor broadcast **read** shapes are bell merges — audit marks **(a,b)** like NOTIF; covered by Stream 2 **P0-A**.
 
 ## Deferred / M3
 
