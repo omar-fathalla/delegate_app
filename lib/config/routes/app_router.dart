@@ -7,6 +7,7 @@ import 'package:delegate_app/features/profile/presentation/pages/user_profile_sc
 import 'package:delegate_app/features/profile/presentation/pages/profile_screen.dart';
 import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_main_screen.dart';
+import 'package:delegate_app/web/admin_desktop/admin_desktop_shell_web.dart';
 import 'package:delegate_app/features/admin/presentation/pages/branch_details_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/company_details_screen.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
@@ -98,7 +99,12 @@ final appRouter = GoRouter(
         }
         return AppMotionPage.fadeThrough(
           state: state,
-          child: AdminMainScreen(delegate: delegate),
+          // Web-only desktop shell (>= 840dp); mobile/narrow keep AdminMainScreen.
+          child: Builder(
+            builder: (context) => AdminDesktopShellWeb.shouldUse(context, delegate)
+                ? AdminDesktopShellWeb(delegate: delegate)
+                : AdminMainScreen(delegate: delegate),
+          ),
         );
       },
     ),
