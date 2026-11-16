@@ -2,24 +2,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/widgets/universal_app_header.dart';
 import 'package:delegate_app/core/widgets/app_logout_modal.dart';
-import 'package:delegate_app/features/admin/presentation/pages/anti_fraud_audit_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/subscription_renewal_screen.dart';
 import 'package:delegate_app/features/admin/domain/entities/subscription_renewal.dart';
-import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
-import 'package:delegate_app/features/hr/presentation/pages/hr_device_unbind_requests_screen.dart';
-import 'package:delegate_app/features/hr/presentation/pages/hr_leaves_and_excuses_screen.dart';
-import 'package:delegate_app/features/hr/presentation/pages/hr_monthly_payroll_screen.dart';
-import 'package:delegate_app/features/hr/presentation/pages/tabs/hr_attendance_tab.dart';
-import 'package:delegate_app/features/hr/presentation/pages/tabs/hr_delegates_tab.dart';
-import 'package:delegate_app/features/hr/presentation/pages/tabs/hr_photos_tab.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_tab.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_desktop_sidebar.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_desktop_top_bar.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_more_bottom_sheet.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
-import 'package:delegate_app/features/tracking/presentation/pages/delegate_tracking_screen.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
 
@@ -193,7 +187,19 @@ class _HRMainScreenState extends State<HRMainScreen> {
       case 'attendance_adjustments':
         _onTabSelected(8);
         break;
+      case 'delegate_subscriptions':
+      case 'tasks':
+      case 'supervisor_photo_permissions':
+      case 'penalty_rules_catalog':
+      case 'penalties_management':
+        final tab = hrShellItemById(value)?.tabIndex;
+        if (tab != null) _onTabSelected(tab);
+        break;
       case 'delegate_renewal':
+        if (WebRuntimePolicy.isWeb) {
+          _onTabSelected(kHrTabRenewal);
+          break;
+        }
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => SubscriptionRenewalScreen(supervisor: delegate),
@@ -207,10 +213,8 @@ class _HRMainScreenState extends State<HRMainScreen> {
         // Policy: Settings MUST always be the last item in the menu
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => SettingsScreen(
-              delegate: delegate,
-              showAppBar: true,
-            ),
+            builder: (_) =>
+                SettingsScreen(delegate: delegate, showAppBar: true),
           ),
         );
         break;
@@ -230,23 +234,21 @@ class _HRMainScreenState extends State<HRMainScreen> {
       required String value,
       required Widget icon,
       required String title,
+      Color? color,
     }) {
       return PopupMenuItem<String>(
         value: value,
         child: Row(
           children: [
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: Center(child: icon),
-            ),
+            SizedBox(width: 24, height: 24, child: Center(child: icon)),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w500,
+                  color: color,
                 ),
               ),
             ),
@@ -255,71 +257,128 @@ class _HRMainScreenState extends State<HRMainScreen> {
       );
     }
 
+    if (WebRuntimePolicy.isWeb) {
+      final entries = <PopupMenuEntry<String>>[];
+      for (final item in hrShellItems(
+        delegate: widget.delegate,
+        isWeb: true,
+        placement: HrShellPlacement.compactMenu,
+      )) {
+        if (item.id == 'settings') entries.add(const PopupMenuDivider());
+        final icon = item.badgeCollection == 'leave_requests'
+            ? _buildLeaveRequestsBadge(
+                Icon(item.selectedIcon, color: colorScheme.primary, size: 20),
+                colorScheme,
+              )
+            : item.badgeCollection == 'device_unbind_requests'
+            ? _buildDeviceRequestsBadge(
+                Icon(item.selectedIcon, color: colorScheme.primary, size: 20),
+                colorScheme,
+              )
+            : Icon(
+                item.selectedIcon,
+                color: item.destructive
+                    ? colorScheme.error
+                    : item.id == 'delegate_renewal'
+                    ? colorScheme.tertiary
+                    : colorScheme.primary,
+                size: 20,
+              );
+        entries.add(
+          buildMenuItem(
+            value: item.id,
+            icon: icon,
+            title: item.title,
+            color: item.destructive ? colorScheme.error : null,
+          ),
+        );
+      }
+      return entries;
+    }
+
     return [
       buildMenuItem(
         value: 'profile',
-        icon: Icon(Icons.person_outline_rounded,
-            color: colorScheme.primary, size: 20),
+        icon: Icon(
+          Icons.person_outline_rounded,
+          color: colorScheme.primary,
+          size: 20,
+        ),
         title: l10n.profile,
       ),
       buildMenuItem(
         value: 'attendance',
-        icon: Icon(Icons.how_to_reg_rounded,
-            color: colorScheme.primary, size: 20),
+        icon: Icon(
+          Icons.how_to_reg_rounded,
+          color: colorScheme.primary,
+          size: 20,
+        ),
         title: 'الحضور والانصراف',
       ),
       buildMenuItem(
         value: 'delegates',
-        icon: Icon(Icons.badge_rounded,
-            color: colorScheme.primary, size: 20),
+        icon: Icon(Icons.badge_rounded, color: colorScheme.primary, size: 20),
         title: 'مناديب الشركة',
       ),
       buildMenuItem(
         value: 'delegate_tracking',
-        icon: Icon(Icons.radar_rounded,
-            color: colorScheme.primary, size: 20),
+        icon: Icon(Icons.radar_rounded, color: colorScheme.primary, size: 20),
         title: 'Live Tracking',
       ),
       buildMenuItem(
         value: 'leaves_and_excuses',
         icon: _buildLeaveRequestsBadge(
-          Icon(Icons.event_note_rounded,
-              color: colorScheme.primary, size: 20),
+          Icon(Icons.event_note_rounded, color: colorScheme.primary, size: 20),
           colorScheme,
         ),
         title: 'طلبات الإجازات والأعذار',
       ),
       buildMenuItem(
         value: 'monthly_payroll',
-        icon: Icon(Icons.account_balance_wallet_rounded,
-            color: colorScheme.primary, size: 20),
+        icon: Icon(
+          Icons.account_balance_wallet_rounded,
+          color: colorScheme.primary,
+          size: 20,
+        ),
         title: 'مسير الرواتب والعمولات',
       ),
       buildMenuItem(
         value: 'device_unbind_requests',
         icon: _buildDeviceRequestsBadge(
-          Icon(Icons.phonelink_lock_rounded,
-              color: colorScheme.primary, size: 20),
+          Icon(
+            Icons.phonelink_lock_rounded,
+            color: colorScheme.primary,
+            size: 20,
+          ),
           colorScheme,
         ),
         title: 'طلبات فك وربط الأجهزة',
       ),
       buildMenuItem(
         value: 'anti_fraud',
-        icon: Icon(Icons.security_rounded,
-            color: colorScheme.primary, size: 20),
+        icon: Icon(
+          Icons.security_rounded,
+          color: colorScheme.primary,
+          size: 20,
+        ),
         title: 'تدقيق الأمان ومكافحة الاحتيال',
       ),
       buildMenuItem(
         value: 'field_photos',
-        icon: Icon(Icons.photo_library_rounded,
-            color: colorScheme.primary, size: 20),
+        icon: Icon(
+          Icons.photo_library_rounded,
+          color: colorScheme.primary,
+          size: 20,
+        ),
         title: 'الصور والزيارات الميدانية',
       ),
       buildMenuItem(
         value: 'attendance_adjustments',
-        icon: Icon(Icons.history_edu_rounded,
-            color: colorScheme.primary, size: 20),
+        icon: Icon(
+          Icons.history_edu_rounded,
+          color: colorScheme.primary,
+          size: 20,
+        ),
         title: 'سجل تعديلات الحضور والانصراف',
       ),
       if (canCreateSubscriptionRenewal(
@@ -328,15 +387,22 @@ class _HRMainScreenState extends State<HRMainScreen> {
       ))
         buildMenuItem(
           value: 'delegate_renewal',
-          icon: Icon(Icons.autorenew_rounded, color: colorScheme.tertiary, size: 20),
+          icon: Icon(
+            Icons.autorenew_rounded,
+            color: colorScheme.tertiary,
+            size: 20,
+          ),
           title: SubscriptionRenewalScreen.title,
         ),
       const PopupMenuDivider(),
       // Rule: Settings MUST ALWAYS BE THE LAST ITEM in the menu
       buildMenuItem(
         value: 'settings',
-        icon: Icon(Icons.settings_outlined,
-            color: colorScheme.onSurfaceVariant, size: 20),
+        icon: Icon(
+          Icons.settings_outlined,
+          color: colorScheme.onSurfaceVariant,
+          size: 20,
+        ),
         title: l10n.settings,
       ),
     ];
@@ -373,14 +439,18 @@ class _HRMainScreenState extends State<HRMainScreen> {
                 ),
           body: isWideScreen
               ? Row(
-                  textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
+                  textDirection: isArabic
+                      ? TextDirection.rtl
+                      : TextDirection.ltr,
                   children: [
                     HRDesktopSidebar(
                       delegate: delegate,
                       selectedIndex: _currentIndex,
                       isExpanded: _isSidebarExpanded,
                       onToggleExpanded: () {
-                        setState(() => _isSidebarExpanded = !_isSidebarExpanded);
+                        setState(
+                          () => _isSidebarExpanded = !_isSidebarExpanded,
+                        );
                       },
                       onItemSelected: _onTabSelected,
                       onOpenProfile: () => _onMenuSelected('profile'),
@@ -397,9 +467,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
                             onMenuSelected: _onMenuSelected,
                             menuItems: menuItems,
                           ),
-                          Expanded(
-                            child: _buildIndexedStack(delegate),
-                          ),
+                          Expanded(child: _buildIndexedStack(delegate)),
                         ],
                       ),
                     ),
@@ -460,54 +528,14 @@ class _HRMainScreenState extends State<HRMainScreen> {
     return IndexedStack(
       index: _currentIndex,
       children: [
-        HRAttendanceTab(
-          hrDelegate: delegate,
-          onNavigateToTab: _onTabSelected,
-        ),
-        _loadedTabs.contains(1)
-            ? DelegateTrackingScreen(
-                adminDelegate: delegate,
-                initialMapView: true,
-                showAppBar: false,
-              )
-            : const SizedBox.shrink(),
-        _loadedTabs.contains(2)
-            ? HRDeviceUnbindRequestsScreen(
-                hrDelegate: delegate,
-                showAppBar: false,
-              )
-            : const SizedBox.shrink(),
-        _loadedTabs.contains(3)
-            ? HRLeavesAndExcusesScreen(
-                hrDelegate: delegate,
-                showAppBar: false,
-              )
-            : const SizedBox.shrink(),
-        _loadedTabs.contains(4)
-            ? HRMonthlyPayrollScreen(
-                hrDelegate: delegate,
-                showAppBar: false,
-              )
-            : const SizedBox.shrink(),
-        _loadedTabs.contains(5)
-            ? AntiFraudAuditScreen(
-                delegate: delegate,
-                showAppBar: false,
-                initialTab: 'violations',
-              )
-            : const SizedBox.shrink(),
-        _loadedTabs.contains(6)
-            ? HRPhotosTab(hrDelegate: delegate)
-            : const SizedBox.shrink(),
-        _loadedTabs.contains(7)
-            ? HRDelegatesTab(hrDelegate: delegate)
-            : const SizedBox.shrink(),
-        _loadedTabs.contains(8)
-            ? HRAttendanceAdjustmentsScreen(
-                hrDelegate: delegate,
-                showAppBar: false,
-              )
-            : const SizedBox.shrink(),
+        for (var index = 0; index < kHrShellTabCount; index++)
+          index == 0 || _loadedTabs.contains(index)
+              ? hrShellTab(
+                  index: index,
+                  delegate: delegate,
+                  onNavigateToTab: _onTabSelected,
+                )
+              : const SizedBox.shrink(),
       ],
     );
   }

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 
@@ -44,7 +45,7 @@ class HRDesktopTopBar extends StatelessWidget {
       case 8:
         return 'سجل تعديلات الحضور والانصراف';
       default:
-        return 'بوابة الموارد البشرية';
+        return hrShellHeaderTitle(index);
     }
   }
 
@@ -72,7 +73,7 @@ class HRDesktopTopBar extends StatelessWidget {
       case 8:
         return 'أرشيف وتدقيق كافة التعديلات الإدارية على أوقات الحضور وساعات العمل';
       default:
-        return 'منظومة تسهيل السحابية لإدارة الموارد البشرية';
+        return hrShellHeaderTitle(index);
     }
   }
 
@@ -97,7 +98,7 @@ class HRDesktopTopBar extends StatelessWidget {
       case 8:
         return Icons.history_edu_rounded;
       default:
-        return Icons.business_center_rounded;
+        return hrShellHeaderIcon(index);
     }
   }
 
@@ -248,7 +249,9 @@ class HRDesktopTopBar extends StatelessWidget {
             icon: const Icon(Icons.refresh_rounded, size: 20),
             onPressed: onRefresh,
             style: IconButton.styleFrom(
-              backgroundColor: colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
+              backgroundColor: colorScheme.surfaceContainerHigh.withValues(
+                alpha: 0.5,
+              ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -260,9 +263,11 @@ class HRDesktopTopBar extends StatelessWidget {
           // ── Theme Mode Toggle Button (Light/Dark Mode) ──
           BlocBuilder<ThemeCubit, ThemeState>(
             builder: (context, themeState) {
-              final isDark = themeState.themeMode == ThemeMode.dark ||
+              final isDark =
+                  themeState.themeMode == ThemeMode.dark ||
                   (themeState.themeMode == ThemeMode.system &&
-                      MediaQuery.of(context).platformBrightness == Brightness.dark);
+                      MediaQuery.of(context).platformBrightness ==
+                          Brightness.dark);
               return IconButton(
                 tooltip: isDark ? 'الوضع النهاري' : 'الوضع الليلي',
                 icon: Icon(
@@ -272,7 +277,9 @@ class HRDesktopTopBar extends StatelessWidget {
                 ),
                 onPressed: () => context.read<ThemeCubit>().toggleTheme(),
                 style: IconButton.styleFrom(
-                  backgroundColor: colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
+                  backgroundColor: colorScheme.surfaceContainerHigh.withValues(
+                    alpha: 0.5,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),

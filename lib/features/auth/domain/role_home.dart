@@ -53,6 +53,25 @@ enum AdminShellKind {
   companySupervisor,
 }
 
+/// Who may open `/hr/home` and `/hr/delegate-attendance`.
+///
+/// Mobile sends only [UserRole.hr] here ([homePathForRole]). Company
+/// supervisors are [UserRole.admin] for every stored spelling (`supervisor`,
+/// `company_supervisor`, `company-admin`, `company_admin`, `companyadmin`,
+/// `admin`); on mobile they open the individual HR screens from the admin
+/// shell, and on web they land here. Super admin, technical support and
+/// organization admin keep their own shells. No other role mounts the HR shell.
+bool canOpenHrShell(UserRole role) =>
+    role == UserRole.admin || role == UserRole.hr;
+
+/// Null when [role] may stay on the HR shell. Web delegates go to the
+/// login-screen notice. Everyone else goes to [homePathForRole].
+String? hrShellDeniedLocation(UserRole role, {required bool isWeb}) {
+  if (canOpenHrShell(role)) return null;
+  if (isWeb && role == UserRole.delegate) return '/login?notice=delegate';
+  return homePathForRole(role);
+}
+
 AdminShellKind adminShellKindFor(UserRole role) {
   switch (role) {
     case UserRole.superAdmin:

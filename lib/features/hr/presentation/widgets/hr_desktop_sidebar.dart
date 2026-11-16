@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
@@ -14,6 +16,7 @@ class HRSidebarItemData {
   final IconData selectedIcon;
   final String? badgeCollection; // اسم المجموعة في فايرستور لعد الطلبات المعلقة
   final Color? badgeColor;
+  final bool destructive;
 
   const HRSidebarItemData({
     required this.index,
@@ -22,6 +25,7 @@ class HRSidebarItemData {
     required this.selectedIcon,
     this.badgeCollection,
     this.badgeColor,
+    this.destructive = false,
   });
 }
 
@@ -30,10 +34,7 @@ class HRSidebarSectionData {
   final String sectionTitle;
   final List<HRSidebarItemData> items;
 
-  const HRSidebarSectionData({
-    required this.sectionTitle,
-    required this.items,
-  });
+  const HRSidebarSectionData({required this.sectionTitle, required this.items});
 }
 
 /// الشريط الجانبي المكتبي المتطور لمنظومة الموارد البشرية (M3 Desktop Sidebar)
@@ -66,86 +67,9 @@ class HRDesktopSidebar extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final isArabic = localeProvider.isArabic;
 
-    final sections = [
-      const HRSidebarSectionData(
-        sectionTitle: 'العمليات والميدان',
-        items: [
-          HRSidebarItemData(
-            index: 0,
-            title: 'الحضور والانصراف',
-            icon: Icons.how_to_reg_outlined,
-            selectedIcon: Icons.how_to_reg_rounded,
-          ),
-          HRSidebarItemData(
-            index: 1,
-            title: 'الخريطة الحية',
-            icon: Icons.radar_outlined,
-            selectedIcon: Icons.radar_rounded,
-          ),
-          HRSidebarItemData(
-            index: 6,
-            title: 'الصور والميداني',
-            icon: Icons.photo_library_outlined,
-            selectedIcon: Icons.photo_library_rounded,
-          ),
-        ],
-      ),
-      const HRSidebarSectionData(
-        sectionTitle: 'إدارة الكوادر',
-        items: [
-          HRSidebarItemData(
-            index: 7,
-            title: 'مناديب الشركة',
-            icon: Icons.badge_outlined,
-            selectedIcon: Icons.badge_rounded,
-          ),
-          HRSidebarItemData(
-            index: 2,
-            title: 'طلبات فك الأجهزة',
-            icon: Icons.phonelink_lock_outlined,
-            selectedIcon: Icons.phonelink_lock_rounded,
-            badgeCollection: 'device_unbind_requests',
-            badgeColor: Color(0xFFDC2626),
-          ),
-        ],
-      ),
-      const HRSidebarSectionData(
-        sectionTitle: 'الماليات والطلبات',
-        items: [
-          HRSidebarItemData(
-            index: 3,
-            title: 'الإجازات والأعذار',
-            icon: Icons.event_note_outlined,
-            selectedIcon: Icons.event_note_rounded,
-            badgeCollection: 'leave_requests',
-            badgeColor: Color(0xFFD97706),
-          ),
-          HRSidebarItemData(
-            index: 4,
-            title: 'مسيرات الرواتب',
-            icon: Icons.account_balance_wallet_outlined,
-            selectedIcon: Icons.account_balance_wallet_rounded,
-          ),
-        ],
-      ),
-      const HRSidebarSectionData(
-        sectionTitle: 'الرقابة والامتثال',
-        items: [
-          HRSidebarItemData(
-            index: 5,
-            title: 'سجل الاحتيال',
-            icon: Icons.security_outlined,
-            selectedIcon: Icons.security_rounded,
-          ),
-          HRSidebarItemData(
-            index: 8,
-            title: 'تعديلات الحضور',
-            icon: Icons.history_edu_outlined,
-            selectedIcon: Icons.history_edu_rounded,
-          ),
-        ],
-      ),
-    ];
+    final sections = WebRuntimePolicy.isWeb
+        ? _webSections()
+        : _mobileSections();
 
     final sidebarWidth = isExpanded ? 260.0 : 76.0;
 
@@ -199,7 +123,9 @@ class HRDesktopSidebar extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.7,
+                          ),
                           letterSpacing: 0.4,
                         ),
                       ),
@@ -230,6 +156,119 @@ class HRDesktopSidebar extends StatelessWidget {
     );
   }
 
+  /// Mobile HR sidebar. Titles and order are the ones the phone already ships.
+  List<HRSidebarSectionData> _mobileSections() => const [
+    HRSidebarSectionData(
+      sectionTitle: 'العمليات والميدان',
+      items: [
+        HRSidebarItemData(
+          index: 0,
+          title: 'الحضور والانصراف',
+          icon: Icons.how_to_reg_outlined,
+          selectedIcon: Icons.how_to_reg_rounded,
+        ),
+        HRSidebarItemData(
+          index: 1,
+          title: 'الخريطة الحية',
+          icon: Icons.radar_outlined,
+          selectedIcon: Icons.radar_rounded,
+        ),
+        HRSidebarItemData(
+          index: 6,
+          title: 'الصور والميداني',
+          icon: Icons.photo_library_outlined,
+          selectedIcon: Icons.photo_library_rounded,
+        ),
+      ],
+    ),
+    HRSidebarSectionData(
+      sectionTitle: 'إدارة الكوادر',
+      items: [
+        HRSidebarItemData(
+          index: 7,
+          title: 'مناديب الشركة',
+          icon: Icons.badge_outlined,
+          selectedIcon: Icons.badge_rounded,
+        ),
+        HRSidebarItemData(
+          index: 2,
+          title: 'طلبات فك الأجهزة',
+          icon: Icons.phonelink_lock_outlined,
+          selectedIcon: Icons.phonelink_lock_rounded,
+          badgeCollection: 'device_unbind_requests',
+          badgeColor: Color(0xFFDC2626),
+        ),
+      ],
+    ),
+    HRSidebarSectionData(
+      sectionTitle: 'الماليات والطلبات',
+      items: [
+        HRSidebarItemData(
+          index: 3,
+          title: 'الإجازات والأعذار',
+          icon: Icons.event_note_outlined,
+          selectedIcon: Icons.event_note_rounded,
+          badgeCollection: 'leave_requests',
+          badgeColor: Color(0xFFD97706),
+        ),
+        HRSidebarItemData(
+          index: 4,
+          title: 'مسيرات الرواتب',
+          icon: Icons.account_balance_wallet_outlined,
+          selectedIcon: Icons.account_balance_wallet_rounded,
+        ),
+      ],
+    ),
+    HRSidebarSectionData(
+      sectionTitle: 'الرقابة والامتثال',
+      items: [
+        HRSidebarItemData(
+          index: 5,
+          title: 'سجل الاحتيال',
+          icon: Icons.security_outlined,
+          selectedIcon: Icons.security_rounded,
+        ),
+        HRSidebarItemData(
+          index: 8,
+          title: 'تعديلات الحضور',
+          icon: Icons.history_edu_outlined,
+          selectedIcon: Icons.history_edu_rounded,
+        ),
+      ],
+    ),
+  ];
+
+  /// Web sidebar: every supervisor-menu tool, grouped, without a second copy
+  /// of الإعدادات (that stays in the footer).
+  List<HRSidebarSectionData> _webSections() {
+    final items = hrShellItems(
+      delegate: delegate,
+      isWeb: true,
+      placement: HrShellPlacement.sidebar,
+    );
+    final order = <String>[];
+    final grouped = <String, List<HRSidebarItemData>>{};
+    for (final item in items) {
+      final row = HRSidebarItemData(
+        index: item.tabIndex ?? -1,
+        title: item.title,
+        icon: item.icon,
+        selectedIcon: item.selectedIcon,
+        badgeCollection: item.badgeCollection,
+        destructive: item.destructive,
+      );
+      final bucket = grouped.putIfAbsent(item.section, () {
+        order.add(item.section);
+        return [];
+      });
+      bucket.add(row);
+    }
+    return [
+      for (final name in order)
+        HRSidebarSectionData(sectionTitle: name, items: grouped[name]!),
+    ];
+  }
+
   /// هيدر القائمة الجانبية
   Widget _buildSidebarHeader(
     BuildContext context,
@@ -238,9 +277,7 @@ class HRDesktopSidebar extends StatelessWidget {
   ) {
     return Container(
       height: 64,
-      padding: EdgeInsets.symmetric(
-        horizontal: isExpanded ? 14 : 10,
-      ),
+      padding: EdgeInsets.symmetric(horizontal: isExpanded ? 14 : 10),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: colorScheme.surface,
@@ -252,8 +289,9 @@ class HRDesktopSidebar extends StatelessWidget {
         ),
       ),
       child: Row(
-        mainAxisAlignment:
-            isExpanded ? MainAxisAlignment.spaceBetween : MainAxisAlignment.center,
+        mainAxisAlignment: isExpanded
+            ? MainAxisAlignment.spaceBetween
+            : MainAxisAlignment.center,
         children: [
           if (isExpanded) ...[
             Expanded(
@@ -362,42 +400,57 @@ class HRDesktopSidebar extends StatelessWidget {
     required bool isSelected,
     required ColorScheme colorScheme,
   }) {
+    final itemColor = item.destructive
+        ? colorScheme.error
+        : isSelected
+        ? colorScheme.onPrimaryContainer
+        : colorScheme.onSurfaceVariant;
+
     Widget iconWidget = Icon(
       isSelected ? item.selectedIcon : item.icon,
       size: 20,
-      color: isSelected
-          ? colorScheme.onPrimaryContainer
-          : colorScheme.onSurfaceVariant,
+      color: itemColor,
     );
 
     // إضافة شارة العداد الحي إذا كان العنصر مرتبطاً بطلبات معلقة
     if (item.badgeCollection != null) {
-      iconWidget = StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
+      Stream<QuerySnapshot>? pending;
+      try {
+        pending = FirebaseFirestore.instance
             .collection(item.badgeCollection!)
             .where('companyUID', isEqualTo: delegate.companyUID)
             .where('status', isEqualTo: 'pending')
-            .snapshots(),
-        builder: (context, snapshot) {
-          final count = snapshot.data?.docs.length ?? 0;
-          return Badge(
-            isLabelVisible: count > 0,
-            label: Text(
-              '$count',
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-            ),
-            backgroundColor: item.badgeColor ?? colorScheme.error,
-            textColor: Colors.white,
-            child: Icon(
-              isSelected ? item.selectedIcon : item.icon,
-              size: 20,
-              color: isSelected
-                  ? colorScheme.onPrimaryContainer
-                  : colorScheme.onSurfaceVariant,
-            ),
-          );
-        },
-      );
+            .snapshots();
+      } catch (_) {
+        pending = null;
+      }
+      if (pending == null) {
+        // Firebase isn't ready (tests, or a build without a default app).
+      } else {
+        iconWidget = StreamBuilder<QuerySnapshot>(
+          stream: pending,
+          builder: (context, snapshot) {
+            final count = snapshot.data?.docs.length ?? 0;
+            return Badge(
+              isLabelVisible: count > 0,
+              label: Text(
+                '$count',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              backgroundColor: item.badgeColor ?? colorScheme.error,
+              textColor: Colors.white,
+              child: Icon(
+                isSelected ? item.selectedIcon : item.icon,
+                size: 20,
+                color: itemColor,
+              ),
+            );
+          },
+        );
+      }
     }
 
     final content = AnimatedContainer(
@@ -409,14 +462,13 @@ class HRDesktopSidebar extends StatelessWidget {
         vertical: 10,
       ),
       decoration: BoxDecoration(
-        color: isSelected
-            ? colorScheme.primaryContainer
-            : Colors.transparent,
+        color: isSelected ? colorScheme.primaryContainer : Colors.transparent,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
-        mainAxisAlignment:
-            isExpanded ? MainAxisAlignment.start : MainAxisAlignment.center,
+        mainAxisAlignment: isExpanded
+            ? MainAxisAlignment.start
+            : MainAxisAlignment.center,
         children: [
           iconWidget,
           if (isExpanded) ...[
@@ -427,11 +479,13 @@ class HRDesktopSidebar extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13.5,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected
+                  color: item.destructive
+                      ? colorScheme.error
+                      : isSelected
                       ? colorScheme.onPrimaryContainer
                       : colorScheme.onSurface,
                 ),
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -443,7 +497,13 @@ class HRDesktopSidebar extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => onItemSelected(item.index),
+        onTap: () {
+          if (item.index < 0) {
+            onOpenProfile();
+          } else {
+            onItemSelected(item.index);
+          }
+        },
         borderRadius: BorderRadius.circular(14),
         hoverColor: colorScheme.onSurface.withValues(alpha: 0.06),
         child: isExpanded
@@ -550,7 +610,10 @@ class HRDesktopSidebar extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               hoverColor: colorScheme.onSurface.withValues(alpha: 0.06),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 child: Row(
                   children: [
                     Icon(

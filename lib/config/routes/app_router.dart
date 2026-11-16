@@ -16,9 +16,8 @@ import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/admin/domain/entities/company.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/marketing_main_screen.dart';
 import 'package:delegate_app/features/accountant/presentation/pages/accountant_main_screen.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_access_gate.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_login_screen.dart';
-import 'package:delegate_app/features/hr/presentation/pages/hr_main_screen.dart';
-import 'package:delegate_app/features/hr/presentation/pages/hr_delegate_attendance_detail_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/privacy_policy_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
@@ -193,8 +192,7 @@ final appRouter = GoRouter(
         }
         return AppMotionPage.fadeThrough(
           state: state,
-          child: WebHrSystemRedirect.debugHrSystemBuilder?.call(delegate) ??
-              HRMainScreen(delegate: delegate),
+          child: hrHomeRouteChild(delegate),
         );
       },
     ),
@@ -210,7 +208,7 @@ final appRouter = GoRouter(
         }
         return AppMotionPage.fadeThrough(
           state: state,
-          child: HRDelegateAttendanceDetailScreen(delegate: delegate),
+          child: hrAttendanceDetailRouteChild(context, delegate),
         );
       },
     ),
