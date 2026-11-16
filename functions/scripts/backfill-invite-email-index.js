@@ -13,6 +13,7 @@ const {
   INVITE_EMAIL_INDEX_COLLECTION,
   inviteEmailIndexDocId,
   inviteEmailIndexFromInvite,
+  pickNewestPendingInvite,
 } = require("../lib/invite_email_index_logic");
 
 async function main() {
@@ -23,24 +24,41 @@ async function main() {
   const db = admin.firestore();
 
   const snap = await db.collection("invites").where("status", "==", "pending").get();
-  let wouldWrite = 0;
+  const byEmail = new Map();
   let skipped = 0;
-  const batchSize = 400;
-  let batch = db.batch();
-  let ops = 0;
 
   for (const doc of snap.docs) {
-    const body = inviteEmailIndexFromInvite(doc.id, doc.data());
-    if (!body) {
-      skipped++;
-      continue;
-    }
     const email = inviteEmailIndexDocId(doc.data().email);
     if (!email) {
       skipped++;
       continue;
     }
-    wouldWrite++;
+    const body = inviteEmailIndexFromInvite(doc.id, doc.data());
+    if (!body) {
+      skipped++;
+      continue;
+    }
+    const row = {inviteId: doc.id, data: doc.data()};
+    const prev = byEmail.get(email);
+    if (!prev) {
+      byEmail.set(email, row);
+      continue;
+    }
+    const winner = pickNewestPendingInvite([
+      {inviteId: prev.inviteId, data: prev.data},
+      {inviteId: row.inviteId, data: row.data},
+    ]);
+    byEmail.set(email, winner);
+  }
+
+  const wouldWrite = byEmail.size;
+  const batchSize = 400;
+  let batch = db.batch();
+  let ops = 0;
+
+  for (const [email, row] of byEmail) {
+    const body = inviteEmailIndexFromInvite(row.inviteId, row.data);
+    if (!body) continue;
     if (apply) {
       batch.set(db.collection(INVITE_EMAIL_INDEX_COLLECTION).doc(email), {
         ...body,
@@ -64,6 +82,7 @@ async function main() {
         pendingInvites: snap.size,
         wouldWrite,
         skipped,
+        dedupedEmails: wouldWrite,
         written: apply ? wouldWrite : 0,
       },
       null,

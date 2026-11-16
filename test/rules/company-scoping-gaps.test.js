@@ -177,6 +177,11 @@ describe("TA-8 security rules gaps", () => {
       status: "suspended", statusReason: "policy", updatedAt: "t",
     })));
 
+  test("DENY FS-09: supervisor suspend cannot bundle holds or statusVersion", () =>
+    assertFails(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
+      status: "suspended", statusReason: "policy", holds: {x: {}}, updatedAt: "t",
+    })));
+
   test("DENY H-1: supervisor cannot suspend delegate via status spelling bypass", () =>
     assertFails(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
       status: "SUSPENDED", statusReason: "policy", updatedAt: "t",

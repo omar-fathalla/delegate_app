@@ -311,7 +311,7 @@ describe("storage.rules", () => {
     const hrB = storage("hrB");
     const owned = "organizations/o1/companies/coA/permissions/p1/photo_dlgA_1.jpg";
     const legacy = "organizations/o1/companies/coA/permissions/p1/photo_99.jpg";
-    const meta = {customMetadata: {userId: "dlgA", delegateUid: "dlgA"}};
+    const meta = {customMetadata: {userId: "dlgA", delegateUid: "dlgA"}, contentType: "image/jpeg"};
     await assertSucceeds(uploadBytes(path(dlg, owned), bytes, meta));
     await assertSucceeds(uploadBytes(path(dlg, legacy), bytes));
     await assertSucceeds(getBytes(path(dlgB, owned)));
@@ -325,13 +325,22 @@ describe("storage.rules", () => {
     await assertFails(uploadBytes(path(hrB, owned), bytes));
   });
 
+  test("N1-r permission photo requires image contentType", async () => {
+    const dlg = delegateTok("dlgA", "coA");
+    const photo = "organizations/o1/companies/coA/permissions/p1/photo_dlgA_ct.jpg";
+    const bad = {customMetadata: {userId: "dlgA", delegateUid: "dlgA"}, contentType: "application/pdf"};
+    const good = {customMetadata: {userId: "dlgA", delegateUid: "dlgA"}, contentType: "image/jpeg"};
+    await assertFails(uploadBytes(path(dlg, photo), bytes, bad));
+    await assertSucceeds(uploadBytes(path(dlg, photo), bytes, good));
+  });
+
   test("N1-r permission photo uid is exact, not a prefix", async () => {
     const dlg = delegateTok("dlgA", "coA");
     const dlgA2 = delegateTok("dlgA_2", "coA");
     const colliding = "organizations/o1/companies/coA/permissions/p1/photo_dlgA_2_99.jpg";
     const ownA = "organizations/o1/companies/coA/permissions/p1/photo_dlgA_99.jpg";
-    const metaA2 = {customMetadata: {userId: "dlgA_2", delegateUid: "dlgA_2"}};
-    const metaA = {customMetadata: {userId: "dlgA", delegateUid: "dlgA"}};
+    const metaA2 = {customMetadata: {userId: "dlgA_2", delegateUid: "dlgA_2"}, contentType: "image/jpeg"};
+    const metaA = {customMetadata: {userId: "dlgA", delegateUid: "dlgA"}, contentType: "image/jpeg"};
     await env.withSecurityRulesDisabled(async (ctx) => {
       await uploadBytes(ref(ctx.storage(), colliding), bytes, metaA2);
     });
@@ -358,7 +367,7 @@ describe("storage.rules", () => {
     const fb = "feedback_screenshots/feedback_dlgHeld_1.jpg";
     const leave = "leave_attachments/coA/dlgHeld/sick.jpg";
     const photo = "organizations/o1/companies/coA/permissions/p1/photo_dlgHeld_1.jpg";
-    const meta = {customMetadata: {userId: "dlgHeld", delegateUid: "dlgHeld"}};
+    const meta = {customMetadata: {userId: "dlgHeld", delegateUid: "dlgHeld"}, contentType: "image/jpeg"};
     await assertFails(uploadBytes(path(heldTok, fb), bytes, meta));
     await assertFails(uploadBytes(path(heldTok, leave), bytes));
     await assertFails(uploadBytes(path(heldTok, photo), bytes, meta));
