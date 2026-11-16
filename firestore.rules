@@ -801,33 +801,71 @@ service cloud.firestore {
           && resource.data.get('nationalityID', '') != '');
     }
 
-    function delegateCgStaffDupFieldListOk() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    function delegateCgStaffDupFieldListOkWithUser(u) {
       let co = u.get('companyUID', u.get('companyId', ''));
       let org = u.get('organizationUID', u.get('organizationId', ''));
       let docCo = resource.data.get('companyUID', resource.data.get('companyId', ''));
       let docOrg = resource.data.get('organizationUID', resource.data.get('organizationId', ''));
       let r = u.get('role', '');
+      let dupField = delegateCgStaffDupQueryShape()
+        || (resource.data.keys().hasAll(['nationalityID'])
+          && resource.data.get('nationalityID', '') is string
+          && resource.data.get('nationalityID', '') != '');
+      let scoped = (co != '' && docCo == co)
+        || (org != '' && docOrg == org)
+        || r in ['supervisor', 'company_supervisor'];
       return r in [
           'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
           'hr', 'company-hr', 'company_hr']
-        && (co != '' || org != '')
-        && (
-          (co != '' && docCo == co)
-          || (org != '' && docOrg == org)
-        )
-        && (
-          resource.data.keys().hasAll(['phoneNumber'])
-          || resource.data.keys().hasAll(['nationalId'])
-          || resource.data.keys().hasAll(['receiptCode'])
-          || (resource.data.keys().hasAll(['nationalityID'])
-            && resource.data.get('nationalityID', '') is string
-            && resource.data.get('nationalityID', '') != '')
-        );
+        && dupField
+        && scoped;
     }
 
-    function delegateCgCompanyDupCheckListOk() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    function delegateCgStaffDupFieldListOk() {
+      return delegateCgStaffDupFieldListOkWithUser(
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
+    }
+
+    function delegateCgStaffDupQueryShape() {
+      return resource.data.keys().hasAll(['phoneNumber'])
+        || resource.data.keys().hasAll(['nationalId'])
+        || resource.data.keys().hasAll(['receiptCode']);
+    }
+
+    function delegateCgGlobalStaffListOkWithUser(u) {
+      return u.get('role', '') in [
+        'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+        'technical_support', 'technical-support', 'technicalSupport'];
+    }
+
+    function delegateCgOrgStaffListOkWithUser(u) {
+      let org = u.get('organizationUID', '');
+      return org != ''
+        && resource.data.get('organizationUID', '') == org
+        && u.get('role', '') in [
+          'organization-admin', 'organization_admin', 'organizationAdmin',
+          'marketing', 'marketing_promotion', 'marketingPromotion'];
+    }
+
+    function delegateCgCompanyStaffListOkWithUser(u) {
+      let co = u.get('companyUID', u.get('companyId', ''));
+      return co != ''
+        && resource.data.get('companyUID', resource.data.get('companyId', '')) == co
+        && u.get('role', '') in [
+          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
+          'branches_marketing_manager', 'branchesMarketingManager'];
+    }
+
+    function delegateCgCompanyStaffOrgWideListOkWithUser(u) {
+      let org = u.get('organizationUID', '');
+      return org != ''
+        && resource.data.get('organizationUID', '') == org
+        && u.get('role', '') in [
+          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor'];
+    }
+
+    function delegateCgCompanyDupCheckListOkWithUser(u) {
       let co = u.get('companyUID', u.get('companyId', ''));
       let org = u.get('organizationUID', u.get('organizationId', ''));
       let docCo = resource.data.get('companyUID', resource.data.get('companyId', ''));
@@ -837,6 +875,50 @@ service cloud.firestore {
           'hr', 'company-hr', 'company_hr']
         && ((co != '' && docCo == co)
           || (org != '' && docOrg == org));
+    }
+
+    function delegateCgListDelegateOk(delegateId) {
+      return delegateCgDelegateOwnListOk(delegateId)
+        || (delegateOtpOk()
+          && resource.data.keys().hasAll(['nationalityID'])
+          && resource.data.get('nationalityID', '') is string
+          && resource.data.get('nationalityID', '') != '');
+    }
+
+    function delegateCgListStaffBrowse(u, delegateId) {
+      let r = u.get('role', '');
+      return r in [
+          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+          'technical_support', 'technical-support', 'technicalSupport']
+        ? delegateCgGlobalStaffListOkWithUser(u)
+        : r in [
+            'organization-admin', 'organization_admin', 'organizationAdmin',
+            'marketing', 'marketing_promotion', 'marketingPromotion']
+          ? delegateCgOrgStaffListOkWithUser(u)
+        : resource.data.keys().hasAll(['nationalityID'])
+          && resource.data.get('nationalityID', '') is string
+          && resource.data.get('nationalityID', '') != ''
+          ? delegateCgCompanyDupCheckListOkWithUser(u)
+        : delegateCgCompanyStaffListOkWithUser(u);
+    }
+
+    function delegateCgListStaffSignedIn(delegateId) {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return delegateCgStaffDupQueryShape()
+        ? delegateCgStaffDupFieldListOkWithUser(u)
+        : delegateCgListStaffBrowse(u, delegateId);
+    }
+
+    function delegateCgListDispatcher(delegateId) {
+      return signedIn() && (
+        claimString('role') == 'delegate'
+          ? delegateCgListDelegateOk(delegateId)
+          : delegateCgListStaffSignedIn(delegateId));
+    }
+
+    function delegateCgCompanyDupCheckListOk() {
+      return delegateCgCompanyDupCheckListOkWithUser(
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
     }
 
     function canReadDelegate(delegateId) {
@@ -959,6 +1041,81 @@ service cloud.firestore {
       return changedKeys().hasAny(['role', 'organizationUID', 'companyUID', 'organizationId', 'companyId']);
     }
 
+    function usersListDelegateSupervisorPhoneOk() {
+      let co = claimString('companyId');
+      return delegateOtpOk() && co != ''
+        && resource.data.keys().hasAll(['phoneNumber'])
+        && resource.data.get('role', '') in ['supervisor', 'company_supervisor']
+        && resource.data.get('companyUID', resource.data.get('companyId', '')) == co;
+    }
+
+    function usersListDelegateCompanyOk() {
+      return delegateOtpOk()
+        && resource.data.get('companyUID', resource.data.get('companyId', ''))
+          == claimString('companyId');
+    }
+
+    function usersListSupervisorNotifyOk(u) {
+      let co = u.get('companyUID', u.get('companyId', ''));
+      return u.get('role', '') in ['supervisor', 'company_supervisor']
+        && co != ''
+        && resource.data.get('companyUID', resource.data.get('companyId', '')) == co
+        && resource.data.get('role', '') in [
+          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+          'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport'];
+    }
+
+    function usersListCompanyStaffDirectoryOk(u) {
+      let co = u.get('companyUID', u.get('companyId', ''));
+      return co != ''
+        && resource.data.get('companyUID', resource.data.get('companyId', '')) == co
+        && u.get('role', '') in [
+          'supervisor', 'company_supervisor', 'company-admin', 'company_admin', 'admin'];
+    }
+
+    function usersListGlobalDirectoryOk(u) {
+      let r = u.get('role', '');
+      return r in [
+          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+          'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport']
+        || (r in [
+            'organization-admin', 'organization_admin', 'organizationAdmin',
+            'marketing', 'marketing_promotion', 'marketingPromotion']
+          && u.get('organizationUID', '') != ''
+          && resource.data.get('organizationUID', resource.data.get('organizationId', ''))
+            == u.get('organizationUID', ''))
+        || (r in [
+            'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+            'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
+            'branches_marketing_manager', 'branchesMarketingManager']
+          && u.get('companyUID', u.get('companyId', '')) != ''
+          && resource.data.get('companyUID', resource.data.get('companyId', ''))
+            == u.get('companyUID', u.get('companyId', '')));
+    }
+
+    function usersListSelfLookupOk(u) {
+      return (u.keys().hasAll(['phoneNumber'])
+          && resource.data.keys().hasAll(['phoneNumber'])
+          && resource.data.phoneNumber == u.phoneNumber)
+        || (u.keys().hasAll(['email'])
+          && resource.data.keys().hasAll(['email'])
+          && resource.data.email == u.email);
+    }
+
+    function usersListStaffFromUser(u) {
+      let r = u.get('role', '');
+      return r in ['supervisor', 'company_supervisor']
+        ? usersListSupervisorNotifyOk(u) || usersListCompanyStaffDirectoryOk(u)
+        : r in ['company-admin', 'company_admin', 'admin']
+          ? usersListCompanyStaffDirectoryOk(u)
+        : usersListGlobalDirectoryOk(u) || usersListSelfLookupOk(u);
+    }
+
+    function usersListStaffOk() {
+      return usersListStaffFromUser(
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
+    }
+
     // ==================== SHARED: USERS ====================
 
     match /users/{userId} {
@@ -972,47 +1129,14 @@ service cloud.firestore {
       allow get: if signedIn() && isOrgScopedStaff() && orgScoped();
       allow get: if signedIn() && isCompanyScopedStaff() && companyScoped();
 
-      allow list: if signedIn() && claimString('role') == 'delegate' && delegateOtpOk()
+      allow list: if isDelegate() && usersListDelegateSupervisorPhoneOk();
+      allow list: if isDelegate()
         && claimString('companyId') != ''
         && resource.data.keys().hasAll(['phoneNumber'])
-        && resource.data.get('role', '') in ['supervisor', 'company_supervisor']
         && resource.data.get('companyUID', resource.data.get('companyId', ''))
           == claimString('companyId');
-      allow list: if signedIn() && userExists()
-        && userDoc().get('role', '') in ['supervisor', 'company_supervisor', 'company-admin', 'company_admin', 'admin']
-        && userDoc().get('companyUID', '') != ''
-        && resource.data.get('companyUID', resource.data.get('companyId', '')) == userDoc().companyUID;
-      allow list: if signedIn() && claimString('role') == 'delegate' && delegateOtpOk()
-        && resource.data.get('companyUID', resource.data.get('companyId', ''))
-          == claimString('companyId');
-      allow list: if signedIn() && userExists()
-        && userDoc().get('role', '') in ['supervisor', 'company_supervisor']
-        && userDoc().get('companyUID', '') != ''
-        && resource.data.get('companyUID', resource.data.get('companyId', '')) == userDoc().companyUID
-        && resource.data.get('role', '') in [
-          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-          'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport'];
-      allow list: if signedIn() && roleIs(['supervisor', 'company_supervisor'])
-        && callerCompany() != ''
-        && resource.data.get('companyUID', resource.data.get('companyId', '')) == callerCompany()
-        && resource.data.get('role', '') in [
-          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-          'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport'];
-      allow list: if signedIn() && isCompanyAdmin() && callerCompany() != ''
-        && resource.data.get('companyUID', resource.data.get('companyId', '')) == callerCompany();
-      // Phone/email lookups after sign-in, and the admin directory for
-      // global staff. Unauthenticated list is denied (staffPhoneLookup).
-      allow list: if signedIn() && (
-        isGlobalStaff() ||
-        (isOrgScopedStaff() && orgScoped()) ||
-        (isCompanyScopedStaff() && companyScoped()) ||
-        (userExists()
-          && userDoc().keys().hasAll(['phoneNumber'])
-          && resource.data.phoneNumber == userDoc().phoneNumber) ||
-        (userExists()
-          && userDoc().keys().hasAll(['email'])
-          && resource.data.email == userDoc().email)
-      );
+      allow list: if isDelegate() && usersListDelegateCompanyOk();
+      allow list: if signedIn() && claimString('role') != 'delegate' && usersListStaffOk();
 
       // New staff accounts come from the createStaffUser function (Admin SDK).
       // Client creates stay for delegate approval (M6) and legacy screens.
@@ -1518,7 +1642,8 @@ service cloud.firestore {
         }
 
         match /notifications/{notificationId} {
-          allow list, get: if signedIn() && (
+          allow list: if signedIn() && nestedCompanyNotifListOk(orgId, compId);
+          allow get: if signedIn() && (
             isGlobalStaff()
             || (isCompanyScopedStaff() && callerCompany() == compId)
             || (isOrgScopedStaff() && callerOrg() == orgId)
@@ -1913,22 +2038,7 @@ service cloud.firestore {
     // tighter match and reopen the collection. Those duplicates are gone.
 
     match /{path=**}/delegates/{delegateId} {
-      allow list: if signedIn() && delegateCgStaffDupFieldListOk();
-      allow list: if signedIn() && claimString('role') == 'delegate' && delegateOtpOk()
-        && resource.data.keys().hasAll(['nationalityID'])
-        && resource.data.get('nationalityID', '') is string
-        && resource.data.get('nationalityID', '') != '';
-      allow list: if signedIn() && staffRole() in [
-          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
-          'hr', 'company-hr', 'company_hr']
-        && callerCompany() != ''
-        && resource.data.get('companyUID', resource.data.get('companyId', '')) == callerCompany();
-      allow list: if signedIn() && delegateCgDelegateOwnListOk(delegateId);
-      allow list: if signedIn() && delegateCgCompanyDupCheckListOk();
-      allow list: if signedIn() && delegateCgCompanyStaffOrgWideListOk();
-      allow list: if signedIn() && delegateCgCompanyStaffListOk();
-      allow list: if signedIn() && delegateCgOrgStaffListOk();
-      allow list: if signedIn() && delegateCgGlobalStaffListOk();
+      allow list: if delegateCgListDispatcher(delegateId);
       allow get: if signedIn() && canReadDelegate(delegateId);
       // r5 budget: a nested organizations/{o}/companies/{c}/delegates
       // create is decided by the nested match alone.
@@ -2407,29 +2517,255 @@ service cloud.firestore {
     }
 
     function delegateNotifListOk() {
-      return claimString('role') == 'delegate'
+      return notifListDelegate();
+    }
+
+    function notifListDelegate() {
+      let du = notifDu();
+      let co = claimString('companyId');
+      return notifStaffBroadcastOk()
         && delegateOtpOk()
-        && !isPrivilegedStaffAlert()
         && (
-          notifDu() == 'all'
-          || notifDu() == 'delegates'
-          || notifDu() == request.auth.uid
-          || (callerCompany() != '' && (
-            notifDu() == 'delegates_' + callerCompany()
-            || notifDu() == 'company_' + callerCompany()))
+          du == 'all'
+          || du == 'delegates'
+          || du == request.auth.uid
+          || (co != '' && (du == 'delegates_' + co || du == 'company_' + co))
         );
     }
 
-    function staffNotifListOk() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    function notifListSupervisor(u) {
+      let co = u.get('companyUID', u.get('companyId', ''));
+      let du = notifDu();
+      let docCo = resource.data.get('companyId', resource.data.get('companyUID', ''));
+      return notifStaffBroadcastOk() && co != '' && (
+        du == 'all'
+        || du == 'delegates'
+        || du == 'supervisor_' + co
+        || du == 'company_' + co
+        || du == 'delegates_' + co
+        || du == 'hr'
+        || (du == 'all_company_supervisors' && (docCo == '' || docCo == co))
+        || (notifStaffBroadcastOk() && du == request.auth.uid)
+        || du in ['superAdmin', 'technicalSupport', 'technical-support', 'technical_support']
+        || du in ['supervisor', 'company-admin', 'company_admin']
+      );
+    }
+
+    function notifOrgDocScoped(u) {
+      let org = u.get('organizationUID', u.get('organizationId', ''));
+      let docOrg = resource.data.get('organizationId', resource.data.get('organizationUID', ''));
+      return org != '' && (docOrg == '' || docOrg == org);
+    }
+
+    function notifCompanyDocScoped(u) {
+      let co = u.get('companyUID', u.get('companyId', ''));
+      let docCo = resource.data.get('companyId', resource.data.get('companyUID', ''));
+      return co != '' && (docCo == '' || docCo == co);
+    }
+
+    function notifListOrgAdmin(u) {
+      let du = notifDu();
+      return notifStaffBroadcastOk() && notifOrgDocScoped(u) && (
+        du == 'all'
+        || du == 'hr'
+        || du == 'all_company_supervisors'
+        || du.matches('^company_.*')
+        || du.matches('^delegates_.*')
+        || du in ['organizationAdmin', 'organization-admin', 'organization_admin']
+      );
+    }
+
+    function notifListMarketingRole(u) {
+      let du = notifDu();
+      return notifStaffBroadcastOk() && notifOrgDocScoped(u) && (
+        du == 'all'
+        || du == 'hr'
+        || du == 'all_company_supervisors'
+        || du.matches('^company_.*')
+        || du.matches('^delegates_.*')
+        || du in ['marketing', 'marketing_promotion', 'marketingPromotion']
+      );
+    }
+
+    function notifListBranchesMarketing(u) {
+      let co = u.get('companyUID', u.get('companyId', ''));
+      let du = notifDu();
+      let docCo = resource.data.get('companyId', resource.data.get('companyUID', ''));
+      return notifStaffBroadcastOk() && co != '' && (
+        du == 'all'
+        || du == 'company_' + co
+        || du == 'delegates_' + co
+        || du == 'hr'
+        || (du == 'all_company_supervisors' && (docCo == '' || docCo == co))
+        || du in ['branchesMarketingManager', 'branches_marketing', 'branches-marketing']
+      );
+    }
+
+    function notifListCompanyStaff(u) {
+      let co = u.get('companyUID', u.get('companyId', ''));
+      let du = notifDu();
+      let docCo = resource.data.get('companyId', resource.data.get('companyUID', ''));
+      return notifStaffBroadcastOk() && co != '' && (
+        du == 'all'
+        || du == 'delegates'
+        || du == 'company_' + co
+        || du == 'supervisor_' + co
+        || du == 'delegates_' + co
+        || du == 'hr'
+        || (du == 'all_company_supervisors' && (docCo == '' || docCo == co))
+        || (docCo == co)
+        || du in ['company-admin', 'admin', 'supervisor', 'company_admin']
+        || du in ['accountant', 'accounting', 'account_admin']
+      );
+    }
+
+    function notifListGlobalStaff(u) {
+      let du = notifDu();
+      let r = u.get('role', '');
+      return notifStaffBroadcastOk() && (
+        du == 'all'
+        || du == 'delegates'
+        || du == 'hr'
+        || du == 'all_company_supervisors'
+        || du.matches('^company_.*')
+        || du.matches('^delegates_.*')
+        || (r in [
+            'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+            'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport']
+          && du in [
+            'super-admin', 'super_admin', 'superAdmin', 'role_super_admin',
+            'technicalSupport', 'technical-support', 'technical_support', 'role_technical_support'])
+      );
+    }
+
+    function notifListStaffFromUser(u) {
+      let r = u.get('role', '');
+      return r in ['supervisor', 'company_supervisor'] ? notifListSupervisor(u)
+        : r in [
+            'organization-admin', 'organization_admin', 'organizationAdmin']
+          ? notifListOrgAdmin(u)
+        : r in [
+            'marketing', 'marketing_promotion', 'marketingPromotion', 'marketingpromotion']
+          ? notifListMarketingRole(u)
+        : r in [
+            'branches_marketing', 'branches_marketing_manager', 'branchesMarketingManager']
+          ? notifListBranchesMarketing(u)
+        : r in [
+            'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+            'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport']
+          ? notifListGlobalStaff(u)
+        : r in ['company-admin', 'company_admin', 'admin',
+            'hr', 'company-hr', 'company_hr', 'human_resources',
+            'accountant', 'accounting', 'account_admin']
+          ? notifListCompanyStaff(u)
+        : staffNotifListOkWithUser(u);
+    }
+
+    function notifListShapeAll(u, r) {
+      return r in [
+          'organization-admin', 'organization_admin', 'organizationAdmin']
+        ? notifStaffBroadcastOk() && notifDu() == 'all' && notifOrgDocScoped(u)
+        : r in ['marketing', 'marketing_promotion', 'marketingPromotion', 'marketingpromotion']
+          ? notifStaffBroadcastOk() && notifDu() == 'all' && notifOrgDocScoped(u)
+        : r in [
+            'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+            'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport']
+          ? notifStaffBroadcastOk() && notifDu() == 'all'
+        : notifStaffBroadcastOk() && notifDu() == 'all' && notifCompanyDocScoped(u);
+    }
+
+    function notifListGlobalRolesOk(r) {
+      return r in [
+        'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+        'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport'];
+    }
+
+    function notifListOrgMarketingRolesOk(r) {
+      return r in [
+        'organization-admin', 'organization_admin', 'organizationAdmin',
+        'marketing', 'marketing_promotion', 'marketingPromotion', 'marketingpromotion'];
+    }
+
+    function notifListShapeHr(u, r) {
+      return notifListGlobalRolesOk(r)
+        ? notifStaffBroadcastOk() && notifDu() == 'hr'
+        : notifListOrgMarketingRolesOk(r)
+          ? notifStaffBroadcastOk() && notifDu() == 'hr' && notifOrgDocScoped(u)
+          : notifStaffBroadcastOk() && notifDu() == 'hr' && notifCompanyDocScoped(u);
+    }
+
+    function notifListShapeAcs(u, r) {
+      return notifListGlobalRolesOk(r)
+        ? notifStaffBroadcastOk() && notifDu() == 'all_company_supervisors'
+        : notifListOrgMarketingRolesOk(r)
+          ? notifStaffBroadcastOk() && notifDu() == 'all_company_supervisors' && notifOrgDocScoped(u)
+          : notifStaffBroadcastOk() && notifDu() == 'all_company_supervisors' && notifCompanyDocScoped(u);
+    }
+
+    function notifListShapeCompany(u, r) {
+      return notifListGlobalRolesOk(r)
+        ? notifStaffBroadcastOk() && notifDu().matches('^company_.*')
+        : notifListOrgMarketingRolesOk(r)
+          ? notifStaffBroadcastOk() && notifOrgDocScoped(u) && notifDu().matches('^company_.*')
+          : notifStaffBroadcastOk() && notifCompanyDocScoped(u) && notifDu().matches('^company_.*');
+    }
+
+    function notifListShapeDelegates(u, r) {
+      return notifListGlobalRolesOk(r)
+        ? notifStaffBroadcastOk() && notifDu().matches('^delegates_.*')
+        : notifListOrgMarketingRolesOk(r)
+          ? notifStaffBroadcastOk() && notifOrgDocScoped(u) && notifDu().matches('^delegates_.*')
+          : notifStaffBroadcastOk() && notifCompanyDocScoped(u) && notifDu().matches('^delegates_.*');
+    }
+
+    function notifListShapeSupervisor(u, r) {
+      return r in ['supervisor', 'company_supervisor', 'company-admin', 'company_admin', 'admin']
+        ? notifStaffBroadcastOk() && notifCompanyDocScoped(u)
+          && (notifDu().matches('^supervisor_.*') || notifDu().matches('^company_.*')
+            || notifDu() == 'all_company_supervisors')
+        : notifListShapeCompany(u, r);
+    }
+
+    function notifListShapeRoleInbox(u, r) {
+      return notifListStaffFromUser(u);
+    }
+
+    function notifListStaffShapeDispatcher(u) {
+      let du = notifDu();
+      let r = u.get('role', '');
+      return du == 'all' ? notifListShapeAll(u, r)
+        : du == 'hr' ? notifListShapeHr(u, r)
+        : du == 'all_company_supervisors' ? notifListShapeAcs(u, r)
+        : du.matches('^company_.*') ? notifListShapeCompany(u, r)
+        : du.matches('^delegates_.*') ? notifListShapeDelegates(u, r)
+        : du.matches('^supervisor_.*') ? notifListShapeSupervisor(u, r)
+        : du == 'marketing' ? notifListMarketingRole(u)
+        : du == 'marketing_promotion' ? notifListMarketingRole(u)
+        : du == 'marketingPromotion' ? notifListMarketingRole(u)
+        : du in [
+            'organizationAdmin', 'organization-admin', 'organization_admin',
+            'branchesMarketingManager', 'branches_marketing', 'branches-marketing',
+            'technicalSupport', 'technical-support', 'technical_support']
+          ? notifListShapeRoleInbox(u, r)
+        : notifListStaffFromUser(u);
+    }
+
+    function notifListDispatcher() {
+      return signedIn() && (
+        claimString('role') == 'delegate'
+          ? notifListDelegate()
+          : notifListStaffShapeDispatcher(
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data));
+    }
+
+    function staffNotifListOkWithUser(u) {
       let r = u.get('role', '');
       let co = u.get('companyUID', u.get('companyId', ''));
       let org = u.get('organizationUID', '');
       let du = notifDu();
       let docOrg = resource.data.get('organizationId', '');
       let docCo = resource.data.get('companyId', resource.data.get('companyUID', ''));
-      return signedIn()
-        && !isPrivilegedStaffAlert()
+      return !isPrivilegedStaffAlert()
         && (
           r in [
             'super-admin', 'super_admin', 'superadmin', 'superAdmin',
@@ -2489,6 +2825,12 @@ service cloud.firestore {
           || (du in ['accountant', 'accounting', 'account_admin']
             && r in ['accountant', 'accounting', 'account_admin'])
         );
+    }
+
+    function staffNotifListOk() {
+      return signedIn()
+        && staffNotifListOkWithUser(
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
     }
 
     function notifMarkReadOk() {
@@ -2813,28 +3155,27 @@ service cloud.firestore {
       return signedIn() && notifStaffBroadcastOk() && notifDu() == request.auth.uid;
     }
 
+    function nestedCompanyNotifListOk(orgId, compId) {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let co = u.get('companyUID', u.get('companyId', ''));
+      let org = u.get('organizationUID', u.get('organizationId', ''));
+      return !isPrivilegedStaffAlert() && (
+        r in [
+          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+          'technical_support', 'technical-support', 'technicalSupport']
+        || (co == compId && r in [
+          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
+          'branches_marketing_manager', 'branchesMarketingManager'])
+        || (org == orgId && r in [
+          'organization-admin', 'organization_admin', 'organizationAdmin',
+          'marketing', 'marketing_promotion', 'marketingPromotion'])
+      );
+    }
+
     match /notifications/{notificationId} {
-      allow list: if signedIn() && claimString('role') == 'delegate' && delegateNotifListOk();
-      allow list: if signedIn() && claimString('role') != 'delegate' && staffNotifListOk();
-      allow list: if signedIn() && canReadNotifBroadcastAll();
-      allow list: if signedIn() && canReadNotifBroadcastDelegates();
-      allow list: if signedIn() && canReadNotifStaffSelfTarget();
-      allow list: if signedIn() && canReadNotifListCompanyCo();
-      allow list: if signedIn() && canReadNotifListSupervisorCo();
-      allow list: if signedIn() && canReadNotifListAllCompanySupervisors();
-      allow list: if signedIn() && canReadNotifListDelegatesCo();
-      allow list: if signedIn() && canReadNotifListHrTarget();
-      allow list: if signedIn() && canReadNotifGlobalStaff();
-      allow list: if signedIn() && canReadOrgAdminRoleBroadcast();
-      allow list: if signedIn() && canReadCompanySupervisorBroadcast();
-      allow list: if signedIn() && canReadNotifSupervisorInQueryListOk();
-      allow list: if signedIn() && canReadNotifCompanyStaffBroadcasts();
-      allow list: if signedIn() && canReadNotifOrgMarketingBroadcasts();
-      allow list: if signedIn() && canReadNotifRoleBroadcasts();
-      allow list: if signedIn() && (isOrgAdmin() || isMarketing() || isBranchesMarketing()) && callerOrg() != ''
-        && resource.data.get('organizationId', resource.data.get('organizationUID', '')) == callerOrg()
-        && (notifDu() == 'hr' || notifDu().matches('^company_.*') || notifDu().matches('^delegates_.*')
-          || notifDu() == 'all_company_supervisors');
+      allow list: if notifListDispatcher();
       allow get: if notifUpdateReadOk() || canReadNotifPhoneMatch();
       allow create: if staffFanOutNotificationCreateOk();
       allow create: if canDelegateCreateNotification();
@@ -3224,32 +3565,74 @@ service cloud.firestore {
     }
 
     function delegateRequestCompanyStaffListOk() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return delegateRequestCompanyStaffListOkWithUser(
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
+    }
+
+    function delegateRequestOrgStaffListOk() {
+      return delegateRequestOrgStaffListOkWithUser(
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
+    }
+
+    function delegateRequestAccountantListOkWithUser(u) {
+      let org = u.get('organizationUID', u.get('organizationId', ''));
+      let docOrg = resource.data.get('organizationUID', resource.data.get('organizationId', ''));
+      return org != '' && docOrg == org
+        && u.get('role', '') in ['accountant', 'accounting', 'account_admin'];
+    }
+
+    function delegateRequestAccountantListOk() {
+      return delegateRequestAccountantListOkWithUser(
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
+    }
+
+    function delegateRequestCompanyStaffListOkWithUser(u) {
       let co = u.get('companyUID', u.get('companyId', ''));
       let docCo = resource.data.get('companyUID', resource.data.get('companyId', ''));
       return co != '' && docCo == co
         && u.get('role', '') in [
           'company-admin', 'company_admin', 'companyadmin', 'admin',
-          'supervisor', 'company_supervisor', 'hr', 'company-hr', 'company_hr', 'human_resources'
-        ];
+          'supervisor', 'company_supervisor', 'hr', 'company-hr', 'company_hr', 'human_resources'];
     }
 
-    function delegateRequestOrgStaffListOk() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    function delegateRequestOrgStaffListOkWithUser(u) {
       let org = u.get('organizationUID', '');
       let docOrg = resource.data.get('organizationUID', resource.data.get('organizationId', ''));
       return org != '' && docOrg == org
         && u.get('role', '') in [
-          'organization-admin', 'organization_admin', 'organizationAdmin'
-        ];
+          'organization-admin', 'organization_admin', 'organizationAdmin'];
     }
 
-    function delegateRequestAccountantListOk() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let org = u.get('organizationUID', u.get('organizationId', ''));
-      let docOrg = resource.data.get('organizationUID', resource.data.get('organizationId', ''));
-      return org != '' && docOrg == org
-        && u.get('role', '') in ['accountant', 'accounting', 'account_admin'];
+    function delegateRequestReceiptListOkWithUser(u) {
+      let co = u.get('companyUID', u.get('companyId', ''));
+      let docCo = resource.data.get('companyUID', resource.data.get('companyId', ''));
+      return resource.data.keys().hasAll(['receiptCode'])
+        && co != '' && docCo == co
+        && u.get('role', '') in [
+          'supervisor', 'company_supervisor', 'company-admin', 'company_admin', 'admin',
+          'hr', 'company-hr', 'company_hr'];
+    }
+
+    function delegateRequestListFromUser(u) {
+      let r = u.get('role', '');
+      return resource.data.get('supervisorUid', '') == request.auth.uid
+        ? true
+        : resource.data.keys().hasAll(['receiptCode'])
+          ? delegateRequestReceiptListOkWithUser(u)
+        : r in [
+            'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+            'technical_support', 'technical-support', 'technicalSupport']
+          ? true
+        : r in ['organization-admin', 'organization_admin', 'organizationAdmin']
+          ? delegateRequestOrgStaffListOkWithUser(u)
+        : r in ['accountant', 'accounting', 'account_admin']
+          ? delegateRequestAccountantListOkWithUser(u)
+        : delegateRequestCompanyStaffListOkWithUser(u);
+    }
+
+    function delegateRequestListOk() {
+      return delegateRequestListFromUser(
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
     }
 
     function hrWalletListOk() {
@@ -3258,25 +3641,11 @@ service cloud.firestore {
     }
 
     match /delegate_requests/{requestId} {
-      allow list: if signedIn() && staffRole() in [
-          'supervisor', 'company_supervisor', 'company-admin', 'company_admin', 'admin', 'hr', 'company-hr', 'company_hr']
-        && callerCompany() != ''
-        && resource.data.get('companyUID', resource.data.get('companyId', '')) == callerCompany()
-        && resource.data.keys().hasAll(['receiptCode']);
-      allow list: if signedIn() && resource.data.get('supervisorUid', '') == request.auth.uid;
-      allow list: if signedIn() && staffRole() in ['supervisor', 'company_supervisor']
-        && callerCompany() != ''
-        && resource.data.get('companyUID', resource.data.get('companyId', '')) == callerCompany()
-        && resource.data.keys().hasAll(['receiptCode']);
-      allow list: if signedIn() && staffRole() in [
-        'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-        'technical_support', 'technical-support', 'technicalSupport'];
-      allow list: if signedIn() && delegateRequestOrgStaffListOk();
-      allow list: if signedIn() && delegateRequestCompanyStaffListOk();
-      allow list: if signedIn() && delegateRequestAccountantListOk();
-      allow list: if signedIn() && isCompanyScopedStaff()
-        && callerCompany() != ''
-        && resource.data.get('companyUID', resource.data.get('companyId', '')) == callerCompany();
+      allow list: if signedIn() && resource.data.keys().hasAll(['receiptCode'])
+        && delegateRequestReceiptListOkWithUser(
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
+      allow list: if signedIn() && delegateRequestListFromUser(
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
       allow get: if signedIn() && delegateRequestReadOk();
       // Docs-pending: requests are created by staff only (supervisor flow).
       // The approved delegate's uid equals the request id, so the self path
