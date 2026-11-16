@@ -1,5 +1,5 @@
 /**
- * C1: hardened web claimInvite$ batch (rules-only; inviteId via auth token claim).
+ * C1: hardened web claimInvite$ batch (invite_email_index; no auth inviteId claim).
  */
 const {describe, test, before, after, beforeEach} = require("node:test");
 const {readFileSync} = require("fs");
@@ -35,6 +35,10 @@ async function seedInvite(env, id, email, org = ORG, co = CO) {
     await setDoc(doc(db, "invites/" + id), {
       email, status: "pending", roleToAssign: "company-admin",
       organizationId: org, companyId: co, expiresAt: exp(), invitedByUid: "oa",
+    });
+    await setDoc(doc(db, `invite_email_index/${email.toLowerCase()}`), {
+      inviteId: id, organizationUID: org, companyUID: co,
+      role: "company-admin", status: "pending",
     });
   });
 }
@@ -72,52 +76,63 @@ describe("invite claim batch (C1)", () => {
   after(async () => env.cleanup());
   beforeEach(async () => env.clearFirestore());
 
-  test("web-shaped batch passes with verified token + inviteId claim", async () => {
+  test("web-shaped batch passes with index doc, no inviteId claim", async () => {
     await seedInvite(env, "i1", "good@x.test");
-    const db = ctx(env, "u1", "good@x.test", {inviteId: "i1"});
+    const db = ctx(env, "u1", "good@x.test");
     await assertSucceeds(webBatch(db, "u1", "good@x.test", ORG, CO, "i1"));
   });
 
   test("deny forged client emailVerified without token verification", async () => {
     await seedInvite(env, "i1", "good@x.test");
-    const db = ctx(env, "u2", "good@x.test", {inviteId: "i1", email_verified: false});
+    const db = ctx(env, "u2", "good@x.test", {email_verified: false});
     await assertFails(webBatch(db, "u2", "good@x.test", ORG, CO, "i1", {forgeEmailVerified: true}));
   });
 
   test("deny wrong token email", async () => {
     await seedInvite(env, "i1", "good@x.test");
-    const db = ctx(env, "u3", "wrong@x.test", {inviteId: "i1"});
+    const db = ctx(env, "u3", "wrong@x.test");
     await assertFails(webBatch(db, "u3", "wrong@x.test", ORG, CO, "i1"));
   });
 
   test("deny unverified email token", async () => {
     await seedInvite(env, "i1", "good@x.test");
-    const db = ctx(env, "u4", "good@x.test", {inviteId: "i1", email_verified: false});
+    const db = ctx(env, "u4", "good@x.test", {email_verified: false});
     await assertFails(webBatch(db, "u4", "good@x.test", ORG, CO, "i1"));
+  });
+
+  test("deny without index doc", async () => {
+    await env.withSecurityRulesDisabled(async (c) => {
+      await setDoc(doc(c.firestore(), "invites/i0"), {
+        email: "noindex@x.test", status: "pending", roleToAssign: "company-admin",
+        organizationId: ORG, companyId: CO, expiresAt: exp(),
+      });
+    });
+    const db = ctx(env, "u0", "noindex@x.test");
+    await assertFails(webBatch(db, "u0", "noindex@x.test", ORG, CO, "i0"));
   });
 
   test("deny wrong company on user doc", async () => {
     await seedInvite(env, "i1", "good@x.test");
-    const db = ctx(env, "u5", "good@x.test", {inviteId: "i1"});
+    const db = ctx(env, "u5", "good@x.test");
     await assertFails(webBatch(db, "u5", "good@x.test", ORG, CO, "i1", {wrongCompany: true}));
   });
 
   test("deny admins increment +2", async () => {
     await seedInvite(env, "i1", "good@x.test");
-    const db = ctx(env, "u6", "good@x.test", {inviteId: "i1"});
+    const db = ctx(env, "u6", "good@x.test");
     await assertFails(webBatch(db, "u6", "good@x.test", ORG, CO, "i1", {adminBump: 2}));
   });
 
   test("deny claiming another invite email on update", async () => {
     await seedInvite(env, "i1", "good@x.test");
     await seedInvite(env, "i2", "victim@x.test");
-    const db = ctx(env, "u7", "good@x.test", {inviteId: "i1"});
+    const db = ctx(env, "u7", "good@x.test");
     await assertFails(webBatch(db, "u7", "good@x.test", ORG, CO, "i2"));
   });
 
   test("deny self member without invite batch", async () => {
     await seedInvite(env, "i1", "good@x.test");
-    const db = ctx(env, "nodoc", "good@x.test", {inviteId: "i1"});
+    const db = ctx(env, "nodoc", "good@x.test");
     await assertFails(setDoc(doc(db, `organizations/${ORG}/companies/${CO}/members/nodoc`), {role: "company-admin"}));
   });
 });

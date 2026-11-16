@@ -1109,7 +1109,6 @@ service cloud.firestore {
       // Caller role/org/company are read once and passed in (1000-expression budget).
       // C1 invite-claim is a separate allow so p0 paths stay under the expr cap.
       allow create: if signedIn() && noSecretsCreate()
-        && inviteClaimIdFromContext() != ''
         && inviteClaimSelfUserCreateOk(request.resource.data);
       allow create: if signedIn() && noSecretsCreate()
         && usersCreateOk(userRole(), callerOrg(), callerCompany(), request.resource.data);
@@ -1418,22 +1417,19 @@ service cloud.firestore {
         && request.auth.token.email_verified == true;
     }
 
-    // Legacy web passes inviteId only on the invite update path; correlate via auth token claim.
-    function inviteClaimIdFromContext() {
-      return request.auth != null
-        && request.auth.token.keys().hasAll(['inviteId'])
-        && request.auth.token.inviteId is string
-        && request.auth.token.inviteId != ''
-          ? request.auth.token.inviteId
-          : '';
-    }
-
-    function pendingInviteForClaim(orgId, compId, inviteId, roleToAssign) {
-      let R = /databases/$(database)/documents/invites/$(inviteId);
+    // C1: pending invite resolved via invite_email_index (maintained by onInviteEmailIndexSync).
+    function inviteClaimResolvedId(orgId, compId, roleToAssign) {
       let em = authEmailLower();
-      let inv = get(R).data;
-      return inviteId != '' && em != ''
-        && authEmailVerified()
+      let idxPath = /databases/$(database)/documents/invite_email_index/$(em);
+      let idx = exists(idxPath) ? get(idxPath).data : {};
+      let inviteId = idx.get('inviteId', '');
+      let R = /databases/$(database)/documents/invites/$(inviteId);
+      let inv = exists(R) ? get(R).data : {};
+      return authEmailVerified() && em != '' && exists(idxPath)
+        && idx.get('status', '') == 'pending'
+        && inviteId != ''
+        && idx.get('organizationUID', '') == orgId
+        && idx.get('companyUID', '') == compId
         && exists(R)
         && inv.get('status', '') == 'pending'
         && !inv.keys().hasAny(['claimedBy', 'claimedByUid', 'claimedAt'])
@@ -1441,14 +1437,14 @@ service cloud.firestore {
         && inv.get('organizationId', '') == orgId
         && inv.get('companyId', '') == compId
         && inv.get('roleToAssign', '') in ['company-admin', 'company_admin', 'admin']
-        && roleToAssign in ['company-admin', 'company_admin', 'admin'];
+        && roleToAssign in ['company-admin', 'company_admin', 'admin']
+        ? inviteId : '';
     }
 
     function inviteClaimSelfUserCreateOk(d) {
       let nr = roleOf(d);
       let org = d.get('organizationUID', '');
       let co = d.get('companyUID', '');
-      let inviteId = inviteClaimIdFromContext();
       return request.auth.uid == request.resource.id
         && nr in ['company-admin', 'company_admin', 'admin']
         && authEmailVerified()
@@ -1457,13 +1453,12 @@ service cloud.firestore {
         && org != '' && co != ''
         && d.get('uid', request.auth.uid) == request.auth.uid
         && !d.keys().hasAny(privilegeKeys())
-        && inviteId != ''
-        && pendingInviteForClaim(org, co, inviteId, nr);
+        && inviteClaimResolvedId(org, co, nr) != '';
     }
 
     function companyMemberSelfInviteClaimCreateOk(orgId, compId, memberId) {
-      let inviteId = inviteClaimIdFromContext();
       let role = request.resource.data.get('role', '');
+      let inviteId = inviteClaimResolvedId(orgId, compId, role);
       let I = /databases/$(database)/documents/invites/$(inviteId);
       return signedIn()
         && memberId == request.auth.uid
@@ -1477,7 +1472,7 @@ service cloud.firestore {
     }
 
     function companyAdminsInviteClaimBumpOk(orgId, compId) {
-      let inviteId = inviteClaimIdFromContext();
+      let inviteId = inviteClaimResolvedId(orgId, compId, 'company-admin');
       let ch = request.resource.data.diff(resource.data).affectedKeys();
       let I = /databases/$(database)/documents/invites/$(inviteId);
       let M = /databases/$(database)/documents/organizations/$(orgId)/companies/$(compId)/members/$(request.auth.uid);
@@ -1488,6 +1483,15 @@ service cloud.firestore {
         && existsAfter(M) && existsAfter(I)
         && getAfter(I).data.get('status', '') == 'claimed'
         && getAfter(I).data.get('claimedByUid', '') == request.auth.uid;
+    }
+
+    function inviteStaffPendingEditScopeOk() {
+      return (isOrgAdmin() && callerOrg() != ''
+          && (resource.data.get('organizationId', '') == callerOrg()
+            || resource.data.get('organizationUID', '') == callerOrg()))
+        || (isStrictCompanyAdmin() && callerOrg() != '' && callerCompany() != ''
+          && resource.data.get('organizationId', '') == callerOrg()
+          && resource.data.get('companyId', '') == callerCompany());
     }
 
     function inviteClaimInviteeUpdateOk() {
@@ -2234,6 +2238,11 @@ service cloud.firestore {
 
     // ==================== WEB DASHBOARD ====================
 
+    // invite_email_index: server-maintained only (onInviteEmailIndexSync / backfill).
+    match /invite_email_index/{emailKey} {
+      allow read, write: if false;
+    }
+
     match /invites/{inviteId} {
       // Signup still resolves one invite by its unguessable id.
       allow get: if true;
@@ -2275,6 +2284,21 @@ service cloud.firestore {
 
       // Invitee claim (web claimInvite$ batch or legacy invite-only update).
       allow update: if inviteClaimInviteeUpdateOk();
+      // Company/org staff: extend expiry only (supervisor ≡ company-admin per H2).
+      allow update: if signedIn()
+        && isStrictCompanyAdmin()
+        && callerOrg() != ''
+        && callerCompany() != ''
+        && resource.data.get('status', '') == 'pending'
+        && request.resource.data.get('status', '') == 'pending'
+        && changedKeys().hasOnly(['expiresAt'])
+        && resource.data.get('organizationId', '') == callerOrg()
+        && resource.data.get('companyId', '') == callerCompany()
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt <= request.time + duration.value(7, 'd') + duration.value(10, 'm')
+        && request.resource.data.get('organizationId', '') == resource.data.get('organizationId', '')
+        && request.resource.data.get('companyId', '') == resource.data.get('companyId', '')
+        && request.resource.data.get('roleToAssign', '') == resource.data.get('roleToAssign', '');
       // H3: staff edits pending invites (not claim); claimed is terminal.
       allow update: if signedIn()
         && resource.data.get('status', '') == 'pending'
@@ -2289,7 +2313,7 @@ service cloud.firestore {
           (isOrgAdmin() && (resource.data.get('organizationId', '') == callerOrg() || resource.data.get('organizationUID', '') == callerOrg())
             && request.resource.data.get('organizationId', '') == resource.data.get('organizationId', '')
             && request.resource.data.get('roleToAssign', '') == resource.data.get('roleToAssign', '')) ||
-          (isStrictCompanyAdmin() && companyScoped()
+          (isStrictCompanyAdmin() && inviteStaffPendingEditScopeOk()
             && request.resource.data.get('organizationId', '') == resource.data.get('organizationId', '')
             && request.resource.data.get('companyId', '') == resource.data.get('companyId', '')
             && request.resource.data.get('roleToAssign', '') == resource.data.get('roleToAssign', ''))

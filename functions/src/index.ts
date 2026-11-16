@@ -319,6 +319,7 @@ export {staffPhoneLookup} from "./staff_phone_lookup";
 export {listGlobalNotifyStaff} from "./list_global_notify_staff";
 
 export {createStaffUser, resendStaffSetupLink, claimInvite} from "./staff_accounts";
+export {onInviteEmailIndexSync} from "./invite_email_index";
 export {
   sendStaffPasswordSetupEmail,
   requestStaffPasswordReset,

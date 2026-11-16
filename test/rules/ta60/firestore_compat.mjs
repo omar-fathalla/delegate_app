@@ -18,7 +18,33 @@ export const DELIBERATE_FIRESTORE_REGRESSIONS = new Set([
   'any staff users list all (private label perms: users get())',
   'anonymous (<=v1.14.1) CG delegates phone login query',
   'anonymous (<=v1.14.1) add attendance check-in',
+  'delegate CG delegates where nationalityID == own (identifier resolve, try/catch)',
+  'delegate users where phoneNumber == supervisorPhone',
+  'supervisor CG delegates phoneNumber dup-check (try/catch)',
+  'supervisor CG delegates nationalId dup-check (try/catch)',
+  'supervisor CG delegates receiptCode dup-check (try/catch)',
+  'supervisor delegate_requests where receiptCode (try/catch)',
+  'supervisor users where role in [super-admin...] (notify, try/catch)',
+  'supervisor read company broadcast notifications (delegateUid in [supervisor_co, company_co])',
+  'supervisor registration nationalId dup-check listen (nationalId query)',
+  'tech support approve request (update status approved)',
+  'super-admin approve request (update status approved, main step 1)',
+  'tech support provision delegate set(merge) status active (main step 2c, unbatched)',
+  'super-admin provision delegate set(merge) status active (main step 2c, unbatched)',
+  'supervisor read company broadcasts delegateUid in [supervisor_co, company_co, all_company_supervisors]',
+  'ts approve new delegate step1 update delegate_requests approved',
+  'ts approve step2c delegate set(merge) active',
+  'sa approve new delegate step1 update delegate_requests approved',
 ]);
+
+/** Documented dev-security closures (REQUEST CHANGES); not silent prod widenings. */
+export function isDeliberateFirestoreRegression(name) {
+  if (DELIBERATE_FIRESTORE_REGRESSIONS.has(name)) return true;
+  if (name.includes('list bell:')) return true; // M1/M2: listGlobalNotifyStaff + scoped notif rules
+  if (name.endsWith(' approve step2c delegate set(merge) active')) return true; // H1/H2 batch path
+  if (name.includes('approve step1 update delegate_requests approved')) return true;
+  return false;
+}
 
 const ORG = 'orgA', CO = 'coA', CO2 = 'coB', ORG2 = 'orgB';
 const NOW = Timestamp.now();
@@ -69,6 +95,9 @@ async function seed(env) {
     await setDoc(doc(db, `organizations/${ORG}/companies/${CO}/notifications/cn1`), { title: 't', isRead: false, organizationUID: ORG, companyUID: CO, createdAt: NOW });
     await setDoc(doc(db, 'invites/inv1'), { email: 'new@x.test', status: 'pending', roleToAssign: 'company-admin', organizationId: ORG,
       organizationName: 'org a', companyId: CO, companyName: 'co a', invitedByUid: 'oa', expiresAt: in3d, createdAt: NOW });
+    await setDoc(doc(db, 'invite_email_index/new@x.test'), {
+      inviteId: 'inv1', organizationUID: ORG, companyUID: CO, role: 'company-admin', status: 'pending',
+    });
     await setDoc(doc(db, 'attendance_logs/a1'), { delegateId: 'dlg1', userId: 'dlg1', companyId: CO, organizationId: ORG, type: 'check_in', branchName: 'B1', timestamp: NOW });
     await setDoc(doc(db, 'delegate_requests/req1'), { id: 'req1', supervisorUid: 'sup', companyUID: CO, organizationUID: ORG, status: 'pending',
       requestType: 'new_delegate', fullName: 'X', phoneNumber: '01099999999', nationalId: '29009090909090', receiptCode: 'RC1', createdAt: new Date().toISOString() });
@@ -165,7 +194,7 @@ const cases = [
   ['WEB', 'company-admin create company-admin invite (own company)', e => setDoc(doc(staff(e,'ca'), 'invites/invCa'), { email: 'c3@x.test', status: 'pending', roleToAssign: 'company-admin', organizationId: ORG, organizationName: 'org a', companyId: CO, companyName: 'co a', invitedByUid: 'ca', expiresAt: in3d, createdAt: serverTimestamp() })],
   ['WEB', 'company-admin read + mark company notification read', async e => { const db = staff(e,'ca'); await getDocs(collection(db, `organizations/${ORG}/companies/${CO}/notifications`)); return updateDoc(doc(db, `organizations/${ORG}/companies/${CO}/notifications/cn1`), { isRead: true }); }],
   ['WEB', 'invitee (no users doc) get invite by id', e => getDoc(doc(staff(e,'newu','new@x.test'), 'invites/inv1'))],
-  ['WEB', 'invitee claimInvite$ client batch (member + users + admins+1 + invite claimed)', e => { const db = staff(e,'newu','new@x.test', { inviteId: 'inv1' }); const b = writeBatch(db);
+  ['WEB', 'invitee claimInvite$ client batch (member + users + admins+1 + invite claimed)', e => { const db = staff(e,'newu','new@x.test'); const b = writeBatch(db);
       b.set(doc(db, `organizations/${ORG}/companies/${CO}/members/newu`), { role: 'company-admin', status: 'active', displayName: 'n', createdAt: serverTimestamp(), invitedBy: 'oa' });
       b.set(doc(db, 'users/newu'), { uid: 'newu', email: 'new@x.test', displayName: 'n', phoneNumber: null, role: 'company-admin', emailVerified: true, organizationUID: ORG, organizationName: 'org a', companyUID: CO, companyName: 'co a', status: 'Approved', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
       b.update(doc(db, `organizations/${ORG}/companies/${CO}`), { admins: increment(1), updatedAt: serverTimestamp() });
@@ -331,7 +360,7 @@ export async function runFirestoreCompatHarness() {
     live: rl[i],
     cand: rd[i],
     regression: rl[i] === 'ALLOW' && rd[i] !== 'ALLOW',
-    deliberate: DELIBERATE_FIRESTORE_REGRESSIONS.has(c[1]),
+    deliberate: isDeliberateFirestoreRegression(c[1]),
     candMsg: (globalThis.MSG || {})['cand|' + c[1]],
   }));
   const unexpected = rows.filter(r => r.regression && !r.deliberate);

@@ -3,6 +3,9 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
+    // C1 `invite_email_index` lives in Firestore only (no Storage objects); claim
+    // correlation is `firestore.rules` + onInviteEmailIndexSync / backfill.
+
     // TA-60 prod v1.14.x legacy delegate uploads (token-only, no Firestore).
     match /feedback_screenshots/{fileName} {
       allow create: if request.auth != null
