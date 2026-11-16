@@ -1518,6 +1518,13 @@ service cloud.firestore {
       return !changed.hasAny(['nationalId', 'nationalityID']);
     }
 
+    // users/{auth.uid}.phoneNumber feeds staff bell matching — block self-writes
+    // (Mohamed TA-60); Admin SDK and staff edits of other users unchanged.
+    function usersSelfContactPhoneLocked(changed, userId) {
+      return request.auth.uid != userId
+        || !changed.hasAny(['phoneNumber', 'phone']);
+    }
+
     // C1 (web claimInvite$ batch): trust token email only — never client emailVerified.
     function authEmailLower() {
       return signedIn()
@@ -1690,7 +1697,9 @@ service cloud.firestore {
       let changed = d.diff(old).affectedKeys();
       let nr = roleOf(d);
       let or = roleOf(old);
-      return usersIdentityClientLocked(changed) && ((r in superAdminRoleList() && newRoleOk(nr)) || (
+      return usersIdentityClientLocked(changed)
+        && usersSelfContactPhoneLocked(changed, userId)
+        && ((r in superAdminRoleList() && newRoleOk(nr)) || (
         newRoleOk(nr)
         && !changed.hasAny(privilegeKeys())
         && staffMaySetIsActiveActive(d, old, changed, r)

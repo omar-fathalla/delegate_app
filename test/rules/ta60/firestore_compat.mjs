@@ -22,6 +22,18 @@ export const DELIBERATE_FIRESTORE_REGRESSIONS = new Set([
   'delegate CG delegates where nationalityID == own (identifier resolve, try/catch)',
   'delegate users where phoneNumber == supervisorPhone',
   'supervisor users where role in [super-admin...] (notify, try/catch)',
+  'hr users self-update phoneNumber victim 01X (coB)',
+  'hr users self-update phoneNumber victim +20 (coB)',
+  'sup users self-update phoneNumber victim 01X (coB)',
+  'sup users self-update phoneNumber victim +20 (coB)',
+  'hr users self-update phone victim 01X (coB)',
+  'sup users self-update phone victim 01X (coB)',
+  'hr bell cross-co after forged victim 01X phoneNumber field',
+  'hr bell cross-co after forged victim +20 phoneNumber field',
+  'sup bell cross-co after forged victim 01X phoneNumber field',
+  'sup bell cross-co after forged victim +20 phoneNumber field',
+  'hr bell cross-co after forged victim 01X phone_ tag',
+  'sup bell cross-co after forged victim 01X phone_ tag',
 ]);
 
 /** Documented dev-security closures (REQUEST CHANGES); not silent prod widenings. */
@@ -121,6 +133,9 @@ const STAFF_PHONE_BY_UID = {
 };
 
 const ORG = 'orgA', CO = 'coA', CO2 = 'coB', ORG2 = 'orgB';
+/** dlg2 @ coB — cross-company bell victim phones */
+const VICTIM_01X = '01000000002';
+const VICTIM_PLUS20 = '+200100000002';
 const NOW = Timestamp.now();
 const in3d = Timestamp.fromMillis(Date.now() + 3 * 86400e3);
 const DOCS = ['personalPhoto','nationalityId','criminalRecord','militaryStatus','qualification','birthCertificate','paymentReceipt']
@@ -248,6 +263,14 @@ async function seed(env) {
     await setDoc(doc(db, 'counters/delegates'), { value: 10 });
     await setDoc(doc(db, `organizations/${ORG}/companyRequests/cr1`), { status: 'pending', companyUID: CO, organizationUID: ORG });
     await setDoc(doc(db, `organizations/${ORG}/sent_notifications/sn1`), { title: 'x', createdAt: NOW });
+    await setDoc(doc(db, 'notifications/nbVictimCoB01X'), {
+      phoneNumber: VICTIM_01X, delegateUid: `phone_${VICTIM_01X}`, title: 'victim-coB-01X',
+      companyId: CO2, organizationId: ORG, isRead: false, createdAt: NOW, deletedBy: [],
+    });
+    await setDoc(doc(db, 'notifications/nbVictimCoBIntl'), {
+      phoneNumber: VICTIM_PLUS20, delegateUid: `phone_${VICTIM_PLUS20}`, title: 'victim-coB-intl',
+      companyId: CO2, organizationId: ORG, isRead: false, createdAt: NOW, deletedBy: [],
+    });
   });
 }
 
@@ -607,6 +630,56 @@ const attOrgBranchToday = (db) => getDocs(query(
   where('timestamp', '<', attDayEnd()),
   limit(2000),
 ));
+
+async function staffSelfwriteThenList(env, uid, victimPhone, listFn) {
+  const db = staff(env, uid);
+  try {
+    await updateDoc(doc(db, 'users', uid), { phoneNumber: victimPhone });
+  } catch (_) {}
+  return listFn(db);
+}
+
+/** Mohamed staff self-write → users.phoneNumber bell cross-co attack matrix. */
+function staffSelfwriteAttackCases() {
+  const selfPatch = (uid, label, patch) => [
+    'ATT-SEC',
+    `${uid} users self-update ${label}`,
+    (e) => updateDoc(doc(staff(e, uid), 'users', uid), patch),
+  ];
+  const crossCoProbe = (uid, victim, label, listFn) => [
+    'ATT-SEC',
+    `${uid} bell cross-co after forged ${label}`,
+    (e) => staffSelfwriteThenList(e, uid, victim, listFn),
+  ];
+  return [
+    selfPatch('hr', 'phoneNumber victim 01X (coB)', { phoneNumber: VICTIM_01X }),
+    selfPatch('hr', 'phoneNumber victim +20 (coB)', { phoneNumber: VICTIM_PLUS20 }),
+    selfPatch('sup', 'phoneNumber victim 01X (coB)', { phoneNumber: VICTIM_01X }),
+    selfPatch('sup', 'phoneNumber victim +20 (coB)', { phoneNumber: VICTIM_PLUS20 }),
+    selfPatch('hr', 'phone victim 01X (coB)', { phone: VICTIM_01X }),
+    selfPatch('sup', 'phone victim 01X (coB)', { phone: VICTIM_01X }),
+    crossCoProbe('hr', VICTIM_01X, 'victim 01X phoneNumber field', (db) => notifListPhoneField(db, VICTIM_01X)),
+    crossCoProbe('hr', VICTIM_PLUS20, 'victim +20 phoneNumber field', (db) => notifListPhoneField(db, VICTIM_PLUS20)),
+    crossCoProbe('sup', VICTIM_01X, 'victim 01X phoneNumber field', (db) => notifListPhoneField(db, VICTIM_01X)),
+    crossCoProbe('sup', VICTIM_PLUS20, 'victim +20 phoneNumber field', (db) => notifListPhoneField(db, VICTIM_PLUS20)),
+    crossCoProbe('hr', VICTIM_01X, 'victim 01X phone_ tag', (db) => notifList(db, `phone_${VICTIM_01X}`)),
+    crossCoProbe('sup', VICTIM_01X, 'victim 01X phone_ tag', (db) => notifList(db, `phone_${VICTIM_01X}`)),
+  ];
+}
+
+export function assertStaffSelfwriteSecurity(rows) {
+  const issues = [];
+  for (const r of rows.filter((x) => x.area === 'ATT-SEC')) {
+    if (r.name.includes('self-update') && r.cand !== 'DENY') {
+      issues.push(`${r.name}: cand ${r.cand} expected DENY`);
+    }
+    if (r.name.includes('cross-co') && r.cand === 'ALLOW' && (r.candDocCount ?? 0) !== 0) {
+      issues.push(`${r.name}: cand docCount ${r.candDocCount} expected 0 cross-co`);
+    }
+  }
+  return issues;
+}
+
 const cases = [
   ['WEB', 'org-admin get own users doc', e => getDoc(doc(staff(e,'oa'), 'users/oa'))],
   ['WEB', 'org-admin get organization', e => getDoc(doc(staff(e,'oa'), `organizations/${ORG}`))],
@@ -759,6 +832,7 @@ const cases = [
   ['URG', 'company-admin nested company notifications list', e => getDocs(collection(staff(e,'ca'), `organizations/${ORG}/companies/${CO}/notifications`))],
   ['URG', 'org-admin nested company notifications list', e => getDocs(collection(staff(e,'oa'), `organizations/${ORG}/companies/${CO}/notifications`))],
   ...buildBellHarnessCases(),
+  ...staffSelfwriteAttackCases(),
   ['ATT-READ', 'marketing_promotion attendance org+branchName+today (limit 2000)', e => attOrgBranchToday(staff(e, 'mp'))],
   ['ATT-READ', 'marketing attendance org+branchName+today (limit 2000, chain shape)', e => attOrgBranchToday(staff(e, 'mkt'))],
   ['ATT-READ', 'branches_marketing attendance org+branchName+today (limit 2000)', e => attOrgBranchToday(staff(e, 'bm'))],
@@ -818,6 +892,7 @@ export async function runFirestoreCompatHarness() {
   const isExprLimitMsg = (msg) => /maximum of 1000 expressions|limit exceeded/i.test(String(msg || ''));
   const bellCountIssues = assertBellAllowCounts(rows);
   const bellSimulationIssues = assertBellSimulatedDocCounts(bellLiveSim, bellCandSim);
+  const staffSelfwriteIssues = assertStaffSelfwriteSecurity(rows);
   return {
     rows,
     total: rows.length,
@@ -828,5 +903,6 @@ export async function runFirestoreCompatHarness() {
     bellLiveSim,
     bellCandSim,
     bellSimulationIssues,
+    staffSelfwriteIssues,
   };
 }

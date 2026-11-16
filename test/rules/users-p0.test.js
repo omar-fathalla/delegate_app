@@ -113,6 +113,8 @@ describe("P0 users hardening", () => {
       await assertFails(as("hr").doc("users/hr").update(patch));
     }
     await assertSucceeds(as("hr").doc("users/hr").update({displayName: "HR", fcmToken: "t", requireReLogin: false}));
+    await assertFails(as("hr").doc("users/hr").update({phoneNumber: "01099999999"}));
+    await assertFails(as("sup").doc("users/sup").update({phoneNumber: "01088888888", phone: "01088888888"}));
   });
 
   test("no client write may set or change password fields; untouched legacy value is OK (S1)", async () => {

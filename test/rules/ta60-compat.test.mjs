@@ -30,6 +30,11 @@ test('TA-60 firestore: live prod vs candidate (main v1.14.2 + web shapes)', asyn
     0,
     `getNotifications() sim doc counts: ${(r.bellSimulationIssues || []).join('; ')}`,
   );
+  assert.equal(
+    r.staffSelfwriteIssues?.length ?? 0,
+    0,
+    `staff self-write bell attack: ${(r.staffSelfwriteIssues || []).join('; ')}`,
+  );
   console.log(
     `firestore harness: ${r.total} cases, ${r.deliberate.length} deliberate regressions, ` +
       `0 unexpected; bell sim ${JSON.stringify(r.bellLiveSim?.uniqueDocs)}`,
