@@ -19,7 +19,13 @@ const int kHrTabTasks = 11;
 const int kHrTabPhotoPermissions = 12;
 const int kHrTabPenaltyCatalog = 13;
 const int kHrTabPenalties = 14;
-const int kHrShellTabCount = 15;
+const int kHrTabOverview = 15;
+const int kHrShellTabCount = 16;
+
+/// The tab `/hr/home` opens on. Web lands on the overview; mobile keeps the
+/// attendance tab.
+int hrShellHomeTab({required bool isWeb}) =>
+    isWeb ? kHrTabOverview : kHrTabAttendance;
 
 /// Where a shell item is rendered.
 enum HrShellPlacement { sidebar, compactMenu, moreSheet }
@@ -58,6 +64,16 @@ class HrShellItem {
 }
 
 const List<HrShellItem> kHrShellCatalog = [
+  HrShellItem(
+    id: 'overview',
+    title: 'الرئيسية',
+    subtitle: 'حضور النهاردة والسلاسل',
+    section: 'الرئيسية',
+    icon: Icons.home_outlined,
+    selectedIcon: Icons.home_rounded,
+    tabIndex: kHrTabOverview,
+    webOnly: true,
+  ),
   HrShellItem(
     id: 'profile',
     title: 'الملف الشخصي',
@@ -221,12 +237,14 @@ const List<HrShellItem> kHrShellCatalog = [
   ),
 ];
 
-const Set<int> _kBottomNavTabs = {
-  kHrTabAttendance,
+/// Tabs of the compact bottom bar, in order. On web the first slot is the
+/// overview, so the attendance log moves into the "more" sheet.
+List<int> hrBottomNavTabs({required bool isWeb}) => [
+  isWeb ? kHrTabOverview : kHrTabAttendance,
   kHrTabDelegates,
   kHrTabTracking,
   kHrTabLeaves,
-};
+];
 
 HrShellItem? hrShellItemById(String id) {
   for (final item in kHrShellCatalog) {
@@ -262,7 +280,8 @@ List<HrShellItem> hrShellItems({
       HrShellPlacement.moreSheet =>
         item.id != 'profile' &&
             item.id != 'settings' &&
-            (item.tabIndex == null || !_kBottomNavTabs.contains(item.tabIndex)),
+            (item.tabIndex == null ||
+                !hrBottomNavTabs(isWeb: isWeb).contains(item.tabIndex)),
     };
     if (show) visible.add(item);
   }

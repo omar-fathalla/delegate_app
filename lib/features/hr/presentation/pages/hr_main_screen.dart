@@ -19,13 +19,11 @@ import 'package:delegate_app/main.dart';
 
 class HRMainScreen extends StatefulWidget {
   final Delegate delegate;
-  final int initialIndex;
 
-  const HRMainScreen({
-    super.key,
-    required this.delegate,
-    this.initialIndex = 0,
-  });
+  /// Defaults to [hrShellHomeTab]: the overview on web, attendance on mobile.
+  final int? initialIndex;
+
+  const HRMainScreen({super.key, required this.delegate, this.initialIndex});
 
   @override
   State<HRMainScreen> createState() => _HRMainScreenState();
@@ -35,12 +33,13 @@ class _HRMainScreenState extends State<HRMainScreen> {
   late int _currentIndex;
   late final Set<int> _loadedTabs;
   bool _isSidebarExpanded = true;
+  final int _homeIndex = hrShellHomeTab(isWeb: WebRuntimePolicy.isWeb);
 
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex;
-    _loadedTabs = {widget.initialIndex};
+    _currentIndex = widget.initialIndex ?? _homeIndex;
+    _loadedTabs = {_currentIndex};
   }
 
   void _onTabSelected(int index) {
@@ -52,6 +51,10 @@ class _HRMainScreenState extends State<HRMainScreen> {
 
   /// تحويل مؤشر التبويب النشط إلى موقعه في الشريط السفلي للموبايل (4 أساسية + المزيد)
   int _getBottomNavIndex(int currentTabIndex) {
+    if (WebRuntimePolicy.isWeb) {
+      final slot = hrBottomNavTabs(isWeb: true).indexOf(currentTabIndex);
+      return slot < 0 ? 4 : slot;
+    }
     switch (currentTabIndex) {
       case 0:
         return 0; // الحضور
@@ -68,6 +71,10 @@ class _HRMainScreenState extends State<HRMainScreen> {
 
   /// التفاعل مع عناصر الشريط السفلي للموبايل
   void _onBottomNavSelected(int bottomNavIndex) {
+    if (WebRuntimePolicy.isWeb && bottomNavIndex < 4) {
+      _onTabSelected(hrBottomNavTabs(isWeb: true)[bottomNavIndex]);
+      return;
+    }
     switch (bottomNavIndex) {
       case 0:
         _onTabSelected(0); // الحضور
@@ -187,6 +194,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
       case 'attendance_adjustments':
         _onTabSelected(8);
         break;
+      case 'overview':
       case 'delegate_subscriptions':
       case 'tasks':
       case 'supervisor_photo_permissions':
@@ -421,11 +429,11 @@ class _HRMainScreenState extends State<HRMainScreen> {
     return Directionality(
       textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
       child: PopScope(
-        canPop: isWideScreen || _currentIndex == 0,
+        canPop: isWideScreen || _currentIndex == _homeIndex,
         onPopInvokedWithResult: (didPop, result) {
           if (didPop) return;
-          if (_currentIndex != 0) {
-            _onTabSelected(0);
+          if (_currentIndex != _homeIndex) {
+            _onTabSelected(_homeIndex);
           }
         },
         child: Scaffold(
@@ -480,11 +488,18 @@ class _HRMainScreenState extends State<HRMainScreen> {
                   selectedIndex: _getBottomNavIndex(_currentIndex),
                   onDestinationSelected: _onBottomNavSelected,
                   destinations: [
-                    const NavigationDestination(
-                      icon: Icon(Icons.how_to_reg_outlined),
-                      selectedIcon: Icon(Icons.how_to_reg_rounded),
-                      label: 'الحضور',
-                    ),
+                    if (WebRuntimePolicy.isWeb)
+                      const NavigationDestination(
+                        icon: Icon(Icons.home_outlined),
+                        selectedIcon: Icon(Icons.home_rounded),
+                        label: 'الرئيسية',
+                      )
+                    else
+                      const NavigationDestination(
+                        icon: Icon(Icons.how_to_reg_outlined),
+                        selectedIcon: Icon(Icons.how_to_reg_rounded),
+                        label: 'الحضور',
+                      ),
                     const NavigationDestination(
                       icon: Icon(Icons.badge_outlined),
                       selectedIcon: Icon(Icons.badge_rounded),
@@ -529,7 +544,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
       index: _currentIndex,
       children: [
         for (var index = 0; index < kHrShellTabCount; index++)
-          index == 0 || _loadedTabs.contains(index)
+          index == _homeIndex || _loadedTabs.contains(index)
               ? hrShellTab(
                   index: index,
                   delegate: delegate,

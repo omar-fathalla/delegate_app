@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/branch_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/pages/anti_fraud_audit_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
@@ -22,6 +23,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/admin_tasks_screen.dart';
 import 'package:delegate_app/features/tracking/presentation/pages/delegate_tracking_screen.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/web/hr_system/hr_home_overview_web.dart';
 
 /// The existing screen for one HR-shell tab, with the same delegate the
 /// supervisor menu used to push. New tools keep their own blocs and company
@@ -79,6 +81,12 @@ Widget hrShellTab({
       return PenaltyRulesCatalogPage(currentDelegate: delegate);
     case kHrTabPenalties:
       return HrPenaltiesHost(admin: delegate);
+    case kHrTabOverview:
+      if (!WebRuntimePolicy.isWeb) return const SizedBox.shrink();
+      return HrHomeOverviewWeb(
+        delegate: delegate,
+        onNavigateToTab: onNavigateToTab,
+      );
     default:
       return const SizedBox.shrink();
   }
