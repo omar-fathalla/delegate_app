@@ -503,31 +503,9 @@ class _DelegateSubscriptionRequestsPageState
       AppSnackBar.showError(context, message);
       return;
     }
-    final colorScheme = Theme.of(context).colorScheme;
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(
-            color: colorScheme.onError,
-            fontWeight: FontWeight.w600,
-            fontSize: 13.5,
-          ),
-        ),
-        backgroundColor: colorScheme.error,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        action: SnackBarAction(
-          label: 'إعادة المحاولة',
-          textColor: colorScheme.onError,
-          onPressed: () {
-            retry();
-          },
-        ),
-      ),
-    );
+    showSubscriptionDecisionFailure(context, message, () {
+      retry();
+    });
   }
 
   Future<bool?> _handleNationalIdReview(

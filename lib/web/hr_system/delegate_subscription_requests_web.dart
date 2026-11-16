@@ -43,6 +43,50 @@ TextStyle subscriptionNumberStyle(TextStyle? base) =>
 bool subscriptionRequestReviewerCanDecide(UserRole role) =>
     role == UserRole.superAdmin || role == UserRole.technicalSupport;
 
+/// Web-only failed approve/reject. M3 snackbar: inverse surface, floating,
+/// at most 560 wide, 24 inset. The extra bottom inset clears the decision bar
+/// (about 72 tall) so the bar is not covered. No outline — the shape has no side.
+void showSubscriptionDecisionFailure(
+  BuildContext context,
+  String message,
+  VoidCallback retry,
+) {
+  final cs = Theme.of(context).colorScheme;
+  final width = MediaQuery.sizeOf(context).width;
+  const maxWidth = 560.0;
+  const inset = 24.0;
+  final horizontal = width > maxWidth + inset * 2
+      ? (width - maxWidth) / 2
+      : inset;
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text(
+        message,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: cs.onInverseSurface,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      backgroundColor: cs.inverseSurface,
+      // Elevation paints a hard black shelf under the bar in this renderer.
+      // The inverse surface already separates it; no border, no shadow.
+      elevation: 0,
+      behavior: SnackBarBehavior.floating,
+      margin: EdgeInsets.fromLTRB(horizontal, 0, horizontal, inset + 72),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(4)),
+      ),
+      action: SnackBarAction(
+        label: 'إعادة المحاولة',
+        textColor: cs.inversePrimary,
+        onPressed: retry,
+      ),
+    ),
+  );
+}
+
 /// Gender encoded in an Egyptian national ID (digit 13, odd = male).
 /// Null when the loaded id is missing or not 14 digits.
 DelegateGender? delegateGenderFromNationalId(String nationalId) {
@@ -721,10 +765,10 @@ class _DelegateSubscriptionRequestsWebState
       spacing: 8,
       runSpacing: 8,
       children: [
+        _filterChip('الكل', total, null),
         _filterChip('قيد المراجعة', pending, SubscriptionRequestStatus.pending),
         _filterChip('المعتمدة', approved, SubscriptionRequestStatus.approved),
         _filterChip('المرفوضة', rejected, SubscriptionRequestStatus.rejected),
-        _filterChip('الكل', total, null),
       ],
     );
   }
@@ -1374,7 +1418,7 @@ class _DetailContent extends StatelessWidget {
           const SizedBox(height: 8),
           _ltrValue(
             context,
-            '${request.nationalId} ← ${request.proposedNationalId}',
+            '${request.nationalId} → ${request.proposedNationalId}',
           ),
         ],
         if (request.isDeleteRequest &&
@@ -1450,7 +1494,6 @@ class _DetailContent extends StatelessWidget {
 
   Widget _chainLink(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final rtl = Directionality.of(context) == TextDirection.rtl;
     final from = request.currentOrganizationName?.trim().isNotEmpty == true
         ? request.currentOrganizationName!.trim()
         : 'السلسلة الحالية';
@@ -1474,7 +1517,10 @@ class _DetailContent extends StatelessWidget {
             ),
             _chainChip(context, from, target: false),
             Icon(
-              rtl ? Icons.arrow_back_rounded : Icons.arrow_forward_rounded,
+              // arrow_forward mirrors once with the text direction. In RTL
+              // that lands on a left-pointing arrow, from the source chip
+              // toward the target. arrow_back would be mirrored a second time.
+              Icons.arrow_forward_rounded,
               key: const ValueKey('chain_link_arrow'),
               color: cs.onSurface,
             ),
@@ -1677,29 +1723,28 @@ class _DetailContent extends StatelessWidget {
         ),
       );
     }
-    final style = _documentButtonStyle(context);
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         if (hasId)
-          FilledButton.tonalIcon(
-            style: style,
+          _documentButton(
+            context,
+            label: 'عرض صورة البطاقة',
+            icon: Icons.badge_rounded,
             onPressed: () => _openId(context, front, back),
-            icon: const Icon(Icons.badge_rounded, size: 18),
-            label: const Text('عرض صورة البطاقة'),
           ),
         if (photo.isNotEmpty)
-          FilledButton.tonalIcon(
-            style: style,
+          _documentButton(
+            context,
+            label: 'صور المندوب',
+            icon: Icons.photo_library_rounded,
             onPressed: () => _showImage(
               context,
               'الصورة الشخصية - ${request.fullName}',
               photo,
             ),
-            icon: const Icon(Icons.photo_library_rounded, size: 18),
-            label: const Text('صور المندوب'),
           )
         else
           Text(
@@ -1712,17 +1757,44 @@ class _DetailContent extends StatelessWidget {
     );
   }
 
-  ButtonStyle _documentButtonStyle(BuildContext context) {
+  /// Tonal document action. The label is a plain [Text] in the row, not the
+  /// icon-button's Flexible child, so a narrow detail pane cannot squeeze it
+  /// to nothing. Colors snap with the theme: a lerped fill against a previous
+  /// label color is what made this pill look blank at 1024.
+  Widget _documentButton(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
     final cs = Theme.of(context).colorScheme;
-    final label = Theme.of(context).textTheme.labelLarge;
-    return FilledButton.styleFrom(
-      backgroundColor: cs.secondaryContainer,
-      foregroundColor: cs.onSecondaryContainer,
-      minimumSize: const Size(64, 40),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      textStyle: label?.copyWith(
-        color: cs.onSecondaryContainer,
-        fontWeight: FontWeight.w700,
+    final fg = cs.onSecondaryContainer;
+    final text = Theme.of(context).textTheme.labelLarge?.copyWith(
+      color: fg,
+      fontWeight: FontWeight.w700,
+    );
+    return FilledButton(
+      style: ButtonStyle(
+        animationDuration: Duration.zero,
+        backgroundColor: WidgetStatePropertyAll(cs.secondaryContainer),
+        foregroundColor: WidgetStatePropertyAll(fg),
+        iconColor: WidgetStatePropertyAll(fg),
+        elevation: const WidgetStatePropertyAll(0),
+        minimumSize: const WidgetStatePropertyAll(Size(64, 40)),
+        padding: const WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        ),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: WidgetStatePropertyAll(text),
+      ),
+      onPressed: onPressed,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: fg),
+          const SizedBox(width: 8),
+          Text(label, style: text),
+        ],
       ),
     );
   }
@@ -1931,26 +2003,66 @@ class _DecisionBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
+    final size = compact ? const Size(48, 56) : const Size(120, 48);
+    final label = theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700);
+    // animationDuration zero: the fill and the label read the same scheme.
+    // The default 200ms material animation was leaving «اعتماد» on the
+    // previous onPrimary (dark #381E72 on light purple) and «رفض» on the
+    // previous primary.
     final approve = FilledButton(
-      style: FilledButton.styleFrom(
-        minimumSize: compact ? const Size(48, 56) : const Size(120, 48),
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+      style: ButtonStyle(
+        animationDuration: Duration.zero,
+        backgroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return cs.onSurface.withValues(alpha: 0.12);
+          }
+          return cs.primary;
+        }),
+        foregroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return cs.onSurface.withValues(alpha: 0.38);
+          }
+          return cs.onPrimary;
+        }),
+        minimumSize: WidgetStatePropertyAll(size),
+        padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 20)),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: WidgetStatePropertyAll(label),
       ),
       onPressed: deciding ? null : onApprove,
       child: const Text('اعتماد'),
     );
     final reject = OutlinedButton(
-      style: OutlinedButton.styleFrom(
-        foregroundColor: cs.primary,
-        minimumSize: compact ? const Size(48, 56) : const Size(120, 48),
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+      style: ButtonStyle(
+        animationDuration: Duration.zero,
+        backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
+        foregroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return cs.onSurface.withValues(alpha: 0.38);
+          }
+          return cs.primary;
+        }),
+        side: WidgetStateProperty.resolveWith((states) {
+          return BorderSide(
+            color: states.contains(WidgetState.disabled)
+                ? cs.outline.withValues(alpha: 0.38)
+                : cs.outline,
+          );
+        }),
+        overlayColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.pressed)) {
+            return cs.primary.withValues(alpha: 0.12);
+          }
+          if (states.contains(WidgetState.hovered) ||
+              states.contains(WidgetState.focused)) {
+            return cs.primary.withValues(alpha: 0.08);
+          }
+          return null;
+        }),
+        minimumSize: WidgetStatePropertyAll(size),
+        padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 20)),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        side: BorderSide(color: cs.outline),
-        textStyle: theme.textTheme.labelLarge?.copyWith(
-          color: cs.primary,
-          fontWeight: FontWeight.w700,
-        ),
+        textStyle: WidgetStatePropertyAll(label),
       ),
       onPressed: deciding ? null : onReject,
       child: const Text('رفض'),
@@ -2020,7 +2132,6 @@ class _OutcomeCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(16),
-        border: approved ? null : Border.all(color: cs.outline),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
