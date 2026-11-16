@@ -14,6 +14,7 @@ import 'package:delegate_app/features/hr/presentation/hr_shell_tab.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_desktop_sidebar.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_desktop_top_bar.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_more_bottom_sheet.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_web_overflow_menu.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -282,42 +283,6 @@ class _HRMainScreenState extends State<HRMainScreen> {
       );
     }
 
-    if (WebRuntimePolicy.isWeb) {
-      final entries = <PopupMenuEntry<String>>[];
-      for (final item in hrShellItems(
-        delegate: widget.delegate,
-        isWeb: true,
-        placement: HrShellPlacement.compactMenu,
-      )) {
-        if (item.id == 'settings') entries.add(const PopupMenuDivider());
-        final icon = item.badgeCollection == 'leave_requests'
-            ? _buildLeaveRequestsBadge(
-                Icon(item.selectedIcon, color: colorScheme.primary, size: 20),
-                colorScheme,
-              )
-            : item.badgeCollection == 'device_unbind_requests'
-            ? _buildDeviceRequestsBadge(
-                Icon(item.selectedIcon, color: colorScheme.primary, size: 20),
-                colorScheme,
-              )
-            : Icon(
-                item.selectedIcon,
-                color: item.id == 'delegate_renewal'
-                    ? colorScheme.tertiary
-                    : colorScheme.primary,
-                size: 20,
-              );
-        entries.add(
-          buildMenuItem(
-            value: item.id,
-            icon: icon,
-            title: item.menuLabel(isWeb: true),
-          ),
-        );
-      }
-      return entries;
-    }
-
     return [
       buildMenuItem(
         value: 'profile',
@@ -438,9 +403,10 @@ class _HRMainScreenState extends State<HRMainScreen> {
 
     final isWideScreen = MediaQuery.of(context).size.width > 768;
     final isArabic = localeProvider.isArabic;
-    final menuItems = _buildMenuItems(context, l10n, colorScheme);
-
     final web = WebRuntimePolicy.isWeb;
+    final menuItems = web
+        ? const <PopupMenuEntry<String>>[]
+        : _buildMenuItems(context, l10n, colorScheme);
     return Directionality(
       textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
       child: HrWebHeaderBridgeScope(
@@ -462,6 +428,29 @@ class _HRMainScreenState extends State<HRMainScreen> {
                     onMenuSelected: _onMenuSelected,
                     menuItems: menuItems,
                     extraActions: web ? _narrowWebHeaderActions() : null,
+                    menuButton: web
+                        ? HrWebOverflowMenu(
+                            delegate: delegate,
+                            currentIndex: _currentIndex,
+                            onSelected: _onMenuSelected,
+                            wrapIcon: (item, icon) {
+                              if (item.badgeCollection == 'leave_requests') {
+                                return _buildLeaveRequestsBadge(
+                                  icon,
+                                  colorScheme,
+                                );
+                              }
+                              if (item.badgeCollection ==
+                                  'device_unbind_requests') {
+                                return _buildDeviceRequestsBadge(
+                                  icon,
+                                  colorScheme,
+                                );
+                              }
+                              return icon;
+                            },
+                          )
+                        : null,
                   ),
             body: isWideScreen
                 ? Row(
