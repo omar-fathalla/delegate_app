@@ -2688,8 +2688,8 @@ service cloud.firestore {
         ownsDelegateId(resource.data.get('delegateUid', ''))
         || ownsDelegateId(resource.data.get('userId', ''))
         || delegateOwns(resource.data.get('delegateUid', ''))
-        || (isDelegate() && claimListHas('phones', resource.data.get('phoneNumber', '')))
-        || (isDelegate() && claimListHas('phones', resource.data.get('delegateUid', '')))
+        || (isDelegate() && notifDelegateOwnPhoneQueryOk(resource.data.get('phoneNumber', '')))
+        || (isDelegate() && notifDelegateOwnPhoneQueryOk(resource.data.get('delegateUid', '')))
       );
     }
 
@@ -2724,7 +2724,7 @@ service cloud.firestore {
       let du = notifDu();
       return notifStaffBroadcastOk()
         && delegateOtpOk()
-        && claimListHas('phones', du);
+        && notifDelegateOwnPhoneQueryOk(du);
     }
 
     // Suffix after phone_ for getNotifications / send_notification phone tags.
@@ -2733,24 +2733,45 @@ service cloud.firestore {
       return parts.size() == 2 ? parts[1] : '';
     }
 
-    // 01X, 1X, 20X, +20X, +200X — same shapes as delegate login claims + bell.
+    // Canonical 01X on users/{uid} for delegate bell (+20+leading-0 without token-only).
+    function notifDelegateUserCanonicalPhone() {
+      return userExists()
+        && userDoc().keys().hasAll(['phoneNumber'])
+        && userDoc().phoneNumber is string
+        && userDoc().phoneNumber != ''
+        ? userDoc().phoneNumber
+        : '';
+    }
+
+    // Exact claim hit or provable Egyptian variant of own users/{uid} phone only.
+    function notifDelegateOwnPhoneQueryOk(queryPh) {
+      let canonical = notifDelegateUserCanonicalPhone();
+      return queryPh != '' && (
+        claimListHas('phones', queryPh)
+        || (canonical != '' && notifEgyptPhoneVariantMatch(queryPh, canonical))
+      );
+    }
+
+    // 01X, 1X, 20X, +20X, +200X, +2+01X — same shapes as delegate login claims + bell.
     function notifEgyptPhoneVariantMatch(queryPh, canonicalPh) {
       return queryPh != '' && canonicalPh != '' && (
         queryPh == canonicalPh
         || (canonicalPh.size() == 11
           && canonicalPh.matches('^01[0-9]{9}$')
           && (
-            queryPh == canonicalPh.substring(1)
-            || queryPh == ('20' + canonicalPh.substring(1))
-            || queryPh == ('+20' + canonicalPh.substring(1))
-            || queryPh == ('+20' + canonicalPh)))
+            queryPh == canonicalPh[1:]
+            || queryPh == ('20' + canonicalPh[1:])
+            || queryPh == ('+20' + canonicalPh[1:])
+            || queryPh == ('+20' + canonicalPh)
+            || queryPh == ('+2' + canonicalPh)))
         || (canonicalPh.size() == 10
           && canonicalPh.matches('^1[0-9]{9}$')
           && (
             queryPh == ('0' + canonicalPh)
             || queryPh == ('20' + canonicalPh)
             || queryPh == ('+20' + canonicalPh)
-            || queryPh == ('+20' + ('0' + canonicalPh))))
+            || queryPh == ('+20' + ('0' + canonicalPh))
+            || queryPh == ('+2' + ('0' + canonicalPh))))
       );
     }
 
@@ -2759,7 +2780,7 @@ service cloud.firestore {
       return notifStaffBroadcastOk() && delegateOtpOk() && (
         du == 'phone_' + request.auth.uid
         || (du.matches('^phone_.+')
-          && claimListHas('phones', phoneSuffixFromPhoneTag(du)))
+          && notifDelegateOwnPhoneQueryOk(phoneSuffixFromPhoneTag(du)))
       );
     }
 
@@ -2773,7 +2794,7 @@ service cloud.firestore {
           || du == 'delegates'
           || du == request.auth.uid
           || du == 'phone_' + request.auth.uid
-          || claimListHas('phones', du)
+          || notifDelegateOwnPhoneQueryOk(du)
           || (co != '' && (du == 'delegates_' + co || du == 'company_' + co))
         );
     }
@@ -2782,7 +2803,7 @@ service cloud.firestore {
     function notifListDelegatePhoneFieldOk() {
       return notifStaffBroadcastOk()
         && delegateOtpOk()
-        && claimListHas('phones', resource.data.get('phoneNumber', ''));
+        && notifDelegateOwnPhoneQueryOk(resource.data.get('phoneNumber', ''));
     }
 
     function notifListStaffSelfUidOk() {
