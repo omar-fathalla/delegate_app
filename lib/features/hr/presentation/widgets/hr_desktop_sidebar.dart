@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
@@ -110,41 +111,23 @@ class HRDesktopSidebar extends StatelessWidget {
 
           // ── Navigation Menu Items ──
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-              physics: const BouncingScrollPhysics(),
-              children: [
-                for (final section in sections) ...[
-                  if (isExpanded)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
-                      child: Text(
-                        section.sectionTitle,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: colorScheme.onSurfaceVariant.withValues(
-                            alpha: 0.7,
-                          ),
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                    )
-                  else
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 6),
-                      child: Divider(height: 1, indent: 8, endIndent: 8),
+            child: WebRuntimePolicy.isWeb
+                ? HrSidebarScrollArea(
+                    selectedIndex: selectedIndex,
+                    entries: _menuEntries(context, sections, colorScheme),
+                  )
+                : ListView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 12,
                     ),
-                  for (final item in section.items)
-                    _buildMenuItem(
-                      context: context,
-                      item: item,
-                      isSelected: selectedIndex == item.index,
-                      colorScheme: colorScheme,
-                    ),
-                ],
-              ],
-            ),
+                    physics: const BouncingScrollPhysics(),
+                    children: [
+                      for (final entry
+                          in _menuEntries(context, sections, colorScheme))
+                        entry.child,
+                    ],
+                  ),
           ),
 
           const Divider(height: 1, thickness: 0.8),
@@ -155,6 +138,44 @@ class HRDesktopSidebar extends StatelessWidget {
       ),
     );
   }
+
+  List<HrSidebarEntry> _menuEntries(
+    BuildContext context,
+    List<HRSidebarSectionData> sections,
+    ColorScheme colorScheme,
+  ) => [
+    for (final section in sections) ...[
+      HrSidebarEntry(
+        child: isExpanded
+            ? Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+                child: Text(
+                  section.sectionTitle,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              )
+            : const Padding(
+                padding: EdgeInsets.symmetric(vertical: 6),
+                child: Divider(height: 1, indent: 8, endIndent: 8),
+              ),
+      ),
+      for (final item in section.items)
+        HrSidebarEntry(
+          index: item.index,
+          child: _buildMenuItem(
+            context: context,
+            item: item,
+            isSelected: selectedIndex == item.index,
+            colorScheme: colorScheme,
+          ),
+        ),
+    ],
+  ];
 
   /// Mobile HR sidebar. Titles and order are the ones the phone already ships.
   List<HRSidebarSectionData> _mobileSections() => const [
@@ -649,6 +670,121 @@ class HRDesktopSidebar extends StatelessWidget {
               onPressed: onOpenSettings,
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// One row of the sidebar list. [index] is the tab the row opens (or -1 for
+/// the profile row); section headers have none.
+class HrSidebarEntry {
+  final int? index;
+  final Widget child;
+
+  const HrSidebarEntry({this.index, required this.child});
+}
+
+/// Web: the menu scrolls on its own between the header and the pinned footer,
+/// with a visible scrollbar, so the last tools are never hidden behind the
+/// profile and الإعدادات. The selected row is scrolled into view.
+class HrSidebarScrollArea extends StatefulWidget {
+  final int selectedIndex;
+  final List<HrSidebarEntry> entries;
+
+  const HrSidebarScrollArea({
+    super.key,
+    required this.selectedIndex,
+    required this.entries,
+  });
+
+  @override
+  State<HrSidebarScrollArea> createState() => _HrSidebarScrollAreaState();
+}
+
+class _HrSidebarScrollAreaState extends State<HrSidebarScrollArea> {
+  final ScrollController _controller = ScrollController();
+  final Map<int, GlobalKey> _rowKeys = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _revealSelected(animate: false);
+  }
+
+  @override
+  void didUpdateWidget(HrSidebarScrollArea oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedIndex != widget.selectedIndex) {
+      _revealSelected(animate: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _revealSelected({required bool animate}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_controller.hasClients) return;
+      final row = _rowKeys[widget.selectedIndex]?.currentContext
+          ?.findRenderObject();
+      if (row == null || !row.attached) return;
+      final viewport = RenderAbstractViewport.maybeOf(row);
+      if (viewport == null) return;
+      final position = _controller.position;
+      final atTop = viewport.getOffsetToReveal(row, 0).offset;
+      final atBottom = viewport.getOffsetToReveal(row, 1).offset;
+      final double target;
+      if (position.pixels > atTop) {
+        target = atTop;
+      } else if (position.pixels < atBottom) {
+        target = atBottom;
+      } else {
+        return;
+      }
+      final clamped = target.clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      );
+      if (animate) {
+        _controller.animateTo(
+          clamped,
+          duration: AppMotionDurations.medium2,
+          curve: AppMotionCurves.emphasizedDecelerate,
+        );
+      } else {
+        _controller.jumpTo(clamped);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scrollbar(
+      controller: _controller,
+      thumbVisibility: true,
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+        child: SingleChildScrollView(
+          key: const ValueKey('hr_sidebar_scroll'),
+          controller: _controller,
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(10, 12, 10, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final entry in widget.entries)
+                entry.index == null
+                    ? entry.child
+                    : KeyedSubtree(
+                        key: _rowKeys.putIfAbsent(entry.index!, GlobalKey.new),
+                        child: entry.child,
+                      ),
+            ],
+          ),
+        ),
       ),
     );
   }
