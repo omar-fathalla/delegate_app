@@ -58,17 +58,23 @@ final appRouter = GoRouter(
       path: '/login',
       // Splash → login: M3 fade-through (90ms out + 210ms in). The header
       // colour equals the splash colour, so only the sheet content fades in.
-      pageBuilder: (context, state) => AppMotionPage.fadeThrough(
-        state: state,
-        child: const LoginScreen(),
-      ),
+      pageBuilder: (context, state) {
+        AdminDesktopShellWeb.clearPendingPage();
+        return AppMotionPage.fadeThrough(
+          state: state,
+          child: const LoginScreen(),
+        );
+      },
     ),
     GoRoute(
       path: '/hr/login',
-      pageBuilder: (context, state) => AppMotionPage.fadeThrough(
-        state: state,
-        child: const HrLoginScreen(),
-      ),
+      pageBuilder: (context, state) {
+        AdminDesktopShellWeb.clearPendingPage();
+        return AppMotionPage.fadeThrough(
+          state: state,
+          child: const HrLoginScreen(),
+        );
+      },
     ),
     GoRoute(
       path: '/home',
@@ -96,8 +102,12 @@ final appRouter = GoRouter(
         // Web desktop shell page (`?p=`); kept across the splash after a reload.
         final page = state.uri.queryParameters['p'];
         if (delegate == null) {
-          if (WebRuntimePolicy.isWeb && AdminDesktopShellWeb.isKnownPage(page)) {
-            AdminDesktopShellWeb.pendingPage = page;
+          if (WebRuntimePolicy.isWeb) {
+            AdminDesktopShellWeb.takeInitialPage(
+              signedIn: false,
+              useShell: false,
+              queryPage: page,
+            );
           }
           return AppMotionPage.fadeThrough(
             state: state,
@@ -109,13 +119,15 @@ final appRouter = GoRouter(
           // Web-only desktop shell (>= 840dp); mobile/narrow keep AdminMainScreen.
           child: Builder(
             builder: (context) {
-              if (!AdminDesktopShellWeb.shouldUse(context, delegate)) {
+              final useShell = AdminDesktopShellWeb.shouldUse(context, delegate);
+              final initial = AdminDesktopShellWeb.takeInitialPage(
+                signedIn: true,
+                useShell: useShell,
+                queryPage: page,
+              );
+              if (!useShell) {
                 return AdminMainScreen(delegate: delegate);
               }
-              final initial = AdminDesktopShellWeb.isKnownPage(page)
-                  ? page
-                  : AdminDesktopShellWeb.pendingPage;
-              AdminDesktopShellWeb.pendingPage = null;
               return AdminDesktopShellWeb(
                   delegate: delegate, initialPage: initial);
             },

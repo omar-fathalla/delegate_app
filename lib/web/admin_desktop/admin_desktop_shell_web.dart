@@ -84,6 +84,31 @@ class AdminDesktopShellWeb extends StatefulWidget {
   /// a reload (the splash navigates to `/admin/home` without the query).
   static String? pendingPage;
 
+  /// Drops a page remembered for a session that has ended or that does not
+  /// get this shell.
+  static void clearPendingPage() => pendingPage = null;
+
+  /// Signed-out: remember a known `?p=` for after the splash.
+  /// Signed-in: the page to open. When [useShell] is false the remembered
+  /// page is dropped so the next supervisor does not inherit it.
+  static String? takeInitialPage({
+    required bool signedIn,
+    required bool useShell,
+    required String? queryPage,
+  }) {
+    if (!signedIn) {
+      if (isKnownPage(queryPage)) pendingPage = queryPage;
+      return null;
+    }
+    if (!useShell) {
+      pendingPage = null;
+      return null;
+    }
+    final initial = isKnownPage(queryPage) ? queryPage : pendingPage;
+    pendingPage = null;
+    return initial;
+  }
+
   /// Test hook: receives every URL the shell writes.
   @visibleForTesting
   static void Function(Uri uri)? debugOnSyncUrl;

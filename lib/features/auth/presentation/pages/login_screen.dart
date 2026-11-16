@@ -916,7 +916,7 @@ class _LoginScreenState extends State<LoginScreen>
                 Text(
                   isArabic
                       ? WebRuntimePolicy.delegateLoginWebMessage
-                      : 'Delegate sign-in and device binding are only available in the mobile app.',
+                      : WebRuntimePolicy.delegateLoginWebMessageEn,
                   style: text.titleSmall?.copyWith(
                     color: colorScheme.onSecondaryContainer,
                     fontWeight: FontWeight.w600,

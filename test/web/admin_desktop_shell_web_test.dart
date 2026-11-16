@@ -119,6 +119,36 @@ void main() {
     }
   });
 
+  test('pending page is dropped on logout and for roles without the shell', () {
+    AdminDesktopShellWeb.pendingPage = 'requests';
+    AdminDesktopShellWeb.clearPendingPage();
+    expect(AdminDesktopShellWeb.pendingPage, isNull);
+
+    AdminDesktopShellWeb.takeInitialPage(
+      signedIn: false,
+      useShell: false,
+      queryPage: 'delegates',
+    );
+    expect(AdminDesktopShellWeb.pendingPage, 'delegates');
+
+    final kept = AdminDesktopShellWeb.takeInitialPage(
+      signedIn: true,
+      useShell: true,
+      queryPage: null,
+    );
+    expect(kept, 'delegates');
+    expect(AdminDesktopShellWeb.pendingPage, isNull);
+
+    AdminDesktopShellWeb.pendingPage = 'attendance';
+    final dropped = AdminDesktopShellWeb.takeInitialPage(
+      signedIn: true,
+      useShell: false,
+      queryPage: 'attendance',
+    );
+    expect(dropped, isNull);
+    expect(AdminDesktopShellWeb.pendingPage, isNull);
+  });
+
   testWidgets('drawer order: profile first, penalties right above logout, settings last', (t) async {
     await _pump(t, const Size(1280, 800), AppTheme.lightTheme());
     final labels = t

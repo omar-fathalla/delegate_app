@@ -31,6 +31,9 @@ class WebRuntimePolicy {
   static const String delegateLoginWebMessage =
       'تسجيل دخول المندوب وربط الجهاز متاح من تطبيق الجوال فقط.';
 
+  static const String delegateLoginWebMessageEn =
+      'Delegate sign-in and device binding are only available in the mobile app.';
+
   static const String checkInWebMessage =
       'تسجيل الحضور والانصراف متاح من تطبيق الجوال فقط.';
 

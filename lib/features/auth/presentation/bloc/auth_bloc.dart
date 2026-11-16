@@ -4,6 +4,7 @@ import 'package:bloc/bloc.dart';
 import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
 import 'package:delegate_app/core/config/debug_stall.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/usecases/usecase.dart';
 import 'package:delegate_app/core/services/device_binding_service.dart';
@@ -349,6 +350,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // Network hang: never log out or unbind on a timeout. Keep the cached
       // session if we have one; otherwise send the user to login.
       final d = cached;
+      if (d != null && _delegateSessionBlockedOnWeb(d)) {
+        try {
+          await logoutUseCase(const LogoutParams());
+        } catch (_) {}
+        emit(
+          const AuthUnauthenticated(
+            message: WebRuntimePolicy.delegateLoginWebMessage,
+          ),
+        );
+        return;
+      }
       emit(
         d != null
             ? AuthAuthenticated(delegate: d)
@@ -390,6 +402,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final delegate = result.fold((_) => null, (d) => d);
     if (delegate == null) {
       return const _AutoLoginDecision(AuthUnauthenticated());
+    }
+    // A cached delegate session must not land on /home in the web build.
+    // Device binding is bypassed on web, so reject the role here and sign out.
+    if (_delegateSessionBlockedOnWeb(delegate)) {
+      return const _AutoLoginDecision(
+        AuthUnauthenticated(message: WebRuntimePolicy.delegateLoginWebMessage),
+        logout: true,
+      );
     }
     onCached(delegate);
 
@@ -480,6 +500,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     _startHoldWatch(delegate);
   }
 }
+
+bool _delegateSessionBlockedOnWeb(Delegate delegate) =>
+    WebRuntimePolicy.isWeb && delegate.role == UserRole.delegate;
 
 class _AutoLoginDecision {
   final AuthState state;

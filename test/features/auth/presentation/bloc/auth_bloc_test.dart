@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/usecases/usecase.dart';
 import 'package:delegate_app/features/auth/domain/delegate_otp_config.dart';
 import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
@@ -135,6 +136,7 @@ void main() {
 
   tearDown(() {
     DelegateOtpConfig.enabled = false;
+    WebRuntimePolicy.debugReset();
     authBloc.close();
   });
 
@@ -453,6 +455,86 @@ void main() {
       },
       act: (bloc) => bloc.add(CheckAutoLoginRequested()),
       expect: () => [AuthLoading(), AuthAuthenticated(delegate: tDelegate)],
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'on web, signs out a cached delegate and shows the app-only message',
+      setUp: () {
+        WebRuntimePolicy.debugIsWebOverride = true;
+        when(
+          () => mockLogout(any()),
+        ).thenAnswer((_) async => const Right(null));
+        when(
+          () => mockCheckAutoLogin(any()),
+        ).thenAnswer((_) async => Right(tDelegate));
+      },
+      build: () => authBloc,
+      act: (bloc) => bloc.add(CheckAutoLoginRequested()),
+      expect: () => [
+        AuthLoading(),
+        const AuthUnauthenticated(
+          message: WebRuntimePolicy.delegateLoginWebMessage,
+        ),
+      ],
+      verify: (_) {
+        verify(() => mockLogout(any())).called(1);
+      },
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'on web, a cached staff session still signs in',
+      setUp: () {
+        WebRuntimePolicy.debugIsWebOverride = true;
+        when(() => mockCheckAutoLogin(any())).thenAnswer(
+          (_) async => Right(
+            Delegate(
+              uid: tDelegate.uid,
+              firstName: tDelegate.firstName,
+              middleName: tDelegate.middleName,
+              lastName: tDelegate.lastName,
+              fullName: tDelegate.fullName,
+              nationalityID: tDelegate.nationalityID,
+              motherName: tDelegate.motherName,
+              city: tDelegate.city,
+              phoneNumber: tDelegate.phoneNumber,
+              gender: tDelegate.gender,
+              position: tDelegate.position,
+              birthDate: tDelegate.birthDate,
+              organizationUID: tDelegate.organizationUID,
+              organizationName: tDelegate.organizationName,
+              companyUID: tDelegate.companyUID,
+              companyName: tDelegate.companyName,
+              status: tDelegate.status,
+              delegatePublicId: tDelegate.delegatePublicId,
+              allReceiptCodes: tDelegate.allReceiptCodes,
+              createdAt: tDelegate.createdAt,
+              createdBy: tDelegate.createdBy,
+              hasPendingUpdate: tDelegate.hasPendingUpdate,
+              isDeductedFromCompany: tDelegate.isDeductedFromCompany,
+              isPrinted: tDelegate.isPrinted,
+              isProfileComplete: tDelegate.isProfileComplete,
+              numberOfDocuments: tDelegate.numberOfDocuments,
+              paymentAmount: tDelegate.paymentAmount,
+              version: tDelegate.version,
+              documents: tDelegate.documents,
+              role: UserRole.admin,
+            ),
+          ),
+        );
+      },
+      build: () => authBloc,
+      act: (bloc) => bloc.add(CheckAutoLoginRequested()),
+      expect: () => [
+        AuthLoading(),
+        isA<AuthAuthenticated>().having(
+          (state) => state.delegate.role,
+          'role',
+          UserRole.admin,
+        ),
+      ],
+      verify: (_) {
+        verifyNever(() => mockLogout(any()));
+      },
     );
 
     blocTest<AuthBloc, AuthState>(

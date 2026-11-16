@@ -1,4 +1,27 @@
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:delegate_app/features/admin/domain/entities/delegate_hold_access.dart';
+
+/// Arabic copy for a `setDelegateHold` failure reason.
+String delegateHoldFailureMessage(String reason) {
+  switch (reason) {
+    case 'caller_not_allowed':
+    case 'caller_not_staff':
+    case 'permission-denied':
+      return 'ليس لديك صلاحية إيقاف أو إعادة تفعيل هذا المندوب.';
+    case 'out_of_scope':
+      return 'هذا المندوب خارج نطاق صلاحيتك.';
+    case 'caller_inactive':
+      return 'حسابك غير نشط.';
+    case 'status_not_actionable':
+      return 'لا يمكن تغيير حالة هذا المندوب حالياً.';
+    case 'hold_not_present':
+      return 'هذا الإيقاف غير موجود على حساب المندوب.';
+    case 'hold_not_allowed':
+      return delegateHoldNotAllowedMessage;
+    default:
+      return 'تعذر إتمام العملية. حاول مرة أخرى.';
+  }
+}
 
 class DelegateHoldException implements Exception {
   DelegateHoldException(this.message);
@@ -51,21 +74,6 @@ class DelegateHoldRemote {
       }
       return e.message ?? e.code;
     }();
-    switch (reason) {
-      case 'caller_not_allowed':
-      case 'caller_not_staff':
-      case 'permission-denied':
-        return 'ليس لديك صلاحية إيقاف أو إعادة تفعيل هذا المندوب.';
-      case 'out_of_scope':
-        return 'هذا المندوب خارج نطاق صلاحيتك.';
-      case 'caller_inactive':
-        return 'حسابك غير نشط.';
-      case 'status_not_actionable':
-        return 'لا يمكن تغيير حالة هذا المندوب حالياً.';
-      case 'hold_not_present':
-        return 'هذا الإيقاف غير موجود على حساب المندوب.';
-      default:
-        return 'تعذر إتمام العملية. حاول مرة أخرى.';
-    }
+    return delegateHoldFailureMessage(reason);
   }
 }

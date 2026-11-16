@@ -53,6 +53,7 @@ class AdminDesktopHomeGridWeb extends StatelessWidget {
           AdminHomeChainChips(
             organizations: data.organizations,
             foreground: cs.onSurface,
+            adminDelegate: d,
             wrap: true,
           ),
         ],

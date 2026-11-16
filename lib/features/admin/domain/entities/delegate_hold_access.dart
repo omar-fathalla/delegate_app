@@ -47,6 +47,20 @@ bool canSetDelegateHold({
 /// caller is out of scope, including an empty company UID.
 const String companySupervisorStatusHold = 'admin_suspend';
 
+/// Shown when a company supervisor tries to lift a hold. The server rejects
+/// `op: remove` from that role with `hold_not_allowed`.
+const String delegateHoldNotAllowedMessage = 'لا يمكنك رفع هذا الإيقاف.';
+
+/// `null` when the caller must not call the server. A company supervisor may
+/// add the admin-suspend hold and must never send `op: remove`.
+String? delegateHoldOpFor({
+  required UserRole? callerRole,
+  required bool suspend,
+}) {
+  if (callerRole == UserRole.admin && !suspend) return null;
+  return suspend ? 'add' : 'remove';
+}
+
 const Set<String> delegateHoldPayloadKeys = {
   'uid',
   'orgId',
@@ -67,7 +81,8 @@ Map<String, dynamic>? buildDelegateHoldPayload({
   String hold = companySupervisorStatusHold,
   String? note,
 }) {
-  if (callerRole == UserRole.admin && hold != companySupervisorStatusHold) {
+  if (callerRole == UserRole.admin &&
+      (hold != companySupervisorStatusHold || op != 'add')) {
     return null;
   }
   if (!canSetDelegateHold(

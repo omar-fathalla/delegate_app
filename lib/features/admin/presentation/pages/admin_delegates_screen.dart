@@ -976,6 +976,14 @@ class _CompactDelegateTile extends StatelessWidget {
       },
     );
     if (confirmed != true || !context.mounted) return;
+    final op = delegateHoldOpFor(
+      callerRole: adminDelegate?.role,
+      suspend: suspend,
+    );
+    if (op == null) {
+      AppSnackBar.showError(context, delegateHoldNotAllowedMessage);
+      return;
+    }
     final payload = buildDelegateHoldPayload(
       callerRole: adminDelegate?.role,
       callerOrganizationUID: adminDelegate?.organizationUID ?? '',
@@ -983,7 +991,7 @@ class _CompactDelegateTile extends StatelessWidget {
       uid: delegate.uid,
       organizationUID: delegate.organizationUID,
       companyUID: delegate.companyUID,
-      op: suspend ? 'add' : 'remove',
+      op: op,
     );
     if (payload == null) {
       AppSnackBar.showError(context, 'هذا المندوب خارج نطاق صلاحيتك.');

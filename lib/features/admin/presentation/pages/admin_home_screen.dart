@@ -987,8 +987,11 @@ class AdminHomeHeroCard extends StatelessWidget with _AdminHomeHelpers {
     final companyName = adminDelegate.companyName.isNotEmpty
         ? adminDelegate.companyName
         : (adminDelegate.organizationName.isNotEmpty ? adminDelegate.organizationName : '');
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fg = isDark ? colorScheme.onPrimaryContainer : Colors.white;
+    // The primaryContainer restyle is web-only. Mobile keeps the gradient in
+    // both themes.
+    final restyleForWebDark = WebRuntimePolicy.isWeb &&
+        Theme.of(context).brightness == Brightness.dark;
+    final fg = restyleForWebDark ? colorScheme.onPrimaryContainer : Colors.white;
     final isOrgAdmin = adminDelegate.role == UserRole.organizationAdmin;
     final isSuperAdmin = adminDelegate.role == UserRole.superAdmin;
     final isMarketing = adminDelegate.role == UserRole.marketing;
@@ -1010,9 +1013,10 @@ class AdminHomeHeroCard extends StatelessWidget with _AdminHomeHelpers {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        // Dark mode: primaryContainer surface (light-on-dark); light mode unchanged.
-        color: isDark ? colorScheme.primaryContainer : null,
-        gradient: isDark ? null : LinearGradient(
+        // Web dark mode: primaryContainer surface. Mobile and light mode keep
+        // the gradient.
+        color: restyleForWebDark ? colorScheme.primaryContainer : null,
+        gradient: restyleForWebDark ? null : LinearGradient(
           colors: [
             colorScheme.primary,
             colorScheme.primary.withValues(alpha: 0.85),
@@ -1163,7 +1167,11 @@ class AdminHomeHeroCard extends StatelessWidget with _AdminHomeHelpers {
             // رُقاقات سلاسل المنظمات التابع لها مناديب المشرف (صف يأخذ 3 عناصر دائماً)
             if (_isCompanySupervisor && organizations.isNotEmpty) ...[
               const SizedBox(height: 12),
-              AdminHomeChainChips(organizations: organizations, foreground: fg),
+              AdminHomeChainChips(
+                organizations: organizations,
+                foreground: fg,
+                adminDelegate: adminDelegate,
+              ),
             ],
 
             const SizedBox(height: 16),
@@ -1186,15 +1194,16 @@ class AdminHomeChainChips extends StatelessWidget with _AdminHomeHelpers {
   /// false: fixed 3-per-row grid (mobile). true: free-flowing Wrap (desktop).
   final bool wrap;
 
+  @override
+  final Delegate adminDelegate;
+
   const AdminHomeChainChips({
     super.key,
     required this.organizations,
     required this.foreground,
+    required this.adminDelegate,
     this.wrap = false,
   });
-
-  @override
-  Delegate get adminDelegate => throw UnimplementedError();
 
   @override
   Widget build(BuildContext context) {

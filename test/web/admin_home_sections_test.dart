@@ -2,6 +2,7 @@ import 'dart:io';
 // Mobile home (unchanged order) + web-only desktop home grid, with fake data.
 import 'package:bloc_test/bloc_test.dart';
 import 'package:delegate_app/config/theme/app_theme.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/features/admin/domain/entities/dashboard_summary.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
@@ -123,6 +124,7 @@ void main() {
   });
 
   tearDown(() {
+    WebRuntimePolicy.debugReset();
     final v = TestWidgetsFlutterBinding.instance.platformDispatcher.views.first;
     v.resetPhysicalSize();
     v.resetDevicePixelRatio();
@@ -158,7 +160,8 @@ void main() {
     });
   }
 
-  testWidgets('hero card dark mode uses primaryContainer with readable contrast', (t) async {
+  testWidgets('web hero card dark mode uses primaryContainer with readable contrast', (t) async {
+    WebRuntimePolicy.debugIsWebOverride = true;
     _size(t, const Size(390, 1600));
     await t.pumpWidget(_app(AdminHomeScreen(adminDelegate: sup), dark: true));
     for (var i = 0; i < 20; i++) {
@@ -177,6 +180,21 @@ void main() {
     final a = lum(cs.onPrimaryContainer), b = lum(cs.primaryContainer);
     final ratio = (a > b ? a + .05 : b + .05) / (a > b ? b + .05 : a + .05);
     expect(ratio, greaterThanOrEqualTo(4.5));
+  });
+
+  testWidgets('mobile hero card dark mode keeps the gradient', (t) async {
+    _size(t, const Size(390, 1600));
+    await t.pumpWidget(_app(AdminHomeScreen(adminDelegate: sup), dark: true));
+    for (var i = 0; i < 20; i++) {
+      await t.pump(const Duration(milliseconds: 200));
+    }
+    final box = t.widget<Container>(find.descendant(
+            of: find.byType(AdminHomeHeroCard), matching: find.byType(Container))
+        .first);
+    final deco = box.decoration as BoxDecoration;
+    expect(deco.gradient, isNotNull);
+    expect(deco.color, isNull);
+    expect(t.widget<Text>(find.textContaining('أهلاً بك')).style!.color, Colors.white);
   });
 
   testWidgets('hero card light mode keeps primary gradient + white', (t) async {
@@ -199,6 +217,7 @@ void main() {
   ];
   for (final c in cases) {
     testWidgets('desktop home grid ${c.$3}', (t) async {
+      WebRuntimePolicy.debugIsWebOverride = true;
       _size(t, c.$1);
       await t.pumpWidget(_app(AdminDesktopHomeWeb(delegate: sup), dark: c.$2));
       for (var i = 0; i < 20; i++) {

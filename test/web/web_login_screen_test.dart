@@ -55,14 +55,18 @@ void main() {
     view.resetDevicePixelRatio();
   });
 
-  Future<void> pump(WidgetTester t, {required bool web}) async {
+  Future<void> pump(
+    WidgetTester t, {
+    required bool web,
+    Locale locale = const Locale('ar'),
+  }) async {
     WebRuntimePolicy.debugIsWebOverride = web;
     t.view.physicalSize = const Size(1280, 900);
     t.view.devicePixelRatio = 1;
     await t.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      locale: const Locale('ar'),
+      locale: locale,
       home: BlocProvider<AuthBloc>.value(value: bloc, child: const LoginScreen()),
     ));
     await t.pumpAndSettle();
@@ -77,10 +81,21 @@ void main() {
     expect(tab(LoginMode.delegate), findsOneWidget);
     expect(find.byKey(const ValueKey('login_web_delegate_notice')), findsOneWidget);
     expect(find.text(WebRuntimePolicy.delegateLoginWebMessage), findsOneWidget);
+    expect(find.text(WebRuntimePolicy.delegateLoginWebMessageEn), findsNothing);
     expect(find.byKey(const ValueKey('login_national_id')), findsNothing);
     final submit = t.widget<FilledButton>(find.byKey(const ValueKey('login_submit')));
     expect(submit.onPressed, isNull);
     verifyNever(() => bloc.add(any()));
+  });
+
+  testWidgets('english delegate tab uses the policy message', (t) async {
+    localeProvider.setLocale(const Locale('en'));
+    addTearDown(() => localeProvider.setLocale(const Locale('ar')));
+    await pump(t, web: true, locale: const Locale('en'));
+    expect(find.text(WebRuntimePolicy.delegateLoginWebMessageEn), findsOneWidget);
+    expect(find.text(WebRuntimePolicy.delegateLoginWebMessage), findsNothing);
+    final submit = t.widget<FilledButton>(find.byKey(const ValueKey('login_submit')));
+    expect(submit.onPressed, isNull);
   });
 
   testWidgets('web staff tab signs in with LoginMode.staff', (t) async {
