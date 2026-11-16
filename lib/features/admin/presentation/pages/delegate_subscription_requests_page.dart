@@ -1,5 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
+import 'package:delegate_app/web/hr_system/delegate_subscription_requests_web.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
@@ -55,6 +57,13 @@ class _DelegateSubscriptionRequestsPageState
 
   @override
   Widget build(BuildContext context) {
+    if (WebRuntimePolicy.isWeb) {
+      return DelegateSubscriptionRequestsWeb(
+        currentAdmin: widget.currentAdmin,
+        onApprove: _handleApprove,
+        onReject: _handleReject,
+      );
+    }
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final repo = sl<DelegateSubscriptionRepository>();
@@ -488,7 +497,40 @@ class _DelegateSubscriptionRequestsPageState
   }
 
 
-  Future<void> _handleNationalIdReview(
+  void _showDecisionFailure(String message, Future<void> Function() retry) {
+    if (!mounted) return;
+    if (!WebRuntimePolicy.isWeb) {
+      AppSnackBar.showError(context, message);
+      return;
+    }
+    final colorScheme = Theme.of(context).colorScheme;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: TextStyle(
+            color: colorScheme.onError,
+            fontWeight: FontWeight.w600,
+            fontSize: 13.5,
+          ),
+        ),
+        backgroundColor: colorScheme.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        action: SnackBarAction(
+          label: 'إعادة المحاولة',
+          textColor: colorScheme.onError,
+          onPressed: () {
+            retry();
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<bool?> _handleNationalIdReview(
     DelegateSubscriptionRequest request, {
     required bool approve,
   }) async {
@@ -544,33 +586,50 @@ class _DelegateSubscriptionRequestsPageState
         ],
       ),
     );
-    if (confirm != true || !mounted) return;
+    if (confirm != true || !mounted) return null;
+    final reason = reasonController.text.trim();
+    return _submitNationalIdReview(request, approve: approve, reason: reason);
+  }
+
+  Future<bool> _submitNationalIdReview(
+    DelegateSubscriptionRequest request, {
+    required bool approve,
+    required String reason,
+  }) async {
     try {
       await DelegateProfileEditRepository().reviewNationalIdUpdate(
         requestId: request.id,
         approve: approve,
-        rejectionReason: approve ? null : reasonController.text.trim(),
+        rejectionReason: approve ? null : reason,
       );
-      if (!mounted) return;
+      if (!mounted) return false;
       AppSnackBar.showSuccess(
         context,
         approve
             ? 'تم اعتماد الرقم القومي الجديد وتحديثه في كل السلاسل.'
             : 'تم رفض طلب تعديل الرقم القومي.',
       );
+      return true;
     } on DelegateProfileEditException catch (e) {
-      if (!mounted) return;
-      AppSnackBar.showError(context, e.message);
+      if (!mounted) return false;
+      _showDecisionFailure(
+        e.message,
+        () => _submitNationalIdReview(request, approve: approve, reason: reason),
+      );
+      return false;
     } catch (_) {
-      if (!mounted) return;
-      AppSnackBar.showError(context, 'تعذر إتمام المراجعة. حاول مرة أخرى.');
+      if (!mounted) return false;
+      _showDecisionFailure(
+        'تعذر إتمام المراجعة. حاول مرة أخرى.',
+        () => _submitNationalIdReview(request, approve: approve, reason: reason),
+      );
+      return false;
     }
   }
 
-  Future<void> _handleApprove(DelegateSubscriptionRequest request) async {
+  Future<bool?> _handleApprove(DelegateSubscriptionRequest request) async {
     if (request.isNationalIdUpdateRequest) {
-      await _handleNationalIdReview(request, approve: true);
-      return;
+      return _handleNationalIdReview(request, approve: true);
     }
     final isDelete = request.requestType == 'delete_delegate';
 
@@ -618,8 +677,14 @@ class _DelegateSubscriptionRequestsPageState
       ),
     );
 
-    if (confirm != true || !mounted) return;
+    if (confirm != true || !mounted) return null;
+    return _submitApprove(request, isDelete: isDelete);
+  }
 
+  Future<bool> _submitApprove(
+    DelegateSubscriptionRequest request, {
+    required bool isDelete,
+  }) async {
     final repo = sl<DelegateSubscriptionRepository>();
     final result = await repo.approveSubscriptionRequest(
       request: request,
@@ -628,22 +693,32 @@ class _DelegateSubscriptionRequestsPageState
       reviewerRole: widget.currentAdmin.role.name,
     );
 
-    if (!mounted) return;
+    if (!mounted) return false;
 
     final failure = result.fold((f) => f, (_) => null);
     if (failure is ApprovalFollowUpFailure) {
       await _retryApprovalFollowUps(failure);
-      return;
+      return true;
     }
-    result.fold(
-      (failure) => AppSnackBar.showError(context, failure.message),
-      (_) => AppSnackBar.showSuccess(
+    return result.fold((failure) {
+      _showDecisionFailure(
+        failure.message,
+        () => _submitApprove(request, isDelete: isDelete),
+      );
+      return false;
+    }, (_) {
+      AppSnackBar.showSuccess(
         context,
         isDelete
-            ? 'تم حذف المندوب ${request.fullName} نهائياً من المنظومة بنجاح.'
-            : 'تم اعتماد المندوب ${request.fullName} بنجاح وتفعيل حسابه!',
-      ),
-    );
+            ? (WebRuntimePolicy.isWeb
+                  ? subscriptionDecisionSuccessMessage(request, deleted: true)
+                  : 'تم حذف المندوب ${request.fullName} نهائياً من المنظومة بنجاح.')
+            : (WebRuntimePolicy.isWeb
+                  ? subscriptionDecisionSuccessMessage(request, deleted: false)
+                  : 'تم اعتماد المندوب ${request.fullName} بنجاح وتفعيل حسابه!'),
+      );
+      return true;
+    });
   }
 
   /// The approval committed but the delegate's account record did not; keep
@@ -682,10 +757,9 @@ class _DelegateSubscriptionRequestsPageState
     }
   }
 
-  Future<void> _handleReject(DelegateSubscriptionRequest request) async {
+  Future<bool?> _handleReject(DelegateSubscriptionRequest request) async {
     if (request.isNationalIdUpdateRequest) {
-      await _handleNationalIdReview(request, approve: false);
-      return;
+      return _handleNationalIdReview(request, approve: false);
     }
     final isDelete = request.requestType == 'delete_delegate';
     final reasonController = TextEditingController();
@@ -743,27 +817,41 @@ class _DelegateSubscriptionRequestsPageState
       ),
     );
 
-    if (confirm != true || !mounted) return;
+    if (confirm != true || !mounted) return null;
+    final reason = reasonController.text.trim();
+    return _submitReject(request, reason: reason, isDelete: isDelete);
+  }
 
+  Future<bool> _submitReject(
+    DelegateSubscriptionRequest request, {
+    required String reason,
+    required bool isDelete,
+  }) async {
     final repo = sl<DelegateSubscriptionRepository>();
     final result = await repo.rejectSubscriptionRequest(
       request: request,
-      reason: reasonController.text.trim(),
+      reason: reason,
       reviewerUid: widget.currentAdmin.uid,
       reviewerName: widget.currentAdmin.fullName,
     );
 
-    if (!mounted) return;
+    if (!mounted) return false;
 
-    result.fold(
-      (failure) => AppSnackBar.showError(context, failure.message),
-      (_) => AppSnackBar.showSuccess(
+    return result.fold((failure) {
+      _showDecisionFailure(
+        failure.message,
+        () => _submitReject(request, reason: reason, isDelete: isDelete),
+      );
+      return false;
+    }, (_) {
+      AppSnackBar.showSuccess(
         context,
         isDelete
             ? 'تم رفض طلب حذف المندوب ${request.fullName}.'
             : 'تم رفض الطلب وإشعار المشرف بالسبب.',
-      ),
-    );
+      );
+      return true;
+    });
   }
 }
 
