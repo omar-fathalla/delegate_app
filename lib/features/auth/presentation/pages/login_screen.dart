@@ -915,8 +915,8 @@ class _LoginScreenState extends State<LoginScreen>
               children: [
                 Text(
                   isArabic
-                      ? 'دخول المندوب من تطبيق الموبايل'
-                      : 'Delegates sign in from the mobile app',
+                      ? WebRuntimePolicy.delegateLoginWebMessage
+                      : 'Delegate sign-in and device binding are only available in the mobile app.',
                   style: text.titleSmall?.copyWith(
                     color: colorScheme.onSecondaryContainer,
                     fontWeight: FontWeight.w600,
@@ -925,8 +925,8 @@ class _LoginScreenState extends State<LoginScreen>
                 const SizedBox(height: 4),
                 Text(
                   isArabic
-                      ? 'حساب المندوب مربوط بجهازه، لذلك تسجيل الدخول وتسجيل الحضور والتتبع المباشر والإشعارات متاحة من تطبيق تسهيل على الموبايل فقط. المشرفون والموظفون الإداريون يدخلون من تبويب "موظف إداري".'
-                      : 'A delegate account is tied to its phone, so sign-in, check-in, live tracking and notifications are only available in the Tashil mobile app. Supervisors and staff use the "Staff" tab.',
+                      ? 'تسجيل الحضور والتتبع المباشر والإشعارات متاحة من تطبيق تسهيل على الموبايل فقط. المشرفون والموظفون الإداريون يدخلون من تبويب "موظف إداري".'
+                      : 'Check-in, live tracking and notifications are only available in the Tashil mobile app. Supervisors and staff use the "Staff" tab.',
                   style: text.bodyMedium?.copyWith(
                     color: colorScheme.onSecondaryContainer,
                   ),

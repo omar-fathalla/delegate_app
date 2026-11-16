@@ -76,6 +76,7 @@ void main() {
     expect(find.text('موظف إداري'), findsWidgets);
     expect(tab(LoginMode.delegate), findsOneWidget);
     expect(find.byKey(const ValueKey('login_web_delegate_notice')), findsOneWidget);
+    expect(find.text(WebRuntimePolicy.delegateLoginWebMessage), findsOneWidget);
     expect(find.byKey(const ValueKey('login_national_id')), findsNothing);
     final submit = t.widget<FilledButton>(find.byKey(const ValueKey('login_submit')));
     expect(submit.onPressed, isNull);
