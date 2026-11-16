@@ -2,6 +2,7 @@ import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/services/device_binding_service.dart';
 import 'package:delegate_app/features/auth/data/datasources/delegate_login_api.dart';
 import 'package:delegate_app/features/auth/domain/delegate_login_validator.dart';
@@ -67,6 +68,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       throw const AuthFailure(
         'تعذر تسجيل الدخول حالياً. يرجى المحاولة مرة أخرى.',
         'unavailable',
+      );
+    }
+
+    if (!WebRuntimePolicy.delegateDeviceBindingEnabled) {
+      throw const AuthFailure(
+        WebRuntimePolicy.delegateLoginWebMessage,
+        'delegate_web_app_only',
       );
     }
 

@@ -9,6 +9,7 @@ import 'package:delegate_app/features/settings/presentation/pages/settings_scree
 import 'package:delegate_app/features/photo_permission/presentation/pages/monthly_photo_report_screen.dart';
 import 'package:delegate_app/features/photo_permission/presentation/photo_reports_refresh.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
+import 'package:delegate_app/features/auth/domain/role_home.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:delegate_app/features/auth/domain/usecases/cache_delegate.dart';
@@ -327,22 +328,7 @@ class _MainScreenState extends State<MainScreen> {
         ),
       );
 
-      if (delegate.role == UserRole.admin ||
-          delegate.role == UserRole.superAdmin ||
-          delegate.role == UserRole.organizationAdmin ||
-          delegate.role == UserRole.technicalSupport ||
-          delegate.role == UserRole.branchesMarketingManager) {
-        context.go('/admin/home', extra: delegate);
-      } else if (delegate.role == UserRole.accountant) {
-        context.go('/accountant/home', extra: delegate);
-      } else if (delegate.role == UserRole.hr) {
-        context.go('/hr/home', extra: delegate);
-      } else if (delegate.role == UserRole.marketing ||
-          delegate.role == UserRole.marketingPromotion) {
-        context.go('/marketing/home', extra: delegate);
-      } else {
-        context.go('/home', extra: delegate);
-      }
+      context.go(homePathForRole(delegate.role), extra: delegate);
     }
   }
 

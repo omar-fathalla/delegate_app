@@ -4,6 +4,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 /// نتيجة التحقق من بصمة الجهاز
@@ -104,6 +105,14 @@ class DeviceBindingService {
   static Future<DeviceVerificationResult> verifyOrBindDevice({
     required Delegate delegate,
   }) async {
+    // Web never reads a device id, compares a binding, or writes one.
+    if (!WebRuntimePolicy.delegateDeviceBindingEnabled) {
+      return const DeviceVerificationResult(
+        status: DeviceVerificationStatus.bypassed,
+        message: 'تم تجاوز فحص الجهاز على الويب',
+      );
+    }
+
     // 1. استثناء الرتب الإدارية والمشرفين (الحماية تطبق فقط على المندوب)
     if (delegate.role != UserRole.delegate) {
       return const DeviceVerificationResult(

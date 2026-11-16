@@ -4,7 +4,7 @@ import 'package:delegate_app/core/widgets/device_lock_dialog.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/auth/domain/role_home.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/features/auth/presentation/widgets/tashil_m3.dart';
@@ -53,22 +53,7 @@ class _SplashScreenState extends State<SplashScreen>
       listener: (context, state) {
         if (state is AuthAuthenticated) {
           final delegate = state.delegate;
-          if (delegate.role == UserRole.superAdmin ||
-              delegate.role == UserRole.admin ||
-              delegate.role == UserRole.organizationAdmin ||
-              delegate.role == UserRole.technicalSupport ||
-              delegate.role == UserRole.branchesMarketingManager) {
-            context.go('/admin/home', extra: delegate);
-          } else if (delegate.role == UserRole.accountant) {
-            context.go('/accountant/home', extra: delegate);
-          } else if (delegate.role == UserRole.hr) {
-            context.go('/hr/home', extra: delegate);
-          } else if (delegate.role == UserRole.marketing ||
-              delegate.role == UserRole.marketingPromotion) {
-            context.go('/marketing/home', extra: delegate);
-          } else {
-            context.go('/home', extra: delegate);
-          }
+          context.go(homePathForRole(delegate.role), extra: delegate);
 
           // تهيئة الإشعارات في الخلفية بعد اكتمال الانتقال
           Future.delayed(const Duration(milliseconds: 1500), () {

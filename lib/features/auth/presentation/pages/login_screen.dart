@@ -1,5 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:delegate_app/core/config/app_env.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
+import 'package:delegate_app/features/auth/domain/role_home.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -8,7 +9,6 @@ import 'package:delegate_app/features/auth/domain/delegate_login_validator.dart'
 import 'package:delegate_app/features/auth/presentation/auth_error_message.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/auth/presentation/pages/delegate_phone_otp_view.dart';
-import 'package:delegate_app/features/hr/presentation/pages/hr_login_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -132,9 +132,8 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb) {
-      return const HrLoginScreen();
-    }
+    // Web keeps the same مندوب / موظف إداري switch.
+    assert(WebRuntimePolicy.loginKeepsModeTabs);
     return Theme(
       data: tashilAuthTheme(context),
       child: Builder(builder: _buildThemed),
@@ -822,27 +821,9 @@ class _LoginScreenState extends State<LoginScreen>
         '🚀 LoginScreen: AuthAuthenticated received! name=${delegate.fullName}, role=${delegate.role}, uid=${delegate.uid}',
       );
       try {
-        if (delegate.role == UserRole.superAdmin ||
-            delegate.role == UserRole.admin ||
-            delegate.role == UserRole.organizationAdmin ||
-            delegate.role == UserRole.technicalSupport ||
-            delegate.role == UserRole.branchesMarketingManager) {
-          debugPrint('🚀 LoginScreen: Navigating to /admin/home');
-          context.go('/admin/home', extra: delegate);
-        } else if (delegate.role == UserRole.accountant) {
-          debugPrint('🚀 LoginScreen: Navigating to /accountant/home');
-          context.go('/accountant/home', extra: delegate);
-        } else if (delegate.role == UserRole.hr) {
-          debugPrint('🚀 LoginScreen: Navigating to /hr/home');
-          context.go('/hr/home', extra: delegate);
-        } else if (delegate.role == UserRole.marketing ||
-            delegate.role == UserRole.marketingPromotion) {
-          debugPrint('🚀 LoginScreen: Navigating to /marketing/home');
-          context.go('/marketing/home', extra: delegate);
-        } else {
-          debugPrint('🚀 LoginScreen: Navigating to /home');
-          context.go('/home', extra: delegate);
-        }
+        final path = homePathForRole(delegate.role);
+        debugPrint('🚀 LoginScreen: Navigating to $path');
+        context.go(path, extra: delegate);
       } catch (e, stack) {
         debugPrint('❌ Navigation Error in LoginScreen: $e\n$stack');
       }

@@ -38,3 +38,54 @@ bool canSetDelegateHold({
       return false;
   }
 }
+
+/// Callable fields for `setDelegateHold`.
+///
+/// A company supervisor (`UserRole.admin`) may suspend only a delegate in
+/// their own company, and the only mutation is the admin-suspend hold that
+/// drives status. Profile fields are never included. Returns null when the
+/// caller is out of scope, including an empty company UID.
+const String companySupervisorStatusHold = 'admin_suspend';
+
+const Set<String> delegateHoldPayloadKeys = {
+  'uid',
+  'orgId',
+  'companyId',
+  'hold',
+  'op',
+  'note',
+};
+
+Map<String, dynamic>? buildDelegateHoldPayload({
+  required UserRole? callerRole,
+  required String callerOrganizationUID,
+  required String callerCompanyUID,
+  required String uid,
+  required String organizationUID,
+  required String companyUID,
+  required String op,
+  String hold = companySupervisorStatusHold,
+  String? note,
+}) {
+  if (callerRole == UserRole.admin && hold != companySupervisorStatusHold) {
+    return null;
+  }
+  if (!canSetDelegateHold(
+    role: callerRole,
+    callerOrganizationUID: callerOrganizationUID,
+    callerCompanyUID: callerCompanyUID,
+    targetOrganizationUID: organizationUID,
+    targetCompanyUID: companyUID,
+  )) {
+    return null;
+  }
+  final trimmedNote = note?.trim() ?? '';
+  return {
+    'uid': uid,
+    'orgId': organizationUID,
+    'companyId': companyUID,
+    'hold': hold,
+    'op': op,
+    if (trimmedNote.isNotEmpty) 'note': trimmedNote,
+  };
+}
