@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/web/hr_system/hr_western_digits.dart';
 
 /// هيدر مكتبي متطور للـ HR يستغل عرض الشاشات الكبيرة
 class HRDesktopTopBar extends StatelessWidget {
@@ -119,7 +121,12 @@ class HRDesktopTopBar extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
 
     final now = DateTime.now();
-    final arabicDate = DateFormat('EEEE، d MMMM y', 'ar').format(now);
+    final formatted = DateFormat('EEEE، d MMMM y', 'ar').format(now);
+    // Web matches the rest of the shell (16 نوفمبر 2026). Mobile keeps the
+    // Arabic-Indic digits the wide layout already shipped.
+    final arabicDate = WebRuntimePolicy.isWeb
+        ? hrWesternDigits(formatted)
+        : formatted;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -140,6 +147,9 @@ class HRDesktopTopBar extends StatelessWidget {
     bool showName,
   ) {
     final account = webAccount?.call(showName);
+    // «الرئيسية» was both the title and the fallback subtitle on the home tab.
+    final showSubtitle =
+        !(WebRuntimePolicy.isWeb && activeIndex == kHrTabOverview);
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -225,16 +235,18 @@ class HRDesktopTopBar extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  _getSubtitle(activeIndex),
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: colorScheme.onSurfaceVariant,
+                if (showSubtitle) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    _getSubtitle(activeIndex),
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                ],
               ],
             ),
           ),
@@ -266,6 +278,7 @@ class HRDesktopTopBar extends StatelessWidget {
                     arabicDate,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    locale: WebRuntimePolicy.isWeb ? const Locale('en') : null,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,

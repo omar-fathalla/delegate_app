@@ -19,6 +19,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/web/hr_system/hr_home_attendance_card_web.dart';
 import 'package:delegate_app/web/hr_system/hr_home_side_cards_web.dart';
+import 'package:delegate_app/web/hr_system/hr_overlay_scrollbar.dart';
 import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
 
 /// Width of the side column next to the attendance card.
@@ -269,6 +270,7 @@ class HrHomeOverviewView extends StatefulWidget {
 
 class _HrHomeOverviewViewState extends State<HrHomeOverviewView> {
   final TextEditingController _search = TextEditingController();
+  final ScrollController _scroll = ScrollController();
   HrPresenceFilter _presence = HrPresenceFilter.all;
   String? _chain;
   int _page = 0;
@@ -312,6 +314,7 @@ class _HrHomeOverviewViewState extends State<HrHomeOverviewView> {
     _headerBridge?.release();
     _ticker?.cancel();
     _search.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -468,8 +471,10 @@ class _HrHomeOverviewViewState extends State<HrHomeOverviewView> {
           );
         }
 
-        return Scrollbar(
+        return HrOverlayScrollbar(
+          controller: _scroll,
           child: SingleChildScrollView(
+            controller: _scroll,
             key: const ValueKey('hr_home_overview'),
             padding: EdgeInsets.all(padding),
             child: Center(
