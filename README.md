@@ -135,6 +135,20 @@ Web HR login is the fake phone plus the password from the local file. Company sc
 | delegate active / مندوب نشط | fake.delegate.beta.3@example.com | 01000000020 | seed-fake-co-beta |
 | delegate active / مندوب نشط | fake.delegate.beta.4@example.com | 01000000021 | seed-fake-co-beta |
 | delegate suspended / مندوب موقوف | fake.delegate.beta.5@example.com | 01000000022 | seed-fake-co-beta |
+| company-admin / مشرف شركة من دعوة الويب (Angular claimInvite) ألف | fake.companyadmin.invite.alpha@example.com | 01000000023 | seed-fake-co-alpha |
+| company_admin / مشرف شركة (createStaffUser / قديم) ألف | fake.companyadmin.legacy.alpha@example.com | 01000000024 | seed-fake-co-alpha |
+| companyadmin / مشرف شركة بالحقل القديم companyId فقط ألف | fake.companyadmin.companyid.alpha@example.com | 01000000025 | (none; companyId=seed-fake-co-alpha) |
+| admin + position supervisor / مشرف ألف | fake.admin.position.alpha@example.com | 01000000026 | seed-fake-co-alpha |
+| company_supervisor / مشرف الشركة باء | fake.company-supervisor.beta@example.com | 01000000027 | seed-fake-co-beta |
+| admin + userType HR / مشرف بحقل userType قديم باء | fake.admin.usertype-hr.beta@example.com | 01000000028 | seed-fake-co-beta |
+| company-hr / موارد بشرية (قديم) ألف | fake.company-hr.alpha@example.com | 01000000029 | seed-fake-co-alpha |
+| company_hr / موارد بشرية باء | fake.company_hr.beta@example.com | 01000000030 | seed-fake-co-beta |
+| human_resources / موارد بشرية باء | fake.human-resources.beta@example.com | 01000000031 | seed-fake-co-beta |
+| admin / مشرف قديم بلا شركة | fake.admin.nocompany@example.com | 01000000032 | (none) |
+
+Accounts `01000000023`–`01000000032` mirror the other supervisor / HR `users` shapes seen in production (the Angular invite's `company-admin`, `company_admin`, `companyadmin` with only the legacy `companyId` field, `admin` with `position` or a legacy `userType`, `company_supervisor`, the legacy HR spellings, and a legacy `admin` without a company). On web every one of them lands on the HR desktop system (`/hr/home`).
+
+الحسابات من `01000000023` إلى `01000000032` تحاكي بقية أشكال مستندات المشرف والموارد البشرية الموجودة في الإنتاج، وكلها تفتح نظام الموارد البشرية المكتبي (`/hr/home`) على الويب.
 
 Phones are a fake `01000000xxx` block, not real numbers. More detail: [`functions/scripts/README-hr-web-fake-accounts.md`](functions/scripts/README-hr-web-fake-accounts.md).
 

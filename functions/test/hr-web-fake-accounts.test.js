@@ -147,7 +147,7 @@ test("data builder matches staff and company delegate shapes", () => {
   assert.deepEqual(plan, lib.buildPlan());
   assert.equal(plan.seedTag, "tashil-dev-hr-web-fake-v1");
   assert.equal(plan.organizationId, "seed-fake-hr-org");
-  assert.equal(plan.accounts.length, 22);
+  assert.equal(plan.accounts.length, 32);
 
   const byEmail = Object.fromEntries(plan.accounts.map((account) => [account.email, account]));
   const expectAccount = (email, role, companyUID, phone, status = "approved") => {
@@ -269,11 +269,87 @@ test("data builder matches staff and company delegate shapes", () => {
   for (const write of plan.writes) lib.assertNoSecretKeys(write.data);
 });
 
+test("the original 22 accounts keep their uids, phones and order", () => {
+  const original = [
+    "seed-fake-super-admin", "seed-fake-tech-support", "seed-fake-org-admin", "seed-fake-no-company",
+    "seed-fake-supervisor-alpha", "seed-fake-hr-alpha", "seed-fake-marketing-alpha", "seed-fake-bmm-alpha",
+    "seed-fake-del-alpha-1", "seed-fake-del-alpha-2", "seed-fake-del-alpha-3", "seed-fake-del-alpha-4",
+    "seed-fake-del-alpha-5",
+    "seed-fake-supervisor-beta", "seed-fake-hr-beta", "seed-fake-marketing-beta", "seed-fake-bmm-beta",
+    "seed-fake-del-beta-1", "seed-fake-del-beta-2", "seed-fake-del-beta-3", "seed-fake-del-beta-4",
+    "seed-fake-del-beta-5",
+  ];
+  const accounts = lib.buildPlan().accounts;
+  original.forEach((uid, i) => {
+    assert.equal(accounts[i].uid, uid);
+    assert.equal(accounts[i].phoneNumber, lib.fakePhone(i + 1), uid);
+  });
+});
+
+test("role-shape accounts mirror every prod supervisor / HR users doc shape", () => {
+  const plan = lib.buildPlan();
+  const shapes = plan.accounts.slice(22);
+  assert.equal(shapes.length, lib.ROLE_SHAPE_ACCOUNTS.length);
+  const doc = (uid) => plan.writes.find((write) => write.path === `users/${uid}`).data;
+  const expected = [
+    ["seed-fake-company-admin-invite-alpha", "company-admin", "01000000023"],
+    ["seed-fake-company-admin-legacy-alpha", "company_admin", "01000000024"],
+    ["seed-fake-companyadmin-companyid-alpha", "companyadmin", "01000000025"],
+    ["seed-fake-admin-position-alpha", "admin", "01000000026"],
+    ["seed-fake-company-supervisor-beta", "company_supervisor", "01000000027"],
+    ["seed-fake-admin-usertype-hr-beta", "admin", "01000000028"],
+    ["seed-fake-company-hr-alpha", "company-hr", "01000000029"],
+    ["seed-fake-company-hr-beta", "company_hr", "01000000030"],
+    ["seed-fake-human-resources-beta", "human_resources", "01000000031"],
+    ["seed-fake-admin-no-company", "admin", "01000000032"],
+  ];
+  assert.deepEqual(shapes.map((a) => [a.uid, a.role, a.phoneNumber]), expected);
+  for (const account of shapes) {
+    assert.ok(account.email.endsWith("@example.com"), account.email);
+    assert.ok(account.uid.startsWith("seed-fake-"), account.uid);
+    assert.ok(account.shape, account.uid);
+    const data = doc(account.uid);
+    assert.equal(data.role, account.role);
+    assert.equal(data.organizationUID, "seed-fake-hr-org");
+    assert.equal(data.seedTag, plan.seedTag);
+    assert.equal(data.fake, true);
+  }
+
+  const invite = doc("seed-fake-company-admin-invite-alpha");
+  assert.equal(invite.companyUID, "seed-fake-co-alpha");
+  assert.equal(invite.emailVerified, true);
+  assert.equal(invite.status, "Approved");
+
+  const legacyField = doc("seed-fake-companyadmin-companyid-alpha");
+  assert.equal(legacyField.companyId, "seed-fake-co-alpha");
+  assert.equal(Object.prototype.hasOwnProperty.call(legacyField, "companyUID"), false);
+
+  assert.equal(doc("seed-fake-admin-position-alpha").position, "supervisor");
+  assert.equal(doc("seed-fake-admin-usertype-hr-beta").userType, "HR");
+  assert.equal(doc("seed-fake-company-supervisor-beta").companyUID, "seed-fake-co-beta");
+
+  const noCompany = doc("seed-fake-admin-no-company");
+  assert.equal(Object.prototype.hasOwnProperty.call(noCompany, "companyUID"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(noCompany, "companyId"), false);
+
+  for (const account of plan.accounts.filter((a) => lib.HR_ROLES.has(a.role))) {
+    assert.ok(account.companyUID || account.companyId, `${account.email} HR must belong to a company`);
+  }
+});
+
+test("plan refuses an HR spelling without a company", () => {
+  const plan = lib.buildPlan();
+  const broken = plan.accounts.find((a) => a.uid === "seed-fake-company-hr-alpha");
+  broken.companyUID = "";
+  assert.throws(() => lib.assertPlanSafe(plan), /must belong to a company/);
+});
+
 test("dry-run text lists emails and does not contain a generated password", () => {
   const plan = lib.buildPlan();
   const password = lib.passwordFromBytes(Buffer.alloc(20, 7));
   const text = `${lib.formatDryRun(plan)}\n${lib.formatCleanupDryRun(plan)}`;
   assert.match(text, /fake.hr.beta@example.com/);
+  assert.match(text, /companyadmin fake\.companyadmin\.companyid\.alpha@example\.com .*companyId=seed-fake-co-alpha/);
   assert.match(text, /mode: dry-run/);
   assert.match(text, /cleanup dry-run/);
   assert.equal(text.includes(password), false);

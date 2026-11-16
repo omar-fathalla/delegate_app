@@ -70,6 +70,20 @@ Organization `seed-fake-hr-org` (Fake Test Organization / منظمة وهمية 
 | delegate active / مندوب نشط | fake.delegate.beta.3@example.com | 01000000020 | seed-fake-co-beta |
 | delegate active / مندوب نشط | fake.delegate.beta.4@example.com | 01000000021 | seed-fake-co-beta |
 | delegate suspended / مندوب موقوف | fake.delegate.beta.5@example.com | 01000000022 | seed-fake-co-beta |
+| company-admin / مشرف شركة من دعوة الويب (Angular claimInvite) ألف | fake.companyadmin.invite.alpha@example.com | 01000000023 | seed-fake-co-alpha |
+| company_admin / مشرف شركة (createStaffUser / قديم) ألف | fake.companyadmin.legacy.alpha@example.com | 01000000024 | seed-fake-co-alpha |
+| companyadmin / مشرف شركة بالحقل القديم companyId فقط ألف | fake.companyadmin.companyid.alpha@example.com | 01000000025 | (none; companyId=seed-fake-co-alpha) |
+| admin + position supervisor / مشرف ألف | fake.admin.position.alpha@example.com | 01000000026 | seed-fake-co-alpha |
+| company_supervisor / مشرف الشركة باء | fake.company-supervisor.beta@example.com | 01000000027 | seed-fake-co-beta |
+| admin + userType HR / مشرف بحقل userType قديم باء | fake.admin.usertype-hr.beta@example.com | 01000000028 | seed-fake-co-beta |
+| company-hr / موارد بشرية (قديم) ألف | fake.company-hr.alpha@example.com | 01000000029 | seed-fake-co-alpha |
+| company_hr / موارد بشرية باء | fake.company_hr.beta@example.com | 01000000030 | seed-fake-co-beta |
+| human_resources / موارد بشرية باء | fake.human-resources.beta@example.com | 01000000031 | seed-fake-co-beta |
+| admin / مشرف قديم بلا شركة | fake.admin.nocompany@example.com | 01000000032 | (none) |
+
+Accounts `01000000023`–`01000000032` mirror the other supervisor / HR `users` shapes seen in production (the Angular invite's `company-admin`, `company_admin`, `companyadmin` with only the legacy `companyId` field, `admin` with `position` or a legacy `userType`, `company_supervisor`, the legacy HR spellings, and a legacy `admin` without a company). On web every one of them lands on the HR desktop system (`/hr/home`).
+
+الحسابات من `01000000023` إلى `01000000032` تحاكي بقية أشكال مستندات المشرف والموارد البشرية الموجودة في الإنتاج، وكلها تفتح نظام الموارد البشرية المكتبي (`/hr/home`) على الويب.
 
 Phones are the fake block `01000000xxx`. They are not real numbers. Every HR account belongs to a company; `fake.nocompany@example.com` is a second HR user under `seed-fake-co-alpha` (same phone `01000000004` as before). Delegate documents use deterministic, clearly fake 14-digit ASCII `nationalityID` / `nationalId` values such as `00000000000101` (alpha 1) and `00000000000205` (beta 5) so mobile delegate login works. Role `supervisor` is the company supervisor (the app maps it to the company-admin screens). Role `marketing` is branch marketing. Role `branches_marketing` is the branches marketing manager.
 
