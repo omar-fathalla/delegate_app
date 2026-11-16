@@ -8,7 +8,6 @@ import 'package:delegate_app/features/auth/domain/delegate_login_validator.dart'
 import 'package:delegate_app/features/auth/presentation/auth_error_message.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/auth/presentation/pages/delegate_phone_otp_view.dart';
-import 'package:delegate_app/features/hr/presentation/pages/hr_login_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -28,6 +27,15 @@ const kLoginModePrefKey = 'login_selected_mode';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  /// Test hook for the web-only behaviour (tests run on the VM).
+  @visibleForTesting
+  static bool? debugIsWebOverride;
+
+  static bool get isWeb => debugIsWebOverride ?? kIsWeb;
+
+  /// Phone width of the login sheet when shown in a wide browser window.
+  static const double webMaxWidth = 480;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -99,6 +107,10 @@ class _LoginScreenState extends State<LoginScreen>
 
   bool get _isStaff => _mode == LoginMode.staff;
 
+  /// Delegate sign-in binds the calling device on the server, so it stays
+  /// in the mobile app; the web tab only explains that.
+  bool get _isWebDelegate => LoginScreen.isWeb && !_isStaff;
+
   void _restoreMode() {
     try {
       final saved = sl<SharedPreferences>().getString(kLoginModePrefKey);
@@ -132,12 +144,19 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb) {
-      return const HrLoginScreen();
-    }
-    return Theme(
+    final themed = Theme(
       data: tashilAuthTheme(context),
       child: Builder(builder: _buildThemed),
+    );
+    if (!LoginScreen.isWeb) return themed;
+    return ColoredBox(
+      color: kTashilBrandScheme.primary,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: LoginScreen.webMaxWidth),
+          child: themed,
+        ),
+      ),
     );
   }
 
@@ -489,71 +508,76 @@ class _LoginScreenState extends State<LoginScreen>
       ),
       _row(
         i++,
-        Shake(
-          key: _shakeKey,
-          child: Form(
-            key: _formKey,
-            autovalidateMode: _autovalidate,
-            child: AutofillGroup(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: _buildFields(context, l10n, isArabic, loading),
-              ),
-            ),
-          ),
-        ),
-      ),
-      _row(
-        i++,
-        Row(
-          children: [
-            // Compact: checkbox, 8dp, label; whole row tappable, 48dp min.
-            InkWell(
-              key: const ValueKey('login_remember_me'),
-              borderRadius: BorderRadius.circular(8),
-              onTap: () => setState(() => _rememberMe = !_rememberMe),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 48),
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.only(end: 8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Semantics(
-                        label: l10n.rememberMe,
-                        child: Checkbox(
-                          value: _rememberMe,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                          onChanged: (v) =>
-                              setState(() => _rememberMe = v ?? false),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        l10n.rememberMe,
-                        style: text.bodyLarge?.copyWith(
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
+        _isWebDelegate
+            ? _buildWebDelegateNotice(context, isArabic)
+            : Shake(
+                key: _shakeKey,
+                child: Form(
+                  key: _formKey,
+                  autovalidateMode: _autovalidate,
+                  child: AutofillGroup(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: _buildFields(context, l10n, isArabic, loading),
+                    ),
                   ),
                 ),
               ),
-            ),
-            const Spacer(),
-            if (_isStaff)
-              TextButton(
-                key: const ValueKey('login_forgot_password'),
-                onPressed: loading
-                    ? null
-                    : () => _forgotPassword(context, isArabic),
-                child: Text(AppLocalizations.of(context)!.forgotPasswordQ,
-                ),
+      ),
+      _row(
+        i++,
+        _isWebDelegate
+            ? const SizedBox.shrink()
+            : Row(
+                children: [
+                  // Compact: checkbox, 8dp, label; whole row tappable, 48dp min.
+                  InkWell(
+                    key: const ValueKey('login_remember_me'),
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => setState(() => _rememberMe = !_rememberMe),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 48),
+                      child: Padding(
+                        padding: const EdgeInsetsDirectional.only(end: 8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Semantics(
+                              label: l10n.rememberMe,
+                              child: Checkbox(
+                                value: _rememberMe,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                                onChanged: (v) =>
+                                    setState(() => _rememberMe = v ?? false),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              l10n.rememberMe,
+                              style: text.bodyLarge?.copyWith(
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  if (_isStaff)
+                    TextButton(
+                      key: const ValueKey('login_forgot_password'),
+                      onPressed: loading
+                          ? null
+                          : () => _forgotPassword(context, isArabic),
+                      child: Text(
+                        AppLocalizations.of(context)!.forgotPasswordQ,
+                      ),
+                    ),
+                ],
               ),
-          ],
-        ),
       ),
     ];
   }
@@ -698,7 +722,7 @@ class _LoginScreenState extends State<LoginScreen>
           child: FilledButton(
             key: const ValueKey('login_submit'),
             // IgnorePointer keeps the primary colour while loading (spec §3).
-            onPressed: () => _submitLogin(context),
+            onPressed: _isWebDelegate ? null : () => _submitLogin(context),
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
               // The app theme's FilledButton padding is vertical 16, which in
@@ -859,6 +883,7 @@ class _LoginScreenState extends State<LoginScreen>
   // ---- Helper: Submit Login ----
   void _submitLogin(BuildContext context) {
     if (BlocProvider.of<AuthBloc>(context).state is AuthLoading) return;
+    if (_isWebDelegate) return;
 
     if (_formKey.currentState!.validate()) {
       FocusScope.of(context).unfocus();
@@ -887,6 +912,54 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  Widget _buildWebDelegateNotice(BuildContext context, bool isArabic) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return Container(
+      key: const ValueKey('login_web_delegate_notice'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.phone_android_rounded,
+            color: colorScheme.onSecondaryContainer,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isArabic
+                      ? 'دخول المندوب من تطبيق الموبايل'
+                      : 'Delegates sign in from the mobile app',
+                  style: text.titleSmall?.copyWith(
+                    color: colorScheme.onSecondaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isArabic
+                      ? 'حساب المندوب مربوط بجهازه، لذلك تسجيل الدخول وتسجيل الحضور والتتبع المباشر والإشعارات متاحة من تطبيق تسهيل على الموبايل فقط. المشرفون والموظفون الإداريون يدخلون من تبويب "موظف إداري".'
+                      : 'A delegate account is tied to its phone, so sign-in, check-in, live tracking and notifications are only available in the Tashil mobile app. Supervisors and staff use the "Staff" tab.',
+                  style: text.bodyMedium?.copyWith(
+                    color: colorScheme.onSecondaryContainer,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ---- Helper: Forgot password (staff only) ----
   Future<void> _forgotPassword(BuildContext context, bool isArabic) async {
     final l10n = AppLocalizations.of(context)!;
@@ -910,8 +983,7 @@ class _LoginScreenState extends State<LoginScreen>
       messenger.showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          content: Text(l10n.resetLinkSentIfRegistered,
-          ),
+          content: Text(l10n.resetLinkSentIfRegistered),
         ),
       );
     } catch (_) {
@@ -919,8 +991,7 @@ class _LoginScreenState extends State<LoginScreen>
         SnackBar(
           behavior: SnackBarBehavior.floating,
           backgroundColor: colorScheme.error,
-          content: Text(l10n.resetLinkFailed,
-          ),
+          content: Text(l10n.resetLinkFailed),
         ),
       );
     }
@@ -1053,7 +1124,8 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
               const SizedBox(height: 20),
-              Text(AppLocalizations.of(context)!.selectOrganization,
+              Text(
+                AppLocalizations.of(context)!.selectOrganization,
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -1061,7 +1133,8 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
               const SizedBox(height: 8),
-              Text(AppLocalizations.of(context)!.multipleOrgsChoose,
+              Text(
+                AppLocalizations.of(context)!.multipleOrgsChoose,
                 style: TextStyle(
                   fontSize: 14,
                   color: colorScheme.onSurfaceVariant,
