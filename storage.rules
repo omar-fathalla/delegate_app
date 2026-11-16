@@ -10,10 +10,30 @@ service firebase.storage {
         && fileName.matches('^feedback_(ts|[0-9]+)(\\.[A-Za-z0-9]+)?$');
     }
     match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
+      // v1.14.x legacy fresh upload (token-only; separate from overwrite).
       allow create: if request.auth != null
         && request.auth.token.get('role', '') == 'delegate'
         && request.auth.token.get('companyId', '') == compId
-        && photoId.matches('photo_(ts|[0-9]+)(\\.[A-Za-z0-9]+)?$');
+        && photoId.matches('photo_(ts|[0-9]+)(\\.[A-Za-z0-9]+)?$')
+        && resource == null
+        && request.resource.size < 5 * 1024 * 1024;
+      allow create: if request.auth != null
+        && request.auth.token.get('role', '') == 'delegate'
+        && request.auth.token.get('companyId', '') == compId
+        && photoId.matches('photo_(ts|[0-9]+)(\\.[A-Za-z0-9]+)?$')
+        && request.resource.contentType.matches('image/.*')
+        && request.resource.size < 5 * 1024 * 1024;
+      allow update: if request.auth != null
+        && request.auth.token.get('role', '') == 'delegate'
+        && request.auth.token.get('companyId', '') == compId
+        && photoId.matches('photo_(ts|[0-9]+)(\\.[A-Za-z0-9]+)?$')
+        && resource != null
+        && request.auth.uid != ''
+        && resource.metadata != null
+        && (
+          resource.metadata.get('userId', '') == request.auth.uid
+          || resource.metadata.get('delegateUid', '') == request.auth.uid
+        );
     }
     // ==================== HELPER FUNCTIONS ====================
     function isAuthenticated() {

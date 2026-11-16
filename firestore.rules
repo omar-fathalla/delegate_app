@@ -985,6 +985,13 @@ service cloud.firestore {
       allow list: if signedIn() && claimString('role') == 'delegate' && delegateOtpOk()
         && resource.data.get('companyUID', resource.data.get('companyId', ''))
           == claimString('companyId');
+      allow list: if signedIn() && userExists()
+        && userDoc().get('role', '') in ['supervisor', 'company_supervisor']
+        && userDoc().get('companyUID', '') != ''
+        && resource.data.get('companyUID', resource.data.get('companyId', '')) == userDoc().companyUID
+        && resource.data.get('role', '') in [
+          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+          'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport'];
       allow list: if signedIn() && roleIs(['supervisor', 'company_supervisor'])
         && callerCompany() != ''
         && resource.data.get('companyUID', resource.data.get('companyId', '')) == callerCompany()
