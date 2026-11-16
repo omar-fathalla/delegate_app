@@ -23,21 +23,21 @@ const FLOW = {
   'supervisor registration nationalId dup-check listen (nationalId query)':
     ['Supervisor registration realtime dup listener', 'admin registration'],
   'tech support approve request (update status approved)':
-    ['TS approve subscription request (unbatched harness)', 'admin subscription requests (1.14.3 uses WriteBatch)'],
+    ['TS approve subscription request (unbatched)', 'admin subscription requests (app cb3f4e2 unbatched)'],
   'super-admin approve request (update status approved, main step 1)':
-    ['SA approve subscription request (unbatched harness)', 'admin subscription requests (1.14.3 uses WriteBatch)'],
+    ['SA approve subscription request (unbatched)', 'admin subscription requests (app cb3f4e2 unbatched)'],
   'tech support provision delegate set(merge) status active (main step 2c, unbatched)':
-    ['TS provision delegate (unbatched harness)', 'admin approve (1.14.3 batched)'],
+    ['TS provision delegate (unbatched step 2c)', 'admin approve (app cb3f4e2 unbatched)'],
   'any staff users list all (private label perms: users get())':
     ['Private Label hub user search', 'private label permissions hub (marketing / super-admin)'],
   'supervisor read company broadcasts delegateUid in [supervisor_co, company_co, all_company_supervisors]':
     ['Supervisor notification bell broadcasts', 'notifications bell'],
   'ts approve new delegate step1 update delegate_requests approved':
-    ['TS approve step1 (unbatched harness)', 'admin subscription requests (batched in app)'],
+    ['TS approve step1 (unbatched)', 'admin subscription requests (app cb3f4e2)'],
   'ts approve step2c delegate set(merge) active':
-    ['TS provision step2c unbatched', 'admin approve (batched in app)'],
+    ['TS provision step2c unbatched', 'admin approve (app cb3f4e2)'],
   'sa approve new delegate step1 update delegate_requests approved':
-    ['SA approve step1 (unbatched harness)', 'admin subscription requests (batched in app)'],
+    ['SA approve step1 (unbatched)', 'admin subscription requests (app cb3f4e2)'],
   'anonymous (<=v1.14.1) CG delegates phone login query':
     ['Legacy anonymous phone login', 'login (≤1.14.1)'],
   'anonymous (<=v1.14.1) add attendance check-in':
@@ -63,8 +63,9 @@ function classify(row) {
   }
   if (name.includes('approve') || name.includes('provision') || name.includes('step2c') || name.includes('step1')) {
     return {
-      cls: 'd',
-      firebase: 'Yes — 1.14.3 approval uses WriteBatch; harness tests forbidden unbatched path (H1/H2). No client widen.',
+      cls: 'b',
+      firebase:
+        'Yes — globalStaffUnbatched*Ok() restores live unbatched TS/SA approve+provision (app cb3f4e2); batched r4 path unchanged.',
       decision: '',
     };
   }

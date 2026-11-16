@@ -13,19 +13,15 @@ const FS_PORT = Number(process.env.LOCAL_CI_FIRESTORE_PORT || 8080);
 const LIVE_RULES = path.join(ROOT, 'test/rules/ta60/live.rules');
 const CAND_RULES = process.env.CAND || path.join(ROOT, 'firestore.rules');
 
-// Exactly 11 deliberate prod-compat rows: 2 class-(c) + 9 silent class-(d).
+// Deliberate prod-compat rows: 2 class-(c) + silent class-(d) try/catch only.
+// Global-staff unbatched approve/provision (FS-11–18) are class (b) and must
+// match live ALLOW via globalStaffUnbatched*Ok() — not silenced as (d).
 export const DELIBERATE_FIRESTORE_REGRESSIONS = new Set([
   'anonymous (<=v1.14.1) CG delegates phone login query',
   'anonymous (<=v1.14.1) add attendance check-in',
   'delegate CG delegates where nationalityID == own (identifier resolve, try/catch)',
   'delegate users where phoneNumber == supervisorPhone',
   'supervisor users where role in [super-admin...] (notify, try/catch)',
-  'tech support approve request (update status approved)',
-  'super-admin approve request (update status approved, main step 1)',
-  'tech support provision delegate set(merge) status active (main step 2c, unbatched)',
-  'ts approve new delegate step1 update delegate_requests approved',
-  'ts approve step2c delegate set(merge) active',
-  'sa approve new delegate step1 update delegate_requests approved',
 ]);
 
 /** Documented dev-security closures (REQUEST CHANGES); not silent prod widenings. */
@@ -352,5 +348,6 @@ export async function runFirestoreCompatHarness() {
   }));
   const unexpected = rows.filter(r => r.regression && !r.deliberate);
   const deliberate = rows.filter(r => r.regression && r.deliberate);
-  return { rows, total: rows.length, deliberate, unexpected, exprLimit: unexpected.filter(r => String(r.candMsg || '').includes('limit exceeded')) };
+  const isExprLimitMsg = (msg) => /maximum of 1000 expressions|limit exceeded/i.test(String(msg || ''));
+  return { rows, total: rows.length, deliberate, unexpected, exprLimit: unexpected.filter(r => isExprLimitMsg(r.candMsg)) };
 }

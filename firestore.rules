@@ -1198,6 +1198,50 @@ service cloud.firestore {
         || (metaKeys && !changedKeys().hasAny(['status']));
     }
 
+    // 1.14.3 prod parity: super-admin / technical support approve
+    // delegate_requests with unbatched writes (live prod + app cb3f4e2).
+    // One users/{uid} get — no getAfter(delegate) batch gate or MED-2 mark.
+    function globalStaffUnbatchedRequestApproveOk() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let d = request.resource.data;
+      let st = d.get('status', '');
+      let reviewKeysOnly = changedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason', 'updatedAt']);
+      return signedIn()
+        && (r in superAdminRoleList() || r in techRoleList())
+        && reviewKeysOnly
+        && resource.data.get('supervisorUid', '') != request.auth.uid
+        && resource.data.get('createdBy', '') != request.auth.uid
+        && !(changedKeys().hasAny(['status']) && st == 'pending')
+        && !(st == 'approved' && resource.data.get('status', '') != 'pending')
+        && globalStaffUnbatchedOrgCheckOk()
+        && resource.data.get('requestType', '') != 'update_national_id'
+        && resource.data.get('actionType', '') != 'update_national_id';
+    }
+
+    // Unbatched global-staff approve (1.14.3 / live): absent check is ok;
+    // explicit failed still blocks; strict ok-only stays on the batched path.
+    function globalStaffUnbatchedOrgCheckOk() {
+      let ty = resource.data.get('requestType', 'new_delegate');
+      return !(ty in ['new_delegate', 'add_organization'])
+        || resource.data.get('orgCompanyCheck', '') != 'failed';
+    }
+
+    // 1.14.3 step-2c follow-up: nested delegate set(merge) active after
+    // unbatched request approval. Global staff only; path must match tenant.
+    function globalStaffUnbatchedDelegateProvisionOk(orgId, compId, delegateId) {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let d = request.resource.data;
+      let stl = d.get('status', '') is string ? d.get('status', '').lower().trim() : '';
+      return signedIn()
+        && request.auth.uid != delegateId
+        && (r in superAdminRoleList() || r in techRoleList())
+        && stl == 'active'
+        && d.get('organizationUID', '') == orgId
+        && d.get('companyUID', '') == compId;
+    }
+
     function requestStaffUpdateOk(requestId) {
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
       let r = u.get('role', '');
@@ -1701,19 +1745,21 @@ service cloud.firestore {
 
         match /delegates/{delegateId} {
           allow read: if signedIn() && canReadNestedDelegate(orgId, compId, delegateId);
-          allow create: if deviceBindingAbsent() && sourceStampKeysLocked()
+          allow create: if globalStaffUnbatchedDelegateProvisionOk(orgId, compId, delegateId)
+            || (deviceBindingAbsent() && sourceStampKeysLocked()
             && exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId))
-            && nestedDelegateCreateOk(orgId, compId, delegateId);
+            && nestedDelegateCreateOk(orgId, compId, delegateId));
           // sourceStampKeysLocked is not on this allow: the 4-flip tech
           // approval is already at the 1000-expression budget. Delegate
           // self-updates are hasOnly-gated by delegateFieldsSafe. Staff
           // updates take staffDocsApproveOk, which locks source keys on
           // the non-techSignup branch only (techFlipOk already hasOnly).
-          allow update: if delegateOwns(delegateId)
+          allow update: if globalStaffUnbatchedDelegateProvisionOk(orgId, compId, delegateId)
+            || (delegateOwns(delegateId)
             ? delegateFieldsSafe()
             : (deviceBindingUntouched() && signedIn()
               && staffManagesDelegate([orgId], [compId], false)
-              && staffDocsApproveOk(orgId, compId, compId, delegateId));
+              && staffDocsApproveOk(orgId, compId, compId, delegateId)));
           allow delete: if canManageNestedDelegate(orgId, compId);
         }
 
@@ -3798,7 +3844,13 @@ service cloud.firestore {
       // status, or any other field. Review fields are written only by
       // reviewNationalIdUpdate (Admin SDK). Clients also cannot convert
       // another request into update_national_id.
-      allow update: if ((signedIn() && request.auth.uid == requestId
+      allow update: if (globalStaffUnbatchedRequestApproveOk()
+          && orgCompanyCheckKeysLocked()
+          && subscriptionPaymentUntouched()
+          && !changedKeys().hasAny(['proposedNationalId'])
+          && (!changedKeys().hasAny(['organizationUIDs', 'organizationUID', 'organizationId', 'companyUID', 'companyId'])
+            || (requestOrganizationUIDsOk() && requestPrimaryOrgBelongsToCompany())))
+        || (((signedIn() && request.auth.uid == requestId
           && changedKeys().hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
             'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'])
           && delegateDocsOk() && delegateUrlsWithDocs())
@@ -3816,7 +3868,7 @@ service cloud.firestore {
         && (!changedKeys().hasAny(['organizationUIDs', 'organizationUID', 'organizationId', 'companyUID', 'companyId'])
           || (requestOrganizationUIDsOk() && requestPrimaryOrgBelongsToCompany()))
         && orgCompanyCheckKeysLocked()
-        && requestApprovalOrgCheckOk();
+        && requestApprovalOrgCheckOk());
       allow delete: if isSuperAdmin()
         || (isOrgAdmin()
           && (resource.data.get('organizationUID', '') == callerOrg()
