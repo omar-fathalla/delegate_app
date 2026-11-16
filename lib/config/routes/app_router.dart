@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:delegate_app/features/auth/presentation/pages/login_screen.dart';
 import 'package:delegate_app/features/auth/presentation/pages/splash_screen.dart';
@@ -9,6 +8,7 @@ import 'package:delegate_app/features/profile/presentation/pages/profile_screen.
 import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_main_screen.dart';
 import 'package:delegate_app/web/admin_desktop/admin_desktop_shell_web.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/admin/presentation/pages/branch_details_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/company_details_screen.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
@@ -96,7 +96,7 @@ final appRouter = GoRouter(
         // Web desktop shell page (`?p=`); kept across the splash after a reload.
         final page = state.uri.queryParameters['p'];
         if (delegate == null) {
-          if (kIsWeb && AdminDesktopShellWeb.isKnownPage(page)) {
+          if (WebRuntimePolicy.isWeb && AdminDesktopShellWeb.isKnownPage(page)) {
             AdminDesktopShellWeb.pendingPage = page;
           }
           return AppMotionPage.fadeThrough(

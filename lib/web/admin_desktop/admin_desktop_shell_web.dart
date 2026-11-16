@@ -1,15 +1,16 @@
 // WEB-ONLY: Material 3 desktop shell for the supervisor (company admin) role.
-// Used only when kIsWeb && width >= kAdminDesktopMinWidth (see
+// Used only when WebRuntimePolicy.isWeb && width >= kAdminDesktopMinWidth (see
 // AdminDesktopShellWeb.shouldUse). Mobile and narrow web keep AdminMainScreen.
 // Composes the existing shared tab screens without modifying them.
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
+import 'package:delegate_app/features/auth/domain/role_home.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_main_screen.dart';
 import 'package:delegate_app/features/notifications/presentation/bloc/notification_bloc.dart';
 import 'package:delegate_app/core/widgets/app_logout_modal.dart';
@@ -100,7 +101,7 @@ class AdminDesktopShellWeb extends StatefulWidget {
   /// companyUID, keep their existing layout on web.
   static bool shouldUse(BuildContext context, Delegate delegate) =>
       shouldUseFor(
-        isWeb: kIsWeb,
+        isWeb: WebRuntimePolicy.isWeb,
         delegate: delegate,
         width: MediaQuery.sizeOf(context).width,
       );
@@ -112,7 +113,10 @@ class AdminDesktopShellWeb extends StatefulWidget {
     required double width,
   }) {
     if (!isWeb) return false;
-    if (delegate.role != UserRole.admin) return false;
+    if (homePathForRole(delegate.role) != '/admin/home') return false;
+    if (adminShellKindFor(delegate.role) != AdminShellKind.companySupervisor) {
+      return false;
+    }
     if (delegate.companyUID.trim().isEmpty) return false;
     return width >= kAdminDesktopMinWidth;
   }
@@ -225,7 +229,7 @@ class _AdminDesktopShellWebState extends State<AdminDesktopShellWeb> {
   void _syncUrl(String page) {
     final uri = AdminDesktopShellWeb.urlFor(page);
     AdminDesktopShellWeb.debugOnSyncUrl?.call(uri);
-    if (!kIsWeb) return;
+    if (!WebRuntimePolicy.isWeb) return;
     SystemNavigator.routeInformationUpdated(uri: uri, replace: true);
   }
 

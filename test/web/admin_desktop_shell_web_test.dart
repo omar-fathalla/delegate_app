@@ -1,5 +1,6 @@
 import 'dart:io';
 // Tests + review screenshots for the WEB-ONLY admin desktop shell (fake data).
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/config/theme/app_theme.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -78,6 +79,23 @@ void main() {
   testWidgets('shouldUse is false off-web (mobile unchanged)', (t) async {
     late bool v;
     await t.pumpWidget(Builder(builder: (c) { v = AdminDesktopShellWeb.shouldUse(c, _sup); return const SizedBox(); }));
+    expect(v, isFalse);
+  });
+
+  testWidgets('shouldUse follows the shared WebRuntimePolicy gate', (t) async {
+    addTearDown(WebRuntimePolicy.debugReset);
+    t.view.physicalSize = const Size(1280, 800);
+    t.view.devicePixelRatio = 1;
+    bool? v;
+    Widget probe() => Builder(builder: (c) {
+          v = AdminDesktopShellWeb.shouldUse(c, _sup);
+          return const SizedBox();
+        });
+    WebRuntimePolicy.debugIsWebOverride = true;
+    await t.pumpWidget(probe());
+    expect(v, isTrue);
+    WebRuntimePolicy.debugIsWebOverride = false;
+    await t.pumpWidget(Container(child: probe()));
     expect(v, isFalse);
   });
 
