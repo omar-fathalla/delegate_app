@@ -5,7 +5,7 @@ const FLOW = {
   'delegate CG delegates where nationalityID == own (identifier resolve, try/catch)':
     ['Delegate login / identifier resolve (OTP path fallback)', 'auth login'],
   'delegate users where phoneNumber == supervisorPhone':
-    ['Delegate attendance check-in notify lookup (try/catch)', 'attendance check-in → supervisor notification'],
+    ['Delegate supervisor home contact card lookup (try/catch)', 'delegate home → supervisor contact card'],
   'supervisor CG delegates phoneNumber dup-check (try/catch)':
     ['Supervisor new-delegate registration dup check', 'admin registration / chain attach'],
   'supervisor CG delegates nationalId dup-check (try/catch)':
