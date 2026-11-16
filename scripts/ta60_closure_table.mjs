@@ -70,16 +70,14 @@ function classify(row) {
   }
   if (name.includes('list bell:')) {
     const role = name.split(' ')[0];
-    const webRoles = new Set(['oa']);
-    const cls = webRoles.has(role) ? 'a,b' : 'd';
     const screen =
       role === 'oa'
         ? 'Org-admin notification bell (live web tashil + app)'
-        : `${role} staff notification bell`;
-  return {
-      cls,
+        : `${role} staff notification bell (web where applicable + app 1.14.3)`;
+    return {
+      cls: 'a,b',
       firebase:
-        'Yes — split cheap `allow list` on `/notifications` (P0-A); app uses `queryAllSettled` so each row is partial deny unless all queries fail',
+        'Yes — Stream 2 P0-A split cheap scoped `allow list` on `/notifications`; restores bell without REQUEST CHANGES widen',
       decision: '',
       screen,
       flow: 'notifications bell / header',
