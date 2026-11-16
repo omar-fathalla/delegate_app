@@ -39,8 +39,8 @@ bool usesWebHrSystem(UserRole role, {required bool isWeb}) =>
 /// Mobile always gets [homePathForRole].
 String landingPathForRole(UserRole role, {bool? isWeb}) =>
     usesWebHrSystem(role, isWeb: isWeb ?? WebRuntimePolicy.isWeb)
-        ? kWebHrSystemPath
-        : homePathForRole(role);
+    ? kWebHrSystemPath
+    : homePathForRole(role);
 
 /// Which shell [AdminMainScreen] mounts. Roles that do not use that screen
 /// still map to [companySupervisor] so a stray navigation keeps the previous

@@ -123,43 +123,43 @@ Future<DelegateModel> _staffLogin(Map<String, dynamic> shape) async {
 }
 
 Delegate _delegate(UserRole role, {String companyUID = _co}) => Delegate(
-      uid: 'seed-fake-${role.name}',
-      firstName: 'مشرف',
-      middleName: '',
-      lastName: 'وهمي',
-      fullName: 'مشرف وهمي',
-      nationalityID: '__firebase_auth__:fake@example.com',
-      motherName: '',
-      city: '',
-      phoneNumber: '01000000099',
-      gender: DelegateGender.male,
-      position: DelegatePosition.supervisor,
-      birthDate: DateTime(1990),
-      organizationUID: _org,
-      organizationName: 'Fake Test Organization',
-      companyUID: companyUID,
-      companyName: companyUID.isEmpty ? '' : 'Fake Company Alpha',
-      status: DelegateStatus.approved,
-      delegatePublicId: '',
-      allReceiptCodes: const [],
-      createdAt: DateTime(2026),
-      createdBy: 'system_admin',
-      hasPendingUpdate: false,
-      isDeductedFromCompany: false,
-      isPrinted: false,
-      isProfileComplete: true,
-      numberOfDocuments: 0,
-      paymentAmount: 0,
-      version: 1,
-      documents: const [],
-      role: role,
-      email: 'fake@example.com',
-    );
+  uid: 'seed-fake-${role.name}',
+  firstName: 'مشرف',
+  middleName: '',
+  lastName: 'وهمي',
+  fullName: 'مشرف وهمي',
+  nationalityID: '__firebase_auth__:fake@example.com',
+  motherName: '',
+  city: '',
+  phoneNumber: '01000000099',
+  gender: DelegateGender.male,
+  position: DelegatePosition.supervisor,
+  birthDate: DateTime(1990),
+  organizationUID: _org,
+  organizationName: 'Fake Test Organization',
+  companyUID: companyUID,
+  companyName: companyUID.isEmpty ? '' : 'Fake Company Alpha',
+  status: DelegateStatus.approved,
+  delegatePublicId: '',
+  allReceiptCodes: const [],
+  createdAt: DateTime(2026),
+  createdBy: 'system_admin',
+  hasPendingUpdate: false,
+  isDeductedFromCompany: false,
+  isPrinted: false,
+  isProfileComplete: true,
+  numberOfDocuments: 0,
+  paymentAmount: 0,
+  version: 1,
+  documents: const [],
+  role: role,
+  email: 'fake@example.com',
+);
 
 Widget _hrSystemStub(Delegate d) => Scaffold(
-      key: const ValueKey('hr_system'),
-      body: Text('HR system for ${d.role.name}'),
-    );
+  key: const ValueKey('hr_system'),
+  body: Text('HR system for ${d.role.name}'),
+);
 
 void main() {
   late _MockAuthBloc bloc;
@@ -211,15 +211,21 @@ void main() {
         final expected = role == UserRole.admin || role == UserRole.hr
             ? '/hr/home'
             : homePathForRole(role);
-        expect(landingPathForRole(role, isWeb: true), expected,
-            reason: role.name);
+        expect(
+          landingPathForRole(role, isWeb: true),
+          expected,
+          reason: role.name,
+        );
       }
     });
 
     test('mobile keeps every role home unchanged', () {
       for (final role in UserRole.values) {
-        expect(landingPathForRole(role, isWeb: false), homePathForRole(role),
-            reason: role.name);
+        expect(
+          landingPathForRole(role, isWeb: false),
+          homePathForRole(role),
+          reason: role.name,
+        );
       }
       WebRuntimePolicy.debugIsWebOverride = false;
       expect(landingPathForRole(UserRole.admin), '/admin/home');
@@ -239,9 +245,12 @@ void main() {
         final model = await _staffLogin(entry.value);
         expect(model.role, anyOf(UserRole.admin, UserRole.hr));
         expect(landingPathForRole(model.role, isWeb: true), '/hr/home');
-        expect(landingPathForRole(model.role, isWeb: false),
-            homePathForRole(model.role));
-        final hasCompany = entry.value.containsKey('companyUID') ||
+        expect(
+          landingPathForRole(model.role, isWeb: false),
+          homePathForRole(model.role),
+        );
+        final hasCompany =
+            entry.value.containsKey('companyUID') ||
             entry.value.containsKey('companyId');
         expect(model.companyUID, hasCompany ? _co : '');
 
@@ -258,33 +267,39 @@ void main() {
       });
     }
 
-    test('callable path: company-admin invite profile lands on /hr/home',
-        () async {
-      final source = AuthRemoteDataSourceImpl(
-        firestore: FakeFirebaseFirestore(),
-        firebaseAuth: MockFirebaseAuth(),
-        staffPhoneLookupApi: _Lookup(const StaffPhoneProfile(
-          uid: 'seed-fake-company-admin-invite-alpha',
-          email: 'fake.companyadmin.invite.alpha@example.com',
-          role: 'company-admin',
-          displayName: 'Fake Company Admin Invite',
-          phoneNumber: '01000000023',
-          organizationUID: _org,
-          companyUID: _co,
-        )),
-      );
-      final model = (await source.getDelegatesByPhone('01000000023')).single;
-      expect(model.role, UserRole.admin);
-      expect(model.companyUID, _co);
-      expect(landingPathForRole(model.role, isWeb: true), '/hr/home');
-    });
+    test(
+      'callable path: company-admin invite profile lands on /hr/home',
+      () async {
+        final source = AuthRemoteDataSourceImpl(
+          firestore: FakeFirebaseFirestore(),
+          firebaseAuth: MockFirebaseAuth(),
+          staffPhoneLookupApi: _Lookup(
+            const StaffPhoneProfile(
+              uid: 'seed-fake-company-admin-invite-alpha',
+              email: 'fake.companyadmin.invite.alpha@example.com',
+              role: 'company-admin',
+              displayName: 'Fake Company Admin Invite',
+              phoneNumber: '01000000023',
+              organizationUID: _org,
+              companyUID: _co,
+            ),
+          ),
+        );
+        final model = (await source.getDelegatesByPhone('01000000023')).single;
+        expect(model.role, UserRole.admin);
+        expect(model.companyUID, _co);
+        expect(landingPathForRole(model.role, isWeb: true), '/hr/home');
+      },
+    );
 
     for (final entry in _notHrSystem.entries) {
       test('${entry.key} keeps its own home on web', () async {
         final model = await _staffLogin({'role': entry.key});
         expect(model.role, entry.value);
-        expect(landingPathForRole(model.role, isWeb: true),
-            homePathForRole(entry.value));
+        expect(
+          landingPathForRole(model.role, isWeb: true),
+          homePathForRole(entry.value),
+        );
       });
     }
   });
@@ -305,15 +320,17 @@ void main() {
         routes: routes ?? appRouter.configuration.routes,
       );
       addTearDown(router.dispose);
-      await t.pumpWidget(BlocProvider<AuthBloc>.value(
-        value: bloc,
-        child: MaterialApp.router(
-          routerConfig: router,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          locale: const Locale('ar'),
+      await t.pumpWidget(
+        BlocProvider<AuthBloc>.value(
+          value: bloc,
+          child: MaterialApp.router(
+            routerConfig: router,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: const Locale('ar'),
+          ),
         ),
-      ));
+      );
       await t.pumpAndSettle();
       return router;
     }
@@ -323,8 +340,9 @@ void main() {
 
     for (final role in [UserRole.admin, UserRole.hr]) {
       for (final path in ['/admin/home', '/home']) {
-        testWidgets('web ${role.name} at $path is sent to the HR system',
-            (t) async {
+        testWidgets('web ${role.name} at $path is sent to the HR system', (
+          t,
+        ) async {
           WebRuntimePolicy.debugIsWebOverride = true;
           final r = await pumpRouter(t, initial: path, extra: _delegate(role));
           expect(location(r), '/hr/home');
@@ -335,72 +353,92 @@ void main() {
       }
     }
 
-    testWidgets('web supervisor without a company still gets the HR system',
-        (t) async {
+    testWidgets('web supervisor without a company still gets the HR system', (
+      t,
+    ) async {
       WebRuntimePolicy.debugIsWebOverride = true;
-      final r = await pumpRouter(t,
-          initial: '/admin/home',
-          extra: _delegate(UserRole.admin, companyUID: ''));
+      final r = await pumpRouter(
+        t,
+        initial: '/admin/home',
+        extra: _delegate(UserRole.admin, companyUID: ''),
+      );
       expect(location(r), '/hr/home');
       expect(find.byKey(const ValueKey('hr_system')), findsOneWidget);
     });
 
     testWidgets('narrow web window (600dp) also gets the HR system', (t) async {
       WebRuntimePolicy.debugIsWebOverride = true;
-      final r = await pumpRouter(t,
-          initial: '/admin/home',
-          extra: _delegate(UserRole.admin),
-          size: const Size(600, 900));
+      final r = await pumpRouter(
+        t,
+        initial: '/admin/home',
+        extra: _delegate(UserRole.admin),
+        size: const Size(600, 900),
+      );
       expect(location(r), '/hr/home');
       expect(find.byKey(const ValueKey('hr_system')), findsOneWidget);
     });
 
-    testWidgets('a stale ?p= from the old shell is dropped on redirect',
-        (t) async {
+    testWidgets('a stale ?p= from the old shell is dropped on redirect', (
+      t,
+    ) async {
       WebRuntimePolicy.debugIsWebOverride = true;
-      final r = await pumpRouter(t,
-          initial: '/admin/home?p=attendance', extra: _delegate(UserRole.admin));
+      final r = await pumpRouter(
+        t,
+        initial: '/admin/home?p=attendance',
+        extra: _delegate(UserRole.admin),
+      );
       expect(location(r), '/hr/home');
     });
 
     List<RouteBase> loginWithStubHomes() => [
-          ...appRouter.configuration.routes.where(
-              (route) => route is GoRoute && route.path == '/login'),
-          ...appRouter.configuration.routes.where(
-              (route) => route is GoRoute && route.path == '/'),
-          for (final p in ['/admin/home', '/home', '/hr/home'])
-            GoRoute(
-              path: p,
-              builder: (_, __) => Scaffold(body: Text('landed $p')),
-            ),
-        ];
+      ...appRouter.configuration.routes.where(
+        (route) => route is GoRoute && route.path == '/login',
+      ),
+      ...appRouter.configuration.routes.where(
+        (route) => route is GoRoute && route.path == '/',
+      ),
+      for (final p in ['/admin/home', '/home', '/hr/home'])
+        GoRoute(
+          path: p,
+          builder: (_, _) => Scaffold(body: Text('landed $p')),
+        ),
+    ];
 
     for (final web in [true, false]) {
       for (final role in [UserRole.admin, UserRole.hr]) {
         final expected = web ? '/hr/home' : homePathForRole(role);
         testWidgets(
-            '${web ? 'web' : 'mobile'} login as ${role.name} goes to $expected',
-            (t) async {
-          WebRuntimePolicy.debugIsWebOverride = web;
-          final r = await pumpRouter(t,
-              initial: '/login', routes: loginWithStubHomes());
-          authStates.add(AuthAuthenticated(delegate: _delegate(role)));
-          await t.pumpAndSettle();
-          expect(location(r), expected);
-          expect(find.text('landed $expected'), findsOneWidget);
-          await t.pump(const Duration(seconds: 2));
-        });
+          '${web ? 'web' : 'mobile'} login as ${role.name} goes to $expected',
+          (t) async {
+            WebRuntimePolicy.debugIsWebOverride = web;
+            final r = await pumpRouter(
+              t,
+              initial: '/login',
+              routes: loginWithStubHomes(),
+            );
+            authStates.add(AuthAuthenticated(delegate: _delegate(role)));
+            await t.pumpAndSettle();
+            expect(location(r), expected);
+            expect(find.text('landed $expected'), findsOneWidget);
+            await t.pump(const Duration(seconds: 2));
+          },
+        );
 
         testWidgets(
-            '${web ? 'web' : 'mobile'} reload (splash) as ${role.name} goes to $expected',
-            (t) async {
-          WebRuntimePolicy.debugIsWebOverride = web;
-          final r = await pumpRouter(t, initial: '/', routes: loginWithStubHomes());
-          authStates.add(AuthAuthenticated(delegate: _delegate(role)));
-          await t.pumpAndSettle();
-          expect(location(r), expected);
-          await t.pump(const Duration(seconds: 2));
-        });
+          '${web ? 'web' : 'mobile'} reload (splash) as ${role.name} goes to $expected',
+          (t) async {
+            WebRuntimePolicy.debugIsWebOverride = web;
+            final r = await pumpRouter(
+              t,
+              initial: '/',
+              routes: loginWithStubHomes(),
+            );
+            authStates.add(AuthAuthenticated(delegate: _delegate(role)));
+            await t.pumpAndSettle();
+            expect(location(r), expected);
+            await t.pump(const Duration(seconds: 2));
+          },
+        );
       }
     }
   });
