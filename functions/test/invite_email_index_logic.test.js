@@ -29,3 +29,24 @@ test("non-pending invite yields no index", () => {
     null,
   );
 });
+
+test("pickNewestPendingInvite chooses later createdAt", () => {
+  const pick = L.pickNewestPendingInvite([
+    {inviteId: "old", data: {createdAt: 1000}},
+    {inviteId: "new", data: {createdAt: 2000}},
+  ]);
+  assert.equal(pick.inviteId, "new");
+});
+
+test("pickNewestPendingInvite tie-breaks on inviteId", () => {
+  const pick = L.pickNewestPendingInvite([
+    {inviteId: "a", data: {createdAt: 1}},
+    {inviteId: "b", data: {createdAt: 1}},
+  ]);
+  assert.equal(pick.inviteId, "b");
+});
+
+test("shouldDeleteInviteEmailIndexForInvite only matches same inviteId", () => {
+  assert.equal(L.shouldDeleteInviteEmailIndexForInvite("inv1", "inv1"), true);
+  assert.equal(L.shouldDeleteInviteEmailIndexForInvite("inv2", "inv1"), false);
+});

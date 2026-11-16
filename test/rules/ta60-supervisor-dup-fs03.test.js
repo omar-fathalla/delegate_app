@@ -141,6 +141,21 @@ describe("ta60 supervisor dup + FS-09", () => {
       updatedAt: serverTimestamp(),
     })));
 
+  test("FS-09 DENY supervisor suspend with holds or statusVersion", async () => {
+    await assertFails(updateDoc(doc(staff("sup"), D(ORG, CO, "dlg1")), {
+      status: "suspended",
+      statusReason: "suspend",
+      holds: {admin_suspend: {at: "2026-11-16"}},
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(doc(staff("sup"), D(ORG, CO, "dlg1")), {
+      status: "suspended",
+      statusReason: "suspend",
+      statusVersion: 2,
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
   test("FS-09 DENY supervisor pending→active via status write", async () => {
     await env.withSecurityRulesDisabled(async (c) => {
       await c.firestore().doc(D(ORG, CO, "dlg1")).set({

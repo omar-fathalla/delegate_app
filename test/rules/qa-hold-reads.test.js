@@ -133,6 +133,12 @@ describe("qa hold supervisor reads and edit policy", () => {
     await assertSucceeds(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
       status: "suspended", statusReason: "hold", updatedAt: "t",
     }));
+    await assertFails(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
+      status: "suspended", statusReason: "hold", holds: {admin_suspend: {at: "t"}}, updatedAt: "t",
+    }));
+    await assertFails(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
+      status: "suspended", statusReason: "hold", statusVersion: 1, updatedAt: "t",
+    }));
     await assertSucceeds(updateDoc(doc(as("sa"), "organizations/o1/companies/c1/delegates/d1"), {status: "suspended", updatedAt: "t"}));
     await assertSucceeds(updateDoc(doc(as("ts"), "organizations/o1/companies/c1/delegates/d1"), {status: "active", updatedAt: "t"}));
   });

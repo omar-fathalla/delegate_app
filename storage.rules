@@ -362,6 +362,7 @@ service firebase.storage {
       allow create, update: if delegateTokenOwnsCompany(compId)
         && callerDelegateMayWriteStorage()
         && !permissionPhotoNameOwnedByOther(photoId)
+        && request.resource.contentType.matches('image/.*')
         && (
           (resource == null && permissionPhotoNameOwnedByCaller(photoId))
           || (resource != null && delegateOwnsPermissionPhoto(photoId)));

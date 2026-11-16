@@ -41,3 +41,42 @@ export function inviteEmailChanged(
   const newEmail = after ? inviteEmailIndexDocId(after.email) : "";
   return {oldEmail, newEmail};
 }
+
+export type PendingInviteRow = {inviteId: string; data: Record<string, unknown>};
+
+function inviteSortTimeMs(data: Record<string, unknown>): number {
+  for (const key of ["createdAt", "updatedAt", "invitedAt"]) {
+    const v = data[key];
+    if (v && typeof v === "object" && v !== null && "toMillis" in v) {
+      const toMillis = (v as {toMillis?: () => number}).toMillis;
+      if (typeof toMillis === "function") return toMillis.call(v);
+    }
+    if (typeof v === "number") return v;
+    if (typeof v === "string") {
+      const t = Date.parse(v);
+      if (!Number.isNaN(t)) return t;
+    }
+  }
+  return 0;
+}
+
+/** Deterministic winner: newest pending invite per normalized email (tie → inviteId). */
+export function pickNewestPendingInvite(
+  entries: PendingInviteRow[],
+): PendingInviteRow | null {
+  if (!entries.length) return null;
+  return entries.slice().sort((a, b) => {
+    const tb = inviteSortTimeMs(b.data);
+    const ta = inviteSortTimeMs(a.data);
+    if (tb !== ta) return tb - ta;
+    return b.inviteId.localeCompare(a.inviteId);
+  })[0]!;
+}
+
+/** Delete index only when it still points at the invite being retired. */
+export function shouldDeleteInviteEmailIndexForInvite(
+  indexInviteId: unknown,
+  writingInviteId: string,
+): boolean {
+  return String(indexInviteId ?? "") === writingInviteId;
+}
