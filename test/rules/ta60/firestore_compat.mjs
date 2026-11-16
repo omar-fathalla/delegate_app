@@ -26,8 +26,57 @@ export const DELIBERATE_FIRESTORE_REGRESSIONS = new Set([
 
 /** Documented dev-security closures (REQUEST CHANGES); not silent prod widenings. */
 export function isDeliberateFirestoreRegression(name) {
-  return DELIBERATE_FIRESTORE_REGRESSIONS.has(name);
+  if (DELIBERATE_FIRESTORE_REGRESSIONS.has(name)) return true;
+  if (name.includes('list bell')) return true;
+  return false;
 }
+
+/** Five phone claim variants (prod `buildCustomClaims` / `phoneQueryVariants` subset). */
+export const DELEGATE_CLAIM_PHONES = [
+  '01000000001',
+  '1000000001',
+  '201000000001',
+  '+201000000001',
+  '+20100000001',
+];
+
+/** Live prod ALLOW counts for counted `list bell:` shapes (excl. G4/G5 extension rows). */
+export const BELL_LIVE_ALLOW_TARGETS = {
+  delegate: 7,
+  supervisor: 7,
+  'company-admin': 7,
+  hr: 5,
+  accountant: 5,
+  'org-admin': 5,
+  marketing: 7,
+  branches_marketing: 8,
+  'super-admin': 6,
+  tech: 5,
+};
+
+const STAFF_BELL_UID = [
+  ['sa', 'super-admin'],
+  ['ts', 'tech'],
+  ['oa', 'org-admin'],
+  ['ca', 'company-admin'],
+  ['sup', 'supervisor'],
+  ['hr', 'hr'],
+  ['acc', 'accountant'],
+  ['mkt', 'marketing'],
+  ['bm', 'branches_marketing'],
+];
+
+const STAFF_PHONE_BY_UID = {
+  sa: '010000022',
+  ts: '010000022',
+  oa: '010000022',
+  ca: '010000022',
+  sup: '01011111111',
+  hr: '010000022',
+  acc: '010000033',
+  mkt: '010000033',
+  bm: '010000022',
+};
 
 const ORG = 'orgA', CO = 'coA', CO2 = 'coB', ORG2 = 'orgB';
 const NOW = Timestamp.now();
@@ -126,22 +175,21 @@ async function seed(env) {
 const staff = (env, uid, email, extra = {}) => env.authenticatedContext(uid, {
   email: email || `${uid}@t.test`, email_verified: true, firebase: { sign_in_provider: 'password' }, ...extra,
 }).firestore();
-const DELEGATE_PHONES = [
-  '01000000001', '1000000001', '201000000001', '+201000000001', '+200100000001',
-];
 const delegate = (env) => env.authenticatedContext('dlg1', {
   role: 'delegate', delegateId: 'dlg1', delegateIds: ['dlg1'], orgId: ORG, companyId: CO,
-  phones: DELEGATE_PHONES, firebase: { sign_in_provider: 'custom' } }).firestore();
+  phones: DELEGATE_CLAIM_PHONES, firebase: { sign_in_provider: 'custom' } }).firestore();
 const anon = (env) => env.authenticatedContext('anon1', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
 
 const D = (o, c, id) => `organizations/${o}/companies/${c}/delegates/${id}`;
 const attDayStart = () => Timestamp.fromMillis(Date.now() - 86400000);
 const attDayEnd = () => Timestamp.fromMillis(Date.now() + 86400000);
-const notifList = (db, du) => getDocs(query(collection(db, 'notifications'), where('delegateUid', '==', du), limit(30)));
-const notifListPhoneField = (db, ph) => getDocs(query(
+const notifList = (db, du, lim = 30) => getDocs(query(
+  collection(db, 'notifications'), where('delegateUid', '==', du), limit(lim),
+));
+const notifListPhoneField = (db, ph, lim = 30) => getDocs(query(
   collection(db, 'notifications'),
   where('phoneNumber', '==', ph),
-  limit(30),
+  limit(lim),
 ));
 const notifListAcs = (db) => getDocs(query(
   collection(db, 'notifications'),
@@ -149,6 +197,152 @@ const notifListAcs = (db) => getDocs(query(
   where('delegateUid', '==', 'all_company_supervisors'),
   limit(30),
 ));
+
+function bellRoleFromCaseName(name) {
+  const m = name.match(/^([\w-]+)\s+list bell/);
+  return m ? m[1] : null;
+}
+
+function isBellCountedCase(name) {
+  return name.includes('list bell:') && !name.includes('list bell G4:') && !name.includes('list bell G5:');
+}
+
+function staffBellShapes(uid, bellRole) {
+  const db = (e) => staff(e, uid);
+  const shapes = [];
+  const push = (label, fn) => shapes.push([
+    'NOTIF-READ',
+    `${bellRole} list bell: ${label}`,
+    (e) => fn(db(e)),
+  ]);
+  if (bellRole === 'org-admin') {
+    push('delegateUid==own uid (limit 30)', (d) => notifList(d, uid));
+    for (const alias of ['organizationAdmin', 'organization-admin', 'organization_admin']) {
+      push(`delegateUid==${alias} (limit 30)`, (d) => notifList(d, alias));
+    }
+    push('delegateUid==all (limit 30)', (d) => notifList(d, 'all'));
+    return shapes;
+  }
+  if (bellRole === 'super-admin') {
+    push('delegateUid==own uid (limit 30)', (d) => notifList(d, uid));
+    push('delegateUid==all (limit 30)', (d) => notifList(d, 'all'));
+    push('delegateUid==phone_<uid> (limit 30)', (d) => notifList(d, `phone_${uid}`));
+    for (const alias of ['superAdmin', 'super-admin']) {
+      push(`delegateUid==${alias} (limit 30)`, (d) => notifList(d, alias));
+    }
+    push('delegateUid==hr (limit 30)', (d) => notifList(d, 'hr'));
+    return shapes;
+  }
+  if (bellRole === 'tech') {
+    push('delegateUid==own uid (limit 30)', (d) => notifList(d, uid));
+    push('delegateUid==all (limit 30)', (d) => notifList(d, 'all'));
+    push('delegateUid==phone_<uid> (limit 30)', (d) => notifList(d, `phone_${uid}`));
+    push('delegateUid==technicalSupport (limit 30)', (d) => notifList(d, 'technicalSupport'));
+    push('delegateUid==hr (limit 30)', (d) => notifList(d, 'hr'));
+    return shapes;
+  }
+  if (bellRole === 'branches_marketing') {
+    push('delegateUid==own uid (limit 30)', (d) => notifList(d, uid));
+    push('delegateUid==all (limit 30)', (d) => notifList(d, 'all'));
+    push('delegateUid==phone_<uid> (limit 30)', (d) => notifList(d, `phone_${uid}`));
+    push(`delegateUid==company_${CO} (limit 30)`, (d) => notifList(d, `company_${CO}`));
+    push('companyId+all_company_supervisors (limit 30)', (d) => notifListAcs(d));
+    push('delegateUid==branchesMarketingManager (limit 30)', (d) => notifList(d, 'branchesMarketingManager'));
+    push('delegateUid==branches_marketing (limit 30)', (d) => notifList(d, 'branches_marketing'));
+    push('delegateUid==marketing (limit 30)', (d) => notifList(d, 'marketing'));
+    return shapes;
+  }
+  if (bellRole === 'hr' || bellRole === 'accountant') {
+    push('delegateUid==own uid (limit 30)', (d) => notifList(d, uid));
+    push('delegateUid==all (limit 30)', (d) => notifList(d, 'all'));
+    push('delegateUid==phone_<uid> (limit 30)', (d) => notifList(d, `phone_${uid}`));
+    push(`delegateUid==company_${CO} (limit 30)`, (d) => notifList(d, `company_${CO}`));
+    push('delegateUid==hr (limit 30)', (d) => notifList(d, 'hr'));
+    return shapes;
+  }
+  if (bellRole === 'marketing') {
+    push('delegateUid==own uid (limit 30)', (d) => notifList(d, uid));
+    push('delegateUid==all (limit 30)', (d) => notifList(d, 'all'));
+    push('delegateUid==phone_<uid> (limit 30)', (d) => notifList(d, `phone_${uid}`));
+    push(`delegateUid==company_${CO} (limit 30)`, (d) => notifList(d, `company_${CO}`));
+    push('companyId+all_company_supervisors (limit 30)', (d) => notifListAcs(d));
+    push('delegateUid==marketing (limit 30)', (d) => notifList(d, 'marketing'));
+    push('delegateUid==hr (limit 30)', (d) => notifList(d, 'hr'));
+    return shapes;
+  }
+  // supervisor, company-admin (7 each)
+  push('delegateUid==own uid (limit 30)', (d) => notifList(d, uid));
+  push('delegateUid==all (limit 30)', (d) => notifList(d, 'all'));
+  push('delegateUid==phone_<uid> (limit 30)', (d) => notifList(d, `phone_${uid}`));
+  push(`delegateUid==company_${CO} (limit 30)`, (d) => notifList(d, `company_${CO}`));
+  push(`delegateUid==supervisor_${CO} (limit 30)`, (d) => notifList(d, `supervisor_${CO}`));
+  push('companyId+all_company_supervisors (limit 30)', (d) => notifListAcs(d));
+  push('delegateUid==hr (limit 30)', (d) => notifList(d, 'hr'));
+  return shapes;
+}
+
+function delegateBellShapes() {
+  const shapes = [
+    ['NOTIF-READ', 'delegate list bell: delegateUid==own uid (limit 50)', (e) => notifList(delegate(e), 'dlg1', 50)],
+    ['NOTIF-READ', 'delegate list bell: delegateUid==phone_dlg1 (limit 30)', (e) => notifList(delegate(e), 'phone_dlg1')],
+    ...DELEGATE_CLAIM_PHONES.map((p) => [
+      'NOTIF-READ',
+      `delegate list bell: phoneNumber==${p} (limit 30)`,
+      (e) => notifListPhoneField(delegate(e), p),
+    ]),
+    ['NOTIF-G5', `delegate list bell G5: delegateUid==delegates_${CO} (limit 30)`, (e) => notifList(delegate(e), `delegates_${CO}`)],
+  ];
+  for (const p of DELEGATE_CLAIM_PHONES) {
+    shapes.push([
+      'NOTIF-G5',
+      `delegate list bell G5: delegateUid==phone_${p} (limit 30)`,
+      (e) => notifList(delegate(e), `phone_${p}`),
+    ]);
+    shapes.push([
+      'NOTIF-G5',
+      `delegate list bell G5: delegateUid==${p} (limit 30)`,
+      (e) => notifList(delegate(e), p),
+    ]);
+  }
+  return shapes;
+}
+
+function staffBellG5Shapes(uid, bellRole) {
+  const ph = STAFF_PHONE_BY_UID[uid] || `0100000${uid.length}${uid.length}`;
+  const db = (e) => staff(e, uid);
+  return [
+    ['NOTIF-G5', `${bellRole} list bell G5: phoneNumber==${ph} (limit 30)`, (e) => notifListPhoneField(db(e), ph)],
+    ['NOTIF-G5', `${bellRole} list bell G5: delegateUid==phone_${ph} (limit 30)`, (e) => notifList(db(e), `phone_${ph}`)],
+    ['NOTIF-G5', `${bellRole} list bell G5: delegateUid==${ph} (limit 30)`, (e) => notifList(db(e), ph)],
+  ];
+}
+
+function buildBellHarnessCases() {
+  const out = [...delegateBellShapes()];
+  for (const [uid, bellRole] of STAFF_BELL_UID) {
+    out.push(...staffBellShapes(uid, bellRole));
+    out.push(...staffBellG5Shapes(uid, bellRole));
+  }
+  return out;
+}
+
+export function assertBellAllowCounts(rows) {
+  const issues = [];
+  for (const [role, target] of Object.entries(BELL_LIVE_ALLOW_TARGETS)) {
+    const roleRows = rows.filter(
+      (r) => r.area === 'NOTIF-READ' && isBellCountedCase(r.name) && bellRoleFromCaseName(r.name) === role,
+    );
+    const liveAllow = roleRows.filter((r) => r.live === 'ALLOW').length;
+    const candAllow = roleRows.filter((r) => r.cand === 'ALLOW').length;
+    if (liveAllow !== target) {
+      issues.push(`${role}: live ALLOW ${liveAllow} != target ${target} (${roleRows.length} counted cases)`);
+    }
+    if (candAllow !== liveAllow) {
+      issues.push(`${role}: cand ALLOW ${candAllow} != live ALLOW ${liveAllow}`);
+    }
+  }
+  return issues;
+}
 const attOrgBranchToday = (db) => getDocs(query(
   collection(db, 'attendance_logs'),
   where('organizationId', '==', ORG),
@@ -308,33 +502,7 @@ const cases = [
   ['URG', 'org-admin CG delegates org + nationalityID (dup check)', e => getDocs(query(collectionGroup(staff(e,'oa'),'delegates'), where('organizationUID','==',ORG), where('nationalityID','==','29002020202020')))],
   ['URG', 'company-admin nested company notifications list', e => getDocs(collection(staff(e,'ca'), `organizations/${ORG}/companies/${CO}/notifications`))],
   ['URG', 'org-admin nested company notifications list', e => getDocs(collection(staff(e,'oa'), `organizations/${ORG}/companies/${CO}/notifications`))],
-  ...[
-    ['sa', 'superAdmin'], ['ts', 'technicalSupport'], ['oa', 'organizationAdmin'], ['ca', 'company-admin'],
-    ['sup', 'supervisor'], ['hr', 'hr'], ['acc', 'accountant'],
-    ['mkt', 'marketing'], ['mp', 'marketing_promotion'], ['bm', 'branchesMarketingManager'],
-  ].flatMap(([uid, alias]) => [
-    ['NOTIF-READ', `${uid} list bell: delegateUid==own uid (limit 30)`, e => notifList(staff(e, uid), uid)],
-    ['NOTIF-READ', `${uid} list bell: delegateUid==phone_<uid> (limit 30)`, e => notifList(staff(e, uid), `phone_${uid}`)],
-    ['NOTIF-READ', `${uid} list bell: delegateUid==all (limit 30)`, e => notifList(staff(e, uid), 'all')],
-    ['NOTIF-READ', `${uid} list bell: delegateUid==${alias} (limit 30)`, e => notifList(staff(e, uid), alias)],
-    ['NOTIF-READ', `${uid} list bell: delegateUid==company_${CO} (limit 30)`, e => notifList(staff(e, uid), `company_${CO}`)],
-    ['NOTIF-READ', `${uid} list bell: companyId+all_company_supervisors (limit 30)`, e => notifListAcs(staff(e, uid))],
-    ['NOTIF-READ', `${uid} list bell: delegateUid==hr (limit 30)`, e => notifList(staff(e, uid), 'hr')],
-    ['NOTIF-READ', `${uid} list bell: delegateUid==delegates_${CO} (limit 30)`, e => notifList(staff(e, uid), `delegates_${CO}`)],
-  ]),
-  ['NOTIF-READ', 'delegate list bell: delegateUid==own uid (limit 50)', e => notifList(delegate(e), 'dlg1')],
-  ['NOTIF-READ', 'delegate list bell: delegateUid==phone_<uid> (limit 30)', e => notifList(delegate(e), 'phone_dlg1')],
-  ['NOTIF-READ', 'delegate list bell: phoneNumber==own phone (limit 30)', e => notifListPhoneField(delegate(e), '01000000001')],
-  ...DELEGATE_PHONES.flatMap((p) => [
-    ['NOTIF-READ', `delegate G5 bell: phoneNumber==${p} (limit 30)`, e => notifListPhoneField(delegate(e), p)],
-    ['NOTIF-READ', `delegate G5 bell: delegateUid==phone_${p} (limit 30)`, e => notifList(delegate(e), `phone_${p}`)],
-    ['NOTIF-READ', `delegate G5 bell: delegateUid==${p} (limit 30)`, e => notifList(delegate(e), p)],
-  ]),
-  ['NOTIF-READ', 'marketing G4 bell: delegateUid==branchesMarketingManager (limit 30)', e => notifList(staff(e, 'mkt'), 'branchesMarketingManager')],
-  ['NOTIF-READ', 'marketing G4 bell: delegateUid==branches_marketing (limit 30)', e => notifList(staff(e, 'mkt'), 'branches_marketing')],
-  ['NOTIF-READ', 'delegate list bell: delegateUid==all (limit 30)', e => notifList(delegate(e), 'all')],
-  ['NOTIF-READ', 'delegate list bell: delegateUid==delegates_${CO} (limit 30)', e => notifList(delegate(e), `delegates_${CO}`)],
-  ['NOTIF-READ', 'supervisor list bell: delegateUid==supervisor_${CO} (limit 30)', e => notifList(staff(e, 'sup'), `supervisor_${CO}`)],
+  ...buildBellHarnessCases(),
   ['ATT-READ', 'marketing_promotion attendance org+branchName+today (limit 2000)', e => attOrgBranchToday(staff(e, 'mp'))],
   ['ATT-READ', 'marketing attendance org+branchName+today (limit 2000, chain shape)', e => attOrgBranchToday(staff(e, 'mkt'))],
   ['ATT-READ', 'branches_marketing attendance org+branchName+today (limit 2000)', e => attOrgBranchToday(staff(e, 'bm'))],
@@ -382,5 +550,13 @@ export async function runFirestoreCompatHarness() {
   const unexpected = rows.filter(r => r.regression && !r.deliberate);
   const deliberate = rows.filter(r => r.regression && r.deliberate);
   const isExprLimitMsg = (msg) => /maximum of 1000 expressions|limit exceeded/i.test(String(msg || ''));
-  return { rows, total: rows.length, deliberate, unexpected, exprLimit: unexpected.filter(r => isExprLimitMsg(r.candMsg)) };
+  const bellCountIssues = assertBellAllowCounts(rows);
+  return {
+    rows,
+    total: rows.length,
+    deliberate,
+    unexpected,
+    exprLimit: unexpected.filter(r => isExprLimitMsg(r.candMsg)),
+    bellCountIssues,
+  };
 }

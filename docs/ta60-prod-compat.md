@@ -85,7 +85,7 @@ Code references: `lib/features/notifications/data/datasources/notification_remot
 | ID | Harness case | Web visible? | App 1.14.3 visible? | Verdict | Action |
 |----|--------------|--------------|---------------------|---------|--------|
 | FS-01 | delegate CG `nationalityID` (try/catch) | No (web N/A) | No — login is phone CG + `delegate_login_api`; harness is secondary | **OK (d)** | None |
-| FS-02 | delegate `users` by supervisor phone | No | No — attendance loops company `users` queries in `catch (_) {}` (`attendance_remote_data_source.dart`) | **OK (d)** | None |
+| FS-02 | delegate `users` by supervisor phone | No | No — supervisor home contact card lookup in `catch (_) {}` (not attendance notify fan-out) | **OK (d)** | None |
 | FS-03 | supervisor CG phone dup-check | No | **Yes** — `DuplicateChainLookupException` snackbar | **MISCLASS → (b)** | Stream 2 **P2** org-scoped dup list |
 | FS-04 | supervisor CG nationalId dup-check | No | **Yes** | **MISCLASS → (b)** | Stream 2 **P2** |
 | FS-05 | supervisor CG receiptCode dup-check | No | **Yes** | **MISCLASS → (b)** | Stream 2 **P2** |
@@ -123,7 +123,7 @@ Keep main table **(d)** labels until integrator merges Stream 2; use this audit 
 | ID | Area | Harness case | Class | Screen / flow | Firebase-only keep working? | Decision |
 |----|------|--------------|-------|---------------|----------------------------|----------|
 | FS-01 | APP-D | delegate CG delegates where nationalityID == own (identifier resolve, try/catch) | (d) | Delegate login / identifier resolve (OTP path fallback) | Yes — partial degrade; app uses queryAllSettled / login fallbacks | — |
-| FS-02 | APP-D | delegate users where phoneNumber == supervisorPhone | (d) | Delegate attendance check-in notify lookup (try/catch) | Yes — partial degrade; app uses queryAllSettled / login fallbacks | — |
+| FS-02 | APP-D | delegate users where phoneNumber == supervisorPhone | (d) | Delegate supervisor home contact card lookup (try/catch) | Yes — partial degrade; app uses queryAllSettled / login fallbacks | — |
 | FS-03 | APP-S | supervisor CG delegates phoneNumber dup-check (try/catch) | (d) | Supervisor new-delegate registration dup check | Yes — narrow org-scoped CG/delegate_requests list (Stream 2 / P2–P3a; no REQUEST CHANGES widen) | — |
 | FS-04 | APP-S | supervisor CG delegates nationalId dup-check (try/catch) | (d) | Supervisor new-delegate registration dup check | Yes — narrow org-scoped CG/delegate_requests list (Stream 2 / P2–P3a; no REQUEST CHANGES widen) | — |
 | FS-05 | APP-S | supervisor CG delegates receiptCode dup-check (try/catch) | (d) | Supervisor new-delegate registration receipt dup | Yes — narrow org-scoped CG/delegate_requests list (Stream 2 / P2–P3a; no REQUEST CHANGES widen) | — |

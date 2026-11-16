@@ -21,6 +21,7 @@ service firebase.storage {
         && request.auth.token.get('companyId', '') == compId
         && photoId.matches('photo_(ts|[0-9]+)(\\.[A-Za-z0-9]+)?$')
         && resource == null
+        && request.resource.contentType.matches('image/.*')
         && request.resource.size < 5 * 1024 * 1024;
       allow create: if request.auth != null
         && request.auth.token.get('role', '') == 'delegate'
