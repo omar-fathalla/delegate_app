@@ -169,6 +169,15 @@ class _FilterBar extends StatelessWidget {
             onChanged: (v) => on(v ?? 'all'),
           ),
         );
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    // Drawn in LTR so RTL does not mirror a chevron that was already chosen.
+    // Previous points toward the past: right in RTL, left in LTR.
+    Widget dayChevron(bool previous) => Icon(
+          previous
+              ? (rtl ? Symbols.chevron_right_rounded : Symbols.chevron_left_rounded)
+              : (rtl ? Symbols.chevron_left_rounded : Symbols.chevron_right_rounded),
+          textDirection: TextDirection.ltr,
+        );
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Wrap(
@@ -179,7 +188,7 @@ class _FilterBar extends StatelessWidget {
           Row(mainAxisSize: MainAxisSize.min, children: [
             IconButton(
               tooltip: 'اليوم السابق',
-              icon: const Icon(Symbols.chevron_right_rounded),
+              icon: dayChevron(true),
               onPressed: () => d.onDateChanged(d.selectedDate.subtract(const Duration(days: 1))),
             ),
             // Fixed width so the Wrap does not reflow when the date label changes.
@@ -205,7 +214,7 @@ class _FilterBar extends StatelessWidget {
             ),
             IconButton(
               tooltip: 'اليوم التالي',
-              icon: const Icon(Symbols.chevron_left_rounded),
+              icon: dayChevron(false),
               onPressed: d.isToday
                   ? null
                   : () => d.onDateChanged(d.selectedDate.add(const Duration(days: 1))),

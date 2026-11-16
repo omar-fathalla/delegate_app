@@ -95,7 +95,8 @@ class HrWebOverflowMenu extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   for (var i = 0; i < sections.length; i++) ...[
-                    if (i > 0)
+                    // The divider under «الرئيسية» repeats the first item.
+                    if (i > 1)
                       Padding(
                         padding: const EdgeInsetsDirectional.fromSTEB(
                           8,

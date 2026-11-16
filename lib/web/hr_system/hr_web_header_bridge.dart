@@ -15,11 +15,16 @@ class HrWebHeaderBridge extends ChangeNotifier {
     required Future<void> Function() reloadHome,
     required VoidCallback openNotifications,
   }) {
+    final changed =
+        this.unread != unread ||
+        this.reloadHome != reloadHome ||
+        this.openNotifications != openNotifications;
     this.reloadHome = reloadHome;
     this.openNotifications = openNotifications;
-    if (this.unread == unread) return;
     this.unread = unread;
-    notifyListeners();
+    // The header builds before the overview attaches. Skipping the notify
+    // when the count is unchanged left the bell disabled (onPressed null).
+    if (changed) notifyListeners();
   }
 
   /// Drops the callbacks when the overview leaves the tree. The count stays
@@ -57,6 +62,7 @@ class HrWebHeaderBell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final iconColor = cs.onSurfaceVariant;
     return Badge(
       key: const ValueKey('hr_web_header_notifications_badge'),
       isLabelVisible: unread > 0,
@@ -65,15 +71,20 @@ class HrWebHeaderBell extends StatelessWidget {
         key: const ValueKey('hr_web_header_notifications'),
         tooltip: 'الإشعارات',
         onPressed: onPressed,
-        icon: Icon(Icons.notifications_outlined, size: toolbar ? 20 : 24),
+        icon: Icon(
+          Icons.notifications_outlined,
+          size: toolbar ? 20 : 24,
+          color: iconColor,
+        ),
         style: toolbar
             ? IconButton.styleFrom(
+                foregroundColor: iconColor,
                 backgroundColor: cs.surfaceContainerHigh.withValues(alpha: 0.5),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
               )
-            : null,
+            : IconButton.styleFrom(foregroundColor: iconColor),
       ),
     );
   }

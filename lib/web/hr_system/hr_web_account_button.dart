@@ -7,6 +7,7 @@ import 'package:delegate_app/core/widgets/universal_app_header.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/profile/presentation/pages/user_profile_screen.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/web/hr_system/hr_western_digits.dart';
 
 /// Header account control for the web HR shell.
 ///
@@ -82,131 +83,165 @@ class HrWebAccountButton extends StatelessWidget {
     );
 
     return MenuAnchor(
-      style: MenuStyle(
-        backgroundColor: WidgetStatePropertyAll(cs.surfaceContainerHigh),
-        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
-        elevation: const WidgetStatePropertyAll(3),
+      // The overlay clamps flush to the window, so the anchor shell is
+      // transparent and the visible surface sits 8dp inside it.
+      reservedPadding: const EdgeInsets.all(8),
+      style: const MenuStyle(
+        backgroundColor: WidgetStatePropertyAll(Colors.transparent),
+        surfaceTintColor: WidgetStatePropertyAll(Colors.transparent),
+        shadowColor: WidgetStatePropertyAll(Colors.transparent),
+        elevation: WidgetStatePropertyAll(0),
+        side: WidgetStatePropertyAll(BorderSide.none),
+        padding: WidgetStatePropertyAll(EdgeInsets.zero),
         shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-          ),
-        ),
-        padding: const WidgetStatePropertyAll(
-          EdgeInsets.symmetric(vertical: 8),
+          RoundedRectangleBorder(side: BorderSide.none),
         ),
       ),
       alignmentOffset: const Offset(0, 8),
       menuChildren: [
-        SizedBox(
-          key: const ValueKey('hr_web_profile_panel'),
-          width: 300,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: Container(
+            key: const ValueKey('hr_web_profile_panel'),
+            width: 300,
+            decoration: BoxDecoration(
+              color: cs.surfaceContainer,
+              borderRadius: BorderRadius.circular(14),
+              // M3 level-2 lift. Material elevation paints a hard edge in this
+              // renderer, so the shadow is a soft blur with no outline.
+              boxShadow: [
+                BoxShadow(
+                  color: cs.shadow.withValues(alpha: 0.16),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        AppAvatar(
-                          imageUrl: delegate.personalPhotoUrl,
-                          fallbackText: name == 'مستخدم' ? 'H' : name,
-                          radius: 22,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                name,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: cs.onSurface,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: cs.secondaryContainer,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  role,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: cs.onSecondaryContainer,
+                        Row(
+                          children: [
+                            AppAvatar(
+                              imageUrl: delegate.personalPhotoUrl,
+                              fallbackText: name == 'مستخدم' ? 'H' : name,
+                              radius: 22,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: cs.onSurface,
+                                    ),
                                   ),
-                                ),
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: cs.secondaryContainer,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      role,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: cs.onSecondaryContainer,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 12),
+                        _ContactRow(
+                          icon: Icons.mail_outline_rounded,
+                          text: email.isEmpty ? '—' : email,
+                        ),
+                        if (phone.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          _ContactRow(
+                            key: const ValueKey('hr_web_profile_phone'),
+                            icon: Icons.smartphone_rounded,
+                            text: hrWesternDigits(phone),
+                            textDirection: TextDirection.ltr,
+                          ),
+                        ],
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    _ContactRow(
-                      icon: Icons.mail_outline_rounded,
-                      text: email.isEmpty ? '—' : email,
+                  ),
+                  Divider(
+                    height: 1,
+                    color: cs.outlineVariant.withValues(alpha: 0.5),
+                  ),
+                  MenuItemButton(
+                    key: const ValueKey('hr_web_profile_open'),
+                    leadingIcon: Icon(Icons.person_rounded, color: cs.primary),
+                    onPressed: () =>
+                        context.push('/user-profile', extra: delegate),
+                    child: Text(l10n.profile),
+                  ),
+                  MenuItemButton(
+                    key: const ValueKey('hr_web_profile_password'),
+                    leadingIcon: Icon(
+                      Icons.lock_reset_rounded,
+                      color: cs.primary,
                     ),
-                    const SizedBox(height: 6),
-                    _ContactRow(
-                      icon: Icons.smartphone_rounded,
-                      text: phone.isEmpty ? '—' : phone,
+                    onPressed: () {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (context.mounted) {
+                          showUserChangePasswordSheet(
+                            context,
+                            delegate: delegate,
+                          );
+                        }
+                      });
+                    },
+                    child: Text(l10n.changePassword),
+                  ),
+                  MenuItemButton(
+                    key: const ValueKey('hr_web_profile_logout'),
+                    leadingIcon: Icon(
+                      Icons.logout_rounded,
+                      color: cs.onSurfaceVariant,
                     ),
-                  ],
-                ),
+                    style: ButtonStyle(
+                      foregroundColor: WidgetStatePropertyAll(cs.onSurface),
+                      iconColor: WidgetStatePropertyAll(cs.onSurfaceVariant),
+                    ),
+                    onPressed: () {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (context.mounted) {
+                          AppLogoutModal.show(context, delegate: delegate);
+                        }
+                      });
+                    },
+                    child: Text(l10n.logout),
+                  ),
+                ],
               ),
-              Divider(
-                height: 1,
-                color: cs.outlineVariant.withValues(alpha: 0.5),
-              ),
-              MenuItemButton(
-                key: const ValueKey('hr_web_profile_open'),
-                leadingIcon: Icon(Icons.person_rounded, color: cs.primary),
-                onPressed: () => context.push('/user-profile', extra: delegate),
-                child: Text(l10n.profile),
-              ),
-              MenuItemButton(
-                key: const ValueKey('hr_web_profile_password'),
-                leadingIcon: Icon(Icons.lock_reset_rounded, color: cs.primary),
-                onPressed: () {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (context.mounted) {
-                      showUserChangePasswordSheet(context, delegate: delegate);
-                    }
-                  });
-                },
-                child: Text(l10n.changePassword),
-              ),
-              MenuItemButton(
-                key: const ValueKey('hr_web_profile_logout'),
-                leadingIcon: Icon(Icons.logout_rounded, color: cs.error),
-                style: ButtonStyle(
-                  foregroundColor: WidgetStatePropertyAll(cs.error),
-                ),
-                onPressed: () {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (context.mounted) {
-                      AppLogoutModal.show(context, delegate: delegate);
-                    }
-                  });
-                },
-                child: Text(l10n.logout),
-              ),
-            ],
+            ),
           ),
         ),
       ],
@@ -220,6 +255,7 @@ class HrWebAccountButton extends StatelessWidget {
               color: Colors.transparent,
               child: InkWell(
                 key: const ValueKey('hr_web_header_account'),
+                focusColor: cs.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(24),
                 onTap: () {
                   if (controller.isOpen) {
@@ -248,21 +284,30 @@ class HrWebAccountButton extends StatelessWidget {
 class _ContactRow extends StatelessWidget {
   final IconData icon;
   final String text;
+  final TextDirection? textDirection;
 
-  const _ContactRow({required this.icon, required this.text});
+  const _ContactRow({
+    super.key,
+    required this.icon,
+    required this.text,
+    this.textDirection,
+  });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final ltr = textDirection == TextDirection.ltr;
     return Row(
       children: [
         Icon(icon, size: 18, color: cs.onSurfaceVariant),
         const SizedBox(width: 8),
-        Expanded(
+        Flexible(
           child: Text(
             text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            textDirection: textDirection,
+            locale: ltr ? const Locale('en') : null,
             style: TextStyle(fontSize: 13, color: cs.onSurface),
           ),
         ),
