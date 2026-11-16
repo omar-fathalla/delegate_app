@@ -937,18 +937,32 @@ service cloud.firestore {
     // ==================== SHARED: USERS ====================
 
     match /users/{userId} {
-      allow get: if signedIn() && (
-        request.auth.uid == userId ||
-        ownsDelegateId(userId) ||
-        isGlobalStaff() ||
-        (isOrgScopedStaff() && orgScoped()) ||
-        (isCompanyScopedStaff() && companyScoped())
-        || (isDelegate() && delegateOtpOk()
-          && resource.data.get('role', '') in ['supervisor', 'company_supervisor']
-          && resource.data.get('companyUID', resource.data.get('companyId', ''))
-            == claimString('companyId'))
-      );
+      allow get: if signedIn() && request.auth.uid == userId;
+      allow get: if signedIn() && ownsDelegateId(userId);
+      allow get: if signedIn() && claimString('role') == 'delegate' && delegateOtpOk()
+        && resource.data.get('role', '') in ['supervisor', 'company_supervisor']
+        && resource.data.get('companyUID', resource.data.get('companyId', ''))
+          == claimString('companyId');
+      allow get: if signedIn() && isGlobalStaff();
+      allow get: if signedIn() && isOrgScopedStaff() && orgScoped();
+      allow get: if signedIn() && isCompanyScopedStaff() && companyScoped();
 
+      allow list: if signedIn() && claimString('role') == 'delegate' && delegateOtpOk()
+        && resource.data.keys().hasAll(['phoneNumber'])
+        && resource.data.get('role', '') in ['supervisor', 'company_supervisor']
+        && resource.data.get('companyUID', resource.data.get('companyId', ''))
+          == claimString('companyId');
+      allow list: if signedIn() && claimString('role') == 'delegate' && delegateOtpOk()
+        && resource.data.get('companyUID', resource.data.get('companyId', ''))
+          == claimString('companyId');
+      allow list: if signedIn() && roleIs(['supervisor', 'company_supervisor'])
+        && callerCompany() != ''
+        && resource.data.get('companyUID', resource.data.get('companyId', '')) == callerCompany()
+        && resource.data.get('role', '') in [
+          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+          'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport'];
+      allow list: if signedIn() && isCompanyAdmin() && callerCompany() != ''
+        && resource.data.get('companyUID', resource.data.get('companyId', '')) == callerCompany();
       // Phone/email lookups after sign-in, and the admin directory for
       // global staff. Unauthenticated list is denied (staffPhoneLookup).
       allow list: if signedIn() && (
@@ -962,30 +976,6 @@ service cloud.firestore {
           && userDoc().keys().hasAll(['email'])
           && resource.data.email == userDoc().email)
       );
-      allow list: if signedIn() && isDelegate() && delegateOtpOk()
-        && resource.data.get('companyUID', resource.data.get('companyId', ''))
-          == claimString('companyId');
-      allow list: if signedIn() && isDelegate() && delegateOtpOk()
-        && resource.data.get('role', '') in ['supervisor', 'company_supervisor']
-        && resource.data.get('companyUID', resource.data.get('companyId', ''))
-          == claimString('companyId');
-      allow list: if signedIn() && isDelegate() && delegateOtpOk()
-        && resource.data.keys().hasAll(['phoneNumber'])
-        && resource.data.get('role', '') in ['supervisor', 'company_supervisor']
-        && resource.data.get('companyUID', resource.data.get('companyId', ''))
-          == claimString('companyId');
-      allow list: if signedIn() && roleIs(['supervisor', 'company_supervisor'])
-        && callerCompany() != ''
-        && resource.data.get('companyUID', resource.data.get('companyId', '')) == callerCompany()
-        && resource.data.get('role', '') in [
-          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-          'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport'];
-      allow list: if signedIn() && isCompanyAdmin() && callerCompany() != ''
-        && resource.data.get('role', '') in [
-          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-          'technical_support', 'technical-support', 'technicalSupport', 'technical-support'];
-      allow list: if signedIn() && isCompanyAdmin() && callerCompany() != ''
-        && resource.data.get('companyUID', resource.data.get('companyId', '')) == callerCompany();
 
       // New staff accounts come from the createStaffUser function (Admin SDK).
       // Client creates stay for delegate approval (M6) and legacy screens.
@@ -1886,12 +1876,21 @@ service cloud.firestore {
     // tighter match and reopen the collection. Those duplicates are gone.
 
     match /{path=**}/delegates/{delegateId} {
-      allow list: if signedIn() && delegateCgGlobalStaffListOk();
-      allow list: if signedIn() && delegateCgOrgStaffListOk();
-      allow list: if signedIn() && delegateCgCompanyStaffListOk();
-      allow list: if signedIn() && delegateCgCompanyStaffOrgWideListOk();
+      allow list: if signedIn() && claimString('role') == 'delegate' && delegateOtpOk()
+        && resource.data.keys().hasAll(['nationalityID'])
+        && resource.data.get('nationalityID', '') is string
+        && resource.data.get('nationalityID', '') != '';
+      allow list: if signedIn() && staffRole() in [
+          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr']
+        && callerCompany() != ''
+        && resource.data.get('companyUID', resource.data.get('companyId', '')) == callerCompany();
       allow list: if signedIn() && delegateCgDelegateOwnListOk();
       allow list: if signedIn() && delegateCgCompanyDupCheckListOk();
+      allow list: if signedIn() && delegateCgCompanyStaffOrgWideListOk();
+      allow list: if signedIn() && delegateCgCompanyStaffListOk();
+      allow list: if signedIn() && delegateCgOrgStaffListOk();
+      allow list: if signedIn() && delegateCgGlobalStaffListOk();
       allow get: if signedIn() && canReadDelegate();
       // r5 budget: a nested organizations/{o}/companies/{c}/delegates
       // create is decided by the nested match alone.
@@ -3221,6 +3220,11 @@ service cloud.firestore {
     }
 
     match /delegate_requests/{requestId} {
+      allow list: if signedIn() && resource.data.get('supervisorUid', '') == request.auth.uid;
+      allow list: if signedIn() && staffRole() in ['supervisor', 'company_supervisor']
+        && callerCompany() != ''
+        && resource.data.get('companyUID', resource.data.get('companyId', '')) == callerCompany()
+        && resource.data.keys().hasAll(['receiptCode']);
       allow list: if signedIn() && staffRole() in [
         'super-admin', 'super_admin', 'superadmin', 'superAdmin',
         'technical_support', 'technical-support', 'technicalSupport'];
@@ -3230,11 +3234,6 @@ service cloud.firestore {
       allow list: if signedIn() && isCompanyScopedStaff()
         && callerCompany() != ''
         && resource.data.get('companyUID', resource.data.get('companyId', '')) == callerCompany();
-      allow list: if signedIn() && (isCompanyAdmin() || roleIs(['supervisor', 'company_supervisor']))
-        && callerCompany() != ''
-        && resource.data.get('companyUID', resource.data.get('companyId', '')) == callerCompany()
-        && resource.data.keys().hasAll(['receiptCode']);
-      allow list: if signedIn() && resource.data.get('supervisorUid', '') == request.auth.uid;
       allow get: if signedIn() && delegateRequestReadOk();
       // Docs-pending: requests are created by staff only (supervisor flow).
       // The approved delegate's uid equals the request id, so the self path

@@ -3,6 +3,18 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
+    // TA-60 prod v1.14.x legacy delegate uploads (token-only, no Firestore).
+    match /feedback_screenshots/{fileName} {
+      allow create: if request.auth != null
+        && request.auth.token.get('role', '') == 'delegate'
+        && fileName.matches('feedback_(ts|[0-9]+)(\\.[A-Za-z0-9]+)?$');
+    }
+    match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
+      allow create: if request.auth != null
+        && request.auth.token.get('role', '') == 'delegate'
+        && request.auth.token.get('companyId', '') == compId
+        && photoId.matches('photo_(ts|[0-9]+)(\\.[A-Za-z0-9]+)?$');
+    }
     // ==================== HELPER FUNCTIONS ====================
     function isAuthenticated() {
       return request.auth != null;
@@ -278,23 +290,17 @@ service firebase.storage {
       // owner even if a client upload is classified as create.
       allow read: if isStorageStaff()
         || feedbackDelegateMayAccess(fileName);
-      // Legacy timestamp filenames (prod v1.14.x): keep a cheap create
-      // rule so evaluation stays under the storage rules expression cap.
-      allow create: if isNonAnonymous()
-        && request.auth.token.get('role', '') == 'delegate'
+      allow create: if isStorageStaff();
+      allow create: if isDelegateToken()
         && resource == null
-        && fileName.matches('feedback_(ts|[0-9]+)(\\.[A-Za-z0-9]+)?$');
-      allow create, update: if isStorageStaff()
+        && feedbackMetaOk(storageMetaUserId(request.resource.metadata))
+        && feedbackNameOwnedByCaller(fileName);
+      allow update: if isStorageStaff()
         || (
           isDelegateToken()
           && callerDelegateMayWriteStorage()
           && feedbackMetaOk(storageMetaUserId(request.resource.metadata))
-          && (
-            (resource == null && (
-              feedbackNameOwnedByCaller(fileName)
-              || fileName.matches('feedback_[0-9]+(\\.[A-Za-z0-9]+)?$')))
-            || (resource != null && feedbackDelegateMayAccess(fileName))
-          )
+          && feedbackDelegateMayAccess(fileName)
         );
       allow delete: if isStorageStaff()
         || (feedbackDelegateMayAccess(fileName) && callerDelegateMayWriteStorage());
@@ -335,15 +341,16 @@ service firebase.storage {
         && resource == null
         && photoId.matches('photo_(ts|[0-9]+)(\\.[A-Za-z0-9]+)?$')
         && !permissionPhotoNameOwnedByOther(photoId);
-      // Filename photo_{uid}_* is treated as owned by that uid so a
-      // create-classified overwrite cannot steal a colleague's object.
-      allow create, update: if canAccessOrgCompanyFiles(orgId, compId)
+      allow create: if canAccessOrgCompanyFiles(orgId, compId);
+      allow create: if delegateTokenOwnsCompany(compId)
+        && resource == null
+        && !permissionPhotoNameOwnedByOther(photoId)
+        && permissionPhotoNameOwnedByCaller(photoId);
+      allow update: if canAccessOrgCompanyFiles(orgId, compId)
         || (delegateTokenOwnsCompany(compId)
           && callerDelegateMayWriteStorage()
           && !permissionPhotoNameOwnedByOther(photoId)
-          && (
-            resource == null
-            || delegateOwnsPermissionPhoto(photoId)));
+          && delegateOwnsPermissionPhoto(photoId));
       allow delete: if canAccessOrgCompanyFiles(orgId, compId)
         || (delegateTokenOwnsCompany(compId)
           && callerDelegateMayWriteStorage()
