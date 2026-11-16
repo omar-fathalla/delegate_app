@@ -15,6 +15,8 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/web/admin_desktop/admin_desktop_home_web.dart';
 import 'package:firebase_core/firebase_core.dart';
+// Transitive test helper of firebase_core (fake Firebase app, no network).
+// ignore: depend_on_referenced_packages
 import 'package:firebase_core_platform_interface/test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -23,7 +25,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'web_golden.dart';
 
-class _MockBloc extends MockBloc<AdminDashboardEvent, AdminDashboardState>
+class FakeAdminDashboardBloc extends MockBloc<AdminDashboardEvent, AdminDashboardState>
     implements AdminDashboardBloc {}
 
 class _MockRepo extends Mock implements DelegateSubscriptionRepository {}
@@ -56,7 +58,7 @@ Future<void> _fonts() async {
   await sym.load();
 }
 
-late _MockBloc bloc;
+late FakeAdminDashboardBloc bloc;
 
 Widget _app(Widget home, {bool dark = false}) {
   final t = dark ? AppTheme.darkTheme() : AppTheme.lightTheme();
@@ -108,7 +110,7 @@ void main() {
   });
 
   setUp(() {
-    bloc = _MockBloc();
+    bloc = FakeAdminDashboardBloc();
     whenListen(
       bloc,
       const Stream<AdminDashboardState>.empty(),
