@@ -1,6 +1,7 @@
 // Web login keeps the delegate / staff tabs; the delegate tab never calls the
 // device-binding delegate login on web. Fake data only.
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -48,14 +49,14 @@ void main() {
   });
 
   tearDown(() {
-    LoginScreen.debugIsWebOverride = null;
+    WebRuntimePolicy.debugIsWebOverride = null;
     final view = TestWidgetsFlutterBinding.instance.platformDispatcher.views.first;
     view.resetPhysicalSize();
     view.resetDevicePixelRatio();
   });
 
   Future<void> pump(WidgetTester t, {required bool web}) async {
-    LoginScreen.debugIsWebOverride = web;
+    WebRuntimePolicy.debugIsWebOverride = web;
     t.view.physicalSize = const Size(1280, 900);
     t.view.devicePixelRatio = 1;
     await t.pumpWidget(MaterialApp(

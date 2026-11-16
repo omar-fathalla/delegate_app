@@ -23,6 +23,7 @@ import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -591,7 +592,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       child: BlocConsumer<AttendanceBloc, AttendanceState>(
         listener: (context, state) {
           if (state is AttendanceCheckedIn) {
-            if (!widget.viewOnly) {
+            if (!widget.viewOnly && WebRuntimePolicy.liveTrackingEnabled) {
               DelegateTrackingEngine().startTrackingSession(delegateId: widget.delegate.uid);
             }
             if (state.attendance.isSynced) {
@@ -698,6 +699,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           }
 
           if (!widget.viewOnly &&
+              WebRuntimePolicy.liveTrackingEnabled &&
               isCheckedIn &&
               !DelegateTrackingEngine().isTracking) {
             DelegateTrackingEngine()
@@ -741,16 +743,25 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                               onChanged: () {
                                 if (mounted) setState(() {});
                               },
-                              action: () => _isGeofenceMode
-                                  ? _handleGeofenceAction(
-                                      isCheckedIn: isCheckedIn,
-                                      activeAttendance: activeAttendance,
-                                    )
-                                  : _showQRScanner(
-                                      context,
-                                      isCheckedIn,
-                                      activeAttendance,
-                                    ),
+                              action: () {
+                                if (!WebRuntimePolicy.checkInEnabled) {
+                                  AppSnackBar.showInfo(
+                                    context,
+                                    WebRuntimePolicy.checkInWebMessage,
+                                  );
+                                  return Future<void>.value();
+                                }
+                                return _isGeofenceMode
+                                    ? _handleGeofenceAction(
+                                        isCheckedIn: isCheckedIn,
+                                        activeAttendance: activeAttendance,
+                                      )
+                                    : _showQRScanner(
+                                        context,
+                                        isCheckedIn,
+                                        activeAttendance,
+                                      );
+                              },
                             );
                           },
                     backgroundColor: isCheckedIn
@@ -2552,6 +2563,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     String? actionType,
     bool silent = false,
   }) async {
+    if (!WebRuntimePolicy.checkInEnabled) {
+      if (!silent && context.mounted) {
+        AppSnackBar.showInfo(context, WebRuntimePolicy.checkInWebMessage);
+      }
+      return null;
+    }
     bool serviceEnabled;
     LocationPermission permission;
 

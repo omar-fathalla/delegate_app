@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:delegate_app/core/constants.dart';
@@ -2275,7 +2276,9 @@ class _AttendanceDetailsBottomSheetState
                 orgsList.isNotEmpty ? orgsList : entry.value.allOrganizationNames,
           ));
         }
-      } else {
+      } else if (!WebRuntimePolicy.skipEmptyCompanyDelegateDirectory(
+        companyUID: widget.adminDelegate.companyUID,
+      )) {
         final delegatesSnapshot = await firestore
             .collection('organizations')
             .doc(widget.adminDelegate.organizationUID)

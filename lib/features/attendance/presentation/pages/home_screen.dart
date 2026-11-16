@@ -15,6 +15,7 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -55,7 +56,10 @@ class _HomeScreenState extends State<HomeScreen> {
               AppSnackBar.showError(context, state.message);
             } else if (state is AttendanceCheckedIn) {
               AppSnackBar.showSuccess(context, l10n.checkedInSuccessfully);
-              DelegateTrackingEngine().startTrackingSession(delegateId: widget.delegate.uid);
+              if (WebRuntimePolicy.liveTrackingEnabled) {
+                DelegateTrackingEngine()
+                    .startTrackingSession(delegateId: widget.delegate.uid);
+              }
               context.read<AttendanceBloc>().add(
                 HistoryRequested(
                   userId: widget.delegate.uid,
@@ -81,7 +85,9 @@ class _HomeScreenState extends State<HomeScreen> {
               isCheckedIn = state.activeAttendance != null;
               activeAttendance = state.activeAttendance;
 
-              if (isCheckedIn && !DelegateTrackingEngine().isTracking) {
+              if (WebRuntimePolicy.liveTrackingEnabled &&
+                  isCheckedIn &&
+                  !DelegateTrackingEngine().isTracking) {
                 DelegateTrackingEngine()
                     .startTrackingSession(delegateId: widget.delegate.uid);
               }
@@ -194,6 +200,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<String> _getDeviceInfo() async {
+    if (!WebRuntimePolicy.delegateDeviceBindingEnabled) {
+      return 'Web Browser';
+    }
     final deviceInfoPlugin = DeviceInfoPlugin();
     try {
       if (Platform.isAndroid) {
@@ -208,6 +217,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<Position?> _getCurrentLocation(BuildContext context) async {
+    if (!WebRuntimePolicy.checkInEnabled) {
+      if (context.mounted) {
+        AppSnackBar.showInfo(context, WebRuntimePolicy.checkInWebMessage);
+      }
+      return null;
+    }
     bool serviceEnabled;
     LocationPermission permission;
 

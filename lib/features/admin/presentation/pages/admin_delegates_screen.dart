@@ -976,12 +976,26 @@ class _CompactDelegateTile extends StatelessWidget {
       },
     );
     if (confirmed != true || !context.mounted) return;
+    final payload = buildDelegateHoldPayload(
+      callerRole: adminDelegate?.role,
+      callerOrganizationUID: adminDelegate?.organizationUID ?? '',
+      callerCompanyUID: adminDelegate?.companyUID ?? '',
+      uid: delegate.uid,
+      organizationUID: delegate.organizationUID,
+      companyUID: delegate.companyUID,
+      op: suspend ? 'add' : 'remove',
+    );
+    if (payload == null) {
+      AppSnackBar.showError(context, 'هذا المندوب خارج نطاق صلاحيتك.');
+      return;
+    }
     try {
       final result = await DelegateHoldRemote().setDelegateHold(
-        uid: delegate.uid,
-        organizationUID: delegate.organizationUID,
-        companyUID: delegate.companyUID,
-        op: suspend ? 'add' : 'remove',
+        uid: payload['uid'] as String,
+        organizationUID: payload['orgId'] as String,
+        companyUID: payload['companyId'] as String,
+        op: payload['op'] as String,
+        hold: payload['hold'] as String,
       );
       if (!context.mounted) return;
       final reason = result['reason']?.toString();

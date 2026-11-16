@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -41,7 +42,7 @@ class PushNotificationService {
   /// Initializes FCM: requests permissions, saves token, subscribes to topics,
   /// and sets up foreground/tap handlers.
   Future<void> initialize(String delegateUid) async {
-    if (kIsWeb) return;
+    if (!WebRuntimePolicy.pushNotificationsEnabled) return;
     if (_initializedUid == delegateUid) {
       debugPrint('FCM: Already initialized for delegate $delegateUid');
       return;
@@ -130,7 +131,7 @@ class PushNotificationService {
   /// Drops this user's push registration. Network steps are best-effort and
   /// time out so logout is not stuck offline.
   Future<void> clearToken(String delegateUid) async {
-    if (kIsWeb) return;
+    if (!WebRuntimePolicy.pushNotificationsEnabled) return;
     _initializedUid = null;
     try {
       await _tokenRefreshSub?.cancel();
