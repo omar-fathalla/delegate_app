@@ -26,10 +26,27 @@ export const DELIBERATE_FIRESTORE_REGRESSIONS = new Set([
 
 /** Documented dev-security closures (REQUEST CHANGES); not silent prod widenings. */
 export function isDeliberateFirestoreRegression(name) {
-  if (DELIBERATE_FIRESTORE_REGRESSIONS.has(name)) return true;
-  if (name.includes('list bell')) return true;
-  return false;
+  return DELIBERATE_FIRESTORE_REGRESSIONS.has(name);
 }
+
+/** Same 5 shapes as `buildCustomClaims` → `phoneQueryVariants` in delegate_login_logic.ts (cb3f4e2). */
+export function delegateLoginPhoneClaimVariants(normalizedPhone) {
+  const variants = new Set();
+  if (!normalizedPhone) return [];
+  variants.add(normalizedPhone);
+  if (normalizedPhone.startsWith('0') && normalizedPhone.length === 11) {
+    const withoutZero = normalizedPhone.substring(1);
+    variants.add(withoutZero);
+    variants.add(`20${withoutZero}`);
+    variants.add(`+20${withoutZero}`);
+    variants.add(`0020${withoutZero}`);
+    variants.add(`+2${normalizedPhone}`);
+    variants.add(`002${normalizedPhone}`);
+  }
+  return [...variants];
+}
+
+const DELEGATE_PRIMARY_PHONE = '01000000001';
 
 /**
  * cb3f4e2 getNotifications() phone variations (notification_remote_data_source.dart §5).
@@ -46,14 +63,8 @@ export function getNotificationsPhoneVariations(rawP) {
   return [...variations];
 }
 
-/** Delegate JWT `phones` subset exercised by bell phoneNumber== probes (incl. +2001000000001). */
-export const DELEGATE_CLAIM_PHONES = [
-  '01000000001',
-  '1000000001',
-  '20100000001',
-  '+20100000001',
-  '+2001000000001',
-];
+/** Delegate JWT `phones` claim (5 variants); not Dart-only +2001X leading-zero extras. */
+export const DELEGATE_CLAIM_PHONES = delegateLoginPhoneClaimVariants(DELEGATE_PRIMARY_PHONE);
 
 /** Live prod ALLOW counts for counted `list bell:` shapes (excl. G4/G5 extension rows). */
 export const BELL_LIVE_ALLOW_TARGETS = {
@@ -169,14 +180,12 @@ async function seed(env) {
     await nb('nbOaUnder', 'organization_admin');
     await nb('nbSaUnder', 'super_admin');
     await nb('nbSaCamel', 'superAdmin');
+    await nb('nbSaDash', 'super-admin');
     await nb('nbTsDash', 'technical-support');
     await nb('nbTsRole', 'role_technical_support');
     await nb('nbDel', `delegates_${CO}`);
     await nb('nbPhoneDlg', `phone_dlg1`);
-    await setDoc(doc(db, 'notifications/nPhoneDlg'), {
-      phoneNumber: '01000000001', delegateUid: 'dlg1', title: 'phone-row', isRead: false,
-      companyId: CO, organizationId: ORG, createdAt: NOW, deletedBy: [],
-    });
+    // Staff G5 (+2001X leading-zero); not in delegate JWT phones claim.
     await setDoc(doc(db, 'notifications/nPhoneDlgPlus20Lead'), {
       phoneNumber: '+2001000000001', delegateUid: 'dlg1', title: 'phone-+20-01', isRead: false,
       companyId: CO, organizationId: ORG, createdAt: NOW, deletedBy: [],
@@ -200,8 +209,14 @@ async function seed(env) {
       delegateUid: `phone_${uid}`, title: 'phone-tag', isRead: false,
       companyId: CO, organizationId: ORG, createdAt: NOW, deletedBy: [],
     });
+    const staffOwnUidRow = (uid) => setDoc(doc(db, `notifications/nbOwn_${uid}`), {
+      delegateUid: uid, title: 'own-uid', isRead: false,
+      companyId: CO, organizationId: ORG, createdAt: NOW, deletedBy: [],
+    });
+    const STAFF_OWN_UID_BELL = new Set(['sa', 'ts', 'oa', 'hr', 'bm', 'mp']);
     for (const uid of ['sa', 'ts', 'oa', 'ca', 'sup', 'hr', 'acc', 'mkt', 'mp', 'bm']) {
       await staffPhoneTag(uid);
+      if (STAFF_OWN_UID_BELL.has(uid)) await staffOwnUidRow(uid);
     }
     await setDoc(doc(db, `organizations/${ORG}/tasks/t1`), { companyId: CO, assignedTo: 'dlg1', createdBy: 'sup', title: 't', createdAt: NOW, status: 'pending' });
     await setDoc(doc(db, 'penalties/p1'), { targetDelegateId: 'dlg1', delegateId: 'dlg1', companyId: CO, organizationId: ORG, amount: 10, createdAt: NOW });
@@ -410,6 +425,53 @@ function buildBellHarnessCases() {
   return out;
 }
 
+function bellCountedQueryFns(bellRole, uid) {
+  if (bellRole === 'delegate') {
+    return delegateBellShapes()
+      .filter(([area, name]) => area === 'NOTIF-READ' && isBellCountedCase(name))
+      .map(([, , fn]) => fn);
+  }
+  return staffBellShapes(uid, bellRole).map(([, , fn]) => fn);
+}
+
+/**
+ * cb3f4e2 getNotifications(): parallel bell queries (queryAllSettled-style).
+ * Returns deduped doc ids plus per-shape hits (queries that returned ≥1 doc).
+ */
+export async function simulateGetNotifications(env, uid, bellRole) {
+  await seed(env);
+  const docIds = new Set();
+  let queryHits = 0;
+  for (const fn of bellCountedQueryFns(bellRole, uid)) {
+    try {
+      const snap = await fn(env);
+      if ((snap?.size ?? 0) > 0) queryHits += 1;
+      for (const d of snap?.docs ?? []) {
+        docIds.add(d.id);
+      }
+    } catch (_) {
+      // permission-denied / failed query does not drop the rest
+    }
+  }
+  return { uniqueDocs: docIds.size, queryHits, docIds: [...docIds] };
+}
+
+export async function simulateGetNotificationsDocCount(env, uid, bellRole) {
+  return (await simulateGetNotifications(env, uid, bellRole)).uniqueDocs;
+}
+
+export async function runBellGetNotificationsSimulation(testEnv) {
+  const roles = [['dlg1', 'delegate'], ...STAFF_BELL_UID];
+  const uniqueDocs = {};
+  const queryHits = {};
+  for (const [uid, bellRole] of roles) {
+    const sim = await simulateGetNotifications(testEnv, uid, bellRole);
+    uniqueDocs[bellRole] = sim.uniqueDocs;
+    queryHits[bellRole] = sim.queryHits;
+  }
+  return { uniqueDocs, queryHits };
+}
+
 export function assertBellAllowCounts(rows) {
   const issues = [];
   for (const [role, target] of Object.entries(BELL_LIVE_ALLOW_TARGETS)) {
@@ -435,6 +497,44 @@ export function assertBellAllowCounts(rows) {
   }
   return issues;
 }
+
+/** Deduped bell list size after cb3f4e2 getNotifications() merge: live/cand vs prod targets. */
+export function assertBellSimulatedDocCounts(liveSim, candSim) {
+  const issues = [];
+  for (const [role, target] of Object.entries(BELL_LIVE_ALLOW_TARGETS)) {
+    const liveDocs = liveSim.uniqueDocs[role];
+    const candDocs = candSim.uniqueDocs[role];
+    if (liveDocs !== target) {
+      issues.push(`${role}: getNotifications() sim live docs ${liveDocs} != target ${target}`);
+    }
+    if (candDocs !== liveDocs) {
+      issues.push(`${role}: getNotifications() sim cand docs ${candDocs} != live ${liveDocs}`);
+    }
+  }
+  return issues;
+}
+
+/** Mohamed probe matrix: list paths rules use for bell phone / phone_ tags. */
+export const BELL_PHONE_PROBE_MATRIX = [
+  {
+    shape: 'a',
+    label: 'users/{uid} doc + phone_* delegateUid tag',
+    probe: 'delegateUid == phone_<staffOrDelegateUid>',
+    seed: 'notifications/nbPhone_<uid> with delegateUid phone_<uid>',
+  },
+  {
+    shape: 'b',
+    label: 'no users doc + +2001X leading-zero (Dart §5, staff G5)',
+    probe: 'phoneNumber == +2001… or delegateUid == phone_+2001…',
+    seed: 'notifications/nPhoneDlgPlus20Lead (+2001000000001); staff STAFF_PHONE_BY_UID + getNotificationsPhoneVariations',
+  },
+  {
+    shape: 'c',
+    label: '+201 international + users/{uid}.phoneNumber (login claim family)',
+    probe: 'phoneNumber == +201… / delegateUid bare +201… (JWT phones claim)',
+    seed: `notifications/nbPhField_* per DELEGATE_CLAIM_PHONES (${DELEGATE_CLAIM_PHONES.join(', ')})`,
+  },
+];
 const attOrgBranchToday = (db) => getDocs(query(
   collection(db, 'attendance_logs'),
   where('organizationId', '==', ORG),
@@ -634,6 +734,8 @@ export async function runFirestoreCompatHarness() {
   const cand = await mk('demo-ta60-cand', CAND_RULES);
   const rl = await runAll(live, 'live');
   const rd = await runAll(cand, 'cand');
+  const bellLiveSim = await runBellGetNotificationsSimulation(live);
+  const bellCandSim = await runBellGetNotificationsSimulation(cand);
   await live.cleanup();
   await cand.cleanup();
   const rows = cases.map((c, i) => ({
@@ -651,6 +753,7 @@ export async function runFirestoreCompatHarness() {
   const deliberate = rows.filter(r => r.regression && r.deliberate);
   const isExprLimitMsg = (msg) => /maximum of 1000 expressions|limit exceeded/i.test(String(msg || ''));
   const bellCountIssues = assertBellAllowCounts(rows);
+  const bellSimulationIssues = assertBellSimulatedDocCounts(bellLiveSim, bellCandSim);
   return {
     rows,
     total: rows.length,
@@ -658,5 +761,8 @@ export async function runFirestoreCompatHarness() {
     unexpected,
     exprLimit: unexpected.filter(r => isExprLimitMsg(r.candMsg)),
     bellCountIssues,
+    bellLiveSim,
+    bellCandSim,
+    bellSimulationIssues,
   };
 }
