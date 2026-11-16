@@ -12,7 +12,7 @@
 | Branch | SHA | Note |
 |--------|-----|------|
 | `cursor/ta60-prod-compat-9a4a` | `9f86350` | C1 `invite_email_index` |
-| `cursor/ta60-w1-closures` | `c9f2007` | Closure classification doc + generator |
+| `cursor/ta60-w1-closures` | `bbacd6a` | Closure classification (39 NOTIF as a,b) |
 
 ## C1 — `invite_email_index` (not auth `inviteId` claim)
 
