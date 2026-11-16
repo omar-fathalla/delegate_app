@@ -95,11 +95,27 @@ service firebase.storage {
         && request.resource.size < 6 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
+    function companyStaffRegistrationUploadOk() {
+      return storageCallerHasProfile()
+        && isStorageCompanyStaffRole(storageUserRole())
+        && storageUserCo() != ''
+        && request.resource != null
+        && request.resource.size < 6 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
     function supervisorKnownDelegateFolderOk(folderId) {
       let org = storageUserOrg();
       let co = storageUserCo();
       return isNonAnonymous()
         && isStorageSupervisorRole(storageUserRole())
+        && org != '' && co != ''
+        && firestore.exists(/databases/(default)/documents/organizations/$(org)/companies/$(co)/delegates/$(folderId));
+    }
+    function companyStaffKnownDelegateFolderOk(folderId) {
+      let org = storageUserOrg();
+      let co = storageUserCo();
+      return isNonAnonymous()
+        && isStorageCompanyStaffRole(storageUserRole())
         && org != '' && co != ''
         && firestore.exists(/databases/(default)/documents/organizations/$(org)/companies/$(co)/delegates/$(folderId));
     }
@@ -439,7 +455,11 @@ service firebase.storage {
     }
     match /penalties/evidence/{allPaths=**} {
       allow read: if isStorageStaff();
-      allow write: if companyStaffPenaltyEvidenceUploadOk();
+      allow write: if companyStaffPenaltyEvidenceUploadOk()
+        || (isStorageCompanyStaffRole(storageUserRole())
+          && storageUserCo() != ''
+          && request.resource != null
+          && request.resource.size < 10 * 1024 * 1024);
     }
 
     // ==================== LEAVE ATTACHMENTS ====================
@@ -480,12 +500,13 @@ service firebase.storage {
     // prod is a separate, owner-approved change.
     match /delegate_documents/{delegateUid}/{allPaths=**} {
       allow read: if canAccessDelegateDocuments(delegateUid)
-        || supervisorKnownDelegateFolderOk(delegateUid)
+        || companyStaffKnownDelegateFolderOk(delegateUid)
         || supervisorDelegateRequestFolderOk(delegateUid)
         || isStorageGlobalRole(storageUserRole());
       allow write: if canAccessDelegateDocuments(delegateUid)
         || supervisorRegistrationUploadOk()
-        || supervisorKnownDelegateFolderOk(delegateUid)
+        || companyStaffRegistrationUploadOk()
+        || companyStaffKnownDelegateFolderOk(delegateUid)
         || supervisorDelegateRequestFolderOk(delegateUid);
     }
 
@@ -493,7 +514,8 @@ service firebase.storage {
     // (registration writes the intent first). Anonymous is denied.
     match /delegate_subscription_receipts/{requestId}/{allPaths=**} {
       allow read, write: if canAccessDelegateDocuments(requestId)
-        || supervisorRegistrationUploadOk();
+        || supervisorRegistrationUploadOk()
+        || companyStaffRegistrationUploadOk();
     }
 
     // ==================== PUBLIC FILES ====================
@@ -516,7 +538,10 @@ service firebase.storage {
           && storageUserCo() != ''
           && request.resource != null
           && request.resource.size < 6 * 1024 * 1024
-          && request.resource.contentType.matches('image/.*'));
+          && request.resource.contentType.matches('image/.*'))
+        || (isStorageCompanyStaffRole(storageUserRole())
+          && storageUserCo() != ''
+          && firestore.exists(/databases/(default)/documents/organizations/$(storageUserOrg())/companies/$(storageUserCo())/requests/$(requestId)));
     }
     // Storage ORs overlapping matches, so this residual must not
     // also match staging/requests/{id} or the intent check above is undone.
