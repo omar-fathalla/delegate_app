@@ -23,6 +23,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 @visibleForTesting
 DateTime Function()? hrNotificationsSheetDebugNow;
 
+/// Opens the first row menu once, for screenshots. Production leaves this false.
+@visibleForTesting
+bool hrNotificationsSheetDebugOpenFirstMenu = false;
+
 DateTime _sheetNow() => hrNotificationsSheetDebugNow?.call() ?? DateTime.now();
 
 const double _kSheetWidth = 440;
@@ -181,31 +185,11 @@ class _HrNotificationsSheet extends StatefulWidget {
 }
 
 class _HrNotificationsSheetState extends State<_HrNotificationsSheet> {
-  final ScrollController _scroll = ScrollController();
+  final GlobalKey<ScaffoldMessengerState> _messenger =
+      GlobalKey<ScaffoldMessengerState>();
+  final Set<String> _pendingDelete = <String>{};
   _SheetFilter _filter = _SheetFilter.all;
   int _limit = _kPageSize;
-
-  @override
-  void initState() {
-    super.initState();
-    _scroll.addListener(_onScroll);
-  }
-
-  @override
-  void dispose() {
-    _scroll.removeListener(_onScroll);
-    _scroll.dispose();
-    super.dispose();
-  }
-
-  void _onScroll() {
-    if (!_scroll.hasClients) return;
-    final position = _scroll.position;
-    if (position.maxScrollExtent <= 0) return;
-    if (position.pixels >= position.maxScrollExtent - 72) {
-      _revealOlder();
-    }
-  }
 
   void _revealOlder() {
     setState(() => _limit += _kPageSize);
@@ -243,23 +227,46 @@ class _HrNotificationsSheetState extends State<_HrNotificationsSheet> {
     );
   }
 
-  Future<void> _delete(NotificationEntity notification) async {
-    final confirmed = await _confirmDelete(context);
-    if (!confirmed || !mounted) return;
+  void _delete(NotificationEntity notification) {
+    final id = notification.id;
+    if (_pendingDelete.contains(id)) return;
+    setState(() => _pendingDelete.add(id));
+
+    final bloc = context.read<NotificationBloc>();
     final delegate = widget.delegate;
-    context.read<NotificationBloc>().add(
-      DeleteNotificationRequested(
-        notificationId: notification.id,
-        delegateUid: delegate.uid,
-        organizationId: delegate.organizationUID,
-        phoneNumber: delegate.phoneNumber,
-      ),
-    );
-    ScaffoldMessenger.of(context).showSnackBar(
+    final message = AppLocalizations.of(context)!.notificationDeleted;
+    var undone = false;
+    final messenger = _messenger.currentState;
+    messenger?.hideCurrentSnackBar();
+    final controller = messenger?.showSnackBar(
       SnackBar(
-        content: Text(AppLocalizations.of(context)!.notificationDeleted),
+        behavior: SnackBarBehavior.floating,
+        content: Text(
+          message,
+          style: const TextStyle(fontFamily: 'Cairo'),
+        ),
+        action: SnackBarAction(
+          label: 'تراجع',
+          onPressed: () {
+            undone = true;
+            if (!mounted) return;
+            setState(() => _pendingDelete.remove(id));
+          },
+        ),
       ),
     );
+    controller?.closed.then((reason) {
+      if (undone || reason == SnackBarClosedReason.action) return;
+      bloc.add(
+        DeleteNotificationRequested(
+          notificationId: id,
+          delegateUid: delegate.uid,
+          organizationId: delegate.organizationUID,
+          phoneNumber: delegate.phoneNumber,
+        ),
+      );
+      if (mounted) setState(() => _pendingDelete.remove(id));
+    });
   }
 
   void _open(NotificationEntity notification) {
@@ -276,34 +283,31 @@ class _HrNotificationsSheetState extends State<_HrNotificationsSheet> {
     final cs = Theme.of(context).colorScheme;
     final viewport = MediaQuery.sizeOf(context).width;
     final fullScreen = viewport < _kFullScreenBreakpoint;
-    final width = fullScreen
-        ? viewport
-        : _kSheetWidth.clamp(400, _kSheetMaxWidth).toDouble();
 
-    return Align(
-      alignment: Alignment.centerRight,
-      child: SizedBox(
-        width: width,
-        height: MediaQuery.sizeOf(context).height,
-        child: Material(
-          key: const ValueKey('hr_notifications_side_sheet'),
-          color: cs.surfaceContainerLow,
-          elevation: 1,
-          shadowColor: cs.shadow,
-          surfaceTintColor: cs.surfaceTint.withValues(alpha: 0),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              border: fullScreen
-                  ? null
-                  : Border(
-                      left: BorderSide(color: cs.outlineVariant),
-                    ),
-            ),
-            child: SafeArea(
+    final sheet = Material(
+      key: const ValueKey('hr_notifications_side_sheet'),
+      color: cs.surfaceContainerLow,
+      elevation: fullScreen ? 0 : 1,
+      shadowColor: cs.shadow,
+      surfaceTintColor: cs.surfaceTint.withValues(alpha: 0),
+      clipBehavior: Clip.antiAlias,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: fullScreen
+              ? null
+              : Border(left: BorderSide(color: cs.outlineVariant)),
+        ),
+        child: ScaffoldMessenger(
+          key: _messenger,
+          child: Scaffold(
+            backgroundColor: cs.surfaceContainerLow,
+            body: SafeArea(
               child: BlocBuilder<NotificationBloc, NotificationState>(
                 builder: (context, state) {
                   final loaded = state is NotificationLoaded
                       ? state.notifications
+                            .where((n) => !_pendingDelete.contains(n.id))
+                            .toList()
                       : const <NotificationEntity>[];
                   final sorted = [...loaded]
                     ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -323,30 +327,15 @@ class _HrNotificationsSheetState extends State<_HrNotificationsSheet> {
                         onMarkAll: unread > 0 ? _markAll : null,
                         onFilter: _setFilter,
                       ),
-                      Expanded(child: _body(context, state, visible, filtered)),
-                      if (hasMore)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                          child: Center(
-                            child: OutlinedButton.icon(
-                              key: const ValueKey('hr_notifications_older'),
-                              onPressed: _revealOlder,
-                              icon: const Icon(Symbols.expand_more_rounded, size: 18),
-                              label: const Text('عرض الأقدم'),
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(0, 44),
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                side: BorderSide(color: cs.outlineVariant),
-                                foregroundColor: cs.onSurface,
-                                textStyle: const TextStyle(
-                                  fontFamily: 'Cairo',
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
+                      Expanded(
+                        child: _body(
+                          context,
+                          state,
+                          visible,
+                          filtered,
+                          hasMore,
                         ),
+                      ),
                     ],
                   );
                 },
@@ -356,6 +345,16 @@ class _HrNotificationsSheetState extends State<_HrNotificationsSheet> {
         ),
       ),
     );
+
+    if (fullScreen) return SizedBox.expand(child: sheet);
+    return Align(
+      alignment: Alignment.centerRight,
+      child: SizedBox(
+        width: _kSheetWidth.clamp(400, _kSheetMaxWidth).toDouble(),
+        height: MediaQuery.sizeOf(context).height,
+        child: sheet,
+      ),
+    );
   }
 
   Widget _body(
@@ -363,6 +362,7 @@ class _HrNotificationsSheetState extends State<_HrNotificationsSheet> {
     NotificationState state,
     List<NotificationEntity> visible,
     List<NotificationEntity> filtered,
+    bool hasMore,
   ) {
     if (state is NotificationLoading || state is NotificationInitial) {
       return const Center(child: M3DelayedLoading());
@@ -393,14 +393,14 @@ class _HrNotificationsSheetState extends State<_HrNotificationsSheet> {
       return _Message(
         key: const ValueKey('hr_notifications_empty'),
         icon: Symbols.notifications_off_rounded,
-        text: unreadFilter ? 'لا توجد إشعارات غير مقروءة' : 'لا توجد إشعارات',
+        text: unreadFilter ? 'مفيش إشعارات غير مقروءة' : 'مفيش إشعارات',
       );
     }
 
     final now = _sheetNow();
     final groups = _group(visible, now);
+    final cs = Theme.of(context).colorScheme;
     return ListView(
-      controller: _scroll,
       padding: const EdgeInsets.only(bottom: 8),
       children: [
         for (final group in groups) ...[
@@ -415,6 +415,29 @@ class _HrNotificationsSheetState extends State<_HrNotificationsSheet> {
               onDelete: () => _delete(notification),
             ),
         ],
+        if (hasMore)
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(24, 8, 24, 16),
+            child: Center(
+              child: OutlinedButton.icon(
+                key: const ValueKey('hr_notifications_older'),
+                onPressed: _revealOlder,
+                icon: const Icon(Symbols.expand_more_rounded, size: 18),
+                label: const Text('عرض الأقدم'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 44),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  side: BorderSide(color: cs.outlineVariant),
+                  foregroundColor: cs.onSurface,
+                  textStyle: const TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -448,7 +471,7 @@ class _Header extends StatelessWidget {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 16, 12),
+        padding: const EdgeInsetsDirectional.fromSTEB(24, 8, 24, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -606,7 +629,7 @@ class _GroupLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+      padding: const EdgeInsetsDirectional.fromSTEB(24, 14, 24, 4),
       child: Text(
         label,
         style: TextStyle(
@@ -641,8 +664,6 @@ class _NotificationRow extends StatefulWidget {
 }
 
 class _NotificationRowState extends State<_NotificationRow> {
-  bool _hover = false;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -650,143 +671,88 @@ class _NotificationRowState extends State<_NotificationRow> {
     final unread = !notification.isRead;
     final title = NotificationModel.sanitizeText(notification.title);
     final body = NotificationModel.sanitizeText(notification.body);
-    final compact = MediaQuery.sizeOf(context).width < _kFullScreenBreakpoint;
-    final showLabels = _hover && !compact;
-    final showMenu = _hover || compact;
-    final visuals = _visuals(notification.type, cs);
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: InkWell(
-        onTap: widget.onOpen,
-        hoverColor: cs.onSurface.withValues(alpha: 0.06),
-        splashColor: cs.onSurface.withValues(alpha: 0.08),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _TypeIcon(visuals: visuals),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        if (unread) ...[
-                          const _UnreadDot(),
-                          const SizedBox(width: 6),
-                        ],
-                        Expanded(
-                          child: Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontFamily: 'Cairo',
-                              fontSize: 14,
-                              height: 1.3,
-                              fontWeight: unread ? FontWeight.w700 : FontWeight.w500,
-                              color: cs.onSurface,
-                            ),
-                          ),
-                        ),
-                        if (!showLabels) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            _formatWhen(notification.createdAt, widget.now),
-                            style: TextStyle(
-                              fontFamily: 'Cairo',
-                              fontSize: 12,
-                              color: cs.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                        if (showLabels) ...[
-                          const SizedBox(width: 4),
-                          if (unread)
-                            _ActionLabel(
-                              label: 'تحديد كمقروء',
-                              color: cs.primary,
-                              onPressed: widget.onMarkRead,
-                            ),
-                          _ActionLabel(
-                            label: 'حذف',
-                            color: cs.error,
-                            onPressed: widget.onDelete,
-                          ),
-                        ],
-                        if (showMenu)
-                          _OverflowMenu(
-                            unread: unread,
-                            onMarkRead: widget.onMarkRead,
-                            onDelete: widget.onDelete,
-                          ),
+    return InkWell(
+      onTap: widget.onOpen,
+      hoverColor: cs.onSurface.withValues(alpha: 0.06),
+      splashColor: cs.onSurface.withValues(alpha: 0.08),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(24, 8, 12, 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _TypeIcon(icon: _iconFor(notification.type)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      if (unread) ...[
+                        const _UnreadDot(),
+                        const SizedBox(width: 6),
                       ],
-                    ),
-                    if (body.isNotEmpty)
-                      Padding(
-                        padding: EdgeInsetsDirectional.only(
-                          start: unread ? 14 : 0,
-                        ),
+                      Expanded(
                         child: Text(
-                          body,
+                          title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontFamily: 'Cairo',
-                            fontSize: 13,
-                            height: 1.35,
-                            color: cs.onSurfaceVariant,
+                            fontSize: 14,
+                            height: 1.3,
+                            fontWeight: unread
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: cs.onSurface,
                           ),
                         ),
                       ),
-                  ],
-                ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _formatWhen(notification.createdAt, widget.now),
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 12,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (body.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsetsDirectional.only(
+                        start: unread ? 14 : 0,
+                      ),
+                      child: Text(
+                        body,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 13,
+                          height: 1.35,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-            ],
-          ),
+            ),
+            _OverflowMenu(
+              unread: unread,
+              onMarkRead: widget.onMarkRead,
+              onDelete: widget.onDelete,
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _ActionLabel extends StatelessWidget {
-  final String label;
-  final Color color;
-  final VoidCallback onPressed;
-
-  const _ActionLabel({
-    required this.label,
-    required this.color,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: onPressed,
-        style: TextButton.styleFrom(
-          foregroundColor: color,
-          visualDensity: VisualDensity.compact,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          minimumSize: const Size(0, 32),
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-        textStyle: const TextStyle(
-          fontFamily: 'Cairo',
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      child: Text(label),
-    );
-  }
-}
-
-class _OverflowMenu extends StatelessWidget {
+class _OverflowMenu extends StatefulWidget {
   final bool unread;
   final VoidCallback onMarkRead;
   final VoidCallback onDelete;
@@ -798,42 +764,75 @@ class _OverflowMenu extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  State<_OverflowMenu> createState() => _OverflowMenuState();
+}
+
+class _OverflowMenuState extends State<_OverflowMenu> {
+  final GlobalKey _button = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    if (!hrNotificationsSheetDebugOpenFirstMenu) return;
+    hrNotificationsSheetDebugOpenFirstMenu = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future<void>.delayed(AppMotionDurations.medium4, () {
+        if (mounted) _open();
+      });
+    });
+  }
+
+  Future<void> _open() async {
+    final button = _button.currentContext?.findRenderObject() as RenderBox?;
+    if (button == null || !button.hasSize) return;
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final cs = Theme.of(context).colorScheme;
-    return PopupMenuButton<String>(
-      tooltip: 'المزيد',
-      icon: Icon(Symbols.more_vert_rounded, size: 18, color: cs.onSurfaceVariant),
+    final value = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        button.localToGlobal(Offset.zero, ancestor: overlay) & button.size,
+        Offset.zero & overlay.size,
+      ),
       color: cs.surfaceContainerHigh,
       elevation: 3,
-      padding: EdgeInsets.zero,
-      style: IconButton.styleFrom(
-        visualDensity: VisualDensity.compact,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        minimumSize: const Size(32, 32),
-      ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
         side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
-      onSelected: (value) {
-        if (value == 'read') onMarkRead();
-        if (value == 'delete') onDelete();
-      },
-      itemBuilder: (context) => [
-        if (unread)
+      items: [
+        if (widget.unread)
           PopupMenuItem(
             value: 'read',
-            child: _MenuRow(icon: Symbols.mark_email_read_rounded, label: 'تحديد كمقروء'),
+            child: _MenuRow(
+              icon: Symbols.mark_email_read_rounded,
+              label: 'تحديد كمقروء',
+            ),
           ),
-        PopupMenuItem(
+        const PopupMenuItem(
           value: 'delete',
-          child: _MenuRow(
-            icon: Symbols.delete_rounded,
-            label: 'حذف',
-            color: cs.error,
-          ),
+          child: _MenuRow(icon: Symbols.delete_rounded, label: 'حذف'),
         ),
       ],
+    );
+    if (!mounted || value == null) return;
+    if (value == 'read') widget.onMarkRead();
+    if (value == 'delete') widget.onDelete();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return IconButton(
+      key: _button,
+      tooltip: 'المزيد',
+      onPressed: _open,
+      icon: Icon(Symbols.more_vert_rounded, size: 18, color: cs.onSurfaceVariant),
+      style: IconButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        minimumSize: const Size(32, 32),
+        padding: EdgeInsets.zero,
+      ),
     );
   }
 }
@@ -841,14 +840,13 @@ class _OverflowMenu extends StatelessWidget {
 class _MenuRow extends StatelessWidget {
   final IconData icon;
   final String label;
-  final Color? color;
 
-  const _MenuRow({required this.icon, required this.label, this.color});
+  const _MenuRow({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final ink = color ?? cs.onSurface;
+    final ink = cs.onSurface;
     return Row(
       children: [
         Icon(icon, size: 18, color: ink),
@@ -868,18 +866,22 @@ class _MenuRow extends StatelessWidget {
 }
 
 class _TypeIcon extends StatelessWidget {
-  final _TypeVisuals visuals;
+  final IconData icon;
 
-  const _TypeIcon({required this.visuals});
+  const _TypeIcon({required this.icon});
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       width: 40,
       height: 40,
       alignment: Alignment.center,
-      decoration: BoxDecoration(color: visuals.background, shape: BoxShape.circle),
-      child: Icon(visuals.icon, size: 20, color: visuals.foreground),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, size: 20, color: cs.onSurfaceVariant),
     );
   }
 }
@@ -1026,36 +1028,11 @@ String _clock(int hour24, int minute) {
   return '$hour:$mm ${isPm ? 'م' : 'ص'}';
 }
 
-class _TypeVisuals {
-  final IconData icon;
-  final Color background;
-  final Color foreground;
-
-  const _TypeVisuals(this.icon, this.background, this.foreground);
-}
-
-_TypeVisuals _visuals(String type, ColorScheme cs) {
-  if (type == 'attendance_check_in') {
-    return _TypeVisuals(Symbols.login_rounded, cs.primaryContainer, cs.onPrimaryContainer);
-  }
-  if (type == 'attendance_check_out') {
-    return _TypeVisuals(
-      Symbols.logout_rounded,
-      cs.surfaceContainerHigh,
-      cs.onSurfaceVariant,
-    );
-  }
-  if (_isRequest(type)) {
-    return _TypeVisuals(
-      _requestIcon(type),
-      cs.secondaryContainer,
-      cs.onSecondaryContainer,
-    );
-  }
-  if (type == 'penalty' || type == 'subscription_rejected') {
-    return _TypeVisuals(Symbols.gavel_rounded, cs.errorContainer, cs.onErrorContainer);
-  }
-  return _TypeVisuals(_neutralIcon(type), cs.surfaceContainerHigh, cs.onSurfaceVariant);
+IconData _iconFor(String type) {
+  if (type == 'attendance_check_in') return Symbols.login_rounded;
+  if (type == 'attendance_check_out') return Symbols.logout_rounded;
+  if (_isRequest(type)) return _requestIcon(type);
+  return _neutralIcon(type);
 }
 
 bool _isRequest(String type) {
@@ -1133,129 +1110,4 @@ Future<void> _openTarget(
   } catch (e) {
     debugPrint('Error opening store listing: $e');
   }
-}
-
-Future<bool> _confirmDelete(BuildContext context) async {
-  final l10n = AppLocalizations.of(context)!;
-  final wide = MediaQuery.sizeOf(context).width > 768;
-  if (wide) {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        final cs = Theme.of(dialogContext).colorScheme;
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Text(
-            l10n.deleteNotification,
-            style: TextStyle(
-              fontFamily: 'Cairo',
-              fontWeight: FontWeight.w700,
-              color: cs.onSurface,
-            ),
-          ),
-          content: Text(
-            l10n.deleteNotificationConfirm,
-            style: TextStyle(
-              fontFamily: 'Cairo',
-              color: cs.onSurfaceVariant,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton.tonal(
-              style: FilledButton.styleFrom(
-                backgroundColor: cs.errorContainer,
-                foregroundColor: cs.onErrorContainer,
-              ),
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: Text(l10n.delete),
-            ),
-          ],
-        );
-      },
-    );
-    return result ?? false;
-  }
-
-  final result = await showModalBottomSheet<bool>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-    ),
-    builder: (sheetContext) {
-      final cs = Theme.of(sheetContext).colorScheme;
-      return Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom + 16,
-          left: 16,
-          right: 16,
-          top: 8,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 38,
-              height: 4.5,
-              decoration: BoxDecoration(
-                color: cs.outlineVariant.withValues(alpha: 0.6),
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              l10n.deleteNotification,
-              style: TextStyle(
-                fontFamily: 'Cairo',
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              l10n.deleteNotificationConfirm,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'Cairo',
-                fontSize: 14,
-                color: cs.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              height: 48,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: cs.outlineVariant),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.of(sheetContext).pop(false),
-                      child: const Text('إلغاء'),
-                    ),
-                  ),
-                  VerticalDivider(width: 1, color: cs.outlineVariant),
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.of(sheetContext).pop(true),
-                      child: Text('حذف', style: TextStyle(color: cs.error)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-  return result ?? false;
 }
