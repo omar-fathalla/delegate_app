@@ -43,6 +43,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class _MockAuthBloc extends Mock implements AuthBloc {}
 
 const _supervisorMenu = [
+  'الرئيسية',
   'الملف الشخصي',
   'طلبات اشتراك واعتماد المناديب',
   'تجديد المناديب',
@@ -63,6 +64,7 @@ const _supervisorMenu = [
 ];
 
 const _webOnlyTitles = [
+  'الرئيسية',
   'طلبات اشتراك واعتماد المناديب',
   'المهام',
   'أذونات التصوير',
@@ -311,7 +313,8 @@ void main() {
         expect(find.text('لائحة الغرامات والجزاءات'), findsOneWidget);
         expect(find.text('نظام الغرامات والمخالفات'), findsOneWidget);
         expect(find.text('طلبات اشتراك واعتماد المناديب'), findsOneWidget);
-        expect(find.text('سجل الحضور والانصراف'), findsNothing);
+        expect(find.text('سجل الحضور والانصراف'), findsOneWidget);
+        expect(find.text('الرئيسية'), findsNothing);
       },
     );
 

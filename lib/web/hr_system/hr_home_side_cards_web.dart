@@ -468,10 +468,11 @@ class HrHomeFeatureCard extends StatelessWidget {
                         minimumSize: const Size(48, 48),
                         shape: const StadiumBorder(),
                         padding: const EdgeInsets.symmetric(horizontal: 20),
-                        textStyle: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        textStyle: Theme.of(context).textTheme.labelLarge
+                            ?.copyWith(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
                       ).copyWith(overlayColor: hrStateLayer(cs.onPrimary)),
                     ),
                     OutlinedButton.icon(
@@ -486,10 +487,11 @@ class HrHomeFeatureCard extends StatelessWidget {
                             foregroundColor: cs.onPrimaryContainer,
                             side: BorderSide(color: cs.outline),
                             padding: const EdgeInsets.symmetric(horizontal: 20),
-                            textStyle: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
+                            textStyle: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
                           ).copyWith(
                             overlayColor: hrStateLayer(cs.onPrimaryContainer),
                           ),

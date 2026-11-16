@@ -89,15 +89,64 @@ class HrHomeOverviewWeb extends StatelessWidget {
     required this.onNavigateToTab,
   });
 
+  /// Test hook: fake data instead of the live attendance tab (it needs a
+  /// live Firestore). Always null in the app.
+  @visibleForTesting
+  static HrHomeOverviewData Function(Delegate delegate)? debugData;
+
+  /// Test hook: fixed clock for [debugData] (stable «آخر تحديث» / durations).
+  @visibleForTesting
+  static DateTime Function()? debugClock;
+
+  HrHomeOverviewActions _actions(
+    BuildContext context, {
+    required Future<void> Function() onReload,
+    required DateTime month,
+    required Map<String, Branch> branchesByName,
+  }) => HrHomeOverviewActions(
+    onReload: onReload,
+    onOpenNotifications: () => context.push('/notifications', extra: delegate),
+    onOpenProfile: () => context.push('/user-profile', extra: delegate),
+    onOpenAttendanceLog: () => onNavigateToTab(kHrTabAttendance),
+    onOpenDelegates: () => onNavigateToTab(kHrTabDelegates),
+    onAddDelegate: () => openAdminHomeAddDelegate(context, delegate),
+    onHowToLink: () => showAdminHomeLinkingGuide(context, delegate),
+    onOpenRecord: (record) => Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => HRDelegateAttendanceDetailScreen(
+          delegate: record.delegate,
+          initialMonth: month,
+          branchesByName: branchesByName,
+          hrDelegate: delegate,
+        ),
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
+    final fake = debugData?.call(delegate);
+    if (fake != null) {
+      final clock = debugClock ?? DateTime.now;
+      return HrHomeOverviewView(
+        data: fake,
+        clock: clock,
+        actions: _actions(
+          context,
+          onReload: () async {},
+          month: clock(),
+          branchesByName: fake.branchesByName,
+        ),
+      );
+    }
     return _UnreadNotifications(
       delegate: delegate,
       child: HRAttendanceTab(
         hrDelegate: delegate,
         onNavigateToTab: onNavigateToTab,
-        viewBuilder: (context, view) {
-          final data = HrHomeOverviewData(
+        viewBuilder: (context, view) => HrHomeOverviewView(
+          data: HrHomeOverviewData(
             delegate: delegate,
             isLoading: view.isLoading,
             errorMessage: view.errorMessage,
@@ -109,33 +158,14 @@ class HrHomeOverviewWeb extends StatelessWidget {
               null,
               delegate.companyUID,
             ),
-          );
-          return HrHomeOverviewView(
-            data: data,
-            actions: HrHomeOverviewActions(
-              onReload: view.onReload ?? view.onRefresh,
-              onOpenNotifications: () =>
-                  context.push('/notifications', extra: delegate),
-              onOpenProfile: () =>
-                  context.push('/user-profile', extra: delegate),
-              onOpenAttendanceLog: () => onNavigateToTab(kHrTabAttendance),
-              onOpenDelegates: () => onNavigateToTab(kHrTabDelegates),
-              onAddDelegate: () => openAdminHomeAddDelegate(context, delegate),
-              onHowToLink: () => showAdminHomeLinkingGuide(context, delegate),
-              onOpenRecord: (record) => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => HRDelegateAttendanceDetailScreen(
-                    delegate: record.delegate,
-                    initialMonth: view.selectedDate,
-                    branchesByName: view.branchesByName,
-                    hrDelegate: delegate,
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
+          ),
+          actions: _actions(
+            context,
+            onReload: view.onReload ?? view.onRefresh,
+            month: view.selectedDate,
+            branchesByName: view.branchesByName,
+          ),
+        ),
       ),
     );
   }
