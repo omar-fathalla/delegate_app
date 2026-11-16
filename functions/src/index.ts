@@ -316,6 +316,7 @@ export const onNotificationCreated = functions.firestore
 export {delegateLoginV2} from "./delegate_login";
 export {confirmDelegateOtp} from "./confirm_delegate_otp";
 export {staffPhoneLookup} from "./staff_phone_lookup";
+export {onStaffUserPhonesClaimSync} from "./staff_phones_claim";
 export {listGlobalNotifyStaff} from "./list_global_notify_staff";
 
 export {createStaffUser, resendStaffSetupLink, claimInvite} from "./staff_accounts";

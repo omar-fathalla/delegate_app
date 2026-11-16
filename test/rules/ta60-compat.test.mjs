@@ -6,13 +6,45 @@ import {
   BELL_PHONE_PROBE_MATRIX,
   shapeCZeroPrefixFromPhones,
   STAFF_SHAPE_C_PHONE,
+  runBellGetNotificationsSimulation,
+  staffG5PhoneDocCounts,
+  staffRealProdToken,
+  staffWithMintedPhones,
 } from './ta60/firestore_compat.mjs';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import { runStorageCompatHarness } from './ta60/storage_compat.mjs';
 
 test('TA-60 bell shape (c): 0+prefix probe matrix', () => {
   const row = BELL_PHONE_PROBE_MATRIX.find((x) => x.shape === 'c');
   assert.ok(row?.label?.includes('0+'), 'shape (c) documents 0+ prefix');
   assert.deepEqual(shapeCZeroPrefixFromPhones(['01000000001', STAFF_SHAPE_C_PHONE]), [`0${STAFF_SHAPE_C_PHONE}`]);
+});
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const FS_PORT = Number(process.env.LOCAL_CI_FIRESTORE_PORT || 8080);
+const CAND_RULES = process.env.CAND || path.join(ROOT, 'firestore.rules');
+
+test('TA-60 staff JWT phones: pre-mint short counts + G5 deny on candidate', async () => {
+  const cand = await initializeTestEnvironment({
+    projectId: 'demo-ta60-cand-pre-mint',
+    firestore: {
+      rules: fs.readFileSync(CAND_RULES, 'utf8'),
+      host: '127.0.0.1',
+      port: FS_PORT,
+    },
+  });
+  const g5Pre = await staffG5PhoneDocCounts(cand, staffRealProdToken);
+  for (const [role, n] of Object.entries(g5Pre)) {
+    if (role === 'delegate') continue;
+    assert.equal(n, 0, `${role}: pre-mint G5 phone list must DENY (0 docs)`);
+  }
+  const postG5 = await staffG5PhoneDocCounts(cand, staffWithMintedPhones);
+  const g5Gained = Object.entries(postG5).filter(([role, n]) => role !== 'delegate' && n > 0);
+  assert.ok(g5Gained.length > 0, 'post-mint staff G5 must return docs for at least one role');
+  await cand.cleanup();
 });
 
 test('TA-60 firestore: live prod vs candidate (main v1.14.2 + web shapes)', async () => {

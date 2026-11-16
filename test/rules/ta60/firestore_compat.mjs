@@ -293,13 +293,31 @@ function staffJwtPhones(uid) {
   ])].filter(Boolean);
 }
 
-const staff = (env, uid, email, extra = {}) => env.authenticatedContext(uid, {
-  email: email || `${uid}@t.test`,
-  email_verified: true,
-  firebase: { sign_in_provider: 'password' },
-  phones: staffJwtPhones(uid),
-  ...extra,
-}).firestore();
+/** Prod-like staff email/password token (no server-minted `phones` claim). */
+export function staffRealProdToken(env, uid, email, extra = {}) {
+  return env.authenticatedContext(uid, {
+    email: email || `${uid}@t.test`,
+    email_verified: true,
+    firebase: { sign_in_provider: 'password' },
+    ...extra,
+  }).firestore();
+}
+
+/** Post-deploy CF backfill: JWT `phones` matches delegate_login_logic variants. */
+export function staffWithMintedPhones(env, uid, email, extra = {}) {
+  return env.authenticatedContext(uid, {
+    email: email || `${uid}@t.test`,
+    email_verified: true,
+    firebase: { sign_in_provider: 'password' },
+    phones: staffJwtPhones(uid),
+    ...extra,
+  }).firestore();
+}
+
+/** Default staff auth for prod-compat target state (post-mint). */
+function staff(env, uid, email, extra = {}) {
+  return staffWithMintedPhones(env, uid, email, extra);
+}
 const delegate = (env) => env.authenticatedContext('dlg1', {
   role: 'delegate', delegateId: 'dlg1', delegateIds: ['dlg1'], orgId: ORG, companyId: CO,
   phones: DELEGATE_CLAIM_PHONES, firebase: { sign_in_provider: 'custom' } }).firestore();
@@ -365,8 +383,8 @@ function companyUidForStaff(uid, bellRole) {
 }
 
 /** cb3f4e2 getNotifications() §1–4 list shapes (release/1.14.x-supervisor @ cb3f4e2). */
-function staffBellShapes(uid, bellRole) {
-  const db = (e) => staff(e, uid);
+function staffBellShapes(uid, bellRole, staffCtx = (e, u) => staff(e, u)) {
+  const db = (e) => staffCtx(e, uid);
   const shapes = [];
   const push = (label, fn) => shapes.push([
     'NOTIF-READ',
@@ -470,9 +488,9 @@ function delegateBellShapes() {
   return shapes;
 }
 
-function staffBellG5Shapes(uid, bellRole) {
+function staffBellG5Shapes(uid, bellRole, staffCtx = (e, u) => staff(e, u)) {
   const ph = staffStoredPhoneForBell(uid);
-  const db = (e) => staff(e, uid);
+  const db = (e) => staffCtx(e, uid);
   const variants = [...new Set([ph, ...getNotificationsPhoneVariations(ph)])];
   const out = [];
   for (const v of variants) {
@@ -533,7 +551,8 @@ function shapeCPhoneSimulationFns(bellRole, uid) {
   return [];
 }
 
-function bellCountedQueryFns(bellRole, uid) {
+function bellCountedQueryFns(bellRole, uid, staffDb) {
+  const staffCtx = staffDb ?? ((e, u) => staff(e, u));
   if (bellRole === 'delegate') {
     const base = delegateBellShapes()
       .filter(([area, name]) => area === 'NOTIF-READ' && isBellCountedCase(name))
@@ -541,18 +560,24 @@ function bellCountedQueryFns(bellRole, uid) {
     // Shape (c) §5 0+ queries covered in NOTIF-G5 probes; keep counted rows aligned to live targets.
     return [...base, ...shapeCPhoneSimulationFns(bellRole, uid)];
   }
-  return staffBellShapes(uid, bellRole).map(([, , fn]) => fn);
+  return staffBellShapes(uid, bellRole, staffCtx).map(([, , fn]) => fn);
 }
 
 /**
  * cb3f4e2 getNotifications(): parallel bell queries (queryAllSettled-style).
  * Returns deduped doc ids plus per-shape hits (queries that returned ≥1 doc).
  */
-export async function simulateGetNotifications(env, uid, bellRole) {
+function bellStaffQueryFns(uid, bellRole, staffCtx, includeG5) {
+  const base = bellCountedQueryFns(bellRole, uid, staffCtx);
+  if (bellRole === 'delegate' || !includeG5) return base;
+  return [...base, ...staffBellG5Shapes(uid, bellRole, staffCtx).map(([, , fn]) => fn)];
+}
+
+export async function simulateGetNotifications(env, uid, bellRole, staffDb, includeStaffG5 = false) {
   await seed(env);
   const docIds = new Set();
   let queryHits = 0;
-  for (const fn of bellCountedQueryFns(bellRole, uid)) {
+  for (const fn of bellStaffQueryFns(uid, bellRole, staffDb, includeStaffG5)) {
     try {
       const snap = await fn(env);
       if ((snap?.size ?? 0) > 0) queryHits += 1;
@@ -566,20 +591,118 @@ export async function simulateGetNotifications(env, uid, bellRole) {
   return { uniqueDocs: docIds.size, queryHits, docIds: [...docIds] };
 }
 
-export async function simulateGetNotificationsDocCount(env, uid, bellRole) {
-  return (await simulateGetNotifications(env, uid, bellRole)).uniqueDocs;
+export async function simulateGetNotificationsDocCount(env, uid, bellRole, staffDb) {
+  return (await simulateGetNotifications(env, uid, bellRole, staffDb)).uniqueDocs;
 }
 
-export async function runBellGetNotificationsSimulation(testEnv) {
+export async function runBellGetNotificationsSimulation(testEnv, staffDb, includeStaffG5 = false) {
+  const staffCtx = staffDb ?? ((e, u) => staff(e, u));
   const roles = [['dlg1', 'delegate'], ...STAFF_BELL_UID];
   const uniqueDocs = {};
   const queryHits = {};
   for (const [uid, bellRole] of roles) {
-    const sim = await simulateGetNotifications(testEnv, uid, bellRole);
+    const sim = await simulateGetNotifications(
+      testEnv, uid, bellRole, staffCtx, includeStaffG5,
+    );
     uniqueDocs[bellRole] = sim.uniqueDocs;
     queryHits[bellRole] = sim.queryHits;
   }
   return { uniqueDocs, queryHits };
+}
+
+/**
+ * Pre-mint: G5 phone-group reads contribute 0 docs (fully denied without JWT `phones`).
+ * Counted (a/b) cb3f4e2 shapes may still hit live targets; the prod gap is the G5 slice.
+ */
+export function assertStaffPreMintBellShortCounts(baseSim, g5DocCountsByRole, postMintSim) {
+  const issues = [];
+  for (const [role, target] of Object.entries(BELL_LIVE_ALLOW_TARGETS)) {
+    if (role === 'delegate') continue;
+    const g5 = g5DocCountsByRole[role] ?? 0;
+    if (g5 !== 0) {
+      issues.push(`${role}: pre-mint G5 docs ${g5} != 0`);
+    }
+    const counted = baseSim.uniqueDocs[role];
+    const post = postMintSim?.uniqueDocs?.[role];
+    if (typeof post === 'number' && counted > post) {
+      issues.push(`${role}: pre-mint counted ${counted} > post-mint ${post}`);
+    }
+    if (counted > target) {
+      issues.push(`${role}: pre-mint counted ${counted} > live target ${target}`);
+    }
+  }
+  return issues;
+}
+
+/** One G5 phone-field probe per staff role (single shared seed). */
+export async function staffG5PhoneDocCounts(testEnv, staffCtx) {
+  await seed(testEnv);
+  const out = {};
+  for (const [uid, bellRole] of STAFF_BELL_UID) {
+    const ph = staffStoredPhoneForBell(uid);
+    let size = 0;
+    try {
+      const snap = await notifListPhoneField(staffCtx(testEnv, uid), ph);
+      size = snap.size;
+    } catch (_) {
+      size = 0;
+    }
+    out[bellRole] = size;
+  }
+  return out;
+}
+
+/** Post-mint staff tokens must hit live bell targets (10 staff roles × targets). */
+export function assertStaffPostMintBellTargets(sim) {
+  const issues = [];
+  for (const [role, target] of Object.entries(BELL_LIVE_ALLOW_TARGETS)) {
+    const docs = sim.uniqueDocs[role];
+    if (docs !== target) {
+      issues.push(`${role}: post-mint sim docs ${docs} != target ${target}`);
+    }
+  }
+  return issues;
+}
+
+async function staffG5AllowsOnCandidate(env, staffCtx) {
+  const rows = [];
+  for (const [uid, bellRole] of STAFF_BELL_UID) {
+    const ph = staffStoredPhoneForBell(uid);
+    const db = (e) => staffCtx(e, uid);
+    const variants = [...new Set([ph, ...getNotificationsPhoneVariations(ph)])].slice(0, 1);
+    for (const v of variants) {
+      await seed(env);
+      try {
+        await notifListPhoneField(db(env), v);
+        rows.push({ bellRole, allow: true });
+      } catch {
+        rows.push({ bellRole, allow: false });
+      }
+    }
+  }
+  return rows;
+}
+
+/** Pre-mint: G5 phone field queries denied for every staff role on candidate rules. */
+export async function assertStaffPreMintG5Denied(testEnv) {
+  const staffCtx = (e, u) => staffRealProdToken(e, u);
+  const rows = await staffG5AllowsOnCandidate(testEnv, staffCtx);
+  const issues = rows.filter((r) => r.allow).map((r) => `${r.bellRole}: G5 unexpected ALLOW pre-mint`);
+  return issues;
+}
+
+/** Post-mint: at least one G5 probe per staff role must ALLOW. */
+export async function assertStaffPostMintG5Allows(testEnv) {
+  const staffCtx = (e, u) => staffWithMintedPhones(e, u);
+  const rows = await staffG5AllowsOnCandidate(testEnv, staffCtx);
+  const issues = [];
+  for (const bellRole of STAFF_BELL_UID.map((x) => x[1])) {
+    const roleRows = rows.filter((r) => r.bellRole === bellRole);
+    if (!roleRows.some((r) => r.allow)) {
+      issues.push(`${bellRole}: G5 expected ALLOW post-mint`);
+    }
+  }
+  return issues;
 }
 
 export function assertBellAllowCounts(rows) {
