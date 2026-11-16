@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import 'package:delegate_app/features/admin/domain/entities/subscription_renewal.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -38,6 +39,11 @@ enum HrShellPlacement { sidebar, compactMenu, moreSheet }
 class HrShellItem {
   final String id;
   final String title;
+
+  /// Shorter label for web menus only (sidebar, collapsed rail, compact
+  /// menu, and the web "more" sheet). Null keeps [title]. Mobile menus
+  /// never read this.
+  final String? webTitle;
   final String subtitle;
   final String section;
   final IconData icon;
@@ -51,6 +57,7 @@ class HrShellItem {
   const HrShellItem({
     required this.id,
     required this.title,
+    this.webTitle,
     required this.subtitle,
     required this.section,
     required this.icon,
@@ -61,6 +68,10 @@ class HrShellItem {
     this.destructive = false,
     this.requiresRenewalPermission = false,
   });
+
+  /// Menu label. Web uses [webTitle] when one is set; mobile keeps [title].
+  String menuLabel({required bool isWeb}) =>
+      isWeb ? (webTitle ?? title) : title;
 }
 
 const List<HrShellItem> kHrShellCatalog = [
@@ -85,6 +96,7 @@ const List<HrShellItem> kHrShellCatalog = [
   HrShellItem(
     id: 'delegate_subscriptions',
     title: 'طلبات اشتراك واعتماد المناديب',
+    webTitle: 'طلبات الاشتراك',
     subtitle: 'اعتماد طلبات تسجيل المناديب واشتراكاتهم',
     section: 'الكوادر والاشتراكات',
     icon: Icons.how_to_reg_outlined,
@@ -108,8 +120,8 @@ const List<HrShellItem> kHrShellCatalog = [
     title: 'سجل الحضور والانصراف',
     subtitle: 'متابعة حضور وانصراف مناديب الشركة',
     section: 'الحضور والميدان',
-    icon: Icons.how_to_reg_outlined,
-    selectedIcon: Icons.how_to_reg_rounded,
+    icon: Icons.event_available_outlined,
+    selectedIcon: Icons.event_available_rounded,
     tabIndex: kHrTabAttendance,
   ),
   HrShellItem(
@@ -131,8 +143,40 @@ const List<HrShellItem> kHrShellCatalog = [
     tabIndex: kHrTabTracking,
   ),
   HrShellItem(
+    id: 'field_photos',
+    title: 'الصور والزيارات الميدانية',
+    webTitle: 'الصور',
+    subtitle: 'صور الزيارات وأذونات التصوير',
+    section: 'الحضور والميدان',
+    icon: Icons.photo_library_outlined,
+    selectedIcon: Icons.photo_library_rounded,
+    tabIndex: kHrTabPhotos,
+  ),
+  HrShellItem(
+    id: 'supervisor_photo_permissions',
+    title: 'أذونات التصوير',
+    subtitle: 'اعتماد أذونات التصوير الميداني',
+    // Web sidebar: directly under «الصور» in this group.
+    section: 'الحضور والميدان',
+    icon: Symbols.add_a_photo,
+    selectedIcon: Symbols.add_a_photo_rounded,
+    tabIndex: kHrTabPhotoPermissions,
+    webOnly: true,
+  ),
+  HrShellItem(
+    id: 'attendance_adjustments',
+    title: 'سجل تعديلات الحضور والانصراف',
+    webTitle: 'تعديلات الحضور',
+    subtitle: 'التعديلات اليدوية على البصمات',
+    section: 'الحضور والميدان',
+    icon: Icons.history_edu_outlined,
+    selectedIcon: Icons.history_edu_rounded,
+    tabIndex: kHrTabAdjustments,
+  ),
+  HrShellItem(
     id: 'leaves_and_excuses',
     title: 'طلبات الإجازات والأعذار',
+    webTitle: 'طلبات الإجازات',
     subtitle: 'اعتماد الإجازات والأعذار',
     section: 'الطلبات والماليات',
     icon: Icons.event_note_outlined,
@@ -143,6 +187,7 @@ const List<HrShellItem> kHrShellCatalog = [
   HrShellItem(
     id: 'monthly_payroll',
     title: 'مسير الرواتب والعمولات',
+    webTitle: 'الرواتب',
     subtitle: 'كشوف الرواتب والبدلات',
     section: 'الطلبات والماليات',
     icon: Icons.account_balance_wallet_outlined,
@@ -150,18 +195,9 @@ const List<HrShellItem> kHrShellCatalog = [
     tabIndex: kHrTabPayroll,
   ),
   HrShellItem(
-    id: 'device_unbind_requests',
-    title: 'طلبات فك وربط الأجهزة',
-    subtitle: 'طلبات تغيير هاتف المندوب',
-    section: 'الطلبات والماليات',
-    icon: Icons.phonelink_lock_outlined,
-    selectedIcon: Icons.phonelink_lock_rounded,
-    tabIndex: kHrTabDevices,
-    badgeCollection: 'device_unbind_requests',
-  ),
-  HrShellItem(
     id: 'anti_fraud',
     title: 'تدقيق الأمان ومكافحة الاحتيال',
+    webTitle: 'تدقيق الأمان',
     subtitle: 'محاولات التلاعب بالموقع والجهاز',
     section: 'الرقابة والأدوات',
     icon: Icons.security_outlined,
@@ -169,22 +205,16 @@ const List<HrShellItem> kHrShellCatalog = [
     tabIndex: kHrTabFraud,
   ),
   HrShellItem(
-    id: 'field_photos',
-    title: 'الصور والزيارات الميدانية',
-    subtitle: 'صور الزيارات وأذونات التصوير',
-    section: 'الحضور والميدان',
-    icon: Icons.photo_library_outlined,
-    selectedIcon: Icons.photo_library_rounded,
-    tabIndex: kHrTabPhotos,
-  ),
-  HrShellItem(
-    id: 'attendance_adjustments',
-    title: 'سجل تعديلات الحضور والانصراف',
-    subtitle: 'التعديلات اليدوية على البصمات',
-    section: 'الحضور والميدان',
-    icon: Icons.history_edu_outlined,
-    selectedIcon: Icons.history_edu_rounded,
-    tabIndex: kHrTabAdjustments,
+    id: 'device_unbind_requests',
+    title: 'طلبات فك وربط الأجهزة',
+    webTitle: 'فك الأجهزة',
+    subtitle: 'طلبات تغيير هاتف المندوب',
+    // Web sidebar: الرقابة والأدوات, immediately after تدقيق الأمان.
+    section: 'الرقابة والأدوات',
+    icon: Icons.phonelink_lock_outlined,
+    selectedIcon: Icons.phonelink_lock_rounded,
+    tabIndex: kHrTabDevices,
+    badgeCollection: 'device_unbind_requests',
   ),
   HrShellItem(
     id: 'tasks',
@@ -197,18 +227,9 @@ const List<HrShellItem> kHrShellCatalog = [
     webOnly: true,
   ),
   HrShellItem(
-    id: 'supervisor_photo_permissions',
-    title: 'أذونات التصوير',
-    subtitle: 'اعتماد أذونات التصوير الميداني',
-    section: 'الرقابة والأدوات',
-    icon: Icons.collections_outlined,
-    selectedIcon: Icons.collections_rounded,
-    tabIndex: kHrTabPhotoPermissions,
-    webOnly: true,
-  ),
-  HrShellItem(
     id: 'penalty_rules_catalog',
     title: 'لائحة الغرامات والجزاءات',
+    webTitle: 'لائحة الغرامات',
     subtitle: 'اللائحة المعتمدة للجزاءات',
     section: 'الرقابة والأدوات',
     icon: Icons.menu_book_outlined,
@@ -219,6 +240,7 @@ const List<HrShellItem> kHrShellCatalog = [
   HrShellItem(
     id: 'penalties_management',
     title: 'نظام الغرامات والمخالفات',
+    webTitle: 'نظام الغرامات',
     subtitle: 'إصدار ومتابعة الغرامات',
     section: 'الرقابة والأدوات',
     icon: Icons.gavel_outlined,

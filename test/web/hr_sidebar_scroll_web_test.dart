@@ -202,27 +202,20 @@ void main() {
 
           for (final item in items) {
             // «الرئيسية» is also a section title above its row.
+            final shown = item.menuLabel(isWeb: true);
             final title = find
-                .descendant(of: _scrollArea, matching: find.text(item.title))
+                .descendant(of: _scrollArea, matching: find.text(shown))
                 .last;
             await tester.scrollUntilVisible(title, 80, scrollable: _scrollable);
             await tester.pumpAndSettle();
             final rect = tester.getRect(title);
-            expect(
-              rect.top,
-              greaterThanOrEqualTo(viewport.top),
-              reason: item.title,
-            );
+            expect(rect.top, greaterThanOrEqualTo(viewport.top), reason: shown);
             expect(
               rect.bottom,
               lessThanOrEqualTo(viewport.bottom),
-              reason: item.title,
+              reason: shown,
             );
-            expect(
-              rect.bottom,
-              lessThanOrEqualTo(footerTop),
-              reason: item.title,
-            );
+            expect(rect.bottom, lessThanOrEqualTo(footerTop), reason: shown);
 
             if (item.tabIndex != null) {
               await tester.tap(title);
@@ -230,7 +223,7 @@ void main() {
               expect(
                 tester.state<_HostState>(find.byType(_Host)).selected,
                 item.tabIndex,
-                reason: item.title,
+                reason: shown,
               );
             }
           }
@@ -247,12 +240,7 @@ void main() {
       await tester.pumpAndSettle();
       final viewport = tester.getRect(_scrollArea);
       final footerTop = _footerTop(tester);
-      for (final title in const [
-        'المهام',
-        'أذونات التصوير',
-        'لائحة الغرامات والجزاءات',
-        'نظام الغرامات والمخالفات',
-      ]) {
+      for (final title in const ['المهام', 'لائحة الغرامات', 'نظام الغرامات']) {
         final rect = tester.getRect(
           find.descendant(of: _scrollArea, matching: find.text(title)),
         );
@@ -267,7 +255,7 @@ void main() {
       await _pump(tester, const Size(1280, 720), _delegate(UserRole.hr));
       final penalties = find.descendant(
         of: _scrollArea,
-        matching: find.text('نظام الغرامات والمخالفات'),
+        matching: find.text('نظام الغرامات'),
       );
       final viewport = tester.getRect(_scrollArea);
       expect(tester.getRect(penalties).top, greaterThan(viewport.bottom));
@@ -288,10 +276,7 @@ void main() {
       );
       final viewport = tester.getRect(_scrollArea);
       final rect = tester.getRect(
-        find.descendant(
-          of: _scrollArea,
-          matching: find.text('نظام الغرامات والمخالفات'),
-        ),
+        find.descendant(of: _scrollArea, matching: find.text('نظام الغرامات')),
       );
       expect(rect.top, greaterThanOrEqualTo(viewport.top));
       expect(rect.bottom, lessThanOrEqualTo(viewport.bottom));

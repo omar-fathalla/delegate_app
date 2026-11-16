@@ -122,6 +122,12 @@ class HRDesktopSidebar extends StatelessWidget {
                 child: WebRuntimePolicy.isWeb
                     ? HrSidebarScrollArea(
                         selectedIndex: selectedIndex,
+                        padding: EdgeInsets.fromLTRB(
+                          showLabels ? 10 : 0,
+                          12,
+                          showLabels ? 10 : 0,
+                          16,
+                        ),
                         entries: _menuEntries(
                           context,
                           sections,
@@ -167,27 +173,37 @@ class HRDesktopSidebar extends StatelessWidget {
     ColorScheme colorScheme,
     bool showLabels,
   ) => [
-    for (final section in sections) ...[
-      HrSidebarEntry(
-        child: showLabels
-            ? Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
-                child: Text(
-                  section.sectionTitle,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                    letterSpacing: 0.4,
+    for (var i = 0; i < sections.length; i++) ...[
+      if (WebRuntimePolicy.isWeb && i > 0)
+        HrSidebarEntry(child: _groupDivider(colorScheme)),
+      // Mobile keeps a plain section header (a title when expanded, the
+      // original rail divider when collapsed). Web adds the divider above
+      // and still shows the group title only while the labels fit. The
+      // «الرئيسية» header is omitted because it repeats the first item.
+      if (!(WebRuntimePolicy.isWeb && sections[i].sectionTitle == 'الرئيسية') &&
+          (showLabels || !WebRuntimePolicy.isWeb))
+        HrSidebarEntry(
+          child: showLabels
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+                  child: Text(
+                    sections[i].sectionTitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.7,
+                      ),
+                      letterSpacing: 0.4,
+                    ),
                   ),
+                )
+              : const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Divider(height: 1, indent: 8, endIndent: 8),
                 ),
-              )
-            : const Padding(
-                padding: EdgeInsets.symmetric(vertical: 6),
-                child: Divider(height: 1, indent: 8, endIndent: 8),
-              ),
-      ),
-      for (final item in section.items)
+        ),
+      for (final item in sections[i].items)
         HrSidebarEntry(
           index: item.index,
           child: _buildMenuItem(
@@ -200,6 +216,23 @@ class HRDesktopSidebar extends StatelessWidget {
         ),
     ],
   ];
+
+  /// Thin group separator for the web sidebar and the collapsed rail.
+  Widget _groupDivider(ColorScheme colorScheme) {
+    return Padding(
+      padding: EdgeInsetsDirectional.fromSTEB(
+        isExpanded ? 8 : 12,
+        6,
+        isExpanded ? 8 : 12,
+        6,
+      ),
+      child: Divider(
+        height: 1,
+        thickness: 1,
+        color: colorScheme.outlineVariant,
+      ),
+    );
+  }
 
   /// Mobile HR sidebar. Titles and order are the ones the phone already ships.
   List<HRSidebarSectionData> _mobileSections() => const [
@@ -294,13 +327,13 @@ class HRDesktopSidebar extends StatelessWidget {
     final order = <String>[];
     final grouped = <String, List<HRSidebarItemData>>{};
     for (final item in items) {
+      // «نظام الغرامات» keeps the same colors as every other row.
       final row = HRSidebarItemData(
         index: item.tabIndex ?? -1,
-        title: item.title,
+        title: item.menuLabel(isWeb: true),
         icon: item.icon,
         selectedIcon: item.selectedIcon,
         badgeCollection: item.badgeCollection,
-        destructive: item.destructive,
       );
       final bucket = grouped.putIfAbsent(item.section, () {
         order.add(item.section);
@@ -447,14 +480,22 @@ class HRDesktopSidebar extends StatelessWidget {
     required ColorScheme colorScheme,
     required bool showLabels,
   }) {
-    // Web penalties keep the same icon colour as the other tools. Error red
-    // stays available for a destructive mobile row; the web catalog's gavel
-    // is not one of those.
-    final iconColor = isSelected
-        ? colorScheme.onPrimaryContainer
-        : item.destructive && !WebRuntimePolicy.isWeb
+    final web = WebRuntimePolicy.isWeb;
+    // Web selected rows use the drawer indicator. Error red stays available
+    // for a destructive mobile row; the web catalog's gavel is not one.
+    final selectedColor = web
+        ? colorScheme.onSecondaryContainer
+        : colorScheme.onPrimaryContainer;
+    final iconColor = !web && item.destructive
         ? colorScheme.error
+        : isSelected
+        ? selectedColor
         : colorScheme.onSurfaceVariant;
+    final labelColor = !web && item.destructive
+        ? colorScheme.error
+        : isSelected
+        ? selectedColor
+        : colorScheme.onSurface;
 
     Widget iconWidget = Icon(
       isSelected ? item.selectedIcon : item.icon,
@@ -503,6 +544,26 @@ class HRDesktopSidebar extends StatelessWidget {
       }
     }
 
+    void open() {
+      if (item.index < 0) {
+        onOpenProfile();
+      } else {
+        onItemSelected(item.index);
+      }
+    }
+
+    if (web) {
+      return _webNavDestination(
+        item: item,
+        isSelected: isSelected,
+        colorScheme: colorScheme,
+        iconWidget: iconWidget,
+        labelColor: labelColor,
+        showLabels: showLabels,
+        onTap: open,
+      );
+    }
+
     final content = AnimatedContainer(
       duration: AppMotionDurations.short3,
       curve: AppMotionCurves.standardDecelerate,
@@ -529,11 +590,7 @@ class HRDesktopSidebar extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13.5,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: item.destructive
-                      ? colorScheme.error
-                      : isSelected
-                      ? colorScheme.onPrimaryContainer
-                      : colorScheme.onSurface,
+                  color: labelColor,
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -547,13 +604,7 @@ class HRDesktopSidebar extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          if (item.index < 0) {
-            onOpenProfile();
-          } else {
-            onItemSelected(item.index);
-          }
-        },
+        onTap: open,
         borderRadius: BorderRadius.circular(14),
         hoverColor: colorScheme.onSurface.withValues(alpha: 0.06),
         child: showLabels
@@ -562,6 +613,83 @@ class HRDesktopSidebar extends StatelessWidget {
                 label: item.title,
                 selected: isSelected,
                 child: content,
+              ),
+      ),
+    );
+  }
+
+  /// Web drawer row (48dp) or rail destination (48dp target, 56×32 indicator).
+  Widget _webNavDestination({
+    required HRSidebarItemData item,
+    required bool isSelected,
+    required ColorScheme colorScheme,
+    required Widget iconWidget,
+    required Color labelColor,
+    required bool showLabels,
+    required VoidCallback onTap,
+  }) {
+    final indicator = BoxDecoration(
+      color: isSelected ? colorScheme.secondaryContainer : Colors.transparent,
+      borderRadius: BorderRadius.circular(showLabels ? 24 : 16),
+    );
+    final destination = showLabels
+        ? AnimatedContainer(
+            duration: AppMotionDurations.short3,
+            curve: AppMotionCurves.standardDecelerate,
+            height: 48,
+            margin: const EdgeInsets.symmetric(vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            alignment: Alignment.center,
+            decoration: indicator,
+            child: Row(
+              children: [
+                iconWidget,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    item.title,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                      color: labelColor,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          )
+        : SizedBox(
+            height: 48,
+            width: double.infinity,
+            child: Center(
+              child: AnimatedContainer(
+                duration: AppMotionDurations.short3,
+                curve: AppMotionCurves.standardDecelerate,
+                width: 56,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: indicator,
+                child: iconWidget,
+              ),
+            ),
+          );
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(showLabels ? 24 : 16),
+        hoverColor: colorScheme.onSurface.withValues(alpha: 0.06),
+        child: showLabels
+            ? destination
+            : _collapsedRailTarget(
+                label: item.title,
+                selected: isSelected,
+                child: destination,
               ),
       ),
     );
@@ -766,11 +894,13 @@ class HrSidebarEntry {
 class HrSidebarScrollArea extends StatefulWidget {
   final int selectedIndex;
   final List<HrSidebarEntry> entries;
+  final EdgeInsets padding;
 
   const HrSidebarScrollArea({
     super.key,
     required this.selectedIndex,
     required this.entries,
+    this.padding = const EdgeInsets.fromLTRB(10, 12, 10, 16),
   });
 
   @override
@@ -844,7 +974,7 @@ class _HrSidebarScrollAreaState extends State<HrSidebarScrollArea> {
         key: const ValueKey('hr_sidebar_scroll'),
         controller: _controller,
         physics: const ClampingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(10, 12, 10, 16),
+        padding: widget.padding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
