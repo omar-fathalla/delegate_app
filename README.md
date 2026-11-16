@@ -107,16 +107,16 @@ Re-running `--apply` updates the same documents and does not change passwords. `
 
 إعادة التشغيل لا تغيّر كلمات السر. `--cleanup` يحذف فقط ما وسمه السكربت.
 
-Web HR login is the fake phone plus the password from the local file. Company scoping uses organization `seed-fake-hr-org` and companies `seed-fake-co-alpha` / `seed-fake-co-beta`. Each company has four active delegates and one suspended delegate (`*.5`). `fake.nocompany@example.com` is an HR user with no `companyUID`.
+Web HR login is the fake phone plus the password from the local file. Company scoping uses organization `seed-fake-hr-org` and companies `seed-fake-co-alpha` / `seed-fake-co-beta`. Each company has four active delegates and one suspended delegate (`*.5`). Every HR account belongs to a company; `fake.nocompany@example.com` is a second HR user under `seed-fake-co-alpha`. Delegate national IDs are unique, clearly fake 14-digit ASCII values such as `00000000000101`.
 
-تسجيل الدخول في بوابة الموارد البشرية: رقم الهاتف الوهمي ثم كلمة السر من الملف المحلي. لكل شركة أربعة مندوبين نشطين ومندوب موقوف (`*.5`). الحساب `fake.nocompany@example.com` موارد بشرية بدون `companyUID`.
+تسجيل الدخول في بوابة الموارد البشرية: رقم الهاتف الوهمي ثم كلمة السر من الملف المحلي. لكل شركة أربعة مندوبين نشطين ومندوب موقوف (`*.5`). كل حساب موارد بشرية تابع لشركة؛ الحساب `fake.nocompany@example.com` موارد بشرية إضافي تحت `seed-fake-co-alpha`. أرقام الهوية القومية للمندوبين الوهميين 14 رقمًا إنجليزيًا واضحة أنها تجريبية.
 
 | Role / الدور | Email | Phone | companyUID |
 | --- | --- | --- | --- |
 | super-admin / سوبر أدمن | fake.superadmin@example.com | 01000000001 | (none) |
 | technical_support / دعم فني | fake.techsupport@example.com | 01000000002 | (none) |
 | organization-admin / مسؤول المنظمة | fake.orgadmin@example.com | 01000000003 | (none) |
-| hr, no company / موارد بشرية بلا شركة | fake.nocompany@example.com | 01000000004 | (none) |
+| hr / موارد بشرية ألف (حساب إضافي) | fake.nocompany@example.com | 01000000004 | seed-fake-co-alpha |
 | supervisor / مشرف الشركة ألف | fake.supervisor.alpha@example.com | 01000000005 | seed-fake-co-alpha |
 | hr / موارد بشرية ألف | fake.hr.alpha@example.com | 01000000006 | seed-fake-co-alpha |
 | marketing / تسويق فرع ألف | fake.marketing.alpha@example.com | 01000000007 | seed-fake-co-alpha |

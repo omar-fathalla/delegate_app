@@ -163,7 +163,7 @@ test("data builder matches staff and company delegate shapes", () => {
   expectAccount("fake.superadmin@example.com", "super-admin", "", "01000000001");
   expectAccount("fake.techsupport@example.com", "technical_support", "", "01000000002");
   expectAccount("fake.orgadmin@example.com", "organization-admin", "", "01000000003");
-  expectAccount("fake.nocompany@example.com", "hr", "", "01000000004");
+  expectAccount("fake.nocompany@example.com", "hr", "seed-fake-co-alpha", "01000000004");
   expectAccount("fake.supervisor.alpha@example.com", "supervisor", "seed-fake-co-alpha", "01000000005");
   expectAccount("fake.hr.alpha@example.com", "hr", "seed-fake-co-alpha", "01000000006");
   expectAccount("fake.marketing.alpha@example.com", "marketing", "seed-fake-co-alpha", "01000000007");
@@ -195,13 +195,20 @@ test("data builder matches staff and company delegate shapes", () => {
     "seed-fake-super-admin",
     "seed-fake-tech-support",
     "seed-fake-org-admin",
-    "seed-fake-no-company",
   ]) {
     const doc = plan.writes.find((write) => write.path === `users/${uid}`);
     assert.equal(Object.prototype.hasOwnProperty.call(doc.data, "companyUID"), false, uid);
     assert.equal(doc.data.organizationUID, "seed-fake-hr-org");
     assert.equal(doc.data.seedTag, plan.seedTag);
   }
+
+  const extraHr = plan.writes.find((write) => write.path === "users/seed-fake-no-company").data;
+  assert.equal(extraHr.role, "hr");
+  assert.equal(extraHr.companyUID, "seed-fake-co-alpha");
+  assert.equal(extraHr.companyName, "Fake Company Alpha");
+  assert.equal(extraHr.email, "fake.nocompany@example.com");
+  assert.equal(extraHr.displayName, "Fake HR Alpha Extra");
+  assert.equal(extraHr.phoneNumber, "01000000004");
 
   const hrAlpha = plan.writes.find((write) => write.path === "users/seed-fake-hr-alpha").data;
   assert.equal(hrAlpha.role, "hr");
@@ -218,7 +225,27 @@ test("data builder matches staff and company delegate shapes", () => {
   assert.equal(nested.data.organizationUID, "seed-fake-hr-org");
   assert.equal(nested.data.role, "delegate");
   assert.equal(nested.data.position, "Promoter");
-  assert.equal(nested.data.nationalityID, "FAKE-NID-beta-5");
+  assert.equal(nested.data.nationalityID, "00000000000205");
+  assert.equal(nested.data.nationalId, "00000000000205");
+  assert.match(nested.data.nationalityID, /^[0-9]{14}$/);
+
+  const delegateWrites = plan.writes.filter((write) => write.kind === "delegate");
+  assert.equal(delegateWrites.length, 10);
+  const nids = delegateWrites.map((write) => write.data.nationalityID);
+  assert.equal(new Set(nids).size, nids.length);
+  for (const write of delegateWrites) {
+    assert.match(String(write.data.nationalityID), /^[0-9]{14}$/, write.path);
+    assert.equal(write.data.nationalId, write.data.nationalityID, write.path);
+  }
+  assert.equal(lib.fakeNationalId("alpha", 1), "00000000000101");
+  assert.equal(lib.fakeNationalId("alpha", 5), "00000000000105");
+  assert.equal(lib.fakeNationalId("beta", 1), "00000000000201");
+
+  const hrAccounts = plan.accounts.filter((account) => account.role === "hr");
+  assert.equal(hrAccounts.length, 3);
+  for (const account of hrAccounts) {
+    assert.ok(account.companyUID, account.email);
+  }
   assert.equal(nested.data.isActive, false);
 
   const company = plan.writes.find((write) => write.path === "organizations/seed-fake-hr-org/companies/seed-fake-co-alpha").data;

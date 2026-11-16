@@ -207,6 +207,23 @@ function fakePhone(n) {
 }
 
 /**
+ * Deterministic, clearly fake 14-digit national IDs for mobile delegate login.
+ * Century digit 0 is invalid for a real Egyptian NID, so these cannot be
+ * mistaken for live IDs. Unique per company slug + index.
+ * @param {string} slug
+ * @param {number} index
+ * @return {string}
+ */
+function fakeNationalId(slug, index) {
+  const companyCode = slug === "alpha" ? "01" : slug === "beta" ? "02" : "99";
+  const id = `0000000000${companyCode}${String(index).padStart(2, "0")}`;
+  if (!/^[0-9]{14}$/.test(id)) {
+    throw new Error(`fake national id must be 14 ASCII digits: ${slug}-${index}`);
+  }
+  return id;
+}
+
+/**
  * @param {Buffer|Uint8Array} bytes
  * @return {string}
  */
@@ -405,12 +422,14 @@ function buildPlan() {
     displayName: "Fake Organization Admin",
     omitCompany: true,
   });
+  // Same uid/email/phone as the former no-company HR account, now attached
+  // to company alpha. HR is always created under a company.
   addAccount({
     uid: "seed-fake-no-company",
     email: "fake.nocompany@example.com",
     role: "hr",
-    displayName: "Fake No Company",
-    omitCompany: true,
+    displayName: "Fake HR Alpha Extra",
+    company: COMPANIES[0],
   });
 
   for (const company of COMPANIES) {
@@ -456,7 +475,8 @@ function buildPlan() {
         isActive: !suspended,
         delegate: {
           middleName: "",
-          nationalityID: `FAKE-NID-${slug}-${i}`,
+          nationalityID: fakeNationalId(slug, i),
+          nationalId: fakeNationalId(slug, i),
           motherName: "Fake Mother",
           city: "Fake City",
           gender: i === 2 ? "Female" : "Male",
@@ -508,11 +528,15 @@ function assertPlanSafe(plan) {
     if (account.phoneNumber === "01508899965") {
       throw new Error("refusing a known real phone number");
     }
+    if (account.role === "hr" && !account.companyUID) {
+      throw new Error(`HR account ${account.email} must belong to a company`);
+    }
   }
   const serialized = JSON.stringify(plan);
   if (serialized.includes(PROD_PROJECT)) {
     throw new Error("plan must not mention the production project");
   }
+  const nationalIds = new Set();
   for (const write of plan.writes) {
     assertNoSecretKeys(write.data);
     if (write.data.seedTag !== SEED_TAG || write.data.fake !== true) {
@@ -520,6 +544,22 @@ function assertPlanSafe(plan) {
     }
     if (!write.path.includes("seed-fake-")) {
       throw new Error(`write path is outside the fake id prefix: ${write.path}`);
+    }
+    const nid = write.data.nationalityID;
+    if (nid != null || write.kind === "delegate" || write.data.role === "delegate") {
+      if (typeof nid !== "string" || !/^[0-9]{14}$/.test(nid)) {
+        throw new Error(`delegate ${write.path} national id must be 14 ASCII digits`);
+      }
+      if (write.data.nationalId != null && write.data.nationalId !== nid) {
+        throw new Error(`delegate ${write.path} nationalId does not match nationalityID`);
+      }
+      // Nested delegate docs are one per person; users/{uid} repeats the same id.
+      if (write.kind === "delegate") {
+        if (nationalIds.has(nid)) {
+          throw new Error(`duplicate fake national id ${nid}`);
+        }
+        nationalIds.add(nid);
+      }
     }
   }
 }
@@ -890,6 +930,7 @@ module.exports = {
   resolveCredentialProject,
   parseArgs,
   fakePhone,
+  fakeNationalId,
   generatePassword,
   passwordFromBytes,
   assertPasswordFilePath,

@@ -51,7 +51,7 @@ Organization `seed-fake-hr-org` (Fake Test Organization / منظمة وهمية 
 | super-admin / سوبر أدمن | fake.superadmin@example.com | 01000000001 | (none) |
 | technical_support / دعم فني | fake.techsupport@example.com | 01000000002 | (none) |
 | organization-admin / مسؤول المنظمة | fake.orgadmin@example.com | 01000000003 | (none) |
-| hr, no company / موارد بشرية بلا شركة | fake.nocompany@example.com | 01000000004 | (none) |
+| hr / موارد بشرية ألف (حساب إضافي) | fake.nocompany@example.com | 01000000004 | seed-fake-co-alpha |
 | supervisor / مشرف الشركة ألف | fake.supervisor.alpha@example.com | 01000000005 | seed-fake-co-alpha |
 | hr / موارد بشرية ألف | fake.hr.alpha@example.com | 01000000006 | seed-fake-co-alpha |
 | marketing / تسويق فرع ألف | fake.marketing.alpha@example.com | 01000000007 | seed-fake-co-alpha |
@@ -71,6 +71,6 @@ Organization `seed-fake-hr-org` (Fake Test Organization / منظمة وهمية 
 | delegate active / مندوب نشط | fake.delegate.beta.4@example.com | 01000000021 | seed-fake-co-beta |
 | delegate suspended / مندوب موقوف | fake.delegate.beta.5@example.com | 01000000022 | seed-fake-co-beta |
 
-Phones are the fake block `01000000xxx`. They are not real numbers. Delegate documents use `nationalityID` values such as `FAKE-NID-alpha-1`. Role `supervisor` is the company supervisor (the app maps it to the company-admin screens). Role `marketing` is branch marketing. Role `branches_marketing` is the branches marketing manager.
+Phones are the fake block `01000000xxx`. They are not real numbers. Every HR account belongs to a company; `fake.nocompany@example.com` is a second HR user under `seed-fake-co-alpha` (same phone `01000000004` as before). Delegate documents use deterministic, clearly fake 14-digit ASCII `nationalityID` / `nationalId` values such as `00000000000101` (alpha 1) and `00000000000205` (beta 5) so mobile delegate login works. Role `supervisor` is the company supervisor (the app maps it to the company-admin screens). Role `marketing` is branch marketing. Role `branches_marketing` is the branches marketing manager.
 
 أرقام الهاتف من النطاق الوهمي `01000000xxx`. دور `supervisor` هو مشرف الشركة. دور `marketing` تسويق الفرع. دور `branches_marketing` مسؤول تسويق الفروع.
