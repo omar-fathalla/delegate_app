@@ -488,6 +488,7 @@ service firebase.storage {
       allow write: if companyStaffPenaltyEvidenceUploadOk()
         || (isStorageCompanyStaffRole(storageUserRole())
           && storageUserCo() != ''
+          && resource == null
           && request.resource != null
           && request.resource.size < 10 * 1024 * 1024);
     }
@@ -534,18 +535,21 @@ service firebase.storage {
         || supervisorDelegateRequestFolderOk(delegateUid)
         || isStorageGlobalRole(storageUserRole());
       allow write: if canAccessDelegateDocuments(delegateUid)
-        || supervisorRegistrationUploadOk()
-        || companyStaffRegistrationUploadOk()
-        || companyStaffKnownDelegateFolderOk(delegateUid)
-        || supervisorDelegateRequestFolderOk(delegateUid);
+        || (supervisorRegistrationUploadOk() && resource == null)
+        || (companyStaffRegistrationUploadOk() && resource == null)
+        || (companyStaffKnownDelegateFolderOk(delegateUid) && resource == null)
+        || (supervisorDelegateRequestFolderOk(delegateUid) && resource == null);
     }
 
     // Same tenant check as documents when an intent exists for the request id
     // (registration writes the intent first). Anonymous is denied.
     match /delegate_subscription_receipts/{requestId}/{allPaths=**} {
-      allow read, write: if canAccessDelegateDocuments(requestId)
+      allow read: if canAccessDelegateDocuments(requestId)
         || supervisorRegistrationUploadOk()
         || companyStaffRegistrationUploadOk();
+      allow write: if canAccessDelegateDocuments(requestId)
+        || (supervisorRegistrationUploadOk() && resource == null)
+        || (companyStaffRegistrationUploadOk() && resource == null);
     }
 
     // ==================== PUBLIC FILES ====================
@@ -566,11 +570,13 @@ service firebase.storage {
       allow write: if canAccessDelegateDocuments(requestId)
         || (isStorageCompanyStaffRole(storageUserRole())
           && storageUserCo() != ''
+          && resource == null
           && request.resource != null
           && request.resource.size < 6 * 1024 * 1024
           && request.resource.contentType.matches('image/.*'))
         || (isStorageCompanyStaffRole(storageUserRole())
           && storageUserCo() != ''
+          && resource == null
           && firestore.exists(/databases/(default)/documents/organizations/$(storageUserOrg())/companies/$(storageUserCo())/requests/$(requestId)));
     }
     // Storage ORs overlapping matches, so this residual must not

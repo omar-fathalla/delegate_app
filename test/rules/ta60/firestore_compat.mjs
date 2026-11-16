@@ -99,7 +99,9 @@ async function seed(env) {
   });
 }
 
-const staff = (env, uid, email) => env.authenticatedContext(uid, { email: email || `${uid}@t.test`, email_verified: true, firebase: { sign_in_provider: 'password' } }).firestore();
+const staff = (env, uid, email, extra = {}) => env.authenticatedContext(uid, {
+  email: email || `${uid}@t.test`, email_verified: true, firebase: { sign_in_provider: 'password' }, ...extra,
+}).firestore();
 const delegate = (env) => env.authenticatedContext('dlg1', {
   role: 'delegate', delegateId: 'dlg1', delegateIds: ['dlg1'], orgId: ORG, companyId: CO,
   phones: ['01000000001', '+201000000001', '201000000001'], firebase: { sign_in_provider: 'custom' } }).firestore();
@@ -163,7 +165,7 @@ const cases = [
   ['WEB', 'company-admin create company-admin invite (own company)', e => setDoc(doc(staff(e,'ca'), 'invites/invCa'), { email: 'c3@x.test', status: 'pending', roleToAssign: 'company-admin', organizationId: ORG, organizationName: 'org a', companyId: CO, companyName: 'co a', invitedByUid: 'ca', expiresAt: in3d, createdAt: serverTimestamp() })],
   ['WEB', 'company-admin read + mark company notification read', async e => { const db = staff(e,'ca'); await getDocs(collection(db, `organizations/${ORG}/companies/${CO}/notifications`)); return updateDoc(doc(db, `organizations/${ORG}/companies/${CO}/notifications/cn1`), { isRead: true }); }],
   ['WEB', 'invitee (no users doc) get invite by id', e => getDoc(doc(staff(e,'newu','new@x.test'), 'invites/inv1'))],
-  ['WEB', 'invitee claimInvite$ client batch (member + users + admins+1 + invite claimed)', e => { const db = staff(e,'newu','new@x.test'); const b = writeBatch(db);
+  ['WEB', 'invitee claimInvite$ client batch (member + users + admins+1 + invite claimed)', e => { const db = staff(e,'newu','new@x.test', { inviteId: 'inv1' }); const b = writeBatch(db);
       b.set(doc(db, `organizations/${ORG}/companies/${CO}/members/newu`), { role: 'company-admin', status: 'active', displayName: 'n', createdAt: serverTimestamp(), invitedBy: 'oa' });
       b.set(doc(db, 'users/newu'), { uid: 'newu', email: 'new@x.test', displayName: 'n', phoneNumber: null, role: 'company-admin', emailVerified: true, organizationUID: ORG, organizationName: 'org a', companyUID: CO, companyName: 'co a', status: 'Approved', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
       b.update(doc(db, `organizations/${ORG}/companies/${CO}`), { admins: increment(1), updatedAt: serverTimestamp() });

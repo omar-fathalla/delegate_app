@@ -793,11 +793,6 @@ service cloud.firestore {
         || delegateId == request.auth.uid
         || ownsDelegateId(resource.data.get('uid', ''))
         || (delegateOtpOk() && delegateId == request.auth.uid
-          && resource.data.get('nationalityID', '') != '')
-        || (delegateOtpOk() && claimString('companyId') != ''
-          && resource.data.get('companyUID', resource.data.get('companyId', ''))
-            == claimString('companyId')
-          && resource.data.get('nationalityID', '') is string
           && resource.data.get('nationalityID', '') != '');
     }
 
@@ -812,8 +807,7 @@ service cloud.firestore {
           && resource.data.get('nationalityID', '') is string
           && resource.data.get('nationalityID', '') != '');
       let scoped = (co != '' && docCo == co)
-        || (org != '' && docOrg == org)
-        || r in ['supervisor', 'company_supervisor'];
+        || (org != '' && docOrg == org);
       return r in [
           'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
           'hr', 'company-hr', 'company_hr']
@@ -878,11 +872,7 @@ service cloud.firestore {
     }
 
     function delegateCgListDelegateOk(delegateId) {
-      return delegateCgDelegateOwnListOk(delegateId)
-        || (delegateOtpOk()
-          && resource.data.keys().hasAll(['nationalityID'])
-          && resource.data.get('nationalityID', '') is string
-          && resource.data.get('nationalityID', '') != '');
+      return delegateCgDelegateOwnListOk(delegateId);
     }
 
     function delegateCgListStaffBrowse(u, delegateId) {
@@ -1041,13 +1031,6 @@ service cloud.firestore {
       return changedKeys().hasAny(['role', 'organizationUID', 'companyUID', 'organizationId', 'companyId']);
     }
 
-    function usersListSupervisorNotifyOk(u) {
-      return u.get('role', '') in ['supervisor', 'company_supervisor']
-        && resource.data.get('role', '') in [
-          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-          'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport'];
-    }
-
     function usersListCompanyStaffDirectoryOk(u) {
       let co = u.get('companyUID', u.get('companyId', ''));
       return co != ''
@@ -1077,18 +1060,17 @@ service cloud.firestore {
     }
 
     function usersListSelfLookupOk(u) {
-      return (u.keys().hasAll(['phoneNumber'])
-          && resource.data.keys().hasAll(['phoneNumber'])
-          && resource.data.phoneNumber == u.phoneNumber)
-        || (u.keys().hasAll(['email'])
+      return (claimListHas('phones', resource.data.get('phoneNumber', '')))
+        || (request.auth.token.keys().hasAll(['email'])
+          && request.auth.token.email is string
           && resource.data.keys().hasAll(['email'])
-          && resource.data.email == u.email);
+          && resource.data.email == request.auth.token.email);
     }
 
     function usersListStaffFromUser(u) {
       let r = u.get('role', '');
       return r in ['supervisor', 'company_supervisor']
-        ? usersListSupervisorNotifyOk(u) || usersListCompanyStaffDirectoryOk(u)
+        ? usersListCompanyStaffDirectoryOk(u)
         : r in ['company-admin', 'company_admin', 'admin']
           ? usersListCompanyStaffDirectoryOk(u)
         : usersListGlobalDirectoryOk(u) || usersListSelfLookupOk(u);
@@ -1096,8 +1078,8 @@ service cloud.firestore {
 
     function usersListDelegateOk() {
       let docCo = resource.data.get('companyUID', resource.data.get('companyId', ''));
-      return resource.data.phoneNumber is string
-        || (claimString('companyId') != '' && docCo == claimString('companyId'));
+      return claimString('companyId') != ''
+        && docCo == claimString('companyId');
     }
 
     function usersListStaffOk() {
@@ -1125,6 +1107,10 @@ service cloud.firestore {
       // New staff accounts come from the createStaffUser function (Admin SDK).
       // Client creates stay for delegate approval (M6) and legacy screens.
       // Caller role/org/company are read once and passed in (1000-expression budget).
+      // C1 invite-claim is a separate allow so p0 paths stay under the expr cap.
+      allow create: if signedIn() && noSecretsCreate()
+        && inviteClaimIdFromContext() != ''
+        && inviteClaimSelfUserCreateOk(request.resource.data);
       allow create: if signedIn() && noSecretsCreate()
         && usersCreateOk(userRole(), callerOrg(), callerCompany(), request.resource.data);
 
@@ -1417,6 +1403,110 @@ service cloud.firestore {
       return !changed.hasAny(['nationalId', 'nationalityID']);
     }
 
+    // C1 (web claimInvite$ batch): trust token email only — never client emailVerified.
+    function authEmailLower() {
+      return signedIn()
+        && request.auth.token.keys().hasAll(['email'])
+        && request.auth.token.email is string
+        ? request.auth.token.email.lower()
+        : '';
+    }
+
+    function authEmailVerified() {
+      return signedIn()
+        && request.auth.token.keys().hasAll(['email_verified'])
+        && request.auth.token.email_verified == true;
+    }
+
+    // Legacy web passes inviteId only on the invite update path; correlate via auth token claim.
+    function inviteClaimIdFromContext() {
+      return request.auth != null
+        && request.auth.token.keys().hasAll(['inviteId'])
+        && request.auth.token.inviteId is string
+        && request.auth.token.inviteId != ''
+          ? request.auth.token.inviteId
+          : '';
+    }
+
+    function pendingInviteForClaim(orgId, compId, inviteId, roleToAssign) {
+      let R = /databases/$(database)/documents/invites/$(inviteId);
+      let em = authEmailLower();
+      let inv = get(R).data;
+      return inviteId != '' && em != ''
+        && authEmailVerified()
+        && exists(R)
+        && inv.get('status', '') == 'pending'
+        && !inv.keys().hasAny(['claimedBy', 'claimedByUid', 'claimedAt'])
+        && inv.get('email', '').lower() == em
+        && inv.get('organizationId', '') == orgId
+        && inv.get('companyId', '') == compId
+        && inv.get('roleToAssign', '') in ['company-admin', 'company_admin', 'admin']
+        && roleToAssign in ['company-admin', 'company_admin', 'admin'];
+    }
+
+    function inviteClaimSelfUserCreateOk(d) {
+      let nr = roleOf(d);
+      let org = d.get('organizationUID', '');
+      let co = d.get('companyUID', '');
+      let inviteId = inviteClaimIdFromContext();
+      return request.auth.uid == request.resource.id
+        && nr in ['company-admin', 'company_admin', 'admin']
+        && authEmailVerified()
+        && authEmailLower() != ''
+        && d.get('email', '').lower() == authEmailLower()
+        && org != '' && co != ''
+        && d.get('uid', request.auth.uid) == request.auth.uid
+        && !d.keys().hasAny(privilegeKeys())
+        && inviteId != ''
+        && pendingInviteForClaim(org, co, inviteId, nr);
+    }
+
+    function companyMemberSelfInviteClaimCreateOk(orgId, compId, memberId) {
+      let inviteId = inviteClaimIdFromContext();
+      let role = request.resource.data.get('role', '');
+      let I = /databases/$(database)/documents/invites/$(inviteId);
+      return signedIn()
+        && memberId == request.auth.uid
+        && role in ['company-admin', 'company_admin', 'admin']
+        && inviteId != ''
+        && existsAfter(I)
+        && getAfter(I).data.get('status', '') == 'claimed'
+        && getAfter(I).data.get('claimedByUid', '') == request.auth.uid
+        && getAfter(I).data.get('organizationId', '') == orgId
+        && getAfter(I).data.get('companyId', '') == compId;
+    }
+
+    function companyAdminsInviteClaimBumpOk(orgId, compId) {
+      let inviteId = inviteClaimIdFromContext();
+      let ch = request.resource.data.diff(resource.data).affectedKeys();
+      let I = /databases/$(database)/documents/invites/$(inviteId);
+      let M = /databases/$(database)/documents/organizations/$(orgId)/companies/$(compId)/members/$(request.auth.uid);
+      return signedIn()
+        && inviteId != ''
+        && ch.hasOnly(['admins', 'updatedAt'])
+        && request.resource.data.admins == resource.data.admins + 1
+        && existsAfter(M) && existsAfter(I)
+        && getAfter(I).data.get('status', '') == 'claimed'
+        && getAfter(I).data.get('claimedByUid', '') == request.auth.uid;
+    }
+
+    function inviteClaimInviteeUpdateOk() {
+      let ch = changedKeys();
+      let em = authEmailLower();
+      return signedIn()
+        && authEmailVerified()
+        && em != ''
+        && resource.data.get('status', '') == 'pending'
+        && !resource.data.keys().hasAny(['claimedBy', 'claimedByUid', 'claimedAt'])
+        && resource.data.get('email', '').lower() == em
+        && request.resource.data.get('status', '') == 'claimed'
+        && request.resource.data.get('claimedByUid', '') == request.auth.uid
+        && (!ch.hasAny(['claimedByEmail'])
+          || request.resource.data.get('claimedByEmail', '').lower() == em)
+        && (ch.hasOnly(['status', 'claimedByUid', 'claimedAt'])
+          || ch.hasOnly(['status', 'claimedByUid', 'claimedAt', 'claimedByEmail', 'updatedAt']));
+    }
+
     function usersCreateOk(r, org, co, d) {
       let nr = roleOf(d);
       let isSA = r in superAdminRoleList();
@@ -1426,14 +1516,8 @@ service cloud.firestore {
         && !d.keys().hasAny(['status', 'organizationUID', 'companyUID', 'organizationId', 'companyId', 'isActive'])
         && !d.keys().hasAny(privilegeKeys())
         && !(nr in privilegedRoleList());
-      let inviteClaimSelf = request.auth.uid == request.resource.id
-        && nr in ['company-admin', 'company_admin', 'admin']
-        && d.get('emailVerified', false) == true
-        && d.get('organizationUID', '') != ''
-        && d.get('companyUID', '') != ''
-        && !d.keys().hasAny(privilegeKeys());
       return usersIdentityClientLocked(d.keys())
-        && newRoleOk(nr) && (isSA || selfCreate || inviteClaimSelf || (
+        && newRoleOk(nr) && (isSA || selfCreate || (
         !d.keys().hasAny(privilegeKeys())
         && !(nr in privilegedRoleList())
         && companyPinned(d)
@@ -1528,10 +1612,7 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if isSuperAdmin();
       allow update: if isSuperAdmin()
-        || (isOrgAdmin() && callerOrg() == orgId)
-        || (signedIn() && callerOrg() == orgId && isStaffWriter()
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['admins', 'updatedAt'])
-            && request.resource.data.admins == resource.data.admins + 1);
+        || (isOrgAdmin() && callerOrg() == orgId);
       allow delete: if isSuperAdmin();
 
       match /branches/{branchId} {
@@ -1564,8 +1645,7 @@ service cloud.firestore {
         allow update: if isGlobalStaff()
           || (isOrgAdmin() && callerOrg() == orgId)
           || (isCompanyScopedStaff() && callerOrg() == orgId && callerCompany() == compId)
-          || (signedIn() && changedKeys().hasOnly(['admins', 'updatedAt'])
-            && request.resource.data.get('admins', 0) == resource.data.get('admins', 0) + 1);
+          || companyAdminsInviteClaimBumpOk(orgId, compId);
 
         match /admins/{adminId} {
           allow read: if signedIn() && (
@@ -1585,26 +1665,15 @@ service cloud.firestore {
             request.auth.uid == memberId || isGlobalStaff() || canManageNestedDelegate(orgId, compId)
           );
           allow create: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId)
-            || (signedIn() && request.auth.uid == memberId
-              && memberId == request.auth.uid
-              && request.resource.data.get('role', '') in ['company-admin', 'company_admin', 'admin']);
+            || companyMemberSelfInviteClaimCreateOk(orgId, compId, memberId);
           allow update, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
         }
 
         match /delegates/{delegateId} {
           allow read: if signedIn() && canReadNestedDelegate(orgId, compId, delegateId);
-          allow create: if signedIn() && isGlobalStaff()
-            && request.resource.data.get('organizationUID', '') == orgId
-            && request.resource.data.get('companyUID', '') == compId
-            && request.resource.data.get('status', '') == 'active';
           allow create: if deviceBindingAbsent() && sourceStampKeysLocked()
             && exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId))
             && nestedDelegateCreateOk(orgId, compId, delegateId);
-          allow update: if signedIn() && isGlobalStaff()
-            && request.resource.data.get('status', '') == 'active'
-            && request.resource.data.get('companyUID', '') == compId
-            && request.resource.data.get('organizationUID', '') == orgId
-            && !changedKeys().hasAny(['role', 'permissions']);
           // sourceStampKeysLocked is not on this allow: the 4-flip tech
           // approval is already at the 1000-expression budget. Delegate
           // self-updates are hasOnly-gated by delegateFieldsSafe. Staff
@@ -2204,15 +2273,9 @@ service cloud.firestore {
           )
         );
 
-      // Claiming is function-only (claimInvite). Clients cannot set claimed.
-      // H3: only pending, never-claimed invites change; claimed (and any
-      // other non-pending status) is terminal; the 7-day cap applies again.
-      allow update: if signedIn()
-        && resource.data.get('status', '') == 'pending'
-        && request.resource.data.get('status', '') == 'claimed'
-        && request.resource.data.get('claimedByUid', '') == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'claimedByUid', 'claimedAt', 'claimedByEmail', 'updatedAt']);
+      // Invitee claim (web claimInvite$ batch or legacy invite-only update).
+      allow update: if inviteClaimInviteeUpdateOk();
+      // H3: staff edits pending invites (not claim); claimed is terminal.
       allow update: if signedIn()
         && resource.data.get('status', '') == 'pending'
         && !resource.data.keys().hasAny(['claimedBy', 'claimedByUid', 'claimedAt'])
@@ -2342,12 +2405,16 @@ service cloud.firestore {
 
     // Provable path for marketing org+branch+today list (limit 2000) without
     // folding isOrgScopedStaff/orgScoped into delegate-own branches.
+    // TEMPORARY (M3): org-level attendance list (no company filter) — legacy ≤v1.14.x; remove after forced-update gate.
     function attendanceMarketingOrgListOk() {
       return (isMarketing() || isBranchesMarketing())
         && callerOrg() != ''
         && resource.data.get('organizationId', '') == callerOrg();
     }
 
+    // TEMPORARY (M3 / legacy mobile ≤v1.14.x): org-wide attendance list without
+    // companyUID filter for supervisor/company-admin — remove in a follow-up PR
+    // after forced-update gate and all clients on a safe build.
     function attendanceSupervisorOrgBranchListOk() {
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
       let org = u.get('organizationUID', '');
@@ -2401,6 +2468,7 @@ service cloud.firestore {
     }
 
     match /attendance_logs/{logId} {
+      // M3: eight stacked list allows (expr-budget risk) — org-branch path temporary; see attendanceSupervisorOrgBranchListOk.
       allow list: if attendanceCompanyStaffListOk();
       allow list: if attendanceMarketingOrgListOk();
       allow list: if attendanceSupervisorOrgBranchListOk();
@@ -2513,6 +2581,7 @@ service cloud.firestore {
           du == 'all'
           || du == 'delegates'
           || du == request.auth.uid
+          || claimListHas('phones', du)
           || (co != '' && (du == 'delegates_' + co || du == 'company_' + co))
         );
     }
@@ -2530,7 +2599,6 @@ service cloud.firestore {
         || du == 'hr'
         || (du == 'all_company_supervisors' && (docCo == '' || docCo == co))
         || (notifStaffBroadcastOk() && du == request.auth.uid)
-        || du in ['superAdmin', 'technicalSupport', 'technical-support', 'technical_support']
         || du in ['supervisor', 'company-admin', 'company_admin']
       );
     }
@@ -2538,13 +2606,13 @@ service cloud.firestore {
     function notifOrgDocScoped(u) {
       let org = u.get('organizationUID', u.get('organizationId', ''));
       let docOrg = resource.data.get('organizationId', resource.data.get('organizationUID', ''));
-      return org != '' && (docOrg == '' || docOrg == org);
+      return org != '' && docOrg != '' && docOrg == org;
     }
 
     function notifCompanyDocScoped(u) {
       let co = u.get('companyUID', u.get('companyId', ''));
       let docCo = resource.data.get('companyId', resource.data.get('companyUID', ''));
-      return co != '' && (docCo == '' || docCo == co);
+      return co != '' && docCo != '' && docCo == co;
     }
 
     function notifListOrgAdmin(u) {
@@ -3609,7 +3677,7 @@ service cloud.firestore {
       let docOrg = resource.data.get('organizationUID', resource.data.get('organizationId', ''));
       let rc = resource.data.get('receiptCode', '');
       return rc is string && rc != ''
-        ? r in ['supervisor', 'company_supervisor']
+        ? r in ['supervisor', 'company_supervisor'] && co != '' && docCo == co
         : resource.data.get('supervisorUid', '') == request.auth.uid
         || r in ['super-admin', 'super_admin', 'superAdmin', 'technical_support', 'technicalSupport']
         || (r in ['organization-admin', 'organization_admin', 'organizationAdmin'] && org != '' && docOrg == org)
@@ -3648,10 +3716,6 @@ service cloud.firestore {
       // status, or any other field. Review fields are written only by
       // reviewNationalIdUpdate (Admin SDK). Clients also cannot convert
       // another request into update_national_id.
-      allow update: if signedIn() && (staffRole() in techRoleList() || staffRole() in superAdminRoleList())
-        && resource.data.get('status', '') == 'pending'
-        && request.resource.data.get('status', '') == 'approved'
-        && changedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'updatedAt', 'rejectionReason']);
       allow update: if ((signedIn() && request.auth.uid == requestId
           && changedKeys().hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
             'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'])
