@@ -2688,8 +2688,8 @@ service cloud.firestore {
         ownsDelegateId(resource.data.get('delegateUid', ''))
         || ownsDelegateId(resource.data.get('userId', ''))
         || delegateOwns(resource.data.get('delegateUid', ''))
-        || (isDelegate() && notifDelegateOwnPhoneQueryOk(resource.data.get('phoneNumber', '')))
-        || (isDelegate() && notifDelegateOwnPhoneQueryOk(resource.data.get('delegateUid', '')))
+        || (isDelegate() && notifDelegateTokenPhoneQueryOk(resource.data.get('phoneNumber', '')))
+        || (isDelegate() && notifDelegateTokenPhoneQueryOk(resource.data.get('delegateUid', '')))
       );
     }
 
@@ -2713,42 +2713,23 @@ service cloud.firestore {
       return notifListDelegate();
     }
 
-    function delegateNotifListByUidOk() {
-      let du = notifDu();
-      return notifStaffBroadcastOk()
-        && delegateOtpOk()
-        && du == request.auth.uid;
-    }
-
-    function delegateNotifListByPhoneOk() {
-      let du = notifDu();
-      return notifStaffBroadcastOk()
-        && delegateOtpOk()
-        && notifDelegateOwnPhoneQueryOk(du);
-    }
-
     // Suffix after phone_ for getNotifications / send_notification phone tags.
     function phoneSuffixFromPhoneTag(du) {
       let parts = du.split('phone_');
       return parts.size() == 2 ? parts[1] : '';
     }
 
-    // Canonical 01X on users/{uid} for delegate bell (+20+leading-0 without token-only).
-    function notifDelegateUserCanonicalPhone() {
-      return userExists()
-        && userDoc().keys().hasAll(['phoneNumber'])
-        && userDoc().phoneNumber is string
-        && userDoc().phoneNumber != ''
-        ? userDoc().phoneNumber
-        : '';
-    }
-
-    // Exact claim hit or provable Egyptian variant of own users/{uid} phone only.
-    function notifDelegateOwnPhoneQueryOk(queryPh) {
-      let canonical = notifDelegateUserCanonicalPhone();
+    // Delegate bell phone match: JWT phones claim only (no users/{uid}.phoneNumber get).
+    // +2001… via +20+[1:] and +20+full 01X — no users doc required for nested doc-id login.
+    function notifDelegateTokenPhoneQueryOk(queryPh) {
       return queryPh != '' && (
         claimListHas('phones', queryPh)
-        || (canonical != '' && notifEgyptPhoneVariantMatch(queryPh, canonical))
+        || (queryPh.size() == 14
+          && queryPh.matches('^\\+20[0-9]{11}$')
+          && claimListHas('phones', queryPh[3:]))
+        || (queryPh.size() == 13
+          && queryPh.matches('^\\+20[0-9]{10}$')
+          && claimListHas('phones', '0' + queryPh[3:]))
       );
     }
 
@@ -2780,7 +2761,7 @@ service cloud.firestore {
       return notifStaffBroadcastOk() && delegateOtpOk() && (
         du == 'phone_' + request.auth.uid
         || (du.matches('^phone_.+')
-          && notifDelegateOwnPhoneQueryOk(phoneSuffixFromPhoneTag(du)))
+          && notifDelegateTokenPhoneQueryOk(phoneSuffixFromPhoneTag(du)))
       );
     }
 
@@ -2794,16 +2775,16 @@ service cloud.firestore {
           || du == 'delegates'
           || du == request.auth.uid
           || du == 'phone_' + request.auth.uid
-          || notifDelegateOwnPhoneQueryOk(du)
+          || notifDelegateTokenPhoneQueryOk(du)
           || (co != '' && (du == 'delegates_' + co || du == 'company_' + co))
         );
     }
 
-    // Provable list on where(phoneNumber == own) — get() only; list must use resource.
+    // Provable list on where(phoneNumber == own) — token phones only; no users get().
     function notifListDelegatePhoneFieldOk() {
       return notifStaffBroadcastOk()
         && delegateOtpOk()
-        && notifDelegateOwnPhoneQueryOk(resource.data.get('phoneNumber', ''));
+        && notifDelegateTokenPhoneQueryOk(resource.data.get('phoneNumber', ''));
     }
 
     function notifListStaffSelfUidOk() {
