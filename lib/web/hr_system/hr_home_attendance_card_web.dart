@@ -9,7 +9,6 @@ import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import 'package:delegate_app/features/hr/presentation/pages/tabs/hr_attendance_tab.dart';
 import 'package:delegate_app/web/hr_system/hr_home_side_cards_web.dart';
-import 'package:delegate_app/web/hr_system/hr_western_digits.dart';
 
 /// M3 window size classes used by the overview.
 enum HrWindowClass { compact, medium, expanded }
@@ -198,12 +197,11 @@ class HrHomeAttendanceCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final rtl = Directionality.of(context) == TextDirection.rtl;
     // Forward sits at the end of the label and points that way. The glyph is
-    // frozen so RTL does not mirror arrow_forward a second time.
+    // drawn in LTR so RTL does not mirror arrow_forward a second time.
     final forwardIcon = Icon(
-      hrFixedDirectionIcon(
-        rtl ? Icons.arrow_back_rounded : Icons.arrow_forward_rounded,
-      ),
+      rtl ? Icons.arrow_back_rounded : Icons.arrow_forward_rounded,
       size: 18,
+      textDirection: TextDirection.ltr,
     );
     return HrOverviewCard(
       key: const ValueKey('hr_home_attendance_card'),
