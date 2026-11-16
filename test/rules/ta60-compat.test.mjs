@@ -1,7 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runFirestoreCompatHarness, BELL_LIVE_ALLOW_TARGETS } from './ta60/firestore_compat.mjs';
+import {
+  runFirestoreCompatHarness,
+  BELL_LIVE_ALLOW_TARGETS,
+  BELL_PHONE_PROBE_MATRIX,
+  shapeCZeroPrefixFromPhones,
+  STAFF_SHAPE_C_PHONE,
+} from './ta60/firestore_compat.mjs';
 import { runStorageCompatHarness } from './ta60/storage_compat.mjs';
+
+test('TA-60 bell shape (c): 0+prefix probe matrix', () => {
+  const row = BELL_PHONE_PROBE_MATRIX.find((x) => x.shape === 'c');
+  assert.ok(row?.label?.includes('0+'), 'shape (c) documents 0+ prefix');
+  assert.deepEqual(shapeCZeroPrefixFromPhones(['01000000001', STAFF_SHAPE_C_PHONE]), [`0${STAFF_SHAPE_C_PHONE}`]);
+});
 
 test('TA-60 firestore: live prod vs candidate (main v1.14.2 + web shapes)', async () => {
   const r = await runFirestoreCompatHarness();

@@ -2719,42 +2719,52 @@ service cloud.firestore {
       return parts.size() == 2 ? parts[1] : '';
     }
 
-    // Delegate bell phone match: JWT phones claim only (no users/{uid}.phoneNumber get).
-    // +2001… via +20+[1:] and +20+full 01X — no users doc required for nested doc-id login.
-    function notifDelegateTokenPhoneQueryOk(queryPh) {
-      return queryPh != '' && (
-        claimListHas('phones', queryPh)
-        || (queryPh.size() == 14
-          && queryPh.matches('^\\+20[0-9]{11}$')
-          && claimListHas('phones', queryPh[3:]))
-        || (queryPh.size() == 13
-          && queryPh.matches('^\\+20[0-9]{10}$')
-          && claimListHas('phones', '0' + queryPh[3:]))
-      );
-    }
+  // Delegate bell phone match: JWT phones claim only (no users/{uid}.phoneNumber get).
+  // +2001… via +20+[1:] and +20+full 01X — no users doc required for nested doc-id login.
+  // cb3f4e2 §5 also queries 0+<allowedPhone> (e.g. 0+201… when stored international).
+  function notifDelegateTokenPhoneQueryOk(queryPh) {
+    let q = queryPh.size() > 2 && queryPh[0:2] == '0+' ? queryPh[1:] : queryPh;
+    return q != '' && (
+      claimListHas('phones', q)
+      || (q.size() == 14
+        && q.matches('^\\+20[0-9]{11}$')
+        && claimListHas('phones', q[3:]))
+      || (q.size() == 13
+        && q.matches('^\\+20[0-9]{10}$')
+        && claimListHas('phones', '0' + q[3:]))
+    );
+  }
 
-    // 01X, 1X, 20X, +20X, +200X, +2+01X — same shapes as delegate login claims + bell.
-    function notifEgyptPhoneVariantMatch(queryPh, canonicalPh) {
-      return queryPh != '' && canonicalPh != '' && (
-        queryPh == canonicalPh
-        || (canonicalPh.size() == 11
-          && canonicalPh.matches('^01[0-9]{9}$')
-          && (
-            queryPh == canonicalPh[1:]
-            || queryPh == ('20' + canonicalPh[1:])
-            || queryPh == ('+20' + canonicalPh[1:])
-            || queryPh == ('+20' + canonicalPh)
-            || queryPh == ('+2' + canonicalPh)))
-        || (canonicalPh.size() == 10
-          && canonicalPh.matches('^1[0-9]{9}$')
-          && (
-            queryPh == ('0' + canonicalPh)
-            || queryPh == ('20' + canonicalPh)
-            || queryPh == ('+20' + canonicalPh)
-            || queryPh == ('+20' + ('0' + canonicalPh))
-            || queryPh == ('+2' + ('0' + canonicalPh))))
-      );
-    }
+  // 01X, 1X, 20X, +20X, +200X, +2+01X — same shapes as delegate login claims + bell.
+  // cb3f4e2 §5 0+prefix on international stored phones (strip once, then variant match).
+  function notifEgyptPhoneVariantMatch(queryPh, canonicalPh) {
+    let q = queryPh.size() > 2 && queryPh[0:2] == '0+' ? queryPh[1:] : queryPh;
+    return q != '' && canonicalPh != '' && (
+      q == canonicalPh
+      || (canonicalPh.size() == 11
+        && canonicalPh.matches('^01[0-9]{9}$')
+        && (
+          q == canonicalPh[1:]
+          || q == ('20' + canonicalPh[1:])
+          || q == ('+20' + canonicalPh[1:])
+          || q == ('+20' + canonicalPh)
+          || q == ('+2' + canonicalPh)))
+      || (canonicalPh.size() == 10
+        && canonicalPh.matches('^1[0-9]{9}$')
+        && (
+          q == ('0' + canonicalPh)
+          || q == ('20' + canonicalPh)
+          || q == ('+20' + canonicalPh)
+          || q == ('+20' + ('0' + canonicalPh))
+          || q == ('+2' + ('0' + canonicalPh))))
+      || (canonicalPh.size() >= 12
+        && canonicalPh.matches('^\\+20[0-9]{9,11}$')
+        && (
+          q == canonicalPh
+          || q == ('0' + canonicalPh[3:])
+          || q == canonicalPh[3:]))
+    );
+  }
 
     function notifDelegatePhoneUidTagListOk() {
       let du = notifDu();

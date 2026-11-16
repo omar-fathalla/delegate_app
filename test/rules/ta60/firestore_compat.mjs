@@ -66,6 +66,21 @@ export function getNotificationsPhoneVariations(rawP) {
 /** Delegate JWT `phones` claim (5 variants); not Dart-only +2001X leading-zero extras. */
 export const DELEGATE_CLAIM_PHONES = delegateLoginPhoneClaimVariants(DELEGATE_PRIMARY_PHONE);
 
+/** cb3f4e2 getNotifications() §5: leading 0 concatenated before each phonesToCheck entry. */
+/** cb3f4e2 §5: only international (+…) gets 0+ concatenation (shape c). */
+export function shapeCZeroPrefixFromPhones(phones) {
+  return [...new Set(phones.filter((p) => p && String(p).startsWith('+')).map((p) => `0${p}`))];
+}
+
+function staffStoredPhoneForBell(uid) {
+  if (uid === STAFF_SHAPE_C_UID) return STAFF_SHAPE_C_PHONE;
+  return STAFF_PHONE_BY_UID[uid] ?? '01012000099';
+}
+
+/** Shape (c): staff users.phoneNumber stored as +20… (hr in seed). */
+export const STAFF_SHAPE_C_UID = 'hr';
+export const STAFF_SHAPE_C_PHONE = '+201012000005';
+
 /** Live prod ALLOW counts for counted `list bell:` shapes (excl. G4/G5 extension rows). */
 export const BELL_LIVE_ALLOW_TARGETS = {
   delegate: 7,
@@ -124,7 +139,7 @@ async function seed(env) {
     await u('oa', 'organization-admin', ORG, '');
     await u('ca', 'company-admin', ORG, CO);
     await u('sup', 'supervisor', ORG, CO, { phoneNumber: '01011111111' });
-    await u('hr', 'hr', ORG, CO);
+    await u('hr', 'hr', ORG, CO, { phoneNumber: STAFF_SHAPE_C_PHONE });
     await u('mkt', 'marketing', ORG, CO);
     await u('mp', 'marketing_promotion', ORG, '');
     await u('bm', 'branches_marketing', ORG, CO);
@@ -189,6 +204,12 @@ async function seed(env) {
     await setDoc(doc(db, 'notifications/nPhoneDlgPlus20Lead'), {
       phoneNumber: '+2001000000001', delegateUid: 'dlg1', title: 'phone-+20-01', isRead: false,
       companyId: CO, organizationId: ORG, createdAt: NOW, deletedBy: [],
+    });
+    await setDoc(doc(db, 'notifications/nbShapeC_hrIntl'), {
+      phoneNumber: STAFF_SHAPE_C_PHONE,
+      delegateUid: `phone_${STAFF_SHAPE_C_PHONE}`,
+      title: 'shape-c-hr-intl',
+      isRead: false, companyId: CO, organizationId: ORG, createdAt: NOW, deletedBy: [],
     });
     for (const p of DELEGATE_CLAIM_PHONES) {
       const slug = p.replace(/[^0-9]/g, '');
@@ -404,7 +425,7 @@ function delegateBellShapes() {
 }
 
 function staffBellG5Shapes(uid, bellRole) {
-  const ph = STAFF_PHONE_BY_UID[uid] ?? '01012000099';
+  const ph = staffStoredPhoneForBell(uid);
   const db = (e) => staff(e, uid);
   const variants = [...new Set([ph, ...getNotificationsPhoneVariations(ph)])];
   const out = [];
@@ -416,20 +437,63 @@ function staffBellG5Shapes(uid, bellRole) {
   return out;
 }
 
+function buildShapeCBellCases() {
+  const out = [];
+  const dDb = (e) => delegate(e);
+  for (const zp of shapeCZeroPrefixFromPhones(DELEGATE_CLAIM_PHONES)) {
+    out.push(['NOTIF-G5', `delegate list bell shape-c: phoneNumber==${zp} (limit 30)`, (e) => notifListPhoneField(dDb(e), zp)]);
+    out.push(['NOTIF-G5', `delegate list bell shape-c: delegateUid==phone_${zp} (limit 30)`, (e) => notifList(dDb(e), `phone_${zp}`)]);
+    out.push(['NOTIF-G5', `delegate list bell shape-c: delegateUid==${zp} (limit 30)`, (e) => notifList(dDb(e), zp)]);
+  }
+  const hrDb = (e) => staff(e, STAFF_SHAPE_C_UID);
+  const hrPhones = [...new Set([STAFF_SHAPE_C_PHONE, ...getNotificationsPhoneVariations(STAFF_SHAPE_C_PHONE)])];
+  for (const zp of shapeCZeroPrefixFromPhones(hrPhones)) {
+    out.push(['NOTIF-G5', `hr list bell shape-c: phoneNumber==${zp} (limit 30)`, (e) => notifListPhoneField(hrDb(e), zp)]);
+    out.push(['NOTIF-G5', `hr list bell shape-c: delegateUid==phone_${zp} (limit 30)`, (e) => notifList(hrDb(e), `phone_${zp}`)]);
+    out.push(['NOTIF-G5', `hr list bell shape-c: delegateUid==${zp} (limit 30)`, (e) => notifList(hrDb(e), zp)]);
+  }
+  return out;
+}
+
 function buildBellHarnessCases() {
   const out = [...delegateBellShapes()];
   for (const [uid, bellRole] of STAFF_BELL_UID) {
     out.push(...staffBellShapes(uid, bellRole));
     out.push(...staffBellG5Shapes(uid, bellRole));
   }
+  out.push(...buildShapeCBellCases());
   return out;
+}
+
+/** §5 0+prefix queries when phones include international +20 (shape c). */
+function shapeCPhoneSimulationFns(bellRole, uid) {
+  if (bellRole === 'delegate') {
+    const dDb = (e) => delegate(e);
+    return shapeCZeroPrefixFromPhones(DELEGATE_CLAIM_PHONES).flatMap((zp) => [
+      (e) => notifListPhoneField(dDb(e), zp),
+      (e) => notifList(dDb(e), `phone_${zp}`),
+      (e) => notifList(dDb(e), zp),
+    ]);
+  }
+  if (bellRole === 'hr' && uid === STAFF_SHAPE_C_UID) {
+    const hrDb = (e) => staff(e, STAFF_SHAPE_C_UID);
+    const hrPhones = [...new Set([STAFF_SHAPE_C_PHONE, ...getNotificationsPhoneVariations(STAFF_SHAPE_C_PHONE)])];
+    return shapeCZeroPrefixFromPhones(hrPhones).flatMap((zp) => [
+      (e) => notifListPhoneField(hrDb(e), zp),
+      (e) => notifList(hrDb(e), `phone_${zp}`),
+      (e) => notifList(hrDb(e), zp),
+    ]);
+  }
+  return [];
 }
 
 function bellCountedQueryFns(bellRole, uid) {
   if (bellRole === 'delegate') {
-    return delegateBellShapes()
+    const base = delegateBellShapes()
       .filter(([area, name]) => area === 'NOTIF-READ' && isBellCountedCase(name))
       .map(([, , fn]) => fn);
+    // Shape (c) §5 0+ queries covered in NOTIF-G5 probes; keep counted rows aligned to live targets.
+    return [...base, ...shapeCPhoneSimulationFns(bellRole, uid)];
   }
   return staffBellShapes(uid, bellRole).map(([, , fn]) => fn);
 }
@@ -530,9 +594,9 @@ export const BELL_PHONE_PROBE_MATRIX = [
   },
   {
     shape: 'c',
-    label: '+201 international + users/{uid}.phoneNumber (login claim family)',
-    probe: 'phoneNumber == +201… / delegateUid bare +201… (JWT phones claim)',
-    seed: `notifications/nbPhField_* per DELEGATE_CLAIM_PHONES (${DELEGATE_CLAIM_PHONES.join(', ')})`,
+    label: '+201 stored + cb3f4e2 §5 0+<allowedPhone> (e.g. 0+201…)',
+    probe: 'phoneNumber / delegateUid / phone_<p> with 0+ prefix on JWT or +20 users.phoneNumber',
+    seed: `nbPhField_* (${DELEGATE_CLAIM_PHONES.join(', ')}); hr users.phone ${STAFF_SHAPE_C_PHONE} + nbShapeC_hrIntl; shape-c G5 rows`,
   },
 ];
 const attOrgBranchToday = (db) => getDocs(query(
