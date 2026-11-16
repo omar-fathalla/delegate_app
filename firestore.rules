@@ -576,9 +576,14 @@ service cloud.firestore {
       return !(stCh && st1 == 'pending' && !approver)
         && !privGlobalStaffDocsServer
         && ((techSignup && techFlipOk(delegateId) && techReqOk(o1, c1, delegateId))
-          || (!techSignup && (delegateDocsOk() || approver)
-            && staffDelegateAccountFieldsOk(r, approver)
-            && sourceStampKeysLocked()));
+          || (!techSignup && (
+            (r in ['supervisor', 'company_supervisor']
+              && changedKeys().hasAny(['status', 'statusReason'])
+              && !changedKeys().hasAny(['documents'])
+              ? supervisorNestedSuspendOk(o1, c1)
+              : ((delegateDocsOk() || approver)
+                && staffDelegateAccountFieldsOk(r, approver)
+                && sourceStampKeysLocked())))));
     }
 
     // r4: tech support may create a delegate that is active or carries an
@@ -807,7 +812,8 @@ service cloud.firestore {
           && resource.data.get('nationalityID', '') is string
           && resource.data.get('nationalityID', '') != '');
       let scoped = (co != '' && docCo == co)
-        || (org != '' && docOrg == org);
+        || (org != '' && docOrg == org)
+        || r in ['supervisor', 'company_supervisor'];
       return r in [
           'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
           'hr', 'company-hr', 'company_hr']
@@ -867,8 +873,23 @@ service cloud.firestore {
       return u.get('role', '') in [
           'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
           'hr', 'company-hr', 'company_hr']
-        && ((co != '' && docCo == co)
-          || (org != '' && docOrg == org));
+        && (u.get('role', '') in ['supervisor', 'company_supervisor']
+          ? (co != '' && docCo == co)
+          : ((co != '' && docCo == co)
+            || (org != '' && docOrg == org)));
+    }
+
+    function supervisorNestedSuspendOk(orgId, compId) {
+      return roleIs(['supervisor', 'company_supervisor'])
+        && callerCompany() == compId
+        && resource.data.get('companyUID', resource.data.get('companyId', '')) == compId
+        && deviceBindingUntouched()
+        && changedKeys().hasOnly(['status', 'statusReason', 'updatedAt', 'holds', 'statusVersion'])
+        && delegateStatusLower(resource.data.get('status', '')) == 'active'
+        && request.resource.data.get('status', '') is string
+        && request.resource.data.get('status', '') == 'suspended'
+        && request.resource.data.get('statusReason', '') is string
+        && request.resource.data.get('statusReason', '') != '';
     }
 
     function delegateCgListDelegateOk(delegateId) {
@@ -892,11 +913,17 @@ service cloud.firestore {
         : delegateCgCompanyStaffListOkWithUser(u);
     }
 
-    function delegateCgListStaffSignedIn(delegateId) {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    function delegateCgListStaffSignedInCore(delegateId, u) {
       return delegateCgStaffDupQueryShape()
         ? delegateCgStaffDupFieldListOkWithUser(u)
         : delegateCgListStaffBrowse(u, delegateId);
+    }
+
+    function delegateCgListStaffSignedIn(delegateId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && delegateCgListStaffSignedInCore(delegateId,
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
     }
 
     function delegateCgListDispatcher(delegateId) {
@@ -1563,7 +1590,6 @@ service cloud.firestore {
       let stCh = ch.hasAny(['status']);
       let actCh = ch.hasAny(['isActive']);
       let globalStaff = r in superAdminRoleList() || r in techRoleList();
-      let fromSuspended = delegateStatusLower(resource.data.get('status', '')) == 'suspended';
       // Explicit deny (TA-32): nationalId changes on delegate docs only via
       // approval batches (techSignup skips this helper) or Admin SDK.
       let idClientLock = !ch.hasAny(['nationalId', 'nationalityID']);
@@ -2596,6 +2622,20 @@ service cloud.firestore {
       return notifListDelegate();
     }
 
+    function delegateNotifListByUidOk() {
+      let du = notifDu();
+      return notifStaffBroadcastOk()
+        && delegateOtpOk()
+        && du == request.auth.uid;
+    }
+
+    function delegateNotifListByPhoneOk() {
+      let du = notifDu();
+      return notifStaffBroadcastOk()
+        && delegateOtpOk()
+        && claimListHas('phones', du);
+    }
+
     function notifListDelegate() {
       let du = notifDu();
       let co = claimString('companyId');
@@ -2623,6 +2663,7 @@ service cloud.firestore {
         || du == 'hr'
         || (du == 'all_company_supervisors' && (docCo == '' || docCo == co))
         || (notifStaffBroadcastOk() && du == request.auth.uid)
+        || du in ['superAdmin', 'technicalSupport', 'technical-support', 'technical_support']
         || du in ['supervisor', 'company-admin', 'company_admin']
       );
     }
@@ -2630,13 +2671,13 @@ service cloud.firestore {
     function notifOrgDocScoped(u) {
       let org = u.get('organizationUID', u.get('organizationId', ''));
       let docOrg = resource.data.get('organizationId', resource.data.get('organizationUID', ''));
-      return org != '' && docOrg != '' && docOrg == org;
+      return org != '' && (docOrg == '' || docOrg == org);
     }
 
     function notifCompanyDocScoped(u) {
       let co = u.get('companyUID', u.get('companyId', ''));
       let docCo = resource.data.get('companyId', resource.data.get('companyUID', ''));
-      return co != '' && docCo != '' && docCo == co;
+      return co != '' && (docCo == '' || docCo == co);
     }
 
     function notifListOrgAdmin(u) {
@@ -3112,6 +3153,7 @@ service cloud.firestore {
       return canReadOwnNotification()
         || canReadOrgAdminRoleBroadcast()
         || canReadCompanySupervisorBroadcast()
+        || canReadCompanySupervisorStaffBroadcast()
         || canReadNotifGlobalStaff()
         || canReadNotifBroadcastAll()
         || canReadNotifBroadcastDelegates()
@@ -3225,6 +3267,16 @@ service cloud.firestore {
       return isCompanyAdmin()
         && callerCompany() != ''
         && resource.data.delegateUid == 'supervisor_' + callerCompany();
+    }
+
+    function canReadCompanySupervisorStaffBroadcast() {
+      let co = callerCompany();
+      let du = resource.data.get('delegateUid', '');
+      return roleIs(['supervisor', 'company_supervisor'])
+        && co != ''
+        && (du == 'supervisor_' + co
+          || du == 'company_' + co
+          || du == 'all_company_supervisors');
     }
 
     function canReadNotifStaffSelfTarget() {
@@ -3693,22 +3745,28 @@ service cloud.firestore {
     }
 
     function delegateRequestListOk() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && delegateRequestListOkCore(
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
+    }
+
+    function delegateRequestListOkCore(u) {
       let r = u.get('role', '');
       let co = u.get('companyUID', u.get('companyId', ''));
       let org = u.get('organizationUID', u.get('organizationId', ''));
       let docCo = resource.data.get('companyUID', resource.data.get('companyId', ''));
       let docOrg = resource.data.get('organizationUID', resource.data.get('organizationId', ''));
       let rc = resource.data.get('receiptCode', '');
-      return rc is string && rc != ''
-        ? r in ['supervisor', 'company_supervisor'] && co != '' && docCo == co
-        : resource.data.get('supervisorUid', '') == request.auth.uid
-        || r in ['super-admin', 'super_admin', 'superAdmin', 'technical_support', 'technicalSupport']
-        || (r in ['organization-admin', 'organization_admin', 'organizationAdmin'] && org != '' && docOrg == org)
-        || (r in ['accountant', 'accounting', 'account_admin'] && org != '' && docOrg == org)
-        || (co != '' && docCo == co && r in [
-          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
-          'hr', 'company-hr', 'company_hr', 'human_resources']);
+      return (rc is string && rc != '')
+        ? (r in ['supervisor', 'company_supervisor'] && co != '' && docCo == co)
+        : (resource.data.get('supervisorUid', '') == request.auth.uid
+          || r in ['super-admin', 'super_admin', 'superAdmin', 'technical_support', 'technicalSupport']
+          || (r in ['organization-admin', 'organization_admin', 'organizationAdmin'] && org != '' && docOrg == org)
+          || (r in ['accountant', 'accounting', 'account_admin'] && org != '' && docOrg == org)
+          || (co != '' && docCo == co && r in [
+            'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+            'hr', 'company-hr', 'company_hr', 'human_resources']));
     }
 
     match /delegate_requests/{requestId} {

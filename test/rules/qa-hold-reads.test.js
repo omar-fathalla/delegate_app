@@ -125,11 +125,14 @@ describe("qa hold supervisor reads and edit policy", () => {
     await assertFails(updateDoc(doc(as("sa"), "organizations/o1/companies/c1/delegates/d1"), patch));
   });
 
-  test("only super-admin and tech may activate or suspend a delegate", async () => {
+  test("super-admin and tech may activate or suspend; supervisor narrow suspend only", async () => {
     await assertFails(updateDoc(doc(as("org"), "organizations/o1/companies/c1/delegates/pending1"), {status: "active", updatedAt: "t"}));
     await assertFails(updateDoc(doc(as("adm"), "organizations/o1/companies/c1/delegates/pending1"), {status: "active", updatedAt: "t"}));
     await assertFails(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {status: "suspended", updatedAt: "t"}));
     await assertFails(updateDoc(doc(as("hr"), "organizations/o1/companies/c1/delegates/d1"), {status: "suspended", updatedAt: "t"}));
+    await assertSucceeds(updateDoc(doc(as("sup"), "organizations/o1/companies/c1/delegates/d1"), {
+      status: "suspended", statusReason: "hold", updatedAt: "t",
+    }));
     await assertSucceeds(updateDoc(doc(as("sa"), "organizations/o1/companies/c1/delegates/d1"), {status: "suspended", updatedAt: "t"}));
     await assertSucceeds(updateDoc(doc(as("ts"), "organizations/o1/companies/c1/delegates/d1"), {status: "active", updatedAt: "t"}));
   });
