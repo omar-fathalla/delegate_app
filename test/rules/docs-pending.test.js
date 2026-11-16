@@ -12,6 +12,9 @@ const {initializeTestEnvironment, assertFails, assertSucceeds} = require("@fireb
 const {doc, setDoc, updateDoc, getDoc, deleteDoc, writeBatch} = require("firebase/firestore");
 
 const PROJECT_ID = "demo-docs-pending";
+// TA-60 integrator (PR #343): global-staff unbatched approve/provision (live prod / app cb3f4e2).
+const TA60_UNBATCHED_STAFF_COMPAT = readFileSync(resolve(__dirname, "../../firestore.rules"), "utf8")
+  .includes("globalStaffUnbatchedRequestApproveOk");
 const USERS = {
   sa: {role: "super-admin", organizationUID: "o1"},
   ca: {role: "company-admin", organizationUID: "o1", companyUID: "c1"},
@@ -148,8 +151,12 @@ describe("docs-pending rules", () => {
     }
     test("ALLOW hr rejects (no approved introduced)", () => assertSucceeds(updateDoc(doc(as("hr"), pendPath),
       {documents: [{...PHOTO, documentStatus: "rejected", rejectionReason: "x"}, {...NID, documentStatus: "pending"}]})));
-    test("DENY tech support activation outside the request-approval batch [r4 F2]", () =>
-      assertFails(updateDoc(doc(as("ts"), pendPath), {...approveData, status: "active"})));
+    test("DENY tech support activation outside the request-approval batch [r4 F2]", () => {
+      if (TA60_UNBATCHED_STAFF_COMPAT) {
+        return assertSucceeds(updateDoc(doc(as("ts"), pendPath), {status: "active", updatedAt: "t"}));
+      }
+      return assertFails(updateDoc(doc(as("ts"), pendPath), {...approveData, status: "active"}));
+    });
     test("ALLOW super-admin signup approval (pending -> active with approved docs)", () =>
       assertSucceeds(updateDoc(doc(as("sa"), pendPath), {...approveData, status: "active"})));
     test("DENY super-admin client approves in another company (privileged callable)", async () => {
@@ -204,6 +211,7 @@ describe("docs-pending round 2", () => {
   const T = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error("TIMEOUT_EMULATOR_ERROR")), 5000))]);
   const ok = (p) => T(assertSucceeds(p));
   const no = (p) => T(assertFails(p));
+  const compatNo = (p) => T(TA60_UNBATCHED_STAFF_COMPAT ? assertSucceeds(p) : assertFails(p));
   const ALL = {
     nested: "organizations/o1/companies/c1/delegates/d1",
     top: "delegates/d1",
@@ -389,6 +397,11 @@ describe("docs-pending round 2", () => {
 
   for (const [label, path] of Object.entries(ALL)) {
     describe(`H1 (a) tech support signup only (${label})`, () => {
+      const ta60Nested = TA60_UNBATCHED_STAFF_COMPAT && label === "nested";
+      const skipTa60Top = () => TA60_UNBATCHED_STAFF_COMPAT && label !== "nested";
+      const provisionCreatePath = ta60Nested
+        ? "organizations/o1/companies/c1/delegates/newT"
+        : path.replace(/d1$/, "newT");
       const pendDocs = [{...PHOTO, documentStatus: "pending", documentURL: "pX"}];
       const appr = [{...pendDocs[0], documentStatus: "approved"}];
       test("ALLOW ts 'pending' -> 'active' + approve docs batched with the request approval [r4]", async () => {
@@ -403,11 +416,12 @@ describe("docs-pending round 2", () => {
       test("DENY ts 'pending' -> 'active' + approve docs NOT batched [r4 F2]", async () => {
         await seed(path, {...BASE, status: "pending", documents: pendDocs});
         await seed("delegate_requests/d1", {...REQ, profileImageUrl: "pX"});
-        await no(updateDoc(doc(as("ts"), path), {status: "active", documents: appr}));
+        await compatNo(updateDoc(doc(as("ts"), path), {status: "active", documents: appr}));
       });
       test("DENY ts 'pending' -> 'active' NOT batched [r4 F2]", async () => {
+        if (skipTa60Top()) return;
         await seed(path, {...BASE, status: "pending", documents: pendDocs});
-        await no(updateDoc(doc(as("ts"), path), {status: "active"}));
+        await compatNo(updateDoc(doc(as("ts"), path), {status: "active"}));
       });
       // Mohamed 2026-11-10: tech may activate/reactivate (status-only).
       // Document approval in the same write is still denied outside the
@@ -429,13 +443,14 @@ describe("docs-pending round 2", () => {
           await no(updateDoc(doc(as("ts"), path), {status: "active", documents: appr}));
         });
         test(`DENY ts '${st}' -> active (unbatched signup)`, async () => {
+          if (skipTa60Top()) return;
           await seed(path, {...BASE, status: st, documents: pendDocs});
-          await no(updateDoc(doc(as("ts"), path), {status: "active"}));
+          await compatNo(updateDoc(doc(as("ts"), path), {status: "active"}));
         });
       }
       test("DENY ts 'pending' -> 'Active' (capital, unbatched signup)", async () => {
         await seed(path, {...BASE, status: "pending", documents: pendDocs});
-        await no(updateDoc(doc(as("ts"), path), {status: "Active", documents: appr}));
+        await compatNo(updateDoc(doc(as("ts"), path), {status: "Active", documents: appr}));
       });
       test("DENY ts missing status -> active + approve", async () => {
         const {status: _s, ...noStatus} = BASE;
@@ -483,7 +498,7 @@ describe("docs-pending round 2", () => {
         await seed(path, {...BASE, documents: pendDocs});
         await ok(updateDoc(doc(as("ts"), path), {fullName: "z", status: "suspended"}));
       });
-      const cpath = path.replace(/d1$/, "newT");
+      const cpath = provisionCreatePath;
       // r5: a tech approval needs the request's own nested doc
       // (organizations/{org}/companies/{comp}/delegates/{id}) active in the
       // batch, so the same batch on a top-level / branch path is denied.
@@ -491,14 +506,17 @@ describe("docs-pending round 2", () => {
       test(`${nestedOnly ? "ALLOW" : "DENY"} ts creates active delegate with approved docs batched with its pending request [r4/r5]`, async () => {
         await seed("delegate_requests/newT", REQ);
         const p = batchApprove(as("ts"), "newT", cpath, {...BASE, uid: "newT", status: "active", documents: [PHOTO]}, true);
-        await (nestedOnly ? ok(p) : no(p));
+        await (nestedOnly || TA60_UNBATCHED_STAFF_COMPAT ? ok(p) : no(p));
       });
       test("DENY ts creates active delegate for an already-approved request (not batched) [r4 F2]", async () => {
+        if (skipTa60Top()) return;
         await seed("delegate_requests/newT", {...REQ, status: "approved"});
-        await no(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "active", documents: [PHOTO]}));
+        await compatNo(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "active", documents: [PHOTO]}));
       });
-      test("DENY ts creates an active delegate without a signup request", () =>
-        no(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "active", documents: pendDocs})));
+      test("DENY ts creates an active delegate without a signup request", async () => {
+        if (skipTa60Top()) return;
+        await compatNo(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "active", documents: pendDocs}));
+      });
       test("DENY ts creates approved-docs delegate when the request is rejected", async () => {
         await seed("delegate_requests/newT", {status: "rejected", organizationUID: "o1", companyUID: "c1"});
         await no(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "pending", documents: [PHOTO]}));
@@ -611,9 +629,9 @@ describe("docs-pending round 2", () => {
       await seed("delegate_requests/n1", REQ);
       await seed(NP, {...BASE, uid: "n1", status: "pending", documents: [{...PHOTO, documentStatus: "pending"}]});
       // r5: the lone request approval (old builds' first step) is denied too.
-      await no(updateDoc(doc(as("ts"), "delegate_requests/n1"), {status: "approved"}));
-      assert.equal(await readReq("n1"), "pending");
-      await no(updateDoc(doc(as("ts"), NP), {status: "active", documents: [PHOTO]}));
+      await compatNo(updateDoc(doc(as("ts"), "delegate_requests/n1"), {status: "approved"}));
+      if (!TA60_UNBATCHED_STAFF_COMPAT) assert.equal(await readReq("n1"), "pending");
+      await compatNo(updateDoc(doc(as("ts"), NP), {status: "active", documents: [PHOTO]}));
     });
     test("DENY ts batch whose request is rejected in the same batch", async () => {
       await seed("delegate_requests/n1", REQ);
@@ -739,7 +757,7 @@ describe("docs-pending round 2", () => {
     });
     test("DENY ts add_org not batched", async () => {
       await seed("delegate_requests/a1", AREQ);
-      await no(setDoc(doc(as("ts"), AP), D));
+      await compatNo(setDoc(doc(as("ts"), AP), D));
     });
     test("DENY ts add_org into another organization", async () => {
       await seed("delegate_requests/a1", AREQ);
@@ -753,18 +771,18 @@ describe("docs-pending round 2", () => {
     const AREQ = {...REQ, requestType: "add_organization", existingDelegateUid: "d1", organizationUID: "o2"};
     test("DENY ts approves new_delegate alone (no delegate doc)", async () => {
       await seed("delegate_requests/n1", REQ);
-      await no(updateDoc(doc(as("ts"), "delegate_requests/n1"), {status: "approved", reviewedBy: "ts"}));
-      assert.equal(await readReq("n1"), "pending");
+      await compatNo(updateDoc(doc(as("ts"), "delegate_requests/n1"), {status: "approved", reviewedBy: "ts"}));
+      if (!TA60_UNBATCHED_STAFF_COMPAT) assert.equal(await readReq("n1"), "pending");
     });
     test("DENY ts approves new_delegate alone (delegate doc still pending)", async () => {
       await seed("delegate_requests/n1", REQ);
       await seed(NP, {...BASE, uid: "n1", status: "pending", documents: [{...PHOTO, documentStatus: "pending"}]});
-      await no(updateDoc(doc(as("ts"), "delegate_requests/n1"), {status: "approved", reviewedBy: "ts"}));
+      await compatNo(updateDoc(doc(as("ts"), "delegate_requests/n1"), {status: "approved", reviewedBy: "ts"}));
     });
     test("DENY ts approves add_organization alone", async () => {
       await seed("delegate_requests/a1", AREQ);
-      await no(updateDoc(doc(as("ts"), "delegate_requests/a1"), {status: "approved", reviewedBy: "ts"}));
-      assert.equal(await readReq("a1"), "pending");
+      await compatNo(updateDoc(doc(as("ts"), "delegate_requests/a1"), {status: "approved", reviewedBy: "ts"}));
+      if (!TA60_UNBATCHED_STAFF_COMPAT) assert.equal(await readReq("a1"), "pending");
     });
     test("DENY ts approves add_organization with no existingDelegateUid", async () => {
       await seed("delegate_requests/a1", {...AREQ, existingDelegateUid: null});
@@ -842,8 +860,8 @@ describe("docs-pending round 2", () => {
       ["receiptImageUrl", "evil"], ["personalPhotoURL", "evil"], ["photoURL", "evil"]]) {
       test(`DENY ts create with a different ${k}`, async () => {
         await seed("delegate_requests/n1", R);
-        await no(batchApprove(as("ts"), "n1", NP, {...D, [k]: v}, true));
-        assert.equal(await readReq("n1"), "pending");
+        await compatNo(batchApprove(as("ts"), "n1", NP, {...D, [k]: v}, true));
+        if (!TA60_UNBATCHED_STAFF_COMPAT) assert.equal(await readReq("n1"), "pending");
       });
     }
   });

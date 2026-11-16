@@ -1219,6 +1219,21 @@ service cloud.firestore {
         && resource.data.get('actionType', '') != 'update_national_id';
     }
 
+    // Same-batch delegate activation must use techRequestReviewOk (r4 F2/F3), not unbatched approve.
+    function globalStaffUnbatchedRequestApproveStandaloneOk(requestId) {
+      let ty = resource.data.get('requestType', 'new_delegate');
+      let org = resource.data.get('organizationUID', '');
+      let co = resource.data.get('companyUID', '');
+      let delId = ty == 'add_organization'
+        ? request.resource.data.get('existingDelegateUid', resource.data.get('existingDelegateUid', ''))
+        : requestId;
+      let delegatePath = /databases/$(database)/documents/organizations/$(org)/companies/$(co)/delegates/$(delId);
+      let unchanged = !exists(delegatePath)
+        || (getAfter(delegatePath).data.get('status', '') == get(delegatePath).data.get('status', '')
+          && getAfter(delegatePath).data.get('updatedAt', '') == get(delegatePath).data.get('updatedAt', ''));
+      return globalStaffUnbatchedRequestApproveOk() && unchanged;
+    }
+
     // Unbatched global-staff approve (1.14.3 / live): absent check is ok;
     // explicit failed still blocks; strict ok-only stays on the batched path.
     function globalStaffUnbatchedOrgCheckOk() {
@@ -1240,6 +1255,25 @@ service cloud.firestore {
         && stl == 'active'
         && d.get('organizationUID', '') == orgId
         && d.get('companyUID', '') == compId;
+    }
+
+    // Step-2c unbatched merge only — not a bypass for arbitrary active updates.
+    function globalStaffUnbatchedDelegateProvisionCreateOk(orgId, compId, delegateId) {
+      return globalStaffUnbatchedDelegateProvisionOk(orgId, compId, delegateId)
+        && sourceStampKeysLocked()
+        && deviceBindingAbsent();
+    }
+
+    function globalStaffUnbatchedDelegateProvisionUpdateOk(orgId, compId, delegateId) {
+      let rStatus = resource.data.get('status', '') is string
+        ? resource.data.get('status', '').lower().trim() : '';
+      return globalStaffUnbatchedDelegateProvisionOk(orgId, compId, delegateId)
+        && sourceStampKeysLocked()
+        && rStatus == 'pending'
+        && changedKeys().hasOnly([
+          'uid', 'name', 'fullName', 'status', 'organizationUID', 'companyUID',
+          'phoneNumber', 'nationalityID', 'registeredVia', 'updatedAt',
+          'organizationName', 'companyName', 'delegatePublicId']);
     }
 
     function requestStaffUpdateOk(requestId) {
@@ -1745,7 +1779,7 @@ service cloud.firestore {
 
         match /delegates/{delegateId} {
           allow read: if signedIn() && canReadNestedDelegate(orgId, compId, delegateId);
-          allow create: if globalStaffUnbatchedDelegateProvisionOk(orgId, compId, delegateId)
+          allow create: if globalStaffUnbatchedDelegateProvisionCreateOk(orgId, compId, delegateId)
             || (deviceBindingAbsent() && sourceStampKeysLocked()
             && exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId))
             && nestedDelegateCreateOk(orgId, compId, delegateId));
@@ -1754,12 +1788,12 @@ service cloud.firestore {
           // self-updates are hasOnly-gated by delegateFieldsSafe. Staff
           // updates take staffDocsApproveOk, which locks source keys on
           // the non-techSignup branch only (techFlipOk already hasOnly).
-          allow update: if globalStaffUnbatchedDelegateProvisionOk(orgId, compId, delegateId)
-            || (delegateOwns(delegateId)
+          allow update: if (delegateOwns(delegateId)
             ? delegateFieldsSafe()
             : (deviceBindingUntouched() && signedIn()
               && staffManagesDelegate([orgId], [compId], false)
-              && staffDocsApproveOk(orgId, compId, compId, delegateId)));
+              && staffDocsApproveOk(orgId, compId, compId, delegateId)))
+            || globalStaffUnbatchedDelegateProvisionUpdateOk(orgId, compId, delegateId);
           allow delete: if canManageNestedDelegate(orgId, compId);
         }
 
@@ -3867,7 +3901,7 @@ service cloud.firestore {
       // status, or any other field. Review fields are written only by
       // reviewNationalIdUpdate (Admin SDK). Clients also cannot convert
       // another request into update_national_id.
-      allow update: if (globalStaffUnbatchedRequestApproveOk()
+      allow update: if (globalStaffUnbatchedRequestApproveStandaloneOk(requestId)
           && orgCompanyCheckKeysLocked()
           && subscriptionPaymentUntouched()
           && !changedKeys().hasAny(['proposedNationalId'])
