@@ -9,8 +9,10 @@ import 'package:material_symbols_icons/symbols.dart';
 /// HR web login. Mounted only when [WebRuntimePolicy.isWeb] is true.
 ///
 /// Wide windows (≥840) are a split screen: the form sits on the start side
-/// and the brand panel on the end side. Narrow windows stack a compact brand
-/// band, the form, and a short feature list.
+/// and the brand panel on the end side. From 1440 the panes are equal and the
+/// form stays at most 400 wide, centred in its pane. Narrower split widths
+/// keep the 360/400 form column. Below 840, a compact brand band, the form,
+/// and all eight features stack in one column.
 class WebHrLoginView extends StatelessWidget {
   const WebHrLoginView({
     super.key,
@@ -36,6 +38,8 @@ class WebHrLoginView extends StatelessWidget {
 
   static const double wideBreakpoint = 840;
   static const double comfortableBreakpoint = 1200;
+  static const double equalPaneBreakpoint = 1440;
+  static const double formMaxWidth = 400;
 
   final GlobalKey<FormState> formKey;
   final GlobalKey<ShakeState> shakeKey;
@@ -61,8 +65,31 @@ class WebHrLoginView extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth >= wideBreakpoint) {
+          final tight = constraints.maxWidth < comfortableBreakpoint;
+          final brand = _BrandPanel(
+            isArabic: isArabic,
+            onLanguage: onLanguage,
+            tight: tight,
+          );
+          // 1440 is about 28% form / 72% brand when the form pane is 400.
+          // Equal panes put at least 560 on the form side; the fields stay
+          // at most [formMaxWidth] and centred. 1024 keeps the 360 column.
+          if (constraints.maxWidth >= equalPaneBreakpoint) {
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: KeyedSubtree(
+                    key: const ValueKey('login_web_form_column'),
+                    child: _FormColumn(view: this),
+                  ),
+                ),
+                Expanded(child: brand),
+              ],
+            );
+          }
           final formWidth = constraints.maxWidth >= comfortableBreakpoint
-              ? 400.0
+              ? formMaxWidth
               : 360.0;
           return Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -72,13 +99,7 @@ class WebHrLoginView extends StatelessWidget {
                 width: formWidth,
                 child: _FormColumn(view: this),
               ),
-              Expanded(
-                child: _BrandPanel(
-                  isArabic: isArabic,
-                  onLanguage: onLanguage,
-                  tight: constraints.maxWidth < comfortableBreakpoint,
-                ),
-              ),
+              Expanded(child: brand),
             ],
           );
         }
@@ -107,7 +128,14 @@ class _FormColumn extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             child: ConstrainedBox(
               constraints: BoxConstraints(minHeight: minHeight),
-              child: Center(child: _FormBody(view: view)),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: WebHrLoginView.formMaxWidth,
+                  ),
+                  child: _FormBody(view: view),
+                ),
+              ),
             ),
           );
         },
@@ -164,9 +192,11 @@ class _FormBody extends StatelessWidget {
                 textInputAction: TextInputAction.done,
                 autocorrect: false,
                 enableSuggestions: false,
+                // Web maps telephoneNumber to autocomplete="tel".
                 autofillHints: const [AutofillHints.telephoneNumber],
                 textDirection: TextDirection.ltr,
-                textAlign: TextAlign.left,
+                // LTR digits, aligned to the ambient start (right) under the label.
+                textAlign: TextAlign.right,
                 onFieldSubmitted: (_) => view.onSubmit(),
                 style: TextStyle(fontSize: 16, color: cs.onSurface),
                 decoration: _fieldDecoration(
@@ -191,6 +221,7 @@ class _FormBody extends StatelessWidget {
                 textInputAction: TextInputAction.done,
                 autocorrect: false,
                 enableSuggestions: false,
+                // Web maps password to autocomplete="current-password".
                 autofillHints: const [AutofillHints.password],
                 obscureText: view.obscurePassword,
                 textDirection: TextDirection.ltr,
@@ -260,6 +291,8 @@ class _FormBody extends StatelessWidget {
                     key: const ValueKey('login_forgot_password'),
                     onPressed: view.loading ? null : view.onForgot,
                     style: TextButton.styleFrom(
+                      // Web's compact density would shrink a 48dp minimum to 40.
+                      visualDensity: VisualDensity.standard,
                       minimumSize: const Size(48, 48),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -285,8 +318,9 @@ class _FormBody extends StatelessWidget {
                 label: view.loading ? l10n.signingIn : null,
                 child: FilledButton(
                   key: const ValueKey('login_submit'),
-                  onPressed: view.onSubmit,
+                  onPressed: view.loading ? null : view.onSubmit,
                   style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.standard,
                     minimumSize: const Size.fromHeight(48),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 24,
@@ -294,6 +328,8 @@ class _FormBody extends StatelessWidget {
                     ),
                     backgroundColor: cs.primary,
                     foregroundColor: cs.onPrimary,
+                    disabledBackgroundColor: cs.primary,
+                    disabledForegroundColor: cs.onPrimary,
                     shape: const StadiumBorder(),
                     textStyle: text.labelLarge?.copyWith(
                       fontSize: 16,
@@ -308,6 +344,10 @@ class _FormBody extends StatelessWidget {
                           child: CircularProgressIndicator(
                             strokeWidth: 2.5,
                             color: cs.onPrimary,
+                            // The app theme uses the expressive indicator, which
+                            // collapses to a dot inside a 22dp button slot.
+                            // ignore: deprecated_member_use
+                            year2023: true,
                           ),
                         )
                       : Text(
@@ -322,9 +362,7 @@ class _FormBody extends StatelessWidget {
                 child: TextButton(
                   key: const ValueKey('login_support_button'),
                   onPressed: view.onSupport,
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(48, 48),
-                  ),
+                  style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
                   child: Text(l10n.contactSupport),
                 ),
               ),
@@ -411,15 +449,11 @@ InputDecoration _fieldDecoration(
     filled: false,
     suffixIcon: suffixIcon,
     border: const OutlineInputBorder(),
-    enabledBorder: OutlineInputBorder(
-      borderSide: BorderSide(color: idle),
-    ),
+    enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: idle)),
     focusedBorder: OutlineInputBorder(
       borderSide: BorderSide(color: focus, width: 2),
     ),
-    errorBorder: OutlineInputBorder(
-      borderSide: BorderSide(color: cs.error),
-    ),
+    errorBorder: OutlineInputBorder(borderSide: BorderSide(color: cs.error)),
     focusedErrorBorder: OutlineInputBorder(
       borderSide: BorderSide(color: cs.error, width: 2),
     ),
@@ -472,6 +506,47 @@ class _LanguageChip extends StatelessWidget {
   }
 }
 
+/// Brand fill for the web login panel.
+///
+/// Light mode uses [ColorScheme.primary] (#6750A4). Dark mode uses
+/// [ColorScheme.onPrimary] (#381E72 for the default seed): a deep purple,
+/// not the neutral near-black [ColorScheme.surfaceContainer]. Feature chips
+/// stay on [ColorScheme.primaryContainer] / [ColorScheme.onPrimaryContainer]
+/// (#4F378A / #E9DDFF in dark).
+class _BrandColors {
+  const _BrandColors({
+    required this.panel,
+    required this.onPanel,
+    required this.onPanelMuted,
+    required this.chip,
+    required this.onChip,
+    required this.shape,
+  });
+
+  final Color panel;
+  final Color onPanel;
+  final Color onPanelMuted;
+  final Color chip;
+  final Color onChip;
+  final Color shape;
+
+  factory _BrandColors.of(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final onPanel = dark ? cs.onPrimaryContainer : cs.onPrimary;
+    return _BrandColors(
+      panel: dark ? cs.onPrimary : cs.primary,
+      onPanel: onPanel,
+      onPanelMuted: onPanel.withValues(alpha: 0.88),
+      chip: cs.primaryContainer,
+      onChip: cs.onPrimaryContainer,
+      shape: (dark ? cs.primary : cs.onPrimary).withValues(
+        alpha: dark ? 0.16 : 0.08,
+      ),
+    );
+  }
+}
+
 class _BrandPanel extends StatelessWidget {
   const _BrandPanel({
     required this.isArabic,
@@ -485,15 +560,9 @@ class _BrandPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final panel = dark ? cs.surfaceContainer : cs.primary;
-    final onPanel = dark ? cs.onSurface : cs.onPrimary;
-    final onPanelMuted = dark
-        ? cs.onSurfaceVariant
-        : cs.onPrimary.withValues(alpha: 0.88);
+    final brand = _BrandColors.of(context);
     return ColoredBox(
-      color: panel,
+      color: brand.panel,
       child: Stack(
         children: [
           PositionedDirectional(
@@ -505,15 +574,18 @@ class _BrandPanel extends StatelessWidget {
                 height: 280,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: (dark ? cs.primary : cs.onPrimary).withValues(
-                    alpha: dark ? 0.16 : 0.08,
-                  ),
+                  color: brand.shape,
                 ),
               ),
             ),
           ),
           Padding(
-            padding: EdgeInsets.fromLTRB(tight ? 28 : 48, 16, tight ? 28 : 48, 24),
+            padding: EdgeInsets.fromLTRB(
+              tight ? 28 : 48,
+              16,
+              tight ? 28 : 48,
+              24,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -535,11 +607,11 @@ class _BrandPanel extends StatelessWidget {
                           child: Center(
                             child: _BrandCopy(
                               isArabic: isArabic,
-                              onPanel: onPanel,
-                              onPanelMuted: onPanelMuted,
+                              onPanel: brand.onPanel,
+                              onPanelMuted: brand.onPanelMuted,
                               tight: tight,
-                              chipColor: cs.primaryContainer,
-                              iconColor: cs.onPrimaryContainer,
+                              chipColor: brand.chip,
+                              iconColor: brand.onChip,
                             ),
                           ),
                         ),
@@ -631,9 +703,7 @@ class _NarrowColumn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final band = dark ? cs.surfaceContainer : cs.primary;
-    final onBand = dark ? cs.onSurface : cs.onPrimary;
+    final brand = _BrandColors.of(context);
     final text = Theme.of(context).textTheme;
     final l10n = AppLocalizations.of(context)!;
     return ColoredBox(
@@ -642,7 +712,7 @@ class _NarrowColumn extends StatelessWidget {
         padding: EdgeInsets.zero,
         children: [
           ColoredBox(
-            color: band,
+            color: brand.panel,
             child: SafeArea(
               bottom: false,
               child: Padding(
@@ -662,7 +732,7 @@ class _NarrowColumn extends StatelessWidget {
                     Text(
                       l10n.appTitle,
                       style: text.headlineSmall?.copyWith(
-                        color: onBand,
+                        color: brand.onPanel,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -673,8 +743,19 @@ class _NarrowColumn extends StatelessWidget {
                           : 'A complete human resources system',
                       textAlign: TextAlign.center,
                       style: text.titleMedium?.copyWith(
-                        color: onBand,
+                        color: brand.onPanel,
                         fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      view.isArabic
+                          ? 'لشركات التجزئة العاملة مع الهايبرماركت'
+                          : 'For retail companies working with hypermarkets',
+                      textAlign: TextAlign.center,
+                      style: text.bodyMedium?.copyWith(
+                        color: brand.onPanelMuted,
+                        height: 1.4,
                       ),
                     ),
                   ],
@@ -690,16 +771,16 @@ class _NarrowColumn extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
             child: Column(
               children: [
-                for (final feature in _features.take(4))
+                for (final feature in _features)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _FeatureTile(
                       feature: feature,
                       isArabic: view.isArabic,
-                      tight: true,
+                      tight: false,
                       labelColor: cs.onSurface,
-                      chipColor: cs.primaryContainer,
-                      iconColor: cs.onPrimaryContainer,
+                      chipColor: brand.chip,
+                      iconColor: brand.onChip,
                     ),
                   ),
               ],
