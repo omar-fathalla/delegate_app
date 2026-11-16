@@ -7,7 +7,7 @@ service firebase.storage {
     match /feedback_screenshots/{fileName} {
       allow create: if request.auth != null
         && request.auth.token.get('role', '') == 'delegate'
-        && fileName.matches('feedback_(ts|[0-9]+)(\\.[A-Za-z0-9]+)?$');
+        && fileName.matches('^feedback_(ts|[0-9]+)(\\.[A-Za-z0-9]+)?$');
     }
     match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
       allow create: if request.auth != null
@@ -290,17 +290,15 @@ service firebase.storage {
       // owner even if a client upload is classified as create.
       allow read: if isStorageStaff()
         || feedbackDelegateMayAccess(fileName);
-      allow create: if isStorageStaff();
-      allow create: if isDelegateToken()
-        && resource == null
-        && feedbackMetaOk(storageMetaUserId(request.resource.metadata))
-        && feedbackNameOwnedByCaller(fileName);
-      allow update: if isStorageStaff()
+      allow create, update: if isStorageStaff()
         || (
           isDelegateToken()
           && callerDelegateMayWriteStorage()
           && feedbackMetaOk(storageMetaUserId(request.resource.metadata))
-          && feedbackDelegateMayAccess(fileName)
+          && (
+            (resource == null && feedbackNameOwnedByCaller(fileName))
+            || (resource != null && feedbackDelegateMayAccess(fileName))
+          )
         );
       allow delete: if isStorageStaff()
         || (feedbackDelegateMayAccess(fileName) && callerDelegateMayWriteStorage());
@@ -335,22 +333,13 @@ service firebase.storage {
     match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
       allow read: if canAccessOrgCompanyFiles(orgId, compId)
         || delegateTokenOwnsCompany(compId);
-      allow create: if isNonAnonymous()
-        && request.auth.token.get('role', '') == 'delegate'
-        && request.auth.token.get('companyId', '') == compId
-        && resource == null
-        && photoId.matches('photo_(ts|[0-9]+)(\\.[A-Za-z0-9]+)?$')
-        && !permissionPhotoNameOwnedByOther(photoId);
       allow create: if canAccessOrgCompanyFiles(orgId, compId);
-      allow create: if delegateTokenOwnsCompany(compId)
-        && resource == null
+      allow create, update: if delegateTokenOwnsCompany(compId)
+        && callerDelegateMayWriteStorage()
         && !permissionPhotoNameOwnedByOther(photoId)
-        && permissionPhotoNameOwnedByCaller(photoId);
-      allow update: if canAccessOrgCompanyFiles(orgId, compId)
-        || (delegateTokenOwnsCompany(compId)
-          && callerDelegateMayWriteStorage()
-          && !permissionPhotoNameOwnedByOther(photoId)
-          && delegateOwnsPermissionPhoto(photoId));
+        && (
+          (resource == null && permissionPhotoNameOwnedByCaller(photoId))
+          || (resource != null && delegateOwnsPermissionPhoto(photoId)));
       allow delete: if canAccessOrgCompanyFiles(orgId, compId)
         || (delegateTokenOwnsCompany(compId)
           && callerDelegateMayWriteStorage()

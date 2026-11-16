@@ -781,7 +781,7 @@ service cloud.firestore {
         ];
     }
 
-    function delegateCgDelegateOwnListOk() {
+    function delegateCgDelegateOwnListOk(delegateId) {
       let phones = request.auth.token.keys().hasAll(['phones']) && request.auth.token.phones is list
         ? request.auth.token.phones
         : [];
@@ -789,16 +789,41 @@ service cloud.firestore {
       return (phones.size() > 0 && pn != '' && pn in phones)
         || (request.auth.token.keys().hasAll(['delegateIds'])
           && request.auth.token.delegateIds is list
-          && resource.id in request.auth.token.delegateIds)
-        || resource.id == request.auth.uid
+          && delegateId in request.auth.token.delegateIds)
+        || delegateId == request.auth.uid
         || ownsDelegateId(resource.data.get('uid', ''))
-        || (delegateOtpOk() && resource.id == request.auth.uid
+        || (delegateOtpOk() && delegateId == request.auth.uid
           && resource.data.get('nationalityID', '') != '')
         || (delegateOtpOk() && claimString('companyId') != ''
           && resource.data.get('companyUID', resource.data.get('companyId', ''))
             == claimString('companyId')
           && resource.data.get('nationalityID', '') is string
           && resource.data.get('nationalityID', '') != '');
+    }
+
+    function delegateCgStaffDupFieldListOk() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let co = u.get('companyUID', u.get('companyId', ''));
+      let org = u.get('organizationUID', u.get('organizationId', ''));
+      let docCo = resource.data.get('companyUID', resource.data.get('companyId', ''));
+      let docOrg = resource.data.get('organizationUID', resource.data.get('organizationId', ''));
+      let r = u.get('role', '');
+      return r in [
+          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr']
+        && (co != '' || org != '')
+        && (
+          (co != '' && docCo == co)
+          || (org != '' && docOrg == org)
+        )
+        && (
+          resource.data.keys().hasAll(['phoneNumber'])
+          || resource.data.keys().hasAll(['nationalId'])
+          || resource.data.keys().hasAll(['receiptCode'])
+          || (resource.data.keys().hasAll(['nationalityID'])
+            && resource.data.get('nationalityID', '') is string
+            && resource.data.get('nationalityID', '') != '')
+        );
     }
 
     function delegateCgCompanyDupCheckListOk() {
@@ -814,9 +839,9 @@ service cloud.firestore {
           || (org != '' && docOrg == org));
     }
 
-    function canReadDelegate() {
+    function canReadDelegate(delegateId) {
       return signedIn() && (
-        delegateCgDelegateOwnListOk()
+        delegateCgDelegateOwnListOk(delegateId)
         || delegateCgGlobalStaffListOk()
         || delegateCgOrgStaffListOk()
         || delegateCgCompanyStaffListOk()
@@ -948,10 +973,15 @@ service cloud.firestore {
       allow get: if signedIn() && isCompanyScopedStaff() && companyScoped();
 
       allow list: if signedIn() && claimString('role') == 'delegate' && delegateOtpOk()
+        && claimString('companyId') != ''
         && resource.data.keys().hasAll(['phoneNumber'])
         && resource.data.get('role', '') in ['supervisor', 'company_supervisor']
         && resource.data.get('companyUID', resource.data.get('companyId', ''))
           == claimString('companyId');
+      allow list: if signedIn() && userExists()
+        && userDoc().get('role', '') in ['supervisor', 'company_supervisor', 'company-admin', 'company_admin', 'admin']
+        && userDoc().get('companyUID', '') != ''
+        && resource.data.get('companyUID', resource.data.get('companyId', '')) == userDoc().companyUID;
       allow list: if signedIn() && claimString('role') == 'delegate' && delegateOtpOk()
         && resource.data.get('companyUID', resource.data.get('companyId', ''))
           == claimString('companyId');
@@ -1876,6 +1906,7 @@ service cloud.firestore {
     // tighter match and reopen the collection. Those duplicates are gone.
 
     match /{path=**}/delegates/{delegateId} {
+      allow list: if signedIn() && delegateCgStaffDupFieldListOk();
       allow list: if signedIn() && claimString('role') == 'delegate' && delegateOtpOk()
         && resource.data.keys().hasAll(['nationalityID'])
         && resource.data.get('nationalityID', '') is string
@@ -1885,13 +1916,13 @@ service cloud.firestore {
           'hr', 'company-hr', 'company_hr']
         && callerCompany() != ''
         && resource.data.get('companyUID', resource.data.get('companyId', '')) == callerCompany();
-      allow list: if signedIn() && delegateCgDelegateOwnListOk();
+      allow list: if signedIn() && delegateCgDelegateOwnListOk(delegateId);
       allow list: if signedIn() && delegateCgCompanyDupCheckListOk();
       allow list: if signedIn() && delegateCgCompanyStaffOrgWideListOk();
       allow list: if signedIn() && delegateCgCompanyStaffListOk();
       allow list: if signedIn() && delegateCgOrgStaffListOk();
       allow list: if signedIn() && delegateCgGlobalStaffListOk();
-      allow get: if signedIn() && canReadDelegate();
+      allow get: if signedIn() && canReadDelegate(delegateId);
       // r5 budget: a nested organizations/{o}/companies/{c}/delegates
       // create is decided by the nested match alone.
       // Lock source stamps on CG create (root / non-nested). Do not put the
@@ -3220,6 +3251,11 @@ service cloud.firestore {
     }
 
     match /delegate_requests/{requestId} {
+      allow list: if signedIn() && staffRole() in [
+          'supervisor', 'company_supervisor', 'company-admin', 'company_admin', 'admin', 'hr', 'company-hr', 'company_hr']
+        && callerCompany() != ''
+        && resource.data.get('companyUID', resource.data.get('companyId', '')) == callerCompany()
+        && resource.data.keys().hasAll(['receiptCode']);
       allow list: if signedIn() && resource.data.get('supervisorUid', '') == request.auth.uid;
       allow list: if signedIn() && staffRole() in ['supervisor', 'company_supervisor']
         && callerCompany() != ''
