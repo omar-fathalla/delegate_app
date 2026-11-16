@@ -22,6 +22,15 @@ abstract class PenaltyRemoteDataSource {
     required String delegateId,
     String? companyId,
   });
+
+  /// Penalties whose subject (`targetDelegateId`) is the signed-in staff user,
+  /// by uid or phone. Every query pins `companyId` so the staff list rule can
+  /// prove it, and nothing about anyone else is fetched.
+  Future<List<PenaltyModel>> getOwnPenalties({
+    required String uid,
+    required String companyId,
+    String? phoneNumber,
+  });
   Future<List<PenaltyModel>> getAllPenalties();
   Future<void> updatePenaltyStatus({
     required String penaltyId,
@@ -590,6 +599,45 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
           list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           return list;
         });
+  }
+
+  @override
+  Future<List<PenaltyModel>> getOwnPenalties({
+    required String uid,
+    required String companyId,
+    String? phoneNumber,
+  }) async {
+    final subjects = {
+      uid.trim(),
+      if (phoneNumber != null) phoneNumber.trim(),
+    }..remove('');
+    if (companyId.isEmpty || uid.trim().isEmpty) return [];
+    try {
+      final results = <String, PenaltyModel>{};
+      for (final subject in subjects) {
+        final snap = await _penaltiesRef
+            .where('companyId', isEqualTo: companyId)
+            .where('targetDelegateId', isEqualTo: subject)
+            .getResilient(forceServer: true);
+        for (final doc in snap.docs) {
+          final model = PenaltyModel.fromFirestore(doc);
+          if (model.companyId == companyId &&
+              subjects.contains(model.targetDelegateId?.trim())) {
+            results[doc.id] = model;
+          }
+        }
+      }
+      final list = results.values.toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final confidentialTitles = await _getConfidentialRuleTitles();
+      return _enrichPenaltiesWithConfidentiality(list, confidentialTitles);
+    } on FirebaseException catch (e) {
+      throw ServerException(
+        e.message?.isNotEmpty == true
+            ? e.message!
+            : 'فشل في جلب مخالفاتك (${e.code}).',
+      );
+    }
   }
 
   bool _isPenaltyMatchingDelegate(

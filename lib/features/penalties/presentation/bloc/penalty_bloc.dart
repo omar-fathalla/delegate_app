@@ -28,6 +28,7 @@ class PenaltyBloc extends Bloc<PenaltyEvent, PenaltyState> {
     on<LoadDelegatePenaltiesEvent>(_onLoadDelegatePenalties);
     on<LoadCompanyPenaltiesEvent>(_onLoadCompanyPenalties);
     on<LoadAllPenaltiesEvent>(_onLoadAllPenalties);
+    on<LoadOwnPenaltiesEvent>(_onLoadOwnPenalties);
     on<CreatePenaltyRequestedEvent>(_onCreatePenaltyRequested);
     on<UpdatePenaltyRequestedEvent>(_onUpdatePenaltyRequested);
     on<UpdatePenaltyStatusEvent>(_onUpdatePenaltyStatus);
@@ -117,6 +118,41 @@ class PenaltyBloc extends Bloc<PenaltyEvent, PenaltyState> {
   ) async {
     emit(PenaltyLoadingState());
     final result = await getAllPenaltiesUseCase();
+
+    result.fold(
+      (failure) => emit(PenaltyErrorState(failure.message)),
+      (penalties) {
+        double totalFine = 0.0;
+        double deductedFine = 0.0;
+        for (var p in penalties) {
+          if (p.status != PenaltyStatus.cancelled) {
+            totalFine += p.fineAmount;
+          }
+          if (p.status == PenaltyStatus.deducted) {
+            deductedFine += p.fineAmount;
+          }
+        }
+        emit(
+          PenaltyLoadedState(
+            penalties: penalties,
+            totalFineAmount: totalFine,
+            deductedAmount: deductedFine,
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _onLoadOwnPenalties(
+    LoadOwnPenaltiesEvent event,
+    Emitter<PenaltyState> emit,
+  ) async {
+    emit(PenaltyLoadingState());
+    final result = await repository.getOwnPenalties(
+      uid: event.user.uid,
+      companyId: event.user.companyUID,
+      phoneNumber: event.user.phoneNumber,
+    );
 
     result.fold(
       (failure) => emit(PenaltyErrorState(failure.message)),

@@ -21,10 +21,14 @@ class AdminPenaltiesListPage extends StatefulWidget {
   final Delegate adminDelegate;
   final bool showAppBar;
 
+  /// Read-only list of the penalties issued to [adminDelegate] only.
+  final bool ownPenaltiesOnly;
+
   const AdminPenaltiesListPage({
     super.key,
     required this.adminDelegate,
     this.showAppBar = true,
+    this.ownPenaltiesOnly = false,
   });
 
   @override
@@ -62,7 +66,9 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
   }
 
   void _loadData() {
-    if (widget.adminDelegate.role == UserRole.admin) {
+    if (widget.ownPenaltiesOnly) {
+      context.read<PenaltyBloc>().add(LoadOwnPenaltiesEvent(widget.adminDelegate));
+    } else if (widget.adminDelegate.role == UserRole.admin) {
       context.read<PenaltyBloc>().add(LoadCompanyPenaltiesEvent(widget.adminDelegate.companyUID));
     } else {
       context.read<PenaltyBloc>().add(const LoadAllPenaltiesEvent());
@@ -948,7 +954,7 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
       // 2) Technical Support
       // 3) Company Supervisor (Admin with same companyId)
       // 4) Target Delegate (if delegate is viewing)
-      if (p.isConfidential) {
+      if (p.isConfidential && !widget.ownPenaltiesOnly) {
         final canView = _canUserViewConfidentialPenalty(p, widget.adminDelegate);
         if (!canView) return false;
       }
@@ -1023,9 +1029,11 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
     return Scaffold(
       appBar: widget.showAppBar
           ? AppBar(
-              title: const Text(
-                'سجل المخالفات والغرامات',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              title: Text(
+                widget.ownPenaltiesOnly
+                    ? 'مخالفاتي وغراماتي'
+                    : 'سجل المخالفات والغرامات',
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               actions: [
                 if (widget.adminDelegate.role == UserRole.superAdmin ||
@@ -1056,7 +1064,8 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
               ],
             )
           : null,
-      floatingActionButton: widget.adminDelegate.role == UserRole.admin
+      floatingActionButton:
+          widget.ownPenaltiesOnly || widget.adminDelegate.role == UserRole.admin
           ? null
           : FloatingActionButton.extended(
               onPressed: () async {
@@ -1190,7 +1199,8 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                                       child: _AdminPenaltyCard(
                                         penalty: p,
                                         currentDelegate: widget.adminDelegate,
-                                        isReadOnly: widget.adminDelegate.role == UserRole.admin,
+                                        isReadOnly: widget.ownPenaltiesOnly ||
+                                            widget.adminDelegate.role == UserRole.admin,
                                         onStatusChanged: (newStatus) {
                                           context.read<PenaltyBloc>().add(
                                                 UpdatePenaltyStatusEvent(
