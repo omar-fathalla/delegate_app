@@ -13,7 +13,15 @@ test('TA-60 firestore: live prod vs candidate (main v1.14.2 + web shapes)', asyn
     console.warn(`bell allow-count drift vs live targets ${JSON.stringify(BELL_LIVE_ALLOW_TARGETS)}: ${r.bellCountIssues.join('; ')}`);
   }
   assert.equal(r.bellCountIssues?.length ?? 0, 0, `bell counts: ${(r.bellCountIssues || []).join('; ')}`);
-  console.log(`firestore harness: ${r.total} cases, ${r.deliberate.length} deliberate regressions, 0 unexpected`);
+  assert.equal(
+    r.bellSimulationIssues?.length ?? 0,
+    0,
+    `getNotifications() sim doc counts: ${(r.bellSimulationIssues || []).join('; ')}`,
+  );
+  console.log(
+    `firestore harness: ${r.total} cases, ${r.deliberate.length} deliberate regressions, ` +
+      `0 unexpected; bell sim ${JSON.stringify(r.bellLiveSim?.uniqueDocs)}`,
+  );
 });
 
 test('TA-60 storage: live prod vs candidate', async () => {
