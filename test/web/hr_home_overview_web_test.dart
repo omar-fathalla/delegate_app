@@ -312,30 +312,20 @@ void main() {
   });
 
   group('sections', () {
-    testWidgets('welcome header: greeting, role chip, last update, actions', (
-      t,
-    ) async {
+    testWidgets('body greeting is gone; reload stays in the header', (t) async {
       await _pumpView(t, const Size(1440, 2000), _data());
-      expect(find.text('أهلاً بك، منى الشريف'), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('hr_home_role_chip')),
-          matching: find.text('مشرف الشركة'),
-        ),
-        findsOneWidget,
-      );
-      expect(find.text('آخر تحديث 1:40 م'), findsOneWidget);
-      final welcome = find.byKey(const ValueKey('hr_home_welcome'));
+      expect(find.textContaining('أهلاً بك'), findsNothing);
+      expect(find.text('مشرف الشركة'), findsNothing);
+      expect(find.textContaining('آخر تحديث'), findsNothing);
+      expect(find.byKey(const ValueKey('hr_home_welcome')), findsNothing);
+      expect(find.byKey(const ValueKey('hr_home_role_chip')), findsNothing);
+      expect(find.byKey(const ValueKey('hr_home_last_updated')), findsNothing);
       for (final icon in [
         Icons.refresh_rounded,
         Icons.notifications_outlined,
         Icons.account_circle_outlined,
       ]) {
-        expect(
-          find.descendant(of: welcome, matching: find.byIcon(icon)),
-          findsNothing,
-          reason: icon.toString(),
-        );
+        expect(find.byIcon(icon), findsNothing, reason: icon.toString());
       }
       expect(find.byKey(const ValueKey('hr_home_refresh')), findsNothing);
       expect(find.byKey(const ValueKey('hr_home_account')), findsNothing);
@@ -345,16 +335,12 @@ void main() {
       expect(find.byType(AdminHomeQuickActions), findsNothing);
     });
 
-    testWidgets('HR accounts get the HR role chip', (t) async {
+    testWidgets('HR accounts have no body greeting or role chip', (t) async {
       await _pumpView(t, const Size(1440, 2000), _data(delegate: _hr));
-      expect(find.text('أهلاً بك، كريم عادل'), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('hr_home_role_chip')),
-          matching: find.text('HR'),
-        ),
-        findsOneWidget,
-      );
+      expect(find.textContaining('أهلاً بك'), findsNothing);
+      expect(find.text('HR'), findsNothing);
+      expect(find.byKey(const ValueKey('hr_home_role_chip')), findsNothing);
+      expect(find.byKey(const ValueKey('hr_home_welcome')), findsNothing);
     });
 
     testWidgets('stats: total, present X of Y with progress, neutral absent', (
@@ -728,7 +714,7 @@ void main() {
         find.byKey(const ValueKey('hr_home_skeleton_row_0')),
         findsNothing,
       );
-      expect(find.text('آخر تحديث 1:41 م'), findsOneWidget);
+      expect(find.textContaining('آخر تحديث'), findsNothing);
     });
 
     testWidgets('empty: cookie, message, tonal button, «لسه مسجلوش N»', (
