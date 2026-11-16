@@ -62,13 +62,6 @@ void showSubscriptionDecisionFailure(
   messenger.hideCurrentSnackBar();
   messenger.showSnackBar(
     SnackBar(
-      content: Text(
-        message,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          color: cs.onInverseSurface,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
       backgroundColor: cs.inverseSurface,
       // Elevation paints a hard black shelf under the bar in this renderer.
       // The inverse surface already separates it; no border, no shadow.
@@ -78,10 +71,40 @@ void showSubscriptionDecisionFailure(
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.all(Radius.circular(4)),
       ),
-      action: SnackBarAction(
-        label: 'إعادة المحاولة',
-        textColor: cs.inversePrimary,
-        onPressed: retry,
+      content: Row(
+        children: [
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: cs.onInverseSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          TextButton(
+            style: ButtonStyle(
+              animationDuration: Duration.zero,
+              foregroundColor: WidgetStatePropertyAll(cs.inversePrimary),
+              overlayColor: WidgetStatePropertyAll(
+                cs.inversePrimary.withValues(alpha: 0.08),
+              ),
+              padding: const WidgetStatePropertyAll(
+                EdgeInsets.symmetric(horizontal: 12),
+              ),
+              minimumSize: const WidgetStatePropertyAll(Size(48, 40)),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            onPressed: retry,
+            child: Text(
+              'إعادة المحاولة',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: cs.inversePrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     ),
   );
@@ -197,20 +220,27 @@ String subscriptionDateTimeLabel(DateTime time) {
   return '$d/$m/${local.year} · $hour:$min $suffix';
 }
 
-/// Keeps the stamp left-to-right inside an Arabic sentence.
-String subscriptionLtrIsolate(String value) => '\u2066$value\u2069';
+/// Same left-to-right stamp «وقت الطلب» uses. A separate [Directionality]
+/// keeps «م» / «ص» inside the run. A bidi isolate in an Arabic sentence
+/// lets that letter jump out in front of the time.
+Widget subscriptionLtrText(String value, TextStyle? style) {
+  return Directionality(
+    textDirection: TextDirection.ltr,
+    child: Text(value, style: subscriptionNumberStyle(style)),
+  );
+}
 
-/// One line after a decision. Reviewer gender is not on the request, so the
-/// verb stays neutral. A missing name, date, or reject reason is omitted.
-String subscriptionOutcomeLine(DelegateSubscriptionRequest request) {
+/// Result sentence split around the absolute stamp. The stamp is rendered
+/// with [subscriptionLtrText], not concatenated into the Arabic run.
+({String before, DateTime? at, String after})? subscriptionOutcomeParts(
+  DelegateSubscriptionRequest request,
+) {
   final who = request.reviewedBy?.trim();
   final hasWho = who != null && who.isNotEmpty;
-  final when = request.reviewedAt;
-  final date = when == null
-      ? null
-      : subscriptionLtrIsolate(subscriptionDateTimeLabel(when));
+  final at = request.reviewedAt;
   final reason = request.rejectionReason?.trim();
   final hasReason = reason != null && reason.isNotEmpty;
+  final reviewer = hasWho ? 'بواسطة $who' : null;
 
   if (request.status == SubscriptionRequestStatus.approved) {
     final action = request.isDeleteRequest
@@ -218,23 +248,29 @@ String subscriptionOutcomeLine(DelegateSubscriptionRequest request) {
         : request.isNationalIdUpdateRequest
         ? 'تم اعتماد تعديل الرقم القومي'
         : 'تم الاعتماد';
-    if (hasWho && date != null) return '$action بواسطة $who يوم $date';
-    if (hasWho) return '$action بواسطة $who';
-    if (date != null) return '$action يوم $date';
-    return action;
+    return (
+      before: [
+        action,
+        ?reviewer,
+        if (at != null) 'يوم',
+      ].join(' '),
+      at: at,
+      after: '',
+    );
   }
   if (request.status == SubscriptionRequestStatus.rejected) {
-    final base = hasWho && date != null
-        ? 'تم الرفض بواسطة $who يوم $date'
-        : hasWho
-        ? 'تم الرفض بواسطة $who'
-        : date != null
-        ? 'تم الرفض يوم $date'
-        : 'تم رفض الطلب';
-    if (hasReason) return '$base. السبب: $reason';
-    return base;
+    final before = [
+      'تم الرفض',
+      ?reviewer,
+      if (at != null) 'يوم',
+    ].join(' ');
+    final after = hasReason ? '. السبب: $reason' : '';
+    if (!hasWho && at == null && !hasReason) {
+      return (before: 'تم رفض الطلب', at: null, after: '');
+    }
+    return (before: before, at: at, after: after);
   }
-  return '';
+  return null;
 }
 
 class DelegateSubscriptionRequestsWeb extends StatefulWidget {
@@ -1211,8 +1247,7 @@ class _StatusChip extends StatelessWidget {
             0.0,
           ),
         };
-    final outlined = request.status == SubscriptionRequestStatus.rejected ||
-        request.status == SubscriptionRequestStatus.cancelled;
+    final outlined = request.status == SubscriptionRequestStatus.cancelled;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -1367,7 +1402,7 @@ class _DetailContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final outcome = subscriptionOutcomeLine(request);
+    final outcome = subscriptionOutcomeParts(request);
     final showOutcome =
         request.status == SubscriptionRequestStatus.approved ||
         request.status == SubscriptionRequestStatus.rejected;
@@ -1402,9 +1437,9 @@ class _DetailContent extends StatelessWidget {
             ),
           ],
         ),
-        if (showOutcome && outcome.isNotEmpty) ...[
+        if (showOutcome && outcome != null) ...[
           const SizedBox(height: 16),
-          _OutcomeCard(request: request, line: outcome),
+          _OutcomeCard(request: request, parts: outcome),
         ],
         if (request.isAddOrganizationRequest) ...[
           const SizedBox(height: 24),
@@ -1701,12 +1736,9 @@ class _DetailContent extends StatelessWidget {
   }
 
   Widget _ltrValue(BuildContext context, String value, {TextStyle? style}) {
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: Text(
-        value,
-        style: subscriptionNumberStyle(style ?? Theme.of(context).textTheme.bodyLarge),
-      ),
+    return subscriptionLtrText(
+      value,
+      style ?? Theme.of(context).textTheme.bodyLarge,
     );
   }
 
@@ -2117,9 +2149,9 @@ class _DecisionBar extends StatelessWidget {
 
 class _OutcomeCard extends StatelessWidget {
   final DelegateSubscriptionRequest request;
-  final String line;
+  final ({String before, DateTime? at, String after}) parts;
 
-  const _OutcomeCard({required this.request, required this.line});
+  const _OutcomeCard({required this.request, required this.parts});
 
   @override
   Widget build(BuildContext context) {
@@ -2127,6 +2159,11 @@ class _OutcomeCard extends StatelessWidget {
     final approved = request.status == SubscriptionRequestStatus.approved;
     final bg = approved ? cs.primaryContainer : cs.surfaceContainerHighest;
     final fg = approved ? cs.onPrimaryContainer : cs.onSurface;
+    final style = Theme.of(context).textTheme.bodyMedium?.copyWith(
+      color: fg,
+      fontWeight: FontWeight.w600,
+    );
+    final at = parts.at;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
@@ -2144,11 +2181,22 @@ class _OutcomeCard extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              line,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: fg,
-                fontWeight: FontWeight.w600,
+            child: Text.rich(
+              TextSpan(
+                style: style,
+                children: [
+                  TextSpan(text: at == null ? parts.before : '${parts.before} '),
+                  if (at != null)
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.baseline,
+                      baseline: TextBaseline.alphabetic,
+                      child: subscriptionLtrText(
+                        subscriptionDateTimeLabel(at),
+                        style,
+                      ),
+                    ),
+                  if (parts.after.isNotEmpty) TextSpan(text: parts.after),
+                ],
               ),
             ),
           ),

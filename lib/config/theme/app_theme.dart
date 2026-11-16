@@ -237,7 +237,7 @@ class AppTheme {
         onPrimary: const Color(0xFFFFFFFF),
         primaryContainer: const Color(0xFFE9DDFF),
         onPrimaryContainer: const Color(0xFF22005D),
-        inversePrimary: const Color(0xFFCFBCFF),
+        inversePrimary: const Color(0xFFD0BCFF),
         secondary: const Color(0xFF625B70),
         secondaryContainer: const Color(0xFFE8DEF8),
         onSecondaryContainer: const Color(0xFF1E192B),
