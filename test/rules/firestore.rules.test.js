@@ -76,6 +76,13 @@ describe("firestore tightened rules", () => {
           email: "owner@example.com",
           displayName: "Owner",
         },
+        "del-1": {
+          role: "delegate",
+          organizationUID: "o1",
+          companyUID: "c1",
+          uid: "del-1",
+          status: "approved",
+        },
         victim: {role: "delegate", organizationUID: "o1", companyUID: "c1", status: "approved"},
       };
       for (const [id, data] of Object.entries(users)) {

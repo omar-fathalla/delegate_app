@@ -144,16 +144,22 @@ service firebase.storage {
     function canAccessCompanyFiles(compId) {
       let role = storageUserRole();
       let co = storageUserCo();
+      return storageCallerHasProfile() && (
+        isStorageGlobalRole(role)
+        || (isStorageNamedStaffRole(role) && co != '' && co == compId)
+      );
+    }
+    function canAccessOrgCompanyFiles(orgId, compId) {
+      let role = storageUserRole();
+      let co = storageUserCo();
       let org = storageUserOrg();
       return storageCallerHasProfile() && (
         isStorageGlobalRole(role)
         || (isStorageNamedStaffRole(role) && co != '' && co == compId)
         || (role in [
           'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin']
-          && org != ''
-          && firestore.exists(/databases/(default)/documents/organizations/$(org)/companies/$(compId)))
-        || (isStorageNamedStaffRole(role) && co == '' && org != ''
-          && firestore.exists(/databases/(default)/documents/organizations/$(org)/companies/$(compId)))
+          && org != '' && org == orgId)
+        || (isStorageNamedStaffRole(role) && co == '' && org != '' && org == orgId)
       );
     }
 
@@ -174,9 +180,9 @@ service firebase.storage {
     // Web ID-docs: registration-style company staff (admin / supervisor /
     // HR / org-admin) and global roles. Accountant and marketing stay out
     // so this path matches delegate_documents more closely.
-    function canAccessWebIdDocs(compId) {
+    function canAccessWebIdDocs(orgId, compId) {
       let role = storageUserRole();
-      return canAccessCompanyFiles(compId) && (
+      return canAccessOrgCompanyFiles(orgId, compId) && (
         isStorageGlobalRole(role) || isStorageCompanyStaffRole(role)
       );
     }
@@ -299,16 +305,18 @@ service firebase.storage {
         );
     }
     match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
-      allow read: if canAccessCompanyFiles(compId)
+      allow read: if canAccessOrgCompanyFiles(orgId, compId)
         || delegateTokenOwnsCompany(compId);
       // Filename photo_{uid}_* is treated as owned by that uid so a
       // create-classified overwrite cannot steal a colleague's object.
-      allow create, update: if canAccessCompanyFiles(compId)
+      allow create, update: if canAccessOrgCompanyFiles(orgId, compId)
         || (delegateTokenOwnsCompany(compId)
           && callerDelegateMayWriteStorage()
           && !permissionPhotoNameOwnedByOther(photoId)
-          && (resource == null || delegateOwnsPermissionPhoto(photoId)));
-      allow delete: if canAccessCompanyFiles(compId)
+          && (
+            resource == null
+            || delegateOwnsPermissionPhoto(photoId)));
+      allow delete: if canAccessOrgCompanyFiles(orgId, compId)
         || (delegateTokenOwnsCompany(compId)
           && callerDelegateMayWriteStorage()
           && delegateOwnsPermissionPhoto(photoId));
@@ -374,14 +382,14 @@ service firebase.storage {
     // Tenant-scope by the company segment so those paths stay usable
     // without an intent (the web repo is not changed in this PR).
     match /organizations/{orgId}/companies/{compId}/delegates/{delegateUid}/{allPaths=**} {
-      allow read, write: if canAccessWebIdDocs(compId)
+      allow read, write: if canAccessWebIdDocs(orgId, compId)
         || (isNonAnonymous() && request.auth.uid == delegateUid);
     }
     // Storage ORs overlapping matches, so this residual must not also
     // match .../delegates/{uid}/** or canAccessWebIdDocs is undone and
     // accountant/marketing would regain ID-doc access.
     match /organizations/{orgId}/companies/{compId}/{segment}/{rest=**} {
-      allow read, write: if segment != 'delegates' && canAccessCompanyFiles(compId);
+      allow read, write: if segment != 'delegates' && canAccessOrgCompanyFiles(orgId, compId);
     }
 
     // ==================== ORGANIZATION FILES ====================
@@ -391,15 +399,9 @@ service firebase.storage {
       let role = storageUserRole();
       let co = storageUserCo();
       let org = storageUserOrg();
-      let orgPath = /databases/(default)/documents/organizations/$(orgId);
-      return isNonAnonymous() && isStorageNamedStaffRole(role) && (
+      return storageCallerHasProfile() && isStorageNamedStaffRole(role) && (
         isStorageGlobalRole(role)
         || (org != '' && org == orgId)
-        || (
-          co != ''
-          && firestore.exists(orgPath)
-          && firestore.get(orgPath).data.get('companyUID', '') == co
-        )
       );
     }
     // Must not also match .../companies/{compId}/** or the company
@@ -447,9 +449,11 @@ service firebase.storage {
     // their screens do not use this path. The folder owner may write
     // their own uid segment when the token company matches.
     match /leave_attachments/{compId}/{uid}/{allPaths=**} {
-      allow read: if canAccessWebIdDocs(compId)
+      allow read: if canAccessCompanyFiles(compId)
+        && (isStorageGlobalRole(storageUserRole()) || isStorageCompanyStaffRole(storageUserRole()))
         || (delegateTokenOwnsCompany(compId) && request.auth.uid == uid);
-      allow write: if canAccessWebIdDocs(compId)
+      allow write: if canAccessCompanyFiles(compId)
+        && (isStorageGlobalRole(storageUserRole()) || isStorageCompanyStaffRole(storageUserRole()))
         || (delegateTokenOwnsCompany(compId)
           && request.auth.uid == uid
           && callerDelegateMayWriteStorage());

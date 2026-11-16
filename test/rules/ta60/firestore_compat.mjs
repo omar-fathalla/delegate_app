@@ -53,6 +53,12 @@ async function seed(env) {
       documents: DOCS, isPrinted: false, hasPendingUpdate: false, receiptCode: 'R-' + id, allReceiptCodes: ['R-' + id],
       createdAt: NOW, updatedAt: NOW, delegatePublicId: 'P-' + id, ...extra });
     await dlg('dlg1', ORG, CO, '29001010101010', '01000000001');
+    await setDoc(doc(db, 'users/dlg1'), { uid: 'dlg1', role: 'delegate', organizationUID: ORG, companyUID: CO, phoneNumber: '01000000001' });
+    await setDoc(doc(db, `organizations/${ORG}/companies/${CO}/photo_permissions/pp1`), {
+      organizationUID: ORG, companyUID: CO, status: 'approved', branchName: 'B1', requestedBy: 'sup',
+      startDate: NOW, endDate: in3d, createdAt: NOW,
+    });
+    await setDoc(doc(db, 'user_wallets/dlg1'), { companyUID: CO, organizationUID: ORG, baseSalary: 100 });
     await dlg('dlg2', ORG, CO2, '29002020202020', '01000000002');
     await setDoc(doc(db, `organizations/${ORG}/companies/${CO}/requests/r1`), {
       uid: 'r1', actionType: 'update', status: 'pending', targetDelegateId: 'dlg1', organizationUID: ORG, companyUID: CO,
@@ -229,6 +235,11 @@ const cases = [
   ['APP-S', 'hr attendance_logs companyId + timestamp', e => getDocs(query(collection(staff(e,'hr'), 'attendance_logs'), where('companyId','==',CO), where('timestamp','>=',Timestamp.fromMillis(0))))],
   ['APP-S', 'marketing attendance_logs organizationId + branchName + ts range + limit 2000 (exact main shape)', e => getDocs(query(collection(staff(e,'mkt'), 'attendance_logs'), where('organizationId','==',ORG), where('branchName','in',['B1']), where('timestamp','>=',Timestamp.fromMillis(Date.now()-86400000)), where('timestamp','<',Timestamp.fromMillis(Date.now()+86400000)), limit(2000)))],
   ['APP-S', 'marketing CG photo_permissions org filter', e => getDocs(query(collectionGroup(staff(e,'mkt'), 'photo_permissions'), where('organizationUID','==',ORG)))],
+  ['RC', 'marketing_promotion CG photo_permissions org (getOngoingPermissions shape)', e => getDocs(query(collectionGroup(staff(e,'mp'), 'photo_permissions'), where('organizationUID','==',ORG)))],
+  ['RC', 'branchesMarketingManager CG photo_permissions org filter', e => getDocs(query(collectionGroup(staff(e,'bm'), 'photo_permissions'), where('organizationUID','==',ORG)))],
+  ['RC', 'hr payroll user_wallets where companyUID', e => getDocs(query(collection(staff(e,'hr'), 'user_wallets'), where('companyUID','==',CO)))],
+  ['RC', 'accountant financial delegate_requests where organizationUID', e => getDocs(query(collection(staff(e,'acc'), 'delegate_requests'), where('organizationUID','==',ORG)))],
+  ['RC', 'supervisor registration nationalId dup-check listen (nationalId query)', e => getDocs(query(collectionGroup(staff(e,'sup'), 'delegates'), where('nationalId','==','29009090909090'), limit(1)))],
   ['APP-S', 'branches_marketing attendance org + branch + ts range + limit 2000 (exact main shape)', e => getDocs(query(collection(staff(e,'bm'), 'attendance_logs'), where('organizationId','==',ORG), where('branchName','in',['B1']), where('timestamp','>=',Timestamp.fromMillis(Date.now()-86400000)), where('timestamp','<',Timestamp.fromMillis(Date.now()+86400000)), limit(2000)))],
   ['APP-S', 'branches_marketing create root branch', e => addDoc(collection(staff(e,'bm'), 'branches'), { branchName: 'B2', organizationUID: ORG, organizationId: ORG, latitude: 30, longitude: 31 })],
   ['APP-S', 'tech support list delegate_requests pending', e => getDocs(query(collection(staff(e,'ts'), 'delegate_requests'), where('status','==','pending')))],
