@@ -2727,6 +2727,42 @@ service cloud.firestore {
         && claimListHas('phones', du);
     }
 
+    // Suffix after phone_ for getNotifications / send_notification phone tags.
+    function phoneSuffixFromPhoneTag(du) {
+      let parts = du.split('phone_');
+      return parts.size() == 2 ? parts[1] : '';
+    }
+
+    // 01X, 1X, 20X, +20X, +200X — same shapes as delegate login claims + bell.
+    function notifEgyptPhoneVariantMatch(queryPh, canonicalPh) {
+      return queryPh != '' && canonicalPh != '' && (
+        queryPh == canonicalPh
+        || (canonicalPh.size() == 11
+          && canonicalPh.matches('^01[0-9]{9}$')
+          && (
+            queryPh == canonicalPh.substring(1)
+            || queryPh == ('20' + canonicalPh.substring(1))
+            || queryPh == ('+20' + canonicalPh.substring(1))
+            || queryPh == ('+20' + canonicalPh)))
+        || (canonicalPh.size() == 10
+          && canonicalPh.matches('^1[0-9]{9}$')
+          && (
+            queryPh == ('0' + canonicalPh)
+            || queryPh == ('20' + canonicalPh)
+            || queryPh == ('+20' + canonicalPh)
+            || queryPh == ('+20' + ('0' + canonicalPh))))
+      );
+    }
+
+    function notifDelegatePhoneUidTagListOk() {
+      let du = notifDu();
+      return notifStaffBroadcastOk() && delegateOtpOk() && (
+        du == 'phone_' + request.auth.uid
+        || (du.matches('^phone_.+')
+          && claimListHas('phones', phoneSuffixFromPhoneTag(du)))
+      );
+    }
+
     function notifListDelegate() {
       let du = notifDu();
       let co = claimString('companyId');
@@ -2756,10 +2792,18 @@ service cloud.firestore {
     function notifListStaffPhoneTagOk(u) {
       let du = notifDu();
       let ph = u.get('phoneNumber', '');
-      return notifStaffBroadcastOk() && (
+      return notifStaffBroadcastOk() && ph != '' && (
         du == 'phone_' + request.auth.uid
-        || (ph != '' && (du == 'phone_' + ph || du == ph))
+        || notifEgyptPhoneVariantMatch(du, ph)
+        || (du.matches('^phone_.+')
+          && notifEgyptPhoneVariantMatch(phoneSuffixFromPhoneTag(du), ph))
       );
+    }
+
+    function notifListStaffPhoneFieldOk(u) {
+      let pn = resource.data.get('phoneNumber', '');
+      let ph = u.get('phoneNumber', '');
+      return notifStaffBroadcastOk() && ph != '' && notifEgyptPhoneVariantMatch(pn, ph);
     }
 
     function notifListSupervisor(u) {
@@ -2813,6 +2857,7 @@ service cloud.firestore {
         || du.matches('^company_.*')
         || du.matches('^delegates_.*')
         || du in ['marketing', 'marketing_promotion', 'marketingPromotion']
+        || du in ['branchesMarketingManager', 'branches_marketing', 'branches-marketing']
       );
     }
 
@@ -2964,6 +3009,7 @@ service cloud.firestore {
       let r = u.get('role', '');
       return notifListStaffSelfUidOk()
         || notifListStaffPhoneTagOk(u)
+        || notifListStaffPhoneFieldOk(u)
         || (du == 'all' ? notifListShapeAll(u, r)
         : du == 'hr' ? notifListShapeHr(u, r)
         : du == 'all_company_supervisors' ? notifListShapeAcs(u, r)
@@ -2984,7 +3030,9 @@ service cloud.firestore {
     function notifListDispatcher() {
       return signedIn() && (
         claimString('role') == 'delegate'
-          ? (notifListDelegate() || notifListDelegatePhoneFieldOk())
+          ? (notifListDelegate()
+            || notifListDelegatePhoneFieldOk()
+            || notifDelegatePhoneUidTagListOk())
           : notifListStaffShapeDispatcher(
             get(/databases/$(database)/documents/users/$(request.auth.uid)).data));
     }
@@ -3048,7 +3096,9 @@ service cloud.firestore {
           || (du in ['marketing', 'marketing_promotion', 'marketingPromotion']
             && r in ['marketing', 'marketing_promotion', 'marketingPromotion'])
           || (du in ['branchesMarketingManager', 'branches_marketing', 'branches-marketing']
-            && r in ['branches_marketing', 'branches_marketing_manager', 'branchesMarketingManager'])
+            && r in [
+              'marketing', 'marketing_promotion', 'marketingPromotion',
+              'branches_marketing', 'branches_marketing_manager', 'branchesMarketingManager'])
           || (du in ['company-admin', 'admin', 'supervisor', 'company_admin']
             && r in ['company-admin', 'company_admin', 'admin'])
           || (du in ['supervisor', 'company-admin', 'company_admin']
@@ -3181,7 +3231,9 @@ service cloud.firestore {
 
     function canReadNotifRoleMarketing() {
       return isMarketing()
-        && notifDu() in ['marketing', 'marketing_promotion', 'marketingPromotion'];
+        && notifDu() in [
+          'marketing', 'marketing_promotion', 'marketingPromotion',
+          'branchesMarketingManager', 'branches_marketing', 'branches-marketing'];
     }
 
     function canReadNotifRoleBranchesMarketing() {
@@ -3239,7 +3291,9 @@ service cloud.firestore {
         || (isTechnicalSupport() && du in ['technicalSupport', 'technical-support', 'technical_support', 'role_technical_support'])
         || (isOrgAdmin() && du in ['organizationAdmin', 'organization-admin', 'organization_admin'])
         || (isHR() && du in ['hr', 'company-hr', 'company_hr'])
-        || (isMarketing() && du in ['marketing', 'marketing_promotion', 'marketingPromotion'])
+        || (isMarketing() && du in [
+          'marketing', 'marketing_promotion', 'marketingPromotion',
+          'branchesMarketingManager', 'branches_marketing', 'branches-marketing'])
         || (isBranchesMarketing() && du in ['branchesMarketingManager', 'branches_marketing', 'branches-marketing'])
         || (isCompanyAdmin() && du in ['company-admin', 'admin', 'supervisor', 'company_admin'])
         || (roleIs(['supervisor', 'company_supervisor']) && du in ['supervisor', 'company-admin', 'company_admin'])

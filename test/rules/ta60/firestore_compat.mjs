@@ -126,9 +126,12 @@ async function seed(env) {
 const staff = (env, uid, email, extra = {}) => env.authenticatedContext(uid, {
   email: email || `${uid}@t.test`, email_verified: true, firebase: { sign_in_provider: 'password' }, ...extra,
 }).firestore();
+const DELEGATE_PHONES = [
+  '01000000001', '1000000001', '201000000001', '+201000000001', '+200100000001',
+];
 const delegate = (env) => env.authenticatedContext('dlg1', {
   role: 'delegate', delegateId: 'dlg1', delegateIds: ['dlg1'], orgId: ORG, companyId: CO,
-  phones: ['01000000001', '+201000000001', '201000000001'], firebase: { sign_in_provider: 'custom' } }).firestore();
+  phones: DELEGATE_PHONES, firebase: { sign_in_provider: 'custom' } }).firestore();
 const anon = (env) => env.authenticatedContext('anon1', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
 
 const D = (o, c, id) => `organizations/${o}/companies/${c}/delegates/${id}`;
@@ -322,6 +325,13 @@ const cases = [
   ['NOTIF-READ', 'delegate list bell: delegateUid==own uid (limit 50)', e => notifList(delegate(e), 'dlg1')],
   ['NOTIF-READ', 'delegate list bell: delegateUid==phone_<uid> (limit 30)', e => notifList(delegate(e), 'phone_dlg1')],
   ['NOTIF-READ', 'delegate list bell: phoneNumber==own phone (limit 30)', e => notifListPhoneField(delegate(e), '01000000001')],
+  ...DELEGATE_PHONES.flatMap((p) => [
+    ['NOTIF-READ', `delegate G5 bell: phoneNumber==${p} (limit 30)`, e => notifListPhoneField(delegate(e), p)],
+    ['NOTIF-READ', `delegate G5 bell: delegateUid==phone_${p} (limit 30)`, e => notifList(delegate(e), `phone_${p}`)],
+    ['NOTIF-READ', `delegate G5 bell: delegateUid==${p} (limit 30)`, e => notifList(delegate(e), p)],
+  ]),
+  ['NOTIF-READ', 'marketing G4 bell: delegateUid==branchesMarketingManager (limit 30)', e => notifList(staff(e, 'mkt'), 'branchesMarketingManager')],
+  ['NOTIF-READ', 'marketing G4 bell: delegateUid==branches_marketing (limit 30)', e => notifList(staff(e, 'mkt'), 'branches_marketing')],
   ['NOTIF-READ', 'delegate list bell: delegateUid==all (limit 30)', e => notifList(delegate(e), 'all')],
   ['NOTIF-READ', 'delegate list bell: delegateUid==delegates_${CO} (limit 30)', e => notifList(delegate(e), `delegates_${CO}`)],
   ['NOTIF-READ', 'supervisor list bell: delegateUid==supervisor_${CO} (limit 30)', e => notifList(staff(e, 'sup'), `supervisor_${CO}`)],
