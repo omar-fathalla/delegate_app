@@ -224,7 +224,7 @@ class HRMoreBottomSheet extends StatelessWidget {
     ))
       HRMoreItemData(
         index: item.tabIndex!,
-        title: item.title,
+        title: item.menuLabel(isWeb: true),
         subtitle: item.subtitle,
         icon: item.icon,
         selectedIcon: item.selectedIcon,

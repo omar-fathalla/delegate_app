@@ -147,27 +147,35 @@ class HRDesktopSidebar extends StatelessWidget {
     List<HRSidebarSectionData> sections,
     ColorScheme colorScheme,
   ) => [
-    for (final section in sections) ...[
-      HrSidebarEntry(
-        child: isExpanded
-            ? Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
-                child: Text(
-                  section.sectionTitle,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                    letterSpacing: 0.4,
+    for (var i = 0; i < sections.length; i++) ...[
+      if (WebRuntimePolicy.isWeb && i > 0)
+        HrSidebarEntry(child: _groupDivider(colorScheme)),
+      // Mobile keeps a plain section header (a title when expanded, the
+      // original rail divider when collapsed). Web adds the divider above
+      // and still shows the group title only while expanded.
+      if (isExpanded || !WebRuntimePolicy.isWeb)
+        HrSidebarEntry(
+          child: isExpanded
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+                  child: Text(
+                    sections[i].sectionTitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.7,
+                      ),
+                      letterSpacing: 0.4,
+                    ),
                   ),
+                )
+              : const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Divider(height: 1, indent: 8, endIndent: 8),
                 ),
-              )
-            : const Padding(
-                padding: EdgeInsets.symmetric(vertical: 6),
-                child: Divider(height: 1, indent: 8, endIndent: 8),
-              ),
-      ),
-      for (final item in section.items)
+        ),
+      for (final item in sections[i].items)
         HrSidebarEntry(
           index: item.index,
           child: _buildMenuItem(
@@ -179,6 +187,23 @@ class HRDesktopSidebar extends StatelessWidget {
         ),
     ],
   ];
+
+  /// Thin group separator for the web sidebar and the collapsed rail.
+  Widget _groupDivider(ColorScheme colorScheme) {
+    return Padding(
+      padding: EdgeInsetsDirectional.fromSTEB(
+        isExpanded ? 8 : 12,
+        6,
+        isExpanded ? 8 : 12,
+        6,
+      ),
+      child: Divider(
+        height: 1,
+        thickness: 1,
+        color: colorScheme.outlineVariant,
+      ),
+    );
+  }
 
   /// Mobile HR sidebar. Titles and order are the ones the phone already ships.
   List<HRSidebarSectionData> _mobileSections() => const [
@@ -273,13 +298,13 @@ class HRDesktopSidebar extends StatelessWidget {
     final order = <String>[];
     final grouped = <String, List<HRSidebarItemData>>{};
     for (final item in items) {
+      // «نظام الغرامات» keeps the same colors as every other row.
       final row = HRSidebarItemData(
         index: item.tabIndex ?? -1,
-        title: item.title,
+        title: item.menuLabel(isWeb: true),
         icon: item.icon,
         selectedIcon: item.selectedIcon,
         badgeCollection: item.badgeCollection,
-        destructive: item.destructive,
       );
       final bucket = grouped.putIfAbsent(item.section, () {
         order.add(item.section);

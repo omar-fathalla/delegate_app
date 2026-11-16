@@ -46,21 +46,21 @@ class _MockAuthBloc extends Mock implements AuthBloc {}
 const _supervisorMenu = [
   'الرئيسية',
   'الملف الشخصي',
-  'طلبات اشتراك واعتماد المناديب',
+  'طلبات الاشتراك',
   'تجديد المناديب',
   'سجل الحضور والانصراف',
   'مناديب الشركة',
   'Live Tracking',
-  'طلبات الإجازات والأعذار',
-  'مسير الرواتب والعمولات',
-  'طلبات فك وربط الأجهزة',
-  'تدقيق الأمان ومكافحة الاحتيال',
-  'الصور والزيارات الميدانية',
-  'سجل تعديلات الحضور والانصراف',
-  'المهام',
+  'الصور',
   'أذونات التصوير',
-  'لائحة الغرامات والجزاءات',
-  'نظام الغرامات والمخالفات',
+  'تعديلات الحضور',
+  'طلبات الإجازات',
+  'الرواتب',
+  'تدقيق الأمان',
+  'فك الأجهزة',
+  'المهام',
+  'لائحة الغرامات',
+  'نظام الغرامات',
   'الإعدادات',
 ];
 
@@ -113,7 +113,7 @@ List<String> _titles(Delegate delegate, HrShellPlacement placement) =>
       delegate: delegate,
       isWeb: true,
       placement: placement,
-    ).map((item) => item.title).toList();
+    ).map((item) => item.menuLabel(isWeb: true)).toList();
 
 void main() {
   setUpAll(() {
@@ -149,7 +149,7 @@ void main() {
         expect(titles.toSet(), titles.toList().toSet());
         expect(titles, _supervisorMenu);
         expect(titles.last, 'الإعدادات');
-        expect(titles[titles.length - 2], 'نظام الغرامات والمخالفات');
+        expect(titles[titles.length - 2], 'نظام الغرامات');
       });
 
       test('$role sidebar lists the same tools except the footer settings', () {
@@ -170,7 +170,7 @@ void main() {
         HrShellPlacement.compactMenu,
       );
       expect(titles, isNot(contains('تجديد المناديب')));
-      expect(titles, contains('نظام الغرامات والمخالفات'));
+      expect(titles, contains('نظام الغرامات'));
       expect(titles.last, 'الإعدادات');
     });
 
@@ -280,7 +280,7 @@ void main() {
       expect(selected, kHrTabTasks);
       await tester.tap(find.text('أذونات التصوير'));
       expect(selected, kHrTabPhotoPermissions);
-      await tester.tap(find.text('نظام الغرامات والمخالفات'));
+      await tester.tap(find.text('نظام الغرامات'));
       expect(selected, kHrTabPenalties);
     });
 
@@ -321,9 +321,9 @@ void main() {
         );
         expect(find.text('المهام'), findsOneWidget);
         expect(find.text('أذونات التصوير'), findsOneWidget);
-        expect(find.text('لائحة الغرامات والجزاءات'), findsOneWidget);
-        expect(find.text('نظام الغرامات والمخالفات'), findsOneWidget);
-        expect(find.text('طلبات اشتراك واعتماد المناديب'), findsOneWidget);
+        expect(find.text('لائحة الغرامات'), findsOneWidget);
+        expect(find.text('نظام الغرامات'), findsOneWidget);
+        expect(find.text('طلبات الاشتراك'), findsOneWidget);
         expect(find.text('سجل الحضور والانصراف'), findsOneWidget);
         expect(find.text('الرئيسية'), findsNothing);
       },

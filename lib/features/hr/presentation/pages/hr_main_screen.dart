@@ -313,7 +313,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
           buildMenuItem(
             value: item.id,
             icon: icon,
-            title: item.title,
+            title: item.menuLabel(isWeb: true),
             color: item.destructive ? colorScheme.error : null,
           ),
         );
