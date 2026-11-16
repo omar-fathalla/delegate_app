@@ -19,6 +19,7 @@ function splitHost(envName, fallback) {
 }
 
 const bytes = Uint8Array.from(Buffer.from("tashil storage rules fixture\n"));
+const imgUpload = {contentType: "image/jpeg"};
 
 describe("storage.rules", () => {
   let env;
@@ -152,7 +153,7 @@ describe("storage.rules", () => {
     const dlgB = delegateTok("dlgB", "coA");
     const hrA = storage("hrA");
     const hrB = storage("hrB");
-    await assertSucceeds(uploadBytes(path(dlg, "organizations/o1/companies/coA/permissions/p1/photo_1.jpg"), bytes));
+    await assertSucceeds(uploadBytes(path(dlg, "organizations/o1/companies/coA/permissions/p1/photo_1.jpg"), bytes, imgUpload));
     await assertFails(uploadBytes(path(dlg, "organizations/o1/companies/coB/permissions/p1/photo_1.jpg"), bytes));
     await assertFails(uploadBytes(path(dlgOtherCo, "organizations/o1/companies/coA/permissions/p1/photo_1.jpg"), bytes));
     await assertSucceeds(uploadBytes(path(dlg, "leave_attachments/coA/dlgA/sick.jpg"), bytes));
@@ -313,7 +314,7 @@ describe("storage.rules", () => {
     const legacy = "organizations/o1/companies/coA/permissions/p1/photo_99.jpg";
     const meta = {customMetadata: {userId: "dlgA", delegateUid: "dlgA"}, contentType: "image/jpeg"};
     await assertSucceeds(uploadBytes(path(dlg, owned), bytes, meta));
-    await assertSucceeds(uploadBytes(path(dlg, legacy), bytes));
+    await assertSucceeds(uploadBytes(path(dlg, legacy), bytes, imgUpload));
     await assertSucceeds(getBytes(path(dlgB, owned)));
     await assertFails(uploadBytes(path(dlgB, owned), bytes));
     await assertFails(uploadBytes(path(dlgB, legacy), bytes));
