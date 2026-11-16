@@ -1071,18 +1071,16 @@ class _Pagination extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final rtl = Directionality.of(context) == TextDirection.rtl;
-    // Previous sits on the right in RTL and points right; next sits on the
-    // left and points left. matchTextDirection is cleared so Directionality
-    // cannot mirror the chosen glyph a second time.
+    // The row is [previous, label, next], so RTL puts next on the left and
+    // previous on the right. The glyph is drawn in LTR: chevron_left is ‹
+    // and chevron_right is ›. Ambient RTL must not mirror it again.
     final prevIcon = Icon(
-      hrFixedDirectionIcon(
-        rtl ? Icons.chevron_right_rounded : Icons.chevron_left_rounded,
-      ),
+      rtl ? Icons.chevron_right_rounded : Icons.chevron_left_rounded,
+      textDirection: TextDirection.ltr,
     );
     final nextIcon = Icon(
-      hrFixedDirectionIcon(
-        rtl ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
-      ),
+      rtl ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+      textDirection: TextDirection.ltr,
     );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
