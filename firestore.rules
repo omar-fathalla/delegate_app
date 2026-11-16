@@ -1518,13 +1518,6 @@ service cloud.firestore {
       return !changed.hasAny(['nationalId', 'nationalityID']);
     }
 
-    // users/{auth.uid}.phoneNumber feeds staff bell matching — block self-writes
-    // (Mohamed TA-60); Admin SDK and staff edits of other users unchanged.
-    function usersSelfContactPhoneLocked(changed, userId) {
-      return request.auth.uid != userId
-        || !changed.hasAny(['phoneNumber', 'phone']);
-    }
-
     // C1 (web claimInvite$ batch): trust token email only — never client emailVerified.
     function authEmailLower() {
       return signedIn()
@@ -1698,7 +1691,6 @@ service cloud.firestore {
       let nr = roleOf(d);
       let or = roleOf(old);
       return usersIdentityClientLocked(changed)
-        && usersSelfContactPhoneLocked(changed, userId)
         && ((r in superAdminRoleList() && newRoleOk(nr)) || (
         newRoleOk(nr)
         && !changed.hasAny(privilegeKeys())
@@ -2810,21 +2802,28 @@ service cloud.firestore {
       return notifStaffBroadcastOk() && notifDu() == request.auth.uid;
     }
 
-    function notifListStaffPhoneTagOk(u) {
+    // Staff bell phone match: JWT phones / phone_number only (never users/{uid}.phoneNumber).
+    function notifStaffTokenPhoneQueryOk(queryPh) {
+      return notifDelegateTokenPhoneQueryOk(queryPh)
+        || (request.auth.token.keys().hasAll(['phone_number'])
+          && request.auth.token.phone_number is string
+          && request.auth.token.phone_number != ''
+          && notifEgyptPhoneVariantMatch(queryPh, request.auth.token.phone_number));
+    }
+
+    function notifListStaffPhoneTagOk() {
       let du = notifDu();
-      let ph = u.get('phoneNumber', '');
-      return notifStaffBroadcastOk() && ph != '' && (
+      return notifStaffBroadcastOk() && (
         du == 'phone_' + request.auth.uid
-        || notifEgyptPhoneVariantMatch(du, ph)
+        || notifStaffTokenPhoneQueryOk(du)
         || (du.matches('^phone_.+')
-          && notifEgyptPhoneVariantMatch(phoneSuffixFromPhoneTag(du), ph))
+          && notifStaffTokenPhoneQueryOk(phoneSuffixFromPhoneTag(du)))
       );
     }
 
-    function notifListStaffPhoneFieldOk(u) {
+    function notifListStaffPhoneFieldOk() {
       let pn = resource.data.get('phoneNumber', '');
-      let ph = u.get('phoneNumber', '');
-      return notifStaffBroadcastOk() && ph != '' && notifEgyptPhoneVariantMatch(pn, ph);
+      return notifStaffBroadcastOk() && notifStaffTokenPhoneQueryOk(pn);
     }
 
     function notifListSupervisor(u) {
@@ -3029,8 +3028,8 @@ service cloud.firestore {
       let du = notifDu();
       let r = u.get('role', '');
       return notifListStaffSelfUidOk()
-        || notifListStaffPhoneTagOk(u)
-        || notifListStaffPhoneFieldOk(u)
+        || notifListStaffPhoneTagOk()
+        || notifListStaffPhoneFieldOk()
         || (du == 'all' ? notifListShapeAll(u, r)
         : du == 'hr' ? notifListShapeHr(u, r)
         : du == 'all_company_supervisors' ? notifListShapeAcs(u, r)

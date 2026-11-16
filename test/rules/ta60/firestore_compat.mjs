@@ -22,18 +22,21 @@ export const DELIBERATE_FIRESTORE_REGRESSIONS = new Set([
   'delegate CG delegates where nationalityID == own (identifier resolve, try/catch)',
   'delegate users where phoneNumber == supervisorPhone',
   'supervisor users where role in [super-admin...] (notify, try/catch)',
-  'hr users self-update phoneNumber victim 01X (coB)',
-  'hr users self-update phoneNumber victim +20 (coB)',
-  'sup users self-update phoneNumber victim 01X (coB)',
-  'sup users self-update phoneNumber victim +20 (coB)',
-  'hr users self-update phone victim 01X (coB)',
-  'sup users self-update phone victim 01X (coB)',
-  'hr bell cross-co after forged victim 01X phoneNumber field',
-  'hr bell cross-co after forged victim +20 phoneNumber field',
-  'sup bell cross-co after forged victim 01X phoneNumber field',
-  'sup bell cross-co after forged victim +20 phoneNumber field',
-  'hr bell cross-co after forged victim 01X phone_ tag',
-  'sup bell cross-co after forged victim 01X phone_ tag',
+  'hr bell cross-co after self forged victim 01X phoneNumber field',
+  'hr bell cross-co after self forged victim +20 phoneNumber field',
+  'hr bell cross-co after self forged victim 01X phone_ tag',
+  'sup bell cross-co after self forged victim 01X phoneNumber field',
+  'sup bell cross-co after self forged victim +20 phoneNumber field',
+  'sup bell cross-co after self forged victim 01X phone_ tag',
+  'ca bell cross-co after self forged victim 01X phoneNumber field',
+  'ca bell cross-co after self forged victim +20 phoneNumber field',
+  'ca bell cross-co after self forged victim 01X phone_ tag',
+  'hr bell cross-co after editing acc victim 01X phoneNumber field',
+  'hr bell cross-co after editing acc victim +20 phoneNumber field',
+  'hr bell cross-co after editing acc victim 01X phone_ tag',
+  'sup bell cross-co after editing acc victim 01X phoneNumber field',
+  'ca bell cross-co after editing acc victim 01X phoneNumber field',
+  'oa bell cross-co after editing ca victim 01X phoneNumber field',
 ]);
 
 /** Documented dev-security closures (REQUEST CHANGES); not silent prod widenings. */
@@ -274,8 +277,28 @@ async function seed(env) {
   });
 }
 
+/** Server-set JWT phones (delegate_login_logic phoneQueryVariants + app §5 extras). */
+function staffJwtPhones(uid) {
+  const ph = staffStoredPhoneForBell(uid);
+  let local = ph;
+  if (ph.startsWith('+20') && ph.length >= 13) {
+    local = `0${ph.slice(3)}`;
+  }
+  return [...new Set([
+    ...delegateLoginPhoneClaimVariants(local),
+    ph,
+    local,
+    ...getNotificationsPhoneVariations(ph),
+    ...getNotificationsPhoneVariations(local),
+  ])].filter(Boolean);
+}
+
 const staff = (env, uid, email, extra = {}) => env.authenticatedContext(uid, {
-  email: email || `${uid}@t.test`, email_verified: true, firebase: { sign_in_provider: 'password' }, ...extra,
+  email: email || `${uid}@t.test`,
+  email_verified: true,
+  firebase: { sign_in_provider: 'password' },
+  phones: staffJwtPhones(uid),
+  ...extra,
 }).firestore();
 const delegate = (env) => env.authenticatedContext('dlg1', {
   role: 'delegate', delegateId: 'dlg1', delegateIds: ['dlg1'], orgId: ORG, companyId: CO,
@@ -631,25 +654,36 @@ const attOrgBranchToday = (db) => getDocs(query(
   limit(2000),
 ));
 
-async function staffSelfwriteThenList(env, uid, victimPhone, listFn) {
+async function staffForgePhoneThenList(env, uid, victimPhone, listFn, opts = {}) {
   const db = staff(env, uid);
+  const { targetUid = uid } = opts;
   try {
-    await updateDoc(doc(db, 'users', uid), { phoneNumber: victimPhone });
+    await updateDoc(doc(db, 'users', targetUid), { phoneNumber: victimPhone });
   } catch (_) {}
   return listFn(db);
 }
 
-/** Mohamed staff self-write → users.phoneNumber bell cross-co attack matrix. */
+/** Mohamed staff forged users.phoneNumber → bell cross-co (self-write + edit-other-user). */
 function staffSelfwriteAttackCases() {
   const selfPatch = (uid, label, patch) => [
     'ATT-SEC',
     `${uid} users self-update ${label}`,
     (e) => updateDoc(doc(staff(e, uid), 'users', uid), patch),
   ];
-  const crossCoProbe = (uid, victim, label, listFn) => [
+  const crossCoAfterSelf = (uid, victim, label, listFn) => [
     'ATT-SEC',
-    `${uid} bell cross-co after forged ${label}`,
-    (e) => staffSelfwriteThenList(e, uid, victim, listFn),
+    `${uid} bell cross-co after self forged ${label}`,
+    (e) => staffForgePhoneThenList(e, uid, victim, listFn),
+  ];
+  const crossCoAfterOther = (attacker, target, victim, label, listFn) => [
+    'ATT-SEC',
+    `${attacker} bell cross-co after editing ${target} ${label}`,
+    (e) => staffForgePhoneThenList(e, attacker, victim, listFn, { targetUid: target }),
+  ];
+  const crossCoProbes = (uid) => [
+    crossCoAfterSelf(uid, VICTIM_01X, 'victim 01X phoneNumber field', (db) => notifListPhoneField(db, VICTIM_01X)),
+    crossCoAfterSelf(uid, VICTIM_PLUS20, 'victim +20 phoneNumber field', (db) => notifListPhoneField(db, VICTIM_PLUS20)),
+    crossCoAfterSelf(uid, VICTIM_01X, 'victim 01X phone_ tag', (db) => notifList(db, `phone_${VICTIM_01X}`)),
   ];
   return [
     selfPatch('hr', 'phoneNumber victim 01X (coB)', { phoneNumber: VICTIM_01X }),
@@ -658,21 +692,21 @@ function staffSelfwriteAttackCases() {
     selfPatch('sup', 'phoneNumber victim +20 (coB)', { phoneNumber: VICTIM_PLUS20 }),
     selfPatch('hr', 'phone victim 01X (coB)', { phone: VICTIM_01X }),
     selfPatch('sup', 'phone victim 01X (coB)', { phone: VICTIM_01X }),
-    crossCoProbe('hr', VICTIM_01X, 'victim 01X phoneNumber field', (db) => notifListPhoneField(db, VICTIM_01X)),
-    crossCoProbe('hr', VICTIM_PLUS20, 'victim +20 phoneNumber field', (db) => notifListPhoneField(db, VICTIM_PLUS20)),
-    crossCoProbe('sup', VICTIM_01X, 'victim 01X phoneNumber field', (db) => notifListPhoneField(db, VICTIM_01X)),
-    crossCoProbe('sup', VICTIM_PLUS20, 'victim +20 phoneNumber field', (db) => notifListPhoneField(db, VICTIM_PLUS20)),
-    crossCoProbe('hr', VICTIM_01X, 'victim 01X phone_ tag', (db) => notifList(db, `phone_${VICTIM_01X}`)),
-    crossCoProbe('sup', VICTIM_01X, 'victim 01X phone_ tag', (db) => notifList(db, `phone_${VICTIM_01X}`)),
+    ...crossCoProbes('hr'),
+    ...crossCoProbes('sup'),
+    ...crossCoProbes('ca'),
+    crossCoAfterOther('hr', 'acc', VICTIM_01X, 'victim 01X phoneNumber field', (db) => notifListPhoneField(db, VICTIM_01X)),
+    crossCoAfterOther('hr', 'acc', VICTIM_PLUS20, 'victim +20 phoneNumber field', (db) => notifListPhoneField(db, VICTIM_PLUS20)),
+    crossCoAfterOther('hr', 'acc', VICTIM_01X, 'victim 01X phone_ tag', (db) => notifList(db, `phone_${VICTIM_01X}`)),
+    crossCoAfterOther('sup', 'acc', VICTIM_01X, 'victim 01X phoneNumber field', (db) => notifListPhoneField(db, VICTIM_01X)),
+    crossCoAfterOther('ca', 'acc', VICTIM_01X, 'victim 01X phoneNumber field', (db) => notifListPhoneField(db, VICTIM_01X)),
+    crossCoAfterOther('oa', 'ca', VICTIM_01X, 'victim 01X phoneNumber field', (db) => notifListPhoneField(db, VICTIM_01X)),
   ];
 }
 
 export function assertStaffSelfwriteSecurity(rows) {
   const issues = [];
   for (const r of rows.filter((x) => x.area === 'ATT-SEC')) {
-    if (r.name.includes('self-update') && r.cand !== 'DENY') {
-      issues.push(`${r.name}: cand ${r.cand} expected DENY`);
-    }
     if (r.name.includes('cross-co') && r.cand === 'ALLOW' && (r.candDocCount ?? 0) !== 0) {
       issues.push(`${r.name}: cand docCount ${r.candDocCount} expected 0 cross-co`);
     }
