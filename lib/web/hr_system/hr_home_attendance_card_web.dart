@@ -851,8 +851,8 @@ class _DelegateCell extends StatelessWidget {
                 d.fullName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 15,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: cs.onSurface,
                 ),

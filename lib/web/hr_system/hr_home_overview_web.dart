@@ -95,7 +95,7 @@ class HrHomeOverviewWeb extends StatelessWidget {
   @visibleForTesting
   static HrHomeOverviewData Function(Delegate delegate)? debugData;
 
-  /// Test hook: fixed clock for [debugData] (stable «آخر تحديث» / durations).
+  /// Test hook: fixed clock for [debugData] (stable durations).
   @visibleForTesting
   static DateTime Function()? debugClock;
 
@@ -273,14 +273,12 @@ class _HrHomeOverviewViewState extends State<HrHomeOverviewView> {
   String? _chain;
   int _page = 0;
   bool _showAllRows = false;
-  DateTime? _lastUpdated;
   Timer? _ticker;
   HrWebHeaderBridge? _headerBridge;
 
   @override
   void initState() {
     super.initState();
-    if (!widget.data.isLoading) _lastUpdated = widget.clock();
     _ticker = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) setState(() {});
     });
@@ -298,9 +296,6 @@ class _HrHomeOverviewViewState extends State<HrHomeOverviewView> {
   @override
   void didUpdateWidget(HrHomeOverviewView old) {
     super.didUpdateWidget(old);
-    if (old.data.isLoading && !widget.data.isLoading) {
-      _lastUpdated = widget.clock();
-    }
     if (_chain != null && !widget.data.chains.contains(_chain)) {
       _chain = null;
     }
@@ -315,7 +310,7 @@ class _HrHomeOverviewViewState extends State<HrHomeOverviewView> {
     super.dispose();
   }
 
-  /// Hands the greeting row's reload and notifications actions to the header.
+  /// Hands reload and notifications to the header.
   void _publishHeader() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -475,18 +470,7 @@ class _HrHomeOverviewViewState extends State<HrHomeOverviewView> {
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1440),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _WelcomeHeader(
-                      delegate: widget.data.delegate,
-                      compact: compact,
-                      lastUpdated: _lastUpdated,
-                    ),
-                    SizedBox(height: gap),
-                    body,
-                  ],
-                ),
+                child: body,
               ),
             ),
           ),
@@ -550,90 +534,6 @@ class _HrHomeOverviewViewState extends State<HrHomeOverviewView> {
           child: list,
         ),
       ),
-    );
-  }
-}
-
-class _WelcomeHeader extends StatelessWidget {
-  final Delegate delegate;
-  final bool compact;
-  final DateTime? lastUpdated;
-
-  const _WelcomeHeader({
-    required this.delegate,
-    required this.compact,
-    required this.lastUpdated,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final name = delegate.fullName.trim();
-    final isSupervisor = delegate.role == UserRole.admin;
-    return Column(
-      key: const ValueKey('hr_home_welcome'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          name.isEmpty ? 'أهلاً بك' : 'أهلاً بك، $name',
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: compact ? 22 : 28,
-            height: 1.3,
-            fontWeight: FontWeight.w700,
-            color: cs.onSurface,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 12,
-          runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Container(
-              key: const ValueKey('hr_home_role_chip'),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: cs.secondaryContainer,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isSupervisor
-                        ? Icons.supervisor_account_rounded
-                        : Icons.badge_rounded,
-                    size: 16,
-                    color: cs.onSecondaryContainer,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    isSupervisor ? 'مشرف الشركة' : 'HR',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: cs.onSecondaryContainer,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Text(
-              lastUpdated == null
-                  ? 'آخر تحديث —'
-                  : 'آخر تحديث ${hrFormatTime(lastUpdated!)}',
-              key: const ValueKey('hr_home_last_updated'),
-              style: TextStyle(
-                fontSize: 13,
-                color: cs.onSurfaceVariant,
-                fontFeatures: kHrTabularFigures,
-              ),
-            ),
-          ],
-        ),
-      ],
     );
   }
 }
