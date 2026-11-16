@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import 'package:delegate_app/features/admin/domain/entities/subscription_renewal.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -119,8 +120,8 @@ const List<HrShellItem> kHrShellCatalog = [
     title: 'سجل الحضور والانصراف',
     subtitle: 'متابعة حضور وانصراف مناديب الشركة',
     section: 'الحضور والميدان',
-    icon: Icons.how_to_reg_outlined,
-    selectedIcon: Icons.how_to_reg_rounded,
+    icon: Icons.event_available_outlined,
+    selectedIcon: Icons.event_available_rounded,
     tabIndex: kHrTabAttendance,
   ),
   HrShellItem(
@@ -157,8 +158,8 @@ const List<HrShellItem> kHrShellCatalog = [
     subtitle: 'اعتماد أذونات التصوير الميداني',
     // Web sidebar: directly under «الصور» in this group.
     section: 'الحضور والميدان',
-    icon: Icons.collections_outlined,
-    selectedIcon: Icons.collections_rounded,
+    icon: Symbols.add_a_photo,
+    selectedIcon: Symbols.add_a_photo_rounded,
     tabIndex: kHrTabPhotoPermissions,
     webOnly: true,
   ),

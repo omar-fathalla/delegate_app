@@ -302,9 +302,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
               )
             : Icon(
                 item.selectedIcon,
-                color: item.destructive
-                    ? colorScheme.error
-                    : item.id == 'delegate_renewal'
+                color: item.id == 'delegate_renewal'
                     ? colorScheme.tertiary
                     : colorScheme.primary,
                 size: 20,
@@ -314,7 +312,6 @@ class _HRMainScreenState extends State<HRMainScreen> {
             value: item.id,
             icon: icon,
             title: item.menuLabel(isWeb: true),
-            color: item.destructive ? colorScheme.error : null,
           ),
         );
       }

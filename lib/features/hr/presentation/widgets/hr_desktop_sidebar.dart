@@ -114,6 +114,12 @@ class HRDesktopSidebar extends StatelessWidget {
             child: WebRuntimePolicy.isWeb
                 ? HrSidebarScrollArea(
                     selectedIndex: selectedIndex,
+                    padding: EdgeInsets.fromLTRB(
+                      isExpanded ? 10 : 0,
+                      12,
+                      isExpanded ? 10 : 0,
+                      16,
+                    ),
                     entries: _menuEntries(context, sections, colorScheme),
                   )
                 : ListView(
@@ -152,8 +158,10 @@ class HRDesktopSidebar extends StatelessWidget {
         HrSidebarEntry(child: _groupDivider(colorScheme)),
       // Mobile keeps a plain section header (a title when expanded, the
       // original rail divider when collapsed). Web adds the divider above
-      // and still shows the group title only while expanded.
-      if (isExpanded || !WebRuntimePolicy.isWeb)
+      // and still shows the group title only while expanded. The «الرئيسية»
+      // header is omitted because it repeats the first item.
+      if (!(WebRuntimePolicy.isWeb && sections[i].sectionTitle == 'الرئيسية') &&
+          (isExpanded || !WebRuntimePolicy.isWeb))
         HrSidebarEntry(
           child: isExpanded
               ? Padding(
@@ -449,11 +457,20 @@ class HRDesktopSidebar extends StatelessWidget {
     required bool isSelected,
     required ColorScheme colorScheme,
   }) {
+    final web = WebRuntimePolicy.isWeb;
+    final selectedColor = web
+        ? colorScheme.onSecondaryContainer
+        : colorScheme.onPrimaryContainer;
     final itemColor = item.destructive
         ? colorScheme.error
         : isSelected
-        ? colorScheme.onPrimaryContainer
+        ? selectedColor
         : colorScheme.onSurfaceVariant;
+    final labelColor = item.destructive
+        ? colorScheme.error
+        : isSelected
+        ? selectedColor
+        : colorScheme.onSurface;
 
     Widget iconWidget = Icon(
       isSelected ? item.selectedIcon : item.icon,
@@ -502,6 +519,25 @@ class HRDesktopSidebar extends StatelessWidget {
       }
     }
 
+    void open() {
+      if (item.index < 0) {
+        onOpenProfile();
+      } else {
+        onItemSelected(item.index);
+      }
+    }
+
+    if (web) {
+      return _webNavDestination(
+        item: item,
+        isSelected: isSelected,
+        colorScheme: colorScheme,
+        iconWidget: iconWidget,
+        labelColor: labelColor,
+        onTap: open,
+      );
+    }
+
     final content = AnimatedContainer(
       duration: AppMotionDurations.short3,
       curve: AppMotionCurves.standardDecelerate,
@@ -528,11 +564,7 @@ class HRDesktopSidebar extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13.5,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: item.destructive
-                      ? colorScheme.error
-                      : isSelected
-                      ? colorScheme.onPrimaryContainer
-                      : colorScheme.onSurface,
+                  color: labelColor,
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -546,13 +578,7 @@ class HRDesktopSidebar extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          if (item.index < 0) {
-            onOpenProfile();
-          } else {
-            onItemSelected(item.index);
-          }
-        },
+        onTap: open,
         borderRadius: BorderRadius.circular(14),
         hoverColor: colorScheme.onSurface.withValues(alpha: 0.06),
         child: isExpanded
@@ -561,6 +587,82 @@ class HRDesktopSidebar extends StatelessWidget {
                 message: item.title,
                 waitDuration: const Duration(milliseconds: 300),
                 child: content,
+              ),
+      ),
+    );
+  }
+
+  /// Web drawer row (48dp) or rail destination (48dp target, 56×32 indicator).
+  Widget _webNavDestination({
+    required HRSidebarItemData item,
+    required bool isSelected,
+    required ColorScheme colorScheme,
+    required Widget iconWidget,
+    required Color labelColor,
+    required VoidCallback onTap,
+  }) {
+    final indicator = BoxDecoration(
+      color: isSelected ? colorScheme.secondaryContainer : Colors.transparent,
+      borderRadius: BorderRadius.circular(isExpanded ? 24 : 16),
+    );
+    final destination = isExpanded
+        ? AnimatedContainer(
+            duration: AppMotionDurations.short3,
+            curve: AppMotionCurves.standardDecelerate,
+            height: 48,
+            margin: const EdgeInsets.symmetric(vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            alignment: Alignment.center,
+            decoration: indicator,
+            child: Row(
+              children: [
+                iconWidget,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    item.title,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                      color: labelColor,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          )
+        : SizedBox(
+            height: 48,
+            width: double.infinity,
+            child: Center(
+              child: AnimatedContainer(
+                duration: AppMotionDurations.short3,
+                curve: AppMotionCurves.standardDecelerate,
+                width: 56,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: indicator,
+                child: iconWidget,
+              ),
+            ),
+          );
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(isExpanded ? 24 : 16),
+        hoverColor: colorScheme.onSurface.withValues(alpha: 0.06),
+        child: isExpanded
+            ? destination
+            : Tooltip(
+                message: item.title,
+                waitDuration: const Duration(milliseconds: 300),
+                child: destination,
               ),
       ),
     );
@@ -723,11 +825,13 @@ class HrSidebarEntry {
 class HrSidebarScrollArea extends StatefulWidget {
   final int selectedIndex;
   final List<HrSidebarEntry> entries;
+  final EdgeInsets padding;
 
   const HrSidebarScrollArea({
     super.key,
     required this.selectedIndex,
     required this.entries,
+    this.padding = const EdgeInsets.fromLTRB(10, 12, 10, 16),
   });
 
   @override
@@ -804,7 +908,7 @@ class _HrSidebarScrollAreaState extends State<HrSidebarScrollArea> {
           key: const ValueKey('hr_sidebar_scroll'),
           controller: _controller,
           physics: const ClampingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(10, 12, 10, 16),
+          padding: widget.padding,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
