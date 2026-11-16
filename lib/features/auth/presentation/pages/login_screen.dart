@@ -843,7 +843,7 @@ class _LoginScreenState extends State<LoginScreen>
         '🚀 LoginScreen: AuthAuthenticated received! name=${delegate.fullName}, role=${delegate.role}, uid=${delegate.uid}',
       );
       try {
-        final path = homePathForRole(delegate.role);
+        final path = landingPathForRole(delegate.role);
         debugPrint('🚀 LoginScreen: Navigating to $path');
         context.go(path, extra: delegate);
       } catch (e, stack) {

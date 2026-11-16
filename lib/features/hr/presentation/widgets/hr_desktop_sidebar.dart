@@ -511,7 +511,9 @@ class HRDesktopSidebar extends StatelessWidget {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              'موارد بشرية (HR)',
+                              delegate.role == UserRole.admin
+                                  ? 'مشرف الشركة'
+                                  : 'موارد بشرية (HR)',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,

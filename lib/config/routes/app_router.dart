@@ -8,6 +8,7 @@ import 'package:delegate_app/features/profile/presentation/pages/profile_screen.
 import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_main_screen.dart';
 import 'package:delegate_app/web/admin_desktop/admin_desktop_shell_web.dart';
+import 'package:delegate_app/web/hr_system/web_hr_system_redirect_web.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/admin/presentation/pages/branch_details_screen.dart';
 import 'package:delegate_app/features/admin/presentation/pages/company_details_screen.dart';
@@ -86,6 +87,12 @@ final appRouter = GoRouter(
             child: const SplashScreen(),
           );
         }
+        if (WebHrSystemRedirect.appliesTo(delegate)) {
+          return AppMotionPage.fadeThrough(
+            state: state,
+            child: WebHrSystemRedirect(delegate: delegate),
+          );
+        }
         return AppMotionPage.fadeThrough(
           state: state,
           child: MainScreen(
@@ -112,6 +119,13 @@ final appRouter = GoRouter(
           return AppMotionPage.fadeThrough(
             state: state,
             child: const SplashScreen(),
+          );
+        }
+        if (WebHrSystemRedirect.appliesTo(delegate)) {
+          AdminDesktopShellWeb.clearPendingPage();
+          return AppMotionPage.fadeThrough(
+            state: state,
+            child: WebHrSystemRedirect(delegate: delegate),
           );
         }
         return AppMotionPage.fadeThrough(
@@ -179,7 +193,8 @@ final appRouter = GoRouter(
         }
         return AppMotionPage.fadeThrough(
           state: state,
-          child: HRMainScreen(delegate: delegate),
+          child: WebHrSystemRedirect.debugHrSystemBuilder?.call(delegate) ??
+              HRMainScreen(delegate: delegate),
         );
       },
     ),

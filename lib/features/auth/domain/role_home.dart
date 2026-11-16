@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 /// Post-login route for a role. Company UID is not an input: accounts with
@@ -21,6 +22,25 @@ String homePathForRole(UserRole role) {
       return '/home';
   }
 }
+
+const String kWebHrSystemPath = '/hr/home';
+
+/// Web only: company supervisors and HR get the HR desktop system and never
+/// a mobile-style home. Every stored supervisor spelling (`supervisor`,
+/// `company_supervisor`, `company-admin`, `company_admin`, `companyadmin`,
+/// `admin`) resolves to [UserRole.admin], and every HR spelling to
+/// [UserRole.hr]. The company is not an input, so a legacy account without a
+/// `companyUID` still lands on the HR system (its screens scope by equality
+/// on the company and show nothing from other companies).
+bool usesWebHrSystem(UserRole role, {required bool isWeb}) =>
+    isWeb && (role == UserRole.admin || role == UserRole.hr);
+
+/// Route used right after sign-in and after the splash restores a session.
+/// Mobile always gets [homePathForRole].
+String landingPathForRole(UserRole role, {bool? isWeb}) =>
+    usesWebHrSystem(role, isWeb: isWeb ?? WebRuntimePolicy.isWeb)
+        ? kWebHrSystemPath
+        : homePathForRole(role);
 
 /// Which shell [AdminMainScreen] mounts. Roles that do not use that screen
 /// still map to [companySupervisor] so a stray navigation keeps the previous
