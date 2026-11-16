@@ -1201,7 +1201,7 @@ service cloud.firestore {
     // 1.14.3 prod parity: super-admin / technical support approve
     // delegate_requests with unbatched writes (live prod + app cb3f4e2).
     // One users/{uid} get — no getAfter(delegate) batch gate or MED-2 mark.
-    function globalStaffUnbatchedRequestApproveOk() {
+    function globalStaffUnbatchedRequestApproveCore() {
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
       let r = u.get('role', '');
       let d = request.resource.data;
@@ -1219,19 +1219,30 @@ service cloud.firestore {
         && resource.data.get('actionType', '') != 'update_national_id';
     }
 
-    // Same-batch delegate activation must use techRequestReviewOk (r4 F2/F3), not unbatched approve.
-    function globalStaffUnbatchedRequestApproveStandaloneOk(requestId) {
+    function unbatchedRequestDelegatePath(requestId) {
       let ty = resource.data.get('requestType', 'new_delegate');
       let org = resource.data.get('organizationUID', '');
       let co = resource.data.get('companyUID', '');
       let delId = ty == 'add_organization'
         ? request.resource.data.get('existingDelegateUid', resource.data.get('existingDelegateUid', ''))
         : requestId;
-      let delegatePath = /databases/$(database)/documents/organizations/$(org)/companies/$(co)/delegates/$(delId);
-      let unchanged = !exists(delegatePath)
-        || (getAfter(delegatePath).data.get('status', '') == get(delegatePath).data.get('status', '')
+      return /databases/$(database)/documents/organizations/$(org)/companies/$(co)/delegates/$(delId);
+    }
+
+    function globalStaffUnbatchedRequestApproveStandaloneFast(requestId) {
+      return globalStaffUnbatchedRequestApproveCore()
+        && !existsAfter(unbatchedRequestDelegatePath(requestId));
+    }
+
+    function globalStaffUnbatchedRequestApproveOk(requestId) {
+      let delegatePath = unbatchedRequestDelegatePath(requestId);
+      let st = request.resource.data.get('status', '');
+      let approveDoesNotTouchDelegate = st != 'approved'
+        || !existsAfter(delegatePath)
+        || (exists(delegatePath)
+          && getAfter(delegatePath).data.get('status', '') == get(delegatePath).data.get('status', '')
           && getAfter(delegatePath).data.get('updatedAt', '') == get(delegatePath).data.get('updatedAt', ''));
-      return globalStaffUnbatchedRequestApproveOk() && unchanged;
+      return globalStaffUnbatchedRequestApproveCore() && approveDoesNotTouchDelegate;
     }
 
     // Unbatched global-staff approve (1.14.3 / live): absent check is ok;
@@ -3901,7 +3912,7 @@ service cloud.firestore {
       // status, or any other field. Review fields are written only by
       // reviewNationalIdUpdate (Admin SDK). Clients also cannot convert
       // another request into update_national_id.
-      allow update: if (globalStaffUnbatchedRequestApproveStandaloneOk(requestId)
+      allow update: if (globalStaffUnbatchedRequestApproveStandaloneFast(requestId)
           && orgCompanyCheckKeysLocked()
           && subscriptionPaymentUntouched()
           && !changedKeys().hasAny(['proposedNationalId'])
@@ -3925,7 +3936,13 @@ service cloud.firestore {
         && (!changedKeys().hasAny(['organizationUIDs', 'organizationUID', 'organizationId', 'companyUID', 'companyId'])
           || (requestOrganizationUIDsOk() && requestPrimaryOrgBelongsToCompany()))
         && orgCompanyCheckKeysLocked()
-        && requestApprovalOrgCheckOk());
+        && requestApprovalOrgCheckOk())
+        || (globalStaffUnbatchedRequestApproveStandaloneFast(requestId)
+          && orgCompanyCheckKeysLocked()
+          && subscriptionPaymentUntouched()
+          && !changedKeys().hasAny(['proposedNationalId'])
+          && (!changedKeys().hasAny(['organizationUIDs', 'organizationUID', 'organizationId', 'companyUID', 'companyId'])
+            || (requestOrganizationUIDsOk() && requestPrimaryOrgBelongsToCompany())));
       allow delete: if isSuperAdmin()
         || (isOrgAdmin()
           && (resource.data.get('organizationUID', '') == callerOrg()
