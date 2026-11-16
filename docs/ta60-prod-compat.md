@@ -39,7 +39,7 @@ Storage: index is Firestore-only; `storage.rules` documents that (no Storage pat
 
 | Suite | cases | unexpected | deliberate |
 |---|---:|---:|---:|
-| Firestore | **209** | **0** | **59** (incl. `list bell:` + documented URG/APP closures via `isDeliberateFirestoreRegression`) |
+| Firestore | **209** | **0** | **11** (2 class-(c) + 9 silent class-(d); W2 restores dup/bell/private-label paths) |
 | Storage | **22** | **0** | 0 |
 
 `npm run test:rules:prod-compat` → **2/2** pass (set `LOCAL_CI_LOGGING_PORT` if hub/logging ports collide on shared CI hosts).

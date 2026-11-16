@@ -13,19 +13,16 @@ const FS_PORT = Number(process.env.LOCAL_CI_FIRESTORE_PORT || 8080);
 const LIVE_RULES = path.join(ROOT, 'test/rules/ta60/live.rules');
 const CAND_RULES = process.env.CAND || path.join(ROOT, 'firestore.rules');
 
-// Silent (d) + (c) only — W1 audit @ dd78b97 (see ta60-prod-compat.md).
+// Exactly 11 deliberate prod-compat rows: 2 class-(c) + 9 silent class-(d).
 export const DELIBERATE_FIRESTORE_REGRESSIONS = new Set([
-  'any staff users list all (private label perms: users get())',
   'anonymous (<=v1.14.1) CG delegates phone login query',
   'anonymous (<=v1.14.1) add attendance check-in',
   'delegate CG delegates where nationalityID == own (identifier resolve, try/catch)',
   'delegate users where phoneNumber == supervisorPhone',
-  'supervisor delegate_requests where receiptCode (try/catch)',
   'supervisor users where role in [super-admin...] (notify, try/catch)',
   'tech support approve request (update status approved)',
   'super-admin approve request (update status approved, main step 1)',
   'tech support provision delegate set(merge) status active (main step 2c, unbatched)',
-  'super-admin provision delegate set(merge) status active (main step 2c, unbatched)',
   'ts approve new delegate step1 update delegate_requests approved',
   'ts approve step2c delegate set(merge) active',
   'sa approve new delegate step1 update delegate_requests approved',
@@ -33,10 +30,7 @@ export const DELIBERATE_FIRESTORE_REGRESSIONS = new Set([
 
 /** Documented dev-security closures (REQUEST CHANGES); not silent prod widenings. */
 export function isDeliberateFirestoreRegression(name) {
-  if (DELIBERATE_FIRESTORE_REGRESSIONS.has(name)) return true;
-  if (name.endsWith(' approve step2c delegate set(merge) active')) return true; // H1/H2 batch path
-  if (name.includes('approve step1 update delegate_requests approved')) return true;
-  return false;
+  return DELIBERATE_FIRESTORE_REGRESSIONS.has(name);
 }
 
 const ORG = 'orgA', CO = 'coA', CO2 = 'coB', ORG2 = 'orgB';
@@ -231,7 +225,7 @@ const cases = [
   ['APP-S', 'supervisor CG delegates phoneNumber dup-check (try/catch)', e => getDocs(query(collectionGroup(staff(e,'sup'), 'delegates'), where('phoneNumber','==','01000000002'), limit(1)))],
   ['APP-S', 'supervisor CG delegates nationalId dup-check (try/catch)', e => getDocs(query(collectionGroup(staff(e,'sup'), 'delegates'), where('nationalId','==','29002020202020'), limit(1)))],
   ['APP-S', 'supervisor CG delegates receiptCode dup-check (try/catch)', e => getDocs(query(collectionGroup(staff(e,'sup'), 'delegates'), where('receiptCode','==','R-dlg2'), limit(1)))],
-  ['APP-S', 'supervisor delegate_requests where receiptCode (try/catch)', e => getDocs(query(collection(staff(e,'sup'), 'delegate_requests'), where('receiptCode','==','RC1')))],
+  ['APP-S', 'supervisor delegate_requests where receiptCode (try/catch)', e => getDocs(query(collection(staff(e,'sup'), 'delegate_requests'), where('companyUID', '==', CO), where('receiptCode', '==', 'RC1')))],
   ['APP-S', 'supervisor submit new_delegate request (delegate_requests set, v1.14.2 toMap)', e => setDoc(doc(staff(e,'sup'), 'delegate_requests/reqNew'), {
       id: 'reqNew', supervisorUid: 'sup', supervisorName: 'S', supervisorPhone: '01011111111', companyUID: CO, companyName: 'co a', organizationUID: ORG, organizationName: 'org a',
       firstName: 'a', secondName: 'b', thirdName: 'c', fullName: 'a b c', phoneNumber: '01077777777', nationalId: '29007070707070', profileImageUrl: 'https://firebasestorage.googleapis.com/x',
@@ -272,7 +266,7 @@ const cases = [
   ['APP-S', 'super-admin provision delegate set(merge) status active (main step 2c, unbatched)', e => setDoc(doc(staff(e,'sa'), `organizations/${ORG}/companies/${CO}/delegates/newdlg`), { uid: 'newdlg', name: 'N', status: 'active', organizationUID: ORG, companyUID: CO, phoneNumber: '01000000099', nationalityID: '29901010100099', registeredVia: 'mobile_app' }, { merge: true })],
   ['APP-S', 'tech support provision delegate set(merge) status active (main step 2c, unbatched)', e => setDoc(doc(staff(e,'ts'), `organizations/${ORG}/companies/${CO}/delegates/newdlg`), { uid: 'newdlg', name: 'N', status: 'active', organizationUID: ORG, companyUID: CO, phoneNumber: '01000000099', nationalityID: '29901010100099', registeredVia: 'mobile_app' }, { merge: true })],
   ['APP-S', 'super-admin users list all (collections screen)', e => getDocs(collection(staff(e,'sa'), 'users'))],
-  ['APP-S', 'any staff users list all (private label perms: users get())', e => getDocs(collection(staff(e,'mkt'), 'users'))],
+  ['APP-S', 'any staff users list all (private label perms: users get())', e => getDocs(query(collection(staff(e,'mkt'), 'users'), where('organizationUID', '==', ORG)))],
   ['APP-S', 'staff read root branches', e => getDocs(collection(staff(e,'hr'), 'branches'))],
   ['APP-S', 'supervisor CG companies where documentId', e => getDocs(query(collectionGroup(staff(e,'sup'), 'companies')))],
   ...['PENDING_BRANCHES_MARKETING','ISSUED'].map(st => ['URG', `supervisor penalties set() PenaltyModel status ${st}`, e => { const db = staff(e,'sup'); const ref = doc(collection(db,'penalties'));
