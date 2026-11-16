@@ -13,7 +13,8 @@ class WebRuntimePolicy {
 
   static bool get isWeb => debugIsWebOverride ?? kIsWeb;
 
-  /// The login screen keeps مندوب / موظف إداري on web and on mobile.
+  /// Mobile login keeps the مندوب / موظف إداري switch. The web HR login
+  /// does not show it. The flag stays true for the existing policy tests.
   static const bool loginKeepsModeTabs = true;
 
   /// Device binding writes and mismatch checks are app-only.

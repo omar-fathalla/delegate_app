@@ -18,6 +18,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/semantics.dart';
 import 'package:delegate_app/features/auth/presentation/widgets/tashil_m3.dart';
+import 'package:delegate_app/features/auth/presentation/widgets/web_hr_login_view.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_remote_data_source.dart';
@@ -45,6 +46,8 @@ class _LoginScreenState extends State<LoginScreen>
   bool _obscureNationalId = true;
   final _shakeKey = GlobalKey<ShakeState>();
   bool _rememberMe = false;
+  bool _webDelegateNotice = false;
+  bool _suppressWebError = false;
   LoginMode _mode = LoginMode.delegate;
   AutovalidateMode _autovalidate = AutovalidateMode.disabled;
   late AnimationController _animationController;
@@ -89,9 +92,12 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ),
         );
+    _phoneController.addListener(_onWebFieldEdited);
+    _passwordController.addListener(_onWebFieldEdited);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _applyDelegateNotice();
+      if (WebRuntimePolicy.isWeb) return;
       if (M3Motion.reduced(context)) {
         _animationController.value = 1;
       } else {
@@ -101,17 +107,34 @@ class _LoginScreenState extends State<LoginScreen>
     _restoreMode();
   }
 
+  void _onWebFieldEdited() {
+    if (!mounted || !WebRuntimePolicy.isWeb || _suppressWebError) return;
+    final state = context.read<AuthBloc>().state;
+    if (!_webDelegateNotice && state is! AuthError) return;
+    setState(() => _suppressWebError = true);
+  }
+
   bool get _isStaff => _mode == LoginMode.staff;
 
   /// `/login?notice=delegate` is where the HR-shell guard sends a delegate
-  /// who opened the system on web. Force the delegate tab so the blocked
-  /// notice is what's on screen, even if staff mode was saved.
+  /// who opened the system on web. Mobile still opens the delegate tab.
+  /// Web keeps the staff form and shows a polite app-only notice.
   void _applyDelegateNotice() {
     String? notice;
     try {
       notice = GoRouterState.of(context).uri.queryParameters['notice'];
     } catch (_) {
       notice = null;
+    }
+    if (WebRuntimePolicy.isWeb) {
+      final blocked = notice == 'delegate';
+      if (_mode != LoginMode.staff || _webDelegateNotice != blocked) {
+        setState(() {
+          _mode = LoginMode.staff;
+          _webDelegateNotice = blocked;
+        });
+      }
+      return;
     }
     if (notice == 'delegate' && _mode != LoginMode.delegate) {
       setState(() => _mode = LoginMode.delegate);
@@ -122,7 +145,46 @@ class _LoginScreenState extends State<LoginScreen>
   /// in the mobile app; the web tab only explains that.
   bool get _isWebDelegate => WebRuntimePolicy.isWeb && !_isStaff;
 
+  String _delegateWebPolite(bool arabic) => arabic
+      ? 'تسجيل الدخول وربط الجهاز متاح من تطبيق الجوال فقط.'
+      : 'Sign-in and device binding are only available in the mobile app.';
+
+  bool _isDelegateWebBlock(String? code, String message) =>
+      code == 'delegate_web_app_only' ||
+      message == WebRuntimePolicy.delegateLoginWebMessage ||
+      message == WebRuntimePolicy.delegateLoginWebMessageEn;
+
+  /// Web form-level message. Credential failures use the approved copy.
+  /// Every other failure keeps the message the app already produces.
+  String? _webFormMessage(
+    AuthState state,
+    AppLocalizations l10n,
+    bool arabic,
+  ) {
+    if (state is AuthError && state.code != 'device_mismatch') {
+      if (state.code == 'invalid_credentials') {
+        return arabic
+            ? 'رقم الجوال أو كلمة المرور غير صحيحة'
+            : 'The mobile number or password is incorrect';
+      }
+      if (_isDelegateWebBlock(state.code, state.message)) {
+        return _delegateWebPolite(arabic);
+      }
+      return localizedAuthError(
+        l10n,
+        message: state.message,
+        code: state.code,
+      );
+    }
+    if (_webDelegateNotice) return _delegateWebPolite(arabic);
+    return null;
+  }
+
   void _restoreMode() {
+    if (WebRuntimePolicy.isWeb) {
+      _mode = LoginMode.staff;
+      return;
+    }
     try {
       final saved = sl<SharedPreferences>().getString(kLoginModePrefKey);
       if (saved == LoginMode.staff.name) _mode = LoginMode.staff;
@@ -146,6 +208,8 @@ class _LoginScreenState extends State<LoginScreen>
   void dispose() {
     _animationController.dispose();
     _submit.dispose();
+    _phoneController.removeListener(_onWebFieldEdited);
+    _passwordController.removeListener(_onWebFieldEdited);
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -155,21 +219,13 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Web keeps the same مندوب / موظف إداري switch.
-    assert(WebRuntimePolicy.loginKeepsModeTabs);
-    final themed = Theme(
+    // Mobile keeps the account-type switch. Web does not render it.
+    if (!WebRuntimePolicy.isWeb) {
+      assert(WebRuntimePolicy.loginKeepsModeTabs);
+    }
+    return Theme(
       data: tashilAuthTheme(context),
       child: Builder(builder: _buildThemed),
-    );
-    if (!WebRuntimePolicy.isWeb) return themed;
-    return ColoredBox(
-      color: kTashilBrandScheme.primary,
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: LoginScreen.webMaxWidth),
-          child: themed,
-        ),
-      ),
     );
   }
 
@@ -180,7 +236,9 @@ class _LoginScreenState extends State<LoginScreen>
     final brand = kTashilBrandScheme;
 
     return Scaffold(
-      backgroundColor: brand.primary,
+      backgroundColor: WebRuntimePolicy.isWeb
+          ? colorScheme.surface
+          : brand.primary,
       resizeToAvoidBottomInset: true,
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) =>
@@ -193,6 +251,36 @@ class _LoginScreenState extends State<LoginScreen>
             );
           }
           final loading = state is AuthLoading;
+          if (WebRuntimePolicy.isWeb) {
+            final message = _suppressWebError
+                ? null
+                : _webFormMessage(state, l10n, isArabic);
+            return WebHrLoginView(
+              formKey: _formKey,
+              shakeKey: _shakeKey,
+              phoneController: _phoneController,
+              passwordController: _passwordController,
+              obscurePassword: _obscurePassword,
+              rememberMe: _rememberMe,
+              loading: loading,
+              autovalidateMode: _autovalidate,
+              formError: message,
+              credentialError:
+                  message != null &&
+                  state is AuthError &&
+                  state.code == 'invalid_credentials',
+              delegateNotice: message == _delegateWebPolite(isArabic),
+              isArabic: isArabic,
+              onToggleObscure: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
+              onToggleRemember: () =>
+                  setState(() => _rememberMe = !_rememberMe),
+              onSubmit: () => _submitLogin(context),
+              onForgot: () => _forgotPassword(context, isArabic),
+              onSupport: () => _launchPhoneDialer(l10n.contactNumber),
+              onLanguage: () => localeProvider.toggleLocale(),
+            );
+          }
           return LayoutBuilder(
             builder: (context, constraints) {
               final compact = constraints.maxHeight < 680;
@@ -813,6 +901,11 @@ class _LoginScreenState extends State<LoginScreen>
     AppLocalizations l10n,
     ColorScheme colorScheme,
   ) {
+    if (WebRuntimePolicy.isWeb &&
+        (state is AuthLoading || state is AuthError) &&
+        _suppressWebError) {
+      setState(() => _suppressWebError = false);
+    }
     if (state is! AuthLoading &&
         state is! AuthAuthenticated &&
         _submit.value > 0) {
@@ -833,7 +926,7 @@ class _LoginScreenState extends State<LoginScreen>
     } else if (state is AuthError) {
       if (state.code == 'device_mismatch') {
         DeviceLockDialog.show(context, requestAlreadyFiled: true);
-      } else {
+      } else if (!WebRuntimePolicy.isWeb) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -882,13 +975,13 @@ class _LoginScreenState extends State<LoginScreen>
 
     if (_formKey.currentState!.validate()) {
       FocusScope.of(context).unfocus();
-      _submit.forward();
+      if (!WebRuntimePolicy.isWeb) _submit.forward();
       BlocProvider.of<AuthBloc>(context).add(
         LoginRequested(
           phoneNumber: _phoneController.text,
           password: _passwordController.text,
           rememberMe: _rememberMe,
-          mode: _mode,
+          mode: WebRuntimePolicy.isWeb ? LoginMode.staff : _mode,
         ),
       );
     } else {

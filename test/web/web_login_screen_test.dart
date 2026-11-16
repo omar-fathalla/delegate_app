@@ -1,5 +1,5 @@
-// Web login keeps the delegate / staff tabs; the delegate tab never calls the
-// device-binding delegate login on web. Fake data only.
+// Web HR login is the staff form only. Delegate sign-in stays in the mobile
+// app. Fake data only.
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
@@ -74,35 +74,33 @@ void main() {
 
   Finder tab(LoginMode m) => find.byKey(ValueKey('group_item_$m'));
 
-  testWidgets('web keeps both tabs; delegate tab explains the app and never logs in', (t) async {
+  testWidgets('web staff form has no delegate choice and can submit', (t) async {
     await pump(t, web: true);
-    expect(find.text('مندوب'), findsWidgets);
-    expect(find.text('موظف إداري'), findsWidgets);
-    expect(tab(LoginMode.delegate), findsOneWidget);
-    expect(find.byKey(const ValueKey('login_web_delegate_notice')), findsOneWidget);
-    expect(find.text(WebRuntimePolicy.delegateLoginWebMessage), findsOneWidget);
-    expect(find.text(WebRuntimePolicy.delegateLoginWebMessageEn), findsNothing);
+    expect(find.text('مندوب'), findsNothing);
+    expect(find.text('موظف إداري'), findsNothing);
+    expect(tab(LoginMode.delegate), findsNothing);
+    expect(find.byKey(const ValueKey('login_mode_switch')), findsNothing);
+    expect(find.text('لحسابات الموظفين والإدارة'), findsOneWidget);
     expect(find.byKey(const ValueKey('login_national_id')), findsNothing);
+    expect(find.byKey(const ValueKey('login_web_delegate_notice')), findsNothing);
     final submit = t.widget<FilledButton>(find.byKey(const ValueKey('login_submit')));
-    expect(submit.onPressed, isNull);
+    expect(submit.onPressed, isNotNull);
     verifyNever(() => bloc.add(any()));
   });
 
-  testWidgets('english delegate tab uses the policy message', (t) async {
+  testWidgets('english web login uses the staff subtitle', (t) async {
     localeProvider.setLocale(const Locale('en'));
     addTearDown(() => localeProvider.setLocale(const Locale('ar')));
     await pump(t, web: true, locale: const Locale('en'));
-    expect(find.text(WebRuntimePolicy.delegateLoginWebMessageEn), findsOneWidget);
-    expect(find.text(WebRuntimePolicy.delegateLoginWebMessage), findsNothing);
+    expect(find.text('For staff and admin accounts'), findsOneWidget);
+    expect(find.text('مندوب'), findsNothing);
+    expect(find.text(WebRuntimePolicy.delegateLoginWebMessageEn), findsNothing);
     final submit = t.widget<FilledButton>(find.byKey(const ValueKey('login_submit')));
-    expect(submit.onPressed, isNull);
+    expect(submit.onPressed, isNotNull);
   });
 
-  testWidgets('web staff tab signs in with LoginMode.staff', (t) async {
+  testWidgets('web staff form signs in with LoginMode.staff', (t) async {
     await pump(t, web: true);
-    await t.tap(tab(LoginMode.staff));
-    await t.pumpAndSettle();
-    expect(find.byKey(const ValueKey('login_web_delegate_notice')), findsNothing);
     await t.enterText(find.byKey(const ValueKey('login_phone')), '01000000000');
     await t.enterText(find.byKey(const ValueKey('login_staff_password')), 'fake-pass-123');
     await t.ensureVisible(find.byKey(const ValueKey('login_submit')));
@@ -113,10 +111,13 @@ void main() {
     expect(req.mode, LoginMode.staff);
   });
 
-  testWidgets('web centres the sheet at phone width on a wide window', (t) async {
+  testWidgets('web form column is 400dp on a 1280 window', (t) async {
     await pump(t, web: true);
-    final size = t.getSize(find.byType(Scaffold).first);
-    expect(size.width, LoginScreen.webMaxWidth);
+    expect(t.getSize(find.byType(Scaffold).first).width, 1280);
+    expect(
+      t.getSize(find.byKey(const ValueKey('login_web_form_column'))).width,
+      400,
+    );
   });
 
   testWidgets('mobile (not web) is unchanged: delegate fields, no notice', (t) async {

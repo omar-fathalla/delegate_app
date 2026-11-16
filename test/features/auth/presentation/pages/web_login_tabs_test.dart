@@ -75,7 +75,7 @@ void main() {
     );
   }
 
-  testWidgets('web login keeps مندوب and موظف إداري tabs', (tester) async {
+  testWidgets('web login has no مندوب or موظف إداري choice', (tester) async {
     tester.view.physicalSize = const Size(1200, 2000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -85,12 +85,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(HrLoginScreen), findsNothing);
-    expect(find.text('مندوب'), findsWidgets);
-    expect(find.text('موظف إداري'), findsWidgets);
-    expect(find.byKey(const ValueKey('login_mode_switch')), findsOneWidget);
+    expect(find.text('مندوب'), findsNothing);
+    expect(find.text('موظف إداري'), findsNothing);
+    expect(find.byKey(const ValueKey('login_mode_switch')), findsNothing);
+    expect(find.text('لحسابات الموظفين والإدارة'), findsOneWidget);
   });
 
-  testWidgets('web staff tab submits LoginMode.staff', (tester) async {
+  testWidgets('web staff form submits LoginMode.staff', (tester) async {
     tester.view.physicalSize = const Size(1200, 2000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -99,8 +100,6 @@ void main() {
     await tester.pumpWidget(app(const LoginScreen()));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(ValueKey('group_item_${LoginMode.staff}')));
-    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).at(0), '01012345678');
     await tester.enterText(find.byType(TextFormField).at(1), 'secret-pass');
     final button = find.widgetWithText(FilledButton, 'تسجيل الدخول');

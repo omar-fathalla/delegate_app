@@ -7,6 +7,7 @@ import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/auth/domain/role_home.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:go_router/go_router.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/auth/presentation/widgets/tashil_m3.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 
@@ -78,10 +79,18 @@ class _SplashScreenState extends State<SplashScreen>
           });
         } else if (state is AuthUnauthenticated) {
           if (state.fromLogout) return;
+          final message = state.message;
+          final delegateBlocked = WebRuntimePolicy.isWeb &&
+              (message == WebRuntimePolicy.delegateLoginWebMessage ||
+                  message == WebRuntimePolicy.delegateLoginWebMessageEn);
+          if (delegateBlocked) {
+            context.go('/login?notice=delegate');
+            return;
+          }
           context.go('/login');
-          if (state.message != null &&
-              state.message!.isNotEmpty &&
-              state.message != AuthBloc.freshSignInMessage) {
+          if (message != null &&
+              message.isNotEmpty &&
+              message != AuthBloc.freshSignInMessage) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
