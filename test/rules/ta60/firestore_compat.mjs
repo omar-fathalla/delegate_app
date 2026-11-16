@@ -31,13 +31,28 @@ export function isDeliberateFirestoreRegression(name) {
   return false;
 }
 
-/** Five phone claim variants (prod `buildCustomClaims` / `phoneQueryVariants` subset). */
+/**
+ * cb3f4e2 getNotifications() phone variations (notification_remote_data_source.dart §5).
+ * Includes +20 with leading 0 (+2001…) required for live G5 / phoneNumber ALLOW.
+ */
+export function getNotificationsPhoneVariations(rawP) {
+  const cleanPhone = String(rawP).replace(/\s+/g, '').trim();
+  const variations = new Set([cleanPhone]);
+  variations.add(cleanPhone.startsWith('0') ? cleanPhone.slice(1) : `0${cleanPhone}`);
+  if (!cleanPhone.startsWith('+')) variations.add(`+20${cleanPhone}`);
+  if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('0')) {
+    variations.add(`+20${cleanPhone.slice(1)}`);
+  }
+  return [...variations];
+}
+
+/** Delegate JWT `phones` subset exercised by bell phoneNumber== probes (incl. +2001000000001). */
 export const DELEGATE_CLAIM_PHONES = [
   '01000000001',
   '1000000001',
-  '201000000001',
-  '+201000000001',
+  '20100000001',
   '+20100000001',
+  '+2001000000001',
 ];
 
 /** Live prod ALLOW counts for counted `list bell:` shapes (excl. G4/G5 extension rows). */
@@ -66,16 +81,17 @@ const STAFF_BELL_UID = [
   ['bm', 'branches_marketing'],
 ];
 
+/** Valid Egyptian 01[0125]XXXXXXXX (11 digits); avoids 010000022-style invalid variant gen. */
 const STAFF_PHONE_BY_UID = {
-  sa: '010000022',
-  ts: '010000022',
-  oa: '010000022',
-  ca: '010000022',
+  sa: '01012000001',
+  ts: '01012000002',
+  oa: '01012000003',
+  ca: '01012000004',
   sup: '01011111111',
-  hr: '010000022',
-  acc: '010000033',
-  mkt: '010000033',
-  bm: '010000022',
+  hr: '01012000005',
+  acc: '01012000006',
+  mkt: '01012000007',
+  bm: '01012000008',
 };
 
 const ORG = 'orgA', CO = 'coA', CO2 = 'coB', ORG2 = 'orgB';
@@ -90,14 +106,15 @@ async function seed(env) {
   await env.withSecurityRulesDisabled(async (c) => {
     const db = c.firestore();
     const u = (id, role, org = ORG, co = CO, extra = {}) => setDoc(doc(db, 'users', id), {
-      uid: id, role, organizationUID: org, companyUID: co, email: `${id}@t.test`, phoneNumber: `0100000${id.length}${id.length}`, status: 'Approved', ...extra });
+      uid: id, role, organizationUID: org, companyUID: co, email: `${id}@t.test`,
+      phoneNumber: STAFF_PHONE_BY_UID[id] ?? `01012000099`, status: 'Approved', ...extra });
     await u('sa', 'super-admin', '', '');
     await u('ts', 'technical_support', '', '');
     await u('oa', 'organization-admin', ORG, '');
     await u('ca', 'company-admin', ORG, CO);
     await u('sup', 'supervisor', ORG, CO, { phoneNumber: '01011111111' });
     await u('hr', 'hr', ORG, CO);
-    await u('mkt', 'marketing', ORG, '');
+    await u('mkt', 'marketing', ORG, CO);
     await u('mp', 'marketing_promotion', ORG, '');
     await u('bm', 'branches_marketing', ORG, CO);
     await u('acc', 'accountant', ORG, CO);
@@ -147,12 +164,38 @@ async function seed(env) {
     await nb('nbTs', 'technicalSupport');
     await nb('nbMkt', 'marketing');
     await nb('nbBmp', 'branchesMarketingManager');
+    await nb('nbOaAdmin', 'organizationAdmin');
+    await nb('nbOaDash', 'organization-admin');
+    await nb('nbOaUnder', 'organization_admin');
+    await nb('nbSaUnder', 'super_admin');
+    await nb('nbSaCamel', 'superAdmin');
+    await nb('nbTsDash', 'technical-support');
+    await nb('nbTsRole', 'role_technical_support');
     await nb('nbDel', `delegates_${CO}`);
     await nb('nbPhoneDlg', `phone_dlg1`);
     await setDoc(doc(db, 'notifications/nPhoneDlg'), {
       phoneNumber: '01000000001', delegateUid: 'dlg1', title: 'phone-row', isRead: false,
       companyId: CO, organizationId: ORG, createdAt: NOW, deletedBy: [],
     });
+    await setDoc(doc(db, 'notifications/nPhoneDlgPlus20Lead'), {
+      phoneNumber: '+2001000000001', delegateUid: 'dlg1', title: 'phone-+20-01', isRead: false,
+      companyId: CO, organizationId: ORG, createdAt: NOW, deletedBy: [],
+    });
+    for (const p of DELEGATE_CLAIM_PHONES) {
+      const slug = p.replace(/[^0-9]/g, '');
+      await setDoc(doc(db, `notifications/nbPhField_${slug}`), {
+        phoneNumber: p, delegateUid: 'dlg1', title: 'phone-field', isRead: false,
+        companyId: CO, organizationId: ORG, createdAt: NOW, deletedBy: [],
+      });
+      await setDoc(doc(db, `notifications/nbG5Ph_${slug}`), {
+        delegateUid: `phone_${p}`, title: 'g5-phone-tag', isRead: false,
+        companyId: CO, organizationId: ORG, createdAt: NOW, deletedBy: [],
+      });
+      await setDoc(doc(db, `notifications/nbG5Bare_${slug}`), {
+        delegateUid: p, title: 'g5-bare-phone', isRead: false,
+        companyId: CO, organizationId: ORG, createdAt: NOW, deletedBy: [],
+      });
+    }
     const staffPhoneTag = (uid) => setDoc(doc(db, `notifications/nbPhone_${uid}`), {
       delegateUid: `phone_${uid}`, title: 'phone-tag', isRead: false,
       companyId: CO, organizationId: ORG, createdAt: NOW, deletedBy: [],
@@ -207,6 +250,39 @@ function isBellCountedCase(name) {
   return name.includes('list bell:') && !name.includes('list bell G4:') && !name.includes('list bell G5:');
 }
 
+function cb3f4e2RoleFlags(bellRole, uid) {
+  const roleKey = {
+    'super-admin': 'super-admin',
+    tech: 'technical_support',
+    'org-admin': 'organization-admin',
+    'company-admin': 'company-admin',
+    supervisor: 'supervisor',
+    hr: 'hr',
+    accountant: 'accountant',
+    marketing: 'marketing',
+    branches_marketing: 'branches_marketing_manager',
+  }[bellRole] ?? bellRole;
+  const normalizedRole = roleKey.toLowerCase();
+  const isSupervisorOrAdmin = normalizedRole.includes('supervisor')
+    || normalizedRole.includes('admin')
+    || normalizedRole.includes('company_admin')
+    || normalizedRole.includes('company-admin')
+    || normalizedRole.includes('super')
+    || normalizedRole.includes('support')
+    || uid === 'super-admin-login';
+  const isDelegate = normalizedRole.includes('delegate')
+    || (!isSupervisorOrAdmin && bellRole === 'delegate');
+  return { normalizedRole, isSupervisorOrAdmin, isDelegate };
+}
+
+function companyUidForStaff(uid, bellRole) {
+  if (bellRole === 'org-admin' || bellRole === 'super-admin' || bellRole === 'tech') {
+    return '';
+  }
+  return CO;
+}
+
+/** cb3f4e2 getNotifications() §1–4 list shapes (release/1.14.x-supervisor @ cb3f4e2). */
 function staffBellShapes(uid, bellRole) {
   const db = (e) => staff(e, uid);
   const shapes = [];
@@ -215,68 +291,73 @@ function staffBellShapes(uid, bellRole) {
     `${bellRole} list bell: ${label}`,
     (e) => fn(db(e)),
   ]);
+  const { normalizedRole, isSupervisorOrAdmin, isDelegate } = cb3f4e2RoleFlags(bellRole, uid);
+  const userCompanyId = companyUidForStaff(uid, bellRole);
+
   if (bellRole === 'org-admin') {
-    push('delegateUid==own uid (limit 30)', (d) => notifList(d, uid));
-    for (const alias of ['organizationAdmin', 'organization-admin', 'organization_admin']) {
+    push('delegateUid==own uid (limit 50)', (d) => getDocs(query(
+      collection(d, 'notifications'), where('delegateUid', '==', uid), limit(50),
+    )));
+    push('delegateUid==all (limit 30)', (d) => notifList(d, 'all'));
+    push('delegateUid==phone_<uid> (limit 30)', (d) => notifList(d, `phone_${uid}`));
+    for (const alias of ['organizationAdmin', 'organization_admin']) {
       push(`delegateUid==${alias} (limit 30)`, (d) => notifList(d, alias));
     }
-    push('delegateUid==all (limit 30)', (d) => notifList(d, 'all'));
     return shapes;
   }
-  if (bellRole === 'super-admin') {
-    push('delegateUid==own uid (limit 30)', (d) => notifList(d, uid));
-    push('delegateUid==all (limit 30)', (d) => notifList(d, 'all'));
-    push('delegateUid==phone_<uid> (limit 30)', (d) => notifList(d, `phone_${uid}`));
-    for (const alias of ['superAdmin', 'super-admin']) {
-      push(`delegateUid==${alias} (limit 30)`, (d) => notifList(d, alias));
-    }
-    push('delegateUid==hr (limit 30)', (d) => notifList(d, 'hr'));
-    return shapes;
-  }
-  if (bellRole === 'tech') {
-    push('delegateUid==own uid (limit 30)', (d) => notifList(d, uid));
-    push('delegateUid==all (limit 30)', (d) => notifList(d, 'all'));
-    push('delegateUid==phone_<uid> (limit 30)', (d) => notifList(d, `phone_${uid}`));
-    push('delegateUid==technicalSupport (limit 30)', (d) => notifList(d, 'technicalSupport'));
-    push('delegateUid==hr (limit 30)', (d) => notifList(d, 'hr'));
-    return shapes;
-  }
-  if (bellRole === 'branches_marketing') {
-    push('delegateUid==own uid (limit 30)', (d) => notifList(d, uid));
-    push('delegateUid==all (limit 30)', (d) => notifList(d, 'all'));
-    push('delegateUid==phone_<uid> (limit 30)', (d) => notifList(d, `phone_${uid}`));
-    push(`delegateUid==company_${CO} (limit 30)`, (d) => notifList(d, `company_${CO}`));
-    push('companyId+all_company_supervisors (limit 30)', (d) => notifListAcs(d));
-    push('delegateUid==branchesMarketingManager (limit 30)', (d) => notifList(d, 'branchesMarketingManager'));
-    push('delegateUid==branches_marketing (limit 30)', (d) => notifList(d, 'branches_marketing'));
-    push('delegateUid==marketing (limit 30)', (d) => notifList(d, 'marketing'));
-    return shapes;
-  }
-  if (bellRole === 'hr' || bellRole === 'accountant') {
-    push('delegateUid==own uid (limit 30)', (d) => notifList(d, uid));
-    push('delegateUid==all (limit 30)', (d) => notifList(d, 'all'));
-    push('delegateUid==phone_<uid> (limit 30)', (d) => notifList(d, `phone_${uid}`));
-    push(`delegateUid==company_${CO} (limit 30)`, (d) => notifList(d, `company_${CO}`));
-    push('delegateUid==hr (limit 30)', (d) => notifList(d, 'hr'));
-    return shapes;
-  }
-  if (bellRole === 'marketing') {
-    push('delegateUid==own uid (limit 30)', (d) => notifList(d, uid));
-    push('delegateUid==all (limit 30)', (d) => notifList(d, 'all'));
-    push('delegateUid==phone_<uid> (limit 30)', (d) => notifList(d, `phone_${uid}`));
-    push(`delegateUid==company_${CO} (limit 30)`, (d) => notifList(d, `company_${CO}`));
-    push('companyId+all_company_supervisors (limit 30)', (d) => notifListAcs(d));
-    push('delegateUid==marketing (limit 30)', (d) => notifList(d, 'marketing'));
-    push('delegateUid==hr (limit 30)', (d) => notifList(d, 'hr'));
-    return shapes;
-  }
-  // supervisor, company-admin (7 each)
-  push('delegateUid==own uid (limit 30)', (d) => notifList(d, uid));
+
+  push('delegateUid==own uid (limit 50)', (d) => getDocs(query(
+    collection(d, 'notifications'), where('delegateUid', '==', uid), limit(50),
+  )));
   push('delegateUid==all (limit 30)', (d) => notifList(d, 'all'));
   push('delegateUid==phone_<uid> (limit 30)', (d) => notifList(d, `phone_${uid}`));
-  push(`delegateUid==company_${CO} (limit 30)`, (d) => notifList(d, `company_${CO}`));
-  push(`delegateUid==supervisor_${CO} (limit 30)`, (d) => notifList(d, `supervisor_${CO}`));
-  push('companyId+all_company_supervisors (limit 30)', (d) => notifListAcs(d));
+
+  if (userCompanyId) {
+    push(`delegateUid==company_${userCompanyId} (limit 30)`, (d) => notifList(d, `company_${userCompanyId}`));
+    if (isSupervisorOrAdmin) {
+      if (bellRole !== 'branches_marketing') {
+        push(`delegateUid==supervisor_${userCompanyId} (limit 30)`, (d) => notifList(d, `supervisor_${userCompanyId}`));
+      }
+      push('companyId+all_company_supervisors (limit 30)', (d) => notifListAcs(d));
+    }
+    if (isDelegate) {
+      push(`delegateUid==delegates_${userCompanyId} (limit 30)`, (d) => notifList(d, `delegates_${userCompanyId}`));
+    }
+  }
+
+  if (bellRole === 'branches_marketing') {
+    for (const r of ['branchesMarketingManager', 'branches_marketing', 'marketing']) {
+      push(`delegateUid==${r} (limit 30)`, (d) => notifList(d, r));
+    }
+    push('delegateUid==hr (limit 30)', (d) => notifList(d, 'hr'));
+    return shapes;
+  }
+
+  if (bellRole === 'super-admin') {
+    for (const r of ['super-admin', 'super_admin', 'superAdmin']) {
+      push(`delegateUid==${r} (limit 30)`, (d) => notifList(d, r));
+    }
+    return shapes;
+  }
+
+  if (bellRole === 'tech' || normalizedRole.includes('technical') || normalizedRole.includes('support')) {
+    push('delegateUid==technicalSupport (limit 30)', (d) => notifList(d, 'technicalSupport'));
+    push('delegateUid==technical-support (limit 30)', (d) => notifList(d, 'technical-support'));
+    return shapes;
+  }
+
+  if (bellRole === 'hr' || bellRole === 'accountant') {
+    push('delegateUid==hr (limit 30)', (d) => notifList(d, 'hr'));
+    return shapes;
+  }
+
+  if (bellRole === 'marketing') {
+    push('companyId+all_company_supervisors (limit 30)', (d) => notifListAcs(d));
+    push('delegateUid==marketing (limit 30)', (d) => notifList(d, 'marketing'));
+    push('delegateUid==hr (limit 30)', (d) => notifList(d, 'hr'));
+    return shapes;
+  }
+  // supervisor, company-admin (7 each): cb3f4e2 company/supervisor/acs + hr broadcast on live
   push('delegateUid==hr (limit 30)', (d) => notifList(d, 'hr'));
   return shapes;
 }
@@ -308,13 +389,16 @@ function delegateBellShapes() {
 }
 
 function staffBellG5Shapes(uid, bellRole) {
-  const ph = STAFF_PHONE_BY_UID[uid] || `0100000${uid.length}${uid.length}`;
+  const ph = STAFF_PHONE_BY_UID[uid] ?? '01012000099';
   const db = (e) => staff(e, uid);
-  return [
-    ['NOTIF-G5', `${bellRole} list bell G5: phoneNumber==${ph} (limit 30)`, (e) => notifListPhoneField(db(e), ph)],
-    ['NOTIF-G5', `${bellRole} list bell G5: delegateUid==phone_${ph} (limit 30)`, (e) => notifList(db(e), `phone_${ph}`)],
-    ['NOTIF-G5', `${bellRole} list bell G5: delegateUid==${ph} (limit 30)`, (e) => notifList(db(e), ph)],
-  ];
+  const variants = [...new Set([ph, ...getNotificationsPhoneVariations(ph)])];
+  const out = [];
+  for (const v of variants) {
+    out.push(['NOTIF-G5', `${bellRole} list bell G5: phoneNumber==${v} (limit 30)`, (e) => notifListPhoneField(db(e), v)]);
+    out.push(['NOTIF-G5', `${bellRole} list bell G5: delegateUid==phone_${v} (limit 30)`, (e) => notifList(db(e), `phone_${v}`)]);
+    out.push(['NOTIF-G5', `${bellRole} list bell G5: delegateUid==${v} (limit 30)`, (e) => notifList(db(e), v)]);
+  }
+  return out;
 }
 
 function buildBellHarnessCases() {
@@ -339,6 +423,14 @@ export function assertBellAllowCounts(rows) {
     }
     if (candAllow !== liveAllow) {
       issues.push(`${role}: cand ALLOW ${candAllow} != live ALLOW ${liveAllow}`);
+    }
+    for (const r of roleRows) {
+      if (r.live === 'ALLOW' && r.cand !== 'ALLOW') {
+        issues.push(`${r.name}: cand ${r.cand} != live ALLOW`);
+      }
+      if (r.live === 'ALLOW' && r.cand === 'ALLOW' && r.liveDocCount !== r.candDocCount) {
+        issues.push(`${r.name}: live docs ${r.liveDocCount} != cand ${r.candDocCount}`);
+      }
     }
   }
   return issues;
@@ -516,12 +608,18 @@ async function runAll(env, label) {
   for (const [, name, fn] of cases) {
     await seed(env);
     let res;
-    try { await fn(env); res = 'ALLOW'; } catch (e) {
+    let docCount;
+    try {
+      const snap = await fn(env);
+      docCount = snap?.size ?? (snap?.docs ? snap.docs.length : undefined);
+      res = 'ALLOW';
+    } catch (e) {
       res = 'DENY';
+      docCount = undefined;
       (globalThis.MSG ||= {})[label + '|' + name] = String(e.message).replace(/\s+/g, ' ').slice(0, 600);
       if (!String(e.code || e.message).includes('permission')) res = 'ERR:' + String(e.code || e.message).slice(0, 80);
     }
-    out.push(res);
+    out.push({ res, docCount });
   }
   return out;
 }
@@ -541,9 +639,11 @@ export async function runFirestoreCompatHarness() {
   const rows = cases.map((c, i) => ({
     area: c[0],
     name: c[1],
-    live: rl[i],
-    cand: rd[i],
-    regression: rl[i] === 'ALLOW' && rd[i] !== 'ALLOW',
+    live: rl[i].res,
+    cand: rd[i].res,
+    liveDocCount: rl[i].docCount,
+    candDocCount: rd[i].docCount,
+    regression: rl[i].res === 'ALLOW' && rd[i].res !== 'ALLOW',
     deliberate: isDeliberateFirestoreRegression(c[1]),
     candMsg: (globalThis.MSG || {})['cand|' + c[1]],
   }));
