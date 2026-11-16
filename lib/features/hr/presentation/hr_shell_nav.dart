@@ -256,9 +256,10 @@ HrShellItem? hrShellItemById(String id) {
 /// Items shown on one surface of the web shell.
 ///
 /// Renewal stays hidden unless [canCreateSubscriptionRenewal] allows it, the
-/// same rule as the supervisor menu. Profile is a labeled sidebar row; settings
-/// stay in the footer and at the end of the compact menu. The compact "more"
-/// sheet skips the four bottom-nav tabs.
+/// same rule as the supervisor menu. On web the profile row is not in the
+/// sidebar (the header account button opens it). Settings stay in the footer
+/// and at the end of the compact menu. The compact "more" sheet skips the
+/// four bottom-nav tabs.
 List<HrShellItem> hrShellItems({
   required Delegate delegate,
   required bool isWeb,
@@ -275,7 +276,8 @@ List<HrShellItem> hrShellItems({
       continue;
     }
     final show = switch (placement) {
-      HrShellPlacement.sidebar => item.id != 'settings',
+      HrShellPlacement.sidebar =>
+        item.id != 'settings' && !(isWeb && item.id == 'profile'),
       HrShellPlacement.compactMenu => true,
       HrShellPlacement.moreSheet =>
         item.id != 'profile' &&

@@ -40,6 +40,7 @@ Delegate _person(
   String org = 'فتح الله ماركت',
   String code = '',
   UserRole role = UserRole.delegate,
+  String? email,
 }) => Delegate(
   uid: uid,
   firstName: name.split(' ').first,
@@ -71,6 +72,7 @@ Delegate _person(
   version: 1,
   documents: const [],
   role: role,
+  email: email,
 );
 
 final _supervisor = _person(
@@ -78,6 +80,7 @@ final _supervisor = _person(
   'منى الشريف',
   role: UserRole.admin,
   code: 'SUP-1',
+  email: 'mona@example.com',
 );
 final _hr = _person('hr', 'كريم عادل', role: UserRole.hr, code: 'HR-1');
 
@@ -302,6 +305,7 @@ void main() {
     WebRuntimePolicy.debugReset();
     HrHomeOverviewWeb.debugData = null;
     HrHomeOverviewWeb.debugClock = null;
+    HrHomeOverviewWeb.debugOnReload = null;
     final v = TestWidgetsFlutterBinding.instance.platformDispatcher.views.first;
     v.resetPhysicalSize();
     v.resetDevicePixelRatio();
@@ -321,20 +325,21 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('آخر تحديث 1:40 م'), findsOneWidget);
-      final badge = t.widget<Badge>(
-        find.byKey(const ValueKey('hr_home_notifications_badge')),
-      );
-      expect(badge.isLabelVisible, isTrue);
-      expect(find.text('3'), findsWidgets);
-      for (final key in ['refresh', 'notifications', 'account']) {
-        final size = t.getSize(find.byKey(ValueKey('hr_home_$key')));
-        expect(size.width, greaterThanOrEqualTo(48), reason: key);
-        expect(size.height, greaterThanOrEqualTo(48), reason: key);
+      final welcome = find.byKey(const ValueKey('hr_home_welcome'));
+      for (final icon in [
+        Icons.refresh_rounded,
+        Icons.notifications_outlined,
+        Icons.account_circle_outlined,
+      ]) {
+        expect(
+          find.descendant(of: welcome, matching: find.byIcon(icon)),
+          findsNothing,
+          reason: icon.toString(),
+        );
       }
-      await t.tap(find.byKey(const ValueKey('hr_home_refresh')));
-      await t.tap(find.byKey(const ValueKey('hr_home_notifications')));
-      await t.tap(find.byKey(const ValueKey('hr_home_account')));
-      expect(_log, ['reload', 'notifications', 'profile']);
+      expect(find.byKey(const ValueKey('hr_home_refresh')), findsNothing);
+      expect(find.byKey(const ValueKey('hr_home_account')), findsNothing);
+      expect(_log, isEmpty);
       expect(find.textContaining('إجراءات سريعة'), findsNothing);
       expect(find.byType(AdminHomeHeroCard), findsNothing);
       expect(find.byType(AdminHomeQuickActions), findsNothing);
@@ -414,10 +419,7 @@ void main() {
       await _pumpView(t, const Size(1440, 2000), _data());
       final card = find.byKey(const ValueKey('hr_home_chains_card'));
       expect(
-        find.descendant(
-          of: card,
-          matching: find.text('السلاسل التابع لها مناديبك'),
-        ),
+        find.descendant(of: card, matching: find.text(kHrHomeChainsTitle)),
         findsOneWidget,
       );
       for (final chain in _chains) {

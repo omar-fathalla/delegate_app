@@ -123,8 +123,11 @@ class HRDesktopSidebar extends StatelessWidget {
                     ),
                     physics: const BouncingScrollPhysics(),
                     children: [
-                      for (final entry
-                          in _menuEntries(context, sections, colorScheme))
+                      for (final entry in _menuEntries(
+                        context,
+                        sections,
+                        colorScheme,
+                      ))
                         entry.child,
                     ],
                   ),
@@ -259,8 +262,8 @@ class HRDesktopSidebar extends StatelessWidget {
     ),
   ];
 
-  /// Web sidebar: every supervisor-menu tool, grouped, without a second copy
-  /// of الإعدادات (that stays in the footer).
+  /// Web sidebar: every supervisor-menu tool, grouped, without profile (the
+  /// header account button opens it) or a second copy of الإعدادات (footer).
   List<HRSidebarSectionData> _webSections() {
     final items = hrShellItems(
       delegate: delegate,
@@ -538,91 +541,96 @@ class HRDesktopSidebar extends StatelessWidget {
     );
   }
 
-  /// أسفل القائمة: البروفايل، الأزرار السريعة والإعدادات
+  /// Footer. Web keeps only الإعدادات; the profile block lives in the header.
+  /// Mobile still shows the profile block above settings.
   Widget _buildSidebarFooter(
     BuildContext context,
     ColorScheme colorScheme,
     AppLocalizations l10n,
     bool isArabic,
   ) {
+    final showProfile = !WebRuntimePolicy.isWeb;
     return Container(
       padding: EdgeInsets.all(isExpanded ? 12 : 8),
       child: Column(
         children: [
-          // بروفايل المستخدم
-          if (isExpanded)
-            InkWell(
-              onTap: onOpenProfile,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                child: Row(
-                  children: [
-                    AppAvatar(
-                      imageUrl: delegate.personalPhotoUrl,
-                      fallbackText: delegate.fullName.isNotEmpty
-                          ? delegate.fullName[0]
-                          : 'H',
-                      radius: 18,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            delegate.fullName.isNotEmpty
-                                ? delegate.fullName
-                                : 'مسؤول الموارد البشرية',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
+          if (showProfile) ...[
+            if (isExpanded)
+              InkWell(
+                onTap: onOpenProfile,
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      AppAvatar(
+                        imageUrl: delegate.personalPhotoUrl,
+                        fallbackText: delegate.fullName.isNotEmpty
+                            ? delegate.fullName[0]
+                            : 'H',
+                        radius: 18,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              delegate.fullName.isNotEmpty
+                                  ? delegate.fullName
+                                  : 'مسؤول الموارد البشرية',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 1.5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              delegate.role == UserRole.admin
-                                  ? 'مشرف الشركة'
-                                  : 'موارد بشرية (HR)',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: colorScheme.onPrimaryContainer,
+                            const SizedBox(height: 2),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 1.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                delegate.role == UserRole.admin
+                                    ? 'مشرف الشركة'
+                                    : 'موارد بشرية (HR)',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: colorScheme.onPrimaryContainer,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+              )
+            else
+              IconButton(
+                tooltip: l10n.profile,
+                icon: AppAvatar(
+                  imageUrl: delegate.personalPhotoUrl,
+                  fallbackText: delegate.fullName.isNotEmpty
+                      ? delegate.fullName[0]
+                      : 'H',
+                  radius: 16,
+                ),
+                onPressed: onOpenProfile,
               ),
-            )
-          else
-            IconButton(
-              tooltip: l10n.profile,
-              icon: AppAvatar(
-                imageUrl: delegate.personalPhotoUrl,
-                fallbackText: delegate.fullName.isNotEmpty
-                    ? delegate.fullName[0]
-                    : 'H',
-                radius: 16,
-              ),
-              onPressed: onOpenProfile,
-            ),
-
-          const SizedBox(height: 6),
+            const SizedBox(height: 6),
+          ],
 
           // زر الإعدادات فقط في الأسفل (تم نقل الثيم للهيدر واللغة والخروج داخل الإعدادات لتجنب الـ Overflow)
           if (isExpanded)
@@ -685,8 +693,8 @@ class HrSidebarEntry {
 }
 
 /// Web: the menu scrolls on its own between the header and the pinned footer,
-/// with a visible scrollbar, so the last tools are never hidden behind the
-/// profile and الإعدادات. The selected row is scrolled into view.
+/// with a visible scrollbar, so the last tools are never hidden behind
+/// الإعدادات. The selected row is scrolled into view.
 class HrSidebarScrollArea extends StatefulWidget {
   final int selectedIndex;
   final List<HrSidebarEntry> entries;

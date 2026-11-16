@@ -2,6 +2,7 @@
 // header and the pinned footer, so every tool can be reached without the
 // profile row or الإعدادات covering it. Mobile keeps its original list.
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
+import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
@@ -126,10 +127,12 @@ Future<void> _pump(
 /// Top edge of the pinned footer (the divider right under the menu).
 double _footerTop(WidgetTester tester) => tester
     .getRect(
-      find.descendant(
-        of: find.byType(HRDesktopSidebar),
-        matching: find.byType(Divider),
-      ).last,
+      find
+          .descendant(
+            of: find.byType(HRDesktopSidebar),
+            matching: find.byType(Divider),
+          )
+          .last,
     )
     .top;
 
@@ -156,9 +159,14 @@ void main() {
   group('web sidebar scrolls above the pinned footer', () {
     setUp(() => WebRuntimePolicy.debugIsWebOverride = true);
 
-    for (final size in const [Size(1440, 900), Size(1280, 720), Size(1024, 768)]) {
+    for (final size in const [
+      Size(1440, 900),
+      Size(1280, 720),
+      Size(1024, 768),
+    ]) {
       for (final role in [UserRole.hr, UserRole.admin]) {
-        final label = '${size.width.toInt()}x${size.height.toInt()} ${role.name}';
+        final label =
+            '${size.width.toInt()}x${size.height.toInt()} ${role.name}';
 
         testWidgets('$label: every tool is reachable and nothing overlaps', (
           tester,
@@ -172,6 +180,15 @@ void main() {
           final settings = tester.getRect(find.text('الإعدادات'));
           expect(settings.top, greaterThanOrEqualTo(footerTop));
           expect(settings.bottom, lessThanOrEqualTo(size.height));
+          final sidebar = find.byType(HRDesktopSidebar);
+          expect(
+            find.descendant(of: sidebar, matching: find.text('الملف الشخصي')),
+            findsNothing,
+          );
+          expect(
+            find.descendant(of: sidebar, matching: find.byType(AppAvatar)),
+            findsNothing,
+          );
 
           final items = hrShellItems(
             delegate: delegate,
@@ -191,9 +208,21 @@ void main() {
             await tester.scrollUntilVisible(title, 80, scrollable: _scrollable);
             await tester.pumpAndSettle();
             final rect = tester.getRect(title);
-            expect(rect.top, greaterThanOrEqualTo(viewport.top), reason: item.title);
-            expect(rect.bottom, lessThanOrEqualTo(viewport.bottom), reason: item.title);
-            expect(rect.bottom, lessThanOrEqualTo(footerTop), reason: item.title);
+            expect(
+              rect.top,
+              greaterThanOrEqualTo(viewport.top),
+              reason: item.title,
+            );
+            expect(
+              rect.bottom,
+              lessThanOrEqualTo(viewport.bottom),
+              reason: item.title,
+            );
+            expect(
+              rect.bottom,
+              lessThanOrEqualTo(footerTop),
+              reason: item.title,
+            );
 
             if (item.tabIndex != null) {
               await tester.tap(title);
@@ -299,6 +328,12 @@ void main() {
         ),
       );
       expect(gavel.bottom, lessThanOrEqualTo(viewport.bottom));
+      final sidebar = find.byType(HRDesktopSidebar);
+      expect(
+        find.descendant(of: sidebar, matching: find.byType(AppAvatar)),
+        findsNothing,
+      );
+      expect(find.byTooltip('الإعدادات'), findsOneWidget);
     });
   });
 
@@ -322,7 +357,10 @@ void main() {
         ),
       );
       expect(list.physics, isA<BouncingScrollPhysics>());
-      expect(list.padding, const EdgeInsets.symmetric(horizontal: 10, vertical: 12));
+      expect(
+        list.padding,
+        const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      );
       for (final title in const [
         'الحضور والانصراف',
         'الخريطة الحية',
@@ -330,27 +368,34 @@ void main() {
       ]) {
         expect(find.text(title), findsOneWidget, reason: title);
       }
+      expect(find.text('موظف وهمي'), findsOneWidget);
+      expect(find.byType(AppAvatar), findsOneWidget);
+      expect(find.text('الإعدادات'), findsOneWidget);
     });
   });
 
   group('penalties tab scope', () {
     test('web HR opens only their own penalties', () {
       WebRuntimePolicy.debugIsWebOverride = true;
-      final host = hrShellTab(
-        index: kHrTabPenalties,
-        delegate: _delegate(UserRole.hr),
-        onNavigateToTab: (_) {},
-      ) as HrPenaltiesHost;
+      final host =
+          hrShellTab(
+                index: kHrTabPenalties,
+                delegate: _delegate(UserRole.hr),
+                onNavigateToTab: (_) {},
+              )
+              as HrPenaltiesHost;
       expect(host.ownPenaltiesOnly, isTrue);
     });
 
     test('web supervisors keep the company list', () {
       WebRuntimePolicy.debugIsWebOverride = true;
-      final host = hrShellTab(
-        index: kHrTabPenalties,
-        delegate: _delegate(UserRole.admin),
-        onNavigateToTab: (_) {},
-      ) as HrPenaltiesHost;
+      final host =
+          hrShellTab(
+                index: kHrTabPenalties,
+                delegate: _delegate(UserRole.admin),
+                onNavigateToTab: (_) {},
+              )
+              as HrPenaltiesHost;
       expect(host.ownPenaltiesOnly, isFalse);
     });
 
