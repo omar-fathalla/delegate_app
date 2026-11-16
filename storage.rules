@@ -44,17 +44,78 @@ service firebase.storage {
           'accountant', 'accounting', 'account_admin', 'account-admin'
         ];
     }
+    function storageUserPath() {
+      return /databases/(default)/documents/users/$(request.auth.uid);
+    }
+    function storageCallerHasProfile() {
+      return isNonAnonymous() && firestore.exists(storageUserPath());
+    }
+    function storageUserRole() {
+      return storageCallerHasProfile()
+        ? firestore.get(storageUserPath()).data.get('role', '')
+        : '';
+    }
+    function storageUserOrg() {
+      return storageCallerHasProfile()
+        ? firestore.get(storageUserPath()).data.get(
+          'organizationUID',
+          firestore.get(storageUserPath()).data.get('organizationId', '')
+        )
+        : '';
+    }
+    function storageUserCo() {
+      return storageCallerHasProfile()
+        ? firestore.get(storageUserPath()).data.get(
+          'companyUID',
+          firestore.get(storageUserPath()).data.get('companyId', '')
+        )
+        : '';
+    }
     function isStorageStaff() {
+      return isStorageNamedStaffRole(storageUserRole());
+    }
+    function isStorageSupervisorRole(role) {
+      return role in ['supervisor', 'company_supervisor'];
+    }
+    function supervisorDelegateRequestFolderOk(folderId) {
+      let co = storageUserCo();
+      let reqPath = /databases/(default)/documents/delegate_requests/$(folderId);
+      return storageCallerHasProfile()
+        && isStorageSupervisorRole(storageUserRole())
+        && co != ''
+        && firestore.exists(reqPath)
+        && firestore.get(reqPath).data.get('companyUID', '') == co;
+    }
+    function supervisorRegistrationUploadOk() {
+      let role = storageUserRole();
+      return storageCallerHasProfile()
+        && isStorageSupervisorRole(role)
+        && storageUserCo() != ''
+        && request.resource != null
+        && request.resource.size < 6 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+    function supervisorKnownDelegateFolderOk(folderId) {
+      let org = storageUserOrg();
+      let co = storageUserCo();
       return isNonAnonymous()
-        && isStorageNamedStaffRole(
-          firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('role', '')
-        );
+        && isStorageSupervisorRole(storageUserRole())
+        && org != '' && co != ''
+        && firestore.exists(/databases/(default)/documents/organizations/$(org)/companies/$(co)/delegates/$(folderId));
+    }
+    function companyStaffPenaltyEvidenceUploadOk() {
+      let role = storageUserRole();
+      return storageCallerHasProfile()
+        && storageUserCo() != ''
+        && (isStorageCompanyStaffRole(role) || role in ['hr', 'company-hr', 'company_hr', 'human_resources'])
+        && request.resource != null
+        && request.resource.size < 10 * 1024 * 1024;
     }
     function storageStaffOrGlobalAccess(folderId) {
-      let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
-      let role = u.get('role', '');
-      let co = u.get('companyUID', '');
+      let role = storageUserRole();
+      let co = storageUserCo();
       let intentPath = /databases/(default)/documents/storage_upload_intents/$(folderId);
+      let ownerPath = /databases/(default)/documents/users/$(folderId);
       // exists+get of the same doc counts as one of the two allowed gets.
       return isStorageGlobalRole(role)
         || (
@@ -62,6 +123,15 @@ service firebase.storage {
           && co != ''
           && firestore.exists(intentPath)
           && firestore.get(intentPath).data.get('companyUID', '') == co
+        )
+        || (
+          isStorageCompanyStaffRole(role)
+          && co != ''
+          && !firestore.exists(intentPath)
+          && firestore.exists(ownerPath)
+          && firestore.get(ownerPath).data.get(
+            'companyUID', firestore.get(ownerPath).data.get('companyId', '')
+          ) == co
         );
     }
     function canAccessDelegateDocuments(folderId) {
@@ -72,12 +142,18 @@ service firebase.storage {
     }
 
     function canAccessCompanyFiles(compId) {
-      let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
-      let role = u.get('role', '');
-      let co = u.get('companyUID', '');
-      return isNonAnonymous() && (
+      let role = storageUserRole();
+      let co = storageUserCo();
+      let org = storageUserOrg();
+      return storageCallerHasProfile() && (
         isStorageGlobalRole(role)
         || (isStorageNamedStaffRole(role) && co != '' && co == compId)
+        || (role in [
+          'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin']
+          && org != ''
+          && firestore.exists(/databases/(default)/documents/organizations/$(org)/companies/$(compId)))
+        || (isStorageNamedStaffRole(role) && co == '' && org != ''
+          && firestore.exists(/databases/(default)/documents/organizations/$(org)/companies/$(compId)))
       );
     }
 
@@ -99,12 +175,9 @@ service firebase.storage {
     // HR / org-admin) and global roles. Accountant and marketing stay out
     // so this path matches delegate_documents more closely.
     function canAccessWebIdDocs(compId) {
-      let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
-      let role = u.get('role', '');
-      let co = u.get('companyUID', '');
-      return isNonAnonymous() && (
-        isStorageGlobalRole(role)
-        || (isStorageCompanyStaffRole(role) && co != '' && co == compId)
+      let role = storageUserRole();
+      return canAccessCompanyFiles(compId) && (
+        isStorageGlobalRole(role) || isStorageCompanyStaffRole(role)
       );
     }
 
@@ -189,7 +262,9 @@ service firebase.storage {
           && callerDelegateMayWriteStorage()
           && feedbackMetaOk(storageMetaUserId(request.resource.metadata))
           && (
-            (resource == null && feedbackNameOwnedByCaller(fileName))
+            (resource == null && (
+              feedbackNameOwnedByCaller(fileName)
+              || fileName.matches('feedback_[0-9]+(\\.[A-Za-z0-9]+)?$')))
             || (resource != null && feedbackDelegateMayAccess(fileName))
           )
         );
@@ -313,10 +388,9 @@ service firebase.storage {
     // Storage ORs overlapping matches, so this must itself be tenant
     // scoped or it would reopen the companies/{compId} rule above.
     function canAccessOrganization(orgId) {
-      let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
-      let role = u.get('role', '');
-      let co = u.get('companyUID', '');
-      let org = u.get('organizationUID', '');
+      let role = storageUserRole();
+      let co = storageUserCo();
+      let org = storageUserOrg();
       let orgPath = /databases/(default)/documents/organizations/$(orgId);
       return isNonAnonymous() && isStorageNamedStaffRole(role) && (
         isStorageGlobalRole(role)
@@ -363,7 +437,7 @@ service firebase.storage {
     }
     match /penalties/evidence/{allPaths=**} {
       allow read: if isStorageStaff();
-      allow write: if false;
+      allow write: if companyStaffPenaltyEvidenceUploadOk();
     }
 
     // ==================== LEAVE ATTACHMENTS ====================
@@ -401,13 +475,21 @@ service firebase.storage {
     // or these gets deny and staff uploads fail. Granted on tashil-dev;
     // prod is a separate, owner-approved change.
     match /delegate_documents/{delegateUid}/{allPaths=**} {
-      allow read, write: if canAccessDelegateDocuments(delegateUid);
+      allow read: if canAccessDelegateDocuments(delegateUid)
+        || supervisorKnownDelegateFolderOk(delegateUid)
+        || supervisorDelegateRequestFolderOk(delegateUid)
+        || isStorageGlobalRole(storageUserRole());
+      allow write: if canAccessDelegateDocuments(delegateUid)
+        || supervisorRegistrationUploadOk()
+        || supervisorKnownDelegateFolderOk(delegateUid)
+        || supervisorDelegateRequestFolderOk(delegateUid);
     }
 
     // Same tenant check as documents when an intent exists for the request id
     // (registration writes the intent first). Anonymous is denied.
     match /delegate_subscription_receipts/{requestId}/{allPaths=**} {
-      allow read, write: if canAccessDelegateDocuments(requestId);
+      allow read, write: if canAccessDelegateDocuments(requestId)
+        || supervisorRegistrationUploadOk();
     }
 
     // ==================== PUBLIC FILES ====================
@@ -421,7 +503,16 @@ service firebase.storage {
     // tenant-scope it like delegate_documents (intent or folder owner).
     // Other staging prefixes are staff-only.
     match /staging/requests/{requestId}/{allPaths=**} {
-      allow read, write: if canAccessDelegateDocuments(requestId);
+      allow read: if canAccessDelegateDocuments(requestId)
+        || (isStorageCompanyStaffRole(storageUserRole())
+          && storageUserCo() != ''
+          && firestore.exists(/databases/(default)/documents/organizations/$(storageUserOrg())/companies/$(storageUserCo())/requests/$(requestId)));
+      allow write: if canAccessDelegateDocuments(requestId)
+        || (isStorageCompanyStaffRole(storageUserRole())
+          && storageUserCo() != ''
+          && request.resource != null
+          && request.resource.size < 6 * 1024 * 1024
+          && request.resource.contentType.matches('image/.*'));
     }
     // Storage ORs overlapping matches, so this residual must not
     // also match staging/requests/{id} or the intent check above is undone.
@@ -431,7 +522,9 @@ service firebase.storage {
 
     // ==================== GUIDE VIDEOS PATH ====================
     match /guide-videos/{fileName} {
-      allow read, write: if isStorageStaff();
+      allow read, write: if storageCallerHasProfile() && (
+        isStorageGlobalRole(storageUserRole())
+        || isStorageNamedStaffRole(storageUserRole()));
     }
 
     // ==================== FALLBACK FOR ALL OTHER AUTHENTICATED PATHS ====================

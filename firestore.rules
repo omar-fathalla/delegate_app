@@ -2232,7 +2232,94 @@ service cloud.firestore {
     }
 
     function canReadNotifBroadcastAll() {
-      return notifStaffBroadcastOk() && notifDu() == 'all' && !isDelegate();
+      return notifStaffBroadcastOk() && notifDu() == 'all';
+    }
+
+    function delegateNotifListOk() {
+      return claimString('role') == 'delegate'
+        && delegateOtpOk()
+        && !isPrivilegedStaffAlert()
+        && (
+          notifDu() == 'all'
+          || notifDu() == 'delegates'
+          || notifDu() == request.auth.uid
+          || (callerCompany() != '' && (
+            notifDu() == 'delegates_' + callerCompany()
+            || notifDu() == 'company_' + callerCompany()))
+        );
+    }
+
+    function staffNotifListOk() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let co = u.get('companyUID', u.get('companyId', ''));
+      let org = u.get('organizationUID', '');
+      let du = notifDu();
+      let docOrg = resource.data.get('organizationId', '');
+      let docCo = resource.data.get('companyId', resource.data.get('companyUID', ''));
+      return signedIn()
+        && !isPrivilegedStaffAlert()
+        && (
+          r in [
+            'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+            'technical_support', 'technical-support', 'technicalSupport',
+            'technicalsupport', 'tech_support', 'techsupport']
+          || du == 'all'
+          || du == 'delegates'
+          || (co != '' && du == 'company_' + co && r in [
+            'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+            'hr', 'company-hr', 'company_hr', 'human_resources', 'accountant', 'accounting',
+            'branches_marketing', 'branches_marketing_manager', 'branchesMarketingManager'])
+          || (co != '' && du == 'supervisor_' + co && r in [
+            'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor'])
+          || (co != '' && du == 'all_company_supervisors' && docCo == co && r in [
+            'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+            'hr', 'company-hr', 'company_hr'])
+          || (co != '' && du == 'delegates_' + co && r in [
+            'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+            'hr', 'company-hr', 'company_hr', 'accountant'])
+          || (co != '' && du == 'hr' && r in [
+            'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+            'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
+            'branches_marketing_manager', 'branchesMarketingManager'])
+          || (org != '' && docOrg == org && r in [
+            'organization-admin', 'organization_admin', 'organizationAdmin',
+            'marketing', 'marketing_promotion', 'marketingPromotion'] && (
+            du == 'all' || du == 'all_company_supervisors' || du == 'hr'
+            || du.matches('^company_.*') || du.matches('^delegates_.*')))
+          || (co != '' && docCo == co && r in [
+            'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+            'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
+            'branches_marketing_manager', 'branchesMarketingManager'])
+          || (org != '' && docOrg == org && r in [
+            'marketing', 'marketing_promotion', 'marketingPromotion'])
+          || (du in ['super-admin', 'super_admin', 'superAdmin', 'role_super_admin']
+            && r in ['super-admin', 'super_admin', 'superadmin', 'superAdmin'])
+          || (du in ['technicalSupport', 'technical-support', 'technical_support', 'role_technical_support']
+            && r in ['technical_support', 'technical-support', 'technicalSupport', 'technicalsupport'])
+          || (du in ['organizationAdmin', 'organization-admin', 'organization_admin']
+            && r in ['organization-admin', 'organization_admin', 'organizationAdmin'])
+          || (du in ['hr', 'company-hr', 'company_hr'] && r in ['hr', 'company-hr', 'company_hr'])
+          || (du in ['marketing', 'marketing_promotion', 'marketingPromotion']
+            && r in ['marketing', 'marketing_promotion', 'marketingPromotion'])
+          || (du in ['branchesMarketingManager', 'branches_marketing', 'branches-marketing']
+            && r in ['branches_marketing', 'branches_marketing_manager', 'branchesMarketingManager'])
+          || (du in ['company-admin', 'admin', 'supervisor', 'company_admin']
+            && r in ['company-admin', 'company_admin', 'admin'])
+          || (du in ['supervisor', 'company-admin', 'company_admin']
+            && r in ['supervisor', 'company_supervisor'])
+          || (du in ['accountant', 'accounting', 'account_admin']
+            && r in ['accountant', 'accounting', 'account_admin'])
+        );
+    }
+
+    function notifMarkReadOk() {
+      return canReadOwnNotification()
+        || delegateNotifListOk()
+        || staffNotifListOk()
+        || canReadNotifGlobalStaff()
+        || canReadOrgAdminRoleBroadcast()
+        || canReadCompanySupervisorBroadcast();
     }
 
     function canReadNotifBroadcastDelegates() {
@@ -2487,29 +2574,15 @@ service cloud.firestore {
     }
 
     match /notifications/{notificationId} {
-      allow read: if canReadOwnNotification();
-      allow read: if canReadOrgAdminRoleBroadcast();
-      allow read: if canReadCompanySupervisorBroadcast();
-      allow read: if canReadNotifGlobalStaff();
-      allow read: if canReadNotifBroadcastAll();
-      allow read: if canReadNotifBroadcastDelegates();
-      allow read: if canReadNotifDelegateDelegatesCo();
-      allow read: if canReadNotifDelegateCompanyCo();
-      allow read: if canReadNotifCompanyStaffBroadcasts();
-      allow read: if canReadNotifOrgMarketingBroadcasts();
-      allow read: if canReadNotifRoleBroadcasts();
-      allow read: if canReadNotifOrgDocScoped();
-      allow read: if canReadNotifPhoneMatch();
+      allow list: if signedIn() && (
+        claimString('role') == 'delegate' ? delegateNotifListOk() : staffNotifListOk()
+      );
+      allow get: if notifMarkReadOk()
+        || canReadNotifPhoneMatch();
       allow create: if canDelegateCreateNotification()
         || (signedIn() && isGlobalStaff())
         || canStaffCreateNotification();
-      allow update: if notificationMarkReadOnlyOk() && canReadOwnNotification();
-      allow update: if notificationMarkReadOnlyOk() && canReadNotifGlobalStaff();
-      allow update: if notificationMarkReadOnlyOk() && canReadNotifCompanyStaffBroadcasts();
-      allow update: if notificationMarkReadOnlyOk() && canReadNotifOrgMarketingBroadcasts();
-      allow update: if notificationMarkReadOnlyOk() && canReadNotifRoleBroadcasts();
-      allow update: if notificationMarkReadOnlyOk() && canReadNotifDelegateDelegatesCo();
-      allow update: if notificationMarkReadOnlyOk() && canReadNotifDelegateCompanyCo();
+      allow update: if notificationMarkReadOnlyOk() && notifMarkReadOk();
       allow delete: if isSuperAdmin();
     }
 

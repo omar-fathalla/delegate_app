@@ -18,7 +18,6 @@ export const DELIBERATE_FIRESTORE_REGRESSIONS = new Set([
   'any staff users list all (private label perms: users get())',
   'anonymous (<=v1.14.1) CG delegates phone login query',
   'anonymous (<=v1.14.1) add attendance check-in',
-  'delegate list bell: delegateUid==all (limit 30) denied',
 ]);
 
 const ORG = 'orgA', CO = 'coA', CO2 = 'coB', ORG2 = 'orgB';
@@ -276,7 +275,7 @@ const cases = [
     ['NOTIF-READ', `${uid} list bell: delegateUid==hr (limit 30)`, e => notifList(staff(e, uid), 'hr')],
     ['NOTIF-READ', `${uid} list bell: delegateUid==delegates_${CO} (limit 30)`, e => notifList(staff(e, uid), `delegates_${CO}`)],
   ]),
-  ['NOTIF-READ', 'delegate list bell: delegateUid==all (limit 30) denied', e => notifList(delegate(e), 'all')],
+  ['NOTIF-READ', 'delegate list bell: delegateUid==all (limit 30)', e => notifList(delegate(e), 'all')],
   ['NOTIF-READ', 'delegate list bell: delegateUid==delegates_${CO} (limit 30)', e => notifList(delegate(e), `delegates_${CO}`)],
   ['ATT-READ', 'marketing_promotion attendance org+branchName+today (limit 2000)', e => attOrgBranchToday(staff(e, 'mp'))],
   ['ATT-READ', 'marketing attendance org+branchName+today (limit 2000, chain shape)', e => attOrgBranchToday(staff(e, 'mkt'))],
