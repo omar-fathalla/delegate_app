@@ -137,11 +137,11 @@ String subscriptionRelativeTime(DateTime time, [DateTime? now]) {
     if (days == 2) return 'من يومين';
     return 'من $days أيام';
   }
-  final d = local.day.toString().padLeft(2, '0');
-  final m = local.month.toString().padLeft(2, '0');
-  return '$d/$m/${local.year}';
+  return subscriptionDateTimeLabel(local);
 }
 
+/// One absolute stamp, used for the request time and the result line.
+/// Example: 16/11/2026 · 8:54 م
 String subscriptionDateTimeLabel(DateTime time) {
   final local = time.toLocal();
   final d = local.day.toString().padLeft(2, '0');
@@ -150,8 +150,11 @@ String subscriptionDateTimeLabel(DateTime time) {
   final hour = h24 % 12 == 0 ? 12 : h24 % 12;
   final min = local.minute.toString().padLeft(2, '0');
   final suffix = h24 < 12 ? 'ص' : 'م';
-  return '$d/$m/${local.year}  $hour:$min $suffix';
+  return '$d/$m/${local.year} · $hour:$min $suffix';
 }
+
+/// Keeps the stamp left-to-right inside an Arabic sentence.
+String subscriptionLtrIsolate(String value) => '\u2066$value\u2069';
 
 /// One line after a decision. Reviewer gender is not on the request, so the
 /// verb stays neutral. A missing name, date, or reject reason is omitted.
@@ -159,7 +162,9 @@ String subscriptionOutcomeLine(DelegateSubscriptionRequest request) {
   final who = request.reviewedBy?.trim();
   final hasWho = who != null && who.isNotEmpty;
   final when = request.reviewedAt;
-  final date = when == null ? null : subscriptionDateTimeLabel(when);
+  final date = when == null
+      ? null
+      : subscriptionLtrIsolate(subscriptionDateTimeLabel(when));
   final reason = request.rejectionReason?.trim();
   final hasReason = reason != null && reason.isNotEmpty;
 
@@ -490,6 +495,7 @@ class _DelegateSubscriptionRequestsWebState
               opened,
               role: widget.currentAdmin.role,
               deciding: _deciding,
+              compact: true,
               onApprove: () =>
                   _decide(opened, () => widget.onApprove(opened)),
               onReject: () => _decide(opened, () => widget.onReject(opened)),
@@ -711,19 +717,15 @@ class _DelegateSubscriptionRequestsWebState
     required int rejected,
     required int total,
   }) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _filterChip('قيد المراجعة', pending, SubscriptionRequestStatus.pending),
-          const SizedBox(width: 8),
-          _filterChip('المعتمدة', approved, SubscriptionRequestStatus.approved),
-          const SizedBox(width: 8),
-          _filterChip('المرفوضة', rejected, SubscriptionRequestStatus.rejected),
-          const SizedBox(width: 8),
-          _filterChip('الكل', total, null),
-        ],
-      ),
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _filterChip('قيد المراجعة', pending, SubscriptionRequestStatus.pending),
+        _filterChip('المعتمدة', approved, SubscriptionRequestStatus.approved),
+        _filterChip('المرفوضة', rejected, SubscriptionRequestStatus.rejected),
+        _filterChip('الكل', total, null),
+      ],
     );
   }
 
@@ -926,7 +928,9 @@ class _DelegateSubscriptionRequestsWebState
             ),
             const SizedBox(height: 16),
             FilledButton.tonal(
-              onPressed: widget.requestsOverride == null ? _retryStream : null,
+              onPressed: widget.requestsOverride == null
+                  ? _retryStream
+                  : () {},
               child: const Text('إعادة المحاولة'),
             ),
           ],
@@ -958,7 +962,7 @@ class _DelegateSubscriptionRequestsWebState
             .where((r) => r.status == SubscriptionRequestStatus.pending)
             .isEmpty;
     if (pendingEmpty) {
-      return _pendingEmpty(action: false);
+      return const SizedBox.expand();
     }
     if (selected == null) {
       final cs = Theme.of(context).colorScheme;
@@ -987,13 +991,22 @@ class _DelegateSubscriptionRequestsWebState
       children: [
         SizedBox(
           height: 56,
-          child: Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: IconButton(
-              tooltip: 'رجوع',
-              onPressed: () => setState(() => _detailOpen = false),
-              icon: const BackButtonIcon(),
-            ),
+          child: Row(
+            children: [
+              IconButton(
+                tooltip: 'رجوع',
+                onPressed: () => setState(() => _detailOpen = false),
+                icon: const BackButtonIcon(),
+              ),
+              Expanded(
+                child: Text(
+                  'تفاصيل الطلب',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         Expanded(
@@ -1193,16 +1206,20 @@ class _Avatar extends StatelessWidget {
     final size = radius * 2;
     final url = request.profileImageUrl.trim();
     final initials = _initials(request.fullName);
-    final fallback = CircleAvatar(
-      radius: radius,
-      backgroundColor: cs.secondaryContainer,
-      foregroundColor: cs.onSecondaryContainer,
+    final fallback = Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: cs.primaryContainer,
+        shape: BoxShape.circle,
+      ),
       child: Text(
         initials,
-        style: TextStyle(
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
           fontSize: radius * 0.7,
           fontWeight: FontWeight.w700,
-          color: cs.onSecondaryContainer,
+          color: cs.onPrimaryContainer,
         ),
       ),
     );
@@ -1262,6 +1279,7 @@ class _DetailBody extends StatelessWidget {
             request,
             role: admin.role,
             deciding: deciding,
+            compact: false,
             onApprove: onApprove,
             onReject: onReject,
           )
@@ -1275,7 +1293,11 @@ class _DetailBody extends StatelessWidget {
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 720),
-                child: _DetailContent(request: request, admin: admin),
+                child: _DetailContent(
+                  request: request,
+                  admin: admin,
+                  showInlineNote: !pinnedBar,
+                ),
               ),
             ),
           ),
@@ -1289,8 +1311,13 @@ class _DetailBody extends StatelessWidget {
 class _DetailContent extends StatelessWidget {
   final DelegateSubscriptionRequest request;
   final Delegate admin;
+  final bool showInlineNote;
 
-  const _DetailContent({required this.request, required this.admin});
+  const _DetailContent({
+    required this.request,
+    required this.admin,
+    required this.showInlineNote,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1300,6 +1327,7 @@ class _DetailContent extends StatelessWidget {
     final showOutcome =
         request.status == SubscriptionRequestStatus.approved ||
         request.status == SubscriptionRequestStatus.rejected;
+    final inlineNote = showInlineNote ? _noteFor(request, admin.role) : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1330,6 +1358,10 @@ class _DetailContent extends StatelessWidget {
             ),
           ],
         ),
+        if (showOutcome && outcome.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _OutcomeCard(request: request, line: outcome),
+        ],
         if (request.isAddOrganizationRequest) ...[
           const SizedBox(height: 24),
           _sectionTitle(context, 'طلب ربط بسلسلة إضافية'),
@@ -1394,18 +1426,14 @@ class _DetailContent extends StatelessWidget {
             ),
           ),
         ],
-        if (_noteFor(request, admin.role) case final note?) ...[
+        if (inlineNote != null) ...[
           const SizedBox(height: 20),
           Text(
-            note,
+            inlineNote,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: cs.onSurfaceVariant,
             ),
           ),
-        ],
-        if (showOutcome && outcome.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          Text(outcome, style: theme.textTheme.bodyLarge),
         ],
       ],
     );
@@ -1437,15 +1465,27 @@ class _DetailContent extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            const Text('من'),
-            _chainChip(context, from),
+            Text(
+              'من',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: cs.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            _chainChip(context, from, target: false),
             Icon(
               rtl ? Icons.arrow_back_rounded : Icons.arrow_forward_rounded,
               key: const ValueKey('chain_link_arrow'),
-              color: cs.onSurfaceVariant,
+              color: cs.onSurface,
             ),
-            const Text('إلى'),
-            _chainChip(context, to),
+            Text(
+              'إلى',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: cs.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            _chainChip(context, to, target: true),
           ],
         ),
         const SizedBox(height: 8),
@@ -1459,15 +1499,23 @@ class _DetailContent extends StatelessWidget {
     );
   }
 
-  Widget _chainChip(BuildContext context, String label) {
+  Widget _chainChip(BuildContext context, String label, {required bool target}) {
     final cs = Theme.of(context).colorScheme;
+    final bg = target ? cs.secondaryContainer : cs.surfaceContainerHigh;
+    final fg = target ? cs.onSecondaryContainer : cs.onSurface;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHigh,
+        color: bg,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(label, style: Theme.of(context).textTheme.labelLarge),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: fg,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 
@@ -1566,42 +1614,33 @@ class _DetailContent extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final shown = value.trim().isEmpty ? '—' : value.trim();
-    return Row(
+    final compact = MediaQuery.sizeOf(context).width < kSubscriptionTwoPaneMinWidth;
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: cs.onSurfaceVariant),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
+        Row(
+          children: [
+            Icon(icon, size: 18, color: cs.onSurfaceVariant),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
                 label,
                 style: theme.textTheme.labelMedium?.copyWith(
                   color: cs.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 2),
-              Row(
-                children: [
-                  Expanded(child: _valueText(context, shown, ltr)),
-                  if (copy && shown != '—')
-                    IconButton(
-                      tooltip: 'نسخ',
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () async {
-                        await Clipboard.setData(ClipboardData(text: shown));
-                        if (!context.mounted) return;
-                        AppSnackBar.showInfo(context, 'تم النسخ');
-                      },
-                      icon: Icon(
-                        Icons.content_copy_rounded,
-                        size: 18,
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                ],
-              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Padding(
+          padding: const EdgeInsetsDirectional.only(start: 26),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Flexible(child: _valueText(context, shown, ltr)),
+              if (copy && shown != '—')
+                _CopyButton(text: shown, alwaysVisible: compact),
             ],
           ),
         ),
@@ -1638,27 +1677,53 @@ class _DetailContent extends StatelessWidget {
         ),
       );
     }
+    final style = _documentButtonStyle(context);
     return Wrap(
       spacing: 8,
       runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        FilledButton.tonalIcon(
-          onPressed: hasId ? () => _openId(context, front, back) : null,
-          icon: const Icon(Icons.badge_rounded),
-          label: const Text('عرض صورة البطاقة'),
-        ),
-        FilledButton.tonalIcon(
-          onPressed: photo.isEmpty
-              ? null
-              : () => _showImage(
-                  context,
-                  'الصورة الشخصية - ${request.fullName}',
-                  photo,
-                ),
-          icon: const Icon(Icons.photo_library_rounded),
-          label: const Text('صور المندوب'),
-        ),
+        if (hasId)
+          FilledButton.tonalIcon(
+            style: style,
+            onPressed: () => _openId(context, front, back),
+            icon: const Icon(Icons.badge_rounded, size: 18),
+            label: const Text('عرض صورة البطاقة'),
+          ),
+        if (photo.isNotEmpty)
+          FilledButton.tonalIcon(
+            style: style,
+            onPressed: () => _showImage(
+              context,
+              'الصورة الشخصية - ${request.fullName}',
+              photo,
+            ),
+            icon: const Icon(Icons.photo_library_rounded, size: 18),
+            label: const Text('صور المندوب'),
+          )
+        else
+          Text(
+            'مفيش صور',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
       ],
+    );
+  }
+
+  ButtonStyle _documentButtonStyle(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final label = Theme.of(context).textTheme.labelLarge;
+    return FilledButton.styleFrom(
+      backgroundColor: cs.secondaryContainer,
+      foregroundColor: cs.onSecondaryContainer,
+      minimumSize: const Size(64, 40),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      textStyle: label?.copyWith(
+        color: cs.onSecondaryContainer,
+        fontWeight: FontWeight.w700,
+      ),
     );
   }
 
@@ -1809,6 +1874,7 @@ Widget? decisionBarFor(
   DelegateSubscriptionRequest request, {
   required UserRole role,
   required bool deciding,
+  required bool compact,
   required VoidCallback onApprove,
   required VoidCallback onReject,
 }) {
@@ -1821,6 +1887,8 @@ Widget? decisionBarFor(
     showApprove: showApprove,
     showReject: showReject,
     deciding: deciding,
+    compact: compact,
+    helper: compact ? null : _noteFor(request, role),
     onApprove: onApprove,
     onReject: onReject,
   );
@@ -1844,6 +1912,8 @@ class _DecisionBar extends StatelessWidget {
   final bool showApprove;
   final bool showReject;
   final bool deciding;
+  final bool compact;
+  final String? helper;
   final VoidCallback onApprove;
   final VoidCallback onReject;
 
@@ -1851,6 +1921,8 @@ class _DecisionBar extends StatelessWidget {
     required this.showApprove,
     required this.showReject,
     required this.deciding,
+    required this.compact,
+    required this.helper,
     required this.onApprove,
     required this.onReject,
   });
@@ -1858,40 +1930,163 @@ class _DecisionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Material(
-      color: cs.surfaceContainerLowest,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: Row(
-            children: [
-              if (showApprove)
-                Expanded(
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(48, 56),
-                    ),
-                    onPressed: deciding ? null : onApprove,
-                    child: const Text('اعتماد'),
-                  ),
-                ),
-              if (showApprove && showReject) const SizedBox(width: 12),
-              if (showReject)
-                Expanded(
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(48, 56),
-                      foregroundColor: cs.onSurface,
-                      side: BorderSide(color: cs.outline),
-                    ),
-                    onPressed: deciding ? null : onReject,
-                    child: const Text('رفض'),
-                  ),
-                ),
-            ],
+    final theme = Theme.of(context);
+    final approve = FilledButton(
+      style: FilledButton.styleFrom(
+        minimumSize: compact ? const Size(48, 56) : const Size(120, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      onPressed: deciding ? null : onApprove,
+      child: const Text('اعتماد'),
+    );
+    final reject = OutlinedButton(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: cs.primary,
+        minimumSize: compact ? const Size(48, 56) : const Size(120, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        side: BorderSide(color: cs.outline),
+        textStyle: theme.textTheme.labelLarge?.copyWith(
+          color: cs.primary,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      onPressed: deciding ? null : onReject,
+      child: const Text('رفض'),
+    );
+    final buttons = <Widget>[
+      if (showReject) reject,
+      if (showApprove && showReject) const SizedBox(width: 12),
+      if (showApprove) approve,
+    ];
+    if (compact) {
+      return Material(
+        color: cs.surface,
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Row(
+              children: [
+                if (showApprove)
+                  Expanded(child: approve),
+                if (showApprove && showReject) const SizedBox(width: 12),
+                if (showReject) Expanded(child: reject),
+              ],
+            ),
           ),
         ),
+      );
+    }
+    final note = helper;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: note == null
+                ? const SizedBox.shrink()
+                : Text(
+                    note,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+          ),
+          const SizedBox(width: 12),
+          ...buttons,
+        ],
+      ),
+    );
+  }
+}
+
+class _OutcomeCard extends StatelessWidget {
+  final DelegateSubscriptionRequest request;
+  final String line;
+
+  const _OutcomeCard({required this.request, required this.line});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final approved = request.status == SubscriptionRequestStatus.approved;
+    final bg = approved ? cs.primaryContainer : cs.surfaceContainerHighest;
+    final fg = approved ? cs.onPrimaryContainer : cs.onSurface;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+        border: approved ? null : Border.all(color: cs.outline),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            approved ? Symbols.check_circle_rounded : Icons.block_rounded,
+            size: 20,
+            color: fg,
+            fill: approved ? 1 : 0,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              line,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: fg,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CopyButton extends StatefulWidget {
+  final String text;
+  final bool alwaysVisible;
+
+  const _CopyButton({required this.text, required this.alwaysVisible});
+
+  @override
+  State<_CopyButton> createState() => _CopyButtonState();
+}
+
+class _CopyButtonState extends State<_CopyButton> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final shown = widget.alwaysVisible || _hover;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: SizedBox(
+        width: 32,
+        height: 32,
+        child: shown
+            ? IconButton(
+                tooltip: 'نسخ',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: widget.text));
+                  if (!context.mounted) return;
+                  AppSnackBar.showInfo(context, 'تم النسخ');
+                },
+                icon: Icon(
+                  Icons.content_copy_rounded,
+                  size: 16,
+                  color: cs.onSurfaceVariant,
+                ),
+              )
+            : const SizedBox.shrink(),
       ),
     );
   }
