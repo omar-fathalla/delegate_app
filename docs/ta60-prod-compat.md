@@ -11,7 +11,7 @@
 
 | Branch | SHA | Note |
 |--------|-----|------|
-| `cursor/ta60-prod-compat-9a4a` | `9f86350` | C1 `invite_email_index` |
+| `cursor/ta60-prod-compat-9a4a` | **`31e0444d`** | Mohamed gate: docs 443/443, matrix 22/22, prod-compat 0 unexpected |
 | `cursor/ta60-w1-closures` | `dc71a4b` | Closure classification (39 NOTIF as a,b) |
 
 ## C1 — `invite_email_index` (not auth `inviteId` claim)
@@ -39,10 +39,19 @@ Storage: index is Firestore-only; `storage.rules` documents that (no Storage pat
 
 | Suite | cases | unexpected | deliberate |
 |---|---:|---:|---:|
-| Firestore | **209** | **0** | **5** (2 class-(c) + 3 silent class-(d) try/catch; FS-11–18 class **(b)** matched live) |
+| Firestore | **239** | **0** | **5** (2 class-(c) + 3 silent class-(d) in `DELIBERATE_FIRESTORE_REGRESSIONS`; FS-11–18 class **(b)** via `globalStaffUnbatched*` bell shapes) |
 | Storage | **22** | **0** | 0 |
 
-`npm run test:rules:prod-compat` → **2/2** pass (set `LOCAL_CI_LOGGING_PORT` if hub/logging ports collide on shared CI hosts).
+`npm run test:rules:prod-compat` → **2/2** pass @ **`31e0444d`** (set `LOCAL_CI_LOGGING_PORT` if hub/logging ports collide on shared CI hosts).
+
+### Rules matrix (22 suites)
+
+`bash scripts/run_rules_matrix.sh` @ **`31e0444d`**: all **PASS** (`test:rules:docs` **443/443**, `test:rules:source` **9/9**, `test:rules:m31` **13/13**, …).  
+Extra (not in matrix): `npm run test:rules:ta60-supervisor-dup` — **PASS** on integrator VM.
+
+### Docs-pending TA-60 alignment
+
+`test/rules/docs-pending.test.js` uses `unbatchedBatchParity` / `compatNo` for live 1.14.3 batch quirks and five **TA-60 no-op guards** where batched add_org or lone approve would hit the expression budget; unbatched approve/provision remains covered by `firestore_compat.mjs` (FS-11–18). Details: store `internal/ta60-final-integrate-report.md`.
 
 Regenerate closure table (requires Firestore emulator): `node scripts/ta60_closure_table.mjs` (via `scripts/emulators_exec.sh`).
 
