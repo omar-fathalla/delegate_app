@@ -297,14 +297,15 @@ void main() {
       expect(rect.bottom, lessThanOrEqualTo(viewport.bottom));
     });
 
-    testWidgets('scrollbar is always visible and physics do not bounce', (
+    testWidgets('scrollbar is an overlay and physics do not bounce', (
       tester,
     ) async {
       await _pump(tester, const Size(1440, 900), _delegate(UserRole.hr));
       final bar = tester.widget<Scrollbar>(
         find.ancestor(of: _scrollArea, matching: find.byType(Scrollbar)).first,
       );
-      expect(bar.thumbVisibility, isTrue);
+      expect(bar.thumbVisibility, isNot(true));
+      expect(bar.trackVisibility, isNot(true));
       final scroll = tester.widget<SingleChildScrollView>(_scrollArea);
       expect(scroll.physics, isA<ClampingScrollPhysics>());
     });
