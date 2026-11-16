@@ -1041,25 +1041,8 @@ service cloud.firestore {
       return changedKeys().hasAny(['role', 'organizationUID', 'companyUID', 'organizationId', 'companyId']);
     }
 
-    function usersListDelegateSupervisorPhoneOk() {
-      let co = claimString('companyId');
-      return delegateOtpOk() && co != ''
-        && resource.data.keys().hasAll(['phoneNumber'])
-        && resource.data.get('role', '') in ['supervisor', 'company_supervisor']
-        && resource.data.get('companyUID', resource.data.get('companyId', '')) == co;
-    }
-
-    function usersListDelegateCompanyOk() {
-      return delegateOtpOk()
-        && resource.data.get('companyUID', resource.data.get('companyId', ''))
-          == claimString('companyId');
-    }
-
     function usersListSupervisorNotifyOk(u) {
-      let co = u.get('companyUID', u.get('companyId', ''));
       return u.get('role', '') in ['supervisor', 'company_supervisor']
-        && co != ''
-        && resource.data.get('companyUID', resource.data.get('companyId', '')) == co
         && resource.data.get('role', '') in [
           'super-admin', 'super_admin', 'superadmin', 'superAdmin',
           'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport'];
@@ -1111,10 +1094,17 @@ service cloud.firestore {
         : usersListGlobalDirectoryOk(u) || usersListSelfLookupOk(u);
     }
 
+    function usersListDelegateOk() {
+      let docCo = resource.data.get('companyUID', resource.data.get('companyId', ''));
+      return resource.data.phoneNumber is string
+        || (claimString('companyId') != '' && docCo == claimString('companyId'));
+    }
+
     function usersListStaffOk() {
       return usersListStaffFromUser(
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
     }
+
 
     // ==================== SHARED: USERS ====================
 
@@ -1129,13 +1119,7 @@ service cloud.firestore {
       allow get: if signedIn() && isOrgScopedStaff() && orgScoped();
       allow get: if signedIn() && isCompanyScopedStaff() && companyScoped();
 
-      allow list: if isDelegate() && usersListDelegateSupervisorPhoneOk();
-      allow list: if isDelegate()
-        && claimString('companyId') != ''
-        && resource.data.keys().hasAll(['phoneNumber'])
-        && resource.data.get('companyUID', resource.data.get('companyId', ''))
-          == claimString('companyId');
-      allow list: if isDelegate() && usersListDelegateCompanyOk();
+      allow list: if isDelegate() && usersListDelegateOk();
       allow list: if signedIn() && claimString('role') != 'delegate' && usersListStaffOk();
 
       // New staff accounts come from the createStaffUser function (Admin SDK).
@@ -3606,46 +3590,37 @@ service cloud.firestore {
     function delegateRequestReceiptListOkWithUser(u) {
       let co = u.get('companyUID', u.get('companyId', ''));
       let docCo = resource.data.get('companyUID', resource.data.get('companyId', ''));
-      return resource.data.keys().hasAll(['receiptCode'])
-        && co != '' && docCo == co
-        && u.get('role', '') in [
-          'supervisor', 'company_supervisor', 'company-admin', 'company_admin', 'admin',
-          'hr', 'company-hr', 'company_hr'];
+      return co != '' && docCo == co
+        && u.get('role', '') in ['supervisor', 'company_supervisor'];
     }
 
-    function delegateRequestListFromUser(u) {
-      let r = u.get('role', '');
-      return resource.data.get('supervisorUid', '') == request.auth.uid
-        ? true
-        : resource.data.keys().hasAll(['receiptCode'])
-          ? delegateRequestReceiptListOkWithUser(u)
-        : r in [
-            'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-            'technical_support', 'technical-support', 'technicalSupport']
-          ? true
-        : r in ['organization-admin', 'organization_admin', 'organizationAdmin']
-          ? delegateRequestOrgStaffListOkWithUser(u)
-        : r in ['accountant', 'accounting', 'account_admin']
-          ? delegateRequestAccountantListOkWithUser(u)
-        : delegateRequestCompanyStaffListOkWithUser(u);
-    }
-
-    function delegateRequestListOk() {
-      return delegateRequestListFromUser(
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
-    }
 
     function hrWalletListOk() {
       let co = callerCompany();
       return isHR() && co != '' && resource.data.get('companyUID', resource.data.get('companyId', '')) == co;
     }
 
+    function delegateRequestListOk() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let co = u.get('companyUID', u.get('companyId', ''));
+      let org = u.get('organizationUID', u.get('organizationId', ''));
+      let docCo = resource.data.get('companyUID', resource.data.get('companyId', ''));
+      let docOrg = resource.data.get('organizationUID', resource.data.get('organizationId', ''));
+      let rc = resource.data.get('receiptCode', '');
+      return rc is string && rc != ''
+        ? r in ['supervisor', 'company_supervisor']
+        : resource.data.get('supervisorUid', '') == request.auth.uid
+        || r in ['super-admin', 'super_admin', 'superAdmin', 'technical_support', 'technicalSupport']
+        || (r in ['organization-admin', 'organization_admin', 'organizationAdmin'] && org != '' && docOrg == org)
+        || (r in ['accountant', 'accounting', 'account_admin'] && org != '' && docOrg == org)
+        || (co != '' && docCo == co && r in [
+          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'human_resources']);
+    }
+
     match /delegate_requests/{requestId} {
-      allow list: if signedIn() && resource.data.keys().hasAll(['receiptCode'])
-        && delegateRequestReceiptListOkWithUser(
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
-      allow list: if signedIn() && delegateRequestListFromUser(
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
+      allow list: if signedIn() && delegateRequestListOk();
       allow get: if signedIn() && delegateRequestReadOk();
       // Docs-pending: requests are created by staff only (supervisor flow).
       // The approved delegate's uid equals the request id, so the self path
