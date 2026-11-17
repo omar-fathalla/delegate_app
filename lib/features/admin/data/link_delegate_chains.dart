@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
+import 'package:delegate_app/features/admin/data/company_chain_registration.dart';
 import 'package:delegate_app/features/admin/domain/entities/chain_selection.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
@@ -17,11 +18,16 @@ class LinkableChain {
     required this.uid,
     required this.name,
     this.alreadyLinked = false,
+    this.companyRegistered = true,
   });
 
   final String uid;
   final String name;
   final bool alreadyLinked;
+
+  /// False when the company is not in this chain yet; approving the request
+  /// registers it there.
+  final bool companyRegistered;
 
   ChainOption get option => ChainOption(uid: uid, name: name);
 }
@@ -38,12 +44,15 @@ String linkRequestCompanyName({
 }) =>
     supervisor.companyName.isNotEmpty ? supervisor.companyName : delegate.companyName;
 
-/// The company's chains for [delegate], with the sheet's original rules:
-/// Fathalla chains are hidden, the chain must contain the company, and an
-/// organization admin only sees their own chain.
+/// Every chain [delegate] can be linked to: all organizations except the
+/// hidden Fathalla chain (product decision 2026-11-17: any company may
+/// request any chain; approval registers the company there). An
+/// organization admin still only sees their own chain.
 ///
-/// By default chains the delegate is already on are left out (the mobile
-/// sheet). With [includeLinked] they are returned with `alreadyLinked`.
+/// [LinkableChain.companyRegistered] tells whether the company is already
+/// in the chain (shown as a hint). By default chains the delegate is
+/// already on are left out (the mobile sheet). With [includeLinked] they
+/// are returned with `alreadyLinked`.
 Future<List<LinkableChain>> fetchLinkableChains({
   required FirebaseFirestore firestore,
   required Delegate delegate,
@@ -66,38 +75,44 @@ Future<List<LinkableChain>> fetchLinkableChains({
   final isGlobal = role == UserRole.superAdmin;
   if (companyUID.isEmpty && !isGlobal) return const [];
 
-  final orgs = <LinkableChain>[];
+  final candidates = <(String, String, bool)>[];
   for (final doc in snap.docs) {
     final data = doc.data();
     final uid = doc.id;
     final name = (data['name'] ?? data['title'] ?? doc.id).toString();
-    final uidKey = uid.trim().toLowerCase();
+    if (isHiddenChain(uid: uid, name: name)) continue;
     final nameKey = name.trim().toLowerCase();
-    final isFathalla = nameKey.contains('fathalla') ||
-        nameKey.contains('فتح الله') ||
-        nameKey.contains('فتح_الله') ||
-        uidKey.contains('fathalla') ||
-        uidKey.contains('فتح_الله');
-    if (isFathalla) continue;
-    final linked = alreadyUids.contains(uidKey) ||
+    final linked = alreadyUids.contains(uid.trim().toLowerCase()) ||
         nameKey == currentOrgName ||
         allKnownOrgNames.contains(nameKey);
     if (linked && !includeLinked) continue;
-    if (companyUID.isNotEmpty) {
-      try {
-        final cDoc = await firestore
-            .collection('organizations')
-            .doc(uid)
-            .collection('companies')
-            .doc(companyUID)
-            .get();
-        if (!cDoc.exists) continue;
-      } catch (_) {
-        continue;
-      }
-    }
-    orgs.add(LinkableChain(uid: uid, name: name, alreadyLinked: linked));
+    candidates.add((uid, name, linked));
   }
+
+  final registered = await Future.wait(candidates.map((c) async {
+    if (companyUID.isEmpty) return true;
+    try {
+      final cDoc = await firestore
+          .collection('organizations')
+          .doc(c.$1)
+          .collection('companies')
+          .doc(companyUID)
+          .get();
+      return cDoc.exists;
+    } catch (_) {
+      return false;
+    }
+  }));
+
+  final orgs = <LinkableChain>[
+    for (var i = 0; i < candidates.length; i++)
+      LinkableChain(
+        uid: candidates[i].$1,
+        name: candidates[i].$2,
+        alreadyLinked: candidates[i].$3,
+        companyRegistered: registered[i],
+      ),
+  ];
   if (role == UserRole.organizationAdmin) {
     final ownOrg = supervisor.organizationUID.trim();
     orgs.removeWhere((o) => o.uid.trim() != ownOrg);

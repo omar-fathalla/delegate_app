@@ -15,7 +15,7 @@ test("summarizeOrgCompanyCheck fails closed without a company and when a chain i
     companyUID: "c1", orgIds: ["o1", "o9"], missing: ["o9"],
   });
   assert.equal(missing.ok, false);
-  assert.equal(missing.reason, "org_not_in_company");
+  assert.equal(missing.reason, "chain_not_available");
   assert.deepEqual(missing.missing, ["o9"]);
   const noCo = L.summarizeOrgCompanyCheck({companyUID: "", orgIds: ["o1"], missing: ["o1"]});
   assert.equal(noCo.ok, false);
@@ -39,4 +39,13 @@ test("delegateCreateCompanyMissing is true when the parent company doc is absent
   assert.equal(L.delegateCreateCompanyMissing({orgId: "oX", companyId: "c1", companyExists: false}), true);
   assert.equal(L.delegateCreateCompanyMissing({orgId: "o1", companyId: "c1", companyExists: true}), false);
   assert.equal(L.delegateCreateCompanyMissing({orgId: "", companyId: "c1", companyExists: true}), true);
+});
+
+test("chainAvailableForRequest: any existing chain, hidden only when already registered (2026-11-17)", () => {
+  assert.equal(L.chainAvailableForRequest({orgExists: true, orgId: "o-carrefour", orgName: "كارفور", companyInChain: false}), true);
+  assert.equal(L.chainAvailableForRequest({orgExists: false, orgId: "o-gone", orgName: "", companyInChain: false}), false);
+  assert.equal(L.chainAvailableForRequest({orgExists: true, orgId: "o1", orgName: "fathalla market", companyInChain: false}), false);
+  assert.equal(L.chainAvailableForRequest({orgExists: true, orgId: "o1", orgName: "fathalla market", companyInChain: true}), true);
+  assert.equal(L.isHiddenChain("x", "أسواق فتح الله"), true);
+  assert.equal(L.isHiddenChain("o2", "مترو"), false);
 });

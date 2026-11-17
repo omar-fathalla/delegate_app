@@ -92,6 +92,7 @@ const _delegatePath = 'organizations/o1/companies/c1/delegates/r1';
 
 Future<void> _seedCompany(FakeFirebaseFirestore db, {Iterable<String> orgs = const ['o1']}) async {
   for (final org in orgs) {
+    await db.doc('organizations/$org').set({'name': 'chain $org'});
     await db.doc('organizations/$org/companies/c1').set({'name': 'C1', 'organizationUID': org});
   }
 }

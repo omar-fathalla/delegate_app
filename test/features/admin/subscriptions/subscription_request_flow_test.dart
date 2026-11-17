@@ -67,6 +67,7 @@ Future<void> seedPaidAddOrgContext(
   List<String> orgs = const ['o1', 'o2'],
 }) async {
   for (final org in orgs) {
+    await db.doc('organizations/$org').set({'name': 'chain $org'});
     await db.doc('organizations/$org/companies/c1').set({'name': 'C'});
   }
   await db.doc('organizations/o1/companies/c1/delegates/$uid').set({
@@ -106,6 +107,7 @@ void main() {
     setUp(() async {
       db = FakeFirebaseFirestore();
       repo = DelegateSubscriptionRepositoryImpl(firestore: db, storage: _MockStorage());
+      await db.doc('organizations/o1').set({'name': 'chain o1'});
       await db.doc('organizations/o1/companies/c1').set({'name': 'C'});
       await db.doc('delegate_requests/r1').set({
         ...req().toMap(),
@@ -205,8 +207,11 @@ void main() {
     final db = FakeFirebaseFirestore();
     final repo = DelegateSubscriptionRepositoryImpl(firestore: db, storage: _MockStorage());
     const uid = 'd1';
+    await db.doc('organizations/o1').set({'name': 'chain o1'});
     await db.doc('organizations/o1/companies/c1').set({'name': 'C'});
+    await db.doc('organizations/o2').set({'name': 'chain o2'});
     await db.doc('organizations/o2/companies/c1').set({'name': 'C'});
+    await db.doc('organizations/o3').set({'name': 'chain o3'});
     await db.doc('organizations/o3/companies/c1').set({'name': 'C'});
     await db.doc('organizations/o1/companies/c1/delegates/$uid').set({
       'uid': uid,
@@ -443,6 +448,7 @@ void main() {
   test('approval refuses new_delegate and add_organization when orgCompanyCheck is not ok', () async {
     final db = FakeFirebaseFirestore();
     final repo = DelegateSubscriptionRepositoryImpl(firestore: db, storage: _MockStorage());
+    await db.doc('organizations/o1').set({'name': 'chain o1'});
     await db.doc('organizations/o1/companies/c1').set({'name': 'C'});
     await db.doc('delegate_requests/r-failed').set({
       ...req(pay: SubscriptionPaymentStatus.paid).toMap(),
@@ -457,18 +463,83 @@ void main() {
     expect((await db.doc('delegate_requests/r-failed').get()).data()!['status'], isNot('approved'));
     expect((await db.doc('organizations/o1/companies/c1/delegates/r-failed').get()).exists, isFalse);
 
+    // No stamp (auditDelegateRequestOrgs not deployed, e.g. prod today):
+    // falls back to the client re-check and approves.
     await db.doc('delegate_requests/r-missing').set(req(pay: SubscriptionPaymentStatus.paid).toMap());
     final missing = await repo.approveSubscriptionRequest(
       request: req(pay: SubscriptionPaymentStatus.paid).copyWith(id: 'r-missing'),
       reviewerUid: 'sa',
       reviewerName: 'SA',
     );
-    expect(missing.isLeft(), isTrue);
+    expect(missing.isRight(), isTrue);
   });
 
-  test('approval refuses a secondary chain that is not in the company even if the mark is ok', () async {
+  test('approval registers the company in a chain it is not in (copied record, admin, no overwrite)', () async {
     final db = FakeFirebaseFirestore();
     final repo = DelegateSubscriptionRepositoryImpl(firestore: db, storage: _MockStorage());
+    await db.doc('organizations/o1').set({'name': 'chain o1', 'code': 'O1'});
+    await db.doc('organizations/o2').set({'name': 'chain o2', 'code': 'O2'});
+    await db.doc('organizations/o3').set({'name': 'chain o3', 'code': 'O3'});
+    await db.doc('organizations/o1/companies/c1').set({
+      'name': 'C', 'type': 'distributor', 'companyCodeInOrg': '1048',
+      'organizationUID': 'o1', 'organizationName': 'chain o1', 'organizationCode': 'O1',
+      'commercialRegisterNumber': 'CR-1', 'taxCardNumber': 'TX-1',
+      'hasDeferredPayment': true, 'deferredPayment': 900, 'status': 'Approved',
+      'delegatesCount': 12, 'totalApprovedDelegates': 12,
+      'documentUrls': {'commercialRegister': 'u1', 'taxCard': 'u2'},
+    });
+    // o3 already has another company with code 1048 -> code left pending.
+    await db.doc('organizations/o3/companies/other').set({'name': 'X', 'companyCodeInOrg': '1048'});
+    await db.doc('delegate_requests/r-new').set({
+      ...req(pay: SubscriptionPaymentStatus.paid).toMap(),
+      'organizationUID': 'o2',
+      'organizationName': 'chain o2',
+      'organizationUIDs': ['o2', 'o3'],
+      'organizationNames': ['chain o2', 'chain o3'],
+      // Old stamp from before the product decision is tolerated.
+      'orgCompanyCheck': 'failed',
+      'orgCompanyCheckReason': 'org_not_in_company',
+    });
+    final r = await repo.approveSubscriptionRequest(
+      request: DelegateSubscriptionRequest.fromMap(
+        (await db.doc('delegate_requests/r-new').get()).data()!,
+        'r-new',
+      ),
+      reviewerUid: 'sa',
+      reviewerName: 'SA',
+    );
+    expect(r.isRight(), isTrue, reason: r.fold((f) => f.message, (_) => ''));
+    final o2 = (await db.doc('organizations/o2/companies/c1').get()).data()!;
+    expect(o2['organizationUID'], 'o2');
+    expect(o2['organizationName'], 'chain o2');
+    expect(o2['organizationCode'], 'O2');
+    expect(o2['companyCodeInOrg'], '1048');
+    expect(o2['commercialRegisterNumber'], 'CR-1');
+    expect(o2['taxCardNumber'], 'TX-1');
+    expect(o2['type'], 'distributor');
+    expect(o2['hasDeferredPayment'], isTrue);
+    expect(o2['deferredPayment'], 0);
+    expect(o2['status'], 'Approved');
+    expect(o2['delegatesCount'], 0);
+    expect(o2['registeredVia'], 'add_organization_approval');
+    expect(o2['registeredFromRequestId'], 'r-new');
+    expect(o2['registeredFromOrganizationUID'], 'o1');
+    final o3 = (await db.doc('organizations/o3/companies/c1').get()).data()!;
+    expect(o3['companyCodeInOrg'], '');
+    expect(o3['companyCodeInOrgPending'], isTrue);
+    expect((await db.doc('organizations/o2/companies/c1/admins/sup1').get()).exists, isTrue);
+    expect((await db.doc('organizations/o2/companies/c1/delegates/r-new').get()).exists, isTrue);
+    expect((await db.doc('organizations/o3/companies/c1/delegates/r-new').get()).exists, isTrue);
+    // The existing record in o1 is untouched.
+    final o1 = (await db.doc('organizations/o1/companies/c1').get()).data()!;
+    expect(o1['deferredPayment'], 900);
+    expect(o1['delegatesCount'], 12);
+  });
+
+  test('approval refuses a secondary chain that does not exist even if the mark is ok', () async {
+    final db = FakeFirebaseFirestore();
+    final repo = DelegateSubscriptionRepositoryImpl(firestore: db, storage: _MockStorage());
+    await db.doc('organizations/o1').set({'name': 'chain o1'});
     await db.doc('organizations/o1/companies/c1').set({'name': 'C'});
     await db.doc('delegate_requests/r-ox').set({
       ...req(pay: SubscriptionPaymentStatus.paid).toMap(),

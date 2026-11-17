@@ -137,8 +137,11 @@ Future<FakeFirebaseFirestore> _seed() async {
     await fs.collection('organizations').doc(e.key).set({'name': e.value});
     await fs.collection('organizations').doc(e.key).collection('companies').doc(_co).set({'name': 'x'});
   }
-  // A chain outside the company is never offered.
-  await fs.collection('organizations').doc('o-other').set({'name': 'سلسلة شركة أخرى'});
+  // Chains the company is not in yet are offered with a «جديدة» hint.
+  await fs.collection('organizations').doc('o-other').set({'name': 'أولاد رجب'});
+  await fs.collection('organizations').doc('o-ragab').set({'name': 'هايبر وان'});
+  // The hidden Fathalla chain is never offered.
+  await fs.collection('organizations').doc('o-fathalla').set({'name': 'fathalla market'});
   final first = _delegates().first;
   for (final org in ['o-jomla', 'o-carrefour']) {
     await fs
@@ -452,13 +455,30 @@ void main() {
     expect(r.pendingOrgUids, {'o-spinneys'});
   });
 
+  testWidgets('any chain: unregistered chains show a «جديدة» hint and a note', (t) async {
+    WebRuntimePolicy.debugIsWebOverride = true;
+    await _pump(t, const Size(1440, 900));
+    await t.tap(find.byKey(const Key('hr_delegate_add_chains_fake-d0')));
+    await t.pumpAndSettle();
+    expect(find.byKey(HrAddChainsSheet.chipKey('o-fathalla')), findsNothing);
+    expect(find.byKey(HrAddChainsSheet.newChainHintKey('o-other')), findsOneWidget);
+    expect(find.byKey(HrAddChainsSheet.newChainHintKey('o-zahran')), findsNothing);
+    await t.tap(find.byKey(HrAddChainsSheet.chipKey('o-other')));
+    await t.tap(find.byKey(HrAddChainsSheet.chipKey('o-zahran')));
+    await t.pumpAndSettle();
+    expect(find.textContaining('ستُسجَّل فيها الشركة تلقائياً'), findsOneWidget);
+    await _shot(t, 'hr-delegates-any-chain-1440');
+  });
+
   test('mobile sheet still hides linked chains (shared fetch default)', () async {
     final fs = await _seed();
     final d = _delegates().first;
     final chains = await fetchLinkableChains(firestore: fs, delegate: d, supervisor: _hr);
     expect(chains.map((c) => c.uid), isNot(contains('o-jomla')));
     expect(chains.map((c) => c.uid), isNot(contains('o-carrefour')));
-    expect(chains.map((c) => c.uid), isNot(contains('o-other')));
+    // Any chain (2026-11-17): o-other is listed, flagged as not registered.
+    expect(chains.firstWhere((c) => c.uid == 'o-other').companyRegistered, isFalse);
+    expect(chains.firstWhere((c) => c.uid == 'o-zahran').companyRegistered, isTrue);
     final all = await fetchLinkableChains(firestore: fs, delegate: d, supervisor: _hr, includeLinked: true);
     expect(all.where((c) => c.alreadyLinked).map((c) => c.uid).toSet(), {'o-jomla', 'o-carrefour'});
   });
