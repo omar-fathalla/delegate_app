@@ -1,5 +1,6 @@
 // Web-only list-detail for «طلبات اشتراك واعتماد المناديب».
 // Built only when WebRuntimePolicy.isWeb. Mobile keeps the card list.
+import 'package:delegate_app/web/hr_system/company_chain_requests_panel.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
@@ -721,6 +722,9 @@ class _DelegateSubscriptionRequestsWebState
               ),
               const SizedBox(height: 4),
               _sortRow(),
+              // Company-level «طلب ضم سلسلة» requests (no delegate on them).
+              if (widget.requestsOverride == null)
+                CompanyChainRequestsPanel(reviewer: widget.currentAdmin),
             ],
           ),
         ),

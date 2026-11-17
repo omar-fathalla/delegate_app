@@ -214,7 +214,7 @@ void main() {
     expect(find.text('ملخص الطلب'), findsOneWidget);
     expect(find.byType(AppBar), findsNothing);
     await _fill(t);
-    expect(find.text('3/$kMaxOrganizationsPerRequest مختارة'), findsOneWidget);
+    expect(find.text('3 مختارة'), findsOneWidget);
     expect(find.text('أحمد محمود السيد'), findsOneWidget);
     expect(find.byKey(const ValueKey('add_delegate_summary_chip_fake-org-3')), findsOneWidget);
     await _shot(t, 'add-delegate-1440');
@@ -226,7 +226,7 @@ void main() {
     ));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('add_delegate_summary_chip_fake-org-3')), findsNothing);
-    expect(find.text('2/$kMaxOrganizationsPerRequest مختارة'), findsOneWidget);
+    expect(find.text('2 مختارة'), findsOneWidget);
   });
 
   testWidgets('1024: rail navigation, still two columns', (t) async {
@@ -246,7 +246,7 @@ void main() {
     expect(find.byKey(const ValueKey('add_delegate_summary')), findsNothing);
     expect(find.byKey(const ValueKey('add_delegate_bottom_bar')), findsOneWidget);
     await _fill(t);
-    expect(find.text('3/$kMaxOrganizationsPerRequest مختارة'), findsWidgets);
+    expect(find.text('3 مختارة'), findsWidgets);
     await _shot(t, 'add-delegate-800');
   });
 
@@ -306,7 +306,7 @@ void main() {
     final note = t.widget<Text>(find.byKey(AddDelegateChainGrid.warningKey));
     final cs = theme.colorScheme;
     expect(note.style?.color, cs.onSurfaceVariant);
-    expect(find.text('2/$kMaxOrganizationsPerRequest مختارة'), findsOneWidget);
+    expect(find.text('2 مختارة'), findsOneWidget);
     await _shot(t, 'add-delegate-duplicate');
   });
 }

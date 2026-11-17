@@ -2,7 +2,11 @@
 /// Company is the tenant: one request, one approval, one subscription.
 library;
 
-const int kMaxOrganizationsPerRequest = 10;
+/// No per-request chain cap (Mohamed, 17 Nov 2026): one fixed payment per
+/// delegate request whatever the number of chains, so «اختيار الكل» can pick
+/// every chain. [kChainListSanityLimit] only guards against a broken list and
+/// matches the delegate_requests rules bound.
+const int kChainListSanityLimit = 100;
 
 class ChainOption {
   const ChainOption({required this.uid, required this.name});
@@ -24,13 +28,14 @@ class ChainSelectionResult {
     this.droppedOverMax = const [],
   });
 
-  /// Chains that will be written on the request (duplicates removed, cap applied).
+  /// Chains that will be written on the request (duplicates removed).
   final List<ChainOption> kept;
 
   /// Selected chains the person is already on (or has a pending request for).
   final List<ChainOption> skipped;
 
-  /// Selected chains dropped because of [kMaxOrganizationsPerRequest].
+  /// Selected chains dropped because a [partitionSelectedChains] `max` was
+  /// passed. Empty by default (no cap).
   final List<ChainOption> droppedOverMax;
 
   bool get canSubmit => kept.isNotEmpty;
@@ -55,18 +60,19 @@ class ChainSelectionResult {
       }
     }
     if (droppedOverMax.isNotEmpty) {
-      parts.add('الحد الأقصى $kMaxOrganizationsPerRequest سلاسل في الطلب الواحد. لم تُضف: ${droppedOverMax.map((c) => c.name).join('، ')}.');
+      parts.add('لم تُضف: ${droppedOverMax.map((c) => c.name).join('، ')}.');
     }
     return parts.join(' ');
   }
 }
 
-/// Keeps selection order, skips [duplicateUids], and caps at [max].
+/// Keeps selection order and skips [duplicateUids]. [max] is optional and
+/// null by default: there is no per-request chain cap.
 ChainSelectionResult partitionSelectedChains({
   required List<ChainOption> all,
   required Set<String> selectedUids,
   Set<String> duplicateUids = const {},
-  int max = kMaxOrganizationsPerRequest,
+  int? max,
 }) {
   final byUid = {for (final c in all) c.uid: c};
   final skipped = <ChainOption>[];
@@ -80,7 +86,7 @@ ChainSelectionResult partitionSelectedChains({
       skipped.add(chain);
       continue;
     }
-    if (kept.length >= max) {
+    if (max != null && kept.length >= max) {
       dropped.add(chain);
       continue;
     }
@@ -90,7 +96,8 @@ ChainSelectionResult partitionSelectedChains({
 }
 
 /// Toggle "select all": if every available chain is already selected, clear;
-/// otherwise select all (the cap is applied later at partition/submit).
+/// otherwise select all of [all] (pass the search-filtered list to select
+/// only the visible chains). There is no cap.
 Set<String> toggleSelectAll({
   required List<ChainOption> all,
   required Set<String> selectedUids,
@@ -105,7 +112,7 @@ Set<String> toggleSelectAll({
 List<String> resolveOrganizationUIDs({
   required String organizationUID,
   List<String> organizationUIDs = const [],
-  int max = kMaxOrganizationsPerRequest,
+  int max = kChainListSanityLimit,
 }) {
   final out = <String>[];
   final seen = <String>{};

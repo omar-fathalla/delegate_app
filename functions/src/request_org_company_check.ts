@@ -26,17 +26,18 @@ export async function unavailableOrgsForRequest(
   orgIds: string[],
 ): Promise<string[]> {
   const missing: string[] = [];
-  for (const orgId of orgIds) {
-    const org = await db.doc(`organizations/${orgId}`).get();
+  if (orgIds.length === 0) return missing;
+  // Two batched reads instead of 2 sequential reads per chain.
+  const orgs = await db.getAll(...orgIds.map((id) => db.doc(`organizations/${id}`)));
+  const cos = await db.getAll(...orgIds.map((id) => db.doc(`organizations/${id}/companies/${companyUID}`)));
+  orgIds.forEach((orgId, i) => {
+    const org = orgs[i];
     const name = org.exists ? (org.get("name") ?? org.get("title") ?? orgId) : orgId;
-    let companyInChain = false;
-    if (org.exists) {
-      companyInChain = (await db.doc(`organizations/${orgId}/companies/${companyUID}`).get()).exists;
-    }
+    const companyInChain = org.exists && cos[i].exists;
     if (!chainAvailableForRequest({orgExists: org.exists, orgId, orgName: name, companyInChain})) {
       missing.push(orgId);
     }
-  }
+  });
   return missing;
 }
 

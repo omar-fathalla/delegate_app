@@ -242,7 +242,9 @@ Future<DuplicateChainLookup> lookupLinkChainStates({
   final pending = <String>{};
   const failure = DuplicateChainLookupException();
 
-  for (final orgId in orgs) {
+  // Every chain in parallel (was one chain after another: up to 3 reads
+  // per chain, about 114 sequential round trips for 38 chains).
+  Future<void> checkOrg(String orgId) async {
     final col = firestore
         .collection('organizations')
         .doc(orgId)
@@ -250,18 +252,13 @@ Future<DuplicateChainLookup> lookupLinkChainStates({
         .doc(co)
         .collection('delegates');
     try {
-      if (uid.isNotEmpty && (await col.doc(uid).get()).exists) {
-        linked.add(orgId);
-        continue;
-      }
-      if (nid.isEmpty) continue;
-      for (final field in const ['nationalId', 'nationalityID']) {
-        final snap = await col.where(field, isEqualTo: nid).limit(1).get();
-        if (snap.docs.isNotEmpty) {
-          linked.add(orgId);
-          break;
-        }
-      }
+      final reads = await Future.wait<bool>([
+        if (uid.isNotEmpty) col.doc(uid).get().then((d) => d.exists),
+        if (nid.isNotEmpty)
+          for (final field in const ['nationalId', 'nationalityID'])
+            col.where(field, isEqualTo: nid).limit(1).get().then((q) => q.docs.isNotEmpty),
+      ]);
+      if (reads.any((hit) => hit)) linked.add(orgId);
     } catch (_) {
       throw failure;
     }
@@ -295,8 +292,11 @@ Future<DuplicateChainLookup> lookupLinkChainStates({
     }
   }
 
-  await scanRequests('nationalId', nid);
-  await scanRequests('phoneNumber', phone);
+  await Future.wait([
+    for (final orgId in orgs) checkOrg(orgId),
+    scanRequests('nationalId', nid),
+    scanRequests('phoneNumber', phone),
+  ]);
   return DuplicateChainLookup(
     duplicateOrgUids: {...linked, ...pending},
     existingDelegateUid: uid.isEmpty ? null : uid,

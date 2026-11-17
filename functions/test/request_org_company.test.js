@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const L = require("../lib/request_org_company");
 
-test("requestOrganizationIds includes every list entry and the primary, unique, capped at 10", () => {
+test("requestOrganizationIds includes every list entry and the primary, unique, capped at 100", () => {
   const ids = L.requestOrganizationIds({
     organizationUID: "o1",
     organizationUIDs: ["o1", "o2", "o2", "", "o3"],
