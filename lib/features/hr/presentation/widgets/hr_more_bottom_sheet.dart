@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'package:delegate_app/config/theme/app_motion.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 /// بيانات عنصر في قائمة "المزيد" لمسؤولي الموارد البشرية والمشرفين
@@ -42,44 +44,7 @@ class HRMoreBottomSheet extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
 
-    final items = [
-      const HRMoreItemData(
-        index: 4,
-        title: 'مسير الرواتب والعمولات',
-        subtitle: 'كشوف الحسابات الشهرية والبدلات والسلف والمكافآت',
-        icon: Icons.account_balance_wallet_outlined,
-        selectedIcon: Icons.account_balance_wallet_rounded,
-      ),
-      const HRMoreItemData(
-        index: 2,
-        title: 'طلبات فك وربط الأجهزة',
-        subtitle: 'اعتماد ومراجعة طلبات تغيير الهواتف المقيدة للمناديب',
-        icon: Icons.phonelink_lock_outlined,
-        selectedIcon: Icons.phonelink_lock_rounded,
-        badgeCollection: 'device_unbind_requests',
-      ),
-      const HRMoreItemData(
-        index: 5,
-        title: 'تدقيق الأمان ومكافحة الاحتيال',
-        subtitle: 'رصد محاولات التلاعب بالموقع الجغرافي والروت والمحاكاة',
-        icon: Icons.security_outlined,
-        selectedIcon: Icons.security_rounded,
-      ),
-      const HRMoreItemData(
-        index: 6,
-        title: 'الصور والزيارات الميدانية',
-        subtitle: 'معرض صور إثبات الحضور والزيارات وتوثيق الفروع',
-        icon: Icons.photo_library_outlined,
-        selectedIcon: Icons.photo_library_rounded,
-      ),
-      const HRMoreItemData(
-        index: 8,
-        title: 'سجل تعديلات الحضور والانصراف',
-        subtitle: 'مراجعة وتدقيق التعديلات اليدوية المعتمدة على البصمات',
-        icon: Icons.history_edu_outlined,
-        selectedIcon: Icons.history_edu_rounded,
-      ),
-    ];
+    final items = WebRuntimePolicy.isWeb ? _webItems() : _mobileItems();
 
     return Container(
       decoration: BoxDecoration(
@@ -115,14 +80,19 @@ class HRMoreBottomSheet extends StatelessWidget {
 
               // Bottom Sheet Header
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 4,
+                ),
                 child: Row(
                   children: [
                     Container(
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: colorScheme.primaryContainer.withValues(alpha: 0.7),
+                        color: colorScheme.primaryContainer.withValues(
+                          alpha: 0.7,
+                        ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
@@ -179,9 +149,13 @@ class HRMoreBottomSheet extends StatelessWidget {
                 child: ListView.separated(
                   shrinkWrap: true,
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
                   itemCount: items.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 8),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final item = items[index];
                     final isSelected = currentIndex == item.index;
@@ -202,6 +176,61 @@ class HRMoreBottomSheet extends StatelessWidget {
       ),
     );
   }
+
+  List<HRMoreItemData> _mobileItems() => const [
+    HRMoreItemData(
+      index: 4,
+      title: 'مسير الرواتب والعمولات',
+      subtitle: 'كشوف الحسابات الشهرية والبدلات والسلف والمكافآت',
+      icon: Icons.account_balance_wallet_outlined,
+      selectedIcon: Icons.account_balance_wallet_rounded,
+    ),
+    HRMoreItemData(
+      index: 2,
+      title: 'طلبات فك وربط الأجهزة',
+      subtitle: 'اعتماد ومراجعة طلبات تغيير الهواتف المقيدة للمناديب',
+      icon: Icons.phonelink_lock_outlined,
+      selectedIcon: Icons.phonelink_lock_rounded,
+      badgeCollection: 'device_unbind_requests',
+    ),
+    HRMoreItemData(
+      index: 5,
+      title: 'تدقيق الأمان ومكافحة الاحتيال',
+      subtitle: 'رصد محاولات التلاعب بالموقع الجغرافي والروت والمحاكاة',
+      icon: Icons.security_outlined,
+      selectedIcon: Icons.security_rounded,
+    ),
+    HRMoreItemData(
+      index: 6,
+      title: 'الصور والزيارات الميدانية',
+      subtitle: 'معرض صور إثبات الحضور والزيارات وتوثيق الفروع',
+      icon: Icons.photo_library_outlined,
+      selectedIcon: Icons.photo_library_rounded,
+    ),
+    HRMoreItemData(
+      index: 8,
+      title: 'سجل تعديلات الحضور والانصراف',
+      subtitle: 'مراجعة وتدقيق التعديلات اليدوية المعتمدة على البصمات',
+      icon: Icons.history_edu_outlined,
+      selectedIcon: Icons.history_edu_rounded,
+    ),
+  ];
+
+  List<HRMoreItemData> _webItems() => [
+    for (final item in hrShellItems(
+      delegate: hrDelegate,
+      isWeb: true,
+      placement: HrShellPlacement.moreSheet,
+    ))
+      HRMoreItemData(
+        index: item.tabIndex!,
+        title: item.menuLabel(isWeb: true),
+        subtitle: item.subtitle,
+        icon: item.icon,
+        selectedIcon: item.selectedIcon,
+        badgeCollection: item.badgeCollection,
+      ),
+  ];
 
   Widget _buildMoreItemTile({
     required BuildContext context,
@@ -249,7 +278,9 @@ class HRMoreBottomSheet extends StatelessWidget {
                     Text(
                       item.title,
                       style: textTheme.bodyLarge?.copyWith(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.w600,
                         color: isSelected
                             ? colorScheme.primary
                             : colorScheme.onSurface,
@@ -307,29 +338,31 @@ class HRMoreBottomSheet extends StatelessWidget {
   ) {
     Widget icon = Icon(
       isSelected ? item.selectedIcon : item.icon,
-      color: isSelected
-          ? colorScheme.primary
-          : colorScheme.onSurfaceVariant,
+      color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
       size: 22,
     );
 
     if (item.badgeCollection != null) {
-      icon = StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
+      Stream<QuerySnapshot>? pending;
+      try {
+        pending = FirebaseFirestore.instance
             .collection(item.badgeCollection!)
             .where('companyUID', isEqualTo: hrDelegate.companyUID)
             .where('status', isEqualTo: 'pending')
-            .snapshots(),
+            .snapshots();
+      } catch (_) {
+        pending = null;
+      }
+      if (pending == null) return icon;
+      icon = StreamBuilder<QuerySnapshot>(
+        stream: pending,
         builder: (context, snapshot) {
           final count = snapshot.data?.docs.length ?? 0;
           return Badge(
             isLabelVisible: count > 0,
             label: Text(
               '$count',
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
             ),
             backgroundColor: colorScheme.error,
             textColor: colorScheme.onError,

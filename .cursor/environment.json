@@ -1,0 +1,4 @@
+{
+  "name": "delegate_app",
+  "install": "if [ -d /agent/repos/delegate_app ]; then cd /agent/repos/delegate_app || exit $?; fi; exec bash .cursor/cloud-agent-install.sh"
+}

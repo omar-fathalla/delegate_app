@@ -38,3 +38,69 @@ bool canSetDelegateHold({
       return false;
   }
 }
+
+/// Callable fields for `setDelegateHold`.
+///
+/// A company supervisor (`UserRole.admin`) may suspend only a delegate in
+/// their own company, and the only mutation is the admin-suspend hold that
+/// drives status. Profile fields are never included. Returns null when the
+/// caller is out of scope, including an empty company UID.
+const String companySupervisorStatusHold = 'admin_suspend';
+
+/// Shown when a company supervisor tries to lift a hold. The server rejects
+/// `op: remove` from that role with `hold_not_allowed`.
+const String delegateHoldNotAllowedMessage = 'لا يمكنك رفع هذا الإيقاف.';
+
+/// `null` when the caller must not call the server. A company supervisor may
+/// add the admin-suspend hold and must never send `op: remove`.
+String? delegateHoldOpFor({
+  required UserRole? callerRole,
+  required bool suspend,
+}) {
+  if (callerRole == UserRole.admin && !suspend) return null;
+  return suspend ? 'add' : 'remove';
+}
+
+const Set<String> delegateHoldPayloadKeys = {
+  'uid',
+  'orgId',
+  'companyId',
+  'hold',
+  'op',
+  'note',
+};
+
+Map<String, dynamic>? buildDelegateHoldPayload({
+  required UserRole? callerRole,
+  required String callerOrganizationUID,
+  required String callerCompanyUID,
+  required String uid,
+  required String organizationUID,
+  required String companyUID,
+  required String op,
+  String hold = companySupervisorStatusHold,
+  String? note,
+}) {
+  if (callerRole == UserRole.admin &&
+      (hold != companySupervisorStatusHold || op != 'add')) {
+    return null;
+  }
+  if (!canSetDelegateHold(
+    role: callerRole,
+    callerOrganizationUID: callerOrganizationUID,
+    callerCompanyUID: callerCompanyUID,
+    targetOrganizationUID: organizationUID,
+    targetCompanyUID: companyUID,
+  )) {
+    return null;
+  }
+  final trimmedNote = note?.trim() ?? '';
+  return {
+    'uid': uid,
+    'orgId': organizationUID,
+    'companyId': companyUID,
+    'hold': hold,
+    'op': op,
+    if (trimmedNote.isNotEmpty) 'note': trimmedNote,
+  };
+}

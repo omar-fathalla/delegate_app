@@ -2297,6 +2297,13 @@ service cloud.firestore {
     }
 
     match /{path=**}/captured_photos/{photoId} {
+      // HR web: a companyUID == own-company collection-group list hits the
+      // 1000-expression limit in the combined rule below. One users get,
+      // same company only: narrower than companyScoped() there.
+      allow read: if signedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('companyUID', '') != ''
+        && resource.data.get('companyUID', '')
+          == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('companyUID', '');
       // Own-id first so a collection-group query where delegateUID==uid
       // is provable without an organizationUID constraint. Still own data only.
       allow read: if signedIn() && (
@@ -4047,12 +4054,29 @@ service cloud.firestore {
       }
     }
 
+    // One users get and literal role lists so the companyUID list query in
+    // the payroll screen stays under the 1000-expression budget.
+    function walletCompanyStaffReadOk() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let co = u.get('companyUID', '');
+      return co is string && co != ''
+        && resource.data.get('companyUID', '') == co
+        && u.get('role', '') in [
+          'company-admin', 'company_admin', 'companyadmin', 'admin',
+          'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'human_resources'
+        ];
+    }
+
     match /user_wallets/{walletId} {
       allow list: if signedIn() && hrWalletListOk();
       allow get: if signedIn() && hrWalletListOk();
       allow read: if signedIn() && (
         walletId == request.auth.uid || delegateOwns(walletId) || isGlobalStaff() || isAccountant() || isOrgAdmin()
       );
+      // HR payroll: HR and company supervisors read wallets of their own
+      // company only (companyUID == users/{uid}.companyUID). Read only.
+      allow read: if signedIn() && walletCompanyStaffReadOk();
       allow create, update: if signedIn() && (
         walletId == request.auth.uid || delegateOwns(walletId) || isGlobalStaff() || isAccountant() || isOrgAdmin()
       );

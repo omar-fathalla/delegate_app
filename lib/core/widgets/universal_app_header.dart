@@ -39,6 +39,10 @@ class UniversalAppHeader extends StatelessWidget
   /// extra actions and the avatar. Other roles keep the popup menu.
   final bool useDrawer;
 
+  /// Replaces the default popup on one surface. The HR web overflow menu
+  /// uses this so it can paint its own panel. Null keeps [menuItems].
+  final Widget? menuButton;
+
   const UniversalAppHeader({
     super.key,
     required this.delegate,
@@ -52,6 +56,7 @@ class UniversalAppHeader extends StatelessWidget
     this.firestore,
     this.showActiveOrganization = true,
     this.useDrawer = false,
+    this.menuButton,
   });
 
   @override
@@ -104,7 +109,6 @@ class UniversalAppHeader extends StatelessWidget
   /// يحوّل دور المستخدم إلى تسمية عربية قصيرة تظهر تحت الاسم في الهيدر.
   /// Company admin and company supervisor are one UserRole.admin: the label
   /// does not depend on the raw Firestore role string or job-title position.
-  @visibleForTesting
   static String roleLabelFor(
     UserRole role, {
     DelegatePosition? position,
@@ -451,17 +455,19 @@ class UniversalAppHeader extends StatelessWidget
                 identifier: 'tashil_main_menu_button',
                 label: 'القائمة الرئيسية',
                 button: true,
-                child: PopupMenuButton<String>(
-                  icon: const Icon(Symbols.menu_rounded),
-                  tooltip:
-                      AppLocalizations.of(context)?.mainMenu ??
-                      'القائمة الرئيسية',
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  onSelected: onMenuSelected,
-                  itemBuilder: (_) => menuItems,
-                ),
+                child:
+                    menuButton ??
+                    PopupMenuButton<String>(
+                      icon: const Icon(Symbols.menu_rounded),
+                      tooltip:
+                          AppLocalizations.of(context)?.mainMenu ??
+                          'القائمة الرئيسية',
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      onSelected: onMenuSelected,
+                      itemBuilder: (_) => menuItems,
+                    ),
               ),
               const SizedBox(width: 4),
             ],

@@ -29,6 +29,7 @@ import 'package:delegate_app/features/admin/presentation/pages/admin_delegates_s
 import 'package:delegate_app/features/admin/presentation/pages/admin_home_screen.dart';
 import 'package:delegate_app/core/widgets/universal_app_header.dart';
 import 'package:delegate_app/core/widgets/app_logout_modal.dart';
+import 'package:delegate_app/features/auth/domain/role_home.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/admin_tasks_screen.dart';
@@ -561,12 +562,17 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
     AppLogoutModal.show(context, delegate: widget.delegate);
   }
 
-  bool get isSuperAdmin => widget.delegate.role == UserRole.superAdmin;
-  bool get isTechnicalSupport => widget.delegate.role == UserRole.technicalSupport;
+  bool get isSuperAdmin =>
+      adminShellKindFor(widget.delegate.role) == AdminShellKind.superAdmin;
+  bool get isTechnicalSupport =>
+      adminShellKindFor(widget.delegate.role) ==
+      AdminShellKind.technicalSupport;
   bool get isOrganizationAdmin =>
-      widget.delegate.role == UserRole.organizationAdmin;
+      adminShellKindFor(widget.delegate.role) ==
+      AdminShellKind.organizationAdmin;
   bool get isBranchesMarketingManager =>
-      widget.delegate.role == UserRole.branchesMarketingManager;
+      adminShellKindFor(widget.delegate.role) ==
+      AdminShellKind.branchesMarketingManager;
 
   @override
   Widget build(BuildContext context) {

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:delegate_app/features/auth/presentation/auth_error_message.dart';
+import 'package:delegate_app/features/auth/domain/role_home.dart';
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/auth/presentation/pages/delegate_phone_otp_view.dart';
@@ -118,27 +119,9 @@ class _HrLoginScreenState extends State<HrLoginScreen>
               '🚀 HrLoginScreen: AuthAuthenticated received! name=${delegate.fullName}, role=${delegate.role}, uid=${delegate.uid}',
             );
             try {
-              if (delegate.role == UserRole.hr) {
-                debugPrint('🚀 HrLoginScreen: Navigating to /hr/home');
-                context.go('/hr/home', extra: delegate);
-              } else if (delegate.role == UserRole.superAdmin ||
-                  delegate.role == UserRole.admin ||
-                  delegate.role == UserRole.organizationAdmin ||
-                  delegate.role == UserRole.technicalSupport ||
-                  delegate.role == UserRole.branchesMarketingManager) {
-                debugPrint('🚀 HrLoginScreen: Navigating to /admin/home');
-                context.go('/admin/home', extra: delegate);
-              } else if (delegate.role == UserRole.accountant) {
-                debugPrint('🚀 HrLoginScreen: Navigating to /accountant/home');
-                context.go('/accountant/home', extra: delegate);
-              } else if (delegate.role == UserRole.marketing ||
-                  delegate.role == UserRole.marketingPromotion) {
-                debugPrint('🚀 HrLoginScreen: Navigating to /marketing/home');
-                context.go('/marketing/home', extra: delegate);
-              } else {
-                debugPrint('🚀 HrLoginScreen: Navigating to /home');
-                context.go('/home', extra: delegate);
-              }
+              final path = landingPathForRole(delegate.role);
+              debugPrint('🚀 HrLoginScreen: Navigating to $path');
+              context.go(path, extra: delegate);
             } catch (e, stack) {
               debugPrint('❌ Navigation Error in HrLoginScreen: $e\n$stack');
             }

@@ -976,12 +976,34 @@ class _CompactDelegateTile extends StatelessWidget {
       },
     );
     if (confirmed != true || !context.mounted) return;
+    final op = delegateHoldOpFor(
+      callerRole: adminDelegate?.role,
+      suspend: suspend,
+    );
+    if (op == null) {
+      AppSnackBar.showError(context, delegateHoldNotAllowedMessage);
+      return;
+    }
+    final payload = buildDelegateHoldPayload(
+      callerRole: adminDelegate?.role,
+      callerOrganizationUID: adminDelegate?.organizationUID ?? '',
+      callerCompanyUID: adminDelegate?.companyUID ?? '',
+      uid: delegate.uid,
+      organizationUID: delegate.organizationUID,
+      companyUID: delegate.companyUID,
+      op: op,
+    );
+    if (payload == null) {
+      AppSnackBar.showError(context, 'هذا المندوب خارج نطاق صلاحيتك.');
+      return;
+    }
     try {
       final result = await DelegateHoldRemote().setDelegateHold(
-        uid: delegate.uid,
-        organizationUID: delegate.organizationUID,
-        companyUID: delegate.companyUID,
-        op: suspend ? 'add' : 'remove',
+        uid: payload['uid'] as String,
+        organizationUID: payload['orgId'] as String,
+        companyUID: payload['companyId'] as String,
+        op: payload['op'] as String,
+        hold: payload['hold'] as String,
       );
       if (!context.mounted) return;
       final reason = result['reason']?.toString();
@@ -1696,9 +1718,16 @@ class _CompactDelegateTile extends StatelessWidget {
     final statusColor = _getStatusColor(context, delegate.status);
     final photoUrl = delegate.personalPhotoUrl;
 
+    final selection = AdminDelegateSelectionScope.maybeOf(context);
+    final isSelected = selection != null && selection.selectedUid == delegate.uid;
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: () async {
+        // Desktop list-detail: select instead of pushing the full page.
+        if (selection != null) {
+          selection.onSelect(delegate);
+          return;
+        }
         final result = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (_) => BlocProvider(
@@ -1717,7 +1746,9 @@ class _CompactDelegateTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+          color: isSelected
+              ? theme.colorScheme.secondaryContainer
+              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
@@ -1795,3 +1826,43 @@ class _CompactDelegateTile extends StatelessWidget {
   }
 }
 
+
+
+/// Optional selection hook for a list-detail layout (used by the web-only
+/// desktop shell). When absent (mobile), tapping a delegate pushes the full
+/// profile page exactly as before.
+class AdminDelegateSelectionScope extends InheritedWidget {
+  final String? selectedUid;
+  final ValueChanged<Delegate> onSelect;
+
+  const AdminDelegateSelectionScope({
+    super.key,
+    required this.selectedUid,
+    required this.onSelect,
+    required super.child,
+  });
+
+  static AdminDelegateSelectionScope? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<AdminDelegateSelectionScope>();
+
+  @override
+  bool updateShouldNotify(AdminDelegateSelectionScope oldWidget) =>
+      oldWidget.selectedUid != selectedUid || oldWidget.onSelect != onSelect;
+}
+
+/// Public detail view for one delegate: the same profile page the mobile
+/// list pushes, embedded (no back button).
+class AdminDelegateDetailView extends StatelessWidget {
+  final Delegate delegate;
+
+  const AdminDelegateDetailView({super.key, required this.delegate});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      key: ValueKey(delegate.uid),
+      create: (_) => sl<ProfileBloc>(),
+      child: ProfileScreen(delegate: delegate, showBackButton: false),
+    );
+  }
+}

@@ -26,6 +26,7 @@
     "test:rules:paymob-superseded": "bash scripts/emulators_exec.sh --only firestore --project demo-paymob-super \"node --test test/rules/paymob-superseded.test.js\"",
     "test:rules:status-guards": "bash scripts/emulators_exec.sh --only firestore --project demo-status-guards \"node --test test/rules/delegate-status-guards.test.js\"",
     "test:rules:security": "bash scripts/emulators_exec.sh --only firestore --project demo-suspend-login-penalties \"node --test test/rules/suspend-login-penalties.test.js\"",
+    "test:rules:hr-web": "bash scripts/emulators_exec.sh --only firestore --project demo-hr-web-reads \"node --test test/rules/hr-web-company-reads.test.js\"",
     "test:rules:storage": "bash scripts/emulators_exec.sh --only storage,firestore --project demo-tashil-storage \"node --test test/rules/storage.rules.test.js\"",
     "test:rules:prod-compat": "bash scripts/emulators_exec.sh --only storage,firestore --project demo-ta60-prod-compat \"node --test test/rules/ta60-compat.test.mjs\"",
     "test:rules:ta60-supervisor-dup": "bash scripts/emulators_exec.sh --only firestore --project demo-ta60-supervisor-dup-fs03 \"node --test test/rules/ta60-supervisor-dup-fs03.test.js\""

@@ -1089,18 +1089,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   // ─── Change Password Sheet ──────────────────────────────────────
   void _showChangePasswordSheet(BuildContext context, Delegate? delegate) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _ChangePasswordBottomSheet(
-        delegate: delegate,
-        firestoreData: _firestoreUserData,
-        // P0: the new password stays in Firebase Auth only; nothing is kept
-        // in local profile data.
-        onPasswordChanged: (_) {},
-      ),
+    showUserChangePasswordSheet(
+      context,
+      delegate: delegate,
+      firestoreData: _firestoreUserData,
     );
   }
 
@@ -1446,6 +1438,27 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
 // ═══════════════════════════════════════════════════════════════════
 // Change Password Bottom Sheet
 // ═══════════════════════════════════════════════════════════════════
+
+/// Opens the profile screen's change-password sheet. The new password stays
+/// in Firebase Auth only.
+void showUserChangePasswordSheet(
+  BuildContext context, {
+  Delegate? delegate,
+  Map<String, dynamic>? firestoreData,
+  void Function(String newPassword)? onPasswordChanged,
+}) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => _ChangePasswordBottomSheet(
+      delegate: delegate,
+      firestoreData: firestoreData,
+      onPasswordChanged: onPasswordChanged ?? (_) {},
+    ),
+  );
+}
 
 class _ChangePasswordBottomSheet extends StatefulWidget {
   final Delegate? delegate;

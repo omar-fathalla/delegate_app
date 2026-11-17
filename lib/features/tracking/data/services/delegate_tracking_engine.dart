@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:battery_plus/battery_plus.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
@@ -59,6 +60,7 @@ class DelegateTrackingEngine {
     required String delegateId,
     Duration interval = const Duration(minutes: 5),
   }) async {
+    if (!WebRuntimePolicy.liveTrackingEnabled) return;
     if (_isTracking && _activeDelegateId == delegateId) return;
 
     _activeDelegateId = delegateId;

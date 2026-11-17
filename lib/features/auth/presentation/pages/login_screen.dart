@@ -1,5 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:delegate_app/core/config/app_env.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
+import 'package:delegate_app/features/auth/domain/role_home.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -8,7 +9,6 @@ import 'package:delegate_app/features/auth/domain/delegate_login_validator.dart'
 import 'package:delegate_app/features/auth/presentation/auth_error_message.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/auth/presentation/pages/delegate_phone_otp_view.dart';
-import 'package:delegate_app/features/hr/presentation/pages/hr_login_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -18,6 +18,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/semantics.dart';
 import 'package:delegate_app/features/auth/presentation/widgets/tashil_m3.dart';
+import 'package:delegate_app/features/auth/presentation/widgets/web_hr_login_view.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_remote_data_source.dart';
@@ -28,6 +29,9 @@ const kLoginModePrefKey = 'login_selected_mode';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  /// Phone width of the login sheet when shown in a wide browser window.
+  static const double webMaxWidth = 480;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -42,6 +46,8 @@ class _LoginScreenState extends State<LoginScreen>
   bool _obscureNationalId = true;
   final _shakeKey = GlobalKey<ShakeState>();
   bool _rememberMe = false;
+  bool _webDelegateNotice = false;
+  bool _suppressWebError = false;
   LoginMode _mode = LoginMode.delegate;
   AutovalidateMode _autovalidate = AutovalidateMode.disabled;
   late AnimationController _animationController;
@@ -86,8 +92,12 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ),
         );
+    _phoneController.addListener(_onWebFieldEdited);
+    _passwordController.addListener(_onWebFieldEdited);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _applyDelegateNotice();
+      if (WebRuntimePolicy.isWeb) return;
       if (M3Motion.reduced(context)) {
         _animationController.value = 1;
       } else {
@@ -97,9 +107,84 @@ class _LoginScreenState extends State<LoginScreen>
     _restoreMode();
   }
 
+  void _onWebFieldEdited() {
+    if (!mounted || !WebRuntimePolicy.isWeb || _suppressWebError) return;
+    final state = context.read<AuthBloc>().state;
+    if (!_webDelegateNotice && state is! AuthError) return;
+    setState(() => _suppressWebError = true);
+  }
+
   bool get _isStaff => _mode == LoginMode.staff;
 
+  /// `/login?notice=delegate` is where the HR-shell guard sends a delegate
+  /// who opened the system on web. Mobile still opens the delegate tab.
+  /// Web keeps the staff form and shows a polite app-only notice.
+  void _applyDelegateNotice() {
+    String? notice;
+    try {
+      notice = GoRouterState.of(context).uri.queryParameters['notice'];
+    } catch (_) {
+      notice = null;
+    }
+    if (WebRuntimePolicy.isWeb) {
+      final blocked = notice == 'delegate';
+      if (_mode != LoginMode.staff || _webDelegateNotice != blocked) {
+        setState(() {
+          _mode = LoginMode.staff;
+          _webDelegateNotice = blocked;
+        });
+      }
+      return;
+    }
+    if (notice == 'delegate' && _mode != LoginMode.delegate) {
+      setState(() => _mode = LoginMode.delegate);
+    }
+  }
+
+  /// Delegate sign-in binds the calling device on the server, so it stays
+  /// in the mobile app; the web tab only explains that.
+  bool get _isWebDelegate => WebRuntimePolicy.isWeb && !_isStaff;
+
+  String _delegateWebPolite(bool arabic) => arabic
+      ? 'تسجيل الدخول وربط الجهاز متاح من تطبيق الجوال فقط.'
+      : 'Sign-in and device binding are only available in the mobile app.';
+
+  bool _isDelegateWebBlock(String? code, String message) =>
+      code == 'delegate_web_app_only' ||
+      message == WebRuntimePolicy.delegateLoginWebMessage ||
+      message == WebRuntimePolicy.delegateLoginWebMessageEn;
+
+  /// Web form-level message. Credential failures use the approved copy.
+  /// Every other failure keeps the message the app already produces.
+  String? _webFormMessage(
+    AuthState state,
+    AppLocalizations l10n,
+    bool arabic,
+  ) {
+    if (state is AuthError && state.code != 'device_mismatch') {
+      if (state.code == 'invalid_credentials') {
+        return arabic
+            ? 'رقم الجوال أو كلمة المرور غير صحيحة'
+            : 'The mobile number or password is incorrect';
+      }
+      if (_isDelegateWebBlock(state.code, state.message)) {
+        return _delegateWebPolite(arabic);
+      }
+      return localizedAuthError(
+        l10n,
+        message: state.message,
+        code: state.code,
+      );
+    }
+    if (_webDelegateNotice) return _delegateWebPolite(arabic);
+    return null;
+  }
+
   void _restoreMode() {
+    if (WebRuntimePolicy.isWeb) {
+      _mode = LoginMode.staff;
+      return;
+    }
     try {
       final saved = sl<SharedPreferences>().getString(kLoginModePrefKey);
       if (saved == LoginMode.staff.name) _mode = LoginMode.staff;
@@ -123,6 +208,8 @@ class _LoginScreenState extends State<LoginScreen>
   void dispose() {
     _animationController.dispose();
     _submit.dispose();
+    _phoneController.removeListener(_onWebFieldEdited);
+    _passwordController.removeListener(_onWebFieldEdited);
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -132,8 +219,9 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb) {
-      return const HrLoginScreen();
+    // Mobile keeps the account-type switch. Web does not render it.
+    if (!WebRuntimePolicy.isWeb) {
+      assert(WebRuntimePolicy.loginKeepsModeTabs);
     }
     return Theme(
       data: tashilAuthTheme(context),
@@ -148,7 +236,9 @@ class _LoginScreenState extends State<LoginScreen>
     final brand = kTashilBrandScheme;
 
     return Scaffold(
-      backgroundColor: brand.primary,
+      backgroundColor: WebRuntimePolicy.isWeb
+          ? colorScheme.surface
+          : brand.primary,
       resizeToAvoidBottomInset: true,
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) =>
@@ -161,6 +251,36 @@ class _LoginScreenState extends State<LoginScreen>
             );
           }
           final loading = state is AuthLoading;
+          if (WebRuntimePolicy.isWeb) {
+            final message = _suppressWebError
+                ? null
+                : _webFormMessage(state, l10n, isArabic);
+            return WebHrLoginView(
+              formKey: _formKey,
+              shakeKey: _shakeKey,
+              phoneController: _phoneController,
+              passwordController: _passwordController,
+              obscurePassword: _obscurePassword,
+              rememberMe: _rememberMe,
+              loading: loading,
+              autovalidateMode: _autovalidate,
+              formError: message,
+              credentialError:
+                  message != null &&
+                  state is AuthError &&
+                  state.code == 'invalid_credentials',
+              delegateNotice: message == _delegateWebPolite(isArabic),
+              isArabic: isArabic,
+              onToggleObscure: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
+              onToggleRemember: () =>
+                  setState(() => _rememberMe = !_rememberMe),
+              onSubmit: () => _submitLogin(context),
+              onForgot: () => _forgotPassword(context, isArabic),
+              onSupport: () => _launchPhoneDialer(l10n.contactNumber),
+              onLanguage: () => localeProvider.toggleLocale(),
+            );
+          }
           return LayoutBuilder(
             builder: (context, constraints) {
               final compact = constraints.maxHeight < 680;
@@ -489,71 +609,76 @@ class _LoginScreenState extends State<LoginScreen>
       ),
       _row(
         i++,
-        Shake(
-          key: _shakeKey,
-          child: Form(
-            key: _formKey,
-            autovalidateMode: _autovalidate,
-            child: AutofillGroup(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: _buildFields(context, l10n, isArabic, loading),
-              ),
-            ),
-          ),
-        ),
-      ),
-      _row(
-        i++,
-        Row(
-          children: [
-            // Compact: checkbox, 8dp, label; whole row tappable, 48dp min.
-            InkWell(
-              key: const ValueKey('login_remember_me'),
-              borderRadius: BorderRadius.circular(8),
-              onTap: () => setState(() => _rememberMe = !_rememberMe),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 48),
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.only(end: 8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Semantics(
-                        label: l10n.rememberMe,
-                        child: Checkbox(
-                          value: _rememberMe,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                          onChanged: (v) =>
-                              setState(() => _rememberMe = v ?? false),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        l10n.rememberMe,
-                        style: text.bodyLarge?.copyWith(
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
+        _isWebDelegate
+            ? _buildWebDelegateNotice(context, isArabic)
+            : Shake(
+                key: _shakeKey,
+                child: Form(
+                  key: _formKey,
+                  autovalidateMode: _autovalidate,
+                  child: AutofillGroup(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: _buildFields(context, l10n, isArabic, loading),
+                    ),
                   ),
                 ),
               ),
-            ),
-            const Spacer(),
-            if (_isStaff)
-              TextButton(
-                key: const ValueKey('login_forgot_password'),
-                onPressed: loading
-                    ? null
-                    : () => _forgotPassword(context, isArabic),
-                child: Text(AppLocalizations.of(context)!.forgotPasswordQ,
-                ),
+      ),
+      _row(
+        i++,
+        _isWebDelegate
+            ? const SizedBox.shrink()
+            : Row(
+                children: [
+                  // Compact: checkbox, 8dp, label; whole row tappable, 48dp min.
+                  InkWell(
+                    key: const ValueKey('login_remember_me'),
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => setState(() => _rememberMe = !_rememberMe),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 48),
+                      child: Padding(
+                        padding: const EdgeInsetsDirectional.only(end: 8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Semantics(
+                              label: l10n.rememberMe,
+                              child: Checkbox(
+                                value: _rememberMe,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                                onChanged: (v) =>
+                                    setState(() => _rememberMe = v ?? false),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              l10n.rememberMe,
+                              style: text.bodyLarge?.copyWith(
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  if (_isStaff)
+                    TextButton(
+                      key: const ValueKey('login_forgot_password'),
+                      onPressed: loading
+                          ? null
+                          : () => _forgotPassword(context, isArabic),
+                      child: Text(
+                        AppLocalizations.of(context)!.forgotPasswordQ,
+                      ),
+                    ),
+                ],
               ),
-          ],
-        ),
       ),
     ];
   }
@@ -698,7 +823,7 @@ class _LoginScreenState extends State<LoginScreen>
           child: FilledButton(
             key: const ValueKey('login_submit'),
             // IgnorePointer keeps the primary colour while loading (spec §3).
-            onPressed: () => _submitLogin(context),
+            onPressed: _isWebDelegate ? null : () => _submitLogin(context),
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
               // The app theme's FilledButton padding is vertical 16, which in
@@ -776,6 +901,11 @@ class _LoginScreenState extends State<LoginScreen>
     AppLocalizations l10n,
     ColorScheme colorScheme,
   ) {
+    if (WebRuntimePolicy.isWeb &&
+        (state is AuthLoading || state is AuthError) &&
+        _suppressWebError) {
+      setState(() => _suppressWebError = false);
+    }
     if (state is! AuthLoading &&
         state is! AuthAuthenticated &&
         _submit.value > 0) {
@@ -796,7 +926,7 @@ class _LoginScreenState extends State<LoginScreen>
     } else if (state is AuthError) {
       if (state.code == 'device_mismatch') {
         DeviceLockDialog.show(context, requestAlreadyFiled: true);
-      } else {
+      } else if (!WebRuntimePolicy.isWeb) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -822,27 +952,9 @@ class _LoginScreenState extends State<LoginScreen>
         '🚀 LoginScreen: AuthAuthenticated received! name=${delegate.fullName}, role=${delegate.role}, uid=${delegate.uid}',
       );
       try {
-        if (delegate.role == UserRole.superAdmin ||
-            delegate.role == UserRole.admin ||
-            delegate.role == UserRole.organizationAdmin ||
-            delegate.role == UserRole.technicalSupport ||
-            delegate.role == UserRole.branchesMarketingManager) {
-          debugPrint('🚀 LoginScreen: Navigating to /admin/home');
-          context.go('/admin/home', extra: delegate);
-        } else if (delegate.role == UserRole.accountant) {
-          debugPrint('🚀 LoginScreen: Navigating to /accountant/home');
-          context.go('/accountant/home', extra: delegate);
-        } else if (delegate.role == UserRole.hr) {
-          debugPrint('🚀 LoginScreen: Navigating to /hr/home');
-          context.go('/hr/home', extra: delegate);
-        } else if (delegate.role == UserRole.marketing ||
-            delegate.role == UserRole.marketingPromotion) {
-          debugPrint('🚀 LoginScreen: Navigating to /marketing/home');
-          context.go('/marketing/home', extra: delegate);
-        } else {
-          debugPrint('🚀 LoginScreen: Navigating to /home');
-          context.go('/home', extra: delegate);
-        }
+        final path = landingPathForRole(delegate.role);
+        debugPrint('🚀 LoginScreen: Navigating to $path');
+        context.go(path, extra: delegate);
       } catch (e, stack) {
         debugPrint('❌ Navigation Error in LoginScreen: $e\n$stack');
       }
@@ -859,16 +971,17 @@ class _LoginScreenState extends State<LoginScreen>
   // ---- Helper: Submit Login ----
   void _submitLogin(BuildContext context) {
     if (BlocProvider.of<AuthBloc>(context).state is AuthLoading) return;
+    if (_isWebDelegate) return;
 
     if (_formKey.currentState!.validate()) {
       FocusScope.of(context).unfocus();
-      _submit.forward();
+      if (!WebRuntimePolicy.isWeb) _submit.forward();
       BlocProvider.of<AuthBloc>(context).add(
         LoginRequested(
           phoneNumber: _phoneController.text,
           password: _passwordController.text,
           rememberMe: _rememberMe,
-          mode: _mode,
+          mode: WebRuntimePolicy.isWeb ? LoginMode.staff : _mode,
         ),
       );
     } else {
@@ -885,6 +998,54 @@ class _LoginScreenState extends State<LoginScreen>
         setState(() => _autovalidate = AutovalidateMode.onUserInteraction);
       }
     }
+  }
+
+  Widget _buildWebDelegateNotice(BuildContext context, bool isArabic) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return Container(
+      key: const ValueKey('login_web_delegate_notice'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.phone_android_rounded,
+            color: colorScheme.onSecondaryContainer,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isArabic
+                      ? WebRuntimePolicy.delegateLoginWebMessage
+                      : WebRuntimePolicy.delegateLoginWebMessageEn,
+                  style: text.titleSmall?.copyWith(
+                    color: colorScheme.onSecondaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isArabic
+                      ? 'تسجيل الحضور والتتبع المباشر والإشعارات متاحة من تطبيق تسهيل على الموبايل فقط. المشرفون والموظفون الإداريون يدخلون من تبويب "موظف إداري".'
+                      : 'Check-in, live tracking and notifications are only available in the Tashil mobile app. Supervisors and staff use the "Staff" tab.',
+                  style: text.bodyMedium?.copyWith(
+                    color: colorScheme.onSecondaryContainer,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ---- Helper: Forgot password (staff only) ----
@@ -910,8 +1071,7 @@ class _LoginScreenState extends State<LoginScreen>
       messenger.showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          content: Text(l10n.resetLinkSentIfRegistered,
-          ),
+          content: Text(l10n.resetLinkSentIfRegistered),
         ),
       );
     } catch (_) {
@@ -919,8 +1079,7 @@ class _LoginScreenState extends State<LoginScreen>
         SnackBar(
           behavior: SnackBarBehavior.floating,
           backgroundColor: colorScheme.error,
-          content: Text(l10n.resetLinkFailed,
-          ),
+          content: Text(l10n.resetLinkFailed),
         ),
       );
     }
@@ -1053,7 +1212,8 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
               const SizedBox(height: 20),
-              Text(AppLocalizations.of(context)!.selectOrganization,
+              Text(
+                AppLocalizations.of(context)!.selectOrganization,
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -1061,7 +1221,8 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
               const SizedBox(height: 8),
-              Text(AppLocalizations.of(context)!.multipleOrgsChoose,
+              Text(
+                AppLocalizations.of(context)!.multipleOrgsChoose,
                 style: TextStyle(
                   fontSize: 14,
                   color: colorScheme.onSurfaceVariant,

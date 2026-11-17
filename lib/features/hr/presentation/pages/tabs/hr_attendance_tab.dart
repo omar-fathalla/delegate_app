@@ -165,14 +165,71 @@ class HRAttendanceRecord {
   }
 }
 
+/// Read-only snapshot of the attendance tab's existing data and filters.
+class HRAttendanceViewData {
+  final bool isLoading;
+  final String? errorMessage;
+  final DateTime selectedDate;
+  final bool isToday;
+  final String statusFilter; // 'all','present','departed','absent','violation','leave'
+  final String selectedChain; // 'all' or chain
+  final String selectedBranch; // 'all' or branch
+  final Set<String> chains;
+  final Set<String> branches;
+  final List<HRAttendanceRecord> records; // already filtered
+  final TextEditingController searchController;
+  final VoidCallback onSearchChanged;
+  final ValueChanged<DateTime> onDateChanged;
+  final ValueChanged<String> onStatusChanged;
+  final ValueChanged<String> onChainChanged;
+  final ValueChanged<String> onBranchChanged;
+  final Future<void> Function() onRefresh;
+
+  /// Every company delegate's record for [selectedDate], before filters.
+  final List<HRAttendanceRecord> allRecords;
+  final Map<String, Branch> branchesByName;
+
+  /// Reloads delegates, branches and attendance and clears [errorMessage].
+  final Future<void> Function()? onReload;
+
+  const HRAttendanceViewData({
+    required this.isLoading,
+    required this.errorMessage,
+    required this.selectedDate,
+    required this.isToday,
+    required this.statusFilter,
+    required this.selectedChain,
+    required this.selectedBranch,
+    required this.chains,
+    required this.branches,
+    required this.records,
+    required this.searchController,
+    required this.onSearchChanged,
+    required this.onDateChanged,
+    required this.onStatusChanged,
+    required this.onChainChanged,
+    required this.onBranchChanged,
+    required this.onRefresh,
+    this.allRecords = const [],
+    this.branchesByName = const {},
+    this.onReload,
+  });
+}
+
 class HRAttendanceTab extends StatefulWidget {
   final Delegate hrDelegate;
   final ValueChanged<int>? onNavigateToTab;
+
+  /// Optional read-only view hook (web-only desktop table). When null
+  /// (mobile), the tab renders exactly as before.
+  final Widget Function(BuildContext context, HRAttendanceViewData data)?
+      viewBuilder;
 
   const HRAttendanceTab({
     super.key,
     required this.hrDelegate,
     this.onNavigateToTab,
+    this.viewBuilder,
   });
 
   @override
@@ -754,6 +811,44 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       }
     }
   }
+
+  /// Same state/filters as the mobile UI; setters mirror its existing
+  /// handlers exactly (date changes refetch; chain resets an invalid branch).
+  HRAttendanceViewData _viewData() => HRAttendanceViewData(
+        isLoading: _isLoading,
+        errorMessage: _errorMessage,
+        selectedDate: _selectedDate,
+        isToday: _isSameDay(_selectedDate, DateTime.now()),
+        statusFilter: _statusFilter,
+        selectedChain: _selectedChain,
+        selectedBranch: _selectedBranch,
+        chains: _availableChains,
+        branches: _cascadingAvailableBranches,
+        records: _filteredRecords,
+        searchController: _searchController,
+        onSearchChanged: () => setState(() {}),
+        onDateChanged: (d) {
+          setState(() => _selectedDate = d);
+          _fetchAttendanceForSelectedDate();
+        },
+        onStatusChanged: (v) => setState(() => _statusFilter = v),
+        onChainChanged: (val) {
+          setState(() {
+            _selectedChain = val;
+            if (_selectedBranch != 'all') {
+              final validBranches = _cascadingAvailableBranches;
+              if (!validBranches.contains(_selectedBranch)) {
+                _selectedBranch = 'all';
+              }
+            }
+          });
+        },
+        onBranchChanged: (val) => setState(() => _selectedBranch = val),
+        onRefresh: _fetchAttendanceForSelectedDate,
+        allRecords: _records,
+        branchesByName: _branchesByName,
+        onReload: _loadInitialData,
+      );
 
   List<HRAttendanceRecord> get _filteredRecords {
     final query = _searchController.text.trim().toLowerCase();
@@ -1831,6 +1926,8 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
 
   @override
   Widget build(BuildContext context) {
+    final viewBuilder = widget.viewBuilder;
+    if (viewBuilder != null) return viewBuilder(context, _viewData());
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final screenWidth = MediaQuery.of(context).size.width;
