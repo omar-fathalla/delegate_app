@@ -57,7 +57,12 @@ class HrAddChainsSheet extends StatefulWidget {
       debugSubmit;
 
   @visibleForTesting
+  /// Test hook: replaces the linked/pending pre-check.
+  @visibleForTesting
+  static Future<DuplicateChainLookup> Function(Iterable<String> orgUids)? debugLookup;
+
   static void debugReset() {
+    debugLookup = null;
     debugFirestore = null;
     debugSubmit = null;
   }
@@ -117,6 +122,9 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
   String? _notice;
   bool _submitting = false;
 
+  /// The pending/linked pre-check failed; chains are shown anyway.
+  bool _checkUnavailable = false;
+
   List<LinkableChain> _chains = const [];
   final Map<String, _ChainState> _state = {};
   final Set<String> _selected = {};
@@ -136,9 +144,11 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
   }
 
   Future<DuplicateChainLookup> _lookup(Iterable<String> orgUids) =>
-      lookupDuplicateChains(
+      HrAddChainsSheet.debugLookup?.call(orgUids) ??
+      lookupLinkChainStates(
         firestore: _firestore,
         companyUID: _companyUID,
+        delegateUid: widget.delegate.uid,
         nationalId: widget.delegate.nationalityID,
         phoneNumber: widget.delegate.phoneNumber,
         organizationUIDs: orgUids,
@@ -178,18 +188,21 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
         for (final c in chains)
           if (!c.alreadyLinked) c.uid,
       ];
-      final lookup = await _lookup(candidates);
+      DuplicateChainLookup? lookup;
+      try {
+        lookup = await _lookup(candidates);
+      } on DuplicateChainLookupException {
+        // Graceful fallback: still show the chains. On send the request
+        // flow re-checks each chain for the delegate's doc and refuses a
+        // chain the delegate is already on.
+        lookup = null;
+      }
       if (!mounted) return;
       setState(() {
         _chains = chains;
-        _applyLookup(lookup);
+        _checkUnavailable = lookup == null;
+        if (lookup != null) _applyLookup(lookup);
         _loading = false;
-      });
-    } on DuplicateChainLookupException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _loadError = e.message;
       });
     } catch (_) {
       if (!mounted) return;
@@ -222,8 +235,9 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
       _notice = null;
     });
 
-    // Same fail-closed duplicate check as the add-delegate form, right
-    // before writing.
+    // Re-check linked / pending chains right before writing. If the check
+    // itself can't run, the request flow still refuses chains the delegate
+    // is already on (it reads the delegate's doc in each chain).
     late ChainSelectionResult selection;
     try {
       final lookup = await _lookup(_selection.keptUids);
@@ -236,13 +250,9 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
       if (lookup.duplicateOrgUids.isNotEmpty) {
         setState(() => _applyLookup(lookup));
       }
-    } on DuplicateChainLookupException catch (e) {
+    } on DuplicateChainLookupException {
       if (!mounted) return;
-      setState(() {
-        _submitting = false;
-        _submitError = e.message;
-      });
-      return;
+      selection = _selection;
     }
 
     if (!selection.canSubmit) {
@@ -359,8 +369,7 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
 
   Widget _buildDelegateCard(ColorScheme cs) {
     final d = widget.delegate;
-    final role = d.position == DelegatePosition.supervisor ? 'مشرف' : 'مندوب / مروج';
-    final subtitle = d.city.trim().isEmpty ? role : '$role · ${d.city.trim()}';
+    final subtitle = d.city.trim();
     final active = d.status == DelegateStatus.active;
     final statusColor = active ? const Color(0xFF2E7D32) : cs.onSurfaceVariant;
     return Container(
@@ -388,10 +397,11 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                Text(
-                  subtitle,
-                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-                ),
+                if (subtitle.isNotEmpty)
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  ),
               ],
             ),
           ),
@@ -581,7 +591,9 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
       _note(
         cs,
         Symbols.info_rounded,
-        'السلاسل المرتبطة حالياً أو التي عليها طلب قيد المراجعة غير متاحة للاختيار.',
+        _checkUnavailable
+            ? 'تعذر التحقق من الطلبات السابقة الآن. سيتم التحقق من ربط المندوب بكل سلسلة عند الإرسال.'
+            : 'السلاسل المرتبطة حالياً أو التي عليها طلب قيد المراجعة غير متاحة للاختيار.',
       ),
       if (selection.warningAr != null || _notice != null) ...[
         const SizedBox(height: 8),
