@@ -1298,31 +1298,17 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       // if it already exists as 'pending', activated with a status-only write
       // (status + pending->approved document flips). Profile fields follow
       // after the commit as a plain merge.
-      final batch = _firestore.batch();
-      batch.update(requestRef, requestApproval);
+      // No chain cap any more, so the delegate docs are written in chunks:
+      // each nested create costs one exists() in the rules and a batch may
+      // use about 20 such lookups. Up to [kApprovalDocsPerBatch] docs keep
+      // the old single atomic batch (every request up to 10 chains + the
+      // supervisor copy). Larger requests write the delegate docs first and
+      // the request approval in the LAST batch, so the request only turns
+      // approved when every doc landed; a retry is idempotent (existing docs
+      // are merged / status-flipped, not duplicated).
       final followUps = <DocumentReference<Map<String, dynamic>>, Map<String, dynamic>>{};
-      Future<void> addActivation(
-        DocumentReference<Map<String, dynamic>> ref,
-        Map<String, dynamic> fullData,
-      ) async {
-        final snap = await ref.get();
-        if (!snap.exists) {
-          batch.set(ref, fullData);
-          return;
-        }
-        final existing = snap.data() ?? const <String, dynamic>{};
-        if (existing['status'] == 'pending') {
-          batch.update(ref, buildStatusOnlyActivation(
-            existingDocuments: existing['documents'],
-            reviewerName: reviewerName,
-            reviewedAtIso: now.toIso8601String(),
-            approvedRequestId: request.id,
-          ));
-          followUps[ref] = profileMergeFields(fullData);
-        } else {
-          batch.set(ref, fullData, SetOptions(merge: true));
-        }
-      }
+      final pendingWrites = <void Function(WriteBatch)>[];
+      final activations = <(DocumentReference<Map<String, dynamic>>, Map<String, dynamic>)>[];
 
       for (var i = 0; i < orgUids.length; i++) {
         final orgId = orgUids[i];
@@ -1346,10 +1332,55 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
             .doc(request.companyUID)
             .collection('delegates')
             .doc(targetDelegateUid);
-        await addActivation(ref, data);
+        activations.add((ref, data));
       }
       if (supRef != null && supDelegateData != null) {
-        await addActivation(supRef, supDelegateData);
+        activations.add((supRef, supDelegateData));
+      }
+      // Read every target doc in parallel (was one after another).
+      final snaps = await Future.wait(activations.map((a) => a.$1.get()));
+      for (var i = 0; i < activations.length; i++) {
+        final (ref, fullData) = activations[i];
+        final snap = snaps[i];
+        if (!snap.exists) {
+          pendingWrites.add((b) => b.set(ref, fullData));
+          continue;
+        }
+        final existing = snap.data() ?? const <String, dynamic>{};
+        if (existing['status'] == 'pending') {
+          final flip = buildStatusOnlyActivation(
+            existingDocuments: existing['documents'],
+            reviewerName: reviewerName,
+            reviewedAtIso: now.toIso8601String(),
+            approvedRequestId: request.id,
+          );
+          pendingWrites.add((b) => b.update(ref, flip));
+          followUps[ref] = profileMergeFields(fullData);
+        } else {
+          pendingWrites.add((b) => b.set(ref, fullData, SetOptions(merge: true)));
+        }
+      }
+      final chunks = approvalWriteChunks(pendingWrites.length);
+      for (var c = 0; c < chunks.length - 1; c++) {
+        final b = _firestore.batch();
+        for (final w in pendingWrites.sublist(chunks[c].$1, chunks[c].$2)) {
+          w(b);
+        }
+        try {
+          await b.commit();
+        } on FirebaseException catch (e) {
+          if (e.code == 'permission-denied') {
+            return const Left(ServerFailure(approvalBatchDeniedMessage));
+          }
+          rethrow;
+        }
+      }
+      final batch = _firestore.batch();
+      batch.update(requestRef, requestApproval);
+      if (chunks.isNotEmpty) {
+        for (final w in pendingWrites.sublist(chunks.last.$1, chunks.last.$2)) {
+          w(batch);
+        }
       }
       try {
         await batch.commit();
@@ -1908,3 +1939,16 @@ Map<String, dynamic> profileMergeFields(Map<String, dynamic> full) {
   return Map<String, dynamic>.from(full)..removeWhere((k, _) => excluded.contains(k));
 }
 
+
+/// Delegate docs per approval batch (see approveSubscriptionRequest).
+const int kApprovalDocsPerBatch = 11;
+
+/// [start, end) ranges over [count] writes, [kApprovalDocsPerBatch] each.
+/// The last range goes into the batch that also approves the request.
+List<(int, int)> approvalWriteChunks(int count, {int size = kApprovalDocsPerBatch}) {
+  final out = <(int, int)>[];
+  for (var i = 0; i < count; i += size) {
+    out.add((i, i + size > count ? count : i + size));
+  }
+  return out;
+}

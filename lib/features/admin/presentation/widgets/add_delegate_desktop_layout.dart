@@ -91,16 +91,16 @@ class AddDelegateSectionCard extends StatelessWidget {
   }
 }
 
-/// «3/10 مختارة» pill.
+/// «3 مختارة» pill (no chain cap; «3/N» only when [max] is passed).
 class AddDelegateChainCounter extends StatelessWidget {
   const AddDelegateChainCounter({
     super.key,
     required this.count,
-    this.max = kMaxOrganizationsPerRequest,
+    this.max,
   });
 
   final int count;
-  final int max;
+  final int? max;
 
   static const counterKey = Key('add_delegate_chain_counter');
 
@@ -115,7 +115,7 @@ class AddDelegateChainCounter extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        '$count/$max مختارة',
+        max == null ? '$count مختارة' : '$count/$max مختارة',
         style: TextStyle(
           fontSize: 12.5,
           fontWeight: FontWeight.w700,
@@ -129,7 +129,7 @@ class AddDelegateChainCounter extends StatelessWidget {
 /// Desktop chain picker: search + «اختيار الكل» + a 3-column checkbox grid.
 ///
 /// Same rules as [ChainMultiSelect]: «اختيار الكل» uses [toggleSelectAll] on
-/// every chain, the cap is [kMaxOrganizationsPerRequest], and the warning is
+/// every chain, there is no cap by default, and the warning is
 /// [ChainSelectionResult.warningAr]. Chains found as duplicates by the submit
 /// check are shown disabled with a neutral note instead of a red one.
 class AddDelegateChainGrid extends StatefulWidget {
@@ -139,14 +139,14 @@ class AddDelegateChainGrid extends StatefulWidget {
     required this.selectedUids,
     required this.onChanged,
     this.duplicateUids = const {},
-    this.maxSelection = kMaxOrganizationsPerRequest,
+    this.maxSelection,
   });
 
   final List<ChainOption> chains;
   final Set<String> selectedUids;
   final ValueChanged<Set<String>> onChanged;
   final Set<String> duplicateUids;
-  final int maxSelection;
+  final int? maxSelection;
 
   static const selectAllKey = Key('chain_select_all');
   static Key optionKey(String uid) => Key('chain_option_$uid');
@@ -315,8 +315,10 @@ class _AddDelegateChainGridState extends State<AddDelegateChainGrid> {
   Widget _chainTile(ChainOption chain, ChainSelectionResult result) {
     final selected = widget.selectedUids.contains(chain.uid);
     final duplicate = widget.duplicateUids.contains(chain.uid);
+    final max = widget.maxSelection;
     final atCap = !selected &&
-        result.kept.length >= widget.maxSelection &&
+        max != null &&
+        result.kept.length >= max &&
         !duplicate;
     return _CheckRow(
       key: AddDelegateChainGrid.optionKey(chain.uid),

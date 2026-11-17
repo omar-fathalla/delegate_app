@@ -2400,12 +2400,13 @@ service cloud.firestore {
 
 
     // Phase 1 item 3: organizationUIDs is optional (legacy docs omit it).
-    // When present it must include organizationUID and stay within 1–10.
+    // When present it must include organizationUID and stay within 1–100
+    // (no chain cap since 17 Nov 2026; 100 is only a sanity bound).
     function requestOrganizationUIDsOk() {
       return !request.resource.data.keys().hasAll(['organizationUIDs'])
         || (request.resource.data.organizationUIDs is list
           && request.resource.data.organizationUIDs.size() >= 1
-          && request.resource.data.organizationUIDs.size() <= 10
+          && request.resource.data.organizationUIDs.size() <= 100
           && request.resource.data.organizationUIDs.hasAll([
             request.resource.data.get('organizationUID', '')
           ]));
@@ -2533,6 +2534,46 @@ service cloud.firestore {
         || ((isCompanyAdmin() || isHR() || isOrgAdmin()) && resource != null && intentCompanyScoped())
       );
       allow create, update, delete: if false;
+    }
+
+    // Company-level «طلب ضم سلسلة» (17 Nov 2026): one doc per (company,
+    // chain), no delegate on it. Company staff create for their own company
+    // only; super admin / technical support, or the target chain's admin,
+    // approve or reject. Approval registers the company in the chain (client,
+    // existing companies rules); autoLinkOnCompanyJoin links the delegates.
+    match /company_chain_requests/{requestId} {
+      function ccrOrgOk(org) {
+        return org is string && org != ''
+          && exists(/databases/$(database)/documents/organizations/$(org));
+      }
+      allow read: if signedIn() && (
+        isGlobalStaff()
+        || (isOrgAdmin() && callerOrg() != '' && resource.data.get('organizationUID', '') == callerOrg())
+        || (isCompanyScopedStaff() && callerCompany() != '' && resource.data.get('companyUID', '') == callerCompany())
+      );
+      allow create: if signedIn() && isCompanyScopedStaff()
+        && request.resource.data.keys().hasOnly([
+          'requestType', 'status', 'batchId', 'batchSize', 'companyUID', 'companyName',
+          'organizationUID', 'organizationName', 'supervisorUid', 'supervisorName', 'createdAt'])
+        && request.resource.data.requestType == 'company_join_chain'
+        && request.resource.data.status == 'pending'
+        && callerCompany() != ''
+        && request.resource.data.companyUID == callerCompany()
+        && request.resource.data.supervisorUid == request.auth.uid
+        && request.resource.data.batchSize is int
+        && request.resource.data.batchSize >= 1 && request.resource.data.batchSize <= 100
+        && request.resource.data.createdAt == request.time
+        && ccrOrgOk(request.resource.data.organizationUID)
+        && !exists(/databases/$(database)/documents/organizations/$(request.resource.data.organizationUID)/companies/$(request.resource.data.companyUID));
+      allow update: if signedIn()
+        && (isGlobalStaff()
+          || (isOrgAdmin() && callerOrg() != '' && resource.data.get('organizationUID', '') == callerOrg()))
+        && resource.data.status == 'pending'
+        && request.resource.data.status in ['approved', 'rejected']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'reviewedBy', 'reviewedByUid', 'reviewedAt', 'rejectionReason'])
+        && request.resource.data.reviewedByUid == request.auth.uid;
+      allow delete: if false;
     }
 
     match /delegate_requests/{requestId} {

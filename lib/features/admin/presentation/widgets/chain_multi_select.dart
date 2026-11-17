@@ -10,14 +10,14 @@ class ChainMultiSelect extends StatelessWidget {
     required this.selectedUids,
     required this.onChanged,
     this.duplicateUids = const {},
-    this.maxSelection = kMaxOrganizationsPerRequest,
+    this.maxSelection,
   });
 
   final List<ChainOption> chains;
   final Set<String> selectedUids;
   final ValueChanged<Set<String>> onChanged;
   final Set<String> duplicateUids;
-  final int maxSelection;
+  final int? maxSelection;
 
   static const selectAllKey = Key('chain_select_all');
   static Key optionKey(String uid) => Key('chain_option_$uid');
@@ -86,7 +86,8 @@ class ChainMultiSelect extends StatelessWidget {
             const Divider(height: 8),
             ...chains.map((chain) {
               final selected = selectedUids.contains(chain.uid);
-              final atCap = !selected && result.kept.length >= maxSelection
+              final max = maxSelection;
+              final atCap = !selected && max != null && result.kept.length >= max
                   && !duplicateUids.contains(chain.uid);
               return CheckboxListTile(
                 key: optionKey(chain.uid),

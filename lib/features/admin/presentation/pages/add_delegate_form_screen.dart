@@ -1407,7 +1407,7 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
                 const SizedBox(height: 12),
                 AddDelegateSummaryLine(
                   label: 'السلاسل المختارة',
-                  value: '${selection.kept.length}/$kMaxOrganizationsPerRequest',
+                  value: '${selection.kept.length}',
                 ),
                 if (selection.kept.isNotEmpty) ...[
                   const SizedBox(height: 4),
