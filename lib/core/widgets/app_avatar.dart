@@ -16,6 +16,10 @@ class AppAvatar extends StatelessWidget {
   final Widget? badge;
   final IconData? fallbackIcon;
 
+  /// Draws [fallbackText] in full. Callers that leave this false keep the
+  /// first-character fallback, including every mobile avatar.
+  final bool verbatimFallback;
+
   const AppAvatar({
     super.key,
     this.imageUrl,
@@ -25,6 +29,7 @@ class AppAvatar extends StatelessWidget {
     this.foregroundColor,
     this.badge,
     this.fallbackIcon,
+    this.verbatimFallback = false,
   });
 
   @override
@@ -35,7 +40,9 @@ class AppAvatar extends StatelessWidget {
     final fg = foregroundColor ?? theme.colorScheme.onPrimaryContainer;
     final size = radius * 2;
     final trimmed = fallbackText.trim();
-    final initial = trimmed.isNotEmpty ? trimmed[0].toUpperCase() : '؟';
+    final initial = verbatimFallback
+        ? (trimmed.isNotEmpty ? trimmed : '؟')
+        : (trimmed.isNotEmpty ? trimmed[0].toUpperCase() : '؟');
 
     Widget fallbackWidget() {
       return Container(
@@ -54,7 +61,7 @@ class AppAvatar extends StatelessWidget {
                 style: TextStyle(
                   color: fg,
                   fontWeight: FontWeight.bold,
-                  fontSize: radius * 0.85,
+                  fontSize: verbatimFallback ? radius * 0.7 : radius * 0.85,
                 ),
               ),
       );
