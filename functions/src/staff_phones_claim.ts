@@ -1,14 +1,17 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import {
+  StaffPhonesMintDecision,
   decideStaffPhonesMint,
   mergeStaffPhonesClaims,
   phoneFieldChanged,
+  resolveStaffMintPhone,
   shouldProcessStaffUser,
 } from "./staff_phones_claim_logic";
 import {hasStaffPhoneCollision, readAuthCustomClaims} from "./staff_phones_claim_query";
 
-const opts = {timeoutSeconds: 60, memory: "256MB" as const};
+// The collision check scans every users and delegate doc (phone fields only).
+const opts = {timeoutSeconds: 300, memory: "512MB" as const};
 
 /**
  * Re-mints staff JWT `phones` when users/{uid}.phoneNumber changes.
@@ -39,29 +42,39 @@ export const onStaffUserPhonesClaimSync = functions
     const isCreate = !change.before.exists;
     if (!isCreate && !phoneFieldChanged(before, after)) return null;
 
-    const phoneRaw = after.phoneNumber;
-    const trustedAdminWrite = after.updatedBy !== uid &&
-      typeof after.updatedBy === "string" &&
-      after.updatedBy.length > 0;
-
-    let collision = false;
-    if (typeof phoneRaw === "string" && phoneRaw.trim()) {
-      collision = await hasStaffPhoneCollision(admin.firestore(), uid, phoneRaw);
-    }
-
-    const decision = decideStaffPhonesMint(phoneRaw, collision, trustedAdminWrite);
-    if (decision.action === "skip") {
-      console.warn("onStaffUserPhonesClaimSync skipped", {uid, reason: decision.reason});
+    let authUser: admin.auth.UserRecord;
+    try {
+      authUser = await admin.auth().getUser(uid);
+    } catch (error) {
+      console.error("onStaffUserPhonesClaimSync no auth user", {uid, code: (error as {code?: string}).code});
       return null;
     }
 
-    const existing = await readAuthCustomClaims(uid);
-    const merged = mergeStaffPhonesClaims(existing, decision);
+    const mint = resolveStaffMintPhone(authUser.phoneNumber, after.phoneNumber);
+    let decision: StaffPhonesMintDecision;
+    if (!mint.phone) {
+      decision = decideStaffPhonesMint("", false);
+    } else {
+      let collision = true;
+      try {
+        collision = await hasStaffPhoneCollision(admin.firestore(), uid, mint.phone);
+      } catch (error) {
+        console.error("onStaffUserPhonesClaimSync collision lookup failed", {uid});
+      }
+      decision = decideStaffPhonesMint(mint.phone, collision);
+    }
+    if (decision.reason === "phone_collision") {
+      console.warn("onStaffUserPhonesClaimSync collision", {uid, source: mint.source});
+    }
+
+    const merged = mergeStaffPhonesClaims({...(authUser.customClaims || {})}, decision);
     try {
       await admin.auth().setCustomUserClaims(uid, merged);
       console.log("onStaffUserPhonesClaimSync", {
         uid,
         action: decision.action,
+        reason: decision.reason,
+        source: mint.source,
         variants: decision.phones?.length ?? 0,
       });
     } catch (error) {

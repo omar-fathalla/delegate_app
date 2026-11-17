@@ -7,15 +7,45 @@ import {isStaffRole} from "./staff_phone_lookup_logic";
 
 export const STAFF_PHONES_CLAIM_KEY = "phones";
 
+/**
+ * Every field a phone identity can live in on users and delegate docs.
+ * Superset of delegate_login_logic PHONE_FIELDS and the 1.14.3 bell reads.
+ */
+export const PHONE_OWNER_FIELDS = ["phoneNumber", "phone", "mobile", "mobileNumber"] as const;
+
+export function normalizeStoredPhone(raw: unknown): string {
+  if (typeof raw === "number" && Number.isFinite(raw)) return normalizePhone(String(raw));
+  if (typeof raw !== "string" || !raw.trim()) return "";
+  return normalizePhone(raw);
+}
+
 export function staffPhonesFromStoredPhone(raw: unknown): string[] {
-  if (typeof raw !== "string" || !raw.trim()) return [];
-  const normalized = normalizePhone(raw);
+  const normalized = normalizeStoredPhone(raw);
   if (!normalized) return [];
   return phoneQueryVariants(normalized);
 }
 
+/** True when any phone field on the doc normalizes to the same phone. */
+export function docHoldsPhone(data: Record<string, unknown> | undefined, normalizedTarget: string): boolean {
+  if (!data || !normalizedTarget) return false;
+  return PHONE_OWNER_FIELDS.some((field) => normalizeStoredPhone(data[field]) === normalizedTarget);
+}
+
+/**
+ * Exact values for indexed `in` lookups: string variants plus numeric forms
+ * for docs that stored the phone as a number. At most 10 values.
+ */
+export function phoneCollisionQueryValues(normalizedTarget: string): (string | number)[] {
+  const values: (string | number)[] = phoneQueryVariants(normalizedTarget);
+  if (/^0\d{10}$/.test(normalizedTarget)) {
+    values.push(Number(normalizedTarget.substring(1)));
+    values.push(Number("20" + normalizedTarget.substring(1)));
+  }
+  return values;
+}
+
 export interface StaffPhonesMintDecision {
-  action: "set" | "clear" | "skip";
+  action: "set" | "clear";
   phones?: string[];
   reason?: string;
 }
@@ -50,7 +80,7 @@ export function shouldProcessStaffUser(data: Record<string, unknown> | undefined
   return isStaffRole(data.role);
 }
 
-/** Collision when another users doc or delegate holds any variant of this phone. */
+/** Collision when another users doc or delegate holds this phone. */
 export function phoneOwnedByOther(
   ownerUid: string,
   hits: {collection: "users" | "delegate"; id: string}[],
@@ -58,20 +88,30 @@ export function phoneOwnedByOther(
   return hits.some((h) => h.id !== ownerUid);
 }
 
-export function decideStaffPhonesMint(
-  phoneRaw: unknown,
-  collision: boolean,
-  trustedAdminWrite?: boolean,
-): StaffPhonesMintDecision {
+/**
+ * Auth `phoneNumber` is set only by the Admin SDK or a verified phone sign-in,
+ * so it wins over the client-writable users doc field when present.
+ */
+export function resolveStaffMintPhone(
+  authPhone: unknown,
+  docPhone: unknown,
+): {source: "auth" | "users_doc" | "none"; phone: string} {
+  if (typeof authPhone === "string" && authPhone.trim()) return {source: "auth", phone: authPhone.trim()};
+  if (typeof docPhone === "string" && docPhone.trim()) return {source: "users_doc", phone: docPhone.trim()};
+  return {source: "none", phone: ""};
+}
+
+/**
+ * A collision clears any existing claim: an old claim must not outlive the
+ * phone it was minted from.
+ */
+export function decideStaffPhonesMint(phoneRaw: unknown, collision: boolean): StaffPhonesMintDecision {
   const phones = staffPhonesFromStoredPhone(phoneRaw);
   if (phones.length === 0) {
     return {action: "clear", reason: "empty_phone"};
   }
-  if (collision && !trustedAdminWrite) {
-    return {action: "skip", reason: "phone_collision"};
-  }
-  if (collision && trustedAdminWrite) {
-    return {action: "skip", reason: "phone_collision_admin_blocked"};
+  if (collision) {
+    return {action: "clear", reason: "phone_collision"};
   }
   return {action: "set", phones};
 }

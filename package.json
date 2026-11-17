@@ -5,6 +5,7 @@
     "test:rules": "bash scripts/emulators_exec.sh --only firestore --project demo-tashil-rules \"node --test test/rules/firestore.rules.test.js\"",
     "test:rules:interim": "bash scripts/emulators_exec.sh --only firestore --project demo-interim-base \"node --test test/rules/interim-prod-hardening.test.js\"",
     "test:e2e:staff": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only auth,firestore --project demo-tashil-staff \"node --test test/e2e/staff-accounts.e2e.test.js\"",
+    "test:e2e:staff-phones-claim": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only auth,firestore --project demo-staff-phones-claim \"node --test --test-concurrency=1 test/e2e/staff-phones-claim.e2e.test.js\"",
     "test:e2e:delegate": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only auth,firestore --project demo-tashil-e2e \"node --test test/e2e/delegate-login.e2e.test.js\"",
     "test:rules:p0": "bash scripts/emulators_exec.sh --only firestore --project demo-tashil-p0 \"node --test test/rules/users-p0.test.js\"",
     "test:rules:invite-claim": "bash scripts/emulators_exec.sh --only firestore --project demo-invite-claim-batch \"node --test test/rules/invite-claim-batch.test.js\"",

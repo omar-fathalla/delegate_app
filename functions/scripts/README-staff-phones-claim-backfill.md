@@ -4,6 +4,16 @@ One-time mint of `phones: phoneQueryVariants(normalizePhone(users.phoneNumber))`
 
 Ongoing updates are handled by **`onStaffUserPhonesClaimSync`** (Firestore `users/{uid}` write trigger).
 
+## Collision check
+
+A staff user gets no `phones` claim (and any existing one is cleared) when the
+same phone, after `normalizePhone`, sits in any of `phoneNumber`, `phone`,
+`mobile` or `mobileNumber` on another `users` doc or on any `delegates` doc.
+The script builds that index with one full scan (phone fields only), so values
+stored as `+20 105 550 0003`, `0020…`, Arabic digits or numbers all count.
+When the Auth user has a `phoneNumber`, that verified phone is minted instead
+of the client-writable `users.phoneNumber`.
+
 ## Safety
 
 - **Dry-run is the default** (omit `--apply`, or pass `--dry-run`). Counts only; no Auth writes.

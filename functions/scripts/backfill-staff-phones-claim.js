@@ -1,5 +1,6 @@
 /**
- * Backfill staff JWT `phones` custom claims from users/{uid}.phoneNumber.
+ * Backfill staff JWT `phones` custom claims from users/{uid}.phoneNumber
+ * (or the Auth phoneNumber when one is set).
  *
  * Dry-run by default. See README-staff-phones-claim-backfill.md.
  */
@@ -10,12 +11,9 @@ const {
   staffPhonesFromStoredPhone,
   mergeStaffPhonesClaims,
   decideStaffPhonesMint,
+  resolveStaffMintPhone,
 } = require("../lib/staff_phones_claim_logic");
-const {hasStaffPhoneCollision, readAuthCustomClaims} = require("../lib/staff_phones_claim_query");
-
-function str(v) {
-  return typeof v === "string" ? v.trim() : "";
-}
+const {buildPhoneOwnerIndex, indexedStaffPhoneCollision} = require("../lib/staff_phones_claim_query");
 
 async function scanStaffUsers(db) {
   const out = [];
@@ -36,18 +34,49 @@ async function scanStaffUsers(db) {
   return out;
 }
 
-async function planOne(db, uid, data) {
-  const phone = data.phoneNumber;
-  const phones = staffPhonesFromStoredPhone(phone);
-  const collision = phones.length > 0
-    ? await hasStaffPhoneCollision(db, uid, str(phone))
-    : false;
-  const decision = decideStaffPhonesMint(phone, collision, false);
-  const existing = await readAuthCustomClaims(uid);
-  const next = mergeStaffPhonesClaims(existing, decision);
-  const prevPhones = existing.phones;
-  const changed = JSON.stringify(prevPhones ?? null) !== JSON.stringify(next.phones ?? null);
-  return {uid, decision, changed, variantCount: phones.length};
+/** Collision is checked against every phone field in users and delegates, normalized. */
+async function runStaffPhonesBackfill(db, auth, {apply, log = () => undefined}) {
+  const ownerIndex = await buildPhoneOwnerIndex(db);
+  const staff = await scanStaffUsers(db);
+  const counts = {
+    staffScanned: staff.length, wouldSet: 0, wouldClear: 0,
+    skippedCollision: 0, missingAuthUser: 0, unchanged: 0, applied: 0,
+  };
+
+  for (const row of staff) {
+    let authUser;
+    try {
+      authUser = await auth.getUser(row.uid);
+    } catch (e) {
+      counts.missingAuthUser += 1;
+      log({uid: row.uid, action: "none", reason: "no_auth_user"});
+      continue;
+    }
+    const mint = resolveStaffMintPhone(authUser.phoneNumber, row.data.phoneNumber);
+    const collision = staffPhonesFromStoredPhone(mint.phone).length > 0 &&
+      indexedStaffPhoneCollision(ownerIndex, row.uid, mint.phone);
+    const decision = decideStaffPhonesMint(mint.phone, collision);
+    const existing = {...(authUser.customClaims || {})};
+    const next = mergeStaffPhonesClaims(existing, decision);
+    const changed = JSON.stringify(existing.phones ?? null) !== JSON.stringify(next.phones ?? null);
+
+    if (decision.reason === "phone_collision") {
+      counts.skippedCollision += 1;
+      log({uid: row.uid, action: "skip", reason: decision.reason, clearsExisting: changed});
+    }
+    if (!changed) {
+      counts.unchanged += 1;
+      continue;
+    }
+    if (decision.action === "set") counts.wouldSet += 1;
+    if (decision.action === "clear") counts.wouldClear += 1;
+
+    if (apply) {
+      await auth.setCustomUserClaims(row.uid, next);
+      counts.applied += 1;
+    }
+  }
+  return counts;
 }
 
 async function main() {
@@ -59,52 +88,20 @@ async function main() {
   if (!admin.apps.length) {
     admin.initializeApp({projectId: project});
   }
-  const db = admin.firestore();
 
   console.log(JSON.stringify({runId, project, apply, dryRun: !apply}));
-
-  const staff = await scanStaffUsers(db);
-  let wouldSet = 0;
-  let wouldClear = 0;
-  let skippedCollision = 0;
-  let unchanged = 0;
-  let applied = 0;
-
-  for (const row of staff) {
-    const plan = await planOne(db, row.uid, row.data);
-    if (plan.decision.action === "skip") {
-      skippedCollision += 1;
-      console.log(JSON.stringify({uid: row.uid, action: "skip", reason: plan.decision.reason}));
-      continue;
-    }
-    if (!plan.changed) {
-      unchanged += 1;
-      continue;
-    }
-    if (plan.decision.action === "set") wouldSet += 1;
-    if (plan.decision.action === "clear") wouldClear += 1;
-
-    if (apply) {
-      const existing = await readAuthCustomClaims(row.uid);
-      const next = mergeStaffPhonesClaims(existing, plan.decision);
-      await admin.auth().setCustomUserClaims(row.uid, next);
-      applied += 1;
-    }
-  }
-
-  console.log(JSON.stringify({
-    runId,
-    staffScanned: staff.length,
-    wouldSet,
-    wouldClear,
-    skippedCollision,
-    unchanged,
-    applied: apply ? applied : 0,
-    mode: apply ? "apply" : "dry-run",
-  }));
+  const counts = await runStaffPhonesBackfill(admin.firestore(), admin.auth(), {
+    apply,
+    log: (row) => console.log(JSON.stringify(row)),
+  });
+  console.log(JSON.stringify({runId, ...counts, applied: apply ? counts.applied : 0, mode: apply ? "apply" : "dry-run"}));
 }
 
-main().catch((e) => {
-  console.error(e.message || e);
-  process.exit(1);
-});
+module.exports = {runStaffPhonesBackfill};
+
+if (require.main === module) {
+  main().catch((e) => {
+    console.error(e.message || e);
+    process.exit(1);
+  });
+}

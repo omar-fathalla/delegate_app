@@ -29,10 +29,40 @@ describe("staff_phones_claim_logic", () => {
     assert.equal(cleared.phones, undefined);
   });
 
-  test("decideStaffPhonesMint refuses collision (attack victim phone)", () => {
-    const d = logic.decideStaffPhonesMint("01000000002", true, false);
-    assert.equal(d.action, "skip");
+  test("decideStaffPhonesMint clears on collision (attack victim phone)", () => {
+    const d = logic.decideStaffPhonesMint("01000000002", true);
+    assert.equal(d.action, "clear");
     assert.equal(d.reason, "phone_collision");
+    const merged = logic.mergeStaffPhonesClaims({role: "hr", phones: ["01000000001"]}, d);
+    assert.equal(merged.phones, undefined);
+    assert.equal(merged.role, "hr");
+  });
+
+  test("docHoldsPhone normalizes every phone field", () => {
+    const target = normalizePhone("01055500003");
+    assert.ok(logic.docHoldsPhone({phone: "01055500003"}, target));
+    assert.ok(logic.docHoldsPhone({phoneNumber: "+20 105 550 0003"}, target));
+    assert.ok(logic.docHoldsPhone({mobileNumber: "0020-105-550-0003"}, target));
+    assert.ok(logic.docHoldsPhone({mobile: "٠١٠٥٥٥٠٠٠٠٣"}, target));
+    assert.ok(logic.docHoldsPhone({phoneNumber: 1055500003}, target));
+    assert.ok(!logic.docHoldsPhone({phoneNumber: "01055500004", email: "01055500003"}, target));
+    assert.ok(!logic.docHoldsPhone(undefined, target));
+  });
+
+  test("phoneCollisionQueryValues fits one `in` query and includes numeric forms", () => {
+    const values = logic.phoneCollisionQueryValues("01055500003");
+    assert.ok(values.length <= 10);
+    assert.ok(values.includes("+201055500003"));
+    assert.ok(values.includes(1055500003));
+    assert.ok(values.includes(201055500003));
+  });
+
+  test("resolveStaffMintPhone prefers the Auth phone", () => {
+    assert.deepEqual(logic.resolveStaffMintPhone("+201000000009", "01055500003"),
+      {source: "auth", phone: "+201000000009"});
+    assert.deepEqual(logic.resolveStaffMintPhone(undefined, " 01055500003 "),
+      {source: "users_doc", phone: "01055500003"});
+    assert.deepEqual(logic.resolveStaffMintPhone(null, ""), {source: "none", phone: ""});
   });
 
   test("decideStaffPhonesMint sets when no collision", () => {
