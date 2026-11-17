@@ -54,6 +54,16 @@ const BATCH_LIMIT = 400;
 const GET_ALL_LIMIT = 100;
 const CREATE_PARALLEL = 25;
 
+/** One write the reconcile makes (or would make), with the before-state. */
+export interface PlannedWrite {
+  path: string;
+  op: "create" | "merge";
+  fields: string[];
+  before: Data | null;
+  /** create only: true when this run created the doc (false = it already existed). */
+  applied?: boolean;
+}
+
 export interface ReconcileResult {
   companyUID: string;
   chains: number;
@@ -143,7 +153,7 @@ export async function loadCoverage(db: Db, now: Date): Promise<Coverage> {
 export async function reconcileCompanyChainLinks(
   db: Db,
   companyUID: string,
-  opts: {onlyUid?: string; now?: Date; dryRun?: boolean} = {},
+  opts: {onlyUid?: string; now?: Date; dryRun?: boolean; plan?: PlannedWrite[]} = {},
 ): Promise<ReconcileResult> {
   const co = companyUID.trim();
   const res: ReconcileResult = {
@@ -188,7 +198,7 @@ export async function reconcileCompanyChainLinks(
     batch = db.batch();
     ops = 0;
   };
-  const creates: Array<{ref: admin.firestore.DocumentReference; data: Data}> = [];
+  const creates: Array<{entry: PlannedWrite; ref: admin.firestore.DocumentReference; data: Data}> = [];
   const ts = FieldValue.serverTimestamp();
 
   for (const uid of uids) {
@@ -206,8 +216,12 @@ export async function reconcileCompanyChainLinks(
     if (!source) continue;
     for (const orgId of plan.create) {
       const chain = chains.find((c) => c.id === orgId)!;
+      const path = `organizations/${orgId}/companies/${co}/delegates/${uid}`;
+      const entry: PlannedWrite = {path, op: "create", fields: [], before: null};
+      opts.plan?.push(entry);
       creates.push({
-        ref: db.doc(`organizations/${orgId}/companies/${co}/delegates/${uid}`),
+        entry,
+        ref: db.doc(path),
         data: {
           ...buildAutoLinkedCopy({source, chain, allNames: plan.allNames}),
           autoLinkedAt: ts, createdAt: ts, updatedAt: ts,
@@ -223,6 +237,16 @@ export async function reconcileCompanyChainLinks(
       const name = str(c.data.organizationName) || chains.find((x) => x.id === c.orgId)?.name || "";
       const position = smartPosition(plan.allNames, name, origin);
       if (sameList(c.data.allOrganizationNames) && str(c.data.position) === position) continue;
+      opts.plan?.push({
+        path: `organizations/${c.orgId}/companies/${co}/delegates/${uid}`,
+        op: "merge",
+        fields: ["allOrganizationNames", "position", "updatedAt"],
+        before: {
+          allOrganizationNames: c.data.allOrganizationNames ?? null,
+          position: c.data.position ?? null,
+          updatedAt: c.data.updatedAt ?? null,
+        },
+      });
       batch.set(db.doc(`organizations/${c.orgId}/companies/${co}/delegates/${uid}`), {
         allOrganizationNames: plan.allNames,
         position,
@@ -235,6 +259,12 @@ export async function reconcileCompanyChainLinks(
     const user = users.get(uid);
     const userNames = Array.isArray(user?.organizationNames) ? user!.organizationNames as unknown[] : [];
     if (user && plan.allNames.some((n) => !userNames.includes(n))) {
+      opts.plan?.push({
+        path: `users/${uid}`,
+        op: "merge",
+        fields: ["organizationNames", "updatedAt"],
+        before: {organizationNames: user.organizationNames ?? null, updatedAt: user.updatedAt ?? null},
+      });
       batch.set(db.doc(`users/${uid}`), {
         organizationNames: FieldValue.arrayUnion(...plan.allNames),
         updatedAt: ts,
@@ -249,9 +279,15 @@ export async function reconcileCompanyChainLinks(
     // other copies name its chain).
     for (const part of chunks(creates, CREATE_PARALLEL)) {
       const results = await Promise.allSettled(part.map((c) => c.ref.create(c.data)));
-      results.forEach((r) => {
-        if (r.status === "fulfilled") res.created++;
-        else if ((r.reason as {code?: number})?.code !== 6) throw r.reason; // 6 = ALREADY_EXISTS
+      results.forEach((r, i) => {
+        if (r.status === "fulfilled") {
+          res.created++;
+          part[i].entry.applied = true;
+        } else if ((r.reason as {code?: number})?.code === 6) { // 6 = ALREADY_EXISTS
+          part[i].entry.applied = false;
+        } else {
+          throw r.reason;
+        }
       });
     }
   }
