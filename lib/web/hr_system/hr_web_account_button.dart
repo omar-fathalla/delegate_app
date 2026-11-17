@@ -11,9 +11,9 @@ import 'package:delegate_app/web/hr_system/hr_western_digits.dart';
 
 /// Header account control for the web HR shell.
 ///
-/// Wide bars show the name beside the avatar. Narrow bars keep the avatar
-/// and put the name on the tooltip. The tap opens a compact profile panel
-/// instead of the sidebar's navigation menu.
+/// Wide bars show the name with the role chip under it, beside the avatar.
+/// Narrow bars keep the avatar and put the name on the tooltip. The tap
+/// opens a compact profile panel instead of the sidebar's navigation menu.
 class HrWebAccountButton extends StatelessWidget {
   final Delegate delegate;
   final bool showName;
@@ -44,23 +44,59 @@ class HrWebAccountButton extends StatelessWidget {
     final email = delegate.email?.trim() ?? '';
     final phone = delegate.phoneNumber.trim();
 
+    final isSupervisor = delegate.role == UserRole.admin;
+    final textTheme = Theme.of(context).textTheme;
     final chip = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (showName) ...[
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 148),
-            child: Text(
-              name,
-              key: const ValueKey('hr_web_header_name'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface,
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 148),
+                child: Text(
+                  name,
+                  key: const ValueKey('hr_web_header_name'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(height: 2),
+              Container(
+                key: const ValueKey('hr_web_header_role_chip'),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: cs.secondaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isSupervisor
+                          ? Icons.supervisor_account_rounded
+                          : Icons.badge_rounded,
+                      size: 14,
+                      color: cs.onSecondaryContainer,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isSupervisor ? 'مشرف الشركة' : 'HR',
+                      style: textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSecondaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           const SizedBox(width: 8),
         ],

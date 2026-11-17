@@ -503,10 +503,10 @@ class HrHomeFeatureCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   CompanyExclusiveCardIntro.titleAr,
-                  style: TextStyle(
-                    fontSize: 22,
-                    height: 1.35,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
+                    height: 1.35,
+                    letterSpacing: 0,
                     color: cs.onPrimaryContainer,
                   ),
                 ),
@@ -597,9 +597,10 @@ class HrHomeDutiesCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const HrCardTitle(
+          HrCardTitle(
             icon: Icons.checklist_rounded,
             text: 'دليل المهام والمسؤوليات',
+            fontSize: Theme.of(context).textTheme.titleSmall?.fontSize ?? 14,
           ),
           const SizedBox(height: 12),
           for (var i = 0; i < duties.length; i++) ...[
@@ -608,66 +609,101 @@ class HrHomeDutiesCard extends StatelessWidget {
               color: cs.surfaceContainerLowest,
               shape: tileShape,
               clipBehavior: Clip.antiAlias,
-              child: ExpansionTile(
-                key: ValueKey('hr_home_duty_$i'),
-                shape: tileShape,
-                collapsedShape: tileShape,
-                minTileHeight: 56,
-                tilePadding: const EdgeInsetsDirectional.only(
-                  start: 12,
-                  end: 8,
-                ),
-                childrenPadding: const EdgeInsetsDirectional.fromSTEB(
-                  60,
-                  0,
-                  16,
-                  16,
-                ),
-                expandedCrossAxisAlignment: CrossAxisAlignment.start,
-                expansionAnimationStyle: AnimationStyle(
-                  duration: AppMotionDurations.medium2,
-                  reverseDuration: AppMotionDurations.short3,
-                  curve: AppMotionCurves.emphasizedDecelerate,
-                  reverseCurve: AppMotionCurves.emphasizedAccelerate,
-                ),
-                iconColor: cs.primary,
-                collapsedIconColor: cs.onSurfaceVariant,
-                leading: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: cs.secondaryContainer,
-                    shape: BoxShape.circle,
+              child: ListTileTheme.merge(
+                horizontalTitleGap: 10,
+                child: ExpansionTile(
+                  key: ValueKey('hr_home_duty_$i'),
+                  shape: tileShape,
+                  collapsedShape: tileShape,
+                  minTileHeight: 56,
+                  tilePadding: const EdgeInsetsDirectional.only(
+                    start: 12,
+                    end: 8,
                   ),
-                  child: Icon(
-                    duties[i].icon,
-                    size: 20,
-                    color: cs.onSecondaryContainer,
+                  childrenPadding: const EdgeInsetsDirectional.fromSTEB(
+                    60,
+                    0,
+                    16,
+                    16,
                   ),
-                ),
-                title: Text(
-                  _cleanTitle(duties[i].title),
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: cs.onSurface,
+                  expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                  expansionAnimationStyle: AnimationStyle(
+                    duration: AppMotionDurations.medium2,
+                    reverseDuration: AppMotionDurations.short3,
+                    curve: AppMotionCurves.emphasizedDecelerate,
+                    reverseCurve: AppMotionCurves.emphasizedAccelerate,
                   ),
-                ),
-                children: [
-                  Text(
-                    duties[i].desc,
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.55,
-                      color: cs.onSurfaceVariant,
+                  iconColor: cs.primary,
+                  collapsedIconColor: cs.onSurfaceVariant,
+                  leading: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: cs.secondaryContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      duties[i].icon,
+                      size: 20,
+                      color: cs.onSecondaryContainer,
                     ),
                   ),
-                ],
+                  title: _DutyLine(_cleanTitle(duties[i].title)),
+                  children: [
+                    Text(
+                      duties[i].desc,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.55,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
         ],
       ),
+    );
+  }
+}
+
+/// One duty title on a single line. The tile centres it with the icon.
+///
+/// Ellipsis and a tooltip appear only when the line cannot fit.
+class _DutyLine extends StatelessWidget {
+  final String text;
+
+  const _DutyLine(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodySmall?.copyWith(
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0,
+      color: Theme.of(context).colorScheme.onSurface,
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: text, style: style),
+          maxLines: 1,
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout(maxWidth: constraints.maxWidth);
+        final overflows = painter.didExceedMaxLines;
+        painter.dispose();
+        final label = Text(
+          text,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.ellipsis,
+          style: style,
+        );
+        if (!overflows) return label;
+        return Tooltip(message: text, child: label);
+      },
     );
   }
 }
