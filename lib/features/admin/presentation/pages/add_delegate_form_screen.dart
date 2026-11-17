@@ -150,14 +150,21 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
                 .collection('companies')
                 .doc(companyUID)
                 .get();
-            if (!cDoc.exists) return null;
+            // Any company may request any chain (2026-11-17); approval
+            // registers the company in chains it is not in yet.
             final data = doc.data();
             return {
               'uid': doc.id,
               'name': data['name'] ?? data['title'] ?? doc.id,
+              'companyRegistered': cDoc.exists,
             };
           } catch (_) {
-            return null;
+            final data = doc.data();
+            return {
+              'uid': doc.id,
+              'name': data['name'] ?? data['title'] ?? doc.id,
+              'companyRegistered': false,
+            };
           }
         }));
         orgs.addAll(checks.whereType<Map<String, dynamic>>());

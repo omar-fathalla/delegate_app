@@ -1,6 +1,9 @@
 /**
- * Check that every organizationUID on a delegate request belongs to the
- * request's company. Used because the rules budget cannot exists() every
+ * Check every organizationUID on a delegate request. Product decision
+ * 2026-11-17 (relaxes MED-2): any company may request any chain and
+ * approval registers the company there, so a chain only fails when it does
+ * not exist, or is the hidden Fathalla chain and the company is not
+ * already in it. Used because the rules budget cannot exists() every
  * secondary chain.
  */
 export function str(v: unknown): string {
@@ -42,7 +45,7 @@ export function summarizeOrgCompanyCheck(opts: {
   }
   if (opts.missing.length > 0) {
     return {
-      ok: false, reason: "org_not_in_company", companyUID,
+      ok: false, reason: "chain_not_available", companyUID,
       orgIds: opts.orgIds, missing: opts.missing,
     };
   }
@@ -55,6 +58,27 @@ export const ORG_COMPANY_CHECK_KEYS = [
   "orgCompanyCheckMissing",
   "orgCompanyCheckAt",
 ] as const;
+
+/** Chains hidden from every picker (Fathalla has its own website signup). */
+export function isHiddenChain(uid: unknown, name: unknown): boolean {
+  const n = str(name).toLowerCase();
+  const u = str(uid).toLowerCase();
+  return n.includes("fathalla") || n.includes("فتح الله") || n.includes("فتح_الله") ||
+    u.includes("fathalla") || u.includes("فتح_الله");
+}
+
+/** A requested chain is available when it exists and is not hidden, or is
+ * hidden but the company is already in it. */
+export function chainAvailableForRequest(opts: {
+  orgExists: boolean;
+  orgId: string;
+  orgName: unknown;
+  companyInChain: boolean;
+}): boolean {
+  if (!opts.orgExists) return false;
+  if (!isHiddenChain(opts.orgId, opts.orgName)) return true;
+  return opts.companyInChain;
+}
 
 /** new_delegate and add_organization must be stamped ok before approval. */
 export function requestApprovalRequiresOrgCheck(requestType: unknown): boolean {

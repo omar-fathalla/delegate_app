@@ -9,6 +9,7 @@ import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/admin/domain/services/delegate_duplicate.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/features/admin/domain/entities/chain_selection.dart';
+import 'package:delegate_app/features/admin/data/company_chain_registration.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/admin/data/datasources/storage_upload_intent.dart';
 import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
@@ -198,11 +199,15 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       if (companyUID.trim().isEmpty) {
         return const Left(ServerFailure('اختر الشركة أولاً ثم أعد المحاولة.'));
       }
-      final missingOrg = await _firstOrgMissingFromCompany(resolveOrgs, companyUID);
-      if (missingOrg != null) {
-        return const Left(ServerFailure(
-          'لا يمكن ربط المندوب بسلسلة لا تنتمي لهذه الشركة.',
-        ));
+      // Any company may request any chain; approval registers the company
+      // in chains it is not in yet. Only missing/hidden chains are refused.
+      final badOrg = await firstInvalidRequestChain(
+        firestore: _firestore,
+        companyUID: companyUID,
+        orgIds: resolveOrgs,
+      );
+      if (badOrg != null) {
+        return const Left(ServerFailure(kRequestChainUnavailableMessage));
       }
 
       final request = DelegateSubscriptionRequest(
@@ -557,11 +562,13 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         targetOrganizationUID.trim(),
         ...extraOrgs,
       };
-      final missingOrg = await _firstOrgMissingFromCompany(orgsToCheck.toList(), companyUID);
-      if (missingOrg != null) {
-        return const Left(ServerFailure(
-          'لا يمكن ربط المندوب بسلسلة لا تنتمي لهذه الشركة.',
-        ));
+      final badOrg = await firstInvalidRequestChain(
+        firestore: _firestore,
+        companyUID: companyUID,
+        orgIds: orgsToCheck.toList(),
+      );
+      if (badOrg != null) {
+        return const Left(ServerFailure(kRequestChainUnavailableMessage));
       }
 
       final docRef = _firestore.collection('delegate_requests').doc();
@@ -943,25 +950,24 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         ));
       }
 
-      // MED-2: approval of new_delegate / add_organization requires the
-      // server mark orgCompanyCheck == ok, and every chain must still
-      // belong to the company (the mark is not enough on its own).
+      // MED-2 (relaxed 2026-11-17 by product decision): any company may
+      // request any chain, and approval registers the company in it.
+      // A server stamp 'failed' (chain missing / hidden) blocks approval.
+      // A missing stamp (function not deployed) or the old
+      // 'org_not_in_company' failure falls back to the client re-check.
       if (request.isNewDelegateRequest || request.isAddOrganizationRequest) {
         final live = await _firestore.collection('delegate_requests').doc(request.id).get();
-        final mark = live.data()?['orgCompanyCheck']?.toString();
-        if (mark != 'ok') {
-          return const Left(ServerFailure(
-            'لا يمكن اعتماد الطلب قبل التأكد أن كل السلاسل تنتمي للشركة.',
-          ));
+        final blocked = approvalStampBlocks(live.data());
+        if (blocked) {
+          return const Left(ServerFailure(kRequestChainUnavailableMessage));
         }
-        final missingOrg = await _firstOrgMissingFromCompany(
-          request.resolvedOrganizationUIDs,
-          request.companyUID,
+        final badOrg = await firstInvalidRequestChain(
+          firestore: _firestore,
+          companyUID: request.companyUID,
+          orgIds: request.resolvedOrganizationUIDs,
         );
-        if (missingOrg != null) {
-          return const Left(ServerFailure(
-            'لا يمكن اعتماد الطلب: سلسلة لا تنتمي للشركة.',
-          ));
+        if (badOrg != null) {
+          return const Left(ServerFailure(kRequestChainUnavailableMessage));
         }
       }
 
@@ -1257,6 +1263,36 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
             .doc(targetDelegateUid);
       }
 
+      // 2a/2b. Register the company in every requested chain it is not in
+      // yet (copying its record from another chain) and add the supervisor
+      // as admin, BEFORE the batch: nested delegate creates require the
+      // company record, and auditDelegateCreateOrgs deletes delegates
+      // under a missing company. Idempotent, never overwrites.
+      if (request.companyUID.trim().isNotEmpty) {
+        try {
+          await ensureCompanyInChains(
+            firestore: _firestore,
+            companyUID: request.companyUID,
+            companyName: request.companyName,
+            chains: {
+              for (var i = 0; i < orgUids.length; i++) orgUids[i]: orgNames[i],
+            },
+            supervisorUid: request.supervisorUid,
+            supervisorName: request.supervisorName,
+            supervisorPhone: request.supervisorPhone,
+            preferredTemplateOrgs: [
+              ?supOrg,
+            ],
+            requestId: request.id,
+          );
+        } on FirebaseException catch (e) {
+          if (e.code == 'permission-denied') {
+            return const Left(ServerFailure(kRegisterCompanyInChainDeniedMessage));
+          }
+          rethrow;
+        }
+      }
+
       // 2c/2e. One WriteBatch (same for super-admin and technical support):
       // request -> approved, plus each delegate doc either created in full or,
       // if it already exists as 'pending', activated with a status-only write
@@ -1332,49 +1368,6 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
           return Left(ServerFailure(message));
         }
         rethrow;
-      }
-
-      // 2a. Ensure the company exists under the target organization
-      try {
-        await _firestore
-            .collection('organizations')
-            .doc(request.organizationUID)
-            .collection('companies')
-            .doc(request.companyUID)
-            .set({
-          'id': request.companyUID,
-          'uid': request.companyUID,
-          'name': request.companyName,
-          'organizationUID': request.organizationUID,
-          'organizationName': request.organizationName,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-      } catch (e) {
-        // Log non-blocking auxiliary error
-      }
-
-      // 2b. Ensure the supervisor is linked as admin of this company under the target organization
-      try {
-        await _firestore
-            .collection('organizations')
-            .doc(request.organizationUID)
-            .collection('companies')
-            .doc(request.companyUID)
-            .collection('admins')
-            .doc(request.supervisorUid)
-            .set({
-          'uid': request.supervisorUid,
-          'name': request.supervisorName,
-          'phone': request.supervisorPhone,
-          'role': 'company-admin',
-          'companyUID': request.companyUID,
-          'companyName': request.companyName,
-          'organizationUID': request.organizationUID,
-          'organizationName': request.organizationName,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-      } catch (e) {
-        // Log non-blocking auxiliary error
       }
 
       // 2d. If add_organization: ensure original organization document maintains its own organizationUID/Name and updates allOrganizationNames
@@ -1834,22 +1827,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
   }
 
   /// Returns the first org in [orgIds] that has no companies/{companyUID} doc.
-  Future<String?> _firstOrgMissingFromCompany(List<String> orgIds, String companyUID) async {
-    final company = companyUID.trim();
-    if (company.isEmpty) return orgIds.isEmpty ? null : orgIds.first;
-    for (final raw in orgIds) {
-      final orgId = raw.trim();
-      if (orgId.isEmpty) continue;
-      final snap = await _firestore
-          .collection('organizations')
-          .doc(orgId)
-          .collection('companies')
-          .doc(company)
-          .get();
-      if (!snap.exists) return orgId;
-    }
-    return null;
-  }
+
 }
 
 String _duplicateCheckErrorMessage(FirebaseFunctionsException e) {
