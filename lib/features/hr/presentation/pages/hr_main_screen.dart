@@ -20,6 +20,7 @@ import 'package:delegate_app/features/settings/presentation/pages/settings_scree
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
 import 'package:delegate_app/web/hr_system/hr_web_account_button.dart';
+import 'package:delegate_app/web/hr_system/hr_shell_link.dart';
 import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
 
 class HRMainScreen extends StatefulWidget {
@@ -46,10 +47,23 @@ class _HRMainScreenState extends State<HRMainScreen> {
     super.initState();
     _currentIndex = widget.initialIndex ?? _homeIndex;
     _loadedTabs = {_currentIndex};
+    if (WebRuntimePolicy.isWeb) {
+      HrShellLink.attach(
+        owner: this,
+        selectTab: (index) {
+          if (mounted) _onTabSelected(index);
+        },
+        selectMenu: (id) {
+          if (mounted) _onMenuSelected(id);
+        },
+        bridge: _headerBridge,
+      );
+    }
   }
 
   @override
   void dispose() {
+    HrShellLink.detach(this);
     _headerBridge.dispose();
     super.dispose();
   }
