@@ -277,7 +277,8 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                                   .doc(compUid)
                                                   .collection('delegates')
                                                   .doc(del.uid)
-                                                  .set(payload, SetOptions(merge: true));
+                                                  // update(): never create a stub doc.
+                                                  .update(payload);
                                             }
 
                                             // 2. Safely update in users document if it exists
