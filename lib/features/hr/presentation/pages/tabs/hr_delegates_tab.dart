@@ -2,7 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
@@ -10,13 +13,32 @@ import 'package:delegate_app/core/widgets/tashil_button_group.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_event.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_state.dart';
+import 'package:delegate_app/features/admin/data/link_delegate_chains.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_delegate_attendance_detail_screen.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_add_chains_sheet.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:delegate_app/features/profile/presentation/pages/profile_screen.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 
 enum HRDelegatesViewMode { table, cards }
+
+/// Web breakpoints of the «مناديب الشركة» page (MD3 Model 3).
+class HRDelegatesWebBreakpoints {
+  HRDelegatesWebBreakpoints._();
+
+  /// Below this viewport width the table becomes cards.
+  static const double cardsBelow = 840;
+
+  /// Below this table width the ID/phone and name/city columns merge.
+  static const double mergedColumnsBelow = 1080;
+
+  /// Fixed width of the actions column (3 icon buttons, 48dp each).
+  static const double actionsWidth = 168;
+
+  /// Fixed width of the «السلاسل» count column.
+  static const double chainsWidth = 84;
+}
 
 class HRDelegatesTab extends StatefulWidget {
   final Delegate hrDelegate;
@@ -105,6 +127,95 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
             showBackButton: true,
             initialTabIndex: initialTabIndex,
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Web: «إضافة سلاسل» for this delegate (same request as the mobile
+  /// «ربط بسلاسل إضافية» sheet).
+  Future<void> _openAddChains(Delegate delegate) async {
+    final names = await HrAddChainsSheet.show(
+      context,
+      delegate: delegate,
+      supervisor: widget.hrDelegate,
+    );
+    if (!mounted || names == null || names.isEmpty) return;
+    AppSnackBar.showSuccess(context, linkChainsSuccessMessage(names));
+  }
+
+  bool _canAddChains(Delegate delegate) =>
+      kHrAllowAddChainsForSuspended || delegate.status == DelegateStatus.active;
+
+  /// Chains the delegate is on, from the loaded delegate (primary chain
+  /// plus allOrganizationNames). No extra reads.
+  int _chainCount(Delegate delegate) {
+    final names = <String>{
+      for (final n in [delegate.organizationName, ...delegate.allOrganizationNames])
+        if (n.trim().isNotEmpty) n.trim().toLowerCase(),
+    };
+    if (names.isEmpty && delegate.organizationUID.trim().isNotEmpty) return 1;
+    return names.length;
+  }
+
+  /// Web actions (MD3 Model 3): icon-only, 48dp, with tooltips.
+  /// «إضافة سلاسل» (tonal), «أسبوعية»/«سنوية» and «سجل الحضور».
+  /// No profile, call or WhatsApp.
+  List<Widget> _buildWebActions(Delegate delegate, ColorScheme colorScheme) {
+    final canAdd = _canAddChains(delegate);
+    const box = BoxConstraints(minWidth: 48, minHeight: 48);
+    final leaveColor = delegate.isAnnualLeaveEnabled
+        ? const Color(0xFF2E7D32)
+        : Colors.amber.shade800;
+    return [
+      Tooltip(
+        message: canAdd ? 'إضافة سلاسل' : kHrAddChainsSuspendedTooltip,
+        child: IconButton.filledTonal(
+          key: Key('hr_delegate_add_chains_${delegate.uid}'),
+          constraints: box,
+          iconSize: 24,
+          onPressed: canAdd ? () => _openAddChains(delegate) : null,
+          icon: const Icon(Symbols.add_business_rounded),
+        ),
+      ),
+      Tooltip(
+        message: delegate.isAnnualLeaveEnabled
+            ? 'سنوية: الإجازات السنوية مفعّلة (${delegate.annualLeaveQuota} يوم) - اضغط للتعديل'
+            : 'أسبوعية: الإجازات السنوية غير مفعّلة - اضغط للتفعيل',
+        child: IconButton(
+          key: Key('hr_delegate_leaves_${delegate.uid}'),
+          constraints: box,
+          iconSize: 24,
+          onPressed: () => _showAnnualLeaveManagementDialog(delegate),
+          icon: Icon(
+            delegate.isAnnualLeaveEnabled
+                ? Symbols.beach_access_rounded
+                : Symbols.event_repeat_rounded,
+            color: leaveColor,
+          ),
+        ),
+      ),
+      Tooltip(
+        message: 'سجل الحضور والانصراف',
+        child: IconButton(
+          key: Key('hr_delegate_attendance_${delegate.uid}'),
+          constraints: box,
+          iconSize: 24,
+          color: colorScheme.onSurfaceVariant,
+          onPressed: () => _openAttendance(delegate),
+          icon: const Icon(Symbols.fact_check_rounded),
+        ),
+      ),
+    ];
+  }
+
+  void _openAttendance(Delegate delegate) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => HRDelegateAttendanceDetailScreen(
+          delegate: delegate,
+          hrDelegate: widget.hrDelegate,
         ),
       ),
     );
@@ -534,7 +645,8 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
 
                 return LayoutBuilder(
                   builder: (context, constraints) {
-                    final isDesktopWide = constraints.maxWidth >= 960;
+                    final isDesktopWide = constraints.maxWidth >=
+                        (WebRuntimePolicy.isWeb ? 900 : 960);
 
                     if (isDesktopWide) {
                       return Row(
@@ -647,9 +759,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
 
                   return RefreshIndicator(
                     onRefresh: () async => _loadDelegates(),
-                    child: _viewMode == HRDelegatesViewMode.table
-                        ? _buildDelegatesTable(filtered, theme, colorScheme)
-                        : _buildCardsGrid(filtered, theme, colorScheme),
+                    child: _buildDelegatesBody(filtered, theme, colorScheme),
                   );
                 }
 
@@ -658,6 +768,420 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDelegatesBody(
+    List<Delegate> delegates,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
+    if (WebRuntimePolicy.isWeb) {
+      final narrow = MediaQuery.sizeOf(context).width <
+          HRDelegatesWebBreakpoints.cardsBelow;
+      if (narrow || _viewMode == HRDelegatesViewMode.cards) {
+        return _buildCardsGrid(delegates, theme, colorScheme);
+      }
+      return _buildWebDelegatesTable(delegates, theme, colorScheme);
+    }
+    return _viewMode == HRDelegatesViewMode.table
+        ? _buildDelegatesTable(delegates, theme, colorScheme)
+        : _buildCardsGrid(delegates, theme, colorScheme);
+  }
+
+  /// Web table (MD3 Model 1): no row tap, labelled actions, and the ID/phone
+  /// and name/city columns merge on narrower tables.
+  Widget _buildWebDelegatesTable(
+    List<Delegate> delegates,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
+    const actionsWidth = HRDelegatesWebBreakpoints.actionsWidth;
+    const statusWidth = 96.0;
+    const chainsWidth = HRDelegatesWebBreakpoints.chainsWidth;
+    const minWidth = actionsWidth + statusWidth + chainsWidth + 420;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Container(
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final available = constraints.maxWidth;
+            final width = available > minWidth ? available : minWidth;
+            final merged = width < HRDelegatesWebBreakpoints.mergedColumnsBelow;
+            final scrollable = width > available;
+
+            Widget header(String title, {int? flex, double? fixed, bool center = false}) {
+              final text = Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Text(
+                  title,
+                  textAlign: center ? TextAlign.center : TextAlign.start,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12.5,
+                  ),
+                ),
+              );
+              return fixed != null
+                  ? SizedBox(width: fixed, child: text)
+                  : Expanded(flex: flex ?? 1, child: text);
+            }
+
+            final table = SizedBox(
+              width: width,
+              child: Column(
+                children: [
+                  Container(
+                    height: 44,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerLow,
+                      border: Border(
+                        bottom: BorderSide(
+                          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: merged
+                          ? [
+                              header('المندوب / المروج', flex: 22),
+                              header('الرقم القومي / الهاتف', flex: 16),
+                              header('السلاسل', fixed: chainsWidth, center: true),
+                              header('الحالة', fixed: statusWidth, center: true),
+                              header('الإجراءات', fixed: actionsWidth, center: true),
+                            ]
+                          : [
+                              header('#', fixed: 40, center: true),
+                              header('المندوب / المروج', flex: 20),
+                              header('الرقم القومي', flex: 15),
+                              header('رقم الهاتف', flex: 13),
+                              header('المدينة', flex: 11),
+                              header('السلاسل', fixed: chainsWidth, center: true),
+                              header('الحالة', fixed: statusWidth, center: true),
+                              header('الإجراءات', fixed: actionsWidth, center: true),
+                            ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.separated(
+                      controller: _vScrollCtrl,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: delegates.length,
+                      separatorBuilder: (_, _) => Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                      ),
+                      itemBuilder: (context, index) => _buildWebRow(
+                        delegates[index],
+                        index,
+                        merged: merged,
+                        statusWidth: statusWidth,
+                        theme: theme,
+                        colorScheme: colorScheme,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+
+            if (!scrollable) return table;
+            return Scrollbar(
+              controller: _hScrollCtrl,
+              thumbVisibility: true,
+              notificationPredicate: (n) =>
+                  n.depth == 0 && n.metrics.axis == Axis.horizontal,
+              child: SingleChildScrollView(
+                controller: _hScrollCtrl,
+                scrollDirection: Axis.horizontal,
+                child: table,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWebRow(
+    Delegate delegate,
+    int index, {
+    required bool merged,
+    required double statusWidth,
+    required ThemeData theme,
+    required ColorScheme colorScheme,
+  }) {
+    final isActive = delegate.status == DelegateStatus.active;
+    final statusColor =
+        isActive ? const Color(0xFF2E7D32) : colorScheme.onSurfaceVariant;
+    final statusBg = isActive
+        ? const Color(0xFF2E7D32).withValues(alpha: 0.12)
+        : colorScheme.surfaceContainerHighest;
+    final role = delegate.position == DelegatePosition.supervisor
+        ? 'مشرف'
+        : 'مندوب / مروج';
+    final city = delegate.city.isNotEmpty
+        ? delegate.city
+        : (delegate.companyName.isNotEmpty ? delegate.companyName : '—');
+
+    final mono = theme.textTheme.bodySmall?.copyWith(
+      fontWeight: FontWeight.w600,
+      color: colorScheme.onSurface,
+      letterSpacing: 0.3,
+    );
+
+    Widget copyCell(String value, String tooltip, VoidCallback onCopy) {
+      return Row(
+        children: [
+          Flexible(
+            child: SelectableText(
+              value.isNotEmpty ? value : '—',
+              style: mono,
+              maxLines: 1,
+            ),
+          ),
+          if (value.isNotEmpty)
+            IconButton(
+              icon: const Icon(Symbols.content_copy_rounded, size: 15),
+              tooltip: tooltip,
+              visualDensity: VisualDensity.compact,
+              color: colorScheme.onSurfaceVariant,
+              onPressed: onCopy,
+            ),
+        ],
+      );
+    }
+
+    final nameCell = Row(
+      children: [
+        AppAvatar(
+          imageUrl: delegate.personalPhotoUrl,
+          fallbackText: delegate.fullName,
+          radius: 16,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: merged
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      delegate.fullName,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      '$role · $city',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 11.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                )
+              : Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: delegate.fullName,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      TextSpan(
+                        text: '   $role',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+        ),
+      ],
+    );
+
+    final chainCount = _chainCount(delegate);
+    final chains = SizedBox(
+      width: HRDelegatesWebBreakpoints.chainsWidth,
+      child: Center(
+        child: Tooltip(
+          message: 'مرتبط بـ $chainCount سلسلة',
+          child: Container(
+            key: Key('hr_delegate_chains_${delegate.uid}'),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            decoration: BoxDecoration(
+              border: Border.all(color: colorScheme.outlineVariant),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Symbols.storefront_rounded, size: 15, color: colorScheme.onSurfaceVariant),
+                const SizedBox(width: 4),
+                Text(
+                  '$chainCount',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final status = SizedBox(
+      width: statusWidth,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: statusBg,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.circle, size: 7, color: statusColor),
+              const SizedBox(width: 5),
+              Text(
+                isActive ? 'نشط' : 'متوقف',
+                style: TextStyle(
+                  color: statusColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final actions = SizedBox(
+      width: HRDelegatesWebBreakpoints.actionsWidth,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          for (final (i, w) in _buildWebActions(delegate, colorScheme).indexed) ...[
+            if (i > 0) const SizedBox(width: 4),
+            w,
+          ],
+        ],
+      ),
+    );
+
+    Widget cell(int flex, Widget child) => Expanded(
+          flex: flex,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: child,
+          ),
+        );
+
+    return Container(
+      key: Key('hr_delegate_row_${delegate.uid}'),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+      constraints: const BoxConstraints(minHeight: 50),
+      child: Row(
+        children: merged
+            ? [
+                cell(22, nameCell),
+                cell(
+                  16,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        delegate.nationalityID.isNotEmpty ? delegate.nationalityID : '—',
+                        style: mono,
+                      ),
+                      Text(
+                        delegate.phoneNumber.isNotEmpty ? delegate.phoneNumber : '—',
+                        style: mono?.copyWith(color: colorScheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+                chains,
+                status,
+                actions,
+              ]
+            : [
+                SizedBox(
+                  width: 40,
+                  child: Center(
+                    child: Text(
+                      '${index + 1}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+                cell(20, nameCell),
+                cell(
+                  15,
+                  copyCell(
+                    delegate.nationalityID,
+                    'نسخ الرقم القومي',
+                    () => _copyNationalId(delegate.nationalityID),
+                  ),
+                ),
+                cell(
+                  13,
+                  copyCell(
+                    delegate.phoneNumber,
+                    'نسخ رقم الهاتف',
+                    () => _copyPhoneNumber(delegate.phoneNumber),
+                  ),
+                ),
+                cell(
+                  11,
+                  Text(
+                    city,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                chains,
+                status,
+                actions,
+              ],
       ),
     );
   }
@@ -1032,9 +1556,9 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
               horizontal: 16,
               vertical: 12,
             ),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
               maxCrossAxisExtent: 550,
-              mainAxisExtent: 175,
+              mainAxisExtent: WebRuntimePolicy.isWeb ? 190 : 175,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
             ),
@@ -1212,12 +1736,23 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
             const SizedBox(height: 8),
 
             // Actions Row
-            Row(
-              children: [
-                const Spacer(),
-                _buildTableActionsButtonGroup(delegate, colorScheme),
-              ],
-            ),
+            if (WebRuntimePolicy.isWeb)
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  alignment: WrapAlignment.end,
+                  children: _buildWebActions(delegate, colorScheme),
+                ),
+              )
+            else
+              Row(
+                children: [
+                  const Spacer(),
+                  _buildTableActionsButtonGroup(delegate, colorScheme),
+                ],
+              ),
           ],
         ),
       ),

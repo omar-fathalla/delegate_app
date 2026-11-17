@@ -13,9 +13,17 @@ class DuplicateChainLookup {
     required this.duplicateOrgUids,
     this.existingDelegateUid,
     this.existingDelegateOrganizationUID,
+    this.delegateOrgUids = const {},
+    this.pendingOrgUids = const {},
   });
 
   final Set<String> duplicateOrgUids;
+
+  /// Subset of [duplicateOrgUids] where a delegate doc already exists.
+  final Set<String> delegateOrgUids;
+
+  /// Subset of [duplicateOrgUids] listed on a pending `delegate_requests` doc.
+  final Set<String> pendingOrgUids;
   final String? existingDelegateUid;
   final String? existingDelegateOrganizationUID;
 }
@@ -67,6 +75,8 @@ Future<DuplicateChainLookup> lookupDuplicateChains({
   }
 
   final found = <String>{};
+  final onDelegateDocs = <String>{};
+  final onPendingRequests = <String>{};
   String? existingUid;
   String? existingOrg;
   final seenUids = <String>{};
@@ -136,6 +146,7 @@ Future<DuplicateChainLookup> lookupDuplicateChains({
       final snap = await query(field, value);
       if (snap.docs.isEmpty) return;
       found.add(orgId);
+      onDelegateDocs.add(orgId);
       for (final doc in snap.docs) {
         final data = doc.data();
         if (phoneMatch) _assertPhoneMatchesIdentity(data);
@@ -175,7 +186,9 @@ Future<DuplicateChainLookup> lookupDuplicateChains({
           for (final e in list)
             if (e.toString().trim().isNotEmpty) e.toString().trim(),
       };
-      found.addAll(ids.intersection(orgs));
+      final hits = ids.intersection(orgs);
+      found.addAll(hits);
+      onPendingRequests.addAll(hits);
       // Pending requests only occupy the chain; identity checks that would
       // attach to a live record run against delegate docs, not this scan.
       final existing = (data['existingDelegateUid'] ?? '').toString().trim();
@@ -190,5 +203,7 @@ Future<DuplicateChainLookup> lookupDuplicateChains({
     duplicateOrgUids: found,
     existingDelegateUid: existingUid,
     existingDelegateOrganizationUID: existingOrg,
+    delegateOrgUids: onDelegateDocs,
+    pendingOrgUids: onPendingRequests,
   );
 }
