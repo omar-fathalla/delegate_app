@@ -32,6 +32,7 @@ describe("delegate_requests: payment is server-only", () => {
       await db.doc("users/tech").set({role: "technical_support"});
       await db.doc("users/mk").set({role: "marketing", organizationUID: "o1", companyUID: "c1"});
       await db.doc("users/d1").set({role: "delegate", organizationUID: "o1", companyUID: "c1", uid: "d1"});
+      for (const o of ["o1", "o2", "o3"]) await db.doc(`organizations/${o}`).set({name: o});
       await db.doc("organizations/o1/companies/c1").set({companyUID: "c1"});
       await db.doc("organizations/o2/companies/c2").set({companyUID: "c2"});
       await db.doc("organizations/o3/companies/c1").set({companyUID: "c1"});
@@ -306,6 +307,32 @@ describe("delegate_requests: payment is server-only", () => {
     await assertFails(as("sup").doc("delegate_requests/create-missing-co").set({
       requestType: "new_delegate", status: "pending", supervisorUid: "sup",
       organizationUID: "o1",
+    }));
+  });
+
+  test("any chain (2026-11-17): company staff may request a chain their company is not in, own company only", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("organizations/o-new").set({name: "سلسلة جديدة"});
+    });
+    // c1 is not registered under o-new: allowed now (approval registers it).
+    await assertSucceeds(as("hr1").doc("delegate_requests/any-chain-hr").set({
+      requestType: "add_organization", status: "pending", supervisorUid: "hr1",
+      companyUID: "c1", organizationUID: "o-new", organizationUIDs: ["o-new", "o2"],
+      existingDelegateUid: "d1",
+    }));
+    await assertSucceeds(as("admin1").doc("delegate_requests/any-chain-admin").set({
+      requestType: "new_delegate", status: "pending", supervisorUid: "admin1",
+      companyUID: "c1", organizationUID: "o-new", organizationUIDs: ["o-new"],
+    }));
+    // Still company-scoped: HR of c1 cannot request for another company.
+    await assertFails(as("hr1").doc("delegate_requests/any-chain-other-co").set({
+      requestType: "add_organization", status: "pending", supervisorUid: "hr1",
+      companyUID: "c2", organizationUID: "o-new", organizationUIDs: ["o-new"],
+    }));
+    // A chain that does not exist is still refused.
+    await assertFails(as("hr1").doc("delegate_requests/any-chain-missing").set({
+      requestType: "add_organization", status: "pending", supervisorUid: "hr1",
+      companyUID: "c1", organizationUID: "no-such-org", organizationUIDs: ["no-such-org"],
     }));
   });
 

@@ -45,6 +45,7 @@ class HrAddChainsSheet extends StatefulWidget {
   static const submitKey = Key('hr_add_chains_submit');
   static const searchKey = Key('hr_add_chains_search');
   static const selectAllKey = Key('hr_add_chains_select_all');
+  static Key newChainHintKey(String uid) => Key('hr_add_chains_new_$uid');
   static Key chipKey(String uid) => Key('hr_add_chains_chip_$uid');
 
   /// Tests and fake-data screenshots only.
@@ -576,7 +577,27 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
                 FilterChip(
                   key: HrAddChainsSheet.chipKey(c.uid),
                   selected: _selected.contains(c.uid),
-                  label: Text(c.name),
+                  tooltip: c.companyRegistered
+                      ? null
+                      : 'الشركة غير مسجلة في هذه السلسلة بعد، وتُسجَّل عند اعتماد الطلب',
+                  label: c.companyRegistered
+                      ? Text(c.name)
+                      : Text.rich(
+                          TextSpan(
+                            text: c.name,
+                            children: [
+                              TextSpan(
+                                text: ' · جديدة',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: cs.onSurfaceVariant,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          key: HrAddChainsSheet.newChainHintKey(c.uid),
+                        ),
                   onSelected: _submitting ||
                           (atCap && !_selected.contains(c.uid))
                       ? null
@@ -595,6 +616,15 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
             ? 'تعذر التحقق من الطلبات السابقة الآن. سيتم التحقق من ربط المندوب بكل سلسلة عند الإرسال.'
             : 'السلاسل المرتبطة حالياً أو التي عليها طلب قيد المراجعة غير متاحة للاختيار.',
       ),
+      if (_chains.any((c) =>
+          _selected.contains(c.uid) && !c.companyRegistered)) ...[
+        const SizedBox(height: 8),
+        _note(
+          cs,
+          Symbols.domain_add_rounded,
+          'السلاسل المعلّمة «جديدة» ستُسجَّل فيها الشركة تلقائياً عند اعتماد الطلب.',
+        ),
+      ],
       if (selection.warningAr != null || _notice != null) ...[
         const SizedBox(height: 8),
         _note(cs, Symbols.info_rounded, (_notice ?? selection.warningAr)!),

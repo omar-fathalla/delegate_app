@@ -2411,18 +2411,18 @@ service cloud.firestore {
           ]));
     }
 
-    // When organizationUIDs is present, the primary chain must be a company
-    // under that organization. Checking every secondary here overflows the
-    // 1000-expression budget (org-admin add_organization already sat at the
-    // limit). Secondaries are enforced server-side and logged.
-    function requestPrimaryOrgBelongsToCompany() {
+    // When organizationUIDs is present, the primary chain must exist.
+    // Product decision 2026-11-17 (relaxes MED-2): any company may request
+    // any chain; approval registers the company in it. Company scoping is
+    // unchanged (createDelegateRequestOk: company staff only for their own
+    // companyUID, org-admin only their own org). Secondaries are checked
+    // server-side by auditDelegateRequestOrgs (chain exists, not hidden).
+    function requestPrimaryOrgExists() {
       let d = request.resource.data;
       let org = d.get('organizationUID', '');
-      let co = d.get('companyUID', '');
       return !d.keys().hasAll(['organizationUIDs'])
         || org == ''
-        || co == ''
-        || exists(/databases/$(database)/documents/organizations/$(org)/companies/$(co));
+        || exists(/databases/$(database)/documents/organizations/$(org));
     }
 
 
@@ -2467,7 +2467,7 @@ service cloud.firestore {
         && d.get('actionType', '') != 'update_national_id'
         && subscriptionPaymentCreateOk()
         && requestOrganizationUIDsOk()
-        && requestPrimaryOrgBelongsToCompany();
+        && requestPrimaryOrgExists();
     }
 
     // L1: org-admin may only include their own organization in
@@ -2579,7 +2579,7 @@ service cloud.firestore {
         && resource.data.get('requestType', '') != 'update_national_id'
         && resource.data.get('actionType', '') != 'update_national_id'
         && (!changedKeys().hasAny(['organizationUIDs', 'organizationUID', 'organizationId', 'companyUID', 'companyId'])
-          || (requestOrganizationUIDsOk() && requestPrimaryOrgBelongsToCompany()))
+          || (requestOrganizationUIDsOk() && requestPrimaryOrgExists()))
         && orgCompanyCheckKeysLocked()
         && requestApprovalOrgCheckOk();
       allow delete: if isSuperAdmin()

@@ -1,6 +1,9 @@
 /**
- * Server-side enforcement for secondary organizationUIDs: each chain must
- * have organizations/{org}/companies/{company}. Logs the reason.
+ * Server-side check for every organizationUID on a delegate request:
+ * each chain must exist and not be the hidden Fathalla chain (unless the
+ * company is already in it). Product decision 2026-11-17: a chain the
+ * company is not in yet is fine; approval registers the company there.
+ * Logs the reason.
  *
  * Deploy: functions:tashil-mobile-notifications:auditDelegateRequestOrgs
  * Do not deploy suspendExpiredSubscriptions with this function.
@@ -9,6 +12,7 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import {FieldValue} from "firebase-admin/firestore";
 import {
+  chainAvailableForRequest,
   requestCompanyId,
   requestOrganizationIds,
   summarizeOrgCompanyCheck,
@@ -16,15 +20,22 @@ import {
 
 if (admin.apps.length === 0) admin.initializeApp();
 
-export async function missingOrgsForCompany(
+export async function unavailableOrgsForRequest(
   db: FirebaseFirestore.Firestore,
   companyUID: string,
   orgIds: string[],
 ): Promise<string[]> {
   const missing: string[] = [];
   for (const orgId of orgIds) {
-    const snap = await db.doc(`organizations/${orgId}/companies/${companyUID}`).get();
-    if (!snap.exists) missing.push(orgId);
+    const org = await db.doc(`organizations/${orgId}`).get();
+    const name = org.exists ? (org.get("name") ?? org.get("title") ?? orgId) : orgId;
+    let companyInChain = false;
+    if (org.exists) {
+      companyInChain = (await db.doc(`organizations/${orgId}/companies/${companyUID}`).get()).exists;
+    }
+    if (!chainAvailableForRequest({orgExists: org.exists, orgId, orgName: name, companyInChain})) {
+      missing.push(orgId);
+    }
   }
   return missing;
 }
@@ -35,7 +46,7 @@ export async function evaluateRequestOrgCompany(
 ): Promise<ReturnType<typeof summarizeOrgCompanyCheck>> {
   const companyUID = requestCompanyId(data);
   const orgIds = requestOrganizationIds(data);
-  const missing = companyUID ? await missingOrgsForCompany(db, companyUID, orgIds) : orgIds;
+  const missing = companyUID ? await unavailableOrgsForRequest(db, companyUID, orgIds) : orgIds;
   return summarizeOrgCompanyCheck({companyUID, orgIds, missing});
 }
 
