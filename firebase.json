@@ -50,6 +50,24 @@
             "value": "no-cache, no-store, must-revalidate"
           }
         ]
+      },
+      {
+        "source": "/@(favicon.ico|favicon.png|apple-touch-icon.png|og-image.png|og-image-512.png)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=86400"
+          }
+        ]
+      },
+      {
+        "source": "/icons/@(Icon-192.png|Icon-512.png|Icon-maskable-192.png|Icon-maskable-512.png)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=86400"
+          }
+        ]
       }
     ]
   },
