@@ -207,3 +207,100 @@ Future<DuplicateChainLookup> lookupDuplicateChains({
     pendingOrgUids: onPendingRequests,
   );
 }
+
+/// Chain states for linking a KNOWN existing delegate to more chains (the
+/// «ربط بسلاسل إضافية» / HR web «إضافة سلاسل» flow).
+///
+/// Unlike [lookupDuplicateChains] (a new person typed into the add form),
+/// the identity is already known, so a chain counts as linked when the
+/// delegate's own doc exists there (a path read, no index needed) or another
+/// doc there carries the same national ID. It does NOT query nested
+/// `delegates` by phoneNumber: on prod that field has no collection-scope
+/// index, so the query fails with FAILED_PRECONDITION.
+/// Pending requests use the same `delegate_requests` scan as the add form.
+/// Throws [DuplicateChainLookupException] on a query error.
+Future<DuplicateChainLookup> lookupLinkChainStates({
+  required FirebaseFirestore firestore,
+  required String companyUID,
+  required String delegateUid,
+  required String nationalId,
+  required String phoneNumber,
+  required Iterable<String> organizationUIDs,
+}) async {
+  final orgs = {
+    for (final id in organizationUIDs)
+      if (id.trim().isNotEmpty) id.trim(),
+  };
+  final co = companyUID.trim();
+  if (orgs.isEmpty || co.isEmpty) {
+    return const DuplicateChainLookup(duplicateOrgUids: {});
+  }
+  final uid = delegateUid.trim();
+  final nid = nationalId.trim();
+  final phone = phoneNumber.trim();
+  final linked = <String>{};
+  final pending = <String>{};
+  const failure = DuplicateChainLookupException();
+
+  for (final orgId in orgs) {
+    final col = firestore
+        .collection('organizations')
+        .doc(orgId)
+        .collection('companies')
+        .doc(co)
+        .collection('delegates');
+    try {
+      if (uid.isNotEmpty && (await col.doc(uid).get()).exists) {
+        linked.add(orgId);
+        continue;
+      }
+      if (nid.isEmpty) continue;
+      for (final field in const ['nationalId', 'nationalityID']) {
+        final snap = await col.where(field, isEqualTo: nid).limit(1).get();
+        if (snap.docs.isNotEmpty) {
+          linked.add(orgId);
+          break;
+        }
+      }
+    } catch (_) {
+      throw failure;
+    }
+  }
+
+  Future<void> scanRequests(String field, String value) async {
+    if (value.isEmpty) return;
+    late final QuerySnapshot<Map<String, dynamic>> snap;
+    try {
+      snap = await firestore
+          .collection('delegate_requests')
+          .where('companyUID', isEqualTo: co)
+          .where(field, isEqualTo: value)
+          .where('status', isEqualTo: 'pending')
+          .limit(20)
+          .get();
+    } catch (_) {
+      throw failure;
+    }
+    for (final doc in snap.docs) {
+      final data = doc.data();
+      final primary = (data['organizationUID'] ?? '').toString().trim();
+      final list = data['organizationUIDs'];
+      final ids = <String>{
+        if (primary.isNotEmpty) primary,
+        if (list is List)
+          for (final e in list)
+            if (e.toString().trim().isNotEmpty) e.toString().trim(),
+      };
+      pending.addAll(ids.intersection(orgs));
+    }
+  }
+
+  await scanRequests('nationalId', nid);
+  await scanRequests('phoneNumber', phone);
+  return DuplicateChainLookup(
+    duplicateOrgUids: {...linked, ...pending},
+    existingDelegateUid: uid.isEmpty ? null : uid,
+    delegateOrgUids: linked,
+    pendingOrgUids: pending.difference(linked),
+  );
+}

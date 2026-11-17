@@ -32,12 +32,6 @@ class HRDelegatesWebBreakpoints {
 
   /// Below this table width the ID/phone and name/city columns merge.
   static const double mergedColumnsBelow = 1080;
-
-  /// Fixed width of the actions column (3 icon buttons, 48dp each).
-  static const double actionsWidth = 168;
-
-  /// Fixed width of the «السلاسل» count column.
-  static const double chainsWidth = 84;
 }
 
 class HRDelegatesTab extends StatefulWidget {
@@ -158,53 +152,74 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
     return names.length;
   }
 
-  /// Web actions (MD3 Model 3): icon-only, 48dp, with tooltips.
-  /// «إضافة سلاسل» (tonal), «أسبوعية»/«سنوية» and «سجل الحضور».
-  /// No profile, call or WhatsApp.
+  /// Web filter segments: room around each label, selected one included.
+  static const EdgeInsets _webSegmentPadding = EdgeInsets.symmetric(horizontal: 18);
+
+  /// Small circular icon action. Neutral grey by default; [accent] gives the
+  /// purple «إضافة سلاسل» look with a tighter circle. 48dp tap target.
+  Widget _webIconAction({
+    Key? key,
+    required String tooltip,
+    required IconData icon,
+    required VoidCallback? onPressed,
+    required ColorScheme colorScheme,
+    bool accent = false,
+  }) {
+    final size = accent ? 30.0 : 34.0;
+    return Tooltip(
+      message: tooltip,
+      child: IconButton(
+        key: key,
+        onPressed: onPressed,
+        icon: Icon(icon),
+        iconSize: accent ? 18 : 19,
+        style: IconButton.styleFrom(
+          fixedSize: Size(size, size),
+          minimumSize: Size(size, size),
+          padding: EdgeInsets.zero,
+          tapTargetSize: MaterialTapTargetSize.padded,
+          shape: const CircleBorder(),
+          backgroundColor: accent
+              ? colorScheme.primary.withValues(alpha: 0.12)
+              : colorScheme.surfaceContainerHighest,
+          foregroundColor: accent ? colorScheme.primary : colorScheme.onSurfaceVariant,
+          disabledBackgroundColor: colorScheme.onSurface.withValues(alpha: 0.06),
+          disabledForegroundColor: colorScheme.onSurface.withValues(alpha: 0.32),
+        ),
+      ),
+    );
+  }
+
+  /// Web actions (MD3 Model 3): «إضافة سلاسل» (purple), «أسبوعية»/«سنوية»
+  /// and «سجل الحضور» (neutral grey). No profile, call or WhatsApp.
   List<Widget> _buildWebActions(Delegate delegate, ColorScheme colorScheme) {
     final canAdd = _canAddChains(delegate);
-    const box = BoxConstraints(minWidth: 48, minHeight: 48);
-    final leaveColor = delegate.isAnnualLeaveEnabled
-        ? const Color(0xFF2E7D32)
-        : Colors.amber.shade800;
     return [
-      Tooltip(
-        message: canAdd ? 'إضافة سلاسل' : kHrAddChainsSuspendedTooltip,
-        child: IconButton.filledTonal(
-          key: Key('hr_delegate_add_chains_${delegate.uid}'),
-          constraints: box,
-          iconSize: 24,
-          onPressed: canAdd ? () => _openAddChains(delegate) : null,
-          icon: const Icon(Symbols.add_business_rounded),
-        ),
+      _webIconAction(
+        key: Key('hr_delegate_add_chains_${delegate.uid}'),
+        tooltip: canAdd ? 'إضافة سلاسل' : kHrAddChainsSuspendedTooltip,
+        icon: Symbols.add_business_rounded,
+        onPressed: canAdd ? () => _openAddChains(delegate) : null,
+        colorScheme: colorScheme,
+        accent: true,
       ),
-      Tooltip(
-        message: delegate.isAnnualLeaveEnabled
+      _webIconAction(
+        key: Key('hr_delegate_leaves_${delegate.uid}'),
+        tooltip: delegate.isAnnualLeaveEnabled
             ? 'سنوية: الإجازات السنوية مفعّلة (${delegate.annualLeaveQuota} يوم) - اضغط للتعديل'
             : 'أسبوعية: الإجازات السنوية غير مفعّلة - اضغط للتفعيل',
-        child: IconButton(
-          key: Key('hr_delegate_leaves_${delegate.uid}'),
-          constraints: box,
-          iconSize: 24,
-          onPressed: () => _showAnnualLeaveManagementDialog(delegate),
-          icon: Icon(
-            delegate.isAnnualLeaveEnabled
-                ? Symbols.beach_access_rounded
-                : Symbols.event_repeat_rounded,
-            color: leaveColor,
-          ),
-        ),
+        icon: delegate.isAnnualLeaveEnabled
+            ? Symbols.beach_access_rounded
+            : Symbols.event_repeat_rounded,
+        onPressed: () => _showAnnualLeaveManagementDialog(delegate),
+        colorScheme: colorScheme,
       ),
-      Tooltip(
-        message: 'سجل الحضور والانصراف',
-        child: IconButton(
-          key: Key('hr_delegate_attendance_${delegate.uid}'),
-          constraints: box,
-          iconSize: 24,
-          color: colorScheme.onSurfaceVariant,
-          onPressed: () => _openAttendance(delegate),
-          icon: const Icon(Symbols.fact_check_rounded),
-        ),
+      _webIconAction(
+        key: Key('hr_delegate_attendance_${delegate.uid}'),
+        tooltip: 'سجل الحضور والانصراف',
+        icon: Symbols.fact_check_rounded,
+        onPressed: () => _openAttendance(delegate),
+        colorScheme: colorScheme,
       ),
     ];
   }
@@ -585,6 +600,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
 
                 final statusButtonGroup = TashilConnectedButtonGroup<DelegateStatus?>(
                   height: 44,
+                  itemPadding: WebRuntimePolicy.isWeb ? _webSegmentPadding : null,
                   selectedValue: _selectedStatus,
                   items: [
                     TashilConnectedButtonItem<DelegateStatus?>(
@@ -612,6 +628,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
 
                 final viewModeButtonGroup = TashilConnectedButtonGroup<HRDelegatesViewMode>(
                   height: 44,
+                  itemPadding: WebRuntimePolicy.isWeb ? _webSegmentPadding : null,
                   selectedValue: _viewMode,
                   items: const [
                     TashilConnectedButtonItem<HRDelegatesViewMode>(
@@ -790,17 +807,50 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
         : _buildCardsGrid(delegates, theme, colorScheme);
   }
 
-  /// Web table (MD3 Model 1): no row tap, labelled actions, and the ID/phone
+  /// Web table columns (MD3 Model 3). Header and cells use the same list,
+  /// the same cell padding and the same alignment, so they always line up.
+  List<_WebCol> _webColumns(bool merged) => merged
+      ? const [
+          _WebCol('المندوب / المروج', 3),
+          _WebCol('الرقم القومي / الهاتف', 3),
+          _WebCol('السلاسل', 2, center: true),
+          _WebCol('الحالة', 2, center: true),
+          _WebCol('الإجراءات', 3, center: true),
+        ]
+      : const [
+          _WebCol('#', 1, center: true),
+          _WebCol('المندوب / المروج', 4),
+          _WebCol('الرقم القومي', 3),
+          _WebCol('رقم الهاتف', 3),
+          _WebCol('المدينة', 3),
+          _WebCol('السلاسل', 2, center: true),
+          _WebCol('الحالة', 2, center: true),
+          _WebCol('الإجراءات', 4, center: true),
+        ];
+
+  static const double _webCellPadding = 8;
+
+  Widget _webCell(_WebCol col, Widget child) => Expanded(
+        flex: col.flex,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: _webCellPadding),
+          child: Align(
+            alignment: col.center
+                ? Alignment.center
+                : AlignmentDirectional.centerStart,
+            child: child,
+          ),
+        ),
+      );
+
+  /// Web table (MD3 Model 3): no row tap, icon actions, and the ID/phone
   /// and name/city columns merge on narrower tables.
   Widget _buildWebDelegatesTable(
     List<Delegate> delegates,
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
-    const actionsWidth = HRDelegatesWebBreakpoints.actionsWidth;
-    const statusWidth = 96.0;
-    const chainsWidth = HRDelegatesWebBreakpoints.chainsWidth;
-    const minWidth = actionsWidth + statusWidth + chainsWidth + 420;
+    const minWidth = 860.0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -819,24 +869,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
             final width = available > minWidth ? available : minWidth;
             final merged = width < HRDelegatesWebBreakpoints.mergedColumnsBelow;
             final scrollable = width > available;
-
-            Widget header(String title, {int? flex, double? fixed, bool center = false}) {
-              final text = Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Text(
-                  title,
-                  textAlign: center ? TextAlign.center : TextAlign.start,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12.5,
-                  ),
-                ),
-              );
-              return fixed != null
-                  ? SizedBox(width: fixed, child: text)
-                  : Expanded(flex: flex ?? 1, child: text);
-            }
+            final cols = _webColumns(merged);
 
             final table = SizedBox(
               width: width,
@@ -844,7 +877,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                 children: [
                   Container(
                     height: 44,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerLow,
                       border: Border(
@@ -854,24 +887,23 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                       ),
                     ),
                     child: Row(
-                      children: merged
-                          ? [
-                              header('المندوب / المروج', flex: 22),
-                              header('الرقم القومي / الهاتف', flex: 16),
-                              header('السلاسل', fixed: chainsWidth, center: true),
-                              header('الحالة', fixed: statusWidth, center: true),
-                              header('الإجراءات', fixed: actionsWidth, center: true),
-                            ]
-                          : [
-                              header('#', fixed: 40, center: true),
-                              header('المندوب / المروج', flex: 20),
-                              header('الرقم القومي', flex: 15),
-                              header('رقم الهاتف', flex: 13),
-                              header('المدينة', flex: 11),
-                              header('السلاسل', fixed: chainsWidth, center: true),
-                              header('الحالة', fixed: statusWidth, center: true),
-                              header('الإجراءات', fixed: actionsWidth, center: true),
-                            ],
+                      children: [
+                        for (final c in cols)
+                          _webCell(
+                            c,
+                            Text(
+                              c.title,
+                              key: Key('hr_delegates_header_${c.title}'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   Expanded(
@@ -887,8 +919,8 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                       itemBuilder: (context, index) => _buildWebRow(
                         delegates[index],
                         index,
+                        cols: cols,
                         merged: merged,
-                        statusWidth: statusWidth,
                         theme: theme,
                         colorScheme: colorScheme,
                       ),
@@ -919,8 +951,8 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
   Widget _buildWebRow(
     Delegate delegate,
     int index, {
+    required List<_WebCol> cols,
     required bool merged,
-    required double statusWidth,
     required ThemeData theme,
     required ColorScheme colorScheme,
   }) {
@@ -930,9 +962,6 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
     final statusBg = isActive
         ? const Color(0xFF2E7D32).withValues(alpha: 0.12)
         : colorScheme.surfaceContainerHighest;
-    final role = delegate.position == DelegatePosition.supervisor
-        ? 'مشرف'
-        : 'مندوب / مروج';
     final city = delegate.city.isNotEmpty
         ? delegate.city
         : (delegate.companyName.isNotEmpty ? delegate.companyName : '—');
@@ -942,30 +971,18 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
       color: colorScheme.onSurface,
       letterSpacing: 0.3,
     );
+    final nameStyle = theme.textTheme.bodyMedium?.copyWith(
+      fontWeight: FontWeight.bold,
+      color: colorScheme.onSurface,
+    );
 
-    Widget copyCell(String value, String tooltip, VoidCallback onCopy) {
-      return Row(
-        children: [
-          Flexible(
-            child: SelectableText(
-              value.isNotEmpty ? value : '—',
-              style: mono,
-              maxLines: 1,
-            ),
-          ),
-          if (value.isNotEmpty)
-            IconButton(
-              icon: const Icon(Symbols.content_copy_rounded, size: 15),
-              tooltip: tooltip,
-              visualDensity: VisualDensity.compact,
-              color: colorScheme.onSurfaceVariant,
-              onPressed: onCopy,
-            ),
-        ],
-      );
-    }
+    Widget plain(String value, {TextStyle? style}) => SelectableText(
+          value.isNotEmpty ? value : '—',
+          style: style ?? mono,
+          maxLines: 1,
+        );
 
-    final nameCell = Row(
+    final name = Row(
       children: [
         AppAvatar(
           imageUrl: delegate.personalPhotoUrl,
@@ -979,17 +996,9 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    Text(delegate.fullName, style: nameStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
                     Text(
-                      delegate.fullName,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      '$role · $city',
+                      city,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                         fontSize: 11.5,
@@ -999,189 +1008,123 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                     ),
                   ],
                 )
-              : Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                        text: delegate.fullName,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                      TextSpan(
-                        text: '   $role',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          fontSize: 11.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+              : Text(delegate.fullName, style: nameStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
         ),
       ],
     );
 
     final chainCount = _chainCount(delegate);
-    final chains = SizedBox(
-      width: HRDelegatesWebBreakpoints.chainsWidth,
-      child: Center(
-        child: Tooltip(
-          message: 'مرتبط بـ $chainCount سلسلة',
-          child: Container(
-            key: Key('hr_delegate_chains_${delegate.uid}'),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-            decoration: BoxDecoration(
-              border: Border.all(color: colorScheme.outlineVariant),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Symbols.storefront_rounded, size: 15, color: colorScheme.onSurfaceVariant),
-                const SizedBox(width: 4),
-                Text(
-                  '$chainCount',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-          ),
+    final chains = Tooltip(
+      message: 'مرتبط بـ $chainCount سلسلة',
+      child: Container(
+        key: Key('hr_delegate_chains_${delegate.uid}'),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        decoration: BoxDecoration(
+          border: Border.all(color: colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(8),
         ),
-      ),
-    );
-
-    final status = SizedBox(
-      width: statusWidth,
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: statusBg,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.circle, size: 7, color: statusColor),
-              const SizedBox(width: 5),
-              Text(
-                isActive ? 'نشط' : 'متوقف',
-                style: TextStyle(
-                  color: statusColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Symbols.storefront_rounded, size: 15, color: colorScheme.onSurfaceVariant),
+            const SizedBox(width: 4),
+            Text(
+              '$chainCount',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: colorScheme.onSurface,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
 
-    final actions = SizedBox(
-      width: HRDelegatesWebBreakpoints.actionsWidth,
+    final status = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: statusBg,
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          for (final (i, w) in _buildWebActions(delegate, colorScheme).indexed) ...[
-            if (i > 0) const SizedBox(width: 4),
-            w,
-          ],
+          Icon(Icons.circle, size: 7, color: statusColor),
+          const SizedBox(width: 5),
+          Text(
+            isActive ? 'نشط' : 'متوقف',
+            style: TextStyle(
+              color: statusColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
 
-    Widget cell(int flex, Widget child) => Expanded(
-          flex: flex,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: child,
-          ),
-        );
+    final actions = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final (i, w) in _buildWebActions(delegate, colorScheme).indexed) ...[
+          if (i > 0) const SizedBox(width: 2),
+          w,
+        ],
+      ],
+    );
+
+    final cells = merged
+        ? <Widget>[
+            name,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                plain(delegate.nationalityID),
+                plain(
+                  delegate.phoneNumber,
+                  style: mono?.copyWith(color: colorScheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+            chains,
+            status,
+            actions,
+          ]
+        : <Widget>[
+            Text(
+              '${index + 1}',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            name,
+            plain(delegate.nationalityID),
+            plain(delegate.phoneNumber),
+            Text(
+              city,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            chains,
+            status,
+            actions,
+          ];
 
     return Container(
       key: Key('hr_delegate_row_${delegate.uid}'),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-      constraints: const BoxConstraints(minHeight: 50),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      constraints: const BoxConstraints(minHeight: 52),
       child: Row(
-        children: merged
-            ? [
-                cell(22, nameCell),
-                cell(
-                  16,
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        delegate.nationalityID.isNotEmpty ? delegate.nationalityID : '—',
-                        style: mono,
-                      ),
-                      Text(
-                        delegate.phoneNumber.isNotEmpty ? delegate.phoneNumber : '—',
-                        style: mono?.copyWith(color: colorScheme.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                ),
-                chains,
-                status,
-                actions,
-              ]
-            : [
-                SizedBox(
-                  width: 40,
-                  child: Center(
-                    child: Text(
-                      '${index + 1}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ),
-                cell(20, nameCell),
-                cell(
-                  15,
-                  copyCell(
-                    delegate.nationalityID,
-                    'نسخ الرقم القومي',
-                    () => _copyNationalId(delegate.nationalityID),
-                  ),
-                ),
-                cell(
-                  13,
-                  copyCell(
-                    delegate.phoneNumber,
-                    'نسخ رقم الهاتف',
-                    () => _copyPhoneNumber(delegate.phoneNumber),
-                  ),
-                ),
-                cell(
-                  11,
-                  Text(
-                    city,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                chains,
-                status,
-                actions,
-              ],
+        children: [
+          for (var i = 0; i < cols.length; i++) _webCell(cols[i], cells[i]),
+        ],
       ),
     );
   }
@@ -1637,13 +1580,15 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      Text(
-                        posName,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.primary,
-                          fontWeight: FontWeight.w600,
+                      // Web: the type is the same for everyone, so it's hidden.
+                      if (!WebRuntimePolicy.isWeb)
+                        Text(
+                          posName,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
                       const SizedBox(height: 3),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -1964,4 +1909,13 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
       ),
     );
   }
+}
+
+/// One web table column: same flex, padding and alignment for the header
+/// and every cell.
+class _WebCol {
+  const _WebCol(this.title, this.flex, {this.center = false});
+  final String title;
+  final int flex;
+  final bool center;
 }
