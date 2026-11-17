@@ -28,6 +28,8 @@ SUITS=(
   test:rules:privileged-reupload
   test:rules:storage
   test:rules:prod-compat
+  test:rules:ta60-supervisor-dup
+  test:rules:hr-web
 )
 : >"$OUT"
 echo "rules matrix @ $(git rev-parse --short HEAD) $(date -Is)" | tee -a "$OUT"

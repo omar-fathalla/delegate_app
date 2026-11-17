@@ -179,7 +179,7 @@ run_job android-dev-config-check 5 'bash scripts/android_dev_config_check.sh && 
 run_job ios-dev-config-check 5 'bash scripts/ios_dev_config_check.sh && bash scripts/maestro_check_flow_headers.sh && bash scripts/patrol_check_integration_targets.sh && bash scripts/holds_authority_mode_trap_test.sh && python3 scripts/holds_authority_mode_payload_test.py'
 
 wait_emulator_ports
-run_job functions 15 'cd functions && npm ci && npm run lint && npm test --if-present && cd .. && npm install --no-audit --no-fund && npm run test:e2e:staff'
+run_job functions 15 'cd functions && npm ci && npm run lint && npm test --if-present && cd .. && npm install --no-audit --no-fund && npm run test:e2e:staff && npm run test:e2e:staff-phones-claim'
 
 wait_emulator_ports
 run_job rules 20 'npm install --no-audit --no-fund && npm --prefix functions ci && npm run test:rules && npm run test:rules:interim && npm run test:rules:p0 && npm run test:rules:adv && npm run test:rules:docs && npm run test:rules:subs && npm run test:rules:qa-hold && npm run test:rules:profile && npm run test:rules:m31 && npm run test:rules:source && npm run test:rules:gaps && npm run test:rules:status-guards && npm run test:rules:security && npm run test:rules:ut-nb && npm run test:rules:nationalid-scope && npm run test:rules:users-nationalid-lock && npm run test:rules:paymob-superseded && npm run test:rules:privileged-reupload && npm run test:rules:storage && npm run test:rules:prod-compat && npm run test:e2e:subscriptions && npm run test:e2e:delegate && npm run test:e2e:supervisor-reupload && npm run test:e2e:privileged-reupload'

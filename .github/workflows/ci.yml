@@ -237,7 +237,7 @@ jobs:
           distribution: 'temurin'
       - name: Staff accounts e2e (createStaffUser / claimInvite on emulators)
         working-directory: .
-        run: npm install --no-audit --no-fund && npm run test:e2e:staff
+        run: npm install --no-audit --no-fund && npm run test:e2e:staff && npm run test:e2e:staff-phones-claim
 
   rules:
     name: Firestore rules & delegate login e2e (emulators)
