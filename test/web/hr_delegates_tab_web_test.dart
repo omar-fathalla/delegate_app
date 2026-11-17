@@ -7,14 +7,15 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:bloc_test/bloc_test.dart';
-import 'package:dartz/dartz.dart' show Right;
 import 'package:delegate_app/config/theme/app_theme.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/features/admin/data/chain_duplicate_lookup.dart';
 import 'package:delegate_app/features/admin/data/link_delegate_chains.dart';
-import 'package:delegate_app/features/admin/domain/entities/chain_selection.dart';
+import 'package:delegate_app/features/admin/data/company_chains.dart';
+import 'package:delegate_app/web/hr_system/company_chain_requests_panel.dart';
+import 'dart:async';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_event.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_state.dart';
@@ -267,10 +268,32 @@ class HRDelegatesShellNav extends StatelessWidget {
       );
 }
 
+
+/// Fake chain names for the 38-chain screenshot (same count as prod).
+const _moreChains = [
+  'أبو زيد ماركت', 'الفرجاني', 'المحلاوي', 'بنده', 'تريد لاين', 'جاردن سيتي ماركت',
+  'حلواني إخوان', 'خيرات مصر', 'رنين', 'زاد الخير', 'سعودي ماركت', 'صن مول',
+  'طلبات', 'عبد الله ماركت', 'فارم بوكس', 'قطر الندى', 'لولو', 'ماي ماركت',
+  'نيو سبينيس', 'هايبر الوكالة', 'وكالة المنصورة', 'أوسكار', 'اكس مارت', 'البدري',
+  'التوحيد والنور', 'الراية', 'السلطان', 'العثيم', 'المصريين',
+];
+
+Future<FakeFirebaseFirestore> _seedMany() async {
+  final fs = await _seed();
+  for (var i = 0; i < _moreChains.length; i++) {
+    await fs.collection('organizations').doc('o-more-$i').set({'name': _moreChains[i]});
+  }
+  await fs.collection(kCompanyChainRequestsCollection).doc('fake-ccr').set({
+    'companyUID': _co, 'status': 'pending', 'organizationUID': 'o-more-3', 'organizationName': _moreChains[3],
+  });
+  return fs;
+}
+
 void main() {
   setUpAll(_fonts);
 
-  late List<List<ChainOption>> submitted;
+  late List<List<CompanyChainOption>> submitted;
+  late FakeFirebaseFirestore fs;
 
   setUp(() async {
     sl.allowReassignment = true;
@@ -293,12 +316,12 @@ void main() {
       initialState: AdminDelegatesLoaded(delegates: _delegates()),
     );
     sl.registerFactory<AdminDelegatesBloc>(() => bloc);
-    final fs = await _seed();
+    fs = await _seedMany();
     submitted = [];
+    CompanyChainCatalog.clear();
     HrAddChainsSheet.debugFirestore = () => fs;
     HrAddChainsSheet.debugSubmit = (selected) async {
       submitted.add(selected);
-      return const Right('fake-request');
     };
     WebRuntimePolicy.debugReset();
   });
@@ -306,137 +329,161 @@ void main() {
   tearDown(() {
     WebRuntimePolicy.debugReset();
     HrAddChainsSheet.debugReset();
+    CompanyChainCatalog.clear();
   });
 
-  testWidgets('mobile keeps the original actions', (t) async {
+  testWidgets('mobile keeps the original actions, no company button', (t) async {
     WebRuntimePolicy.debugIsWebOverride = false;
     await _pump(t, const Size(1440, 900), web: false);
     expect(find.text('الملف'), findsWidgets);
-    expect(find.byKey(const Key('hr_delegate_add_chains_fake-d0')), findsNothing);
+    expect(find.byKey(const Key('hr_add_company_chains')), findsNothing);
   });
 
-  testWidgets('1440: compact table, chain counts, icon actions, no profile/call/WhatsApp', (t) async {
+  testWidgets('1440: compact table, no per-delegate «إضافة سلاسل», page button', (t) async {
     WebRuntimePolicy.debugIsWebOverride = true;
     await _pump(t, const Size(1440, 900));
-    expect(find.text('دليل كوادر ومناديب الشركة'), findsOneWidget);
     expect(find.text('السلاسل'), findsOneWidget);
     expect(find.text('الملف'), findsNothing);
-    expect(find.byTooltip('مراسلة عبر واتساب (01000000001)'), findsNothing);
-    expect(find.byTooltip('اتصال هاتفي (01000000001)'), findsNothing);
-    var rowsVisible = 0;
-    for (var i = 0; i < _names.length; i++) {
-      final f = find.byKey(Key('hr_delegate_row_fake-d$i'));
-      if (f.evaluate().isNotEmpty && t.getRect(f).bottom <= 900) rowsVisible++;
-    }
-    expect(rowsVisible, greaterThanOrEqualTo(13));
-    final add = find.byKey(const Key('hr_delegate_add_chains_fake-d0'));
-    expect(t.getSize(add).height, greaterThanOrEqualTo(48));
+    expect(find.byKey(const Key('hr_delegate_add_chains_fake-d0')), findsNothing);
+    expect(find.byKey(const Key('hr_delegate_attendance_fake-d0')), findsOneWidget);
+    expect(find.byKey(const Key('hr_add_company_chains')), findsOneWidget);
+    expect(find.text('إضافة سلاسل للشركة'), findsOneWidget);
     expect(find.descendant(of: find.byKey(const Key('hr_delegate_chains_fake-d0')), matching: find.text('2')), findsOneWidget);
     await _shot(t, 'hr-delegates-1440');
-    // Row tap (on the # / name side) does not open the profile.
-    final row = find.byKey(const Key('hr_delegate_row_fake-d1'));
-    await t.tapAt(t.getTopRight(row) + const Offset(-30, 25));
-    await t.pumpAndSettle();
-    expect(find.byType(HRDelegatesTab), findsOneWidget);
-    expect(find.byKey(const Key('hr_delegate_row_fake-d1')), findsOneWidget);
-    expect(find.byType(SnackBar), findsNothing);
   });
 
-  testWidgets('suspended delegate: «إضافة سلاسل» disabled with a tooltip', (t) async {
+  testWidgets('sheet loading state: skeleton, no lone spinner', (t) async {
     WebRuntimePolicy.debugIsWebOverride = true;
+    final never = Completer<List<CompanyChainOption>>();
+    HrAddChainsSheet.debugCatalog = () => never.future;
     await _pump(t, const Size(1440, 900));
-    final btn = t.widget<IconButton>(find.byKey(const Key('hr_delegate_add_chains_fake-d5')));
-    expect(btn.onPressed, isNull);
-    expect(find.byTooltip(kHrAddChainsSuspendedTooltip), findsWidgets);
-    expect(kHrAllowAddChainsForSuspended, isFalse);
+    await t.tap(find.byKey(const Key('hr_add_company_chains')));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 300));
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(HrAddChainsSheet.skeletonKey), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(t.widget<FilledButton>(find.byKey(HrAddChainsSheet.submitKey)).onPressed, isNull);
+    await _shot(t, 'chains-sheet-loading-1440');
   });
 
-  testWidgets('side sheet: linked, pending, search, send', (t) async {
+  testWidgets('sheet: sections, joined disabled, pending, search, select all (no cap), send', (t) async {
     WebRuntimePolicy.debugIsWebOverride = true;
     await _pump(t, const Size(1440, 900));
-    await t.tap(find.byKey(const Key('hr_delegate_add_chains_fake-d0')));
+    await t.tap(find.byKey(const Key('hr_add_company_chains')));
     await t.pumpAndSettle();
     expect(find.byKey(HrAddChainsSheet.titleKey), findsOneWidget);
-    expect(t.getSize(find.byType(HrAddChainsSheet)).width, 1440); // overlay
-    expect(find.text('مرتبط حالياً (2)'), findsOneWidget);
-    expect(find.text('سلسلة شركة أخرى'), findsNothing);
-    final spinneys = t.widget<FilterChip>(find.byKey(HrAddChainsSheet.chipKey('o-spinneys')));
-    expect(spinneys.onSelected, isNull);
-    final carrefour = t.widget<FilterChip>(find.byKey(HrAddChainsSheet.chipKey('o-carrefour')));
-    expect(carrefour.onSelected, isNull);
-    await t.tap(find.byKey(HrAddChainsSheet.chipKey('o-zahran')));
-    await t.tap(find.byKey(HrAddChainsSheet.chipKey('o-metro')));
-    await t.pumpAndSettle();
-    expect(find.text('2/$kMaxOrganizationsPerRequest مختارة'), findsOneWidget);
-    expect(find.text('إرسال الطلب (2)'), findsOneWidget);
-    await _shot(t, 'hr-delegates-picker-1440');
+    expect(find.text('سلاسل الشركة (7)'), findsOneWidget);
+    expect(find.text('سلاسل أخرى (تحتاج موافقة) (31)'), findsOneWidget);
+    expect(find.textContaining('· جديدة'), findsNothing);
+    expect(find.byKey(HrAddChainsSheet.chipKey('o-fathalla')), findsNothing);
+    expect(find.text('طلب قيد المراجعة'), findsOneWidget);
+    await _shot(t, 'chains-sheet-loaded-1440');
 
-    await t.enterText(find.byKey(HrAddChainsSheet.searchKey), 'خير');
+    // Joined chains cannot be picked.
+    await t.tap(find.byKey(HrAddChainsSheet.chipKey('o-jomla')));
     await t.pumpAndSettle();
-    expect(find.byKey(HrAddChainsSheet.chipKey('o-beit')), findsNothing);
-    expect(find.byKey(HrAddChainsSheet.chipKey('o-kheir')), findsOneWidget);
+    expect(find.text('0 مختارة'), findsOneWidget);
 
+    // «اختيار الكل» follows the search filter.
+    await t.enterText(find.byKey(HrAddChainsSheet.searchKey), 'ماركت');
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(HrAddChainsSheet.selectAllKey));
+    await t.pumpAndSettle();
+    final filtered = _moreChains.where((n) => n.contains('ماركت')).length;
+    expect(find.text('$filtered مختارة'), findsOneWidget);
+
+    // No cap: every selectable chain (30 = 31 minus the pending one).
+    await t.enterText(find.byKey(HrAddChainsSheet.searchKey), '');
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(HrAddChainsSheet.selectAllKey));
+    await t.pumpAndSettle();
+    expect(find.text('30 مختارة'), findsOneWidget);
+    await _shot(t, 'chains-sheet-selected-1440');
     await t.tap(find.byKey(HrAddChainsSheet.submitKey));
     await t.pumpAndSettle();
-    expect(submitted.single.map((c) => c.uid), ['o-zahran', 'o-metro']);
+    expect(submitted.single.length, 30);
+    expect(submitted.single.any((c) => c.joined), isFalse);
+    expect(submitted.single.any((c) => c.uid == 'o-more-3'), isFalse);
     expect(find.byKey(HrAddChainsSheet.titleKey), findsNothing);
-    expect(find.text(linkChainsSuccessMessage(['زهران ماركت', 'مترو'])), findsOneWidget);
-    await _shot(t, 'hr-delegates-sent-1440');
-  });
-
-  testWidgets('1024: rail navigation and merged columns', (t) async {
-    WebRuntimePolicy.debugIsWebOverride = true;
-    await _pump(t, const Size(1024, 800));
-    expect(t.getSize(find.byType(HRDesktopSidebar)).width, lessThan(100));
-    expect(find.text('الرقم القومي / الهاتف'), findsOneWidget);
-    expect(find.text('السلاسل'), findsOneWidget);
-    await _shot(t, 'hr-delegates-1024');
+    expect(find.textContaining('تم إرسال طلب ضم 30 سلسلة'), findsOneWidget);
   });
 
   testWidgets('800: cards, full-screen sheet', (t) async {
     WebRuntimePolicy.debugIsWebOverride = true;
     await _pump(t, const Size(800, 900));
-    expect(find.text('المندوب / المروج'), findsNothing);
-    expect(find.byKey(const Key('hr_delegate_add_chains_fake-d0')), findsOneWidget);
-    await _shot(t, 'hr-delegates-800');
-    await t.tap(find.byKey(const Key('hr_delegate_add_chains_fake-d0')));
+    await t.tap(find.byKey(const Key('hr_add_company_chains')));
     await t.pumpAndSettle();
-    expect(t.getSize(find.byKey(HrAddChainsSheet.titleKey)).width, greaterThan(500));
-    await _shot(t, 'hr-delegates-picker-800');
+    expect(t.getSize(find.byType(HrAddChainsSheet)).width, 800);
+    await _shot(t, 'chains-sheet-800');
   });
 
-  testWidgets('pre-check fails: chains still show with a neutral note', (t) async {
+  testWidgets('pending check fails: chains still show with a neutral note', (t) async {
     WebRuntimePolicy.debugIsWebOverride = true;
-    HrAddChainsSheet.debugLookup = (_) async => throw const DuplicateChainLookupException();
+    HrAddChainsSheet.debugPending = () async => throw Exception('offline');
     await _pump(t, const Size(1440, 900));
-    await t.tap(find.byKey(const Key('hr_delegate_add_chains_fake-d0')));
+    await t.tap(find.byKey(const Key('hr_add_company_chains')));
     await t.pumpAndSettle();
-    expect(find.text('تعذر التحقق من المندوبين المسجلين. أعد المحاولة.'), findsNothing);
-    expect(find.byKey(HrAddChainsSheet.chipKey('o-zahran')), findsOneWidget);
-    expect(find.textContaining('سيتم التحقق من ربط المندوب'), findsOneWidget);
+    expect(find.byKey(HrAddChainsSheet.chipKey('o-other')), findsOneWidget);
+    expect(find.textContaining('تعذر التحقق من الطلبات السابقة'), findsOneWidget);
   });
 
-  testWidgets('table: headers line up with cells, no type label', (t) async {
-    WebRuntimePolicy.debugIsWebOverride = true;
-    await _pump(t, const Size(1440, 900));
-    expect(find.text('مندوب / مروج'), findsNothing);
-    expect(find.textContaining('مندوب / مروج'), findsNothing);
-    final d = _delegates().first;
-    for (final (header, cell) in [
-      ('الرقم القومي', d.nationalityID),
-      ('رقم الهاتف', d.phoneNumber),
-    ]) {
-      final h = t.getTopRight(find.byKey(Key('hr_delegates_header_$header')));
-      final c = t.getTopRight(find.text(cell).first);
-      expect((h.dx - c.dx).abs(), lessThan(1.5), reason: header);
-    }
-    // Neutral circles, smaller purple one for «إضافة سلاسل»; 48dp targets.
-    final add = t.getSize(find.byKey(const Key('hr_delegate_add_chains_fake-d0')));
-    expect(add.width, greaterThanOrEqualTo(48));
+  test('catalog: joined flags, alphabetical, hidden chain left out, cached', () async {
+    final list = await CompanyChainCatalog.fetch(firestore: fs, companyUID: _co);
+    expect(list.where((c) => c.joined).map((c) => c.uid).toSet(), _orgs.keys.toSet());
+    expect(list.any((c) => c.uid == 'o-fathalla'), isFalse);
+    final names = list.map((c) => c.name.toLowerCase()).toList();
+    expect(names, [...names]..sort());
+    await fs.collection('organizations').doc('o-new').set({'name': 'جديدة تماماً'});
+    final again = await CompanyChainCatalog.fetch(firestore: fs, companyUID: _co);
+    expect(again.length, list.length); // served from the cache
+    final fresh = await CompanyChainCatalog.fetch(firestore: fs, companyUID: _co, forceRefresh: true);
+    expect(fresh.length, list.length + 1);
   });
 
-  test('link pre-check: own doc / same ID = linked, request = pending', () async {
-    final fs = await _seed();
+  test('submit: one pending doc per chain, 40 chains, no delegate on it', () async {
+    final chains = [
+      for (var i = 0; i < 40; i++) CompanyChainOption(uid: 'c$i', name: 'سلسلة $i', joined: false),
+    ];
+    await submitCompanyChainRequests(
+      firestore: fs, supervisor: _hr, companyUID: _co, companyName: 'شركة تجريبية', chains: chains,
+    );
+    final docs = (await fs.collection(kCompanyChainRequestsCollection)
+            .where('companyUID', isEqualTo: _co).where('requestType', isEqualTo: 'company_join_chain').get())
+        .docs;
+    expect(docs.length, 40);
+    expect(docs.map((d) => d['batchId']).toSet().length, 1);
+    expect(docs.every((d) => d['batchSize'] == 40 && d['status'] == 'pending'), isTrue);
+    expect(docs.any((d) => d.data().containsKey('existingDelegateUid')), isFalse);
+    final pending = await fetchPendingCompanyChainUids(firestore: fs, companyUID: _co);
+    expect(pending.length, 41); // 40 + the seeded one
+  });
+
+  testWidgets('approval panel: company, chains, approve/reject buttons', (t) async {
+    t.view.physicalSize = const Size(700, 600);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.resetPhysicalSize);
+    final reqs = [
+      for (final (i, n) in ['كارفور', 'مترو', 'زهران ماركت'].indexed)
+        CompanyChainRequest(
+          id: 'r$i', status: 'pending', companyUID: _co, companyName: 'شركة تجريبية',
+          organizationUID: 'o$i', organizationName: n, supervisorUid: _hr.uid,
+          supervisorName: _hr.fullName, batchId: 'b1',
+        ),
+    ];
+    await t.pumpWidget(MaterialApp(
+      home: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(body: CompanyChainRequestsPanel(reviewer: _hr, requestsOverride: reqs)),
+      ),
+    ));
+    expect(find.text('طلبات ضم سلاسل (3)'), findsOneWidget);
+    expect(find.text('شركة تجريبية'), findsOneWidget);
+    expect(find.text('موافقة على الكل'), findsOneWidget);
+    expect(find.byKey(CompanyChainRequestsPanel.approveKey('r1')), findsOneWidget);
+  });
+
+  test('link pre-check (mobile sheet / add-delegate): own doc / same ID = linked, request = pending', () async {
     final d = _delegates().first;
     await fs
         .collection('organizations').doc('o-metro')
@@ -455,32 +502,12 @@ void main() {
     expect(r.pendingOrgUids, {'o-spinneys'});
   });
 
-  testWidgets('any chain: unregistered chains show a «جديدة» hint and a note', (t) async {
-    WebRuntimePolicy.debugIsWebOverride = true;
-    await _pump(t, const Size(1440, 900));
-    await t.tap(find.byKey(const Key('hr_delegate_add_chains_fake-d0')));
-    await t.pumpAndSettle();
-    expect(find.byKey(HrAddChainsSheet.chipKey('o-fathalla')), findsNothing);
-    expect(find.byKey(HrAddChainsSheet.newChainHintKey('o-other')), findsOneWidget);
-    expect(find.byKey(HrAddChainsSheet.newChainHintKey('o-zahran')), findsNothing);
-    await t.tap(find.byKey(HrAddChainsSheet.chipKey('o-other')));
-    await t.tap(find.byKey(HrAddChainsSheet.chipKey('o-zahran')));
-    await t.pumpAndSettle();
-    expect(find.textContaining('ستُسجَّل فيها الشركة تلقائياً'), findsOneWidget);
-    await _shot(t, 'hr-delegates-any-chain-1440');
-  });
-
   test('mobile sheet still hides linked chains (shared fetch default)', () async {
-    final fs = await _seed();
     final d = _delegates().first;
     final chains = await fetchLinkableChains(firestore: fs, delegate: d, supervisor: _hr);
     expect(chains.map((c) => c.uid), isNot(contains('o-jomla')));
-    expect(chains.map((c) => c.uid), isNot(contains('o-carrefour')));
-    // Any chain (2026-11-17): o-other is listed, flagged as not registered.
     expect(chains.firstWhere((c) => c.uid == 'o-other').companyRegistered, isFalse);
-    expect(chains.firstWhere((c) => c.uid == 'o-zahran').companyRegistered, isTrue);
     final all = await fetchLinkableChains(firestore: fs, delegate: d, supervisor: _hr, includeLinked: true);
     expect(all.where((c) => c.alreadyLinked).map((c) => c.uid).toSet(), {'o-jomla', 'o-carrefour'});
   });
 }
-

@@ -13,7 +13,6 @@ import 'package:delegate_app/core/widgets/tashil_button_group.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_event.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_state.dart';
-import 'package:delegate_app/features/admin/data/link_delegate_chains.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_delegate_attendance_detail_screen.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_add_chains_sheet.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -57,6 +56,8 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
     _viewMode = HRDelegatesViewMode.table;
     _delegatesBloc = di.sl<AdminDelegatesBloc>();
     _loadDelegates();
+    // Warm the chain catalog so «إضافة سلاسل للشركة» opens at once.
+    if (WebRuntimePolicy.isWeb) HrAddChainsSheet.prefetch(widget.hrDelegate);
   }
 
   @override
@@ -126,20 +127,22 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
     );
   }
 
-  /// Web: «إضافة سلاسل» for this delegate (same request as the mobile
-  /// «ربط بسلاسل إضافية» sheet).
-  Future<void> _openAddChains(Delegate delegate) async {
+  /// Web: company-level «إضافة سلاسل للشركة» («طلب ضم سلسلة»). Replaces
+  /// the per-delegate action: approved chains reach every active, paid
+  /// delegate of the company automatically.
+  Future<void> _openAddCompanyChains() async {
     final names = await HrAddChainsSheet.show(
       context,
-      delegate: delegate,
       supervisor: widget.hrDelegate,
     );
     if (!mounted || names == null || names.isEmpty) return;
-    AppSnackBar.showSuccess(context, linkChainsSuccessMessage(names));
+    AppSnackBar.showSuccess(
+      context,
+      'تم إرسال طلب ضم ${names.length} سلسلة للشركة. بعد الموافقة تظهر فروعها لكل المناديب النشطين المدفوع اشتراكهم.',
+    );
   }
 
-  bool _canAddChains(Delegate delegate) =>
-      kHrAllowAddChainsForSuspended || delegate.status == DelegateStatus.active;
+  static const addCompanyChainsKey = Key('hr_add_company_chains');
 
   /// Chains the delegate is on, from the loaded delegate (primary chain
   /// plus allOrganizationNames). No extra reads.
@@ -190,19 +193,11 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
     );
   }
 
-  /// Web actions (MD3 Model 3): «إضافة سلاسل» (purple), «أسبوعية»/«سنوية»
-  /// and «سجل الحضور» (neutral grey). No profile, call or WhatsApp.
+  /// Web actions (MD3 Model 3): «أسبوعية»/«سنوية» and «سجل الحضور»
+  /// (neutral grey). Chains are added for the whole company from the page
+  /// button «إضافة سلاسل للشركة», not per delegate.
   List<Widget> _buildWebActions(Delegate delegate, ColorScheme colorScheme) {
-    final canAdd = _canAddChains(delegate);
     return [
-      _webIconAction(
-        key: Key('hr_delegate_add_chains_${delegate.uid}'),
-        tooltip: canAdd ? 'إضافة سلاسل' : kHrAddChainsSuspendedTooltip,
-        icon: Symbols.add_business_rounded,
-        onPressed: canAdd ? () => _openAddChains(delegate) : null,
-        colorScheme: colorScheme,
-        accent: true,
-      ),
       _webIconAction(
         key: Key('hr_delegate_leaves_${delegate.uid}'),
         tooltip: delegate.isAnnualLeaveEnabled
@@ -647,6 +642,25 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                   },
                 );
 
+                final addCompanyChainsButton = WebRuntimePolicy.isWeb
+                    ? FilledButton.icon(
+                        key: addCompanyChainsKey,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                          padding: const EdgeInsets.symmetric(horizontal: 18),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(22),
+                          ),
+                        ),
+                        onPressed: _openAddCompanyChains,
+                        icon: const Icon(Symbols.add_business_rounded, size: 20),
+                        label: const Text(
+                          'إضافة سلاسل للشركة',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      )
+                    : null;
+
                 final refreshButton = IconButton.filledTonal(
                   style: IconButton.styleFrom(
                     shape: RoundedRectangleBorder(
@@ -675,6 +689,10 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                           viewModeButtonGroup,
                           const SizedBox(width: 10),
                           refreshButton,
+                          if (addCompanyChainsButton != null) ...[
+                            const SizedBox(width: 10),
+                            addCompanyChainsButton,
+                          ],
                         ],
                       );
                     }
@@ -691,6 +709,10 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                             ),
                             const SizedBox(width: 8),
                             refreshButton,
+                            if (addCompanyChainsButton != null) ...[
+                              const SizedBox(width: 8),
+                              addCompanyChainsButton,
+                            ],
                           ],
                         ),
                         const SizedBox(height: 10),
@@ -815,7 +837,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
           _WebCol('الرقم القومي / الهاتف', 3),
           _WebCol('السلاسل', 2, center: true),
           _WebCol('الحالة', 2, center: true),
-          _WebCol('الإجراءات', 3, center: true),
+          _WebCol('الإجراءات', 2, center: true),
         ]
       : const [
           _WebCol('#', 1, center: true),
@@ -825,7 +847,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
           _WebCol('المدينة', 3),
           _WebCol('السلاسل', 2, center: true),
           _WebCol('الحالة', 2, center: true),
-          _WebCol('الإجراءات', 4, center: true),
+          _WebCol('الإجراءات', 3, center: true),
         ];
 
   static const double _webCellPadding = 8;

@@ -245,17 +245,24 @@ Future<String?> firstInvalidRequestChain({
   required String companyUID,
   required List<String> orgIds,
 }) async {
-  for (final raw in orgIds) {
-    final orgId = raw.trim();
-    if (orgId.isEmpty) continue;
+  // Every chain in parallel; the first bad one in request order wins.
+  final ids = [
+    for (final raw in orgIds)
+      if (raw.trim().isNotEmpty) raw.trim(),
+  ];
+  final bad = await Future.wait(ids.map((orgId) async {
     final org = await firestore.collection('organizations').doc(orgId).get();
-    if (!org.exists) return orgId;
+    if (!org.exists) return true;
     final data = org.data() ?? const <String, dynamic>{};
     final name = (data['name'] ?? data['title'] ?? orgId).toString();
     if (isHiddenChain(uid: orgId, name: name)) {
       final co = await org.reference.collection('companies').doc(companyUID.trim()).get();
-      if (!co.exists) return orgId;
+      if (!co.exists) return true;
     }
+    return false;
+  }));
+  for (var i = 0; i < ids.length; i++) {
+    if (bad[i]) return ids[i];
   }
   return null;
 }

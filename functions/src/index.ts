@@ -344,6 +344,12 @@ export {startBillingCycle} from "./start_billing_cycle";
 export {auditDelegateHoldShadow} from "./holds_shadow";
 export {auditDelegateRequestOrgs} from "./request_org_company_check";
 export {auditDelegateCreateOrgs} from "./request_org_company_check";
+export {
+  autoLinkOnCompanyJoin,
+  autoLinkOnDelegateWrite,
+  autoLinkOnUserStatus,
+  reconcileCompanyChainLinksDaily,
+} from "./company_chain_autolink";
 export {suspendExpiredSubscriptions} from "./subscription_schedule";
 export {
   expireAbandonedSubscriptionRenewals,

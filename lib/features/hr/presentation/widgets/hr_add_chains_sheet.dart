@@ -1,77 +1,75 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:dartz/dartz.dart' show Either;
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
-import 'package:delegate_app/core/error/failures.dart';
-import 'package:delegate_app/core/widgets/app_avatar.dart';
-import 'package:delegate_app/features/admin/data/chain_duplicate_lookup.dart';
-import 'package:delegate_app/features/admin/data/link_delegate_chains.dart';
-import 'package:delegate_app/features/admin/domain/entities/chain_selection.dart';
-import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
+import 'package:delegate_app/features/admin/data/company_chains.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
-import 'package:delegate_app/injection_container.dart';
-import 'package:delegate_app/l10n/app_localizations.dart';
 
-/// Suspended («متوقف») delegates can't get chains from the HR web
-/// «مناديب الشركة» page (Mohamed, 17 Nov 2026): the button stays disabled.
+/// Kept for the delegates table: suspended delegates never get chains
+/// (Mohamed, 17 Nov 2026). Chains now come from the company (see
+/// company_chains.dart), so this only documents the rule.
 const bool kHrAllowAddChainsForSuspended = false;
 
 const String kHrAddChainsSuspendedTooltip =
     'المندوب متوقف، لا يمكن إضافة سلاسل له';
 
-/// HR web «إضافة سلاسل» side sheet (MD3 Model 3). Same data and request as
-/// the mobile «ربط بسلاسل إضافية» sheet (see link_delegate_chains.dart):
-/// chain search, FilterChip bubbles, a counter and a sticky «إرسال الطلب».
-/// About 420 wide on the end side; full screen below 840.
+/// HR web «إضافة سلاسل للشركة» side sheet: a company-level «طلب ضم سلسلة».
+///
+/// Sections: «سلاسل الشركة» (already joined, shown disabled) and
+/// «سلاسل أخرى (تحتاج موافقة)» (selectable). No chain cap, «اختيار الكل»
+/// picks every visible chain, alphabetical, search. After approval every
+/// active delegate with a paid subscription of the company is linked to the
+/// chain automatically (Cloud Function), so no delegate is picked here.
+///
+/// Fast: the chain catalog is cached per company and prefetched when the
+/// page opens; the pending-request check is one query and runs alongside.
 class HrAddChainsSheet extends StatefulWidget {
   const HrAddChainsSheet({
     super.key,
-    required this.delegate,
     required this.supervisor,
+    required this.companyUID,
+    required this.companyName,
     required this.fullScreen,
   });
 
-  final Delegate delegate;
   final Delegate supervisor;
+  final String companyUID;
+  final String companyName;
   final bool fullScreen;
 
-  /// Below this width the sheet fills the screen.
   static const double fullScreenBelow = 840;
-  static const double sheetWidth = 420;
+  static const double sheetWidth = 480;
 
   static const titleKey = Key('hr_add_chains_title');
   static const counterKey = Key('hr_add_chains_counter');
   static const submitKey = Key('hr_add_chains_submit');
   static const searchKey = Key('hr_add_chains_search');
   static const selectAllKey = Key('hr_add_chains_select_all');
-  static Key newChainHintKey(String uid) => Key('hr_add_chains_new_$uid');
+  static const skeletonKey = Key('hr_add_chains_skeleton');
+  static const joinedSectionKey = Key('hr_add_chains_joined');
+  static const otherSectionKey = Key('hr_add_chains_other');
   static Key chipKey(String uid) => Key('hr_add_chains_chip_$uid');
 
   /// Tests and fake-data screenshots only.
   @visibleForTesting
   static FirebaseFirestore Function()? debugFirestore;
-
-  /// Tests and fake-data screenshots only: replaces the request write.
   @visibleForTesting
-  static Future<Either<Failure, String>> Function(List<ChainOption> selected)?
-      debugSubmit;
-
+  static Future<List<CompanyChainOption>> Function()? debugCatalog;
   @visibleForTesting
-  /// Test hook: replaces the linked/pending pre-check.
+  static Future<Set<String>> Function()? debugPending;
   @visibleForTesting
-  static Future<DuplicateChainLookup> Function(Iterable<String> orgUids)? debugLookup;
+  static Future<void> Function(List<CompanyChainOption> selected)? debugSubmit;
 
   static void debugReset() {
-    debugLookup = null;
     debugFirestore = null;
+    debugCatalog = null;
+    debugPending = null;
     debugSubmit = null;
   }
 
-  /// Returns the names of the chains in the sent request, or null.
+  /// Returns the names of the requested chains, or null.
   static Future<List<String>?> show(
     BuildContext context, {
-    required Delegate delegate,
     required Delegate supervisor,
   }) {
     final fullScreen = MediaQuery.sizeOf(context).width < fullScreenBelow;
@@ -82,8 +80,9 @@ class HrAddChainsSheet extends StatefulWidget {
       barrierColor: Colors.black.withValues(alpha: 0.32),
       transitionDuration: const Duration(milliseconds: 250),
       pageBuilder: (_, _, _) => HrAddChainsSheet(
-        delegate: delegate,
         supervisor: supervisor,
+        companyUID: supervisor.companyUID,
+        companyName: supervisor.companyName,
         fullScreen: fullScreen,
       ),
       transitionBuilder: (ctx, anim, _, child) {
@@ -91,9 +90,7 @@ class HrAddChainsSheet extends StatefulWidget {
         final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
         return SlideTransition(
           position: Tween<Offset>(
-            begin: fullScreen
-                ? const Offset(0, 0.05)
-                : Offset(rtl ? -1 : 1, 0),
+            begin: fullScreen ? const Offset(0, 0.05) : Offset(rtl ? -1 : 1, 0),
             end: Offset.zero,
           ).animate(curved),
           child: FadeTransition(opacity: curved, child: child),
@@ -102,41 +99,35 @@ class HrAddChainsSheet extends StatefulWidget {
     );
   }
 
+  /// Warms the cache when the delegates page opens (web only).
+  static void prefetch(Delegate supervisor) {
+    if (debugCatalog != null || supervisor.companyUID.trim().isEmpty) return;
+    CompanyChainCatalog.fetch(
+      firestore: debugFirestore?.call() ?? FirebaseFirestore.instance,
+      companyUID: supervisor.companyUID,
+    ).ignore();
+  }
+
   @override
   State<HrAddChainsSheet> createState() => _HrAddChainsSheetState();
 }
 
-enum _ChainState { available, linked, pending }
-
 class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
   final TextEditingController _search = TextEditingController();
 
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
-  }
-
   bool _loading = true;
+  bool _checkingPending = true;
+  bool _pendingUnavailable = false;
   String? _loadError;
   String? _submitError;
-  String? _notice;
   bool _submitting = false;
 
-  /// The pending/linked pre-check failed; chains are shown anyway.
-  bool _checkUnavailable = false;
-
-  List<LinkableChain> _chains = const [];
-  final Map<String, _ChainState> _state = {};
+  List<CompanyChainOption> _chains = const [];
+  Set<String> _pending = const {};
   final Set<String> _selected = {};
 
   FirebaseFirestore get _firestore =>
       HrAddChainsSheet.debugFirestore?.call() ?? FirebaseFirestore.instance;
-
-  String get _companyUID => linkRequestCompanyUID(
-        delegate: widget.delegate,
-        supervisor: widget.supervisor,
-      );
 
   @override
   void initState() {
@@ -144,146 +135,108 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
     _load();
   }
 
-  Future<DuplicateChainLookup> _lookup(Iterable<String> orgUids) =>
-      HrAddChainsSheet.debugLookup?.call(orgUids) ??
-      lookupLinkChainStates(
-        firestore: _firestore,
-        companyUID: _companyUID,
-        delegateUid: widget.delegate.uid,
-        nationalId: widget.delegate.nationalityID,
-        phoneNumber: widget.delegate.phoneNumber,
-        organizationUIDs: orgUids,
-      );
-
-  void _applyLookup(DuplicateChainLookup lookup) {
-    for (final uid in lookup.delegateOrgUids) {
-      if (_state.containsKey(uid)) _state[uid] = _ChainState.linked;
-    }
-    for (final uid in lookup.pendingOrgUids) {
-      if (_state[uid] == _ChainState.available) {
-        _state[uid] = _ChainState.pending;
-      }
-    }
-    _selected.removeWhere((uid) => _state[uid] != _ChainState.available);
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool force = false}) async {
     setState(() {
       _loading = true;
+      _checkingPending = true;
       _loadError = null;
     });
+    final pendingFuture = (HrAddChainsSheet.debugPending?.call() ??
+            fetchPendingCompanyChainUids(
+              firestore: _firestore,
+              companyUID: widget.companyUID,
+            ))
+        .then<Set<String>?>((v) => v)
+        .catchError((Object _) => null);
     try {
-      final chains = await fetchLinkableChains(
-        firestore: _firestore,
-        delegate: widget.delegate,
-        supervisor: widget.supervisor,
-        includeLinked: true,
-      );
-      _state
-        ..clear()
-        ..addAll({
-          for (final c in chains)
-            c.uid: c.alreadyLinked ? _ChainState.linked : _ChainState.available,
-        });
-      final candidates = [
-        for (final c in chains)
-          if (!c.alreadyLinked) c.uid,
-      ];
-      DuplicateChainLookup? lookup;
-      try {
-        lookup = await _lookup(candidates);
-      } on DuplicateChainLookupException {
-        // Graceful fallback: still show the chains. On send the request
-        // flow re-checks each chain for the delegate's doc and refuses a
-        // chain the delegate is already on.
-        lookup = null;
-      }
+      final chains = await (HrAddChainsSheet.debugCatalog?.call() ??
+          CompanyChainCatalog.fetch(
+            firestore: _firestore,
+            companyUID: widget.companyUID,
+            forceRefresh: force,
+          ));
       if (!mounted) return;
+      // Show the chains right away; the pending check fills in after.
       setState(() {
         _chains = chains;
-        _checkUnavailable = lookup == null;
-        if (lookup != null) _applyLookup(lookup);
         _loading = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _loadError = const DuplicateChainLookupException().message;
+        _checkingPending = false;
+        _loadError = 'تعذر تحميل السلاسل الآن. تحقق من الاتصال وحاول مرة أخرى.';
       });
-    }
-  }
-
-  List<ChainOption> get _availableOptions => [
-        for (final c in _chains)
-          if (_state[c.uid] == _ChainState.available) c.option,
-      ];
-
-  ChainSelectionResult get _selection => partitionSelectedChains(
-        all: _availableOptions,
-        selectedUids: _selected,
-      );
-
-  Future<void> _submit() async {
-    if (_submitting) return;
-    if (_selected.isEmpty) {
-      setState(() => _submitError = kLinkChainsRequiredMessage);
       return;
     }
+    final pending = await pendingFuture;
+    if (!mounted) return;
+    setState(() {
+      _checkingPending = false;
+      _pendingUnavailable = pending == null;
+      _pending = pending ?? const {};
+      _selected.removeAll(_pending);
+    });
+  }
+
+  List<CompanyChainOption> get _joined => [
+        for (final c in _chains)
+          if (c.joined) c,
+      ];
+
+  List<CompanyChainOption> get _others => [
+        for (final c in _chains)
+          if (!c.joined) c,
+      ];
+
+  bool _matches(CompanyChainOption c) {
+    final q = _search.text.trim().toLowerCase();
+    return q.isEmpty || c.name.toLowerCase().contains(q);
+  }
+
+  bool _selectable(CompanyChainOption c) => !c.joined && !_pending.contains(c.uid);
+
+  List<CompanyChainOption> get _selectedChains => [
+        for (final c in _chains)
+          if (_selected.contains(c.uid) && _selectable(c)) c,
+      ];
+
+  Future<void> _submit() async {
+    final picked = _selectedChains;
+    if (picked.isEmpty || _submitting) return;
     setState(() {
       _submitting = true;
       _submitError = null;
-      _notice = null;
     });
-
-    // Re-check linked / pending chains right before writing. If the check
-    // itself can't run, the request flow still refuses chains the delegate
-    // is already on (it reads the delegate's doc in each chain).
-    late ChainSelectionResult selection;
     try {
-      final lookup = await _lookup(_selection.keptUids);
-      selection = partitionSelectedChains(
-        all: _availableOptions,
-        selectedUids: _selected,
-        duplicateUids: lookup.duplicateOrgUids,
-      );
-      if (!mounted) return;
-      if (lookup.duplicateOrgUids.isNotEmpty) {
-        setState(() => _applyLookup(lookup));
+      final hook = HrAddChainsSheet.debugSubmit;
+      if (hook != null) {
+        await hook(picked);
+      } else {
+        await submitCompanyChainRequests(
+          firestore: _firestore,
+          supervisor: widget.supervisor,
+          companyUID: widget.companyUID,
+          companyName: widget.companyName,
+          chains: picked,
+        );
       }
-    } on DuplicateChainLookupException {
       if (!mounted) return;
-      selection = _selection;
-    }
-
-    if (!selection.canSubmit) {
+      Navigator.of(context).pop([for (final c in picked) c.name]);
+    } catch (_) {
+      if (!mounted) return;
       setState(() {
         _submitting = false;
-        _submitError = selection.warningAr ?? kLinkChainsRequiredMessage;
+        _submitError = 'تعذر إرسال الطلب الآن، حاول مرة أخرى.';
       });
-      return;
     }
-    if (selection.warningAr != null) {
-      setState(() => _notice = selection.warningAr);
-    }
-
-    final submit = HrAddChainsSheet.debugSubmit;
-    final result = submit != null
-        ? await submit(selection.kept)
-        : await submitLinkChainsRequest(
-            repo: sl<DelegateSubscriptionRepository>(),
-            delegate: widget.delegate,
-            supervisor: widget.supervisor,
-            selected: selection.kept,
-          );
-    if (!mounted) return;
-    result.fold(
-      (failure) => setState(() {
-        _submitting = false;
-        _submitError = failure.message;
-      }),
-      (_) => Navigator.of(context).pop(selection.keptNames),
-    );
   }
 
   @override
@@ -314,23 +267,25 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildTitle(cs),
+        if (!_loading && _checkingPending)
+          const LinearProgressIndicator(minHeight: 2)
+        else
+          const SizedBox(height: 2),
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildDelegateCard(cs),
+                _buildCompanyCard(cs),
                 const SizedBox(height: 16),
-                if (_loading)
-                  const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (_loadError != null)
+                if (_loadError != null)
                   _buildLoadError(cs)
-                else
-                  ..._buildChains(cs),
+                else ...[
+                  _buildSearch(cs),
+                  const SizedBox(height: 20),
+                  if (_loading) _buildSkeleton(cs) else ..._buildSections(cs),
+                ],
               ],
             ),
           ),
@@ -342,23 +297,37 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
 
   Widget _buildTitle(ColorScheme cs) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+      padding: const EdgeInsetsDirectional.fromSTEB(20, 14, 8, 10),
       child: Row(
         children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: cs.primaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Symbols.add_business_rounded, color: cs.onPrimaryContainer, size: 22),
+          ),
+          const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              'إضافة سلاسل',
-              key: HrAddChainsSheet.titleKey,
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'إضافة سلاسل للشركة',
+                  key: HrAddChainsSheet.titleKey,
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: cs.onSurface),
+                ),
+                Text(
+                  'طلب ضم سلسلة',
+                  style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant),
+                ),
+              ],
             ),
           ),
           IconButton(
             tooltip: 'إغلاق',
-            iconSize: 24,
             constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
             icon: const Icon(Symbols.close_rounded),
             onPressed: _submitting ? null : () => Navigator.of(context).pop(),
@@ -368,13 +337,10 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
     );
   }
 
-  Widget _buildDelegateCard(ColorScheme cs) {
-    final d = widget.delegate;
-    final subtitle = d.city.trim();
-    final active = d.status == DelegateStatus.active;
-    final statusColor = active ? const Color(0xFF2E7D32) : cs.onSurfaceVariant;
+  Widget _buildCompanyCard(ColorScheme cs) {
+    final joined = _loading ? null : _joined.length;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: BorderRadius.circular(16),
@@ -382,50 +348,22 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
       ),
       child: Row(
         children: [
-          AppAvatar(
-            imageUrl: d.personalPhotoUrl,
-            fallbackText: d.fullName,
-            radius: 20,
-          ),
+          Icon(Symbols.domain_rounded, color: cs.primary, size: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  d.fullName,
+                  widget.companyName.trim().isEmpty ? 'الشركة' : widget.companyName.trim(),
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (subtitle.isNotEmpty)
-                  Text(
-                    subtitle,
-                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-                  ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: active
-                  ? const Color(0xFF2E7D32).withValues(alpha: 0.12)
-                  : cs.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.circle, size: 7, color: statusColor),
-                const SizedBox(width: 4),
+                const SizedBox(height: 2),
                 Text(
-                  active ? 'نشط' : 'متوقف',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: statusColor,
-                  ),
+                  joined == null ? 'جاري تحميل السلاسل…' : 'مسجلة في $joined سلسلة',
+                  style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant),
                 ),
               ],
             ),
@@ -435,19 +373,50 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
     );
   }
 
-  Widget _sectionLabel(String text, ColorScheme cs, {Widget? trailing}) {
+  Widget _buildSearch(ColorScheme cs) {
+    return SearchBar(
+      key: HrAddChainsSheet.searchKey,
+      controller: _search,
+      hintText: 'ابحث باسم السلسلة',
+      elevation: const WidgetStatePropertyAll(0),
+      constraints: const BoxConstraints(minHeight: 48, maxHeight: 48),
+      backgroundColor: WidgetStatePropertyAll(cs.surfaceContainerHigh),
+      leading: Icon(Symbols.search_rounded, color: cs.onSurfaceVariant),
+      onChanged: (_) => setState(() {}),
+    );
+  }
+
+  Widget _sectionHeader(
+    ColorScheme cs, {
+    Key? key,
+    required String title,
+    required int count,
+    String? subtitle,
+    Widget? trailing,
+  }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      key: key,
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$title ($count)',
+                  style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: cs.onSurface),
+                ),
+                if (subtitle != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      subtitle,
+                      style: TextStyle(fontSize: 12, height: 1.4, color: cs.onSurfaceVariant),
+                    ),
+                  ),
+              ],
             ),
           ),
           ?trailing,
@@ -456,51 +425,141 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
     );
   }
 
-  List<Widget> _buildChains(ColorScheme cs) {
-    final l10n = AppLocalizations.of(context);
-    final linked = [
-      for (final c in _chains)
-        if (_state[c.uid] == _ChainState.linked) c,
-    ];
-    final query = _search.text.trim().toLowerCase();
-    final selectable = [
-      for (final c in _chains)
-        if (_state[c.uid] != _ChainState.linked &&
-            (query.isEmpty || c.name.toLowerCase().contains(query)))
-          c,
-    ];
-    final hasSelectable = _chains.any((c) => _state[c.uid] != _ChainState.linked);
-    final available = _availableOptions;
-    final selection = _selection;
-    final count = selection.kept.length;
-    final atCap = count >= kMaxOrganizationsPerRequest;
-    final allSelected = available.isNotEmpty &&
-        available.every((c) => _selected.contains(c.uid));
+  /// Evenly sized tiles, 2 per row in the sheet, 1 on very narrow screens.
+  Widget _grid(List<Widget> tiles) {
+    return LayoutBuilder(builder: (context, c) {
+      const gap = 8.0;
+      final cols = c.maxWidth >= 340 ? 2 : 1;
+      final w = (c.maxWidth - gap * (cols - 1)) / cols;
+      return Wrap(
+        spacing: gap,
+        runSpacing: gap,
+        children: [for (final t in tiles) SizedBox(width: w, child: t)],
+      );
+    });
+  }
 
-    return [
-      _sectionLabel('مرتبط حالياً (${linked.length})', cs),
-      if (linked.isEmpty)
-        Text('—', style: TextStyle(color: cs.onSurfaceVariant))
-      else
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final c in linked)
-              FilterChip(
-                key: HrAddChainsSheet.chipKey(c.uid),
-                avatar: Icon(Symbols.check_circle_rounded, size: 18, color: cs.onSurfaceVariant),
-                showCheckmark: false,
-                selected: false,
-                label: Text('${c.name} · مرتبط'),
-                onSelected: null,
-              ),
-          ],
+  Widget _tile(
+    ColorScheme cs, {
+    required CompanyChainOption chain,
+    required bool selected,
+    required bool enabled,
+    IconData? stateIcon,
+    String? stateLabel,
+    String? tooltip,
+  }) {
+    final bg = selected ? cs.primaryContainer : cs.surface;
+    final fg = selected ? cs.onPrimaryContainer : cs.onSurface;
+    final tile = Material(
+      key: HrAddChainsSheet.chipKey(chain.uid),
+      color: enabled ? bg : cs.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: selected ? cs.primary : cs.outlineVariant.withValues(alpha: 0.6),
+          width: selected ? 1.5 : 1,
         ),
-      const SizedBox(height: 20),
-      _sectionLabel(
-        'سلاسل الشركة',
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: enabled && !_submitting
+            ? () => setState(() {
+                  selected ? _selected.remove(chain.uid) : _selected.add(chain.uid);
+                  _submitError = null;
+                })
+            : null,
+        child: SizedBox(
+          height: 52,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.only(start: 6, end: 12),
+            child: Row(
+              children: [
+                if (stateIcon != null)
+                  SizedBox(
+                    width: 40,
+                    child: Icon(stateIcon, size: 20, color: cs.onSurfaceVariant),
+                  )
+                else
+                  Checkbox(
+                    value: selected,
+                    onChanged: enabled && !_submitting
+                        ? (v) => setState(() {
+                              v == true ? _selected.add(chain.uid) : _selected.remove(chain.uid);
+                              _submitError = null;
+                            })
+                        : null,
+                  ),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        chain.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                          color: enabled ? fg : cs.onSurfaceVariant,
+                        ),
+                      ),
+                      if (stateLabel != null)
+                        Text(
+                          stateLabel,
+                          style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    return Tooltip(message: tooltip ?? chain.name, child: tile);
+  }
+
+  List<Widget> _buildSections(ColorScheme cs) {
+    final joined = _joined.where(_matches).toList();
+    final others = _others.where(_matches).toList();
+    final visibleSelectable = others.where(_selectable).toList();
+    final count = _selectedChains.length;
+    final allVisibleSelected = visibleSelectable.isNotEmpty &&
+        visibleSelectable.every((c) => _selected.contains(c.uid));
+    return [
+      _sectionHeader(
         cs,
+        key: HrAddChainsSheet.joinedSectionKey,
+        title: 'سلاسل الشركة',
+        count: _joined.length,
+        subtitle: 'الشركة مسجلة فيها بالفعل.',
+      ),
+      if (joined.isEmpty)
+        Text(
+          _joined.isEmpty ? 'لا توجد سلاسل مسجلة بعد.' : 'لا توجد نتائج.',
+          style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant),
+        )
+      else
+        _grid([
+          for (final c in joined)
+            _tile(
+              cs,
+              chain: c,
+              selected: false,
+              enabled: false,
+              stateIcon: Symbols.check_circle_rounded,
+              stateLabel: 'مسجلة',
+            ),
+        ]),
+      const SizedBox(height: 24),
+      _sectionHeader(
+        cs,
+        key: HrAddChainsSheet.otherSectionKey,
+        title: 'سلاسل أخرى (تحتاج موافقة)',
+        count: _others.length,
+        subtitle: 'تُسجَّل الشركة فيها بعد موافقة مسؤول السلسلة.',
         trailing: Container(
           key: HrAddChainsSheet.counterKey,
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -509,134 +568,93 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
-            '$count/$kMaxOrganizationsPerRequest مختارة',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: cs.onSecondaryContainer,
-            ),
+            '$count مختارة',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cs.onSecondaryContainer),
           ),
         ),
       ),
-      if (hasSelectable) ...[
-        SearchBar(
-          key: HrAddChainsSheet.searchKey,
-          controller: _search,
-          hintText: 'ابحث باسم السلسلة',
-          elevation: const WidgetStatePropertyAll(0),
-          constraints: const BoxConstraints(minHeight: 48, maxHeight: 48),
-          backgroundColor: WidgetStatePropertyAll(cs.surfaceContainerHigh),
-          leading: Icon(Symbols.search_rounded, color: cs.onSurfaceVariant),
-          onChanged: (_) => setState(() {}),
-        ),
+      if (others.isNotEmpty)
         Align(
           alignment: AlignmentDirectional.centerStart,
-          child: TextButton(
+          child: TextButton.icon(
             key: HrAddChainsSheet.selectAllKey,
-            style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
-            onPressed: _submitting || available.isEmpty
+            style: TextButton.styleFrom(minimumSize: const Size(48, 40)),
+            onPressed: _submitting || visibleSelectable.isEmpty
                 ? null
                 : () => setState(() {
-                      final next = toggleSelectAll(
-                        all: available,
-                        selectedUids: _selected,
-                      );
-                      _selected
-                        ..clear()
-                        ..addAll(next);
+                      if (allVisibleSelected) {
+                        _selected.removeAll(visibleSelectable.map((c) => c.uid));
+                      } else {
+                        _selected.addAll(visibleSelectable.map((c) => c.uid));
+                      }
                       _submitError = null;
                     }),
-            child: Text(
-              allSelected
-                  ? 'إلغاء الكل'
-                  : (l10n?.chainPickerSelectAll ?? 'اختيار الكل'),
+            icon: Icon(
+              allVisibleSelected ? Symbols.deselect_rounded : Symbols.select_all_rounded,
+              size: 18,
             ),
+            label: Text(allVisibleSelected ? 'إلغاء الكل' : 'اختيار الكل'),
           ),
         ),
-      ],
-      if (!hasSelectable)
-        _note(cs, Symbols.info_rounded, kLinkChainsNoneAvailableMessage)
-      else if (selectable.isEmpty)
-        Text('لا توجد سلاسل مطابقة للبحث', style: TextStyle(color: cs.onSurfaceVariant))
+      const SizedBox(height: 4),
+      if (_others.isEmpty)
+        Text('الشركة مسجلة في كل السلاسل المتاحة.', style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant))
+      else if (others.isEmpty)
+        Text('لا توجد سلاسل مطابقة للبحث', style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant))
       else
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final c in selectable)
-              if (_state[c.uid] == _ChainState.pending)
-                FilterChip(
-                  key: HrAddChainsSheet.chipKey(c.uid),
-                  avatar: Icon(Symbols.schedule_rounded, size: 18, color: cs.onSurfaceVariant),
-                  showCheckmark: false,
-                  selected: false,
-                  label: Text('${c.name} · طلب قيد المراجعة'),
-                  onSelected: null,
-                )
-              else
-                FilterChip(
-                  key: HrAddChainsSheet.chipKey(c.uid),
-                  selected: _selected.contains(c.uid),
-                  tooltip: c.companyRegistered
-                      ? null
-                      : 'الشركة غير مسجلة في هذه السلسلة بعد، وتُسجَّل عند اعتماد الطلب',
-                  label: c.companyRegistered
-                      ? Text(c.name)
-                      : Text.rich(
-                          TextSpan(
-                            text: c.name,
-                            children: [
-                              TextSpan(
-                                text: ' · جديدة',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  color: cs.onSurfaceVariant,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                          key: HrAddChainsSheet.newChainHintKey(c.uid),
-                        ),
-                  onSelected: _submitting ||
-                          (atCap && !_selected.contains(c.uid))
-                      ? null
-                      : (on) => setState(() {
-                            on ? _selected.add(c.uid) : _selected.remove(c.uid);
-                            _submitError = null;
-                          }),
-                ),
-          ],
-        ),
-      const SizedBox(height: 16),
-      _note(
-        cs,
-        Symbols.info_rounded,
-        _checkUnavailable
-            ? 'تعذر التحقق من الطلبات السابقة الآن. سيتم التحقق من ربط المندوب بكل سلسلة عند الإرسال.'
-            : 'السلاسل المرتبطة حالياً أو التي عليها طلب قيد المراجعة غير متاحة للاختيار.',
-      ),
-      if (_chains.any((c) =>
-          _selected.contains(c.uid) && !c.companyRegistered)) ...[
-        const SizedBox(height: 8),
-        _note(
-          cs,
-          Symbols.domain_add_rounded,
-          'السلاسل المعلّمة «جديدة» ستُسجَّل فيها الشركة تلقائياً عند اعتماد الطلب.',
-        ),
-      ],
-      if (selection.warningAr != null || _notice != null) ...[
-        const SizedBox(height: 8),
-        _note(cs, Symbols.info_rounded, (_notice ?? selection.warningAr)!),
+        _grid([
+          for (final c in others)
+            if (_pending.contains(c.uid))
+              _tile(
+                cs,
+                chain: c,
+                selected: false,
+                enabled: false,
+                stateIcon: Symbols.schedule_rounded,
+                stateLabel: 'طلب قيد المراجعة',
+              )
+            else
+              _tile(
+                cs,
+                chain: c,
+                selected: _selected.contains(c.uid),
+                enabled: true,
+              ),
+        ]),
+      if (_pendingUnavailable) ...[
+        const SizedBox(height: 12),
+        _note(cs, Symbols.info_rounded,
+            'تعذر التحقق من الطلبات السابقة الآن. يمكنك الإرسال، وسيراجع المسؤول أي طلب مكرر.'),
       ],
       if (_submitError != null) ...[
-        const SizedBox(height: 8),
-        Text(
-          _submitError!,
-          style: TextStyle(fontSize: 12.5, height: 1.4, color: cs.error),
-        ),
+        const SizedBox(height: 12),
+        Text(_submitError!, style: TextStyle(fontSize: 12.5, color: cs.error)),
       ],
     ];
+  }
+
+  Widget _buildSkeleton(ColorScheme cs) {
+    Widget bar(double w, double h) => Container(
+          width: w,
+          height: h,
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(8),
+          ),
+        );
+    return Column(
+      key: HrAddChainsSheet.skeletonKey,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        bar(140, 16),
+        const SizedBox(height: 12),
+        _grid([for (var i = 0; i < 4; i++) bar(double.infinity, 52)]),
+        const SizedBox(height: 24),
+        bar(200, 16),
+        const SizedBox(height: 12),
+        _grid([for (var i = 0; i < 10; i++) bar(double.infinity, 52)]),
+      ],
+    );
   }
 
   Widget _note(ColorScheme cs, IconData icon, String text) {
@@ -652,10 +670,7 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
           Icon(icon, size: 18, color: cs.onSurfaceVariant),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              text,
-              style: TextStyle(fontSize: 12.5, height: 1.5, color: cs.onSurfaceVariant),
-            ),
+            child: Text(text, style: TextStyle(fontSize: 12.5, height: 1.5, color: cs.onSurfaceVariant)),
           ),
         ],
       ),
@@ -671,8 +686,7 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
         Align(
           alignment: AlignmentDirectional.centerStart,
           child: TextButton.icon(
-            style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
-            onPressed: _load,
+            onPressed: () => _load(force: true),
             icon: const Icon(Symbols.refresh_rounded, size: 18),
             label: const Text('إعادة المحاولة'),
           ),
@@ -681,13 +695,11 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
     );
   }
 
-  /// Sticky footer: the one-request note and the send / cancel buttons.
   Widget _buildFooter(ColorScheme cs) {
-    final l10n = AppLocalizations.of(context);
-    final count = _loading ? 0 : _selection.kept.length;
-    final canSubmit = !_loading && _loadError == null && count > 0 && !_submitting;
+    final count = _selectedChains.length;
+    final canSubmit = !_loading && !_checkingPending && _loadError == null && count > 0 && !_submitting;
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
         border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.6))),
@@ -703,8 +715,8 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '${l10n?.chainPickerOneSubscriptionNote ?? 'طلب واحد، موافقة واحدة، واشتراك واحد. لا تُحتسب رسوم لكل سلسلة.'} '
-                  'الحد الأقصى $kMaxOrganizationsPerRequest سلاسل في الطلب الواحد.',
+                  'بعد الموافقة تظهر فروع السلسلة تلقائياً لكل مناديب الشركة النشطين '
+                  'والمدفوع اشتراكهم. لا رسوم إضافية لكل سلسلة.',
                   style: TextStyle(fontSize: 12, height: 1.5, color: cs.onSurfaceVariant),
                 ),
               ),
@@ -719,14 +731,10 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
                   style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
                   onPressed: canSubmit ? _submit : null,
                   icon: _submitting
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Symbols.send_rounded, size: 20),
                   label: Text(
-                    _submitting ? 'جاري إرسال الطلب...' : 'إرسال الطلب ($count)',
+                    _submitting ? 'جاري إرسال الطلب...' : 'إرسال طلب الضم ($count)',
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),

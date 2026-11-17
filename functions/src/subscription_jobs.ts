@@ -28,7 +28,8 @@ import {
   MAX_DELEGATES_PER_RENEWAL,
   type AdvanceRenewalConfig,
 } from "./subscription_logic";
-import {holdsMode} from "./holds";
+import {holdsMode, HOLDS_MODE_AUTHORITATIVE} from "./holds";
+import {freeChainIds, mirrorUserStatusPlan} from "./company_chain_autolink_logic";
 import {M1_SOURCE, M2_SOURCE, planExpiryHoldWrite, shouldShadowReactivateAfterExpiryClear} from "./subscription_holds";
 import {
   REMINDER_RUNS,
@@ -134,6 +135,71 @@ async function delegateDocsFor(db: Db, uids: string[]) {
   return docs;
 }
 
+/** organizations/{org}/companies/{co}/delegates/{uid} -> org, else "". */
+export function chainOfDelegateDoc(ref: admin.firestore.DocumentReference): string {
+  const parts = ref.path.split("/");
+  return parts.length === 6 && parts[0] === "organizations" && parts[2] === "companies" ? parts[1] : "";
+}
+
+/** Free chains (فتح الله): config/subscriptions.freeChainOrgUids + org flags. */
+async function loadFreeChainSet(db: Db): Promise<Set<string>> {
+  const [cfg, orgs] = await Promise.all([
+    db.doc("config/subscriptions").get(),
+    db.collection("organizations").get(),
+  ]);
+  return freeChainIds(
+    cfg.exists ? (cfg.data() as Data) : null,
+    orgs.docs.map((d) => ({id: d.id, data: (d.data() || {}) as Data})),
+  );
+}
+
+/**
+ * Authoritative mode only: mirror subscription_expired onto users/{uid}.
+ * Suspends the login only when the delegate has no active free-chain copy
+ * (فتح الله works without paying); reactivates only a login this job
+ * suspended (statusReason subscription_expired). Shadow: no writes.
+ */
+async function mirrorUsersForExpiry(
+  db: Db,
+  writer: Batcher,
+  uids: string[],
+  op: "suspend" | "reactivate",
+  freeChains: Set<string>,
+  mode: string,
+): Promise<number> {
+  if (mode !== HOLDS_MODE_AUTHORITATIVE || uids.length === 0) return 0;
+  const docs = await delegateDocsFor(db, uids);
+  const freeActive = new Set<string>();
+  for (const d of docs) {
+    const org = chainOfDelegateDoc(d.ref);
+    const st = str(d.get("status")).toLowerCase();
+    if (org && freeChains.has(org) && (st === "active" || st === "approved")) {
+      freeActive.add(str(d.get("uid")) || d.ref.id);
+    }
+  }
+  const refs = uids.map((u) => db.doc(`users/${u}`));
+  let n = 0;
+  for (let i = 0; i < refs.length; i += 100) {
+    const snaps = await db.getAll(...refs.slice(i, i + 100));
+    for (const snap of snaps) {
+      if (!snap.exists) continue;
+      const update = mirrorUserStatusPlan({
+        op,
+        user: (snap.data() || {}) as Data,
+        hasActiveFreeChainCopy: freeActive.has(snap.id),
+      });
+      if (!update) continue;
+      await writer.update(snap.ref, {
+        ...update,
+        ...(update.statusReason === null ? {statusReason: FieldValue.delete()} : {}),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      n++;
+    }
+  }
+  return n;
+}
+
 export interface SuspensionResult {
   periodCode: string;
   skipped?: "free_promotion" | "grace_period";
@@ -145,6 +211,10 @@ export interface SuspensionResult {
   alreadySuspended: number;
   /** Expiry holds removed because the uid is already covered for this period. */
   clearedHolds?: number;
+  /** Copies in free chains (فتح الله) left active. */
+  skippedFreeChainDocs?: number;
+  /** users/{uid} logins reactivated (authoritative mode). */
+  reactivatedUsers?: number;
 }
 
 /**
@@ -183,8 +253,16 @@ export async function runSubscriptionSuspension(db: Db, now: Date): Promise<Susp
   const writer = new Batcher(db);
   const at = now.toISOString();
   const mode = holdsMode();
+  const freeChains = await loadFreeChainSet(db);
+  const suspendedUids = new Set<string>();
+  let skippedFreeChainDocs = 0;
 
   for (const doc of await delegateDocsFor(db, candidates)) {
+    // فتح الله (free chains) never needs payment: leave that copy active.
+    if (freeChains.has(chainOfDelegateDoc(doc.ref))) {
+      skippedFreeChainDocs++;
+      continue;
+    }
     const planned = planExpiryHoldWrite({
       data: (doc.data() || {}) as Data,
       op: "add",
@@ -211,7 +289,9 @@ export async function runSubscriptionSuspension(db: Db, now: Date): Promise<Susp
       });
     }
     res.suspendedDocs++;
+    suspendedUids.add(str(doc.get("uid")) || doc.ref.id);
   }
+  res.skippedFreeChainDocs = skippedFreeChainDocs;
   // Prepaid / already-covered app-added uids: drop a leftover expiry hold
   // (e.g. advance renewal paid in the previous period). Shadow mode still
   // does not write users/{uid}, but it does reactivate when no holds remain
@@ -257,8 +337,10 @@ export async function runSubscriptionSuspension(db: Db, now: Date): Promise<Susp
     if (planned.ok && !planned.unchanged) clearedHolds++;
   }
   res.clearedHolds = clearedHolds;
-  // users/{uid}.status is not mirrored here (login reads the delegate doc).
-  // Shadow mode does not write users/{uid}.
+  // users/{uid}: authoritative mode only (tashil-dev). Shadow writes nothing.
+  res.suspendedUsers = await mirrorUsersForExpiry(db, writer, [...suspendedUids], "suspend", freeChains, mode);
+  res.reactivatedUsers = await mirrorUsersForExpiry(
+    db, writer, coveredList.filter((u) => appAdded.has(u)), "reactivate", freeChains, mode);
   await writer.flush();
   await db.collection(RUNS).doc(`${period.code}_${now.toISOString().slice(0, 10)}`).set({
     ...res, ranAt: ts,
@@ -1235,7 +1317,11 @@ export async function applyPaidRequest(db: Db, requestId: string, asOf?: Date): 
     }
     await writer.update(doc.ref, withWriteMeta(update, ts));
   }
-  // users/{uid}.status is not mirrored here (login reads the delegate doc).
+  // users/{uid}: reactivate a login the expiry job suspended (authoritative
+  // mode only). The autoLinkOnDelegateWrite trigger then re-links the chains.
+  if (clearsExpiryHold) {
+    await mirrorUsersForExpiry(db, writer, [...found], "reactivate", await loadFreeChainSet(db), mode);
+  }
   await writer.flush();
   const missing = uids.filter((uid) => !found.has(uid));
   const update: Data = {applyState: "applied", reactivatedDocs: reactivated, appliedAt: ts};

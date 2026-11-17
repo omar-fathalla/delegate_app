@@ -28,7 +28,9 @@ export function requestOrganizationIds(data: Record<string, unknown>): string[] 
   }
   add(data.organizationUID);
   add(data.organizationId);
-  return ids.slice(0, 10);
+  // No chain cap any more (one payment per delegate); 100 is a sanity bound
+  // that matches the delegate_requests rules.
+  return ids.slice(0, 100);
 }
 
 export function summarizeOrgCompanyCheck(opts: {
