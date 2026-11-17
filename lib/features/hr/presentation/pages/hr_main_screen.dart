@@ -39,6 +39,11 @@ class _HRMainScreenState extends State<HRMainScreen> {
   late int _currentIndex;
   late final Set<int> _loadedTabs;
   bool _isSidebarExpanded = true;
+
+  /// Web «مناديب الشركة» (MD3 Model 1): below this width the side nav is the
+  /// rail while that tab is open, unless the user expands it.
+  static const double _delegatesRailBelow = 1200;
+  bool? _delegatesNavExpandedOverride;
   final int _homeIndex = hrShellHomeTab(isWeb: WebRuntimePolicy.isWeb);
   final HrWebHeaderBridge _headerBridge = HrWebHeaderBridge();
 
@@ -418,6 +423,9 @@ class _HRMainScreenState extends State<HRMainScreen> {
     final isWideScreen = MediaQuery.of(context).size.width > 768;
     final isArabic = localeProvider.isArabic;
     final web = WebRuntimePolicy.isWeb;
+    final delegatesRail = web &&
+        _currentIndex == kHrTabDelegates &&
+        MediaQuery.sizeOf(context).width < _delegatesRailBelow;
     final menuItems = web
         ? const <PopupMenuEntry<String>>[]
         : _buildMenuItems(context, l10n, colorScheme);
@@ -475,11 +483,18 @@ class _HRMainScreenState extends State<HRMainScreen> {
                       HRDesktopSidebar(
                         delegate: delegate,
                         selectedIndex: _currentIndex,
-                        isExpanded: _isSidebarExpanded,
+                        isExpanded: delegatesRail
+                            ? (_delegatesNavExpandedOverride ?? false)
+                            : _isSidebarExpanded,
                         onToggleExpanded: () {
-                          setState(
-                            () => _isSidebarExpanded = !_isSidebarExpanded,
-                          );
+                          setState(() {
+                            if (delegatesRail) {
+                              _delegatesNavExpandedOverride =
+                                  !(_delegatesNavExpandedOverride ?? false);
+                            } else {
+                              _isSidebarExpanded = !_isSidebarExpanded;
+                            }
+                          });
                         },
                         onItemSelected: _onTabSelected,
                         onOpenProfile: () => _onMenuSelected('profile'),
