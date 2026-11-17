@@ -1,3 +1,8 @@
+// WARNING: Do not run this script until it is updated to the official ت logo.
+// It still draws the old white "E" mark and would overwrite App Store, Play,
+// iOS AppIcon, and Android launcher icons. logo.png and tashil_splash.png are
+// also written here; those in-app assets were left unchanged on purpose.
+
 // ignore_for_file: unnecessary_import, depend_on_referenced_packages, avoid_print
 
 import 'dart:io';
