@@ -16,7 +16,6 @@ import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:material_symbols_icons/symbols.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Pinned clock for screenshots and tests. Production leaves this null.
@@ -369,7 +368,7 @@ class _HrNotificationsSheetState extends State<_HrNotificationsSheet> {
     }
     if (state is NotificationError) {
       return _Message(
-        icon: Symbols.error_rounded,
+        icon: Icons.error_rounded,
         text: state.message,
         action: TextButton(
           onPressed: () {
@@ -392,7 +391,7 @@ class _HrNotificationsSheetState extends State<_HrNotificationsSheet> {
       final unreadFilter = _filter == _SheetFilter.unread;
       return _Message(
         key: const ValueKey('hr_notifications_empty'),
-        icon: Symbols.notifications_off_rounded,
+        icon: Icons.notifications_off_rounded,
         text: unreadFilter ? 'مفيش إشعارات غير مقروءة' : 'مفيش إشعارات',
       );
     }
@@ -422,7 +421,7 @@ class _HrNotificationsSheetState extends State<_HrNotificationsSheet> {
               child: OutlinedButton.icon(
                 key: const ValueKey('hr_notifications_older'),
                 onPressed: _revealOlder,
-                icon: const Icon(Symbols.expand_more_rounded, size: 18),
+                icon: const Icon(Icons.expand_more_rounded, size: 18),
                 label: const Text('عرض الأقدم'),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(0, 44),
@@ -477,17 +476,22 @@ class _Header extends StatelessWidget {
           children: [
             Row(
               children: [
-                Expanded(
+                Flexible(
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        'الإشعارات',
-                        key: const ValueKey('hr_notifications_title'),
-                        style: text.titleLarge?.copyWith(
-                          fontFamily: 'Cairo',
-                          fontWeight: FontWeight.w700,
-                          color: cs.onSurface,
-                          fontSize: 22,
+                      Flexible(
+                        child: Text(
+                          'الإشعارات',
+                          key: const ValueKey('hr_notifications_title'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: text.titleLarge?.copyWith(
+                            fontFamily: 'Cairo',
+                            fontWeight: FontWeight.w700,
+                            color: cs.onSurface,
+                            fontSize: 22,
+                          ),
                         ),
                       ),
                       if (unread > 0) ...[
@@ -497,38 +501,34 @@ class _Header extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (onMarkAll != null)
+                  TextButton(
+                    key: const ValueKey('hr_notifications_mark_all'),
+                    onPressed: onMarkAll,
+                    style: TextButton.styleFrom(
+                      foregroundColor: cs.primary,
+                      visualDensity: VisualDensity.compact,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      minimumSize: const Size(0, 36),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      textStyle: const TextStyle(
+                        fontFamily: 'Cairo',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    child: const Text('تعليم الكل كمقروء'),
+                  ),
                 IconButton(
                   key: const ValueKey('hr_notifications_close'),
                   tooltip: 'إغلاق',
                   autofocus: true,
                   onPressed: onClose,
-                  icon: const Icon(Symbols.close_rounded),
+                  icon: const Icon(Icons.close_rounded),
                 ),
               ],
             ),
-            if (onMarkAll != null)
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: TextButton.icon(
-                  key: const ValueKey('hr_notifications_mark_all'),
-                  onPressed: onMarkAll,
-                  icon: Icon(Symbols.done_all_rounded, size: 18, color: cs.primary),
-                  label: Text(
-                    'تعليم الكل كمقروء',
-                    style: TextStyle(
-                      fontFamily: 'Cairo',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: cs.primary,
-                    ),
-                  ),
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
-                ),
-              ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             Row(
               children: [
                 _FilterChip(
@@ -671,6 +671,11 @@ class _NotificationRowState extends State<_NotificationRow> {
     final unread = !notification.isRead;
     final title = NotificationModel.sanitizeText(notification.title);
     final body = NotificationModel.sanitizeText(notification.body);
+    final tone = _toneFor(
+      notification.type,
+      Theme.of(context).brightness,
+      cs,
+    );
 
     return InkWell(
       onTap: widget.onOpen,
@@ -681,7 +686,11 @@ class _NotificationRowState extends State<_NotificationRow> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _TypeIcon(icon: _iconFor(notification.type)),
+            _TypeIcon(
+              icon: _iconFor(notification.type),
+              background: tone.background,
+              foreground: tone.foreground,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -804,13 +813,13 @@ class _OverflowMenuState extends State<_OverflowMenu> {
           PopupMenuItem(
             value: 'read',
             child: _MenuRow(
-              icon: Symbols.mark_email_read_rounded,
+              icon: Icons.mark_email_read_rounded,
               label: 'تحديد كمقروء',
             ),
           ),
         const PopupMenuItem(
           value: 'delete',
-          child: _MenuRow(icon: Symbols.delete_rounded, label: 'حذف'),
+          child: _MenuRow(icon: Icons.delete_rounded, label: 'حذف'),
         ),
       ],
     );
@@ -826,7 +835,7 @@ class _OverflowMenuState extends State<_OverflowMenu> {
       key: _button,
       tooltip: 'المزيد',
       onPressed: _open,
-      icon: Icon(Symbols.more_vert_rounded, size: 18, color: cs.onSurfaceVariant),
+      icon: Icon(Icons.more_vert_rounded, size: 18, color: cs.onSurfaceVariant),
       style: IconButton.styleFrom(
         visualDensity: VisualDensity.compact,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -867,21 +876,23 @@ class _MenuRow extends StatelessWidget {
 
 class _TypeIcon extends StatelessWidget {
   final IconData icon;
+  final Color background;
+  final Color foreground;
 
-  const _TypeIcon({required this.icon});
+  const _TypeIcon({
+    required this.icon,
+    required this.background,
+    required this.foreground,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Container(
       width: 40,
       height: 40,
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHigh,
-        shape: BoxShape.circle,
-      ),
-      child: Icon(icon, size: 20, color: cs.onSurfaceVariant),
+      decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+      child: Icon(icon, size: 20, color: foreground),
     );
   }
 }
@@ -1028,60 +1039,217 @@ String _clock(int hour24, int minute) {
   return '$hour:$mm ${isPm ? 'م' : 'ص'}';
 }
 
-IconData _iconFor(String type) {
-  if (type == 'attendance_check_in') return Symbols.login_rounded;
-  if (type == 'attendance_check_out') return Symbols.logout_rounded;
-  if (_isRequest(type)) return _requestIcon(type);
-  return _neutralIcon(type);
+enum _IconKind {
+  checkIn,
+  checkOut,
+  notice,
+  penalty,
+  photo,
+  subscription,
+  task,
+  leave,
+  support,
+  wallet,
+  device,
+  neutral,
 }
 
-bool _isRequest(String type) {
+_IconKind _kindFor(String type) {
   switch (type) {
+    case 'attendance_check_in':
+    case 'check_in':
+      return _IconKind.checkIn;
+    case 'attendance_check_out':
+    case 'check_out':
+      return _IconKind.checkOut;
+    case 'update':
+    case 'announcement':
+      return _IconKind.notice;
+    case 'penalty':
+    case 'mock_location_alert':
+    case 'geofence_breach':
+    case 'geofence_return':
+    case 'geofence_breach_offline_sync':
+      return _IconKind.penalty;
     case 'photo_permission':
-    case 'permission':
+      return _IconKind.photo;
     case 'delegate_subscription_request':
+    case 'delegate_profile_edit':
+    case 'delegate_national_id_request':
+    case 'subscription_approved':
     case 'subscription_renewal_reminder':
+    case 'subscription_rejected':
+      return _IconKind.subscription;
+    case 'task':
+      return _IconKind.task;
     case 'leave':
     case 'leave_request':
+    case 'permission':
     case 'excuse':
-    case 'device_unbind':
-    case 'device_unbind_request':
-      return true;
-    default:
-      return type.contains('request') ||
-          type.contains('leave') ||
-          type.contains('permission');
-  }
-}
-
-IconData _requestIcon(String type) {
-  if (type.contains('photo') || type == 'permission') return Symbols.photo_camera_rounded;
-  if (type.contains('device')) return Symbols.phonelink_lock_rounded;
-  if (type.contains('subscription')) return Symbols.person_add_rounded;
-  return Symbols.assignment_rounded;
-}
-
-IconData _neutralIcon(String type) {
-  switch (type) {
-    case 'task':
-      return Symbols.task_alt_rounded;
+      return _IconKind.leave;
     case 'support_alert':
     case 'support_direct':
-      return Symbols.support_agent_rounded;
+      return _IconKind.support;
     case 'wallet_allocation':
-      return Symbols.account_balance_wallet_rounded;
     case 'wallet_payout':
-      return Symbols.payments_rounded;
-    case 'update':
-      return Symbols.system_update_rounded;
-    case 'announcement':
-      return Symbols.campaign_rounded;
-    case 'penalty':
-    case 'subscription_rejected':
-      return Symbols.gavel_rounded;
+      return _IconKind.wallet;
+    case 'device_unbind':
+    case 'device_unbind_request':
+      return _IconKind.device;
     default:
-      return Symbols.notifications_rounded;
+      break;
   }
+  if (type.contains('photo')) return _IconKind.photo;
+  if (type.contains('subscription')) return _IconKind.subscription;
+  if (type.contains('leave') ||
+      type.contains('permission') ||
+      type.contains('excuse')) {
+    return _IconKind.leave;
+  }
+  if (type.contains('device')) return _IconKind.device;
+  if (type.contains('support')) return _IconKind.support;
+  if (type.contains('wallet')) return _IconKind.wallet;
+  if (type.contains('penalty') ||
+      type.contains('geofence') ||
+      type.contains('mock_location')) {
+    return _IconKind.penalty;
+  }
+  if (type.contains('task')) return _IconKind.task;
+  if (type.contains('check_in')) return _IconKind.checkIn;
+  if (type.contains('check_out')) return _IconKind.checkOut;
+  if (type.contains('update') || type.contains('announce')) {
+    return _IconKind.notice;
+  }
+  return _IconKind.neutral;
+}
+
+IconData _iconFor(String type) {
+  final kind = _kindFor(type);
+  switch (kind) {
+    case _IconKind.checkIn:
+      return Icons.login_rounded;
+    case _IconKind.checkOut:
+      return Icons.logout_rounded;
+    case _IconKind.notice:
+      return type == 'announcement'
+          ? Icons.campaign_rounded
+          : Icons.system_update_rounded;
+    case _IconKind.penalty:
+      return type.contains('geofence') || type.contains('mock')
+          ? Icons.warning_rounded
+          : Icons.gavel_rounded;
+    case _IconKind.photo:
+      return Icons.photo_camera_rounded;
+    case _IconKind.subscription:
+      if (type == 'subscription_rejected') return Icons.person_off_rounded;
+      if (type == 'subscription_approved') return Icons.how_to_reg_rounded;
+      if (type == 'subscription_renewal_reminder') {
+        return Icons.event_repeat_rounded;
+      }
+      return Icons.person_add_rounded;
+    case _IconKind.task:
+      return Icons.task_alt_rounded;
+    case _IconKind.leave:
+      return Icons.assignment_rounded;
+    case _IconKind.support:
+      return Icons.support_agent_rounded;
+    case _IconKind.wallet:
+      return type == 'wallet_payout'
+          ? Icons.payments_rounded
+          : Icons.account_balance_wallet_rounded;
+    case _IconKind.device:
+      return Icons.phonelink_lock_rounded;
+    case _IconKind.neutral:
+      return Icons.notifications_rounded;
+  }
+}
+
+class _Tone {
+  final Color background;
+  final Color foreground;
+
+  const _Tone(this.background, this.foreground);
+}
+
+/// Light and dark pairs. Each pair stays above 4.5:1 so the glyph reads
+/// on the tint in both themes. Unknown types stay on the neutral surface.
+const _kTones = <_IconKind, (Color, Color, Color, Color)>{
+  _IconKind.checkIn: (
+    Color(0xFFE7F5EC),
+    Color(0xFF0D652D),
+    Color(0xFF1B3A28),
+    Color(0xFF8FD9A8),
+  ),
+  _IconKind.checkOut: (
+    Color(0xFFFEF4D8),
+    Color(0xFF8A4B00),
+    Color(0xFF3D2E12),
+    Color(0xFFF5D48A),
+  ),
+  _IconKind.notice: (
+    Color(0xFFE8F0FE),
+    Color(0xFF185ABC),
+    Color(0xFF1A3058),
+    Color(0xFFA8C7FA),
+  ),
+  _IconKind.penalty: (
+    Color(0xFFFDE8E4),
+    Color(0xFF8C2F1B),
+    Color(0xFF3F241C),
+    Color(0xFFF2B8A8),
+  ),
+  _IconKind.photo: (
+    Color(0xFFE0F4F3),
+    Color(0xFF00695C),
+    Color(0xFF0E3330),
+    Color(0xFF8FD4CC),
+  ),
+  _IconKind.subscription: (
+    Color(0xFFF3E8FD),
+    Color(0xFF6A1B9A),
+    Color(0xFF3A2448),
+    Color(0xFFE2C2F5),
+  ),
+  _IconKind.task: (
+    Color(0xFFE8EAF6),
+    Color(0xFF283593),
+    Color(0xFF22244A),
+    Color(0xFFC5C8F5),
+  ),
+  _IconKind.leave: (
+    Color(0xFFE0F7FA),
+    Color(0xFF006064),
+    Color(0xFF08343A),
+    Color(0xFF9BE7F0),
+  ),
+  _IconKind.support: (
+    Color(0xFFE8EEF3),
+    Color(0xFF37474F),
+    Color(0xFF2A343C),
+    Color(0xFFC5D0D8),
+  ),
+  _IconKind.wallet: (
+    Color(0xFFF1F4E4),
+    Color(0xFF3E4E12),
+    Color(0xFF2A3318),
+    Color(0xFFD4E2A4),
+  ),
+  _IconKind.device: (
+    Color(0xFFE7EEF5),
+    Color(0xFF1F3A5F),
+    Color(0xFF1C2A3A),
+    Color(0xFFC5D4E8),
+  ),
+};
+
+_Tone _toneFor(String type, Brightness brightness, ColorScheme scheme) {
+  final kind = _kindFor(type);
+  if (kind == _IconKind.neutral) {
+    return _Tone(scheme.surfaceContainerHigh, scheme.onSurfaceVariant);
+  }
+  final tones = _kTones[kind]!;
+  final dark = brightness == Brightness.dark;
+  return _Tone(dark ? tones.$3 : tones.$1, dark ? tones.$4 : tones.$2);
 }
 
 bool _hasTarget(NotificationEntity notification) {
