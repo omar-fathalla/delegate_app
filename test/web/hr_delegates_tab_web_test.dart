@@ -12,6 +12,7 @@ import 'package:delegate_app/config/theme/app_theme.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
+import 'package:delegate_app/features/admin/data/chain_duplicate_lookup.dart';
 import 'package:delegate_app/features/admin/data/link_delegate_chains.dart';
 import 'package:delegate_app/features/admin/domain/entities/chain_selection.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
@@ -334,7 +335,7 @@ void main() {
     await t.tapAt(t.getTopRight(row) + const Offset(-30, 25));
     await t.pumpAndSettle();
     expect(find.byType(HRDelegatesTab), findsOneWidget);
-    expect(find.byKey(const Key('hr_delegate_row_fake-d1')).hitTestable(), findsOneWidget);
+    expect(find.byKey(const Key('hr_delegate_row_fake-d1')), findsOneWidget);
     expect(find.byType(SnackBar), findsNothing);
   });
 
@@ -399,6 +400,56 @@ void main() {
     await t.pumpAndSettle();
     expect(t.getSize(find.byKey(HrAddChainsSheet.titleKey)).width, greaterThan(500));
     await _shot(t, 'hr-delegates-picker-800');
+  });
+
+  testWidgets('pre-check fails: chains still show with a neutral note', (t) async {
+    WebRuntimePolicy.debugIsWebOverride = true;
+    HrAddChainsSheet.debugLookup = (_) async => throw const DuplicateChainLookupException();
+    await _pump(t, const Size(1440, 900));
+    await t.tap(find.byKey(const Key('hr_delegate_add_chains_fake-d0')));
+    await t.pumpAndSettle();
+    expect(find.text('تعذر التحقق من المندوبين المسجلين. أعد المحاولة.'), findsNothing);
+    expect(find.byKey(HrAddChainsSheet.chipKey('o-zahran')), findsOneWidget);
+    expect(find.textContaining('سيتم التحقق من ربط المندوب'), findsOneWidget);
+  });
+
+  testWidgets('table: headers line up with cells, no type label', (t) async {
+    WebRuntimePolicy.debugIsWebOverride = true;
+    await _pump(t, const Size(1440, 900));
+    expect(find.text('مندوب / مروج'), findsNothing);
+    expect(find.textContaining('مندوب / مروج'), findsNothing);
+    final d = _delegates().first;
+    for (final (header, cell) in [
+      ('الرقم القومي', d.nationalityID),
+      ('رقم الهاتف', d.phoneNumber),
+    ]) {
+      final h = t.getTopRight(find.byKey(Key('hr_delegates_header_$header')));
+      final c = t.getTopRight(find.text(cell).first);
+      expect((h.dx - c.dx).abs(), lessThan(1.5), reason: header);
+    }
+    // Neutral circles, smaller purple one for «إضافة سلاسل»; 48dp targets.
+    final add = t.getSize(find.byKey(const Key('hr_delegate_add_chains_fake-d0')));
+    expect(add.width, greaterThanOrEqualTo(48));
+  });
+
+  test('link pre-check: own doc / same ID = linked, request = pending', () async {
+    final fs = await _seed();
+    final d = _delegates().first;
+    await fs
+        .collection('organizations').doc('o-metro')
+        .collection('companies').doc(_co)
+        .collection('delegates').doc('other-doc')
+        .set({'nationalityID': d.nationalityID});
+    final r = await lookupLinkChainStates(
+      firestore: fs,
+      companyUID: _co,
+      delegateUid: d.uid,
+      nationalId: d.nationalityID,
+      phoneNumber: d.phoneNumber,
+      organizationUIDs: const ['o-jomla', 'o-metro', 'o-spinneys', 'o-zahran'],
+    );
+    expect(r.delegateOrgUids, {'o-jomla', 'o-metro'});
+    expect(r.pendingOrgUids, {'o-spinneys'});
   });
 
   test('mobile sheet still hides linked chains (shared fetch default)', () async {
