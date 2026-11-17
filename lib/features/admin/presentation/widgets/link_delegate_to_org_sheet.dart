@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/features/admin/domain/entities/chain_selection.dart';
-import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
+import 'package:delegate_app/features/admin/data/link_delegate_chains.dart';
 import 'package:delegate_app/features/admin/domain/repositories/delegate_subscription_repository.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/chain_multi_select.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -59,78 +59,16 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
 
   Future<void> _fetchAvailableOrganizations() async {
     try {
-      final snap = await FirebaseFirestore.instance
-          .collection('organizations')
-          .get();
-
-      final currentOrgUID = widget.delegate.organizationUID
-          .trim()
-          .toLowerCase();
-      final currentOrgName = widget.delegate.organizationName
-          .trim()
-          .toLowerCase();
-      final allKnownOrgNames = widget.delegate.allOrganizationNames
-          .map((n) => n.trim().toLowerCase())
-          .toSet();
-      final alreadyUids = {currentOrgUID}..removeWhere((id) => id.isEmpty);
-
-      final companyUID =
-          (widget.supervisor.companyUID.isNotEmpty
-                  ? widget.supervisor.companyUID
-                  : widget.delegate.companyUID)
-              .trim();
-      final role = widget.supervisor.role;
-      final isGlobal = role == UserRole.superAdmin;
-      if (companyUID.isEmpty && !isGlobal) {
-        if (mounted) {
-          setState(() {
-            _organizations = [];
-            _selectedOrgUIDs.clear();
-            _isLoadingOrgs = false;
-          });
-        }
-        return;
-      }
-
-      final List<Map<String, dynamic>> orgs = [];
-      for (final doc in snap.docs) {
-        final data = doc.data();
-        final uid = doc.id;
-        final name = (data['name'] ?? data['title'] ?? doc.id).toString();
-        final uidKey = uid.trim().toLowerCase();
-        final nameKey = name.trim().toLowerCase();
-        final isFathalla = nameKey.contains('fathalla') ||
-            nameKey.contains('فتح الله') ||
-            nameKey.contains('فتح_الله') ||
-            uidKey.contains('fathalla') ||
-            uidKey.contains('فتح_الله');
-        if (isFathalla) continue;
-        if (alreadyUids.contains(uidKey)) continue;
-        if (nameKey == currentOrgName) continue;
-        if (allKnownOrgNames.contains(nameKey)) continue;
-        if (companyUID.isNotEmpty) {
-          try {
-            final cDoc = await FirebaseFirestore.instance
-                .collection('organizations')
-                .doc(uid)
-                .collection('companies')
-                .doc(companyUID)
-                .get();
-            if (!cDoc.exists) continue;
-          } catch (_) {
-            continue;
-          }
-        }
-        orgs.add({'uid': uid, 'name': name});
-      }
-      if (role == UserRole.organizationAdmin) {
-        final ownOrg = widget.supervisor.organizationUID.trim();
-        orgs.removeWhere((o) => (o['uid'] as String).trim() != ownOrg);
-      }
-
+      final chains = await fetchLinkableChains(
+        firestore: FirebaseFirestore.instance,
+        delegate: widget.delegate,
+        supervisor: widget.supervisor,
+      );
       if (mounted) {
         setState(() {
-          _organizations = orgs;
+          _organizations = [
+            for (final c in chains) {'uid': c.uid, 'name': c.name},
+          ];
           _selectedOrgUIDs.clear();
           _isLoadingOrgs = false;
         });
@@ -144,49 +82,28 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedOrgUIDs.isEmpty) {
-      AppSnackBar.showError(context, 'يرجى اختيار سلسلة واحدة على الأقل.');
+      AppSnackBar.showError(context, kLinkChainsRequiredMessage);
       return;
     }
 
     final selected = [
       for (final org in _organizations)
-        if (_selectedOrgUIDs.contains(org['uid'])) org,
+        if (_selectedOrgUIDs.contains(org['uid']))
+          ChainOption(uid: org['uid'] as String, name: org['name'] as String),
     ];
     if (selected.isEmpty) {
-      AppSnackBar.showError(context, 'يرجى اختيار سلسلة واحدة على الأقل.');
+      AppSnackBar.showError(context, kLinkChainsRequiredMessage);
       return;
     }
-    final primary = selected.first;
-    final extraUids = [
-      for (final org in selected.skip(1)) org['uid'] as String,
-    ];
-    final extraNames = [
-      for (final org in selected.skip(1)) org['name'] as String,
-    ];
-    final selectedNames = [for (final org in selected) org['name'] as String];
+    final selectedNames = [for (final org in selected) org.name];
 
     setState(() => _isSubmitting = true);
 
-    final repo = sl<DelegateSubscriptionRepository>();
-    final result = await repo.submitAddOrganizationRequest(
-      supervisorUid: widget.supervisor.uid,
-      supervisorName: widget.supervisor.fullName,
-      supervisorPhone: widget.supervisor.phoneNumber,
-      companyUID: widget.supervisor.companyUID.isNotEmpty
-          ? widget.supervisor.companyUID
-          : widget.delegate.companyUID,
-      companyName: widget.supervisor.companyName.isNotEmpty
-          ? widget.supervisor.companyName
-          : widget.delegate.companyName,
-      targetOrganizationUID: primary['uid'] as String,
-      targetOrganizationName: primary['name'] as String,
-      organizationUIDs: extraUids,
-      organizationNames: extraNames,
-      existingDelegate: widget.delegate,
-      // One subscription per delegate covers all chains: no fee here.
-      paymentMethod: SubscriptionPaymentMethod.notRequired,
-      fee: 0,
-      remainingMonths: 0,
+    final result = await submitLinkChainsRequest(
+      repo: sl<DelegateSubscriptionRepository>(),
+      delegate: widget.delegate,
+      supervisor: widget.supervisor,
+      selected: selected,
     );
 
     if (!mounted) return;
@@ -195,10 +112,7 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
     result.fold((failure) => AppSnackBar.showError(context, failure.message), (
       _,
     ) {
-      AppSnackBar.showSuccess(
-        context,
-        'تم إرسال طلب ربط المندوب بـ ${selectedNames.length} سلسلة (${selectedNames.join('، ')}) بنجاح (بدون رسوم إضافية)! بانتظار الاعتماد.',
-      );
+      AppSnackBar.showSuccess(context, linkChainsSuccessMessage(selectedNames));
       Navigator.pop(context, true);
     });
   }
@@ -403,7 +317,7 @@ class _LinkDelegateToOrgSheetState extends State<LinkDelegateToOrgSheet> {
                                 const SizedBox(width: 8),
                                 const Expanded(
                                   child: Text(
-                                    'لا توجد منظمات إضافية متاحة للربط حالياً (المندوب مشترك في جميع المنظمات المتاحة).',
+                                    kLinkChainsNoneAvailableMessage,
                                     style: TextStyle(fontSize: 12),
                                   ),
                                 ),
