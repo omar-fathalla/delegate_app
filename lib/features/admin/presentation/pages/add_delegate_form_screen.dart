@@ -1,5 +1,14 @@
 import 'dart:io';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/admin/domain/services/subscription_payment_gateway.dart';
+import 'package:delegate_app/features/admin/presentation/widgets/add_delegate_desktop_layout.dart';
+import 'package:delegate_app/features/auth/domain/role_home.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_desktop_sidebar.dart';
+import 'package:delegate_app/web/hr_system/hr_shell_link.dart';
+import 'package:delegate_app/web/hr_system/hr_web_account_button.dart';
+import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -24,7 +33,16 @@ import 'package:delegate_app/injection_container.dart';
 class AddDelegateFormScreen extends StatefulWidget {
   final Delegate supervisor;
 
-  const AddDelegateFormScreen({super.key, required this.supervisor});
+  /// Tests and review screenshots only: replaces the Firestore chain lookup
+  /// with fake chains. Production never passes it.
+  @visibleForTesting
+  final Future<List<Map<String, dynamic>>> Function()? debugOrganizationsLoader;
+
+  const AddDelegateFormScreen({
+    super.key,
+    required this.supervisor,
+    this.debugOrganizationsLoader,
+  });
 
   @override
   State<AddDelegateFormScreen> createState() => _AddDelegateFormScreenState();
@@ -83,6 +101,17 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
   }
 
   Future<void> _fetchOrganizations() async {
+    final debugLoader = widget.debugOrganizationsLoader;
+    if (debugLoader != null) {
+      final orgs = await debugLoader();
+      if (mounted) {
+        setState(() {
+          _organizations = orgs;
+          _isLoadingOrgs = false;
+        });
+      }
+      return;
+    }
     try {
       final snap = await FirebaseFirestore.instance.collection('organizations').get();
       final companyUID = widget.supervisor.companyUID;
@@ -562,6 +591,17 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    final width = MediaQuery.sizeOf(context).width;
+    if (AddDelegateDesktopBreakpoints.useDesktop(
+      isWeb: WebRuntimePolicy.isWeb,
+      width: width,
+    )) {
+      return Directionality(
+        textDirection: TextDirection.rtl,
+        child: _buildDesktopScaffold(colorScheme, width),
+      );
+    }
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: _buildFormScaffold(theme, colorScheme),
@@ -686,6 +726,7 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
     Widget? prefixIcon,
     Widget? suffixIcon,
     EdgeInsetsGeometry? contentPadding,
+    bool desktop = false,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     return InputDecoration(
@@ -697,25 +738,25 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
       filled: true,
       fillColor: colorScheme.surfaceContainerLowest,
       labelStyle: TextStyle(
-        fontSize: 11.5,
+        fontSize: desktop ? 13.5 : 11.5,
         fontWeight: FontWeight.normal,
         color: colorScheme.onSurfaceVariant,
       ),
       floatingLabelStyle: TextStyle(
-        fontSize: 11,
+        fontSize: desktop ? 12.5 : 11,
         fontWeight: FontWeight.w600,
         color: colorScheme.primary,
       ),
       hintStyle: TextStyle(
-        fontSize: 11.5,
+        fontSize: desktop ? 13.5 : 11.5,
         color: colorScheme.outline.withValues(alpha: 0.6),
       ),
       helperStyle: TextStyle(
-        fontSize: 10.5,
+        fontSize: desktop ? 12 : 10.5,
         color: colorScheme.outline,
       ),
-      errorStyle: const TextStyle(
-        fontSize: 10,
+      errorStyle: TextStyle(
+        fontSize: desktop ? 12 : 10,
         height: 1.1,
       ),
       contentPadding: contentPadding ?? const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -754,6 +795,73 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
     );
   }
 
+  Widget _buildNameField(
+    TextEditingController controller,
+    String label, {
+    bool desktop = false,
+  }) {
+    return TextFormField(
+      controller: controller,
+      style: TextStyle(fontSize: desktop ? 14 : 12.5),
+      decoration: _buildM3InputDecoration(
+        context: context,
+        labelText: label,
+        desktop: desktop,
+        contentPadding: desktop
+            ? const EdgeInsets.symmetric(horizontal: 14, vertical: 16)
+            : const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+      ),
+      validator: (v) => (v == null || v.trim().isEmpty) ? 'مطلوب' : null,
+    );
+  }
+
+  Widget _buildPhoneField(ColorScheme colorScheme, {bool desktop = false}) {
+    return TextFormField(
+      controller: _phoneController,
+      keyboardType: TextInputType.phone,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      style: TextStyle(fontSize: desktop ? 14 : 13),
+      decoration: _buildM3InputDecoration(
+        context: context,
+        labelText: 'رقم الهاتف (لتسجيل الدخول) *',
+        hintText: '01xxxxxxxxx',
+        desktop: desktop,
+        prefixIcon: Icon(Icons.phone_android_rounded, size: 20, color: colorScheme.primary),
+      ),
+      validator: (v) {
+        if (v == null || v.trim().isEmpty) return 'يرجى إدخال رقم الهاتف';
+        if (!RegExp(r'^01[0125][0-9]{8}$').hasMatch(v.trim())) {
+          return 'يرجى إدخال رقم هاتف مصري صحيح (11 رقم يبدأ بـ 01)';
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildNationalIdField(ColorScheme colorScheme, {bool desktop = false}) {
+    return TextFormField(
+      controller: _nationalIdController,
+      keyboardType: TextInputType.number,
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(14),
+      ],
+      style: TextStyle(fontSize: desktop ? 14 : 13),
+      decoration: _buildM3InputDecoration(
+        context: context,
+        labelText: 'الرقم القومي (14 رقم) للباسورد *',
+        helperText: 'يُعتمد الرقم القومي ككلمة مرور افتراضية لتسجيل دخول المندوب',
+        desktop: desktop,
+        prefixIcon: Icon(Symbols.credit_card_rounded, size: 20, color: colorScheme.primary),
+      ),
+      validator: (v) {
+        if (v == null || v.trim().isEmpty) return 'يرجى إدخال الرقم القومي';
+        if (v.trim().length != 14) return 'الرقم القومي يجب أن يتكون من 14 رقماً';
+        return null;
+      },
+    );
+  }
+
   Widget _buildPersonalInfoCard(ColorScheme colorScheme) {
     return Card(
       elevation: 0,
@@ -767,87 +875,17 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
           children: [
             Row(
               children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _firstNameController,
-                    style: const TextStyle(fontSize: 12.5),
-                    decoration: _buildM3InputDecoration(
-                      context: context,
-                      labelText: 'الاسم الأول *',
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
-                    ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'مطلوب' : null,
-                  ),
-                ),
+                Expanded(child: _buildNameField(_firstNameController, 'الاسم الأول *')),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: TextFormField(
-                    controller: _secondNameController,
-                    style: const TextStyle(fontSize: 12.5),
-                    decoration: _buildM3InputDecoration(
-                      context: context,
-                      labelText: 'اسم الأب *',
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
-                    ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'مطلوب' : null,
-                  ),
-                ),
+                Expanded(child: _buildNameField(_secondNameController, 'اسم الأب *')),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: TextFormField(
-                    controller: _thirdNameController,
-                    style: const TextStyle(fontSize: 12.5),
-                    decoration: _buildM3InputDecoration(
-                      context: context,
-                      labelText: 'اللقب *',
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
-                    ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'مطلوب' : null,
-                  ),
-                ),
+                Expanded(child: _buildNameField(_thirdNameController, 'اللقب *')),
               ],
             ),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              style: const TextStyle(fontSize: 13),
-              decoration: _buildM3InputDecoration(
-                context: context,
-                labelText: 'رقم الهاتف (لتسجيل الدخول) *',
-                hintText: '01xxxxxxxxx',
-                prefixIcon: Icon(Icons.phone_android_rounded, size: 20, color: colorScheme.primary),
-              ),
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'يرجى إدخال رقم الهاتف';
-                if (!RegExp(r'^01[0125][0-9]{8}$').hasMatch(v.trim())) {
-                  return 'يرجى إدخال رقم هاتف مصري صحيح (11 رقم يبدأ بـ 01)';
-                }
-                return null;
-              },
-            ),
+            _buildPhoneField(colorScheme),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _nationalIdController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(14),
-              ],
-              style: const TextStyle(fontSize: 13),
-              decoration: _buildM3InputDecoration(
-                context: context,
-                labelText: 'الرقم القومي (14 رقم) للباسورد *',
-                helperText: 'يُعتمد الرقم القومي ككلمة مرور افتراضية لتسجيل دخول المندوب',
-                prefixIcon: Icon(Symbols.credit_card_rounded, size: 20, color: colorScheme.primary),
-              ),
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'يرجى إدخال الرقم القومي';
-                if (v.trim().length != 14) return 'الرقم القومي يجب أن يتكون من 14 رقماً';
-                return null;
-              },
-            ),
+            _buildNationalIdField(colorScheme),
           ],
         ),
       ),
@@ -975,6 +1013,454 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
     return AddDelegateFreePromotionCard(colorScheme: colorScheme);
   }
 
+  // ───────────────────── Desktop web (MD3 Model 1) ─────────────────────
 
+  /// null = follow the window width; set when the user toggles the nav.
+  bool? _navExpandedOverride;
 
+  bool get _usesHrShell =>
+      usesWebHrSystem(widget.supervisor.role, isWeb: WebRuntimePolicy.isWeb);
+
+  List<ChainOption> get _chainOptions => _organizations
+      .map((o) => ChainOption(uid: o['uid'] as String, name: o['name'] as String))
+      .toList();
+
+  void _setSelectedChains(Set<String> next) {
+    setState(() {
+      _selectedOrgUIDs
+        ..clear()
+        ..addAll(next);
+      _duplicateOrgUIDs = {};
+    });
+  }
+
+  ImageProvider? _previewOf(File? file) {
+    if (file == null) return null;
+    // image_picker hands back a blob: URL on the web.
+    return kIsWeb ? NetworkImage(file.path) : FileImage(file);
+  }
+
+  /// Leaves this page for a destination of the HR shell underneath.
+  void _leaveTo(void Function() action) {
+    Navigator.of(context).maybePop();
+    action();
+  }
+
+  Widget _buildDesktopScaffold(ColorScheme colorScheme, double width) {
+    final twoColumns = width >= AddDelegateDesktopBreakpoints.twoColumns;
+    final navExpanded = _navExpandedOverride ??
+        (width >= AddDelegateDesktopBreakpoints.expandedNav);
+    final content = Column(
+      children: [
+        _buildDesktopHeader(colorScheme),
+        Expanded(
+          child: _isLoadingOrgs
+              ? const Center(child: CircularProgressIndicator())
+              : Form(
+                  key: _formKey,
+                  child: twoColumns
+                      ? _buildTwoColumnBody(colorScheme, width)
+                      : _buildSingleColumnBody(colorScheme),
+                ),
+        ),
+      ],
+    );
+    return Scaffold(
+      backgroundColor: colorScheme.surfaceContainerLowest,
+      body: Row(
+        children: [
+          if (_usesHrShell)
+            HRDesktopSidebar(
+              delegate: widget.supervisor,
+              selectedIndex: kHrTabDelegates,
+              isExpanded: navExpanded,
+              onToggleExpanded: () =>
+                  setState(() => _navExpandedOverride = !navExpanded),
+              onItemSelected: (index) {
+                if (index == kHrTabDelegates) {
+                  Navigator.of(context).maybePop();
+                  return;
+                }
+                _leaveTo(() => HrShellLink.selectTab(index));
+              },
+              onOpenProfile: () => _leaveTo(() => HrShellLink.selectMenu('profile')),
+              onOpenSettings: () => _leaveTo(() => HrShellLink.selectMenu('settings')),
+              onLogout: () => _leaveTo(() => HrShellLink.selectMenu('logout')),
+            ),
+          Expanded(child: content),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopHeader(ColorScheme colorScheme) {
+    final l10n = AppLocalizations.of(context);
+    final bridge = HrShellLink.bridge;
+    return Container(
+      height: 64,
+      padding: const EdgeInsetsDirectional.only(start: 8, end: 20),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            key: const ValueKey('add_delegate_back'),
+            tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'مناديب الشركة',
+                      style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                    ),
+                    Icon(
+                      Icons.chevron_left_rounded,
+                      size: 16,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    Text(
+                      l10n?.addDelegate ?? 'إضافة مندوب',
+                      style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+                const Text(
+                  'إضافة مندوب لمنظمة جديدة',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, height: 1.3),
+                ),
+              ],
+            ),
+          ),
+          if (bridge != null)
+            ListenableBuilder(
+              listenable: bridge,
+              builder: (context, _) => HrWebHeaderBell(
+                unread: bridge.unread,
+                onPressed: bridge.openNotifications == null
+                    ? null
+                    : () => _leaveTo(HrShellLink.openNotifications),
+              ),
+            ),
+          if (_usesHrShell) ...[
+            const SizedBox(width: 10),
+            HrWebAccountButton(delegate: widget.supervisor, showName: false),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Form sections as stacked cards (chains, personal data, images, plan).
+  List<Widget> _buildDesktopFormCards(ColorScheme colorScheme) {
+    return [
+      AddDelegateChainGrid(
+        chains: _chainOptions,
+        selectedUids: _selectedOrgUIDs,
+        duplicateUids: _duplicateOrgUIDs,
+        onChanged: _setSelectedChains,
+      ),
+      const SizedBox(height: 16),
+      AddDelegateSectionCard(
+        icon: Icons.badge_rounded,
+        title: 'البيانات الشخصية للمندوب',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _buildNameField(_firstNameController, 'الاسم الأول *', desktop: true)),
+                const SizedBox(width: 12),
+                Expanded(child: _buildNameField(_secondNameController, 'اسم الأب *', desktop: true)),
+                const SizedBox(width: 12),
+                Expanded(child: _buildNameField(_thirdNameController, 'اللقب *', desktop: true)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildPhoneField(colorScheme, desktop: true),
+            const SizedBox(height: 16),
+            _buildNationalIdField(colorScheme, desktop: true),
+          ],
+        ),
+      ),
+      const SizedBox(height: 16),
+      AddDelegateSectionCard(
+        icon: Icons.upload_file_rounded,
+        title: 'المستندات والصور المرفقة',
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: AddDelegateImageSlot(
+                key: const ValueKey('add_delegate_slot_profile'),
+                title: 'الصورة الشخصية للمندوب *',
+                subtitle: 'صورة واضحة للوجه بخلفية مضيئة',
+                icon: Icons.account_circle_rounded,
+                image: _previewOf(_profileImage),
+                onPick: () => _pickImage((f) => _profileImage = f),
+                onRemove: () => setState(() => _profileImage = null),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: AddDelegateImageSlot(
+                key: const ValueKey('add_delegate_slot_id_front'),
+                title: 'بطاقة الرقم القومي (الوجه) *',
+                subtitle: 'صورة واضحة لوجه البطاقة القومية',
+                icon: Icons.featured_play_list_rounded,
+                image: _previewOf(_nationalIdFront),
+                onPick: () => _pickImage((f) => _nationalIdFront = f),
+                onRemove: () => setState(() => _nationalIdFront = null),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: AddDelegateImageSlot(
+                key: const ValueKey('add_delegate_slot_id_back'),
+                title: 'بطاقة الرقم القومي (الظهر) *',
+                subtitle: 'صورة واضحة لظهر البطاقة القومية',
+                icon: Icons.flip_rounded,
+                image: _previewOf(_nationalIdBack),
+                onPick: () => _pickImage((f) => _nationalIdBack = f),
+                onRemove: () => setState(() => _nationalIdBack = null),
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 16),
+      AddDelegateSectionCard(
+        icon: _isFreePromotion ? Icons.card_giftcard_rounded : Symbols.payments_rounded,
+        title: _isFreePromotion
+            ? 'الاشتراك والربط (مجاناً حتى 31/12)'
+            : 'الاشتراك والدفع الإلكتروني (${SubscriptionCycleHelper.getRemainingMonthsInCycle()} أشهر - ${SubscriptionCycleHelper.formatEgp(SubscriptionCycleHelper.getProratedSubscriptionFee(null, _companyUID))} ج.م)',
+        child: _isFreePromotion
+            ? _buildFreePromotionCard(colorScheme)
+            : _buildPaymobCard(colorScheme),
+      ),
+    ];
+  }
+
+  Widget _buildTwoColumnBody(ColorScheme colorScheme, double width) {
+    final summaryWidth = width >= AddDelegateDesktopBreakpoints.expandedNav ? 360.0 : 320.0;
+    return Align(
+      alignment: AlignmentDirectional.topStart,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1280),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                key: const ValueKey('add_delegate_form_scroll'),
+                padding: const EdgeInsetsDirectional.fromSTEB(24, 20, 12, 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: _buildDesktopFormCards(colorScheme),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: summaryWidth,
+              child: SingleChildScrollView(
+                key: const ValueKey('add_delegate_summary_scroll'),
+                padding: const EdgeInsetsDirectional.fromSTEB(12, 20, 24, 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildCycleBanner(colorScheme),
+                    const SizedBox(height: 16),
+                    _buildSummaryPanel(colorScheme),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSingleColumnBody(ColorScheme colorScheme) {
+    final kept = partitionSelectedChains(
+      all: _chainOptions,
+      selectedUids: _selectedOrgUIDs,
+      duplicateUids: _duplicateOrgUIDs,
+    ).kept.length;
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            key: const ValueKey('add_delegate_form_scroll'),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 840),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildCycleBanner(colorScheme),
+                    const SizedBox(height: 16),
+                    ..._buildDesktopFormCards(colorScheme),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Material(
+          key: const ValueKey('add_delegate_bottom_bar'),
+          color: colorScheme.surfaceContainer,
+          elevation: 3,
+          shadowColor: Colors.black26,
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Row(
+                children: [
+                  AddDelegateChainCounter(count: kept),
+                  const Spacer(),
+                  SizedBox(
+                    width: 340,
+                    child: AddDelegateSubmitButton(
+                      isFree: _isFreePromotion,
+                      isBusy: _isSubmitting || _submitSucceeded,
+                      onSubmit: _submit,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryPanel(ColorScheme colorScheme) {
+    final selection = partitionSelectedChains(
+      all: _chainOptions,
+      selectedUids: _selectedOrgUIDs,
+      duplicateUids: _duplicateOrgUIDs,
+    );
+    final images = [_profileImage, _nationalIdFront, _nationalIdBack]
+        .where((f) => f != null)
+        .length;
+    final fee = SubscriptionCycleHelper.getProratedSubscriptionFee(null, _companyUID);
+    return Card(
+      key: const ValueKey('add_delegate_summary'),
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+        child: ListenableBuilder(
+          listenable: Listenable.merge([
+            _firstNameController,
+            _secondNameController,
+            _thirdNameController,
+            _phoneController,
+          ]),
+          builder: (context, _) {
+            final name = [
+              _firstNameController.text.trim(),
+              _secondNameController.text.trim(),
+              _thirdNameController.text.trim(),
+            ].where((p) => p.isNotEmpty).join(' ');
+            final phone = _phoneController.text.trim();
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'ملخص الطلب',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 12),
+                AddDelegateSummaryLine(
+                  label: 'السلاسل المختارة',
+                  value: '${selection.kept.length}/$kMaxOrganizationsPerRequest',
+                ),
+                if (selection.kept.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final chain in selection.kept)
+                        InputChip(
+                          key: ValueKey('add_delegate_summary_chip_${chain.uid}'),
+                          label: Text(chain.name, style: const TextStyle(fontSize: 13)),
+                          onDeleted: () => _setSelectedChains(
+                            {..._selectedOrgUIDs}..remove(chain.uid),
+                          ),
+                          deleteIcon: const Icon(Symbols.close_rounded, size: 18),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                const Divider(height: 20),
+                AddDelegateSummaryLine(
+                  label: 'المندوب',
+                  value: name.isEmpty ? '—' : name,
+                ),
+                AddDelegateSummaryLine(
+                  label: 'رقم الهاتف',
+                  value: phone.isEmpty ? '—' : phone,
+                  ltrValue: phone.isNotEmpty,
+                ),
+                AddDelegateSummaryLine(
+                  label: 'الصور',
+                  value: '$images من 3',
+                ),
+                const Divider(height: 20),
+                AddDelegateSummaryLine(
+                  label: 'تكلفة الاشتراك',
+                  value: _isFreePromotion
+                      ? 'مجاناً 0 ج.م'
+                      : '${SubscriptionCycleHelper.formatEgp(fee)} ج.م',
+                  emphasize: true,
+                ),
+                const SizedBox(height: 16),
+                AddDelegateSubmitButton(
+                  isFree: _isFreePromotion,
+                  isBusy: _isSubmitting || _submitSucceeded,
+                  onSubmit: _submit,
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  key: const ValueKey('add_delegate_cancel'),
+                  style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                  onPressed: _isSubmitting ? null : () => Navigator.of(context).maybePop(),
+                  child: const Text('إلغاء'),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
 }
