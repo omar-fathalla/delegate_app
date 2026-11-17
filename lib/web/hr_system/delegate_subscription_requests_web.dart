@@ -1,8 +1,8 @@
 // Web-only list-detail for «طلبات اشتراك واعتماد المناديب».
 // Built only when WebRuntimePolicy.isWeb. Mobile keeps the card list.
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
+import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_profile_edit_access.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
@@ -1281,37 +1281,12 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final size = radius * 2;
     final url = request.profileImageUrl.trim();
-    final initials = _initials(request.fullName);
-    final fallback = Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: cs.primaryContainer,
-        shape: BoxShape.circle,
-      ),
-      child: Text(
-        initials,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          fontSize: radius * 0.7,
-          fontWeight: FontWeight.w700,
-          color: cs.onPrimaryContainer,
-        ),
-      ),
-    );
-    if (url.isEmpty) return fallback;
-    return ClipOval(
-      child: CachedNetworkImage(
-        imageUrl: url,
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        placeholder: (_, _) => fallback,
-        errorWidget: (_, _, _) => fallback,
-      ),
+    return AppAvatar(
+      imageUrl: url.isEmpty ? null : url,
+      fallbackText: _initials(request.fullName),
+      radius: radius,
+      verbatimFallback: true,
     );
   }
 
@@ -1901,11 +1876,27 @@ class _DetailContent extends StatelessWidget {
   }
 }
 
-class _ImageSheet extends StatelessWidget {
+class _ImageSheet extends StatefulWidget {
   final String title;
   final String url;
 
   const _ImageSheet({required this.title, required this.url});
+
+  @override
+  State<_ImageSheet> createState() => _ImageSheetState();
+}
+
+class _ImageSheetState extends State<_ImageSheet> {
+  int _attempt = 0;
+
+  Future<void> _retry() async {
+    final url = widget.url.trim();
+    if (url.isNotEmpty) {
+      await NetworkImage(url).evict();
+    }
+    if (!mounted) return;
+    setState(() => _attempt++);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1928,7 +1919,7 @@ class _ImageSheet extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  title,
+                  widget.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleMedium,
@@ -1947,28 +1938,68 @@ class _ImageSheet extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: InteractiveViewer(
-              child: CachedNetworkImage(
-                imageUrl: url,
-                height: 320,
-                fit: BoxFit.contain,
-                placeholder: (_, _) => const SizedBox(
-                  height: 180,
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                errorWidget: (_, _, _) => SizedBox(
-                  height: 140,
-                  child: Center(
-                    child: Text(
-                      'فشل تحميل الصورة',
-                      style: TextStyle(color: cs.error),
-                    ),
-                  ),
-                ),
-              ),
+              child: _photo(cs),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  // Raw Storage URL. ImageUrlHelper would send the bytes through wsrv.nl;
+  // a national ID or this profile photo must not go to a third party.
+  // CanvasKit paints the image once the bucket returns CORS headers.
+  Widget _photo(ColorScheme cs) {
+    final url = widget.url.trim();
+    if (url.isEmpty) return _failed(cs);
+    return Image.network(
+      url,
+      key: ValueKey(_attempt),
+      height: 320,
+      width: double.infinity,
+      fit: BoxFit.contain,
+      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        if (wasSynchronouslyLoaded || frame != null) return child;
+        return _loading();
+      },
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return _loading();
+      },
+      errorBuilder: (_, _, _) => _failed(cs),
+    );
+  }
+
+  Widget _loading() {
+    return const SizedBox(
+      height: 180,
+      width: double.infinity,
+      child: Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  Widget _failed(ColorScheme cs) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 140),
+      child: SizedBox(
+        width: double.infinity,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'فشل تحميل الصورة',
+                style: TextStyle(color: cs.error),
+              ),
+              const SizedBox(height: 8),
+              FilledButton.tonal(
+                onPressed: _retry,
+                child: const Text('إعادة المحاولة'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
