@@ -1,8 +1,3 @@
-// WARNING: Do not run this script until it is updated to the official ت logo.
-// It still draws the old white "E" mark and would overwrite App Store, Play,
-// iOS AppIcon, and Android launcher icons. logo.png and tashil_splash.png are
-// also written here; those in-app assets were left unchanged on purpose.
-
 // ignore_for_file: unnecessary_import, depend_on_referenced_packages, avoid_print
 
 import 'dart:io';
@@ -13,89 +8,148 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 
-/// Permanent utility script to generate all store and launcher icons
-/// for Tashil Employee (`Tashil Employee` / `تساهيل إمبلوي`).
+/// Generates store and launcher icons for Tashil Employee.
 ///
-/// Usage: flutter test tool/generate_app_icons.dart
+/// Official mark: brand purple #6750A4 full background, centered
+/// #EADDFF tile (radius 29% of the tile, 68% of the canvas — measured
+/// from the approved circle-crop reference), Cairo ExtraBold ت in
+/// #21005D. Usage: `flutter test tool/generate_app_icons.dart`
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('Generate full icon suite for Tashil Employee', () async {
-    final sfFile = File('/System/Library/Fonts/SFNS.ttf');
-    final sfLoader = FontLoader('SFNS');
-    sfLoader.addFont(Future.value(ByteData.view(sfFile.readAsBytesSync().buffer)));
-    await sfLoader.load();
+    const brandPurple = Color(0xFF6750A4);
+    const tileColor = Color(0xFFEADDFF);
+    const glyphColor = Color(0xFF21005D);
+    // Tile side / canvas, from Mohamed's 300px circle-crop reference (204/300).
+    const tileRatio = 204 / 300;
+    // Adaptive mask is the center 72dp of the 108dp foreground.
+    const adaptiveMask = 72 / 108;
 
-    const m3Purple = Color(0xFF6750A4);
-    const white = Colors.white;
-
-    // 1. Render Master Icon (1024x1024)
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder, const Rect.fromLTWH(0, 0, 1024, 1024));
-    canvas.drawColor(m3Purple, BlendMode.src);
-
-    final tp = TextPainter(
-      text: const TextSpan(
-        text: 'E',
-        style: TextStyle(
-          fontFamily: 'SFNS',
-          fontWeight: FontWeight.w900,
-          fontSize: 580,
-          color: white,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    final dx = (1024 - tp.width) / 2;
-    final dy = (1024 - tp.height) / 2 + 20;
-    tp.paint(canvas, Offset(dx, dy));
-
-    final picture = recorder.endRecording();
-    final uiImg = await picture.toImage(1024, 1024);
-    final rawByteData = await uiImg.toByteData(format: ui.ImageByteFormat.rawRgba);
-    final primaryImg1024 = img.Image.fromBytes(
-      width: 1024,
-      height: 1024,
-      bytes: rawByteData!.buffer.asUint8List().buffer,
-      order: img.ChannelOrder.rgba,
+    final fontFile = File('assets/fonts/Cairo/Cairo-ExtraBold.ttf');
+    expect(fontFile.existsSync(), isTrue, reason: 'Cairo ExtraBold must be in assets/fonts/Cairo');
+    final cairoLoader = FontLoader('CairoExtraBold');
+    cairoLoader.addFont(
+      Future.value(ByteData.view(fontFile.readAsBytesSync().buffer)),
     );
+    await cairoLoader.load();
+
+    Future<ui.Image> paintLogo({
+      required double canvasSize,
+      required double tileRatioOnCanvas,
+      required bool transparentBackground,
+    }) async {
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, canvasSize, canvasSize));
+      if (transparentBackground) {
+        canvas.drawColor(const Color(0x00000000), BlendMode.src);
+      } else {
+        canvas.drawColor(brandPurple, BlendMode.src);
+      }
+
+      final tileSize = canvasSize * tileRatioOnCanvas;
+      final origin = (canvasSize - tileSize) / 2;
+      final rrect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(origin, origin, tileSize, tileSize),
+        Radius.circular(tileSize * 0.29),
+      );
+      canvas.drawRRect(rrect, Paint()..color = tileColor);
+
+      final tp = TextPainter(
+        text: TextSpan(
+          text: 'ت',
+          style: TextStyle(
+            fontFamily: 'CairoExtraBold',
+            fontWeight: FontWeight.w800,
+            fontSize: tileSize * 0.5,
+            height: 1.2,
+            color: glyphColor,
+          ),
+        ),
+        textDirection: TextDirection.rtl,
+      )..layout();
+      tp.paint(
+        canvas,
+        Offset(
+          origin + (tileSize - tp.width) / 2,
+          origin + (tileSize - tp.height) / 2,
+        ),
+      );
+
+      return recorder.endRecording().toImage(canvasSize.toInt(), canvasSize.toInt());
+    }
+
+    Future<img.Image> toImg(ui.Image uiImg) async {
+      final raw = await uiImg.toByteData(format: ui.ImageByteFormat.rawRgba);
+      return img.Image.fromBytes(
+        width: uiImg.width,
+        height: uiImg.height,
+        bytes: raw!.buffer.asUint8List().buffer,
+        order: img.ChannelOrder.rgba,
+      );
+    }
+
+    img.Image asRgb(img.Image src) {
+      final out = img.Image(width: src.width, height: src.height, numChannels: 3);
+      for (int y = 0; y < src.height; y++) {
+        for (int x = 0; x < src.width; x++) {
+          final p = src.getPixel(x, y);
+          out.setPixelRgb(x, y, p.r, p.g, p.b);
+        }
+      }
+      return out;
+    }
+
+    final uiImg = await paintLogo(
+      canvasSize: 1024,
+      tileRatioOnCanvas: tileRatio,
+      transparentBackground: false,
+    );
+    final primaryImg1024 = await toImg(uiImg);
+    final appStoreRgb = asRgb(primaryImg1024);
 
     final storeDir = Directory('assets/store_icons');
     if (!storeDir.existsSync()) storeDir.createSync(recursive: true);
 
-    // App Store 1024x1024 (24-bit RGB, No Alpha)
-    final appStoreRgb = img.Image(width: 1024, height: 1024, numChannels: 3);
-    for (int y = 0; y < 1024; y++) {
-      for (int x = 0; x < 1024; x++) {
-        final p = primaryImg1024.getPixel(x, y);
-        appStoreRgb.setPixelRgb(x, y, p.r, p.g, p.b);
-      }
-    }
-    File('${storeDir.path}/app_store_1024x1024.png').writeAsBytesSync(img.encodePng(appStoreRgb));
+    File('${storeDir.path}/app_store_1024x1024.png')
+        .writeAsBytesSync(img.encodePng(appStoreRgb));
 
-    // Google Play 512x512
-    final googlePlayImg = img.copyResize(primaryImg1024, width: 512, height: 512, interpolation: img.Interpolation.cubic);
-    File('${storeDir.path}/google_play_512x512.png').writeAsBytesSync(img.encodePng(googlePlayImg));
+    final googlePlayImg = img.copyResize(
+      primaryImg1024,
+      width: 512,
+      height: 512,
+      interpolation: img.Interpolation.cubic,
+    );
+    File('${storeDir.path}/google_play_512x512.png')
+        .writeAsBytesSync(img.encodePng(googlePlayImg));
 
-    // iOS Squircle Preview
     final squircleRec = ui.PictureRecorder();
     final squircleCanvas = Canvas(squircleRec, const Rect.fromLTWH(0, 0, 1024, 1024));
-    final rrect = RRect.fromRectAndRadius(const Rect.fromLTWH(0, 0, 1024, 1024), const Radius.circular(225));
+    final rrect = RRect.fromRectAndRadius(
+      const Rect.fromLTWH(0, 0, 1024, 1024),
+      const Radius.circular(225),
+    );
     squircleCanvas.clipRRect(rrect);
     squircleCanvas.drawImage(uiImg, Offset.zero, Paint());
     final sqUiImg = await squircleRec.endRecording().toImage(1024, 1024);
     final sqData = await sqUiImg.toByteData(format: ui.ImageByteFormat.png);
-    File('${storeDir.path}/tashil_employee_ios_squircle.png').writeAsBytesSync(sqData!.buffer.asUint8List());
+    File('${storeDir.path}/tashil_employee_ios_squircle.png')
+        .writeAsBytesSync(sqData!.buffer.asUint8List());
+    File('${storeDir.path}/ios_squircle_preview_1024.png')
+        .writeAsBytesSync(sqData.buffer.asUint8List());
 
-    // Update In-App Assets
+    // In-app logo and splash (same on-purple mark; splash keeps #6750A4).
     File('assets/images/logo.png').writeAsBytesSync(img.encodePng(googlePlayImg));
-    final splashImg = img.copyResize(primaryImg1024, width: 800, height: 800, interpolation: img.Interpolation.cubic);
+    final splashImg = img.copyResize(
+      primaryImg1024,
+      width: 800,
+      height: 800,
+      interpolation: img.Interpolation.cubic,
+    );
     File('assets/images/splash_logo_light.png').writeAsBytesSync(img.encodePng(splashImg));
     File('assets/images/splash_logo_dark.png').writeAsBytesSync(img.encodePng(splashImg));
     File('assets/images/tashil_splash.png').writeAsBytesSync(img.encodePng(splashImg));
 
-    // Update iOS Runner Assets
     final iosDir = Directory('ios/Runner/Assets.xcassets/AppIcon.appiconset');
     if (iosDir.existsSync()) {
       final sizes = <String, int>{
@@ -124,38 +178,25 @@ void main() {
 
       for (final entry in sizes.entries) {
         final resized = entry.value == 1024
-            ? primaryImg1024
-            : img.copyResize(primaryImg1024, width: entry.value, height: entry.value, interpolation: img.Interpolation.cubic);
-        File('${iosDir.path}/${entry.key}').writeAsBytesSync(img.encodePng(resized));
+            ? appStoreRgb
+            : img.copyResize(
+                primaryImg1024,
+                width: entry.value,
+                height: entry.value,
+                interpolation: img.Interpolation.cubic,
+              );
+        final bytes = entry.value == 1024 ? img.encodePng(appStoreRgb) : img.encodePng(asRgb(resized));
+        File('${iosDir.path}/${entry.key}').writeAsBytesSync(bytes);
       }
     }
 
-    // Render Android Adaptive Foreground (432x432 with transparent background, E sized for 66dp safe zone)
-    final fgRec = ui.PictureRecorder();
-    final fgCanvas = Canvas(fgRec, const Rect.fromLTWH(0, 0, 432, 432));
-    final fgTp = TextPainter(
-      text: const TextSpan(
-        text: 'E',
-        style: TextStyle(
-          fontFamily: 'SFNS',
-          fontWeight: FontWeight.w900,
-          fontSize: 176,
-          color: white,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    fgTp.paint(fgCanvas, Offset((432 - fgTp.width) / 2, (432 - fgTp.height) / 2 + 6));
-    final fgUiImg = await fgRec.endRecording().toImage(432, 432);
-    final fgBytes = await fgUiImg.toByteData(format: ui.ImageByteFormat.rawRgba);
-    final fgImg432 = img.Image.fromBytes(
-      width: 432,
-      height: 432,
-      bytes: fgBytes!.buffer.asUint8List().buffer,
-      order: img.ChannelOrder.rgba,
+    final fgUiImg = await paintLogo(
+      canvasSize: 432,
+      tileRatioOnCanvas: tileRatio * adaptiveMask,
+      transparentBackground: true,
     );
+    final fgImg432 = await toImg(fgUiImg);
 
-    // Update Android mipmaps & adaptive icon foregrounds
     final androidMipmaps = <String, int>{
       'android/app/src/main/res/mipmap-mdpi': 48,
       'android/app/src/main/res/mipmap-hdpi': 72,
@@ -173,7 +214,12 @@ void main() {
     for (final entry in androidMipmaps.entries) {
       final dir = Directory(entry.key);
       if (dir.existsSync()) {
-        final resized = img.copyResize(primaryImg1024, width: entry.value, height: entry.value, interpolation: img.Interpolation.cubic);
+        final resized = img.copyResize(
+          primaryImg1024,
+          width: entry.value,
+          height: entry.value,
+          interpolation: img.Interpolation.cubic,
+        );
         File('${dir.path}/launcher_icon.png').writeAsBytesSync(img.encodePng(resized));
         File('${dir.path}/ic_launcher.png').writeAsBytesSync(img.encodePng(resized));
         final roundResized = img.copyCropCircle(resized);
@@ -182,12 +228,16 @@ void main() {
         final fgSize = adaptiveForegroundSizes[entry.key]!;
         final fgResized = fgSize == 432
             ? fgImg432
-            : img.copyResize(fgImg432, width: fgSize, height: fgSize, interpolation: img.Interpolation.cubic);
+            : img.copyResize(
+                fgImg432,
+                width: fgSize,
+                height: fgSize,
+                interpolation: img.Interpolation.cubic,
+              );
         File('${dir.path}/ic_launcher_foreground.png').writeAsBytesSync(img.encodePng(fgResized));
       }
     }
 
-    // Write Android Adaptive Icon XMLs
     final anyDpiDir = Directory('android/app/src/main/res/mipmap-anydpi-v26');
     if (!anyDpiDir.existsSync()) anyDpiDir.createSync(recursive: true);
     const adaptiveXml = '''<?xml version="1.0" encoding="utf-8"?>
@@ -200,8 +250,7 @@ void main() {
     File('${anyDpiDir.path}/ic_launcher.xml').writeAsBytesSync(adaptiveXml.codeUnits);
     File('${anyDpiDir.path}/ic_launcher_round.xml').writeAsBytesSync(adaptiveXml.codeUnits);
 
-    final colorsFile = File('android/app/src/main/res/values/ic_launcher_background.xml');
-    colorsFile.writeAsStringSync('''<?xml version="1.0" encoding="utf-8"?>
+    File('android/app/src/main/res/values/ic_launcher_background.xml').writeAsStringSync('''<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#6750A4</color>
 </resources>
