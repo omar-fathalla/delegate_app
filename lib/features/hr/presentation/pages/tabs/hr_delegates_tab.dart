@@ -480,7 +480,8 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                                 .doc(compUid)
                                 .collection('delegates')
                                 .doc(delegate.uid)
-                                .set(updatePayload, SetOptions(merge: true));
+                                // update(): never create a stub doc.
+                                .update(updatePayload);
                           }
 
                           // 2. Safely update in users collection if document exists

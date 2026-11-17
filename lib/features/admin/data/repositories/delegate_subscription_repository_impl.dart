@@ -988,35 +988,30 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
 
       // Special handling for delete_delegate request
       if (request.requestType == 'delete_delegate') {
-        await requestRef.update(requestApproval);
-        // A. Delete from organizations subcollections
-        if (request.companyUID.isNotEmpty) {
-          final orgsSnap = await _firestore.collection('organizations').get();
-          for (final orgDoc in orgsSnap.docs) {
-            final delRef = _firestore
-                .collection('organizations')
-                .doc(orgDoc.id)
-                .collection('companies')
-                .doc(request.companyUID)
-                .collection('delegates')
-                .doc(targetDelegateUid);
-            final check = await delRef.get();
-            if (check.exists) {
-              await delRef.delete();
-            }
-          }
+        // A+B. Find every copy first. Old requests can have an empty
+        // companyUID (the 7 Nov stubs): resolve it from users/{uid} or the
+        // chain's companies. Nothing found -> fail visibly, request stays
+        // pending (it used to be approved with nothing deleted).
+        final targets = await resolveDelegateDeleteTargets(
+          firestore: _firestore,
+          delegateUid: targetDelegateUid,
+          companyUID: request.companyUID,
+          organizationUID: request.organizationUID,
+        );
+        if (targets.isEmpty) {
+          return Left(ServerFailure(kDeleteDelegateNotFoundMessage));
         }
-
-        // B. CollectionGroup query deletion to ensure no orphan doc exists
-        try {
-          final groupQuery = await _firestore
-              .collectionGroup('delegates')
-              .where('uid', isEqualTo: targetDelegateUid)
-              .get();
-          for (final doc in groupQuery.docs) {
-            await doc.reference.delete();
+        // Deletes and the approval land together (<= 450 per batch; the
+        // approval goes in the last batch).
+        for (var i = 0; i < targets.length; i += 450) {
+          final batch = _firestore.batch();
+          final end = i + 450 < targets.length ? i + 450 : targets.length;
+          for (final ref in targets.sublist(i, end)) {
+            batch.delete(ref);
           }
-        } catch (_) {}
+          if (end == targets.length) batch.update(requestRef, requestApproval);
+          await batch.commit();
+        }
 
         // C. Delete from users collection if role is delegate/promoter
         try {
@@ -1561,21 +1556,16 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       });
 
       // 2. Update delegate doc status if exists (only for new delegate requests)
+      // update(), never set(merge): a missing doc must stay missing. A merge
+      // set here created the 3-field «rejected» stubs seen on prod (7 Nov).
       if (request.requestType != 'delete_delegate') {
-        try {
-          await _firestore
-              .collection('organizations')
-              .doc(request.organizationUID)
-              .collection('companies')
-              .doc(request.companyUID)
-              .collection('delegates')
-              .doc(request.id)
-              .set({
-            'status': 'rejected',
-            'statusReason': reason,
-            'updatedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-        } catch (_) {}
+        await markRejectedDelegateDocIfExists(
+          firestore: _firestore,
+          organizationUID: request.organizationUID,
+          companyUID: request.companyUID,
+          docId: request.id,
+          reason: reason,
+        );
       }
 
       // 3. Send notification to supervisor
@@ -1951,4 +1941,98 @@ List<(int, int)> approvalWriteChunks(int count, {int size = kApprovalDocsPerBatc
     out.add((i, i + size > count ? count : i + size));
   }
   return out;
+}
+
+
+const String kDeleteDelegateNotFoundMessage =
+    'لم يتم العثور على سجل المندوب لحذفه. لم تتم الموافقة على الطلب.';
+
+/// Marks the pending delegate doc of a rejected request, only if it exists.
+/// Returns true when a doc was updated.
+Future<bool> markRejectedDelegateDocIfExists({
+  required FirebaseFirestore firestore,
+  required String organizationUID,
+  required String companyUID,
+  required String docId,
+  required String reason,
+}) async {
+  final org = organizationUID.trim();
+  final co = companyUID.trim();
+  final id = docId.trim();
+  if (org.isEmpty || co.isEmpty || id.isEmpty) return false;
+  try {
+    await firestore
+        .collection('organizations').doc(org)
+        .collection('companies').doc(co)
+        .collection('delegates').doc(id)
+        .update({
+      'status': 'rejected',
+      'statusReason': reason,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    return true;
+  } on FirebaseException catch (e) {
+    if (e.code == 'not-found') return false;
+    rethrow;
+  } catch (_) {
+    // fake_cloud_firestore throws a non-Firebase error for a missing doc.
+    return false;
+  }
+}
+
+/// Every delegate doc to delete for a delete_delegate request.
+/// Company: the request's companyUID, else users/{uid}.companyUID, else the
+/// company under [organizationUID] that holds delegates/{uid}. Then every
+/// chain's copy for that company, plus any doc found by uid.
+Future<List<DocumentReference<Map<String, dynamic>>>> resolveDelegateDeleteTargets({
+  required FirebaseFirestore firestore,
+  required String delegateUid,
+  required String companyUID,
+  required String organizationUID,
+}) async {
+  final uid = delegateUid.trim();
+  if (uid.isEmpty) return const [];
+  final companies = <String>{};
+  if (companyUID.trim().isNotEmpty) companies.add(companyUID.trim());
+  if (companies.isEmpty) {
+    try {
+      final u = await firestore.collection('users').doc(uid).get();
+      final co = (u.data()?['companyUID'] ?? '').toString().trim();
+      if (co.isNotEmpty) companies.add(co);
+    } catch (_) {}
+  }
+  final org = organizationUID.trim();
+  if (companies.isEmpty && org.isNotEmpty) {
+    final cos = await firestore.collection('organizations').doc(org).collection('companies').get();
+    final hits = await Future.wait(cos.docs.map((c) async {
+      final d = await c.reference.collection('delegates').doc(uid).get();
+      return d.exists ? c.id : null;
+    }));
+    companies.addAll(hits.whereType<String>());
+  }
+  final found = <String, DocumentReference<Map<String, dynamic>>>{};
+  if (companies.isNotEmpty) {
+    final orgs = await firestore.collection('organizations').get();
+    final refs = [
+      for (final o in orgs.docs)
+        for (final co in companies)
+          firestore.collection('organizations').doc(o.id)
+              .collection('companies').doc(co)
+              .collection('delegates').doc(uid),
+    ];
+    final snaps = await Future.wait(refs.map((r) => r.get()));
+    for (final s in snaps) {
+      if (s.exists) found[s.reference.path] = s.reference;
+    }
+  }
+  try {
+    final byUid = await firestore.collectionGroup('delegates').where('uid', isEqualTo: uid).get();
+    for (final d in byUid.docs) {
+      found[d.reference.path] = d.reference;
+    }
+  } catch (_) {
+    // Needs a collection-group index on uid (missing on prod); the path
+    // lookups above already cover the company's copies.
+  }
+  return found.values.toList();
 }
