@@ -57,8 +57,18 @@ export const onDelegateLinkDeleted = functions.firestore
       }
       if (plan.revokeSessions) {
         try {
-          await admin.auth().setCustomUserClaims(authUid, null);
-          await admin.auth().revokeRefreshTokens(authUid);
+          // Only undo what delegateLoginV2 set: never touch an auth user
+          // whose claims are not delegate claims (staff/admin accounts,
+          // including ones with no users/{uid} doc).
+          const user = await admin.auth().getUser(authUid);
+          if (user.customClaims?.role !== "delegate") {
+            functions.logger.info("onDelegateLinkDeleted skip revoke: not a delegate token", {
+              path: snap.ref.path,
+            });
+          } else {
+            await admin.auth().setCustomUserClaims(authUid, null);
+            await admin.auth().revokeRefreshTokens(authUid);
+          }
         } catch (error) {
           const code = (error as {code?: unknown})?.code;
           if (code !== "auth/user-not-found") throw error;
