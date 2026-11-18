@@ -5,7 +5,7 @@
  *   - delegateLoginV2 rejects a deleted profile (account_deleted)
  *   - onDelegateLinkDeleted clears deviceBindings, cancels open unbind
  *     requests and revokes sessions when the last link is deleted, but not
- *     for a staff uid and not while another live link exists.
+ *     for a staff uid, a non-delegate auth user, or while another live link exists.
  * Fake data only.
  */
 const {test, before, after} = require("node:test");
@@ -118,4 +118,15 @@ test("deleting a ghost under a staff uid never revokes the staff account", async
   await deleteAndTrigger(`organizations/o1/companies/c1/delegates/${id}`);
   assert.equal((await fs.doc(`deviceBindings/${id}`).get()).exists, true);
   assert.deepEqual((await admin.auth().getUser(id)).customClaims, {role: "company-admin"});
+});
+
+test("an auth user without delegate claims (no users doc) is never revoked", async () => {
+  const id = "adminNoUsersDoc00000000000AB";
+  await fs.doc(`organizations/o1/companies/c2/delegates/${id}`).set({
+    boundDeviceId: "x", boundDeviceModel: "Pixel", isDeviceLocked: true,
+  });
+  try { await admin.auth().createUser({uid: id}); } catch { /* exists */ }
+  await admin.auth().setCustomUserClaims(id, {orgAdmin: true});
+  await deleteAndTrigger(`organizations/o1/companies/c2/delegates/${id}`);
+  assert.deepEqual((await admin.auth().getUser(id)).customClaims, {orgAdmin: true});
 });

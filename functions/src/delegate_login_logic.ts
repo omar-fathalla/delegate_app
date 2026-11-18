@@ -13,6 +13,7 @@ import {isDeletedDelegateStatus} from "./delegate_identity";
 const ARABIC_DIGITS = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
 const PERSIAN_DIGITS = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"];
 const ENGLISH_DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+
 export const RATE_LIMIT_MAX_FAILURES = 5;
 export const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 export const RATE_LIMIT_LOCK_MS = 15 * 60 * 1000;
