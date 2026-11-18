@@ -6,7 +6,8 @@ name: Firestore indexes
 # would DELETE any prod composite index or field override. Entries the
 # file would ADD are listed in the log but do not fail the job.
 #
-# Runs on GitHub-hosted ubuntu-latest, not tashil-delegate-mac. This is a
+# Runs on the self-hosted runner tashil-box (GitHub-hosted runners are
+# blocked by a billing issue), not tashil-delegate-mac. This is a
 # short Python + HTTPS job, it needs a repo secret, and it must not take
 # the Mac runner or share the Flutter CI concurrency group. It never
 # deploys and never writes to prod.
@@ -40,15 +41,15 @@ jobs:
   check:
     name: Check indexes vs prod (read-only)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, tashil-box]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Install Python deps
-        run: pip install --quiet google-auth requests
+      - name: Install Python deps (venv)
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet google-auth requests
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
       - name: Self-test
         run: python3 scripts/check_firestore_indexes.py --self-test
       - name: Compare file to prod (GET only)
