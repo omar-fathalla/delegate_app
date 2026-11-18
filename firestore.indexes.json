@@ -1,138 +1,6 @@
 {
   "indexes": [
     {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "tasks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "assignedTo",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "tasks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "assignedTo",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "tasks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "assignedTo",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "tasks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "assignedTo",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "tasks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "tasks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "captured_photos",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "capturedAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "app_updates",
       "queryScope": "COLLECTION",
       "fields": [
@@ -142,10 +10,6 @@
         },
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -161,71 +25,6 @@
         },
         {
           "fieldPath": "checkInTime",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "attendance_logs",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "delegateId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "timestamp",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "attendance_logs",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "delegateId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "timestamp",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "attendance_logs",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "organizationId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "delegateId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "timestamp",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -250,9 +49,20 @@
         {
           "fieldPath": "timestamp",
           "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "attendance_logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "delegateId",
+          "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
+          "fieldPath": "timestamp",
           "order": "ASCENDING"
         }
       ],
@@ -263,41 +73,15 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "organizationId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyId",
+          "fieldPath": "delegateId",
           "order": "ASCENDING"
         },
         {
           "fieldPath": "timestamp",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
+          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "attendance_logs",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "organizationId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "branchName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "timestamp",
-          "order": "ASCENDING"
-        }
-      ]
     },
     {
       "collectionGroup": "attendance_logs",
@@ -315,24 +99,11 @@
           "fieldPath": "branchId",
           "order": "ASCENDING"
         }
-      ]
+      ],
+      "density": "SPARSE_ALL"
     },
     {
-      "collectionGroup": "branches",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "branchName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "attendance_logs_testing",
+      "collectionGroup": "attendance_logs",
       "queryScope": "COLLECTION",
       "fields": [
         {
@@ -347,7 +118,46 @@
           "fieldPath": "timestamp",
           "order": "ASCENDING"
         }
-      ]
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "attendance_logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "organizationId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "attendance_logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "organizationId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "delegateId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
     },
     {
       "collectionGroup": "attendance_logs",
@@ -369,7 +179,46 @@
           "fieldPath": "timestamp",
           "order": "ASCENDING"
         }
-      ]
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "attendance_logs_testing",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "organizationId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "branchName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "attendance_logs_testing",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "organizationId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
     },
     {
       "collectionGroup": "attendance_logs_testing",
@@ -391,64 +240,113 @@
           "fieldPath": "timestamp",
           "order": "ASCENDING"
         }
-      ]
+      ],
+      "density": "SPARSE_ALL"
     },
     {
-      "collectionGroup": "attendance_logs_testing",
+      "collectionGroup": "branches",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "organizationId",
+          "fieldPath": "branchName",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "companyId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "timestamp",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
+          "fieldPath": "organizationUID",
           "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
     },
     {
-      "collectionGroup": "companies",
-      "queryScope": "COLLECTION",
+      "collectionGroup": "captured_photos",
+      "queryScope": "COLLECTION_GROUP",
       "fields": [
         {
-          "fieldPath": "organizationUID",
+          "fieldPath": "companyUID",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "createdAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "companies",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
+          "fieldPath": "capturedAt",
           "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "captured_photos",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "delegateUID",
+          "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
+          "fieldPath": "capturedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "captured_photos",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "capturedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "companies",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "hasDeferredPayment",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "companies",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "companies",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
           "order": "DESCENDING"
         }
       ],
@@ -469,10 +367,6 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -491,10 +385,6 @@
         },
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -515,10 +405,6 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -541,10 +427,6 @@
         },
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -569,10 +451,6 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -587,10 +465,6 @@
         },
         {
           "fieldPath": "name",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -610,10 +484,6 @@
         },
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -634,10 +504,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -657,10 +523,6 @@
         {
           "fieldPath": "createdAt",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -680,10 +542,6 @@
         {
           "fieldPath": "createdAt",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -702,10 +560,6 @@
         },
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -729,10 +583,6 @@
         },
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -756,10 +606,6 @@
         },
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -784,10 +630,6 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -806,10 +648,6 @@
         },
         {
           "fieldPath": "name",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -833,10 +671,6 @@
         },
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -861,10 +695,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -888,10 +718,6 @@
         {
           "fieldPath": "createdAt",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -915,10 +741,6 @@
         {
           "fieldPath": "createdAt",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -941,10 +763,6 @@
         },
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -968,10 +786,6 @@
         },
         {
           "fieldPath": "name",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -999,10 +813,6 @@
         },
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -1031,10 +841,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1062,10 +868,6 @@
         {
           "fieldPath": "createdAt",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1085,10 +887,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1108,10 +906,6 @@
         {
           "fieldPath": "createdAt",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1130,10 +924,6 @@
         },
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -1157,10 +947,6 @@
         },
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -1184,10 +970,6 @@
         },
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -1212,10 +994,6 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1234,10 +1012,6 @@
         },
         {
           "fieldPath": "name",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -1262,10 +1036,6 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1288,10 +1058,6 @@
         },
         {
           "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -1316,10 +1082,6 @@
         {
           "fieldPath": "createdAt",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1339,10 +1101,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1358,10 +1116,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1384,10 +1138,6 @@
         },
         {
           "fieldPath": "targetCompanyName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -1416,10 +1166,6 @@
         {
           "fieldPath": "targetCompanyName",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1447,10 +1193,6 @@
         {
           "fieldPath": "targetCompanyName",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1470,10 +1212,6 @@
         {
           "fieldPath": "targetCompanyName",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1492,10 +1230,6 @@
         },
         {
           "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -1520,10 +1254,25 @@
         {
           "fieldPath": "targetCompanyName",
           "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "companyRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "actionType",
+          "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
+          "fieldPath": "organizationUID",
           "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1545,34 +1294,7 @@
           "order": "DESCENDING"
         },
         {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "companyRequests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "actionType",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
           "fieldPath": "targetCompanyName",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -1593,10 +1315,6 @@
         {
           "fieldPath": "targetCompanyName",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1615,10 +1333,6 @@
         },
         {
           "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -1643,10 +1357,25 @@
         {
           "fieldPath": "targetCompanyName",
           "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "companyRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
+          "fieldPath": "status",
           "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1668,34 +1397,7 @@
           "order": "DESCENDING"
         },
         {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "companyRequests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
           "fieldPath": "targetCompanyName",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -1712,10 +1414,6 @@
         {
           "fieldPath": "targetCompanyName",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1730,10 +1428,6 @@
         },
         {
           "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -1754,10 +1448,6 @@
         {
           "fieldPath": "targetCompanyName",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1772,10 +1462,6 @@
         },
         {
           "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -1795,10 +1481,6 @@
         },
         {
           "fieldPath": "targetCompanyName",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -1815,10 +1497,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1834,10 +1512,1129 @@
         {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_profile_audit_logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
+          "fieldPath": "at",
           "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_profile_audit_logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "delegateUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "at",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "existingDelegateUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "requestType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nationalId",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nationalId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nationalityID",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "phoneNumber",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "phoneNumber",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "receiptCode",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "requestType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "existingDelegateUid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "requestType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nationalId",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "phoneNumber",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "receiptCode",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "requestType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "requestType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "paymentStatus",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegate_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "city",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "position",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "city",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "position",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "city",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "position",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "city",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "position",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "city",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "position",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "city",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "position",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "city",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "position",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "city",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "city",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "city",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "city",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "city",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "city",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "position",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "position",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "position",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "position",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "position",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "position",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "position",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "companyName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isPrinted",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1863,7 +2660,7 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
+          "fieldPath": "fullName",
           "order": "ASCENDING"
         }
       ],
@@ -1894,42 +2691,7 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "companyName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "isPrinted",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
           "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -1962,10 +2724,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -1993,10 +2751,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -2024,10 +2778,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -2046,10 +2796,6 @@
         },
         {
           "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -2073,10 +2819,6 @@
         },
         {
           "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -2105,10 +2847,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -2136,10 +2874,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -2163,10 +2897,21 @@
         {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -2184,7 +2929,7 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
+          "fieldPath": "createdAt",
           "order": "ASCENDING"
         }
       ],
@@ -2210,29 +2955,6 @@
       "queryScope": "COLLECTION_GROUP",
       "fields": [
         {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
           "fieldPath": "isPrinted",
           "order": "ASCENDING"
         },
@@ -2242,10 +2964,6 @@
         },
         {
           "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -2269,10 +2987,6 @@
         },
         {
           "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -2301,10 +3015,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -2332,10 +3042,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -2359,10 +3065,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -2386,10 +3088,21 @@
         {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "nationalityID",
+          "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -2405,9 +3118,35 @@
         {
           "fieldPath": "createdAt",
           "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
+          "fieldPath": "nationalityID",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "phoneNumber",
           "order": "ASCENDING"
         }
       ],
@@ -2424,10 +3163,6 @@
         {
           "fieldPath": "position",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -2443,60 +3178,6 @@
         {
           "fieldPath": "status",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -2515,14 +3196,52 @@
         },
         {
           "fieldPath": "fullName",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "delegates",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fullName",
           "order": "DESCENDING"
         },
         {
           "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -2543,10 +3262,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -2566,249 +3281,16 @@
         {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
     },
     {
-      "collectionGroup": "delegates",
+      "collectionGroup": "device_unbind_requests",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "city",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "position",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "city",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "position",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "city",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "position",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "city",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "position",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "city",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "position",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "city",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "position",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "city",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "position",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "city",
+          "fieldPath": "organizationUID",
           "order": "ASCENDING"
         },
         {
@@ -2818,611 +3300,21 @@
         {
           "fieldPath": "status",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
     },
     {
-      "collectionGroup": "delegates",
+      "collectionGroup": "device_unbind_requests",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "city",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
+          "fieldPath": "organizationUID",
           "order": "ASCENDING"
         },
         {
           "fieldPath": "status",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "city",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "city",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "city",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "city",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "position",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "position",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "position",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "position",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "position",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "position",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "position",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fullName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -3437,10 +3329,6 @@
         },
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -3457,10 +3345,6 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -3475,10 +3359,6 @@
         },
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -3498,10 +3378,6 @@
         },
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -3521,10 +3397,6 @@
         },
         {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -3553,10 +3425,6 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -3580,10 +3448,70 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "leave_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
+          "fieldPath": "delegateUid",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "leave_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "leave_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "leave_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -3607,10 +3535,6 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -3630,10 +3554,460 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "actionType",
+          "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "targetDelegateName",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "actionType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "actionType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "targetDelegateName",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "actionType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
           "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "targetDelegateName",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "actionType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "targetDelegateName",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "actionType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "actionType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "targetDelegateName",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "actionType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "actionType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "targetDelegateName",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "targetDelegateName",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "targetDelegateName",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "targetDelegateName",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "targetDelegateName",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "targetDelegateName",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "targetDelegateName",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "targetDelegateId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "targetDelegateId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "actionType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "companyName",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isPrinted",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "targetDelegateName",
+          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -3667,47 +4041,8 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "actionType",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "isPrinted",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "targetDelegateName",
-          "order": "ASCENDING"
-        },
-        {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -3734,10 +4069,6 @@
         },
         {
           "fieldPath": "targetDelegateName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -3770,10 +4101,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -3804,10 +4131,6 @@
         },
         {
           "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -3840,10 +4163,6 @@
         {
           "fieldPath": "targetDelegateName",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -3875,10 +4194,6 @@
         {
           "fieldPath": "targetDelegateName",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -3901,10 +4216,6 @@
         },
         {
           "fieldPath": "targetDelegateName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -3925,10 +4236,6 @@
         {
           "fieldPath": "organizationUID",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -3951,10 +4258,6 @@
         },
         {
           "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -3982,10 +4285,6 @@
         },
         {
           "fieldPath": "targetDelegateName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -4017,10 +4316,6 @@
         },
         {
           "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -4053,10 +4348,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4084,10 +4375,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4115,10 +4402,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4133,10 +4416,6 @@
         },
         {
           "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -4160,10 +4439,6 @@
         },
         {
           "fieldPath": "targetDelegateName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -4192,10 +4467,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4223,10 +4494,6 @@
         {
           "fieldPath": "updatedAt",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4249,10 +4516,6 @@
         },
         {
           "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -4281,10 +4544,6 @@
         {
           "fieldPath": "targetDelegateName",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4304,10 +4563,6 @@
         {
           "fieldPath": "targetDelegateName",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4326,10 +4581,6 @@
         },
         {
           "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -4354,10 +4605,6 @@
         {
           "fieldPath": "targetDelegateName",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4376,10 +4623,6 @@
         },
         {
           "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -4404,10 +4647,36 @@
         {
           "fieldPath": "targetDelegateName",
           "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "actionType",
+          "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "requests",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "actionType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "targetDelegateId",
+          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4422,10 +4691,6 @@
         },
         {
           "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -4450,10 +4715,6 @@
         {
           "fieldPath": "targetDelegateName",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4481,10 +4742,6 @@
         {
           "fieldPath": "targetDelegateName",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4504,10 +4761,6 @@
         {
           "fieldPath": "targetDelegateName",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4526,10 +4779,6 @@
         },
         {
           "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -4554,10 +4803,6 @@
         {
           "fieldPath": "targetDelegateName",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4576,10 +4821,6 @@
         },
         {
           "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -4603,10 +4844,6 @@
         },
         {
           "fieldPath": "targetDelegateName",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -4627,10 +4864,6 @@
         {
           "fieldPath": "status",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4645,10 +4878,6 @@
         },
         {
           "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -4669,10 +4898,6 @@
         {
           "fieldPath": "targetDelegateName",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4691,10 +4916,6 @@
         },
         {
           "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -4719,10 +4940,6 @@
         {
           "fieldPath": "targetDelegateName",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4741,10 +4958,6 @@
         },
         {
           "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -4769,10 +4982,6 @@
         {
           "fieldPath": "targetDelegateName",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4787,10 +4996,6 @@
         },
         {
           "fieldPath": "targetDelegateName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -4807,10 +5012,6 @@
         {
           "fieldPath": "uid",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4825,10 +5026,6 @@
         },
         {
           "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -4849,10 +5046,6 @@
         {
           "fieldPath": "targetDelegateName",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -4867,10 +5060,6 @@
         },
         {
           "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -4891,516 +5080,20 @@
         {
           "fieldPath": "targetDelegateName",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
         }
       ],
       "density": "SPARSE_ALL"
     },
     {
       "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "actionType",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "targetDelegateName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "actionType",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "actionType",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "targetDelegateName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "actionType",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "targetDelegateName",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "actionType",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "targetDelegateName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "actionType",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "actionType",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "targetDelegateName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "actionType",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "actionType",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "targetDelegateName",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "targetDelegateName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "targetDelegateName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "targetDelegateName",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "targetDelegateName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "targetDelegateName",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "targetDelegateName",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
+      "queryScope": "COLLECTION_GROUP",
       "fields": [
         {
           "fieldPath": "status",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "targetDelegateId",
-          "order": "ASCENDING"
-        },
-        {
           "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "targetDelegateId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -5421,9 +5114,39 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "assignedTo",
+          "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "assignedTo",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
           "order": "DESCENDING"
         }
       ],
@@ -5440,9 +5163,47 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyId",
+          "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
+          "fieldPath": "createdBy",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "assignedTo",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
           "order": "DESCENDING"
         }
       ],
@@ -5463,9 +5224,47 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyId",
+          "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdBy",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "assignedTo",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
           "order": "DESCENDING"
         }
       ],
@@ -5490,10 +5289,29 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyUID",
+          "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
+          "fieldPath": "organizationUID",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "role",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "displayName",
+          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -5519,38 +5337,7 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "users",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "role",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "displayName",
-          "order": "ASCENDING"
-        },
-        {
           "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "DESCENDING"
         }
       ],
@@ -5566,10 +5353,6 @@
         },
         {
           "fieldPath": "createdAt",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ],
@@ -5590,10 +5373,6 @@
         {
           "fieldPath": "createdAt",
           "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -5613,604 +5392,6 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegates",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "phoneNumber",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "captured_photos",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "delegateUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "capturedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "captured_photos",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "capturedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "tasks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdBy",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "tasks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdBy",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updatedAt",
-          "order": "DESCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "nationalId",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "phoneNumber",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "receiptCode",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "requestType",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "existingDelegateUid",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "requestType",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "nationalId",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "nationalityID",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "nationalId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "phoneNumber",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "phoneNumber",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "receiptCode",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "requestType",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "existingDelegateUid",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "requestType",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_profile_audit_logs",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "at",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegate_profile_audit_logs",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "delegateUid",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "at",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "requests",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "actionType",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "targetDelegateId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "delegate_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "requestType",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "paymentStatus",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "leave_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "leave_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "device_unbind_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "leave_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "companyUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "delegateUid",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "leave_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    },
-    {
-      "collectionGroup": "device_unbind_requests",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "organizationUID",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
         }
       ],
       "density": "SPARSE_ALL"
@@ -6218,8 +5399,154 @@
   ],
   "fieldOverrides": [
     {
-      "collectionGroup": "photo_permissions",
+      "collectionGroup": "captured_photos",
+      "fieldPath": "capturedAt",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "captured_photos",
+      "fieldPath": "companyUID",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "captured_photos",
+      "fieldPath": "delegateUID",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "delegates",
+      "fieldPath": "nationalId",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "arrayConfig": "CONTAINS",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "delegates",
+      "fieldPath": "nationalityID",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "arrayConfig": "CONTAINS",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "delegates",
       "fieldPath": "organizationUID",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "arrayConfig": "CONTAINS",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "delegates",
+      "fieldPath": "phoneNumber",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "delegates",
+      "fieldPath": "uid",
       "indexes": [
         {
           "order": "ASCENDING",
@@ -6284,9 +5611,8 @@
       ]
     },
     {
-      "collectionGroup": "delegates",
+      "collectionGroup": "photo_permissions",
       "fieldPath": "organizationUID",
-      "ttl": false,
       "indexes": [
         {
           "order": "ASCENDING",
@@ -6307,77 +5633,8 @@
       ]
     },
     {
-      "collectionGroup": "captured_photos",
-      "fieldPath": "delegateUID",
-      "ttl": false,
-      "indexes": [
-        {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION_GROUP"
-        },
-        {
-          "order": "DESCENDING",
-          "queryScope": "COLLECTION_GROUP"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "captured_photos",
-      "fieldPath": "companyUID",
-      "ttl": false,
-      "indexes": [
-        {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION_GROUP"
-        },
-        {
-          "order": "DESCENDING",
-          "queryScope": "COLLECTION_GROUP"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "captured_photos",
-      "fieldPath": "capturedAt",
-      "ttl": false,
-      "indexes": [
-        {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION_GROUP"
-        },
-        {
-          "order": "DESCENDING",
-          "queryScope": "COLLECTION_GROUP"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegates",
-      "fieldPath": "phoneNumber",
-      "ttl": false,
-      "indexes": [
-        {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION"
-        },
-        {
-          "order": "DESCENDING",
-          "queryScope": "COLLECTION"
-        },
-        {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION_GROUP"
-        },
-        {
-          "order": "DESCENDING",
-          "queryScope": "COLLECTION_GROUP"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegates",
-      "fieldPath": "nationalId",
-      "ttl": false,
+      "collectionGroup": "requests",
+      "fieldPath": "organizationUID",
       "indexes": [
         {
           "order": "ASCENDING",
@@ -6393,37 +5650,6 @@
         },
         {
           "order": "ASCENDING",
-          "queryScope": "COLLECTION_GROUP"
-        },
-        {
-          "order": "DESCENDING",
-          "queryScope": "COLLECTION_GROUP"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegates",
-      "fieldPath": "nationalityID",
-      "ttl": false,
-      "indexes": [
-        {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION"
-        },
-        {
-          "order": "DESCENDING",
-          "queryScope": "COLLECTION"
-        },
-        {
-          "arrayConfig": "CONTAINS",
-          "queryScope": "COLLECTION"
-        },
-        {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION_GROUP"
-        },
-        {
-          "order": "DESCENDING",
           "queryScope": "COLLECTION_GROUP"
         }
       ]
@@ -6431,30 +5657,6 @@
     {
       "collectionGroup": "requests",
       "fieldPath": "ttlAt",
-      "ttl": false,
-      "indexes": [
-        {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION"
-        },
-        {
-          "order": "DESCENDING",
-          "queryScope": "COLLECTION"
-        },
-        {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION_GROUP"
-        },
-        {
-          "order": "DESCENDING",
-          "queryScope": "COLLECTION_GROUP"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "requests",
-      "fieldPath": "organizationUID",
-      "ttl": false,
       "indexes": [
         {
           "order": "ASCENDING",
@@ -6471,28 +5673,9 @@
         {
           "order": "ASCENDING",
           "queryScope": "COLLECTION_GROUP"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "delegates",
-      "fieldPath": "uid",
-      "ttl": false,
-      "indexes": [
-        {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION"
         },
         {
           "order": "DESCENDING",
-          "queryScope": "COLLECTION"
-        },
-        {
-          "arrayConfig": "CONTAINS",
-          "queryScope": "COLLECTION"
-        },
-        {
-          "order": "ASCENDING",
           "queryScope": "COLLECTION_GROUP"
         }
       ]

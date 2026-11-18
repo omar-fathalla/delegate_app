@@ -1,0 +1,57 @@
+name: Firestore indexes
+
+# Read-only check: compare firestore.indexes.json with live prod indexes.
+# The repo file is a UNION of live prod plus indexes needed by upcoming
+# / dev queries. Fails if `firebase deploy --only firestore:indexes`
+# would DELETE any prod composite index or field override. Entries the
+# file would ADD are listed in the log but do not fail the job.
+#
+# Runs on GitHub-hosted ubuntu-latest, not tashil-delegate-mac. This is a
+# short Python + HTTPS job, it needs a repo secret, and it must not take
+# the Mac runner or share the Flutter CI concurrency group. It never
+# deploys and never writes to prod.
+#
+# Required repository secret:
+#   FIREBASE_INDEX_READER_SA
+#     Service-account JSON for project practice-firebase-72df1 with
+#     permission to list Firestore indexes (datastore.indexes.list is
+#     enough; Cloud Datastore Viewer / Index Viewer also works).
+#     Do not grant deploy, index create/delete, or datastore write.
+#     The workflow does not create this secret; add it in the repo
+#     Settings → Secrets and variables → Actions.
+#
+# Local run (from the repo root):
+#   python3 scripts/check_firestore_indexes.py --self-test
+#   python3 scripts/check_firestore_indexes.py --project practice-firebase-72df1
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [dev, main]
+    paths:
+      - firestore.indexes.json
+      - scripts/check_firestore_indexes.py
+      - .github/workflows/firestore-indexes.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check indexes vs prod (read-only)
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Python deps
+        run: pip install --quiet google-auth requests
+      - name: Self-test
+        run: python3 scripts/check_firestore_indexes.py --self-test
+      - name: Compare file to prod (GET only)
+        env:
+          FIREBASE_INDEX_READER_SA: ${{ secrets.FIREBASE_INDEX_READER_SA }}
+        run: python3 scripts/check_firestore_indexes.py --project practice-firebase-72df1
