@@ -278,36 +278,96 @@ class SubscriptionCycleHelper {
 
   /// True when [subscription] is paid for a period that still covers [at],
   /// or waived during the free promotion. Status `active` is not a substitute.
+  ///
+  /// Accepts both subscription map shapes (see [_mapCoversPeriod]):
+  /// - new (Paymob, PR #212+): `paymentStatus` + `periodCode`;
+  /// - legacy (field app 1.14.x, every map on prod as of Nov 2026):
+  ///   `cycle` + `isPaid` + `paymentMethod` (+ optional `endDate`).
   static bool hasPaidCoverage(
     Map<String, dynamic>? subscription, {
     DateTime? at,
     String? companyUID,
     Map<String, dynamic>? nextSubscription,
   }) {
-    if (_mapCoversPeriod(subscription, at: at, companyUID: companyUID))
+    if (_mapCoversPeriod(subscription, at: at, companyUID: companyUID)) {
       return true;
-    if (_mapCoversPeriod(nextSubscription, at: at, companyUID: companyUID))
+    }
+    if (_mapCoversPeriod(nextSubscription, at: at, companyUID: companyUID)) {
       return true;
+    }
     return false;
   }
+
+  /// Legacy (1.14.x) payment methods that mean "free promotion" (= waived).
+  static const Set<String> legacyFreePromotionMethods = {
+    'freePromotion',
+    'free_promotion',
+  };
 
   /// A paid map covers only its own period (a prepaid next period stored on
   /// [nextSubscription] or mistakenly on [subscription] must not count as
   /// current coverage). Waived maps cover only during the free promotion.
+  ///
+  /// Period: `periodCode`, else legacy `cycle`. It must equal the period of
+  /// [at]; no period means no coverage.
+  ///
+  /// - New shape (non-empty `paymentStatus`): unchanged rules. `paid` covers;
+  ///   `waived` covers only while the free promotion is active; anything else
+  ///   (pending, failed, expired, ...) does not. Legacy fields are ignored.
+  /// - Legacy shape (no `paymentStatus`): a free-promotion `paymentMethod`
+  ///   (`freePromotion` / `free_promotion`) behaves like `waived`; otherwise
+  ///   `isPaid == true` behaves like `paid` (branchReceipt, companyDeduction,
+  ///   instaPay, ...). A legacy `endDate` in the past (Cairo wall time) means
+  ///   expired, i.e. not covered.
   static bool _mapCoversPeriod(
     Map<String, dynamic>? subscription, {
     DateTime? at,
     String? companyUID,
   }) {
     if (subscription == null) return false;
-    final status = (subscription['paymentStatus'] ?? '').toString().trim();
-    final period = (subscription['periodCode'] ?? '').toString().trim();
-    if (period.isEmpty) return false;
-    if (status == 'paid') return period == getCycleCode(at);
-    if (status == 'waived' && isFreePromotionActive(at, companyUID)) {
-      return period == getCycleCode(at);
+    final status = _str(subscription['paymentStatus']);
+    var period = _str(subscription['periodCode']);
+    if (period.isEmpty) period = _str(subscription['cycle']);
+    if (period.isEmpty || period != getCycleCode(at)) return false;
+
+    if (status.isNotEmpty) {
+      if (status == 'paid') return true;
+      if (status == 'waived') return isFreePromotionActive(at, companyUID);
+      return false;
     }
-    return false;
+
+    // Legacy 1.14.x map.
+    if (_legacyEndDatePassed(subscription['endDate'], at)) return false;
+    final method = _str(subscription['paymentMethod']);
+    if (legacyFreePromotionMethods.contains(method)) {
+      return isFreePromotionActive(at, companyUID);
+    }
+    return subscription['isPaid'] == true;
+  }
+
+  static String _str(Object? v) => v == null ? '' : v.toString().trim();
+
+  /// True when a legacy `endDate` is before [at] (Cairo wall time).
+  /// Accepts an ISO string (written without a zone by 1.14.x: Cairo wall
+  /// time), a [DateTime], or a Firestore Timestamp-like value (`toDate()`).
+  /// Missing or unparseable values never expire the map.
+  static bool _legacyEndDatePassed(Object? raw, DateTime? at) {
+    DateTime? end;
+    if (raw is DateTime) {
+      end = raw.toUtc();
+    } else if (raw is String && raw.trim().isNotEmpty) {
+      // Zone-less (1.14.x) -> local DateTime, read as Cairo wall time;
+      // "...Z" / "+02:00" -> UTC instant, converted below.
+      end = DateTime.tryParse(raw.trim());
+    } else if (raw != null) {
+      try {
+        final d = (raw as dynamic).toDate();
+        if (d is DateTime) end = d.toUtc();
+      } catch (_) {}
+    }
+    if (end == null) return false;
+    final endCairo = cairoTime(end);
+    return cairoTime(at).isAfter(endCairo);
   }
 
   static DateTime? _coverageEnd(

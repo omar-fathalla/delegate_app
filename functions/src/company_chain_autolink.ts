@@ -141,6 +141,7 @@ export async function loadCoverage(db: Db, now: Date): Promise<Coverage> {
     previousPeriodCode: prev.code,
     previousCovered: inGrace ? await collect(prev.code) : new Set(),
     freeChains: freeChainIds(cfg.exists ? (cfg.data() as Data) : null, await loadOrgs(db)),
+    now,
   };
   coverageCache = {at: Date.now(), value};
   return value;

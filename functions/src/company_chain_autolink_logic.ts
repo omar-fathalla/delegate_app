@@ -42,6 +42,8 @@ export interface Coverage {
   previousCovered: Set<string>;
   /** Chains that need no payment (فتح الله). */
   freeChains: Set<string>;
+  /** Evaluation instant; enables the legacy `endDate` expiry check. */
+  now?: Date;
 }
 
 /** Free chains from config/subscriptions.freeChainOrgUids and org flags. */
@@ -71,14 +73,66 @@ export const AUTO_LINK_COPY_FIELDS = [
   "holds", "statusReason",
 ] as const;
 
-/** A paid (or waived-in-its-period) subscription mirror for [periodCode]. */
-export function mapCoversPeriod(sub: unknown, periodCode: string, free: boolean): boolean {
+/** Legacy (app 1.14.x) payment methods meaning "free promotion" (= waived). */
+export const LEGACY_FREE_PROMOTION_METHODS = new Set(["freePromotion", "free_promotion"]);
+
+/**
+ * A paid (or waived-in-its-period) subscription mirror for [periodCode].
+ * Mirrors SubscriptionCycleHelper._mapCoversPeriod (Dart); both must agree.
+ *
+ * Period: `periodCode`, else the legacy `cycle`.
+ * - New shape (non-empty `paymentStatus`): unchanged. `paid` covers,
+ *   `waived` covers only when [free]; anything else does not.
+ * - Legacy 1.14.x shape (no `paymentStatus`; every map on prod as of Nov
+ *   2026): a free-promotion `paymentMethod` behaves like `waived`; otherwise
+ *   `isPaid === true` behaves like `paid`. When [now] is given, a legacy
+ *   `endDate` before it (zone-less strings are Cairo wall time) means expired.
+ */
+export function mapCoversPeriod(sub: unknown, periodCode: string, free: boolean, now?: Date): boolean {
   if (!sub || typeof sub !== "object") return false;
   const m = sub as Data;
-  if (str(m.periodCode) !== periodCode) return false;
+  const period = str(m.periodCode) || str(m.cycle);
+  if (!period || period !== periodCode) return false;
   const status = str(m.paymentStatus);
-  if (status === "paid") return true;
-  return status === "waived" && free;
+  if (status) {
+    if (status === "paid") return true;
+    return status === "waived" && free;
+  }
+  if (now && legacyEndDatePassed(m.endDate, now)) return false;
+  if (LEGACY_FREE_PROMOTION_METHODS.has(str(m.paymentMethod))) return free;
+  return m.isPaid === true;
+}
+
+/** Cairo is UTC+2 in winter, UTC+3 in summer: offset (hours) at [at]. */
+function cairoOffsetHours(at: Date): number {
+  const p = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Cairo", hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+  }).formatToParts(at);
+  const g = (t: string) => Number(p.find((x) => x.type === t)?.value);
+  const wall = Date.UTC(g("year"), g("month") - 1, g("day"), g("hour") % 24, g("minute"));
+  return Math.round((wall - at.getTime()) / 3600000);
+}
+
+/** Legacy `endDate` (ISO string, Date, or Timestamp) is before [now]. Unparseable -> false. */
+export function legacyEndDatePassed(raw: unknown, now: Date): boolean {
+  let end: Date | null = null;
+  if (raw instanceof Date) {
+    end = raw;
+  } else if (typeof raw === "string" && raw.trim()) {
+    const s = raw.trim();
+    const zoned = /([zZ]|[+-]\d{2}:?\d{2})$/.test(s);
+    const parsed = new Date(zoned ? s : `${s}Z`);
+    if (!Number.isNaN(parsed.getTime())) {
+      // Zone-less: Cairo wall time -> shift by the Cairo offset at that moment.
+      end = zoned ? parsed : new Date(parsed.getTime() - cairoOffsetHours(parsed) * 3600000);
+    }
+  } else if (raw && typeof raw === "object" && typeof (raw as {toDate?: unknown}).toDate === "function") {
+    const d = (raw as {toDate: () => Date}).toDate();
+    if (d instanceof Date) end = d;
+  }
+  if (!end || Number.isNaN(end.getTime())) return false;
+  return now.getTime() > end.getTime();
 }
 
 /** Paid coverage now: server requests first, the doc mirror as a fallback. */
@@ -87,8 +141,9 @@ export function isCovered(uid: string, copies: DelegateCopy[], cov: Coverage): b
   if (cov.covered.has(uid)) return true;
   if (cov.inGrace && cov.previousCovered.has(uid)) return true;
   for (const c of copies) {
-    if (mapCoversPeriod(c.data.subscription, cov.periodCode, cov.free)) return true;
-    if (mapCoversPeriod(c.data.nextSubscription, cov.periodCode, cov.free)) return true;
+    if (mapCoversPeriod(c.data.subscription, cov.periodCode, cov.free, cov.now)) return true;
+    if (mapCoversPeriod(c.data.nextSubscription, cov.periodCode, cov.free, cov.now)) return true;
+    // Grace: last period's map still counts, so its endDate is not applied.
     if (cov.inGrace && mapCoversPeriod(c.data.subscription, cov.previousPeriodCode, cov.free)) {
       return true;
     }
