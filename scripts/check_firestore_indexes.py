@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Compare firestore.indexes.json with live prod indexes (read-only).
 
+The repo file is a UNION of everything live on prod plus indexes that
+upcoming / dev queries need. Deploying it would only ADD missing
+indexes; it must not DELETE anything already on prod.
+
 Fetches composite indexes and custom field overrides from the Firestore
 Admin API using GET only. Never creates, updates, or deletes anything.
 
@@ -675,6 +679,12 @@ def main(argv: list[str] | None = None) -> int:
             f"({len(doc['indexes'])} composites, "
             f"{len(doc['fieldOverrides'])} field overrides). "
             "No prod writes were made."
+        )
+        print(
+            "Note: this export is a prod snapshot only. The repo file is a "
+            "UNION (prod + upcoming indexes). Do not commit this export over "
+            "firestore.indexes.json unless you intend to drop the extras.",
+            file=sys.stderr,
         )
         if os.path.abspath(export_path) == os.path.abspath(path):
             file_doc = doc

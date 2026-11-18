@@ -1,9 +1,10 @@
 name: Firestore indexes
 
 # Read-only check: compare firestore.indexes.json with live prod indexes.
-# Fails if `firebase deploy --only firestore:indexes` would DELETE any
-# prod composite index or field override. Entries the file would ADD are
-# listed in the log but do not fail the job.
+# The repo file is a UNION of live prod plus indexes needed by upcoming
+# / dev queries. Fails if `firebase deploy --only firestore:indexes`
+# would DELETE any prod composite index or field override. Entries the
+# file would ADD are listed in the log but do not fail the job.
 #
 # Runs on GitHub-hosted ubuntu-latest, not tashil-delegate-mac. This is a
 # short Python + HTTPS job, it needs a repo secret, and it must not take
