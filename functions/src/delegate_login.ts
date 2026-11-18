@@ -27,6 +27,7 @@ import {
   validateDeviceId,
   validateLoginInput,
 } from "./delegate_login_logic";
+import {hasDelegateIdentity, isDeletedDelegateStatus} from "./delegate_identity";
 
 const RATE_LIMIT_COLLECTION = "delegate_login_rate_limits";
 const DEVICE_BINDINGS = "deviceBindings";
@@ -123,6 +124,22 @@ async function handleDelegateLogin(data: unknown): Promise<{ token: string; dele
       { reason: "bad_credentials" },
     );
   }
+  if (decision.outcome === "profile_missing") {
+    await writeFailure(phoneKey);
+    throw new functions.https.HttpsError(
+      "not-found",
+      "This delegate profile no longer exists.",
+      { reason: "profile_missing" },
+    );
+  }
+  if (decision.outcome === "deleted") {
+    await writeFailure(phoneKey);
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "This delegate account was deleted.",
+      { reason: "account_deleted" },
+    );
+  }
   if (decision.outcome === "inactive") {
     await writeFailure(phoneKey);
     throw new functions.https.HttpsError(
@@ -144,6 +161,14 @@ async function handleDelegateLogin(data: unknown): Promise<{ token: string; dele
     deviceModel,
     phone: validated.phone,
   });
+  if (deviceDecision.action === "profile_missing") {
+    // The primary link doc was deleted (or is a ghost) between lookup and bind.
+    throw new functions.https.HttpsError(
+      "not-found",
+      "This delegate profile no longer exists.",
+      { reason: "profile_missing" },
+    );
+  }
   if (deviceDecision.action === "mismatch") {
     await clearFailures(phoneKey);
     throw new functions.https.HttpsError(
@@ -258,15 +283,28 @@ async function enforceDeviceBinding(input: {
   deviceId: string;
   deviceModel: string;
   phone: string;
-}): Promise<{ action: "bind" | "allow"; deviceId: string } | { action: "mismatch" }> {
+}): Promise<
+  { action: "bind" | "allow"; deviceId: string } | { action: "mismatch" } | { action: "profile_missing" }
+> {
   const db = admin.firestore();
   const bindingRef = db.collection(DEVICE_BINDINGS).doc(input.uid);
   const requests = await loadOpenUnbindRequests(input.profiles.map((profile) => profile.id));
   const approved = requests.find((request) => request.status === "approved") || null;
   const pending = requests.find((request) => request.status === "pending") || null;
 
+  const primaryRef = input.primary.path ? db.doc(input.primary.path) : null;
   const outcome = await db.runTransaction(async (tx) => {
     const snap = await tx.get(bindingRef);
+    // Re-read the primary link doc inside the transaction: a deleted or ghost
+    // profile must not get a binding or a token.
+    if (primaryRef) {
+      const primarySnap = await tx.get(primaryRef);
+      const primaryData = primarySnap.exists ? primarySnap.data() : null;
+      if (!primaryData || !hasDelegateIdentity(primaryData) ||
+          isDeletedDelegateStatus(primaryData.status)) {
+        return { action: "profile_missing" as const };
+      }
+    }
     const serverId = snap.exists ? readString(snap.data() || {}, ["deviceId"]) : "";
     const legacyId = input.primary.boundDeviceId || "";
     const decision = decideDeviceBinding({
@@ -300,6 +338,7 @@ async function enforceDeviceBinding(input: {
     return decision;
   });
 
+  if (outcome.action === "profile_missing") return { action: "profile_missing" };
   if (outcome.action === "mismatch") {
     await upsertPendingUnbindRequest({
       existingId: outcome.pendingRequestId,
@@ -393,9 +432,16 @@ async function mirrorBoundDevice(
     if (firstBind) update.deviceBoundAt = now;
     if (deviceModel) update.boundDeviceModel = deviceModel;
     try {
-      await admin.firestore().doc(profile.path).set(update, { merge: true });
-    } catch {
-      console.error("delegateLoginV2 device mirror failed", profile.id);
+      // update(), not set(merge): a link doc deleted meanwhile must stay
+      // deleted. set(merge) would re-create it as a nameless ghost.
+      await admin.firestore().doc(profile.path).update(update);
+    } catch (error) {
+      const code = (error as { code?: unknown })?.code;
+      if (code === 5 || code === "not-found") {
+        console.warn("delegateLoginV2 device mirror skipped: link doc missing", profile.id);
+      } else {
+        console.error("delegateLoginV2 device mirror failed", profile.id);
+      }
     }
   }));
 }
@@ -433,6 +479,7 @@ async function findCandidates(
       boundDeviceId: readString(data, ["boundDeviceId"]),
       boundDeviceModel: readString(data, ["boundDeviceModel"]),
       fullName: readString(data, ["fullName", "name"]),
+      hasIdentity: hasDelegateIdentity(data),
       createdAtMillis: createdAtMillis(data.createdAt ?? data.hiredAt ?? data.startDate),
       nationalIdMatches,
       phoneMatchesLogin: storedPhone === phone,
