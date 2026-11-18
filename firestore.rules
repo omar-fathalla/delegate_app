@@ -730,6 +730,21 @@ service cloud.firestore {
       return !request.resource.data.keys().hasAny(deviceBindingKeys());
     }
 
+    // Ghost guard (18 Nov 2026): a delegate link doc may only be created with
+    // an identity (name, national ID or phone). Old app builds re-created
+    // deleted delegates as device-only docs with set(merge: true); those are
+    // creates and must be denied. A delegate never creates its own link doc;
+    // its own writes are updates of a doc that already exists.
+    function delegateCreateHasIdentity() {
+      let d = request.resource.data;
+      return (d.get('fullName', '') is string && d.get('fullName', '') != '')
+        || (d.get('firstName', '') is string && d.get('firstName', '') != '')
+        || (d.get('name', '') is string && d.get('name', '') != '')
+        || (d.get('nationalityID', '') is string && d.get('nationalityID', '') != '')
+        || (d.get('nationalId', '') is string && d.get('nationalId', '') != '')
+        || (d.get('phoneNumber', '') is string && d.get('phoneNumber', '') != '');
+    }
+
     // Flat on purpose. Collection-group queries evaluate every delegates
     // match, and the nested helper form exceeds the 1000-expression limit.
     function staffRole() {
@@ -1360,7 +1375,8 @@ service cloud.firestore {
 
         match /delegates/{delegateId} {
           allow read: if signedIn() && canReadNestedDelegate(orgId, compId, delegateId);
-          allow create: if deviceBindingAbsent() && sourceStampKeysLocked()
+          allow create: if !delegateOwns(delegateId) && delegateCreateHasIdentity()
+            && deviceBindingAbsent() && sourceStampKeysLocked()
             && exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId))
             && nestedDelegateCreateOk(orgId, compId, delegateId);
           // sourceStampKeysLocked is not on this allow: the 4-flip tech
@@ -1766,7 +1782,8 @@ service cloud.firestore {
       // (no short-circuit) and the 4-flip tech approval is already at the
       // 1000-expression budget. Nested updates are locked via
       // staffDocsApproveOk / delegateFieldsSafe instead.
-      allow create: if !onNestedDelegate() && signedIn() && deviceBindingAbsent() && (
+      allow create: if !onNestedDelegate() && signedIn() && !delegateOwns(delegateId)
+        && delegateCreateHasIdentity() && deviceBindingAbsent() && (
         isGlobalStaff() ||
         (isOrgScopedStaff() && incomingOrgScoped()) ||
         (isCompanyScopedStaff() && incomingCompanyScoped())

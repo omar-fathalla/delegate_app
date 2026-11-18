@@ -8,6 +8,7 @@ import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/error/firestore_error_handler.dart';
 import 'package:delegate_app/features/admin/data/models/admin_user_model.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
+import 'package:delegate_app/features/profile/data/models/delegate_identity.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
@@ -351,6 +352,10 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
               .limit(1000)
               .get();
           for (final doc in snap.docs) {
+            if (!delegateDocHasIdentity(doc.data())) {
+              logSkippedGhostDelegate(doc.reference.path);
+              continue;
+            }
             final data = Map<String, dynamic>.from(doc.data());
             if ((data['organizationUID'] as String?)?.isEmpty ?? true) {
               data['organizationUID'] = organizationUID;
@@ -376,7 +381,11 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
                   .collection('delegates')
                   .limit(1000)
                   .get();
-              return snap.docs.map((doc) {
+              return snap.docs.where((doc) {
+                if (delegateDocHasIdentity(doc.data())) return true;
+                logSkippedGhostDelegate(doc.reference.path);
+                return false;
+              }).map((doc) {
                 final data = Map<String, dynamic>.from(doc.data());
                 if ((data['organizationUID'] as String?)?.isEmpty ?? true) {
                   data['organizationUID'] = orgDoc.id;
@@ -453,6 +462,10 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
         final Map<String, DelegateModel> unique = {};
         for (final res in results) {
           for (final doc in res.docs) {
+            if (!delegateDocHasIdentity(doc.data())) {
+              logSkippedGhostDelegate(doc.reference.path);
+              continue;
+            }
             final model = DelegateModel.fromJson(doc.data(), doc.id);
             unique[model.uid] = model;
           }
@@ -478,6 +491,10 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
           final results = await Future.wait(futures);
           for (final res in results) {
             for (final doc in res.docs) {
+              if (!delegateDocHasIdentity(doc.data())) {
+                logSkippedGhostDelegate(doc.reference.path);
+                continue;
+              }
               final model = DelegateModel.fromJson(doc.data(), doc.id);
               unique[model.uid] = model;
             }

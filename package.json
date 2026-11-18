@@ -26,7 +26,9 @@
     "test:rules:status-guards": "bash scripts/emulators_exec.sh --only firestore --project demo-status-guards \"node --test test/rules/delegate-status-guards.test.js\"",
     "test:rules:security": "bash scripts/emulators_exec.sh --only firestore --project demo-suspend-login-penalties \"node --test test/rules/suspend-login-penalties.test.js\"",
     "test:rules:hr-web": "bash scripts/emulators_exec.sh --only firestore --project demo-hr-web-reads \"node --test test/rules/hr-web-company-reads.test.js\"",
-    "test:rules:storage": "bash scripts/emulators_exec.sh --only storage,firestore --project demo-tashil-storage \"node --test test/rules/storage.rules.test.js\""
+    "test:rules:storage": "bash scripts/emulators_exec.sh --only storage,firestore --project demo-tashil-storage \"node --test test/rules/storage.rules.test.js\"",
+    "test:rules:ghost": "bash scripts/emulators_exec.sh --only firestore --project demo-ghost-rules \"node --test test/rules/ghost-delegate-create.test.js\"",
+    "test:e2e:ghost": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only auth,firestore --project demo-tashil-ghost \"node --test --test-concurrency=1 test/e2e/ghost-delegate.e2e.test.js\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",

@@ -9,6 +9,17 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // A delegate link doc create must carry a name, national ID or phone.
+    function delegateCreateHasIdentity() {
+      let d = request.resource.data;
+      return (d.get('fullName', '') is string && d.get('fullName', '') != '')
+        || (d.get('firstName', '') is string && d.get('firstName', '') != '')
+        || (d.get('name', '') is string && d.get('name', '') != '')
+        || (d.get('nationalityID', '') is string && d.get('nationalityID', '') != '')
+        || (d.get('nationalId', '') is string && d.get('nationalId', '') != '')
+        || (d.get('phoneNumber', '') is string && d.get('phoneNumber', '') != '');
+    }
+
     // Helper function to get user document
     // NOTE: Firestore rules cache get() calls within the same rule evaluation,
     // so multiple calls to getUserDoc() in the same rule are efficient.
@@ -107,7 +118,10 @@ service cloud.firestore {
     // Authenticated admin users get full read access via canAccessCompany() in nested rules.
     // Marketing users can read delegates for search purposes (read-only).
     match /{path=**}/delegates/{delegateId} {
-      allow read, write: if isAuthenticated();
+      allow read, update, delete: if isAuthenticated();
+      // Ghost guard (18 Nov 2026): no create without identity. Rules are OR'd
+      // across matches, so the nested match below has the same guard.
+      allow create: if isAuthenticated() && delegateCreateHasIdentity();
     }
 
     // Companies collectionGroup (Marketing Search + Delegate Supervisor Lookup)
@@ -291,8 +305,13 @@ service cloud.firestore {
         }
 
         // Delegates subcollection
+        // Ghost guard (18 Nov 2026): the app may update an existing delegate
+        // doc, but a create must carry an identity. Old builds (1.11) wrote
+        // only the bound device with set(merge: true), which re-created
+        // deleted delegates as nameless docs (77 on prod).
         match /delegates/{delegateId} {
-          allow read, write: if isAuthenticated();
+          allow read, update, delete: if isAuthenticated();
+          allow create: if isAuthenticated() && delegateCreateHasIdentity();
         }
 
         // Requests subcollection
@@ -645,6 +664,23 @@ service cloud.firestore {
     }
     match /{path=**}/company_payroll_configs/{companyId} {
       allow read, write: if isAuthenticated();
+    }
+
+    // ==================== COMPANY CHAIN REQUESTS («طلب ضم سلسلة») ====================
+    // Additive only (17 Nov 2026). Company-level request, no delegate on it.
+    match /company_chain_requests/{requestId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && request.resource.data.requestType == 'company_join_chain'
+        && request.resource.data.status == 'pending'
+        && request.resource.data.supervisorUid == request.auth.uid
+        && request.resource.data.companyUID is string
+        && request.resource.data.organizationUID is string;
+      allow update: if isAuthenticated()
+        && resource.data.status == 'pending'
+        && request.resource.data.status in ['approved', 'rejected']
+        && request.resource.data.reviewedByUid == request.auth.uid;
+      allow delete: if false;
     }
 
     // ==================== DEFAULT DENY ====================
