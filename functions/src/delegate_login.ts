@@ -19,6 +19,7 @@ import {
   stableDelegateAuthUid,
   validateLoginInput,
 } from "./delegate_login_logic";
+import {hasDelegateIdentity} from "./delegate_identity";
 
 const RATE_LIMIT_COLLECTION = "delegate_login_rate_limits";
 
@@ -94,6 +95,22 @@ async function handleDelegateLogin(data: unknown): Promise<{ token: string; dele
       "unauthenticated",
       "Phone or national ID is incorrect.",
       { reason: "bad_credentials" },
+    );
+  }
+  if (decision.outcome === "profile_missing") {
+    await writeFailure(phoneKey);
+    throw new functions.https.HttpsError(
+      "not-found",
+      "This delegate profile no longer exists.",
+      { reason: "profile_missing" },
+    );
+  }
+  if (decision.outcome === "deleted") {
+    await writeFailure(phoneKey);
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "This delegate account was deleted.",
+      { reason: "account_deleted" },
     );
   }
   if (decision.outcome === "inactive") {
@@ -214,6 +231,7 @@ async function findCandidates(
       orgId,
       createdAtMillis: createdAtMillis(data.createdAt ?? data.hiredAt ?? data.startDate),
       nationalIdMatches: nationalIdsMatch(extractNationalId(data), nationalId),
+      hasIdentity: hasDelegateIdentity(data),
     });
   }
 

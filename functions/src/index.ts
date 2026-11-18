@@ -498,4 +498,5 @@ export const onNotificationCreated = functions.firestore
   });
 
 export {delegateLoginV2} from "./delegate_login";
+export {onDelegateLinkDeleted} from "./delegate_link_deleted";
 
