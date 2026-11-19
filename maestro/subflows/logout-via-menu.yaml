@@ -1,9 +1,16 @@
 appId: com.tashil.delegate.dev
 ---
-# Opens header menu → logout → confirms M3 modal. Lands on login screen.
-
-- tapOn:
-    id: "tashil_main_menu_button"
+# Logout → confirms M3 modal. Lands on login screen.
+# From a screen with the header menu (home): open the menu first.
+# From Settings: "تسجيل الخروج" is on the page itself and there is no menu
+# button (mac-gate a1d40efb failed tapping a menu that was not there).
+- runFlow:
+    when:
+      visible:
+        id: "tashil_main_menu_button"
+    commands:
+      - tapOn:
+          id: "tashil_main_menu_button"
 
 - tapOn: "تسجيل الخروج"
 
