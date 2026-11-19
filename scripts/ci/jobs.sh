@@ -14,6 +14,10 @@
 CI_JOBS_ALL="analyze test emulator-ports p0-scripts build-web ios-guards android-guards functions rules android-dev-build"
 CI_JOBS_GITHUB="analyze test emulator-ports p0-scripts build-web ios-guards android-guards functions rules"
 
+# Device jobs: never part of a default run; asked for by name (local_ci.sh
+# --jobs mac-gate, scripts/ci/mac_agent.sh after each merge to dev, nightly).
+CI_JOBS_DEVICE="mac-gate"
+
 # Jobs that start Firebase emulators and therefore need a port slot.
 CI_JOBS_EMULATOR="emulator-ports p0-scripts functions rules"
 
@@ -29,12 +33,13 @@ ci_job_timeout() {
     functions) echo 15 ;;
     rules) echo 25 ;;
     android-dev-build) echo 30 ;;
+    mac-gate) echo 90 ;;
     *) echo 0 ;;
   esac
 }
 
 ci_job_exists() {
-  case " $CI_JOBS_ALL " in *" $1 "*) return 0 ;; esac
+  case " $CI_JOBS_ALL $CI_JOBS_DEVICE " in *" $1 "*) return 0 ;; esac
   return 1
 }
 
@@ -135,6 +140,62 @@ job_android-dev-build() {
   flutter pub get --enforce-lockfile
   flutter build apk --debug --flavor dev --dart-define=ENV=dev \
     --dart-define=GIT_SHA="${CI_SHA:-$(git rev-parse HEAD)}"
+}
+
+# Mac six-tool gate on one leased simulator (docs/testing/tool-roles.md,
+# stages 4-6 + preflight). Steps can be narrowed for debugging:
+#   CI_MAC_GATE_STEPS="ios-install preflight" bash scripts/ci/run_job.sh mac-gate
+# Secrets: $CI_SECRETS_FILE (default ~/.tashil-ci.env, mode 600) with
+#   PATROL_DEV_SECRET=...  TASHIL_MAESTRO_DEV_SECRET=...
+# Artifacts (screenshot, Maestro logs): $CI_ARTIFACTS (default build/ci-results/mac-gate).
+job_mac-gate() {
+  local steps="${CI_MAC_GATE_STEPS:-ios-install preflight apk maestro patrol}"
+  local art="${CI_ARTIFACTS:-$PWD/build/ci-results/mac-gate}"
+  local secrets="${CI_SECRETS_FILE:-$HOME/.tashil-ci.env}"
+  local sha
+  sha="${CI_SHA:-$(git rev-parse HEAD)}"
+  mkdir -p "$art"
+  if [[ -f "$secrets" ]]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$secrets"
+    set +a
+  fi
+  case " $steps " in *" maestro "*)
+    [[ -n "${TASHIL_MAESTRO_DEV_SECRET:-}" ]] || { echo "mac-gate: TASHIL_MAESTRO_DEV_SECRET missing (put it in $secrets)" >&2; return 1; } ;;
+  esac
+  case " $steps " in *" patrol "*)
+    [[ -n "${PATROL_DEV_SECRET:-}" ]] || { echo "mac-gate: PATROL_DEV_SECRET missing (put it in $secrets)" >&2; return 1; } ;;
+  esac
+  (
+    # shellcheck source=devices.sh
+    source "$CI_DIR/devices.sh"
+    ci_ios_sim_acquire "mac-gate@${sha:0:8}"
+    trap ci_ios_sim_release EXIT
+    local step
+    for step in $steps; do
+      echo "::group::mac-gate $step"
+      case "$step" in
+        ios-install)
+          flutter pub get --enforce-lockfile
+          flutter build ios --simulator --debug --flavor dev --dart-define=ENV=dev \
+            --dart-define=GIT_SHA="$sha"
+          xcrun simctl install "$CI_SIM_UDID" build/ios/iphonesimulator/Runner.app ;;
+        preflight)
+          TASHIL_PREFLIGHT_KEEP_BOOT=1 TASHIL_PROJECT_STORE="$art" TASHIL_PROJECT_STORE_MEDIA="$art" \
+            bash scripts/mac_gate_preflight.sh ;;
+        apk)
+          flutter build apk --flavor dev --dart-define=ENV=dev --dart-define=GIT_SHA="$sha" ;;
+        maestro)
+          TASHIL_CAPTURE_LOGIN_ROLES=0 TASHIL_MAESTRO_LOG_DIR="$art/maestro" \
+            bash maestro/run-dev-user-journeys.sh ;;
+        patrol)
+          bash scripts/patrol_run_dev_integration.sh -- -d "$CI_SIM_UDID" ;;
+        *) echo "mac-gate: unknown step $step" >&2; exit 2 ;;
+      esac
+      echo "::endgroup::"
+    done
+  )
 }
 
 # --- change-based selection --------------------------------------------------

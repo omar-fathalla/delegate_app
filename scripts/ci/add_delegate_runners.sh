@@ -27,9 +27,11 @@ for n in "$@"; do
   else
     echo "== $name: copying runner binaries to $dir"
     sudo -u "$RUNNER_USER" mkdir -p "$dir"
+    # .runner_migrated alone makes config.sh say "already configured".
     sudo -u "$RUNNER_USER" rsync -a --exclude '_work' --exclude '_diag' \
-      --exclude '.runner' --exclude '.credentials*' --exclude '.service' \
+      --exclude '.runner*' --exclude '.credentials*' --exclude '.service' \
       --exclude '.env' --exclude '.path' "$BASE/" "$dir/"
+    sudo -u "$RUNNER_USER" rm -f "$dir/.runner_migrated"
     token="$(gh api -X POST "repos/${REPO}/actions/runners/registration-token" -q .token)"
     echo "== $name: registering with GitHub"
     sudo -u "$RUNNER_USER" env RUNNER_TOKEN="$token" bash -c '

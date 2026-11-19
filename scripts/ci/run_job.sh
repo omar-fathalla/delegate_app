@@ -22,7 +22,7 @@ source "$CI_DIR/jobs.sh"
 source "$CI_DIR/lease.sh"
 
 if [[ "${1:-}" == "--list" ]]; then
-  for j in $CI_JOBS_ALL; do echo "$j"; done
+  for j in $CI_JOBS_ALL $CI_JOBS_DEVICE; do echo "$j"; done
   exit 0
 fi
 
@@ -31,7 +31,7 @@ if [[ -z "$JOB" ]] || ! ci_job_exists "$JOB"; then
   echo "usage: run_job.sh <job>   (jobs: $CI_JOBS_ALL)" >&2
   exit 2
 fi
-export CI_JOB="$JOB"
+export CI_JOB="$JOB" CI_DIR
 
 ci_slot_env() {
   local k="$1" off=$(( $1 * 10000 ))
