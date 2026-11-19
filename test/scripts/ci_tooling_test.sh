@@ -32,6 +32,16 @@ got="$(printf 'lib/main.dart\n' | ci_jobs_for_paths)"
 [[ "$got" == "analyze test build-web ios-guards android-guards" ]] || fail "lib change -> '$got'"
 got="$(printf '.github/workflows/ci.yml\n' | ci_jobs_for_paths)"
 [[ "$got" == "$CI_JOBS_GITHUB" ]] || fail "workflow change -> '$got'"
+got="$(printf 'test/rules/x.test.js\n' | ci_jobs_for_paths)"
+[[ "$got" == "ios-guards android-guards rules" ]] || fail "rules test change ran Flutter jobs -> '$got'"
+got="$(printf 'docs/x.md\n' | ci_jobs_for_paths)"
+[[ "$got" == "ios-guards android-guards" ]] || fail "docs change -> '$got'"
+# ci.yml gates every job on the changes job, and ci_changes.sh --all is every job.
+for j in analyze test build-web ios-guards android-guards functions rules p0-scripts; do
+  grep -q "contains(needs.changes.outputs.jobs, ' $j ')" .github/workflows/ci.yml \
+    || fail "ci.yml job for '$j' is not gated on the changes job"
+done
+[[ "$(bash scripts/ci/ci_changes.sh --all)" == " $CI_JOBS_GITHUB " ]] || fail "ci_changes --all is not every GitHub job"
 
 # 4. Leases: distinct slots, full pool fails fast, dead owner is reaped.
 tmp="$(mktemp -d)"

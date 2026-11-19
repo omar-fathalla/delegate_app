@@ -100,14 +100,30 @@ flutter build apk --flavor prod
 | 2. الـ commit | ممنوع commit على `dev` أو `main` | hook `pre-commit` |
 | 3. الشغل | كل تغيير في السلوك لازم يبقى معاه test في نفس الـ branch (Dart → `test/`، rules → `test/rules/`، functions → `functions/test/`، رحلة مستخدم → Maestro أو Patrol). dev و `tashil-dev` بس، وبالحسابات الوهمية | المراجعة في `pr-gate` |
 | 4. الفحص | `bash scripts/local_ci.sh --changed --no-apk HEAD` بيشغّل بس الـ jobs اللي الملفات المتغيرة محتاجاها | يدوي في أي وقت |
-| 5. الـ push | بإذن صريح بس. الـ push بيشغّل نفس الفحص، ولو فشل الـ push بيتمنع. والـ push على `dev` أو `main` ممنوع | hook `pre-push` |
-| 6. الـ PR | PR على `dev`، يبدأ draft ويتعمله ready لما الشغل يخلص | — |
+| 5. الـ push | بإذن صريح بس. الـ push بيعمل فحص سريع: `flutter analyze` و test الملفات اللي اتغيرت بس (من دقيقة لـ 3)، ولو فشل الـ push بيتمنع. والـ push على `dev` أو `main` ممنوع | hook `pre-push` |
+| 6. الـ PR و CI | PR على `dev`، يبدأ draft (من غير CI) ويتعمله ready لما الشغل يخلص. الـ CI بيشغّل بس الـ jobs اللي الملفات المتغيرة محتاجاها (job `Changes`)، ولو اتعمل push جديد الـ run القديم بيتلغي | `ci.yml` + `scripts/ci/ci_changes.sh` |
 | 7. البوابة | analyze، tests، guards، backend، CI، والـ Mac gate (APK و Maestro و Patrol)، وفي الآخر تقرير | skill `pr-gate` |
 | 8. الـ merge | بموافقة صريحة بس، ومن خلال `bash scripts/ci/merge_guard.sh <pr> --merge`، اللي بيتأكد إن كل الـ jobs المطلوبة خضرا | `merge_guard.sh` |
 | 9. بعد الـ merge | الـ mac-agent بيشغّل الـ mac-gate لوحده على dev الجديد، وبيعمل run كامل كل ليلة | `scripts/ci/mac_agent.sh` |
 
 **تشغيل الـ hooks** (مرة واحدة لكل clone، وبتشتغل على كل الـ worktrees): `bash scripts/ci/install_git_hooks.sh`.
 
-**تخطّي الفحص وقت الـ push** (لما تكون متأكد، زي تعديل في الوثائق بس): `TASHIL_SKIP_PREPUSH=1 git push ...`. منع الـ push على `dev` و `main` مش بيتخطّى بالطريقة دي.
+**الفحص الكامل قبل الـ push** (لو عاوز تجرّب كل حاجة على جهازك الأول): `TASHIL_PREPUSH=full git push ...`. **التخطّي** (لو متأكد): `TASHIL_SKIP_PREPUSH=1 git push ...`. منع الـ push على `dev` و `main` مش بيتخطّى بالطريقتين دول.
 
 **حسابات الاختبار**: فيه 34 حساب وهمي على `tashil-dev` بتغطي الـ 10 أدوار (`functions/scripts/README-hr-web-fake-accounts.md`). الباسوردات موجودة بس في `functions/scripts/.hr-web-fake-accounts.local.json` على الماك، وما بتتطبعش ولا بتتعملها commit.
+
+### كل مرحلة ليها اختبار على قدها (عشان الماك ما يتضغطش)
+
+| إمتى | إيه اللي يتشغل |
+|---|---|
+| كل commit | منع الـ commit على dev و main بس |
+| كل push | `flutter analyze` و test الملفات اللي اتغيرت بس |
+| CI على الـ PR | الـ jobs المرتبطة بالملفات المتغيرة بس، والـ run القديم بيتلغي لو اتعمل push جديد. لو التعديل في docs بس، بيتشغل الـ static guards بس |
+| الـ PR ready للـ merge | `pr-gate` كامل، ومعاه الـ mac-gate (Maestro و Patrol) |
+| بعد الـ merge على dev | CI كامل والـ mac-gate (الـ mac-agent) |
+| كل ليلة | run كامل لكل حاجة |
+
+**حدود الحِمل على الماك:**
+- ما يشتغلش أكتر من 2 jobs فيهم emulator في نفس الوقت (`CI_SLOTS=2`).
+- الـ mac-gate بيستنى لحد ما مفيش emulator job شغال.
+- الـ job اللي `merge_guard` بيقبله يا إما نجح، يا إما اتخطّى عشان مش مطلوب للتعديل ده، والتاني ده بيتقبل بس لو الـ job `Changes` نجح.

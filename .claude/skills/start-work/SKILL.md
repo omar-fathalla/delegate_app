@@ -58,7 +58,7 @@ bash scripts/ci/install_git_hooks.sh
 
 ## 5. Push and PR
 
-- Push only when the user says so. The `pre-push` hook runs the same changed-files local CI and blocks a red push; it also refuses pushes to `dev` / `main`.
+- Push only when the user says so. The `pre-push` hook runs a fast check (`flutter analyze` + changed test files) and refuses pushes to `dev` / `main`; `TASHIL_PREPUSH=full` runs the full local CI instead.
 - Open the PR to `dev` as a draft; mark it ready when the work is done.
 
 ## 6. Finish

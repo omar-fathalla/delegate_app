@@ -7,7 +7,10 @@
 #
 # A job counts as green when, on the PR head SHA, EITHER the GitHub check run
 # (ci.yml job name) succeeded OR the local commit status local-ci/<job> is
-# success (scripts/local_ci.sh --post-status). Any other state blocks.
+# success (scripts/local_ci.sh --post-status). A check run that was skipped
+# also counts, but only when the "Changes" job succeeded on that SHA: then the
+# skip means "this PR does not touch that job's files" (scripts/ci/ci_changes.sh).
+# Any other state blocks.
 set -euo pipefail
 GH_REPO="omar-fathalla/delegate_app"
 PR="${1:?usage: merge_guard.sh <pr> [--merge]}"
@@ -35,6 +38,9 @@ checks="$(gh api "repos/${GH_REPO}/commits/${sha}/check-runs?per_page=100" \
   -q '.check_runs[] | "\(.name)|\(.status)|\(.conclusion)"')"
 statuses="$(gh api "repos/${GH_REPO}/commits/${sha}/status" -q '.statuses[] | "\(.context)|\(.state)"')"
 
+changes_ok=0
+grep -qF "Changes|completed|success" <<<"$checks" && changes_ok=1
+
 blocked=0
 while IFS='|' read -r job name; do
   [[ -n "$job" ]] || continue
@@ -44,6 +50,8 @@ while IFS='|' read -r job name; do
     printf '  %-16s PASS (GitHub)\n' "$job"
   elif [[ "$local_line" == *"|success" ]]; then
     printf '  %-16s PASS (local-ci)\n' "$job"
+  elif (( changes_ok )) && [[ "$gh_line" == *"|completed|skipped" ]]; then
+    printf '  %-16s PASS (not needed for this change)\n' "$job"
   else
     printf '  %-16s BLOCK  github=%s local=%s\n' "$job" "${gh_line#*|}" "${local_line#*|}"
     blocked=1

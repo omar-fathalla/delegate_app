@@ -17,12 +17,12 @@ on:
 permissions:
   contents: read
 
-# Shared with PR User Test builds so both workflows take the single
-# tashil-delegate-mac runner one at a time instead of interleaving jobs.
-# cancel-in-progress is false so CI and User Test do not cancel each other.
+# One CI run per PR: a new push cancels the older run of the same PR, so the
+# Mac never tests a commit that is already outdated. Pushes to dev are never
+# cancelled (each merge gets its full run).
 concurrency:
-  group: tashil-delegate-mac-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   PATH: /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
@@ -30,9 +30,34 @@ env:
   LC_ALL: en_US.UTF-8
 
 jobs:
+  # Picks the jobs this change needs (scripts/ci/ci_changes.sh, same mapping as
+  # local_ci --changed). Docs-only PRs run just the static guards; push to dev
+  # and manual runs always run everything.
+  changes:
+    name: Changes
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: [self-hosted, macOS, ARM64, delegate-app]
+    timeout-minutes: 5
+    outputs:
+      jobs: ${{ steps.pick.outputs.jobs }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: pick
+        run: |
+          if [[ "${{ github.event_name }}" == pull_request ]]; then
+            jobs="$(bash scripts/ci/ci_changes.sh "origin/${{ github.base_ref }}")"
+          else
+            jobs="$(bash scripts/ci/ci_changes.sh --all)"
+          fi
+          echo "jobs=$jobs" >> "$GITHUB_OUTPUT"
+          echo "CI jobs:$jobs"
+
   analyze:
     name: Analyze
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    needs: changes
+    if: contains(needs.changes.outputs.jobs, ' analyze ')
     runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 20
     steps:
@@ -62,7 +87,8 @@ jobs:
 
   test:
     name: Test
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    needs: changes
+    if: contains(needs.changes.outputs.jobs, ' test ')
     runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 30
     steps:
@@ -91,7 +117,8 @@ jobs:
 
   p0-scripts:
     name: P0 scripts (emulators)
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    needs: changes
+    if: contains(needs.changes.outputs.jobs, ' p0-scripts ') || contains(needs.changes.outputs.jobs, ' emulator-ports ')
     runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 15
     steps:
@@ -125,7 +152,8 @@ jobs:
 
   build-web:
     name: Build web (release)
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    needs: changes
+    if: contains(needs.changes.outputs.jobs, ' build-web ')
     runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 180
     # One heavy delegate_app build at a time on the Mac (replaces ~/mac-resources lock).
@@ -156,7 +184,8 @@ jobs:
 
   ios-dev-config-check:
     name: iOS dev config (static)
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    needs: changes
+    if: contains(needs.changes.outputs.jobs, ' ios-guards ')
     runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 5
     steps:
@@ -179,7 +208,8 @@ jobs:
 
   android-dev-config-check:
     name: Android dev config (static)
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    needs: changes
+    if: contains(needs.changes.outputs.jobs, ' android-guards ')
     runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 5
     steps:
@@ -195,7 +225,8 @@ jobs:
 
   functions:
     name: Functions lint & test
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    needs: changes
+    if: contains(needs.changes.outputs.jobs, ' functions ')
     runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 15
     steps:
@@ -227,7 +258,8 @@ jobs:
 
   rules:
     name: Firestore rules & delegate login e2e (emulators)
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    needs: changes
+    if: contains(needs.changes.outputs.jobs, ' rules ')
     runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 30
     steps:

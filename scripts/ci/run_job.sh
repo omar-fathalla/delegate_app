@@ -10,7 +10,8 @@
 # so a developer running `npm run test:rules` by hand never collides with CI.
 #
 # Env:
-#   CI_SLOTS        number of port slots on this Mac (default 3)
+#   CI_SLOTS        number of port slots on this Mac (default 2: each emulator
+#                   job runs a Java Firestore emulator; 3 at once overloaded the Mac)
 #   CI_SLOT_WAIT    seconds to wait for a free slot (default 1800)
 #   CI_SLOT         pre-acquired slot (set by local_ci.sh)
 set -euo pipefail
@@ -99,7 +100,7 @@ trap cleanup EXIT
 
 if ci_job_needs_emulator "$JOB"; then
   if [[ -z "${CI_SLOT:-}" ]]; then
-    OWN_LEASE="$(ci_lease_acquire slot "${CI_SLOTS:-3}" "${CI_SLOT_WAIT:-1800}" \
+    OWN_LEASE="$(ci_lease_acquire slot "${CI_SLOTS:-2}" "${CI_SLOT_WAIT:-1800}" \
       "$JOB@$(git rev-parse --short HEAD 2>/dev/null || echo '?')")"
     CI_SLOT="$OWN_LEASE"
   fi

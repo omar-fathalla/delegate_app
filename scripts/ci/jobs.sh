@@ -170,6 +170,23 @@ job_mac-gate() {
   (
     # shellcheck source=devices.sh
     source "$CI_DIR/devices.sh"
+    # The device gate (Xcode build + simulator + Maestro/Patrol) is the heaviest
+    # job; wait until no emulator job holds a port slot, up to CI_MAC_GATE_WAIT s.
+    local waited=0 limit="${CI_MAC_GATE_WAIT:-1800}" d
+    while :; do
+      local busy=0
+      for d in "$CI_LEASE_ROOT/slot"/*; do
+        [[ -d "$d" ]] || continue
+        _ci_lease_reap_if_stale "$d" || busy=1
+      done
+      (( busy )) || break
+      if (( waited >= limit )); then
+        echo "mac-gate: emulator jobs still running after ${limit}s, starting anyway" >&2
+        break
+      fi
+      (( waited == 0 )) && echo "mac-gate: waiting for emulator CI jobs to finish ..." >&2
+      sleep 30; waited=$(( waited + 30 ))
+    done
     ci_ios_sim_acquire "mac-gate@${sha:0:8}"
     trap ci_ios_sim_release EXIT
     local step
@@ -213,6 +230,9 @@ ci_jobs_for_paths() {
   while IFS= read -r p; do
     [[ -z "$p" ]] && continue
     case "$p" in
+      # Node-only tests under test/: no Flutter jobs for them.
+      test/rules/* | test/e2e/*) add rules ;;
+      test/scripts/*) add emulator-ports ;;
       .github/* | scripts/ci/* | scripts/local_ci.sh | package.json | package-lock.json)
         add $CI_JOBS_GITHUB ;;
       lib/* | test/* | pubspec.yaml | pubspec.lock | l10n.yaml | analysis_options.yaml | assets/*)
