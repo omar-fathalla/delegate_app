@@ -190,6 +190,8 @@ for j in $JOBS; do
 done
 echo "jobs: $JOBS" | tee -a "$OUT/full.log"
 export CI_SHA="$SHA"
+# Job artifacts (mac-gate screenshot, Maestro logs) outlive the temporary worktree.
+export CI_ARTIFACTS="$OUT/artifacts"
 
 REPO_SLUG="$(git remote get-url origin | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')"
 post_status() {
@@ -294,6 +296,7 @@ done <"$OUT/results.tsv"
   done <"$OUT/results.tsv"
   echo
   echo "Logs: \`${LOGS}\`"
+  [[ -d "$OUT/artifacts" ]] && echo "Artifacts: \`$OUT/artifacts\`"
 } >"$OUT/SUMMARY.md"
 
 echo
