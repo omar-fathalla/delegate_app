@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Tashil pre-push gate (docs/DEV_WORKFLOW_RULES_AR.md (هـ)).
+#  - refuses pushes to dev / main (merge through a PR + scripts/ci/merge_guard.sh)
+#  - runs the local CI jobs for the files this push changes vs origin/dev:
+#      bash scripts/local_ci.sh --changed --no-apk <sha>
+#    summary: /tmp/local-ci/<sha>/SUMMARY.md
+# Skip the test run (not the dev/main block): TASHIL_SKIP_PREPUSH=1 git push ...
+set -uo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+zero=0000000000000000000000000000000000000000
+status=0
+while read -r local_ref local_sha remote_ref _remote_sha; do
+  [[ "$local_sha" == "$zero" ]] && continue          # branch delete
+  case "$remote_ref" in
+    refs/heads/dev|refs/heads/main)
+      echo "pre-push: ممنوع push مباشر على ${remote_ref#refs/heads/}. افتح PR وادمج بـ scripts/ci/merge_guard.sh" >&2
+      exit 1 ;;
+    refs/heads/*) ;;
+    *) continue ;;                                     # tags etc.
+  esac
+  if [[ "${TASHIL_SKIP_PREPUSH:-0}" == 1 ]]; then
+    echo "pre-push: TASHIL_SKIP_PREPUSH=1, skipping local CI for ${local_ref#refs/heads/}" >&2
+    continue
+  fi
+  if [[ ! -f "$ROOT/scripts/local_ci.sh" ]]; then
+    echo "pre-push: scripts/local_ci.sh not on this branch, skipping local CI" >&2
+    continue
+  fi
+  echo "pre-push: local CI (changed files vs origin/dev) on ${local_sha:0:8} ..." >&2
+  if ! bash "$ROOT/scripts/local_ci.sh" --changed --no-apk "$local_sha" >&2; then
+    echo "pre-push: local CI FAILED. Summary: /tmp/local-ci/${local_sha}/SUMMARY.md" >&2
+    echo "          صلّح وجرّب تاني، أو TASHIL_SKIP_PREPUSH=1 لو متأكد." >&2
+    status=1
+  fi
+done
+exit $status

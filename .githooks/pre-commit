@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Tashil: no commits straight on dev / main (docs/DEV_WORKFLOW_RULES_AR.md (أ)).
+# Work on a branch: see .claude/skills/start-work/SKILL.md.
+branch="$(git symbolic-ref --short -q HEAD || true)"
+case "$branch" in
+  dev|main)
+    echo "pre-commit: ممنوع commit مباشرة على '$branch'. اعمل branch:" >&2
+    echo "  git switch -c feat/<name> origin/dev   (أو skill start-work)" >&2
+    exit 1 ;;
+esac
+exit 0

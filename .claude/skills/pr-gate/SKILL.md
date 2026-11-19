@@ -5,6 +5,8 @@ description: Run the Tashil delegate-app release gate for one PR, from scope che
 
 # PR gate — Tashil delegate app
 
+Last step of the lifecycle **start-work → work → pr-gate → merge_guard** (`docs/DEV_WORKFLOW_RULES_AR.md` (هـ)). The branch should have been started with the `start-work` skill.
+
 One pass per PR, in order. Each stage has a **done when** line. Stop at the first red stage, report it, and do not move on until it is green or the user explicitly waives it (record the waiver in the report).
 
 Sources of truth — read them instead of trusting this file if they disagree:
