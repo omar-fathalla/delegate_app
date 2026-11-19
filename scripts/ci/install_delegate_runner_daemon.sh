@@ -77,6 +77,9 @@ cat > "$DAEMON" <<PLIST
 		<key>LC_ALL</key><string>en_US.UTF-8</string>
 		<key>PATH</key><string>/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
 		<key>JAVA_HOME</key><string>/Applications/Android Studio.app/Contents/jbr/Contents/Home</string>
+		<!-- One tool cache (Flutter, Node, JDK) for every delegate runner. A fresh
+		     runner downloading Flutter on its own hit the 30 min job timeout. -->
+		<key>RUNNER_TOOL_CACHE</key><string>${RUNNER_HOME}/actions-runner/_work/_tool</string>
 	</dict>
 	<key>RunAtLoad</key><true/>
 	<key>KeepAlive</key><true/>
