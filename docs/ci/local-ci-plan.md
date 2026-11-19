@@ -1,6 +1,6 @@
 # Local CI on the Mac — plan
 
-Status: **proposal** (2026-11-19). Owner: delegate-app team.
+Status: **phases 0–4 implemented** (2026-11-19); remaining human steps are marked **Human**. Owner: delegate-app team.
 Goal: CI that runs entirely on our Mac (no GitHub-hosted minutes), stays the merge gate, and lets several runners and several AI agents work at the same time without stepping on each other.
 
 ---
@@ -136,19 +136,30 @@ Each phase ends with a check that proves it works. Do not start the next phase u
 - [ ] Register runners 2 and 3: `bash scripts/ci/add_delegate_runners.sh 2 3` — **human, needs admin password**.
 - **Check:** two PRs pushed at once both run `rules` simultaneously without port errors.
 
-### Phase 3 — Device pool + mac-gate workflow (~1 day)
-- [ ] Create `Tashil-CI-1/2` simulators and read-only emulator instances.
-- [ ] `mac-gate` job: preflight → APK dev → Maestro → Patrol, on merged `dev` SHA, posts commit status `mac-gate`.
-- [ ] Secrets (`PATROL_DEV_SECRET`, `TASHIL_MAESTRO_DEV_SECRET`, `DEV_MAPS_ANDROID_KEY`) in the runner user's keychain or `~/.tashil-ci.env` (600), never in the repo.
-- **Check:** a merge to `dev` produces a `mac-gate` status without anyone touching the Mac.
+### Phase 3 — Device pool + mac-gate (done 2026-11-19, pending secrets)
+- [x] iOS simulator pool `scripts/ci/devices.sh`: leases `Tashil-CI-<n>` (pool `ios-sim`, `CI_IOS_SIMS` default 2), created on first use with the newest iOS runtime, booted on lease, shut down on release. Verified: create → boot → lease → shutdown → release.
+- [x] `mac-gate` job in `scripts/ci/jobs.sh`: iOS dev build + install on the leased sim → `mac_gate_preflight.sh` → APK dev → Maestro journeys → Patrol (`-d <sim>`). Narrow with `CI_MAC_GATE_STEPS="ios-install preflight"`.
+- [x] `local_ci.sh` seeds the gitignored `ios/config/dev/GoogleService-Info.plist` (and `android/local.properties`) into its clean checkout.
+- [ ] **Human:** create `~/.tashil-ci.env` (mode 600) with `PATROL_DEV_SECRET=` and `TASHIL_MAESTRO_DEV_SECRET=` from the Project store (`internal/tashil-dev-test-accounts.txt`). Without it, `mac-gate` stops at the secrets check.
+- Android emulators: not pooled. Maestro and Patrol run on iOS today; the APK is only built. Add an `android-emu` pool when an Android device test exists.
+- Runs as the console user (fathalla), not the `delegate-ci` runner: that account owns the simulators, Android SDK, Maestro, Patrol and keys, and a LaunchDaemon has no GUI session for simulators.
+- **Check:** a merge to `dev` produces a `local-ci/mac-gate` commit status without anyone touching the Mac (needs Phase 4 agent + secrets).
 
-### Phase 4 — Gate + hygiene (~½ day)
-- [ ] Branch protection on `dev`: required checks `analyze`, `test`, `guards` (+ `rules` when applicable).
-- [ ] Nightly job: full `rules` + `functions` + `mac-gate` on `dev` HEAD.
-- [ ] Cleanup cron: prune `_work`, DerivedData, old `build/ci-results` (>14 days), shut down idle simulators/emulators.
-- [ ] Health check: runner offline > 15 min → notification.
-- [ ] Move `deploy-ios.yml` (and other hosted workflows) to the self-hosted runner, or run them manually only.
-- **Check:** one week with zero GitHub-hosted minutes used and no manual CI babysitting.
+### Phase 4 — Gate + hygiene (done 2026-11-19)
+- Branch protection is **not available**: private repo on GitHub Free returns 403 ("Upgrade to GitHub Pro"). Instead:
+  - [x] `scripts/ci/merge_guard.sh <pr> [--merge]`: refuses unless every CI job is green on the PR head, from GitHub checks **or** `local-ci/<job>` statuses. Agents and the `pr-gate` skill merge only through it.
+- [x] `scripts/ci/mac_agent.sh`, installed with `bash scripts/ci/install_mac_agent.sh` (LaunchAgent, every 10 min, no sudo):
+  - runner health: notification when a `delegate-app` runner is offline > 15 min, and when it is back;
+  - after each merge: new `origin/dev` SHA → `local_ci.sh --jobs mac-gate --post-status`;
+  - nightly (first pass after 00:30 Cairo): full `local_ci.sh --no-apk --post-status` on `dev`, then cleanup.
+  - Why local, not a GitHub `schedule`: scheduled workflows run from the default branch (`main`), and they would need the runner user to own simulators and secrets.
+- [x] `scripts/ci/cleanup.sh [--dry-run]`: only CI-owned leftovers (old `/tmp/local-ci`, slot tmp, stale leases, unleased `Tashil-CI-*` sims). Never DerivedData or personal devices.
+- Hosted workflows left as they are, on purpose:
+  - `android-release.yml`, `deploy-ios.yml`: team rule in `ci.yml` header ("Do not change release workflows").
+  - `firestore-indexes.yml`: documented to stay on `ubuntu-latest` (prod read-only secret, must not hold the Mac); path-filtered, ~1 min per run.
+  - `actions-cleanup.yml`: weekly, ~1 min.
+  - The real minute burn is **Tashil-Data-Sharing** (§1); moving its workflows to its own Mac runners is a separate task in that repo.
+- **Check:** one week with no manual CI babysitting and `delegate_app` hosted minutes ≈ release builds only.
 
 ---
 

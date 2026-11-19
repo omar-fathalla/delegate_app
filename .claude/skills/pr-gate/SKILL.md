@@ -99,7 +99,7 @@ Install deps the way CI does first (`npm install --no-audit --no-fund` at the ro
 
 ## Stage 6 — Merge (user action)
 
-Ask the user to merge (or to approve you merging). Record the **merged `dev` SHA** — stage 7 runs on that SHA, not the PR head.
+Ask the user to merge (or to approve you merging). Merge only through `bash scripts/ci/merge_guard.sh <pr> --merge` (dev has no branch protection on GitHub Free; this script is the gate). Record the **merged `dev` SHA** — stage 7 runs on that SHA, not the PR head.
 
 **Done when:** merged SHA is known and checked out locally (`git fetch origin dev && git checkout --detach <sha>`).
 
