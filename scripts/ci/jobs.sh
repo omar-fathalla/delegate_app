@@ -188,19 +188,19 @@ job_mac-gate() {
       sleep 30; waited=$(( waited + 30 ))
     done
     ci_ios_sim_acquire "mac-gate@${sha:0:8}"
-    # Fake delegates bind to the first device that logs in (delegateLoginV2);
-    # clear that before the device steps so this simulator can log in.
-    case " $steps " in *" maestro "* | *" patrol "*)
-      if [[ -f functions/scripts/hr-web-fake-accounts.js ]]; then
-        # Clean checkout: no functions/node_modules yet (firebase-admin).
-        [[ -d functions/node_modules/firebase-admin ]] \
-          || (cd functions && npm ci --no-audit --no-fund --silent) \
-          || echo "mac-gate: warning: npm ci in functions failed" >&2
-        (cd functions && GOOGLE_CLOUD_PROJECT=tashil-dev \
-          node scripts/hr-web-fake-accounts.js --project tashil-dev --reset-device-bindings --apply) \
-          || echo "mac-gate: warning: could not reset fake delegates' device bindings" >&2
-      fi ;;
-    esac
+    # Fake delegates bind to the first device that logs in (delegateLoginV2),
+    # and every launch with a cleared keychain is a new device. Clear the
+    # binding right before each device step so the simulator can log in.
+    _reset_fake_delegates() {
+      [[ -f functions/scripts/hr-web-fake-accounts.js ]] || return 0
+      # Clean checkout: no functions/node_modules yet (firebase-admin).
+      [[ -d functions/node_modules/firebase-admin ]] \
+        || (cd functions && npm ci --no-audit --no-fund --silent) \
+        || echo "mac-gate: warning: npm ci in functions failed" >&2
+      (cd functions && GOOGLE_CLOUD_PROJECT=tashil-dev \
+        node scripts/hr-web-fake-accounts.js --project tashil-dev --reset-device-bindings --apply) \
+        || echo "mac-gate: warning: could not reset fake delegates' device bindings" >&2
+    }
     trap ci_ios_sim_release EXIT
     local step
     for step in $steps; do
@@ -217,9 +217,11 @@ job_mac-gate() {
         apk)
           flutter build apk --flavor dev --dart-define=ENV=dev --dart-define=GIT_SHA="$sha" ;;
         maestro)
+          _reset_fake_delegates
           TASHIL_CAPTURE_LOGIN_ROLES=0 TASHIL_MAESTRO_LOG_DIR="$art/maestro" \
             bash maestro/run-dev-user-journeys.sh ;;
         patrol)
+          _reset_fake_delegates
           bash scripts/patrol_run_dev_integration.sh -- -d "$CI_SIM_UDID" ;;
         *) echo "mac-gate: unknown step $step" >&2; exit 2 ;;
       esac
