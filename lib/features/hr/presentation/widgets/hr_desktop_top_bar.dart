@@ -134,7 +134,11 @@ class HRDesktopTopBar extends StatelessWidget {
         // beside a 260px sidebar). Tighter desktop bars keep the avatar and
         // move the name to the tooltip.
         final showName = constraints.maxWidth >= 640;
-        return _bar(context, colorScheme, l10n, arabicDate, showName);
+        // The date pill is the lowest-priority item. An 800px window leaves
+        // about 540px for the bar, and the pill would squeeze the title and
+        // its «مباشر» badge to ~23px, so it is hidden below 720px.
+        final showDate = constraints.maxWidth >= 720;
+        return _bar(context, colorScheme, l10n, arabicDate, showName, showDate);
       },
     );
   }
@@ -145,6 +149,7 @@ class HRDesktopTopBar extends StatelessWidget {
     AppLocalizations l10n,
     String arabicDate,
     bool showName,
+    bool showDate,
   ) {
     final account = webAccount?.call(showName);
     // «الرئيسية» was both the title and the fallback subtitle on the home tab.
@@ -254,43 +259,46 @@ class HRDesktopTopBar extends StatelessWidget {
           const SizedBox(width: 16),
 
           // ── Live Date Display ──
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.calendar_today_rounded,
-                  size: 14,
-                  color: colorScheme.primary,
+          if (showDate) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
                 ),
-                const SizedBox(width: 8),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 220),
-                  child: Text(
-                    arabicDate,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    locale: WebRuntimePolicy.isWeb ? const Locale('en') : null,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: colorScheme.onSurface,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.calendar_today_rounded,
+                    size: 14,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 220),
+                    child: Text(
+                      arabicDate,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      locale: WebRuntimePolicy.isWeb
+                          ? const Locale('en')
+                          : null,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-
-          const SizedBox(width: 10),
+            const SizedBox(width: 10),
+          ],
 
           // ── Refresh Button ──
           IconButton(
