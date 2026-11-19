@@ -50,7 +50,12 @@ if [[ ! -x "$NODE22_BIN/node" ]]; then
   exit 2
 fi
 
-export PATH="$FLUTTER_SDK/bin:$NODE22_BIN:$CLEAN_PATH"
+# Device tools for mac-gate (Maestro, Patrol, adb) when installed for this user.
+DEVICE_TOOLS=""
+for d in "$HOME/.maestro/bin" "$HOME/.pub-cache/bin" "$HOME/Library/Android/sdk/platform-tools"; do
+  [[ -d "$d" ]] && DEVICE_TOOLS="$DEVICE_TOOLS:$d"
+done
+export PATH="$FLUTTER_SDK/bin:$NODE22_BIN${DEVICE_TOOLS}:$CLEAN_PATH"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
