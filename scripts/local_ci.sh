@@ -136,6 +136,22 @@ seed_local_properties() {
 
 seed_local_properties
 
+# Gitignored iOS dev Firebase config (tashil-dev), needed by iOS dev builds (mac-gate).
+seed_ios_dev_firebase() {
+  local rel="ios/config/dev/GoogleService-Info.plist" cand
+  for cand in "$REPO_ROOT/$rel" "${TASHIL_CI_IOS_DEV_PLIST:-}"; do
+    if [[ -n "$cand" && -f "$cand" ]]; then
+      mkdir -p "$SRC/$(dirname "$rel")"
+      cp "$cand" "$SRC/$rel"
+      echo "seeded $rel from a gitignored local file (values not logged)" >>"$OUT/full.log"
+      return 0
+    fi
+  done
+  echo "warning: no $rel found; iOS dev builds (mac-gate) will fail" >>"$OUT/full.log"
+}
+
+seed_ios_dev_firebase
+
 # Record a clean checkout at the exact SHA *before* jobs (gitignored
 # android/local.properties is not shown by status --porcelain).
 WORKTREE_HEAD="$(git -C "$SRC" rev-parse HEAD)"
