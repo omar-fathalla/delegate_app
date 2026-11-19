@@ -47,8 +47,50 @@ ci_slot_env() {
   mkdir -p "$TMPDIR" 2>/dev/null && chmod 1777 "$TMPDIR" 2>/dev/null || true
 }
 
+# The Firestore emulator often fails to stop on these runners ("Error stopping
+# Firestore Emulator") and keeps listening for a few seconds. The next job on
+# the same slot then connects to that dying emulator and its first write hangs
+# (P0 scripts: DEADLINE_EXCEEDED after 60 s, run 44448556800). So every
+# emulator job frees its slot's ports before it starts and after it ends.
+# Slot ports are CI-only (default + k*10000), so only stray emulators live there.
+ci_slot_ports() {
+  echo "$LOCAL_CI_FIRESTORE_PORT $LOCAL_CI_FIRESTORE_HUB_PORT $LOCAL_CI_AUTH_PORT" \
+    "$LOCAL_CI_STORAGE_PORT $LOCAL_CI_FUNCTIONS_PORT $LOCAL_CI_LOGGING_PORT" \
+    "$LOCAL_CI_FIRESTORE_WEBSOCKET_PORT"
+}
+ci_slot_listeners() {
+  local port
+  for port in $(ci_slot_ports); do
+    lsof -nP -t -iTCP:"$port" -sTCP:LISTEN 2>/dev/null || true
+  done | sort -u
+}
+ci_slot_free_ports() {
+  local pids i
+  pids="$(ci_slot_listeners)"
+  [[ -n "$pids" ]] || return 0
+  echo "run_job: slot $CI_SLOT ports still in use by pid(s) $(echo $pids), stopping them"
+  # shellcheck disable=SC2086
+  kill $pids 2>/dev/null || true
+  for i in $(seq 1 20); do
+    [[ -n "$(ci_slot_listeners)" ]] || return 0
+    sleep 0.5
+  done
+  pids="$(ci_slot_listeners)"
+  # shellcheck disable=SC2086
+  [[ -z "$pids" ]] || kill -9 $pids 2>/dev/null || true
+  sleep 1
+  pids="$(ci_slot_listeners)"
+  if [[ -n "$pids" ]]; then
+    echo "run_job: slot $CI_SLOT ports still held by pid(s) $(echo $pids) (another user?)" >&2
+    return 1
+  fi
+}
+
 OWN_LEASE=""
 cleanup() {
+  if [[ -n "${CI_SLOT:-}" && -n "${LOCAL_CI_FIRESTORE_PORT:-}" ]]; then
+    ci_slot_free_ports || true
+  fi
   if [[ -n "$OWN_LEASE" ]]; then
     ci_lease_release slot "$OWN_LEASE"
   fi
@@ -63,6 +105,7 @@ if ci_job_needs_emulator "$JOB"; then
   fi
   ci_slot_env "$CI_SLOT"
   echo "run_job: $JOB on slot $CI_SLOT (firestore :$LOCAL_CI_FIRESTORE_PORT)"
+  ci_slot_free_ports
 else
   echo "run_job: $JOB"
 fi
