@@ -68,9 +68,11 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 180
+    # One heavy delegate_app build at a time on the Mac (replaces ~/mac-resources lock).
+    concurrency:
+      group: delegate-mac-heavy-build
+      cancel-in-progress: false
     steps:
-      - name: Acquire Mac repo lock
-        run: bash ~/mac-resources/ci_delegate_app_lock_acquire.sh repo "${{ github.job }}" 90 150
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -147,18 +149,17 @@ jobs:
           path: build/app/outputs/flutter-apk/app-prod-release.apk
           if-no-files-found: error
           retention-days: 7
-      - name: Release Mac repo lock
-        if: always()
-        run: bash ~/mac-resources/ci_delegate_app_lock_release.sh repo
 
   ios-prod-release:
     name: iOS prod flavor (release, no codesign)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 180
+    # One heavy delegate_app build at a time on the Mac (replaces ~/mac-resources lock).
+    concurrency:
+      group: delegate-mac-heavy-build
+      cancel-in-progress: false
     steps:
-      - name: Acquire Mac repo lock
-        run: bash ~/mac-resources/ci_delegate_app_lock_acquire.sh repo "${{ github.job }}" 90 150
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -233,6 +234,3 @@ jobs:
           path: build/ios/iphoneos/Runner.app
           if-no-files-found: error
           retention-days: 7
-      - name: Release Mac repo lock
-        if: always()
-        run: bash ~/mac-resources/ci_delegate_app_lock_release.sh repo
