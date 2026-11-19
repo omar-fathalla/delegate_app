@@ -192,6 +192,10 @@ job_mac-gate() {
     # clear that before the device steps so this simulator can log in.
     case " $steps " in *" maestro "* | *" patrol "*)
       if [[ -f functions/scripts/hr-web-fake-accounts.js ]]; then
+        # Clean checkout: no functions/node_modules yet (firebase-admin).
+        [[ -d functions/node_modules/firebase-admin ]] \
+          || (cd functions && npm ci --no-audit --no-fund --silent) \
+          || echo "mac-gate: warning: npm ci in functions failed" >&2
         (cd functions && GOOGLE_CLOUD_PROJECT=tashil-dev \
           node scripts/hr-web-fake-accounts.js --project tashil-dev --reset-device-bindings --apply) \
           || echo "mac-gate: warning: could not reset fake delegates' device bindings" >&2
