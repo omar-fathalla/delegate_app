@@ -108,8 +108,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: functions/package-lock.json
+          # No GitHub cache: the self-hosted Mac keeps ~/.npm locally, and the
+          # cache upload post-step stalled past the 15 min job timeout (2026-11-19).
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -208,8 +208,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: functions/package-lock.json
+          # No GitHub cache: the self-hosted Mac keeps ~/.npm locally, and the
+          # cache upload post-step stalled past the 15 min job timeout (2026-11-19).
       - uses: actions/setup-java@v4
         with:
           java-version: '21'
