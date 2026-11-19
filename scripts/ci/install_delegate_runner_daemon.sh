@@ -32,6 +32,14 @@ stop_all() {
   launchctl bootout "system/${LABEL}" 2>/dev/null || true
   launchctl bootout "gui/${RUNNER_UID}/${LABEL}" 2>/dev/null || true
   launchctl bootout "user/${RUNNER_UID}/${LABEL}" 2>/dev/null || true
+  # bootout returns before the old listener has exited; bootstrapping while it
+  # is still there fails with "Bootstrap failed: 5: Input/output error".
+  local i
+  for i in $(seq 1 30); do
+    launchctl print "system/${LABEL}" >/dev/null 2>&1 || return 0
+    sleep 1
+  done
+  echo "warning: system/${LABEL} still loaded after 30 s" >&2
 }
 
 if [[ "${1:-}" == "--remove" ]]; then
@@ -94,7 +102,13 @@ PLIST
 chown root:wheel "$DAEMON"
 chmod 644 "$DAEMON"
 plutil -lint "$DAEMON"
-launchctl bootstrap system "$DAEMON"
+for attempt in 1 2 3; do
+  if launchctl bootstrap system "$DAEMON"; then break; fi
+  (( attempt < 3 )) || { echo "bootstrap failed 3 times: $DAEMON" >&2; exit 1; }
+  echo "bootstrap failed, retrying in 5 s ($attempt/3)" >&2
+  launchctl bootout "system/${LABEL}" 2>/dev/null || true
+  sleep 5
+done
 sleep 3
 launchctl print "system/${LABEL}" | grep -E "^\s*(state|pid) ="
 echo "OK: ${LABEL} runs as ${RUNNER_USER} at boot. Logs: ${LOG_DIR}"
