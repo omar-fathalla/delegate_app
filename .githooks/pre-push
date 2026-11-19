@@ -54,7 +54,7 @@ while read -r local_ref local_sha remote_ref _remote_sha; do
   if [[ "${TASHIL_PREPUSH:-fast}" == full && -f "$ROOT/scripts/local_ci.sh" ]]; then
     echo "pre-push: full local CI on ${local_sha:0:8} ..." >&2
     bash "$ROOT/scripts/local_ci.sh" --changed --no-apk "$local_sha" >&2 \
-      || { echo "pre-push: local CI FAILED. Summary: /tmp/local-ci/${local_sha}/SUMMARY.md" >&2; status=1; }
+      || { echo "pre-push: local CI FAILED. Summary: /tmp/local-ci.noindex/${local_sha}/SUMMARY.md" >&2; status=1; }
     continue
   fi
   if ! fast_check "$local_sha"; then

@@ -68,7 +68,7 @@ Three rules make it safe for many runners and agents at once:
 | Firebase emulator ports | default + `k*10000` (slot 1: Firestore 18080, Auth 19099, Storage 19199, Hub 14400, Logging 14500, WS 19150, Functions 15001) via the existing `LOCAL_CI_*` env. Slots never use the default ports, so a developer running `npm run test:rules` by hand never collides with CI. |
 | Flutter SDK | shared (see §1) |
 | `PUB_CACHE`, Gradle home | shared (both are safe for concurrent readers; Gradle has its own locking) |
-| TMPDIR | `/Users/Shared/tashil-ci/tmp/slot-k` |
+| TMPDIR | `/Users/Shared/tashil-ci/tmp.noindex/slot-k` |
 
 ### 2.2 Devices (exclusive)
 
@@ -153,7 +153,7 @@ Each phase ends with a check that proves it works. Do not start the next phase u
   - after each merge: new `origin/dev` SHA → `local_ci.sh --jobs mac-gate --post-status`;
   - nightly (first pass after 00:30 Cairo): full `local_ci.sh --no-apk --post-status` on `dev`, then cleanup.
   - Why local, not a GitHub `schedule`: scheduled workflows run from the default branch (`main`), and they would need the runner user to own simulators and secrets.
-- [x] `scripts/ci/cleanup.sh [--dry-run]`: only CI-owned leftovers (old `/tmp/local-ci`, slot tmp, stale leases, unleased `Tashil-CI-*` sims). Never DerivedData or personal devices.
+- [x] `scripts/ci/cleanup.sh [--dry-run]`: only CI-owned leftovers (old `/tmp/local-ci.noindex`, slot tmp, stale leases, unleased `Tashil-CI-*` sims). Never DerivedData or personal devices.
 - Hosted workflows left as they are, on purpose:
   - `android-release.yml`, `deploy-ios.yml`: team rule in `ci.yml` header ("Do not change release workflows").
   - `firestore-indexes.yml`: documented to stay on `ubuntu-latest` (prod read-only secret, must not hold the Mac); path-filtered, ~1 min per run.

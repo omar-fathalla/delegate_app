@@ -44,7 +44,7 @@ ci_slot_env() {
   export LOCAL_CI_FUNCTIONS_PORT=$((5001 + off))
   export LOCAL_CI_LOGGING_PORT=$((4500 + off))
   export LOCAL_CI_FIRESTORE_WEBSOCKET_PORT=$((9150 + off))
-  export TMPDIR="/Users/Shared/tashil-ci/tmp/slot-$k/"
+  export TMPDIR="/Users/Shared/tashil-ci/tmp.noindex/slot-$k/"
   mkdir -p "$TMPDIR" 2>/dev/null && chmod 1777 "$TMPDIR" 2>/dev/null || true
 }
 

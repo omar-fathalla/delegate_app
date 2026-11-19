@@ -24,7 +24,7 @@
 #
 # Creates a fresh detached worktree at the SHA, runs every CI job plus an
 # Android dev debug APK build, and writes logs + SUMMARY.md to
-#   /tmp/local-ci/<sha>/
+#   /tmp/local-ci.noindex/<sha>/
 # Timestamps are Africa/Cairo.
 set -u
 set -o pipefail
@@ -94,7 +94,7 @@ if ! SHA="$(git rev-parse --verify "${1}^{commit}" 2>/dev/null)"; then
   SHA="$(git rev-parse --verify "${1}^{commit}")"
 fi
 
-OUT="/tmp/local-ci/${SHA}"
+OUT="/tmp/local-ci.noindex/${SHA}"
 SRC="$OUT/src"
 LOGS="$OUT/logs"
 mkdir -p "$LOGS"

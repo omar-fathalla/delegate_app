@@ -14,7 +14,7 @@ Sources of truth — read them instead of trusting this file if they disagree:
 - `docs/testing/mac-gate-preflight.md`
 - `.github/workflows/ci.yml` (exact CI commands)
 
-Fast path for stages 1–4: `bash scripts/local_ci.sh --changed --no-apk <sha>` runs exactly the CI jobs (from `scripts/ci/jobs.sh`) needed for the changed files, leases a port slot so it can run beside other agents and runners, and writes `/tmp/local-ci/<sha>/SUMMARY.md`. Add `--post-status` (only with the user's yes) to show results on the PR. The stage details below say what each job covers and how to judge it.
+Fast path for stages 1–4: `bash scripts/local_ci.sh --changed --no-apk <sha>` runs exactly the CI jobs (from `scripts/ci/jobs.sh`) needed for the changed files, leases a port slot so it can run beside other agents and runners, and writes `/tmp/local-ci.noindex/<sha>/SUMMARY.md`. Add `--post-status` (only with the user's yes) to show results on the PR. The stage details below say what each job covers and how to judge it.
 
 Hard rules:
 - `dev` / `tashil-dev` only, fake accounts only. Never point any step at prod (`practice-firebase-72df1` is read-only territory).

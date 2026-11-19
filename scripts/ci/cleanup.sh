@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Remove CI leftovers on this Mac. Only touches CI-owned things:
-#   /tmp/local-ci/<sha>       older than 14 days (+ git worktree prune)
-#   /Users/Shared/tashil-ci/tmp/slot-*   files older than 2 days
+#   /tmp/local-ci.noindex/<sha>       older than 14 days (+ git worktree prune)
+#   /Users/Shared/tashil-ci/tmp.noindex/slot-*   files older than 2 days
 #   stale leases              (dead owner pid or older than 4 h)
 #   Tashil-CI-* simulators    booted but not leased -> shut down
 # Never touches DerivedData, your own simulators/emulators, or runner _work.
@@ -15,16 +15,18 @@ DRY=0
 [[ "${1:-}" == "--dry-run" ]] && DRY=1
 do_rm() { if (( DRY )); then echo "would remove $1"; else rm -rf "$1" && echo "removed $1"; fi; }
 
-for d in /tmp/local-ci/*; do
+# Folders end in .noindex so Spotlight skips them; the old names are cleaned too.
+for d in /tmp/local-ci.noindex/* /tmp/local-ci/*; do
   [[ -d "$d" ]] || continue
   if [[ -n "$(find "$d" -maxdepth 0 -mtime +14 2>/dev/null)" ]]; then do_rm "$d"; fi
 done
 (( DRY )) || git -C "$HERE/../.." worktree prune 2>/dev/null || true
 
-if [[ -d /Users/Shared/tashil-ci/tmp ]]; then
+for t in /Users/Shared/tashil-ci/tmp.noindex /Users/Shared/tashil-ci/tmp; do
+  [[ -d "$t" ]] || continue
   while IFS= read -r f; do do_rm "$f"; done \
-    < <(find /Users/Shared/tashil-ci/tmp -mindepth 2 -maxdepth 2 -mtime +2 2>/dev/null)
-fi
+    < <(find "$t" -mindepth 2 -maxdepth 2 -mtime +2 2>/dev/null)
+done
 
 for pool_dir in "$CI_LEASE_ROOT"/*; do
   [[ -d "$pool_dir" ]] || continue

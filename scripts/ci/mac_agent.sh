@@ -64,7 +64,7 @@ gate() {
   if bash "$REPO/scripts/local_ci.sh" --jobs mac-gate --post-status "$sha" >>"$LOG" 2>&1; then
     log "gate: PASS ${sha:0:8}"
   else
-    notify "mac-gate FAILED on dev ${sha:0:8}. Summary: /tmp/local-ci/${sha}/SUMMARY.md"
+    notify "mac-gate FAILED on dev ${sha:0:8}. Summary: /tmp/local-ci.noindex/${sha}/SUMMARY.md"
   fi
 }
 
@@ -80,7 +80,7 @@ nightly() {
   sha="$(git -C "$REPO" rev-parse origin/dev)"
   log "nightly: full local_ci on dev ${sha:0:8}"
   if ! bash "$REPO/scripts/local_ci.sh" --no-apk --post-status "$sha" >>"$LOG" 2>&1; then
-    notify "Nightly CI FAILED on dev ${sha:0:8}. Summary: /tmp/local-ci/${sha}/SUMMARY.md"
+    notify "Nightly CI FAILED on dev ${sha:0:8}. Summary: /tmp/local-ci.noindex/${sha}/SUMMARY.md"
   fi
   bash "$REPO/scripts/ci/cleanup.sh" >>"$LOG" 2>&1 || true
 }
