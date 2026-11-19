@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/widgets/app_loading_indicator.dart';
+import 'package:delegate_app/core/widgets/tashil_maestro_dev_semantics.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/tracking/data/services/delegate_tracking_engine.dart';
@@ -222,7 +223,13 @@ class _LogoutModalContentState extends State<_LogoutModalContent> {
             child: Row(
               children: [
                 // زر تأكيد تسجيل الخروج
+                // Maestro id: "تسجيل الخروج" is also the sheet title and the
+                // Settings row, so a text tap can hit the wrong one.
                 Expanded(
+                  child: tashilMaestroDevSemantics(
+                  identifier: 'tashil_logout_confirm_button',
+                  label: 'تأكيد تسجيل الخروج',
+                  button: true,
                   child: InkWell(
                     borderRadius: isArabic
                         ? const BorderRadius.horizontal(right: Radius.circular(24))
@@ -254,6 +261,7 @@ class _LogoutModalContentState extends State<_LogoutModalContent> {
                               ],
                             ),
                     ),
+                  ),
                   ),
                 ),
 

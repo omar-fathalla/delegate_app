@@ -14,9 +14,14 @@ appId: com.tashil.delegate.dev
 
 - tapOn: "تسجيل الخروج"
 
-- assertVisible: "تسجيل الخروج"
+# Confirm sheet: tap the button by id; the same text is also the sheet title.
+- extendedWaitUntil:
+    visible:
+      id: "tashil_logout_confirm_button"
+    timeout: 15000
 
-- tapOn: "تسجيل الخروج"
+- tapOn:
+    id: "tashil_logout_confirm_button"
 
 - extendedWaitUntil:
     visible: "رقم الجوال"
