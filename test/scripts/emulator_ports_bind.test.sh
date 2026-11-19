@@ -5,6 +5,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
+# Port offset for the override part: the CI slot's ports when run_job.sh
+# leased one (LOCAL_CI_* already set, e.g. slot 2 = 28080), else +10000.
+# Hardcoding 18080 made this collide with whatever job held slot 1.
+if [[ -n "${LOCAL_CI_FIRESTORE_PORT:-}" && "$LOCAL_CI_FIRESTORE_PORT" != 8080 ]]; then
+  PORT_OFF=$(( LOCAL_CI_FIRESTORE_PORT - 8080 ))
+else
+  PORT_OFF=10000
+fi
+
 # shellcheck disable=SC1091
 source "$ROOT/scripts/emulator_ports.env.sh"
 
@@ -43,17 +52,19 @@ if (e.firestore.websocketPort !== 9150) {
 console.log('ok: default generated emulator ports match firebase.json behavior');
 "
 
-export LOCAL_CI_FIRESTORE_PORT=18080
-export LOCAL_CI_FIRESTORE_HUB_PORT=14400
-export LOCAL_CI_AUTH_PORT=19099
-export LOCAL_CI_STORAGE_PORT=19199
-export LOCAL_CI_FUNCTIONS_PORT=15001
-export LOCAL_CI_LOGGING_PORT=14500
-export LOCAL_CI_FIRESTORE_WEBSOCKET_PORT=19150
+FS_PORT=$(( 8080 + PORT_OFF ))
+WS_PORT=$(( 9150 + PORT_OFF ))
+export LOCAL_CI_FIRESTORE_PORT=$FS_PORT
+export LOCAL_CI_FIRESTORE_HUB_PORT=$(( 4400 + PORT_OFF ))
+export LOCAL_CI_AUTH_PORT=$(( 9099 + PORT_OFF ))
+export LOCAL_CI_STORAGE_PORT=$(( 9199 + PORT_OFF ))
+export LOCAL_CI_FUNCTIONS_PORT=$(( 5001 + PORT_OFF ))
+export LOCAL_CI_LOGGING_PORT=$(( 4500 + PORT_OFF ))
+export LOCAL_CI_FIRESTORE_WEBSOCKET_PORT=$WS_PORT
 emulator_export_hosts
 
-if [[ "${FIRESTORE_EMULATOR_HOST}" != "127.0.0.1:18080" ]]; then
-  echo "FIRESTORE_EMULATOR_HOST=${FIRESTORE_EMULATOR_HOST} (expected 127.0.0.1:18080)" >&2
+if [[ "${FIRESTORE_EMULATOR_HOST}" != "127.0.0.1:${FS_PORT}" ]]; then
+  echo "FIRESTORE_EMULATOR_HOST=${FIRESTORE_EMULATOR_HOST} (expected 127.0.0.1:${FS_PORT})" >&2
   exit 1
 fi
 
@@ -66,17 +77,17 @@ bash "$ROOT/scripts/emulators_exec.sh" \
   "node -e \"
     const {execSync}=require('child_process');
     const want=process.env.FIRESTORE_EMULATOR_HOST;
-    if (want!=='127.0.0.1:18080') {
+    if (want!=='127.0.0.1:${FS_PORT}') {
       console.error('inside exec FIRESTORE_EMULATOR_HOST=', want);
       process.exit(1);
     }
-    if (process.env.FIRESTORE_EMULATOR_WEBSOCKET_PORT!=='19150') {
+    if (process.env.FIRESTORE_EMULATOR_WEBSOCKET_PORT!=='${WS_PORT}') {
       console.error('websocket port env', process.env.FIRESTORE_EMULATOR_WEBSOCKET_PORT);
       process.exit(1);
     }
-    execSync('lsof -nP -iTCP:18080 -sTCP:LISTEN', {stdio:'inherit'});
-    execSync('lsof -nP -iTCP:19150 -sTCP:LISTEN', {stdio:'inherit'});
-    console.log('ok: firestore emulator listening on 18080 (ws 19150)');
+    execSync('lsof -nP -iTCP:${FS_PORT} -sTCP:LISTEN', {stdio:'inherit'});
+    execSync('lsof -nP -iTCP:${WS_PORT} -sTCP:LISTEN', {stdio:'inherit'});
+    console.log('ok: firestore emulator listening on ${FS_PORT} (ws ${WS_PORT})');
   \""
 
 echo "ok: emulator port override bind test passed"
