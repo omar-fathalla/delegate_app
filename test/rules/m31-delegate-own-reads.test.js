@@ -125,6 +125,45 @@ describe("m31 delegate own-data queries", () => {
       where("delegateUid", "==", "del-2"),
     ))));
 
+  // tashil-dev delegates have a users/{uid} doc. With it present the staff
+  // branches of leave_requests used the whole 1000-expression budget and the
+  // delegate home listener (companyUID + delegateUid) got permission-denied.
+  const seedDelegateUserDocs = () => env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    for (const uid of ["del-1", "del-2"]) {
+      await db.doc(`users/${uid}`).set({
+        uid, role: "delegate", organizationUID: "o1", companyUID: "c1",
+        status: "active", isActive: true,
+      });
+    }
+  });
+
+  test("delegate home leave_requests listener works with a users doc", async () => {
+    await seedDelegateUserDocs();
+    await assertSucceeds(getDocs(query(
+      collection(as("del-1", DELEGATE), "leave_requests"),
+      where("companyUID", "==", "c1"),
+      where("delegateUid", "==", "del-1"),
+    )));
+  });
+
+  test("with a users doc, delegate still cannot list another delegate's leave_requests", async () => {
+    await seedDelegateUserDocs();
+    await assertFails(getDocs(query(
+      collection(as("del-1", DELEGATE), "leave_requests"),
+      where("companyUID", "==", "c1"),
+      where("delegateUid", "==", "del-2"),
+    )));
+  });
+
+  test("delegate can query own device_unbind_requests with a users doc", async () => {
+    await seedDelegateUserDocs();
+    await assertSucceeds(getDocs(query(
+      collection(as("del-1", DELEGATE), "device_unbind_requests"),
+      where("delegateUid", "==", "del-1"),
+    )));
+  });
+
   test("delegate can query own notifications by uid and by phone claim", async () => {
     await assertSucceeds(getDocs(query(
       collection(as("del-1", DELEGATE), "notifications"),

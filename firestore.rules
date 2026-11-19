@@ -165,6 +165,16 @@ service cloud.firestore {
       return claimString('role') == 'delegate' && delegateOtpOk();
     }
 
+    // Staff branches that read users/{uid} are costly. A delegate token
+    // (role claim set only by delegateLoginV2) skips them up front, so a
+    // delegate list query keeps its 1000-expression budget for the own-id
+    // rule (leave_requests / device_unbind_requests permission-denied).
+    // One map lookup on purpose: HR's company leave list is already close
+    // to the budget, so this guard must stay cheap.
+    function notDelegateToken() {
+      return request.auth == null || request.auth.token.get('role', '') != 'delegate';
+    }
+
     // Own-id paths that skip isDelegate() (attendance / leave by uid).
     // id must be non-empty: get(field, '') would otherwise make
     // claimString('delegateId') == '' true for any staff token
@@ -2731,12 +2741,14 @@ service cloud.firestore {
     }
 
     match /device_unbind_requests/{requestId} {
-      allow read: if canReadOrgAdminRequestInOwnOrg();
-      allow read: if signedIn() && (
+      allow read: if notDelegateToken() && canReadOrgAdminRequestInOwnOrg();
+      allow read: if signedIn() && notDelegateToken() && (
         isGlobalStaff()
         || (isCompanyScopedStaff() && companyScoped())
         || (isOrgScopedStaff() && orgScoped())
-        || resource.data.delegateUid == request.auth.uid
+      );
+      allow read: if signedIn() && (
+        resource.data.delegateUid == request.auth.uid
         || delegateOwns(resource.data.delegateUid)
       );
       allow create: if signedIn() && (
@@ -2789,10 +2801,10 @@ service cloud.firestore {
       // Split allow rules so a company+status list is provable for HR
       // (a single OR with unconstrained own-id branches made that query
       // PERMISSION_DENIED). Own-id stays a separate rule for delegates.
-      allow read: if canReadOrgAdminRequestInOwnOrg();
-      allow read: if signedIn() && isGlobalStaff();
-      allow read: if signedIn() && isCompanyScopedStaff() && companyScoped();
-      allow read: if signedIn() && isOrgScopedStaff() && orgScoped();
+      allow read: if notDelegateToken() && canReadOrgAdminRequestInOwnOrg();
+      allow read: if signedIn() && notDelegateToken() && isGlobalStaff();
+      allow read: if signedIn() && notDelegateToken() && isCompanyScopedStaff() && companyScoped();
+      allow read: if signedIn() && notDelegateToken() && isOrgScopedStaff() && orgScoped();
       allow read: if signedIn() && (
         ownsDelegateId(resource.data.delegateUid)
         || delegateOwns(resource.data.delegateUid)
