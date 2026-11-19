@@ -7,14 +7,17 @@
 # runners (tashil-ci) use LaunchDaemons and stayed up; this mirrors them.
 #
 # Usage (needs admin password):
-#   sudo bash tooling/ci/install_delegate_runner_daemon.sh          # install + start
-#   sudo bash tooling/ci/install_delegate_runner_daemon.sh --remove # stop + remove
+#   sudo bash scripts/ci/install_delegate_runner_daemon.sh          # install + start
+#   sudo bash scripts/ci/install_delegate_runner_daemon.sh --remove # stop + remove
+#   RUNNER_NAME=tashil-delegate-mac-2 RUNNER_DIR=/Users/delegate-ci/actions-runner-2 \
+#     sudo -E bash scripts/ci/install_delegate_runner_daemon.sh     # extra runner
 set -euo pipefail
 
 RUNNER_USER="delegate-ci"
 RUNNER_HOME="/Users/${RUNNER_USER}"
-RUNNER_DIR="${RUNNER_HOME}/actions-runner"
-LABEL="actions.runner.omar-fathalla-delegate_app.tashil-delegate-mac"
+RUNNER_NAME="${RUNNER_NAME:-tashil-delegate-mac}"
+RUNNER_DIR="${RUNNER_DIR:-${RUNNER_HOME}/actions-runner}"
+LABEL="actions.runner.omar-fathalla-delegate_app.${RUNNER_NAME}"
 DAEMON="/Library/LaunchDaemons/${LABEL}.plist"
 AGENT="${RUNNER_HOME}/Library/LaunchAgents/${LABEL}.plist"
 LOG_DIR="${RUNNER_HOME}/Library/Logs"

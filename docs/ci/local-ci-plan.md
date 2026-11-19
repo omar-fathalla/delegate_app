@@ -15,7 +15,7 @@ Goal: CI that runs entirely on our Mac (no GitHub-hosted minutes), stays the mer
 | Workflows still on **GitHub-hosted** runners: `deploy-ios.yml` (`macos-latest`), `android-release.yml`, `firestore-indexes.yml`, `actions-cleanup.yml` (`ubuntu-latest`). | `grep runs-on .github/workflows` |
 | `ci.yml` / `pr-user-test-builds.yml` call `~/mac-resources/ci_delegate_app_lock_*.sh`, which **do not exist** on the runner user. `build-web` would fail on first run. | `ls /Users/delegate-ci/mac-resources` |
 | Firebase emulator ports are fixed defaults (8080, 9099, 9199, 4400, ...). Two jobs running emulators at once collide. Override env exists (`scripts/emulator_ports.env.sh`, TA-39). | |
-| One Flutter SDK (3.44.5, `.fvmrc`) shared by everything → concurrent `flutter` commands wait on the SDK startup lock. | |
+| One Flutter SDK (3.44.5) shared by everything. Its startup lock is held only while the tool checks its cache, so parallel `flutter` commands in **different checkouts** are fine; one SDK is enough. | |
 | Mac: 14 cores, 24 GB RAM, ~375 GB free. | `sysctl`, `df` |
 
 ### Why the minutes ran out (billing, November 2026)
@@ -31,7 +31,7 @@ No self-hosted line appears: **self-hosted jobs are free**. Disabling `ci.yml` (
 
 ### Why the runner went offline
 
-`tashil-delegate-mac` was installed as a **LaunchAgent** of `delegate-ci` (`~/Library/LaunchAgents/...plist`). A LaunchAgent only runs while that user has a login session; the runner log stops on 2026-11-13. The Data-Sharing runners are **LaunchDaemons** (`/Library/LaunchDaemons`, `UserName=tashil-ci`) and stayed up. Fix: `tooling/ci/install_delegate_runner_daemon.sh`.
+`tashil-delegate-mac` was installed as a **LaunchAgent** of `delegate-ci` (`~/Library/LaunchAgents/...plist`). A LaunchAgent only runs while that user has a login session; the runner log stops on 2026-11-13. The Data-Sharing runners are **LaunchDaemons** (`/Library/LaunchDaemons`, `UserName=tashil-ci`) and stayed up. Fix: `scripts/ci/install_delegate_runner_daemon.sh`.
 
 ---
 
@@ -44,9 +44,9 @@ No self-hosted line appears: **self-hosted jobs are free**. Disabling `ci.yml` (
         │ Mac (delegate-ci user)                        │
         │                                               │
         │  runner-1 ─┐                                  │
-        │  runner-2 ─┼─► tooling/ci/run_job.sh <job>    │◄── agents / humans run the
+        │  runner-2 ─┼─► scripts/ci/run_job.sh <job>    │◄── agents / humans run the
         │  runner-3 ─┘        │                         │    SAME script locally
-        │                     ▼                         │    (tooling/ci/local_ci.sh)
+        │                     ▼                         │    (scripts/local_ci.sh)    
         │        slot lease (1..N) ──► ports, SDK, tmp  │
         │        device lease      ──► sim / emulator   │
         │        results ──► build/ci-results/<sha>/    │
@@ -55,7 +55,7 @@ No self-hosted line appears: **self-hosted jobs are free**. Disabling `ci.yml` (
 
 Three rules make it safe for many runners and agents at once:
 
-1. **One source of truth for commands.** Each CI job is a function in `tooling/ci/run_job.sh`. `ci.yml` steps become `bash tooling/ci/run_job.sh analyze`. Agents run the exact same thing locally. No more drift between docs, skill and workflow.
+1. **One source of truth for commands.** Each CI job is a function in `scripts/ci/jobs.sh`, run by `scripts/ci/run_job.sh`. `ci.yml` steps become `bash scripts/ci/run_job.sh analyze`. Agents run the exact same thing locally. No more drift between docs, skill and workflow.
 2. **Everything shared is leased.** A job never touches a port, SDK copy, simulator or emulator it has not leased. Leases live in `/Users/Shared/tashil-ci/leases/` (`mkdir`-atomic lock dirs with PID + timestamp; stale after PID death or timeout).
 3. **Results are written down, not remembered.** Every run writes `result.json` + logs under `build/ci-results/<sha>/<job>/`. Local runs can publish the result as a **GitHub commit status** (`gh api repos/:owner/:repo/statuses/<sha>`) — this costs zero minutes and shows up on the PR like a normal check.
 
@@ -65,8 +65,8 @@ Three rules make it safe for many runners and agents at once:
 
 | Per slot `k` | Value |
 | --- | --- |
-| Firebase emulator ports | base + `k*100` (Firestore `8080+k*100`, Auth `9099+k*100`, Storage `9199+k*100`, Hub `4400+k*100`, Logging `4500+k*100`, WS `9150+k*100`, Functions `5001+k*100`) via the existing `LOCAL_CI_*` env |
-| Flutter SDK | `/Users/Shared/tashil-ci/flutter/slot-k` (git worktree of one Flutter checkout at the `.fvmrc` version) → no startup-lock contention |
+| Firebase emulator ports | default + `k*10000` (slot 1: Firestore 18080, Auth 19099, Storage 19199, Hub 14400, Logging 14500, WS 19150, Functions 15001) via the existing `LOCAL_CI_*` env. Slots never use the default ports, so a developer running `npm run test:rules` by hand never collides with CI. |
+| Flutter SDK | shared (see §1) |
 | `PUB_CACHE`, Gradle home | shared (both are safe for concurrent readers; Gradle has its own locking) |
 | TMPDIR | `/Users/Shared/tashil-ci/tmp/slot-k` |
 
@@ -101,7 +101,7 @@ Path filters cut most PRs to `analyze + test + guards` (~10 min).
 For Claude / Cursor / other agents working in parallel:
 
 1. **One agent = one git worktree** under `worktrees/<branch>`. Never two agents in one checkout.
-2. Before pushing, the agent runs `tooling/ci/local_ci.sh --changed` (picks jobs by changed paths, leases a slot, waits in queue if all slots are busy).
+2. Before pushing, the agent runs `bash scripts/local_ci.sh --changed --no-apk <sha>` (picks jobs by changed paths, leases a slot, waits in queue if all slots are busy).
 3. The agent reads `build/ci-results/<sha>/summary.json`, not raw logs, to decide pass/fail.
 4. Device tests only through `local_ci.sh mac-gate` (never by booting a simulator by hand) so leases are respected.
 5. Agents never: re-enable/disable workflows, change runner services, merge, or touch prod. Those stay human actions.
@@ -117,21 +117,23 @@ Each phase ends with a check that proves it works. Do not start the next phase u
 - [x] Billing confirms the burn is GitHub-hosted runners (§1).
 - [ ] Merge PR #382 (removes `~/mac-resources` locks, uses a GitHub `concurrency` group instead) — **human**.
       Caveat: a GitHub concurrency group keeps **one running + one pending**; a third queued job in the same group is cancelled. Fine with one runner; Phase 2 replaces it with leases.
-- [ ] `sudo bash tooling/ci/install_delegate_runner_daemon.sh` (LaunchAgent → LaunchDaemon) — **human, needs admin password**.
+- [ ] `sudo bash scripts/ci/install_delegate_runner_daemon.sh` (LaunchAgent → LaunchDaemon) — **human, needs admin password**.
 - [ ] Re-enable `CI` workflow (`gh workflow enable CI`).
 - **Check:** runner shows `online` and PR #383 gets a full green CI run.
 - Follow-up (not Phase 0): move Data-Sharing's `ubuntu-latest` workflows to its own Mac runners — that is where most minutes go.
 
 ### Phase 1 — One command source (~½ day)
-- [ ] `tooling/ci/run_job.sh <job>` with the jobs in §2.3, extracted verbatim from `ci.yml`.
-- [ ] `ci.yml` steps call `run_job.sh`.
-- [ ] `tooling/ci/local_ci.sh` (job selection by changed paths, results JSON, optional `--post-status`).
+- [x] `scripts/ci/jobs.sh` (job bodies, timeouts, path→job selection) + `scripts/ci/run_job.sh <job>`.
+      Reconciled the drift between `ci.yml` and the old `local_ci.sh`: guards now include xctestrun + holds_authority checks; rules runs **every** `test:rules*` script in `package.json` (auto-discovered) + all 4 rules e2e suites.
+- [x] `ci.yml` steps call `run_job.sh`; `test/scripts/ci_tooling_test.sh` (in ios-guards) fails if anyone inlines a job command again.
+- [x] `scripts/local_ci.sh` uses the same jobs; new `--jobs`, `--changed[=base]`, `--no-apk`, `--post-status` (commit status `local-ci/<job>`, zero Actions minutes).
 - **Check:** `local_ci.sh` and the GitHub run give the same pass/fail on the same SHA.
 
 ### Phase 2 — Parallel slots (~½ day)
-- [ ] Lease library (`tooling/ci/lease.sh`) with stale-lock recovery.
-- [ ] Slot env (ports, Flutter SDK per slot, TMPDIR).
-- [ ] Register runners 2 and 3 under `delegate-ci` with labels `delegate-app, slot-2/3`.
+- [x] Lease library (`scripts/ci/lease.sh`): `mkdir`-atomic, owner pid/user/time, stale = dead pid or > 4 h, release only by owner. Root `/Users/Shared/tashil-ci/leases` (1777, shared by all CI users).
+- [x] Slot env (ports, TMPDIR) applied by `run_job.sh` for emulator jobs. `CI_SLOTS` (default 3).
+      Verified 2026-11-19: `rules` + `p0-scripts` + `emulator-ports` in parallel took slots 2/3/1 (ports 28080/38080/18080), no port errors, all leases released.
+- [ ] Register runners 2 and 3: `bash scripts/ci/add_delegate_runners.sh 2 3` — **human, needs admin password**.
 - **Check:** two PRs pushed at once both run `rules` simultaneously without port errors.
 
 ### Phase 3 — Device pool + mac-gate workflow (~1 day)

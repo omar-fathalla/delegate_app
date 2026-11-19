@@ -56,9 +56,9 @@ jobs:
           cache: false
       - name: Install dependencies
         run: flutter pub get --enforce-lockfile
-      # Fails only on errors; warnings/infos are reported but don't fail the job.
+      # Commands live in scripts/ci/jobs.sh (single source for CI, local_ci.sh, agents).
       - name: Analyze
-        run: flutter analyze --no-fatal-warnings --no-fatal-infos
+        run: bash scripts/ci/run_job.sh analyze
 
   test:
     name: Test
@@ -87,16 +87,13 @@ jobs:
       - name: Install dependencies
         run: flutter pub get --enforce-lockfile
       - name: Test
-        run: flutter test --concurrency=1
+        run: bash scripts/ci/run_job.sh test
 
   p0-scripts:
     name: P0 scripts (emulators)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: functions
     steps:
       - uses: actions/checkout@v4
       - name: Sanitize PATH for delegate-ci
@@ -117,12 +114,10 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - run: npm ci
       - name: Emulator port override bind (TA-39)
-        working-directory: .
-        run: npm install --no-audit --no-fund && npm run test:scripts:emulator-ports
+        run: bash scripts/ci/run_job.sh emulator-ports
       - name: P0 scripts emulator test
-        run: bash ../scripts/emulators_exec.sh --only auth,firestore --project demo-p0-scripts "node --test scripts/p0-scripts.emulator.test.js"
+        run: bash scripts/ci/run_job.sh p0-scripts
 
   build-web:
     name: Build web (release)
@@ -152,10 +147,8 @@ jobs:
           # runner tool cache. GitHub Actions cache upload of the Flutter
           # SDK stalled the Analyze post-step for 10+ minutes.
           cache: false
-      - name: Install dependencies
-        run: flutter pub get --enforce-lockfile
       - name: Build web
-        run: flutter build web --release
+        run: bash scripts/ci/run_job.sh build-web
 
   ios-dev-config-check:
     name: iOS dev config (static)
@@ -177,14 +170,8 @@ jobs:
       # The self-test is also 3.9-safe (Optional[int], not int | None).
       - name: Prefer Homebrew Python
         run: echo /opt/homebrew/bin >> "$GITHUB_PATH"
-      - name: Static checks (scripts, pbxproj, firebase_config.sh)
-        run: bash scripts/ios_dev_config_check.sh
-      - name: Maestro flow header guard
-        run: bash scripts/maestro_check_flow_headers.sh
-      - name: Patrol integration guard
-        run: bash scripts/patrol_check_integration_targets.sh
-      - name: Patrol xctestrun resolver self-test
-        run: bash patrol_test/manifest/test_xctestrun_resolve.sh
+      - name: Static guards (iOS dev config, Maestro, Patrol, holds, CI tooling)
+        run: bash scripts/ci/run_job.sh ios-guards
 
   android-dev-config-check:
     name: Android dev config (static)
@@ -200,16 +187,13 @@ jobs:
           echo "LANG=en_US.UTF-8" >> "$GITHUB_ENV"
           echo "LC_ALL=en_US.UTF-8" >> "$GITHUB_ENV"
       - name: Static checks (dev flavor, google-services, docs)
-        run: bash scripts/android_dev_config_check.sh && npm run test:scripts:android-dev-distribute-guard
+        run: bash scripts/ci/run_job.sh android-guards
 
   functions:
     name: Functions lint & test
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: [self-hosted, macOS, ARM64, delegate-app]
     timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: functions
     steps:
       - uses: actions/checkout@v4
       - name: Sanitize PATH for delegate-ci
@@ -226,25 +210,18 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: functions/package-lock.json
-      - name: Install dependencies
-        run: npm ci
-      - name: Lint
-        run: npm run lint
-      - name: Test
-        run: npm test --if-present
       - uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
-      - name: Staff accounts e2e (createStaffUser / claimInvite on emulators)
-        working-directory: .
-        run: npm install --no-audit --no-fund && npm run test:e2e:staff
+      - name: Functions lint, unit tests, staff e2e
+        run: bash scripts/ci/run_job.sh functions
 
   rules:
     name: Firestore rules & delegate login e2e (emulators)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: [self-hosted, macOS, ARM64, delegate-app]
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Sanitize PATH for delegate-ci
@@ -263,13 +240,5 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-      - name: Install root test deps
-        run: npm install --no-audit --no-fund
-      - name: Install functions deps
-        run: npm --prefix functions ci
-      - name: Rules tests
-        run: npm run test:rules && npm run test:rules:interim && npm run test:rules:p0 && npm run test:rules:adv && npm run test:rules:docs && npm run test:rules:subs && npm run test:rules:qa-hold && npm run test:rules:profile && npm run test:rules:m31 && npm run test:rules:source && npm run test:rules:gaps && npm run test:rules:security && npm run test:rules:ut-nb && npm run test:rules:nationalid-scope && npm run test:rules:users-nationalid-lock && npm run test:rules:paymob-superseded && npm run test:rules:privileged-reupload && npm run test:rules:status-guards && npm run test:rules:hr-web && npm run test:rules:storage
-      - name: Subscriptions e2e (suspension job + Paymob hook on emulator)
-        run: npm run test:e2e:subscriptions
-      - name: Delegate login e2e (delegateLoginV2 -> custom token -> 1.14.3 query)
-        run: npm run test:e2e:delegate
+      - name: Rules + emulator e2e (every test:rules* in package.json)
+        run: bash scripts/ci/run_job.sh rules
