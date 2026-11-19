@@ -17,6 +17,8 @@ const {
   doc,
   getDoc,
   getDocs,
+  limit,
+  orderBy,
   query,
   setDoc,
   where,
@@ -156,6 +158,31 @@ describe("m31 delegate own-data queries", () => {
     )));
   });
 
+  // Check-in / history / month view (attendance_remote_data_source.dart):
+  // same budget problem as leave_requests once users/{uid} exists.
+  test("delegate attendance queries work with a users doc", async () => {
+    await seedDelegateUserDocs();
+    const db = as("del-1", DELEGATE);
+    const monthStart = new Date(2026, 10, 1);
+    const monthEnd = new Date(2026, 11, 2);
+    await assertSucceeds(getDocs(query(collection(db, "attendance_logs"),
+      where("delegateId", "in", ["del-1"]), where("timestamp", ">=", monthStart),
+      where("timestamp", "<", monthEnd), orderBy("timestamp", "desc"), limit(300))));
+    await assertSucceeds(getDocs(query(collection(db, "attendance_logs"),
+      where("delegateId", "in", ["del-1"]), orderBy("timestamp", "desc"), limit(12))));
+    await assertSucceeds(getDocs(query(collection(db, "attendance_logs"),
+      where("delegateId", "==", "del-1"), orderBy("timestamp", "desc"), limit(1))));
+    await assertSucceeds(getDocs(query(collection(db, "attendance_logs"),
+      where("delegateId", "==", "del-1"), where("type", "==", "check_in"),
+      where("branchId", "==", "b1"), limit(5))));
+  });
+
+  test("with a users doc, delegate still cannot list another delegate's attendance", async () => {
+    await seedDelegateUserDocs();
+    await assertFails(getDocs(query(collection(as("del-1", DELEGATE), "attendance_logs"),
+      where("delegateId", "==", "del-2"), orderBy("timestamp", "desc"), limit(1))));
+  });
+
   test("delegate can query own device_unbind_requests with a users doc", async () => {
     await seedDelegateUserDocs();
     await assertSucceeds(getDocs(query(
@@ -214,4 +241,35 @@ describe("m31 delegate own-data queries", () => {
 
   test("other delegate cannot get a different user's users doc", () =>
     assertFails(getDoc(doc(as("del-2", OTHER), "users/del-1"))));
+});
+
+// Guard for the 1000-expression budget: pads the staff leave_requests rule
+// with PAD extra expressions and checks HR's company leave list still works.
+// dev sat at 50 spare expressions before staffReadsScopedDoc(); it is ~270 now.
+// If this fails, a rule change made the hot staff path costlier: keep users
+// doc reads to one per allow statement (see staffReadsScopedDoc).
+describe("expression budget headroom", () => {
+  const PAD = 150;
+  test(`HR company leave list keeps ${PAD} spare expressions`, async () => {
+    const line = "allow read: if signedIn() && notDelegateToken() && staffReadsScopedDoc();";
+    const base = readFileSync(resolve(__dirname, "../../firestore.rules"), "utf8");
+    if (!base.includes(line)) throw new Error("staff leave_requests rule changed; update this guard");
+    const tree = (m) => (m <= 1 ? "true" : `(${tree(Math.floor(m / 2))} && ${tree(m - Math.floor(m / 2))})`);
+    const rules = base.replace(line, line.replace("allow read: if ", `allow read: if ${tree(PAD)} && `));
+    const env = await initializeTestEnvironment({
+      projectId: "demo-m31-budget-headroom",
+      firestore: {rules},
+    });
+    try {
+      await env.withSecurityRulesDisabled((ctx) =>
+        ctx.firestore().doc("users/hr").set({role: "hr", organizationUID: "o1", companyUID: "c1"}));
+      await assertSucceeds(getDocs(query(
+        collection(env.authenticatedContext("hr", {}).firestore(), "leave_requests"),
+        where("companyUID", "==", "c1"),
+        where("status", "==", "pending"),
+      )));
+    } finally {
+      await env.cleanup();
+    }
+  });
 });

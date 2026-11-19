@@ -648,6 +648,46 @@ describe("firestore tightened rules", () => {
   });
 
 
+  // leave_requests staff reads go through staffReadsLeaveRequest() (one
+  // users/{uid} read for the 1000-expression budget). Same access matrix as
+  // the old isGlobalStaff / company-scoped / org-scoped helpers.
+  test("leave_requests staff read matrix (get + company/org list)", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.doc("leave_requests/m-c1").set({companyUID: "c1", organizationUID: "o1", delegateUid: "del-1", status: "pending"});
+      await db.doc("leave_requests/m-c2").set({companyUID: "c2", organizationUID: "o1", delegateUid: "del-9", status: "pending"});
+      await db.doc("leave_requests/m-o2").set({companyUID: "c9", organizationUID: "o2", delegateUid: "del-8", status: "pending"});
+      await db.doc("leave_requests/m-legacy").set({companyId: "c1", organizationId: "o1", delegateUid: "del-1", status: "pending"});
+    });
+    const get = (uid, id) => dbFor(uid).collection("leave_requests").doc(id).get();
+    // global staff: any company / org
+    for (const uid of ["legacy", "compact", "tech"]) {
+      await assertSucceeds(get(uid, "m-c2"));
+      await assertSucceeds(get(uid, "m-o2"));
+    }
+    // company-scoped staff: own company only (companyUID or legacy companyId)
+    for (const uid of ["comp", "hr", "hrlegacy", "accountant", "supervisor", "bmm"]) {
+      await assertSucceeds(get(uid, "m-c1"));
+      await assertSucceeds(get(uid, "m-legacy"));
+      await assertFails(get(uid, "m-c2"));
+      await assertFails(get(uid, "m-o2"));
+      await assertSucceeds(dbFor(uid).collection("leave_requests").where("companyUID", "==", "c1").get());
+      await assertFails(dbFor(uid).collection("leave_requests").where("companyUID", "==", "c2").get());
+    }
+    // org-scoped staff: own org, every company in it
+    for (const uid of ["orgadmin", "orglegacy", "marketing"]) {
+      await assertSucceeds(get(uid, "m-c1"));
+      await assertSucceeds(get(uid, "m-c2"));
+      await assertFails(get(uid, "m-o2"));
+      await assertSucceeds(dbFor(uid).collection("leave_requests").where("organizationUID", "==", "o1").get());
+      await assertFails(dbFor(uid).collection("leave_requests").where("organizationUID", "==", "o2").get());
+    }
+    await assertSucceeds(get("org2", "m-o2"));
+    await assertFails(get("org2", "m-c1"));
+    // a delegate users doc is not staff
+    await assertFails(get("victim", "m-c2"));
+  });
+
   describe("task images and sender-only edit/delete", () => {
     const seedSent = async () => {
       await testEnv.withSecurityRulesDisabled(async (ctx) => {

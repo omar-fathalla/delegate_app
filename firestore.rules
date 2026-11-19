@@ -175,6 +175,42 @@ service cloud.firestore {
       return request.auth == null || request.auth.token.get('role', '') != 'delegate';
     }
 
+    // Staff read of a company/org-scoped doc (leave_requests, attendance)
+    // with a single users/{uid} read. Same access as
+    //   isGlobalStaff() || (isCompanyScopedStaff() && companyScoped())
+    //   || (isOrgScopedStaff() && orgScoped())
+    // but those helpers re-read the user doc per role check: HR's company
+    // leave list sat 50 expressions under the 1000 budget on dev.
+    // Keep the role lists in sync with isSuperAdmin() ... isAccountant().
+    function staffReadsScopedDoc() {
+      let path = /databases/$(database)/documents/users/$(request.auth.uid);
+      let u = exists(path) ? get(path).data : {};
+      let role = u.get('role', '');
+      let uOrg = u.get('organizationUID', '');
+      let uCo = u.get('companyUID', '');
+      let org = uOrg is string && uOrg != '' ? uOrg : claimString('orgId');
+      let co = uCo is string && uCo != '' ? uCo : claimString('companyId');
+      let d = resource.data;
+      return role in [
+          'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
+          'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport',
+          'tech_support', 'techsupport'
+        ]
+        || (role in [
+            'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
+            'hr', 'company-hr', 'company_hr', 'human_resources',
+            'accountant', 'accounting', 'account_admin',
+            'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+            'branches-marketing-manager', 'branchesmarketingmanager', 'branchesMarketingManager'
+          ]
+          && co != '' && (d.get('companyUID', '') == co || d.get('companyId', '') == co))
+        || (role in [
+            'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
+            'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion'
+          ]
+          && org != '' && (d.get('organizationUID', '') == org || d.get('organizationId', '') == org));
+    }
+
     // Own-id paths that skip isDelegate() (attendance / leave by uid).
     // id must be non-empty: get(field, '') would otherwise make
     // claimString('delegateId') == '' true for any staff token
@@ -1952,11 +1988,10 @@ service cloud.firestore {
 
     // ==================== MOBILE: ATTENDANCE ====================
 
+    // Delegate tokens skip the staff branch (budget, see notDelegateToken).
     function canReadAttendance() {
       return signedIn() && (
-        isGlobalStaff()
-        || (isCompanyScopedStaff() && companyScoped())
-        || (isOrgScopedStaff() && orgScoped())
+        (notDelegateToken() && staffReadsScopedDoc())
         || ownsDelegateId(resource.data.delegateId)
         || ownsDelegateId(resource.data.userId)
         || delegateOwns(resource.data.delegateId)
@@ -1969,6 +2004,7 @@ service cloud.firestore {
     // list used by getTodayCheckedInCount is provable (L1).
     function canReadOrgAdminAttendanceByOrgId() {
       return request.auth != null
+        && notDelegateToken()
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in [
           'organization-admin', 'organization_admin', 'organizationadmin',
           'organizationAdmin'
@@ -2801,10 +2837,7 @@ service cloud.firestore {
       // Split allow rules so a company+status list is provable for HR
       // (a single OR with unconstrained own-id branches made that query
       // PERMISSION_DENIED). Own-id stays a separate rule for delegates.
-      allow read: if notDelegateToken() && canReadOrgAdminRequestInOwnOrg();
-      allow read: if signedIn() && notDelegateToken() && isGlobalStaff();
-      allow read: if signedIn() && notDelegateToken() && isCompanyScopedStaff() && companyScoped();
-      allow read: if signedIn() && notDelegateToken() && isOrgScopedStaff() && orgScoped();
+      allow read: if signedIn() && notDelegateToken() && staffReadsScopedDoc();
       allow read: if signedIn() && (
         ownsDelegateId(resource.data.delegateUid)
         || delegateOwns(resource.data.delegateUid)
