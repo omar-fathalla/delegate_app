@@ -53,6 +53,11 @@ args+=(--flavor dev --dart-define=ENV=dev)
 if [[ -n "${PATROL_DEV_SECRET:-}" ]]; then
   args+=(--dart-define=PATROL_DEV_SECRET="$PATROL_DEV_SECRET")
 fi
+# Staff account override (local CI uses a seeded fake supervisor); delegate
+# tests keep their own account.
+if [[ -n "${PATROL_DEV_STAFF_PHONE:-}" ]]; then
+  args+=(--dart-define=PATROL_DEV_STAFF_PHONE="$PATROL_DEV_STAFF_PHONE")
+fi
 args+=("${extra[@]}")
 
 exec patrol test "${args[@]}"

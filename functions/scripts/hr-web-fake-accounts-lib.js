@@ -614,6 +614,23 @@ function buildPlan() {
     addAccount({...spec, company, omitCompany: !company});
   }
 
+  // Added last so every account above keeps its phone number (phones are
+  // handed out in order). Covers the two UserRole values that had no account.
+  addAccount({
+    uid: "seed-fake-accountant",
+    email: "fake.accountant@example.com",
+    role: "accountant",
+    displayName: "Fake Accountant",
+    omitCompany: true,
+  });
+  addAccount({
+    uid: "seed-fake-marketing-promotion-alpha",
+    email: "fake.marketing-promotion.alpha@example.com",
+    role: "marketing_promotion",
+    displayName: "Fake Marketing Promotion alpha",
+    company: COMPANIES[0],
+  });
+
   assertPlanSafe({seedTag: SEED_TAG, organizationId: ORG_ID, accounts, writes});
   return {seedTag: SEED_TAG, organizationId: ORG_ID, accounts, writes};
 }

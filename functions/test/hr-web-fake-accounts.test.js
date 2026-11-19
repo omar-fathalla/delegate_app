@@ -147,7 +147,7 @@ test("data builder matches staff and company delegate shapes", () => {
   assert.deepEqual(plan, lib.buildPlan());
   assert.equal(plan.seedTag, "tashil-dev-hr-web-fake-v1");
   assert.equal(plan.organizationId, "seed-fake-hr-org");
-  assert.equal(plan.accounts.length, 32);
+  assert.equal(plan.accounts.length, 34);
 
   const byEmail = Object.fromEntries(plan.accounts.map((account) => [account.email, account]));
   const expectAccount = (email, role, companyUID, phone, status = "approved") => {
@@ -288,7 +288,7 @@ test("the original 22 accounts keep their uids, phones and order", () => {
 
 test("role-shape accounts mirror every prod supervisor / HR users doc shape", () => {
   const plan = lib.buildPlan();
-  const shapes = plan.accounts.slice(22);
+  const shapes = plan.accounts.slice(22, 22 + lib.ROLE_SHAPE_ACCOUNTS.length);
   assert.equal(shapes.length, lib.ROLE_SHAPE_ACCOUNTS.length);
   const doc = (uid) => plan.writes.find((write) => write.path === `users/${uid}`).data;
   const expected = [
@@ -559,4 +559,20 @@ test("readme lists every fake account email", () => {
   }
   assert.match(readme, /tashil-dev/);
   assert.match(scriptReadme, /practice-firebase-72df1/);
+});
+
+test("every app UserRole has a fake account (accountant, marketing_promotion added last)", () => {
+  const plan = lib.buildPlan();
+  const byUid = (uid) => plan.accounts.find((a) => a.uid === uid);
+  const acc = byUid("seed-fake-accountant");
+  assert.equal(acc.role, "accountant");
+  assert.equal(acc.phoneNumber, "01000000033");
+  assert.ok(!acc.companyUID);
+  const mp = byUid("seed-fake-marketing-promotion-alpha");
+  assert.equal(mp.role, "marketing_promotion");
+  assert.equal(mp.phoneNumber, "01000000034");
+  assert.equal(mp.companyUID, "seed-fake-co-alpha");
+  // Earlier accounts keep their phones.
+  assert.equal(byUid("seed-fake-super-admin").phoneNumber, "01000000001");
+  assert.equal(byUid("seed-fake-admin-no-company").phoneNumber, "01000000032");
 });

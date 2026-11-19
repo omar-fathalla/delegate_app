@@ -80,6 +80,8 @@ Organization `seed-fake-hr-org` (Fake Test Organization / منظمة وهمية 
 | company_hr / موارد بشرية باء | fake.company_hr.beta@example.com | 01000000030 | seed-fake-co-beta |
 | human_resources / موارد بشرية باء | fake.human-resources.beta@example.com | 01000000031 | seed-fake-co-beta |
 | admin / مشرف قديم بلا شركة | fake.admin.nocompany@example.com | 01000000032 | (none) |
+| accountant / محاسب | fake.accountant@example.com | 01000000033 | (none) |
+| marketing_promotion / تسويق وترويج ألف | fake.marketing-promotion.alpha@example.com | 01000000034 | seed-fake-co-alpha |
 
 Accounts `01000000023`–`01000000032` mirror the other supervisor / HR `users` shapes seen in production (the Angular invite's `company-admin`, `company_admin`, `companyadmin` with only the legacy `companyId` field, `admin` with `position` or a legacy `userType`, `company_supervisor`, the legacy HR spellings, and a legacy `admin` without a company). On web every one of them lands on the HR desktop system (`/hr/home`).
 
