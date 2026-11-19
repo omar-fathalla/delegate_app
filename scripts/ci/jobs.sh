@@ -188,6 +188,15 @@ job_mac-gate() {
       sleep 30; waited=$(( waited + 30 ))
     done
     ci_ios_sim_acquire "mac-gate@${sha:0:8}"
+    # Fake delegates bind to the first device that logs in (delegateLoginV2);
+    # clear that before the device steps so this simulator can log in.
+    case " $steps " in *" maestro "* | *" patrol "*)
+      if [[ -f functions/scripts/hr-web-fake-accounts.js ]]; then
+        (cd functions && GOOGLE_CLOUD_PROJECT=tashil-dev \
+          node scripts/hr-web-fake-accounts.js --project tashil-dev --reset-device-bindings --apply) \
+          || echo "mac-gate: warning: could not reset fake delegates' device bindings" >&2
+      fi ;;
+    esac
     trap ci_ios_sim_release EXIT
     local step
     for step in $steps; do

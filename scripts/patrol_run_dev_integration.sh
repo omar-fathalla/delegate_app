@@ -58,6 +58,12 @@ fi
 if [[ -n "${PATROL_DEV_STAFF_PHONE:-}" ]]; then
   args+=(--dart-define=PATROL_DEV_STAFF_PHONE="$PATROL_DEV_STAFF_PHONE")
 fi
+if [[ -n "${PATROL_DEV_DELEGATE_PHONE:-}" ]]; then
+  args+=(--dart-define=PATROL_DEV_DELEGATE_PHONE="$PATROL_DEV_DELEGATE_PHONE")
+fi
+if [[ -n "${PATROL_DEV_NATIONAL_ID:-}" ]]; then
+  args+=(--dart-define=PATROL_DEV_NATIONAL_ID="$PATROL_DEV_NATIONAL_ID")
+fi
 args+=("${extra[@]}")
 
 exec patrol test "${args[@]}"

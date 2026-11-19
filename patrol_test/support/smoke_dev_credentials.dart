@@ -84,11 +84,16 @@ class SmokeDevPatrolCredentials {
   }
 
   /// Dev delegate account for Patrol setup (`01500000003` + national ID).
+  ///
+  /// `PATROL_DEV_DELEGATE_PHONE` sets the delegate phone only (local CI uses a
+  /// seeded fake delegate whose device lock it resets before each run).
   static SmokeDevPatrolCredentials delegateFromEnvironment() {
-    const phone = String.fromEnvironment(
+    const delegatePhone = String.fromEnvironment('PATROL_DEV_DELEGATE_PHONE');
+    const sharedPhone = String.fromEnvironment(
       'PATROL_DEV_PHONE',
       defaultValue: defaultDelegatePhone,
     );
+    const phone = delegatePhone == '' ? sharedPhone : delegatePhone;
     const nationalId = String.fromEnvironment(
       'PATROL_DEV_NATIONAL_ID',
       defaultValue: defaultDelegateNationalId,
