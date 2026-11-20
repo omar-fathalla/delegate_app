@@ -864,8 +864,8 @@ describe("docs-pending round 2", () => {
     for (const w of ["sa", "ts", "oa", "mk", "ca", "adm", "sup", "hr"]) {
       test(`ALLOW ${w} deletes a nested delegate (same org/company)`, () => ok(deleteDoc(doc(as(w), NP))));
     }
-    // acc / bmm: pre-existing (unchanged by r4) delete rules hit the
-    // 1000-expression limit for these roles and fail closed.
+    // acc / bmm: explicit role deny on the nested delete (was only blocked
+    // by the 1000-expression limit before).
     for (const w of ["sup2", "d1", "acc", "bmm"]) {
       test(`DENY ${w} deletes a nested delegate`, () => no(deleteDoc(doc(as(w), NP))));
     }

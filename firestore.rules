@@ -946,12 +946,17 @@ service cloud.firestore {
         isGlobalStaff() ||
         (isOrgScopedStaff() && orgScoped()) ||
         (isCompanyScopedStaff() && companyScoped()) ||
-        (userExists()
-          && userDoc().keys().hasAll(['phoneNumber'])
-          && resource.data.phoneNumber == userDoc().phoneNumber) ||
-        (userExists()
-          && userDoc().keys().hasAll(['email'])
-          && resource.data.email == userDoc().email)
+        // Own-account lookup by phone/email. Compared with the signed token,
+        // never with the caller's users doc: that doc is self-written, so a
+        // copied victim phone/email would list the victim's doc. These were
+        // denied before only because the old branches ran out of the
+        // 1000-expression budget (adversarial S2).
+        (request.auth.token.get('email', '') is string
+          && request.auth.token.get('email', '') != ''
+          && resource.data.get('email', '') == request.auth.token.email) ||
+        (request.auth.token.get('phone_number', '') is string
+          && request.auth.token.get('phone_number', '') != ''
+          && resource.data.get('phoneNumber', '') == request.auth.token.phone_number)
       );
 
       // New staff accounts come from the createStaffUser function (Admin SDK).
@@ -1419,7 +1424,14 @@ service cloud.firestore {
             : (deviceBindingUntouched() && signedIn()
               && staffManagesDelegate([orgId], [compId], false)
               && staffDocsApproveOk(orgId, compId, compId, delegateId));
-          allow delete: if canManageNestedDelegate(orgId, compId);
+          // Accountant and branches marketing are company-scoped staff but
+          // never delete delegates (docs-pending Q3). Explicit deny: this was
+          // only blocked by the 1000-expression budget before.
+          allow delete: if !(staffRole() in [
+              'accountant', 'branches_marketing',
+              'branches_marketing_manager', 'branchesMarketingManager'
+            ])
+            && canManageNestedDelegate(orgId, compId);
         }
 
         match /requests/{requestId} {

@@ -107,7 +107,12 @@ describe("adversarial", ()=>{
     await rec("attacker lists users by victim phone (reads victim doc)","deny",getDocs(query(collection(as("atk"),"users"),where("phoneNumber","==","01000000009"))));
     await rec("delegate self update phoneNumber to victim phone","deny",updateDoc(doc(as("d1"),"users/d1"),{phoneNumber:"01000000009"}));
     await rec("delegate lists users by victim phone after change","deny",getDocs(query(collection(as("d1"),"users"),where("phoneNumber","==","01000000009"))));
-    await rec("attacker self-create with victim email + list","deny",setDoc(doc(as("atk2"),"users/atk2"),{role:"delegate",email:"victim@x.test"}).then(()=>getDocs(query(collection(as("atk2"),"users"),where("email","==","victim@x.test")))));});
+    await rec("attacker self-create with victim email + list","deny",setDoc(doc(as("atk2"),"users/atk2"),{role:"delegate",email:"victim@x.test"}).then(()=>getDocs(query(collection(as("atk2"),"users"),where("email","==","victim@x.test")))));
+    // Explicit match on the signed token, not on the self-written users doc
+    // (these were budget-only denies before).
+    await rec("token email lists own users doc by email","allow",getDocs(query(collection(as("atk3",{email:"atk3@x.test"}),"users"),where("email","==","atk3@x.test"))));
+    await rec("token email lists victim email","deny",getDocs(query(collection(as("atk3",{email:"atk3@x.test"}),"users"),where("email","==","victim@x.test"))));
+    await rec("token phone lists victim phone","deny",getDocs(query(collection(as("atk4",{phone_number:"+201000000001"}),"users"),where("phoneNumber","==","01000000009"))));});
   test("delegate custom token", async()=>{ const dt=as("d1",{role:"delegate",delegateId:"d1",orgId:"o1",companyId:"c1",phones:["01011111111"]});
     await rec("delegate get own nested doc","allow",getDoc(doc(dt,"organizations/o1/companies/c1/delegates/d1")));
     await rec("delegate get other delegate","deny",getDoc(doc(dt,"organizations/o1/companies/c1/delegates/d9")));
