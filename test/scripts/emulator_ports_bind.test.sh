@@ -43,21 +43,27 @@ if (e.firestore.websocketPort !== 9150) {
 console.log('ok: default generated emulator ports match firebase.json behavior');
 "
 
-export LOCAL_CI_FIRESTORE_PORT=18080
-export LOCAL_CI_FIRESTORE_HUB_PORT=14400
-export LOCAL_CI_AUTH_PORT=19099
-export LOCAL_CI_STORAGE_PORT=19199
-export LOCAL_CI_FUNCTIONS_PORT=15001
-export LOCAL_CI_LOGGING_PORT=14500
-export LOCAL_CI_FIRESTORE_WEBSOCKET_PORT=19150
+# TAS-107: never a fixed port set (18080 was shared by every P0 job and local
+# run on the Mac). CI uses this runner's slot; locally the first free slot.
+if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+  emulator_use_slot 20000 "$(emulator_runner_slot "${RUNNER_NAME:-}")"
+else
+  emulator_pick_local_slot || { echo "no free local emulator slot" >&2; emulator_ports_busy_report >&2; exit 1; }
+fi
+FS_PORT="${LOCAL_CI_FIRESTORE_PORT}"
+WS_PORT="${LOCAL_CI_FIRESTORE_WEBSOCKET_PORT}"
+if [[ "${FS_PORT}" == 8080 ]]; then
+  echo "bind test must run on a non-default port, got ${FS_PORT}" >&2
+  exit 1
+fi
 emulator_export_hosts
 
-if [[ "${FIRESTORE_EMULATOR_HOST}" != "127.0.0.1:18080" ]]; then
-  echo "FIRESTORE_EMULATOR_HOST=${FIRESTORE_EMULATOR_HOST} (expected 127.0.0.1:18080)" >&2
+if [[ "${FIRESTORE_EMULATOR_HOST}" != "127.0.0.1:${FS_PORT}" ]]; then
+  echo "FIRESTORE_EMULATOR_HOST=${FIRESTORE_EMULATOR_HOST} (expected 127.0.0.1:${FS_PORT})" >&2
   exit 1
 fi
 
-wait_emulator_ports_free
+wait_emulator_ports_free || { echo "slot ports busy:" >&2; emulator_ports_busy_report >&2; exit 1; }
 
 # Short-lived firestore emulator on non-default port; assert listen + env inside exec.
 bash "$ROOT/scripts/emulators_exec.sh" \
@@ -66,17 +72,17 @@ bash "$ROOT/scripts/emulators_exec.sh" \
   "node -e \"
     const {execSync}=require('child_process');
     const want=process.env.FIRESTORE_EMULATOR_HOST;
-    if (want!=='127.0.0.1:18080') {
+    if (want!=='127.0.0.1:${FS_PORT}') {
       console.error('inside exec FIRESTORE_EMULATOR_HOST=', want);
       process.exit(1);
     }
-    if (process.env.FIRESTORE_EMULATOR_WEBSOCKET_PORT!=='19150') {
+    if (process.env.FIRESTORE_EMULATOR_WEBSOCKET_PORT!=='${WS_PORT}') {
       console.error('websocket port env', process.env.FIRESTORE_EMULATOR_WEBSOCKET_PORT);
       process.exit(1);
     }
-    execSync('lsof -nP -iTCP:18080 -sTCP:LISTEN', {stdio:'inherit'});
-    execSync('lsof -nP -iTCP:19150 -sTCP:LISTEN', {stdio:'inherit'});
-    console.log('ok: firestore emulator listening on 18080 (ws 19150)');
+    execSync('lsof -nP -iTCP:${FS_PORT} -sTCP:LISTEN', {stdio:'inherit'});
+    execSync('lsof -nP -iTCP:${WS_PORT} -sTCP:LISTEN', {stdio:'inherit'});
+    console.log('ok: firestore emulator listening on ${FS_PORT} (ws ${WS_PORT})');
   \""
 
 echo "ok: emulator port override bind test passed"
