@@ -10,7 +10,7 @@ const {
   initializeTestEnvironment,
   assertFails,
   assertSucceeds,
-} = require("@firebase/rules-unit-testing");
+} = require("./_rules_testing");
 const {
   collection,
   collectionGroup,

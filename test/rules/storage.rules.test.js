@@ -8,7 +8,7 @@ const {describe, test, before, after, beforeEach} = require("node:test");
 const assert = require("node:assert/strict");
 const {readFileSync} = require("fs");
 const {resolve} = require("path");
-const {initializeTestEnvironment, assertFails, assertSucceeds} = require("@firebase/rules-unit-testing");
+const {initializeTestEnvironment, assertFails, assertSucceeds} = require("./_rules_testing");
 const {doc, setDoc} = require("firebase/firestore");
 const {ref, uploadBytes, getBytes, listAll, deleteObject} = require("firebase/storage");
 

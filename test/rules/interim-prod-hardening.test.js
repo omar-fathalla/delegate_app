@@ -11,7 +11,7 @@ const {describe, test, before, after} = require("node:test");
 const assert = require("node:assert");
 const {readFileSync} = require("fs");
 const {resolve} = require("path");
-const {initializeTestEnvironment} = require("@firebase/rules-unit-testing");
+const {initializeTestEnvironment} = require("./_rules_testing");
 
 const read = (p) => readFileSync(resolve(__dirname, p), "utf8");
 const HARDENED = new Set(["users", "attendance_logs", "org_attendance_logs",
