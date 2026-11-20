@@ -81,7 +81,13 @@
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log",
-        ".runtimeconfig.json"
+        ".runtimeconfig.json",
+        "*.md",
+        "*.log",
+        "find_*.js",
+        "create_tech_support.js",
+        "scripts/**",
+        "test/**"
       ]
     }
   ],

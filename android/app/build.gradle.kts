@@ -92,15 +92,9 @@ android {
             storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
             storePassword = keystoreProperties.getProperty("storePassword")
         }
-        getByName("debug") {
-            val uploadKeystoreFile = file("upload-keystore.jks")
-            if (uploadKeystoreFile.exists()) {
-                storeFile = uploadKeystoreFile
-                storePassword = "android"
-                keyAlias = "upload"
-                keyPassword = "android"
-            }
-        }
+        // Debug builds use the default ~/.android/debug.keystore (its SHA-1 is
+        // registered on the Maps key). The upload key must never be used for
+        // debug signing or have its password in source (TAS-12).
     }
 
     testOptions {
