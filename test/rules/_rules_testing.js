@@ -120,18 +120,22 @@ function trueTree(n) {
  * Proves a rule keeps `pad` spare expressions for a real, allowed request.
  * @param {object} o
  * @param {string} o.rules     full rules source
- * @param {string} o.line      exact `allow ...: if ` line to pad (must appear once)
- * @param {number} o.pad       spare expressions required
+ * @param {string} o.line      rules text that appears exactly once; the last
+ *                             `allow ...: if ` inside it is padded (earlier
+ *                             lines are context, to make the text unique)
+ * @param {number} o.pad       spare pad units required (trueTree(pad) is inserted)
  * @param {string} o.projectId demo-* project id for the throwaway env
  * @param {(db, env) => Promise<void>} [o.seed] fixtures, written with rules disabled
  * @param {(env) => Promise<unknown>} o.request request that must still be allowed
  */
 async function assertBudgetHeadroom({rules, line, pad, projectId, seed, request}) {
   const count = rules.split(line).length - 1;
-  if (count !== 1) throw new Error(`headroom guard: expected the rule line once, found ${count}; update the guard`);
-  const m = line.match(/^(\s*allow [a-z, ]+: if )/);
-  if (!m) throw new Error("headroom guard: line must start with `allow <ops>: if `");
-  const padded = rules.replace(line, line.replace(m[1], `${m[1]}${trueTree(pad)} && `));
+  if (count !== 1) throw new Error(`headroom guard: expected the rule text once, found ${count}; update the guard`);
+  const all = [...line.matchAll(/allow [a-z, ]+: if /g)];
+  if (!all.length) throw new Error("headroom guard: rule text must contain `allow <ops>: if `");
+  const last = all[all.length - 1]; // earlier lines are context only
+  const at = last.index + last[0].length;
+  const padded = rules.replace(line, line.slice(0, at) + `${trueTree(pad)} && ` + line.slice(at));
   const env = await base.initializeTestEnvironment({projectId, firestore: {rules: padded}});
   try {
     if (seed) await env.withSecurityRulesDisabled((ctx) => seed(ctx.firestore(), env));
