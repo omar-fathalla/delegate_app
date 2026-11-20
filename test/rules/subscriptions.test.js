@@ -390,7 +390,13 @@ describe("delegate_requests: payment is server-only", () => {
     await assertFails(as("sa").doc("delegate_requests/pending").update({quotedAt: "2027-04-01T00:00:00Z"}));
   });
 
-  test("organizationUIDs is capped after create and the primary chain must belong to the company", async () => {
+  // #375 (17 Nov 2026) removed the 10-chain cap on purpose ("بلا حد أقصى");
+  // rules, functions (requestOrganizationIds) and the app
+  // (kChainListSanityLimit) all use 100 as a sanity bound only. #374 changed
+  // the primary-chain check from "belongs to the company" to "exists" (any
+  // company may request any chain; approval registers it). Company isolation
+  // still holds: company staff cannot touch organizationUIDs after create.
+  test("organizationUIDs has a 100 sanity bound after create and the primary chain must exist", async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       await ctx.firestore().doc("delegate_requests/multi").set({
         requestType: "new_delegate", status: "pending",
@@ -398,10 +404,20 @@ describe("delegate_requests: payment is server-only", () => {
         organizationUIDs: ["o1", "o3"],
       });
     });
-    const twelve = Array.from({length: 12}, (_, i) => i === 0 ? "o1" : `ox${i}`);
-    await assertFails(as("sup").doc("delegate_requests/multi").update({organizationUIDs: twelve}));
-    await assertFails(as("sa").doc("delegate_requests/multi").update({organizationUIDs: twelve}));
+    const list = (n) => Array.from({length: n}, (_, i) => i === 0 ? "o1" : `ox${i}`);
+    // Company staff may only edit updatedAt / notes, whatever the list size.
+    await assertFails(as("sup").doc("delegate_requests/multi").update({organizationUIDs: ["o1", "o3", "o2"]}));
+    await assertFails(as("sup").doc("delegate_requests/multi").update({organizationUIDs: list(12)}));
+    // No 10-chain cap any more; 101 is past the sanity bound.
+    await assertSucceeds(as("sa").doc("delegate_requests/multi").update({organizationUIDs: list(12)}));
+    await assertFails(as("sa").doc("delegate_requests/multi").update({organizationUIDs: list(101)}));
+    // The list must still include the primary chain.
+    await assertFails(as("sa").doc("delegate_requests/multi").update({organizationUIDs: ["o3"]}));
     await assertSucceeds(as("sa").doc("delegate_requests/multi").update({organizationUIDs: ["o1"]}));
+    // Moving the primary to a chain that does not exist is refused.
+    await assertFails(as("sa").doc("delegate_requests/multi").update({
+      organizationUID: "missing-org", organizationUIDs: ["missing-org"],
+    }));
     await assertFails(as("sa").doc("delegate_requests/no-such-chain").set({
       requestType: "new_delegate", status: "pending", supervisorUid: "sa",
       organizationUID: "missing-org", companyUID: "c1",
