@@ -249,12 +249,28 @@ int hrChainGridColumns(double width) {
   return 2;
 }
 
+/// Pending «طلب ضم سلسلة» rows shown in the chains card before «عرض الكل».
+const int kHrHomePendingChainsShown = 3;
+
 /// «سلاسل مناديبك»: one equal-width chip per chain; tapping filters the table.
+///
+/// The company-level «إضافة سلسلة» request lives here (TAS-117): a text
+/// button in the header, the pending requests under the chips, and an empty
+/// state whose main action is «أضف أول سلسلة».
 class HrHomeChainsCard extends StatelessWidget {
   final List<String> chains;
   final String? selected;
   final bool enabled;
   final ValueChanged<String?> onSelected;
+
+  /// Opens the «إضافة سلاسل للشركة» sheet. Null hides the action.
+  final VoidCallback? onAddChain;
+
+  /// Chain names with a pending company request.
+  final List<String> pendingRequests;
+
+  /// Opens the page that lists every chain request. Null hides «عرض الكل».
+  final VoidCallback? onOpenRequests;
 
   const HrHomeChainsCard({
     super.key,
@@ -262,27 +278,45 @@ class HrHomeChainsCard extends StatelessWidget {
     required this.selected,
     required this.onSelected,
     this.enabled = true,
+    this.onAddChain,
+    this.pendingRequests = const [],
+    this.onOpenRequests,
   });
+
+  static const addChainKey = ValueKey('hr_home_add_chain');
+  static const addFirstChainKey = ValueKey('hr_home_add_first_chain');
+  static const pendingKey = ValueKey('hr_home_chain_requests');
+  static const pendingAllKey = ValueKey('hr_home_chain_requests_all');
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final addChain = onAddChain;
     return HrOverviewCard(
       key: const ValueKey('hr_home_chains_card'),
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const HrCardTitle(
+          HrCardTitle(
             icon: Icons.storefront_rounded,
             text: kHrHomeChainsTitle,
+            trailing: addChain == null || chains.isEmpty
+                ? null
+                : TextButton.icon(
+                    key: addChainKey,
+                    onPressed: addChain,
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(0, 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('إضافة سلسلة'),
+                  ),
           ),
           const SizedBox(height: 16),
           if (chains.isEmpty)
-            Text(
-              'لسه مفيش سلاسل مرتبطة بمناديبك',
-              style: TextStyle(fontSize: HrFont.body, color: cs.onSurfaceVariant),
-            )
+            _ChainsEmptyState(onAddChain: addChain)
           else
             LayoutBuilder(
               builder: (context, constraints) {
@@ -307,6 +341,109 @@ class HrHomeChainsCard extends StatelessWidget {
                 );
               },
             ),
+          if (pendingRequests.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Divider(height: 1, color: cs.outlineVariant),
+            const SizedBox(height: 12),
+            Column(
+              key: pendingKey,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'طلبات قيد المراجعة (${pendingRequests.length})',
+                        style: TextStyle(
+                          fontSize: HrFont.body,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    if (onOpenRequests != null)
+                      TextButton(
+                        key: pendingAllKey,
+                        onPressed: onOpenRequests,
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(0, 40),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        child: const Text('عرض الكل'),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                for (final name in pendingRequests.take(
+                  kHrHomePendingChainsShown,
+                ))
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.schedule_rounded,
+                          size: 18,
+                          color: HrStatusColors.of(context).warning,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: HrFont.body,
+                              color: cs.onSurface,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (pendingRequests.length > kHrHomePendingChainsShown)
+                  Text(
+                    '+${pendingRequests.length - kHrHomePendingChainsShown} طلبات أخرى',
+                    style: TextStyle(
+                      fontSize: HrFont.labelMedium,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ChainsEmptyState extends StatelessWidget {
+  final VoidCallback? onAddChain;
+
+  const _ChainsEmptyState({required this.onAddChain});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final text = Text(
+      'لسه مفيش سلاسل مرتبطة بمناديبك',
+      style: TextStyle(fontSize: HrFont.body, color: cs.onSurfaceVariant),
+    );
+    if (onAddChain == null) return text;
+    return Center(
+      child: Column(
+        children: [
+          Icon(Icons.add_business_rounded, size: 40, color: cs.primary),
+          const SizedBox(height: 8),
+          text,
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            key: HrHomeChainsCard.addFirstChainKey,
+            onPressed: onAddChain,
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('أضف أول سلسلة'),
+          ),
         ],
       ),
     );
@@ -461,7 +598,9 @@ class HrHomeFeatureCard extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 color: cs.tertiaryContainer,
-                                borderRadius: BorderRadius.circular(HrRadius.chip),
+                                borderRadius: BorderRadius.circular(
+                                  HrRadius.chip,
+                                ),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,

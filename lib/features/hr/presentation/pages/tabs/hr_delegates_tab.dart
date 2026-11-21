@@ -14,7 +14,6 @@ import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bl
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_event.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_state.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_delegate_attendance_detail_screen.dart';
-import 'package:delegate_app/features/hr/presentation/widgets/hr_add_chains_sheet.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:delegate_app/features/profile/presentation/pages/profile_screen.dart';
@@ -57,8 +56,6 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
     _viewMode = HRDelegatesViewMode.table;
     _delegatesBloc = di.sl<AdminDelegatesBloc>();
     _loadDelegates();
-    // Warm the chain catalog so «إضافة سلاسل للشركة» opens at once.
-    if (WebRuntimePolicy.isWeb) HrAddChainsSheet.prefetch(widget.hrDelegate);
   }
 
   @override
@@ -128,28 +125,14 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
     );
   }
 
-  /// Web: company-level «إضافة سلاسل للشركة» («طلب ضم سلسلة»). Replaces
-  /// the per-delegate action: approved chains reach every active, paid
-  /// delegate of the company automatically.
-  Future<void> _openAddCompanyChains() async {
-    final names = await HrAddChainsSheet.show(
-      context,
-      supervisor: widget.hrDelegate,
-    );
-    if (!mounted || names == null || names.isEmpty) return;
-    AppSnackBar.showSuccess(
-      context,
-      'تم إرسال طلب ضم ${names.length} سلسلة للشركة. بعد الموافقة تظهر فروعها لكل المناديب النشطين المدفوع اشتراكهم.',
-    );
-  }
-
-  static const addCompanyChainsKey = Key('hr_add_company_chains');
-
   /// Chains the delegate is on, from the loaded delegate (primary chain
   /// plus allOrganizationNames). No extra reads.
   int _chainCount(Delegate delegate) {
     final names = <String>{
-      for (final n in [delegate.organizationName, ...delegate.allOrganizationNames])
+      for (final n in [
+        delegate.organizationName,
+        ...delegate.allOrganizationNames,
+      ])
         if (n.trim().isNotEmpty) n.trim().toLowerCase(),
     };
     if (names.isEmpty && delegate.organizationUID.trim().isNotEmpty) return 1;
@@ -157,7 +140,9 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
   }
 
   /// Web filter segments: room around each label, selected one included.
-  static const EdgeInsets _webSegmentPadding = EdgeInsets.symmetric(horizontal: 18);
+  static const EdgeInsets _webSegmentPadding = EdgeInsets.symmetric(
+    horizontal: 18,
+  );
 
   /// Small circular icon action. Neutral grey by default; [accent] gives the
   /// purple «إضافة سلاسل» look with a tighter circle. 48dp tap target.
@@ -186,9 +171,15 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
           backgroundColor: accent
               ? colorScheme.primary.withValues(alpha: 0.12)
               : colorScheme.surfaceContainerHighest,
-          foregroundColor: accent ? colorScheme.primary : colorScheme.onSurfaceVariant,
-          disabledBackgroundColor: colorScheme.onSurface.withValues(alpha: 0.06),
-          disabledForegroundColor: colorScheme.onSurface.withValues(alpha: 0.32),
+          foregroundColor: accent
+              ? colorScheme.primary
+              : colorScheme.onSurfaceVariant,
+          disabledBackgroundColor: colorScheme.onSurface.withValues(
+            alpha: 0.06,
+          ),
+          disabledForegroundColor: colorScheme.onSurface.withValues(
+            alpha: 0.32,
+          ),
         ),
       ),
     );
@@ -257,7 +248,9 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: isEnabled
-                        ? HrStatusColors.of(context).success.withValues(alpha: 0.12)
+                        ? HrStatusColors.of(
+                            context,
+                          ).success.withValues(alpha: 0.12)
                         : Colors.amber.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(HrRadius.chip),
                   ),
@@ -311,12 +304,16 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: isEnabled
-                            ? HrStatusColors.of(context).success.withValues(alpha: 0.08)
+                            ? HrStatusColors.of(
+                                context,
+                              ).success.withValues(alpha: 0.08)
                             : Colors.amber.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(HrRadius.card),
                         border: Border.all(
                           color: isEnabled
-                              ? HrStatusColors.of(context).success.withValues(alpha: 0.25)
+                              ? HrStatusColors.of(
+                                  context,
+                                ).success.withValues(alpha: 0.25)
                               : Colors.amber.withValues(alpha: 0.35),
                         ),
                       ),
@@ -371,20 +368,30 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                     // مفتاح التفعيل M3 SwitchListTile
                     Container(
                       decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
+                        color: colorScheme.surfaceContainerHigh.withValues(
+                          alpha: 0.5,
+                        ),
                         borderRadius: BorderRadius.circular(HrRadius.card),
                         border: Border.all(
-                          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                          color: colorScheme.outlineVariant.withValues(
+                            alpha: 0.4,
+                          ),
                         ),
                       ),
                       child: SwitchListTile.adaptive(
                         value: isEnabled,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 4,
+                        ),
                         activeTrackColor: colorScheme.primary,
                         activeThumbColor: colorScheme.onPrimary,
                         title: const Text(
                           'تفعيل الإجازات السنوية',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.body),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: HrFont.body,
+                          ),
                         ),
                         subtitle: Text(
                           isEnabled
@@ -491,7 +498,10 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                               .doc(delegate.uid);
                           final userDoc = await userRef.get();
                           if (userDoc.exists) {
-                            await userRef.set(updatePayload, SetOptions(merge: true));
+                            await userRef.set(
+                              updatePayload,
+                              SetOptions(merge: true),
+                            );
                           }
 
                           if (dialogContext.mounted) {
@@ -565,19 +575,28 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                   controller: _searchController,
                   hintText: 'بحث بالاسم، رقم الهاتف، أو الرقم القومي...',
                   elevation: const WidgetStatePropertyAll(0),
-                  constraints: const BoxConstraints(minHeight: 44, maxHeight: 44),
+                  constraints: const BoxConstraints(
+                    minHeight: 44,
+                    maxHeight: 44,
+                  ),
                   shape: WidgetStatePropertyAll(
                     RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(HrRadius.pill),
                       side: BorderSide(
-                        color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                        color: colorScheme.outlineVariant.withValues(
+                          alpha: 0.35,
+                        ),
                       ),
                     ),
                   ),
                   backgroundColor: WidgetStatePropertyAll(
                     colorScheme.surfaceContainerHigh,
                   ),
-                  leading: Icon(Icons.search_rounded, size: 19, color: colorScheme.primary),
+                  leading: Icon(
+                    Icons.search_rounded,
+                    size: 19,
+                    color: colorScheme.primary,
+                  ),
                   trailing: _searchController.text.isNotEmpty
                       ? [
                           IconButton(
@@ -595,73 +614,64 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                   onChanged: (_) => setState(() {}),
                 );
 
-                final statusButtonGroup = TashilConnectedButtonGroup<DelegateStatus?>(
-                  height: 44,
-                  itemPadding: WebRuntimePolicy.isWeb ? _webSegmentPadding : null,
-                  selectedValue: _selectedStatus,
-                  items: [
-                    TashilConnectedButtonItem<DelegateStatus?>(
-                      value: null,
-                      label: total > 0 ? 'جميع المناديب ($total)' : 'جميع المناديب',
-                      icon: Icons.people_alt_rounded,
-                    ),
-                    TashilConnectedButtonItem<DelegateStatus?>(
-                      value: DelegateStatus.active,
-                      label: activeCount > 0 ? 'نشط ($activeCount)' : 'نشط',
-                      icon: Icons.check_circle_outline_rounded,
-                      activeColor: HrStatusColors.of(context).success,
-                    ),
-                    TashilConnectedButtonItem<DelegateStatus?>(
-                      value: DelegateStatus.suspended,
-                      label: suspendedCount > 0 ? 'متوقف ($suspendedCount)' : 'متوقف',
-                      icon: Icons.pause_circle_outline_rounded,
-                      activeColor: HrStatusColors.of(context).danger,
-                    ),
-                  ],
-                  onSelected: (val) {
-                    setState(() => _selectedStatus = val);
-                  },
-                );
-
-                final viewModeButtonGroup = TashilConnectedButtonGroup<HRDelegatesViewMode>(
-                  height: 44,
-                  itemPadding: WebRuntimePolicy.isWeb ? _webSegmentPadding : null,
-                  selectedValue: _viewMode,
-                  items: const [
-                    TashilConnectedButtonItem<HRDelegatesViewMode>(
-                      value: HRDelegatesViewMode.table,
-                      label: 'جدول',
-                      icon: Icons.table_chart_rounded,
-                    ),
-                    TashilConnectedButtonItem<HRDelegatesViewMode>(
-                      value: HRDelegatesViewMode.cards,
-                      label: 'بطاقات',
-                      icon: Icons.grid_view_rounded,
-                    ),
-                  ],
-                  onSelected: (val) {
-                    setState(() => _viewMode = val);
-                  },
-                );
-
-                final addCompanyChainsButton = WebRuntimePolicy.isWeb
-                    ? FilledButton.icon(
-                        key: addCompanyChainsKey,
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(0, 44),
-                          padding: const EdgeInsets.symmetric(horizontal: 18),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(HrRadius.pill),
-                          ),
+                final statusButtonGroup =
+                    TashilConnectedButtonGroup<DelegateStatus?>(
+                      height: 44,
+                      itemPadding: WebRuntimePolicy.isWeb
+                          ? _webSegmentPadding
+                          : null,
+                      selectedValue: _selectedStatus,
+                      items: [
+                        TashilConnectedButtonItem<DelegateStatus?>(
+                          value: null,
+                          label: total > 0
+                              ? 'جميع المناديب ($total)'
+                              : 'جميع المناديب',
+                          icon: Icons.people_alt_rounded,
                         ),
-                        onPressed: _openAddCompanyChains,
-                        icon: const Icon(Symbols.add_business_rounded, size: 20),
-                        label: const Text(
-                          'إضافة سلاسل للشركة',
-                          style: TextStyle(fontWeight: FontWeight.w700),
+                        TashilConnectedButtonItem<DelegateStatus?>(
+                          value: DelegateStatus.active,
+                          label: activeCount > 0 ? 'نشط ($activeCount)' : 'نشط',
+                          icon: Icons.check_circle_outline_rounded,
+                          activeColor: HrStatusColors.of(context).success,
                         ),
-                      )
-                    : null;
+                        TashilConnectedButtonItem<DelegateStatus?>(
+                          value: DelegateStatus.suspended,
+                          label: suspendedCount > 0
+                              ? 'متوقف ($suspendedCount)'
+                              : 'متوقف',
+                          icon: Icons.pause_circle_outline_rounded,
+                          activeColor: HrStatusColors.of(context).danger,
+                        ),
+                      ],
+                      onSelected: (val) {
+                        setState(() => _selectedStatus = val);
+                      },
+                    );
+
+                final viewModeButtonGroup =
+                    TashilConnectedButtonGroup<HRDelegatesViewMode>(
+                      height: 44,
+                      itemPadding: WebRuntimePolicy.isWeb
+                          ? _webSegmentPadding
+                          : null,
+                      selectedValue: _viewMode,
+                      items: const [
+                        TashilConnectedButtonItem<HRDelegatesViewMode>(
+                          value: HRDelegatesViewMode.table,
+                          label: 'جدول',
+                          icon: Icons.table_chart_rounded,
+                        ),
+                        TashilConnectedButtonItem<HRDelegatesViewMode>(
+                          value: HRDelegatesViewMode.cards,
+                          label: 'بطاقات',
+                          icon: Icons.grid_view_rounded,
+                        ),
+                      ],
+                      onSelected: (val) {
+                        setState(() => _viewMode = val);
+                      },
+                    );
 
                 final refreshButton = IconButton.filledTonal(
                   style: IconButton.styleFrom(
@@ -678,7 +688,8 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
 
                 return LayoutBuilder(
                   builder: (context, constraints) {
-                    final isDesktopWide = constraints.maxWidth >=
+                    final isDesktopWide =
+                        constraints.maxWidth >=
                         (WebRuntimePolicy.isWeb ? 900 : 960);
 
                     if (isDesktopWide) {
@@ -691,10 +702,6 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                           viewModeButtonGroup,
                           const SizedBox(width: 10),
                           refreshButton,
-                          if (addCompanyChainsButton != null) ...[
-                            const SizedBox(width: 10),
-                            addCompanyChainsButton,
-                          ],
                         ],
                       );
                     }
@@ -711,10 +718,6 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                             ),
                             const SizedBox(width: 8),
                             refreshButton,
-                            if (addCompanyChainsButton != null) ...[
-                              const SizedBox(width: 8),
-                              addCompanyChainsButton,
-                            ],
                           ],
                         ),
                         const SizedBox(height: 10),
@@ -750,7 +753,10 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                           color: colorScheme.error,
                         ),
                         const SizedBox(height: 12),
-                        Text(state.message, style: TextStyle(color: colorScheme.error)),
+                        Text(
+                          state.message,
+                          style: TextStyle(color: colorScheme.error),
+                        ),
                         const SizedBox(height: 16),
                         FilledButton.tonal(
                           onPressed: _loadDelegates,
@@ -763,14 +769,17 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                   final query = _searchController.text.trim().toLowerCase();
                   final filtered = state.delegates.where((d) {
                     if (query.isNotEmpty) {
-                      final matchesName = d.fullName.toLowerCase().contains(query);
+                      final matchesName = d.fullName.toLowerCase().contains(
+                        query,
+                      );
                       final matchesPhone = d.phoneNumber.contains(query);
                       final matchesNat = d.nationalityID.contains(query);
                       if (!matchesName && !matchesPhone && !matchesNat) {
                         return false;
                       }
                     }
-                    if (_selectedStatus != null && d.status != _selectedStatus) {
+                    if (_selectedStatus != null &&
+                        d.status != _selectedStatus) {
                       return false;
                     }
                     return true;
@@ -784,7 +793,9 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                           Icon(
                             Icons.people_outline_rounded,
                             size: 56,
-                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                            color: colorScheme.onSurfaceVariant.withValues(
+                              alpha: 0.5,
+                            ),
                           ),
                           const SizedBox(height: 12),
                           Text(
@@ -819,7 +830,8 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
     ColorScheme colorScheme,
   ) {
     if (WebRuntimePolicy.isWeb) {
-      final narrow = MediaQuery.sizeOf(context).width <
+      final narrow =
+          MediaQuery.sizeOf(context).width <
           HRDelegatesWebBreakpoints.cardsBelow;
       if (narrow || _viewMode == HRDelegatesViewMode.cards) {
         return _buildCardsGrid(delegates, theme, colorScheme);
@@ -855,17 +867,17 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
   static const double _webCellPadding = 8;
 
   Widget _webCell(_WebCol col, Widget child) => Expanded(
-        flex: col.flex,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: _webCellPadding),
-          child: Align(
-            alignment: col.center
-                ? Alignment.center
-                : AlignmentDirectional.centerStart,
-            child: child,
-          ),
-        ),
-      );
+    flex: col.flex,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: _webCellPadding),
+      child: Align(
+        alignment: col.center
+            ? Alignment.center
+            : AlignmentDirectional.centerStart,
+        child: child,
+      ),
+    ),
+  );
 
   /// Web table (MD3 Model 3): no row tap, icon actions, and the ID/phone
   /// and name/city columns merge on narrower tables.
@@ -906,7 +918,9 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                       color: colorScheme.surfaceContainerLow,
                       border: Border(
                         bottom: BorderSide(
-                          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                          color: colorScheme.outlineVariant.withValues(
+                            alpha: 0.6,
+                          ),
                         ),
                       ),
                     ),
@@ -938,7 +952,9 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                       separatorBuilder: (_, _) => Divider(
                         height: 1,
                         thickness: 1,
-                        color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                        color: colorScheme.outlineVariant.withValues(
+                          alpha: 0.3,
+                        ),
                       ),
                       itemBuilder: (context, index) => _buildWebRow(
                         delegates[index],
@@ -981,8 +997,9 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
     required ColorScheme colorScheme,
   }) {
     final isActive = delegate.status == DelegateStatus.active;
-    final statusColor =
-        isActive ? HrStatusColors.of(context).success : colorScheme.onSurfaceVariant;
+    final statusColor = isActive
+        ? HrStatusColors.of(context).success
+        : colorScheme.onSurfaceVariant;
     final statusBg = isActive
         ? HrStatusColors.of(context).success.withValues(alpha: 0.12)
         : colorScheme.surfaceContainerHighest;
@@ -1001,10 +1018,10 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
     );
 
     Widget plain(String value, {TextStyle? style}) => SelectableText(
-          value.isNotEmpty ? value : '—',
-          style: style ?? mono,
-          maxLines: 1,
-        );
+      value.isNotEmpty ? value : '—',
+      style: style ?? mono,
+      maxLines: 1,
+    );
 
     final name = Row(
       children: [
@@ -1020,7 +1037,12 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(delegate.fullName, style: nameStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(
+                      delegate.fullName,
+                      style: nameStyle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     Text(
                       city,
                       style: theme.textTheme.bodySmall?.copyWith(
@@ -1032,7 +1054,12 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                     ),
                   ],
                 )
-              : Text(delegate.fullName, style: nameStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+              : Text(
+                  delegate.fullName,
+                  style: nameStyle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
         ),
       ],
     );
@@ -1050,7 +1077,11 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Symbols.storefront_rounded, size: 15, color: colorScheme.onSurfaceVariant),
+            Icon(
+              Symbols.storefront_rounded,
+              size: 15,
+              color: colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(width: 4),
             Text(
               '$chainCount',
@@ -1091,10 +1122,10 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
     final actions = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        for (final (i, w) in _buildWebActions(delegate, colorScheme).indexed) ...[
-          if (i > 0) const SizedBox(width: 2),
-          w,
-        ],
+        for (final (i, w) in _buildWebActions(
+          delegate,
+          colorScheme,
+        ).indexed) ...[if (i > 0) const SizedBox(width: 2), w],
       ],
     );
 
@@ -1182,8 +1213,9 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final availableWidth = constraints.maxWidth;
-            final contentWidth =
-                availableWidth > minWidth ? availableWidth : minWidth;
+            final contentWidth = availableWidth > minWidth
+                ? availableWidth
+                : minWidth;
             final isScrollable = contentWidth > availableWidth;
 
             return Scrollbar(
@@ -1209,25 +1241,65 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                         height: 52,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest
-                              .withValues(alpha: 0.45),
+                          color: colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.45,
+                          ),
                           border: Border(
                             bottom: BorderSide(
-                              color: colorScheme.outlineVariant
-                                  .withValues(alpha: 0.6),
+                              color: colorScheme.outlineVariant.withValues(
+                                alpha: 0.6,
+                              ),
                               width: 1.5,
                             ),
                           ),
                         ),
                         child: Row(
                           children: [
-                            _buildHeaderCell('#', flex: 4, theme: theme, colorScheme: colorScheme, isCenter: true),
-                            _buildHeaderCell('المندوب / المروج', flex: 20, theme: theme, colorScheme: colorScheme),
-                            _buildHeaderCell('الرقم القومي', flex: 15, theme: theme, colorScheme: colorScheme),
-                            _buildHeaderCell('رقم الهاتف', flex: 14, theme: theme, colorScheme: colorScheme),
-                            _buildHeaderCell('المدينة / المحافظة', flex: 13, theme: theme, colorScheme: colorScheme),
-                            _buildHeaderCell('الحالة', flex: 10, theme: theme, colorScheme: colorScheme, isCenter: true),
-                            _buildHeaderCell('الإجراءات والملف', flex: 34, theme: theme, colorScheme: colorScheme, isCenter: true),
+                            _buildHeaderCell(
+                              '#',
+                              flex: 4,
+                              theme: theme,
+                              colorScheme: colorScheme,
+                              isCenter: true,
+                            ),
+                            _buildHeaderCell(
+                              'المندوب / المروج',
+                              flex: 20,
+                              theme: theme,
+                              colorScheme: colorScheme,
+                            ),
+                            _buildHeaderCell(
+                              'الرقم القومي',
+                              flex: 15,
+                              theme: theme,
+                              colorScheme: colorScheme,
+                            ),
+                            _buildHeaderCell(
+                              'رقم الهاتف',
+                              flex: 14,
+                              theme: theme,
+                              colorScheme: colorScheme,
+                            ),
+                            _buildHeaderCell(
+                              'المدينة / المحافظة',
+                              flex: 13,
+                              theme: theme,
+                              colorScheme: colorScheme,
+                            ),
+                            _buildHeaderCell(
+                              'الحالة',
+                              flex: 10,
+                              theme: theme,
+                              colorScheme: colorScheme,
+                              isCenter: true,
+                            ),
+                            _buildHeaderCell(
+                              'الإجراءات والملف',
+                              flex: 34,
+                              theme: theme,
+                              colorScheme: colorScheme,
+                              isCenter: true,
+                            ),
                           ],
                         ),
                       ),
@@ -1241,28 +1313,37 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                           separatorBuilder: (context, index) => Divider(
                             height: 1,
                             thickness: 1,
-                            color: colorScheme.outlineVariant
-                                .withValues(alpha: 0.22),
+                            color: colorScheme.outlineVariant.withValues(
+                              alpha: 0.22,
+                            ),
                           ),
                           itemBuilder: (context, index) {
                             final delegate = delegates[index];
-                            final isActive = delegate.status == DelegateStatus.active;
-                            final statusColor =
-                                isActive ? HrStatusColors.of(context).success : HrStatusColors.of(context).danger;
+                            final isActive =
+                                delegate.status == DelegateStatus.active;
+                            final statusColor = isActive
+                                ? HrStatusColors.of(context).success
+                                : HrStatusColors.of(context).danger;
                             final statusText = isActive ? 'نشط' : 'متوقف';
 
-                            final posName = delegate.position == DelegatePosition.supervisor
+                            final posName =
+                                delegate.position == DelegatePosition.supervisor
                                 ? 'مشرف'
                                 : 'مندوب / مروج';
 
                             return InkWell(
                               onTap: () => _openProfile(delegate),
-                              hoverColor: colorScheme.primaryContainer.withValues(alpha: 0.12),
+                              hoverColor: colorScheme.primaryContainer
+                                  .withValues(alpha: 0.12),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
                                 color: index.isEven
                                     ? colorScheme.surface
-                                    : colorScheme.surfaceContainerHighest.withValues(alpha: 0.18),
+                                    : colorScheme.surfaceContainerHighest
+                                          .withValues(alpha: 0.18),
                                 child: Row(
                                   children: [
                                     // # Index
@@ -1292,26 +1373,40 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                                           const SizedBox(width: 10),
                                           Expanded(
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
                                               children: [
                                                 Text(
                                                   delegate.fullName,
-                                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                                    fontWeight: FontWeight.bold,
-                                                    color: colorScheme.onSurface,
-                                                  ),
+                                                  style: theme
+                                                      .textTheme
+                                                      .bodyMedium
+                                                      ?.copyWith(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: colorScheme
+                                                            .onSurface,
+                                                      ),
                                                   maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                                 const SizedBox(height: 2),
                                                 Text(
                                                   posName,
-                                                  style: theme.textTheme.bodySmall?.copyWith(
-                                                    color: colorScheme.primary,
-                                                    fontWeight: FontWeight.w600,
-                                                    fontSize: HrFont.labelSmall,
-                                                  ),
+                                                  style: theme
+                                                      .textTheme
+                                                      .bodySmall
+                                                      ?.copyWith(
+                                                        color:
+                                                            colorScheme.primary,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        fontSize:
+                                                            HrFont.labelSmall,
+                                                      ),
                                                 ),
                                               ],
                                             ),
@@ -1336,23 +1431,34 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                                               delegate.nationalityID.isNotEmpty
                                                   ? delegate.nationalityID
                                                   : '—',
-                                              style: theme.textTheme.bodySmall?.copyWith(
-                                                fontFamily: 'monospace',
-                                                fontWeight: FontWeight.w600,
-                                                color: colorScheme.onSurface,
-                                                letterSpacing: 0.5,
-                                              ),
+                                              style: theme.textTheme.bodySmall
+                                                  ?.copyWith(
+                                                    fontFamily: 'monospace',
+                                                    fontWeight: FontWeight.w600,
+                                                    color:
+                                                        colorScheme.onSurface,
+                                                    letterSpacing: 0.5,
+                                                  ),
                                               textAlign: TextAlign.start,
                                             ),
                                           ),
                                           if (delegate.nationalityID.isNotEmpty)
                                             IconButton(
-                                              icon: const Icon(Icons.copy_rounded, size: 14),
+                                              icon: const Icon(
+                                                Icons.copy_rounded,
+                                                size: 14,
+                                              ),
                                               tooltip: 'نسخ الرقم القومي',
-                                              visualDensity: VisualDensity.compact,
+                                              visualDensity:
+                                                  VisualDensity.compact,
                                               padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                                              onPressed: () => _copyNationalId(delegate.nationalityID),
+                                              constraints: const BoxConstraints(
+                                                minWidth: 24,
+                                                minHeight: 24,
+                                              ),
+                                              onPressed: () => _copyNationalId(
+                                                delegate.nationalityID,
+                                              ),
                                             ),
                                         ],
                                       ),
@@ -1374,23 +1480,34 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                                               delegate.phoneNumber.isNotEmpty
                                                   ? delegate.phoneNumber
                                                   : '—',
-                                              style: theme.textTheme.bodySmall?.copyWith(
-                                                fontFamily: 'monospace',
-                                                fontWeight: FontWeight.w600,
-                                                color: colorScheme.onSurface,
-                                                letterSpacing: 0.3,
-                                              ),
+                                              style: theme.textTheme.bodySmall
+                                                  ?.copyWith(
+                                                    fontFamily: 'monospace',
+                                                    fontWeight: FontWeight.w600,
+                                                    color:
+                                                        colorScheme.onSurface,
+                                                    letterSpacing: 0.3,
+                                                  ),
                                               textAlign: TextAlign.start,
                                             ),
                                           ),
                                           if (delegate.phoneNumber.isNotEmpty)
                                             IconButton(
-                                              icon: const Icon(Icons.copy_rounded, size: 14),
+                                              icon: const Icon(
+                                                Icons.copy_rounded,
+                                                size: 14,
+                                              ),
                                               tooltip: 'نسخ رقم الهاتف',
-                                              visualDensity: VisualDensity.compact,
+                                              visualDensity:
+                                                  VisualDensity.compact,
                                               padding: EdgeInsets.zero,
-                                              constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                                              onPressed: () => _copyPhoneNumber(delegate.phoneNumber),
+                                              constraints: const BoxConstraints(
+                                                minWidth: 24,
+                                                minHeight: 24,
+                                              ),
+                                              onPressed: () => _copyPhoneNumber(
+                                                delegate.phoneNumber,
+                                              ),
                                             ),
                                         ],
                                       ),
@@ -1404,20 +1521,25 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                                           Icon(
                                             Icons.location_on_outlined,
                                             size: 15,
-                                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                                            color: colorScheme.onSurfaceVariant
+                                                .withValues(alpha: 0.8),
                                           ),
                                           const SizedBox(width: 5),
                                           Expanded(
                                             child: Text(
                                               delegate.city.isNotEmpty
                                                   ? delegate.city
-                                                  : (delegate.companyName.isNotEmpty
-                                                      ? delegate.companyName
-                                                      : '—'),
-                                              style: theme.textTheme.bodySmall?.copyWith(
-                                                color: colorScheme.onSurface,
-                                                fontWeight: FontWeight.w500,
-                                              ),
+                                                  : (delegate
+                                                            .companyName
+                                                            .isNotEmpty
+                                                        ? delegate.companyName
+                                                        : '—'),
+                                              style: theme.textTheme.bodySmall
+                                                  ?.copyWith(
+                                                    color:
+                                                        colorScheme.onSurface,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                             ),
@@ -1431,18 +1553,31 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                                       flex: 10,
                                       child: Center(
                                         child: Container(
-                                          padding:
-                                              const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
                                           decoration: BoxDecoration(
-                                            color: statusColor.withValues(alpha: 0.12),
-                                            borderRadius: BorderRadius.circular(HrRadius.button),
-                                            border:
-                                                Border.all(color: statusColor.withValues(alpha: 0.3)),
+                                            color: statusColor.withValues(
+                                              alpha: 0.12,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              HrRadius.button,
+                                            ),
+                                            border: Border.all(
+                                              color: statusColor.withValues(
+                                                alpha: 0.3,
+                                              ),
+                                            ),
                                           ),
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              Icon(Icons.circle, size: 7, color: statusColor),
+                                              Icon(
+                                                Icons.circle,
+                                                size: 7,
+                                                color: statusColor,
+                                              ),
                                               const SizedBox(width: 5),
                                               Text(
                                                 statusText,
@@ -1462,7 +1597,10 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                                     Expanded(
                                       flex: 34,
                                       child: Center(
-                                        child: _buildTableActionsButtonGroup(delegate, colorScheme),
+                                        child: _buildTableActionsButtonGroup(
+                                          delegate,
+                                          colorScheme,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -1519,10 +1657,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
       builder: (context, constraints) {
         if (constraints.maxWidth > 750) {
           return GridView.builder(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
               maxCrossAxisExtent: 550,
               mainAxisExtent: WebRuntimePolicy.isWeb ? 190 : 175,
@@ -1531,28 +1666,17 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
             ),
             itemCount: filtered.length,
             itemBuilder: (context, index) {
-              return _buildDelegateCard(
-                filtered[index],
-                theme,
-                colorScheme,
-              );
+              return _buildDelegateCard(filtered[index], theme, colorScheme);
             },
           );
         }
 
         return ListView.separated(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 12,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           itemCount: filtered.length,
           separatorBuilder: (_, _) => const SizedBox(height: 10),
           itemBuilder: (context, index) {
-            return _buildDelegateCard(
-              filtered[index],
-              theme,
-              colorScheme,
-            );
+            return _buildDelegateCard(filtered[index], theme, colorScheme);
           },
         );
       },
@@ -1565,8 +1689,9 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
     ColorScheme colorScheme,
   ) {
     final isActive = delegate.status == DelegateStatus.active;
-    final statusColor =
-        isActive ? HrStatusColors.of(context).success : HrStatusColors.of(context).danger;
+    final statusColor = isActive
+        ? HrStatusColors.of(context).success
+        : HrStatusColors.of(context).danger;
     final statusText = isActive ? 'نشط' : 'متوقف';
 
     final posName = delegate.position == DelegatePosition.supervisor
@@ -1615,15 +1740,22 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                         ),
                       const SizedBox(height: 3),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: delegate.isAnnualLeaveEnabled
-                              ? HrStatusColors.of(context).success.withValues(alpha: 0.1)
+                              ? HrStatusColors.of(
+                                  context,
+                                ).success.withValues(alpha: 0.1)
                               : Colors.amber.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
                             color: delegate.isAnnualLeaveEnabled
-                                ? HrStatusColors.of(context).success.withValues(alpha: 0.25)
+                                ? HrStatusColors.of(
+                                    context,
+                                  ).success.withValues(alpha: 0.25)
                                 : Colors.amber.withValues(alpha: 0.3),
                           ),
                         ),
@@ -1658,8 +1790,11 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                       if (delegate.nationalityID.isNotEmpty)
                         Row(
                           children: [
-                            Icon(Icons.badge_outlined,
-                                size: 14, color: colorScheme.onSurfaceVariant),
+                            Icon(
+                              Icons.badge_outlined,
+                              size: 14,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               delegate.nationalityID,
@@ -1674,12 +1809,16 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                 ),
                 // Status Badge
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(HrRadius.button),
-                    border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -1728,9 +1867,11 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
     );
   }
 
-
   /// أزرار الإجراءات والتواصل والملف كـ Button Group موحدة وفق M3
-  Widget _buildTableActionsButtonGroup(Delegate delegate, ColorScheme colorScheme) {
+  Widget _buildTableActionsButtonGroup(
+    Delegate delegate,
+    ColorScheme colorScheme,
+  ) {
     final hasPhone = delegate.phoneNumber.trim().isNotEmpty;
 
     return Container(
@@ -1809,10 +1950,11 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                   : 'الإجازات السنوية: غير مفعّلة (أسبوعية فقط) - اضغط للتفعيل',
               child: InkWell(
                 onTap: () => _showAnnualLeaveManagementDialog(delegate),
-                hoverColor: (delegate.isAnnualLeaveEnabled
-                        ? HrStatusColors.of(context).success
-                        : HrStatusColors.of(context).warning)
-                    .withValues(alpha: 0.1),
+                hoverColor:
+                    (delegate.isAnnualLeaveEnabled
+                            ? HrStatusColors.of(context).success
+                            : HrStatusColors.of(context).warning)
+                        .withValues(alpha: 0.1),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Row(
