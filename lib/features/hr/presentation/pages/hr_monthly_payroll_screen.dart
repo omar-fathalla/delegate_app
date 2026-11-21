@@ -558,8 +558,13 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
         builder: (ctx) => Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           backgroundColor: Theme.of(context).colorScheme.surface,
+          // Size to content: capped width on web, and a max height relative
+          // to the screen so short content leaves no empty area (TAS-152).
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 540, maxHeight: 780),
+            constraints: BoxConstraints(
+              maxWidth: 560,
+              maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+            ),
             child: _CompanyPayrollPolicySheet(
               config: _companyPayrollConfig,
               hrDelegate: widget.hrDelegate,
@@ -1634,8 +1639,11 @@ class _CompanyPayrollPolicySheetState
         ),
         const Divider(height: 1),
 
-        // 3. Scrollable Body
-        Expanded(
+        // 3. Scrollable Body. The bottom sheet has a fixed height, so the body
+        // fills it; the dialog has only a max height, so the body takes just
+        // the space its content needs and scrolls past that (TAS-152).
+        Flexible(
+          fit: widget.isBottomSheet ? FlexFit.tight : FlexFit.loose,
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Column(
