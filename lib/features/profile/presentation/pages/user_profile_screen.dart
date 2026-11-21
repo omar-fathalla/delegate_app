@@ -23,7 +23,11 @@ import '../../../../l10n/app_localizations.dart';
 class UserProfileScreen extends StatefulWidget {
   final Delegate? delegate;
 
-  const UserProfileScreen({super.key, this.delegate});
+  /// False inside the web HR shell, where the inner page breadcrumb carries
+  /// the title and the back button (TAS-157).
+  final bool showAppBar;
+
+  const UserProfileScreen({super.key, this.delegate, this.showAppBar = true});
 
   @override
   State<UserProfileScreen> createState() => _UserProfileScreenState();
@@ -167,10 +171,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     if (_isLoading) {
       return Scaffold(
         backgroundColor: colorScheme.surface,
-        appBar: AppBar(
-          title: Text(l10n.profile),
-          backgroundColor: colorScheme.surface,
-        ),
+        appBar: widget.showAppBar
+            ? AppBar(
+                title: Text(l10n.profile),
+                backgroundColor: colorScheme.surface,
+              )
+            : null,
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -178,10 +184,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     if (_currentUser == null && _delegate == null && _firestoreUserData == null) {
       return Scaffold(
         backgroundColor: colorScheme.surface,
-        appBar: AppBar(
-          title: Text(l10n.profile),
-          backgroundColor: colorScheme.surface,
-        ),
+        appBar: widget.showAppBar
+            ? AppBar(
+                title: Text(l10n.profile),
+                backgroundColor: colorScheme.surface,
+              )
+            : null,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -202,13 +210,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      appBar: AppBar(
-        title: Text(l10n.profile),
-        backgroundColor: colorScheme.surface,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 1,
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: Text(l10n.profile),
+              backgroundColor: colorScheme.surface,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 1,
+            )
+          : null,
       body: BlocBuilder<AuthBloc, AuthState>(
         builder: (context, state) {
           Delegate? blocDelegate;

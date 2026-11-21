@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
 
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/app_logout_modal.dart';
 import 'package:delegate_app/core/widgets/universal_app_header.dart';
+import 'package:delegate_app/features/hr/presentation/hr_account_pages.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/profile/presentation/pages/user_profile_screen.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -22,10 +22,16 @@ class HrWebAccountButton extends StatelessWidget {
   final Delegate delegate;
   final bool showName;
 
+  /// Opens «الملف الشخصي». The HR shell passes its own handler so the page
+  /// opens inside the content area (TAS-157). When null, the page opens as
+  /// an inner page if a shell host is above, else full screen as before.
+  final VoidCallback? onOpenProfile;
+
   const HrWebAccountButton({
     super.key,
     required this.delegate,
     required this.showName,
+    this.onOpenProfile,
   });
 
   String get _name {
@@ -238,8 +244,9 @@ class HrWebAccountButton extends StatelessWidget {
                   MenuItemButton(
                     key: const ValueKey('hr_web_profile_open'),
                     leadingIcon: Icon(Icons.person_rounded, color: cs.primary),
-                    onPressed: () =>
-                        context.push('/user-profile', extra: delegate),
+                    onPressed:
+                        onOpenProfile ??
+                        () => HrAccountPages.openProfile(context, delegate),
                     child: Text(l10n.profile),
                   ),
                   MenuItemButton(

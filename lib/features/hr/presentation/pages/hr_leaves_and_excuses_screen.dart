@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import 'package:delegate_app/config/theme/app_motion.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/tashil_button_group.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
@@ -22,12 +23,17 @@ class HRLeavesAndExcusesScreen extends StatefulWidget {
   final ValueChanged<HRLeaveSelection>? onSelectLeave;
   final String? selectedLeaveKey;
 
+  /// Firestore used for the requests list stream. Null means
+  /// [FirebaseFirestore.instance]; tests pass a fake.
+  final FirebaseFirestore? firestore;
+
   const HRLeavesAndExcusesScreen({
     super.key,
     required this.hrDelegate,
     this.showAppBar = true,
     this.onSelectLeave,
     this.selectedLeaveKey,
+    this.firestore,
   });
 
   @override
@@ -313,12 +319,70 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
     );
   }
 
+  /// Width from which the toolbar is a single row (see the toolbar below).
+  static const double _toolbarRowMinWidth = 850;
+
+  /// «إدارة الأرصدة» when the page has no AppBar (shell tab, TAS-183).
+  ///
+  /// [inToolbar]: the wide web toolbar row, styled like its other controls.
+  /// Otherwise a compact button for the action row above the toolbar.
+  Widget _leaveManagerButton({required bool inToolbar}) {
+    const label = Text('إدارة الأرصدة');
+    const icon = Icon(Icons.beach_access_rounded, size: 18);
+    final button = inToolbar
+        ? OutlinedButton.icon(
+            key: const ValueKey('hr_leaves_manage_balances'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(HrRadius.pill),
+              ),
+            ),
+            onPressed: _openDelegatesLeaveManager,
+            icon: icon,
+            label: label,
+          )
+        : TextButton.icon(
+            key: const ValueKey('hr_leaves_manage_balances'),
+            onPressed: _openDelegatesLeaveManager,
+            icon: icon,
+            label: label,
+          );
+    return Tooltip(
+      message: 'إدارة إجازات وأرصدة المناديب',
+      child: button,
+    );
+  }
+
+  /// Action row above the toolbar when the page has no AppBar: mobile tab and
+  /// narrow web. Wide web shows the button in the toolbar row instead.
+  Widget _leaveManagerActionRow() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Same width test as the toolbar (it has 16 padding on each side).
+        final toolbarRow = constraints.maxWidth - 32 >= _toolbarRowMinWidth;
+        if (WebRuntimePolicy.isWeb && toolbarRow) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 8, 0),
+          child: Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: _leaveManagerButton(inToolbar: false),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    Query<Map<String, dynamic>> query = FirebaseFirestore.instance
+    Query<Map<String, dynamic>> query =
+        (widget.firestore ?? FirebaseFirestore.instance)
         .collection('leave_requests')
         .where('companyUID', isEqualTo: widget.hrDelegate.companyUID);
 
@@ -358,11 +422,13 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
             tooltip: 'إدارة إجازات وأرصدة المناديب',
             onPressed: _openDelegatesLeaveManager,
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'تحديث',
-            onPressed: () => setState(() {}),
-          ),
+          // The list is a live stream; web relies on the shell refresh.
+          if (!WebRuntimePolicy.isWeb)
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              tooltip: 'تحديث',
+              onPressed: () => setState(() {}),
+            ),
           const SizedBox(width: 8),
         ],
       )
@@ -510,12 +576,15 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                 ),
               ),
 
+              if (!widget.showAppBar) _leaveManagerActionRow(),
+
               // ── 2. Unified Single-Row Toolbar ──
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final isDesktop = constraints.maxWidth >= 850;
+                    final isDesktop =
+                        constraints.maxWidth >= _toolbarRowMinWidth;
 
                     final searchWidget = SizedBox(
                       height: 44,
@@ -614,6 +683,10 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                           Expanded(child: searchWidget),
                           const SizedBox(width: 12),
                           statusButtonGroup,
+                          if (!widget.showAppBar && WebRuntimePolicy.isWeb) ...[
+                            const SizedBox(width: 12),
+                            _leaveManagerButton(inToolbar: true),
+                          ],
                         ],
                       );
                     }
