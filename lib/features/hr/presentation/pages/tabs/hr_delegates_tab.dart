@@ -20,6 +20,7 @@ import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dar
 import 'package:delegate_app/features/profile/presentation/pages/profile_screen.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_table.dart';
 
 enum HRDelegatesViewMode { table, cards }
 
@@ -833,39 +834,24 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
 
   /// Web table columns (MD3 Model 3). Header and cells use the same list,
   /// the same cell padding and the same alignment, so they always line up.
-  List<_WebCol> _webColumns(bool merged) => merged
+  List<HrTableColumn> _webColumns(bool merged) => merged
       ? const [
-          _WebCol('المندوب / المروج', 3),
-          _WebCol('الرقم القومي / الهاتف', 3),
-          _WebCol('السلاسل', 2, center: true),
-          _WebCol('الحالة', 2, center: true),
-          _WebCol('الإجراءات', 2, center: true),
+          HrTableColumn('المندوب / المروج', 3),
+          HrTableColumn('الرقم القومي / الهاتف', 3),
+          HrTableColumn('السلاسل', 2, center: true),
+          HrTableColumn('الحالة', 2, center: true),
+          HrTableColumn('الإجراءات', 2, center: true),
         ]
       : const [
-          _WebCol('#', 1, center: true),
-          _WebCol('المندوب / المروج', 4),
-          _WebCol('الرقم القومي', 3),
-          _WebCol('رقم الهاتف', 3),
-          _WebCol('المدينة', 3),
-          _WebCol('السلاسل', 2, center: true),
-          _WebCol('الحالة', 2, center: true),
-          _WebCol('الإجراءات', 3, center: true),
+          HrTableColumn('#', 1, center: true),
+          HrTableColumn('المندوب / المروج', 4),
+          HrTableColumn('الرقم القومي', 3),
+          HrTableColumn('رقم الهاتف', 3),
+          HrTableColumn('المدينة', 3),
+          HrTableColumn('السلاسل', 2, center: true),
+          HrTableColumn('الحالة', 2, center: true),
+          HrTableColumn('الإجراءات', 3, center: true),
         ];
-
-  static const double _webCellPadding = 8;
-
-  Widget _webCell(_WebCol col, Widget child) => Expanded(
-        flex: col.flex,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: _webCellPadding),
-          child: Align(
-            alignment: col.center
-                ? Alignment.center
-                : AlignmentDirectional.centerStart,
-            child: child,
-          ),
-        ),
-      );
 
   /// Web table (MD3 Model 3): no row tap, icon actions, and the ID/phone
   /// and name/city columns merge on narrower tables.
@@ -874,100 +860,35 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
-    const minWidth = 860.0;
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Container(
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(HrRadius.card),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final available = constraints.maxWidth;
-            final width = available > minWidth ? available : minWidth;
-            final merged = width < HRDelegatesWebBreakpoints.mergedColumnsBelow;
-            final scrollable = width > available;
-            final cols = _webColumns(merged);
-
-            final table = SizedBox(
-              width: width,
-              child: Column(
-                children: [
-                  Container(
-                    height: 44,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerLow,
-                      border: Border(
-                        bottom: BorderSide(
-                          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                        ),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        for (final c in cols)
-                          _webCell(
-                            c,
-                            Text(
-                              c.title,
-                              key: Key('hr_delegates_header_${c.title}'),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                                fontWeight: FontWeight.bold,
-                                fontSize: HrFont.labelMedium,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+      child: HrTableCard(
+        horizontalController: _hScrollCtrl,
+        builder: (context, width) {
+          final merged = width < HRDelegatesWebBreakpoints.mergedColumnsBelow;
+          final cols = _webColumns(merged);
+          return Column(
+            children: [
+              HrTableHeader(columns: cols, keyPrefix: 'hr_delegates_header_'),
+              Expanded(
+                child: ListView.separated(
+                  controller: _vScrollCtrl,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: delegates.length,
+                  separatorBuilder: (_, _) => const HrTableDivider(),
+                  itemBuilder: (context, index) => _buildWebRow(
+                    delegates[index],
+                    index,
+                    cols: cols,
+                    merged: merged,
+                    theme: theme,
+                    colorScheme: colorScheme,
                   ),
-                  Expanded(
-                    child: ListView.separated(
-                      controller: _vScrollCtrl,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: delegates.length,
-                      separatorBuilder: (_, _) => Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: colorScheme.outlineVariant.withValues(alpha: 0.3),
-                      ),
-                      itemBuilder: (context, index) => _buildWebRow(
-                        delegates[index],
-                        index,
-                        cols: cols,
-                        merged: merged,
-                        theme: theme,
-                        colorScheme: colorScheme,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            );
-
-            if (!scrollable) return table;
-            return Scrollbar(
-              controller: _hScrollCtrl,
-              thumbVisibility: true,
-              notificationPredicate: (n) =>
-                  n.depth == 0 && n.metrics.axis == Axis.horizontal,
-              child: SingleChildScrollView(
-                controller: _hScrollCtrl,
-                scrollDirection: Axis.horizontal,
-                child: table,
-              ),
-            );
-          },
-        ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -975,26 +896,17 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
   Widget _buildWebRow(
     Delegate delegate,
     int index, {
-    required List<_WebCol> cols,
+    required List<HrTableColumn> cols,
     required bool merged,
     required ThemeData theme,
     required ColorScheme colorScheme,
   }) {
     final isActive = delegate.status == DelegateStatus.active;
-    final statusColor =
-        isActive ? HrStatusColors.of(context).success : colorScheme.onSurfaceVariant;
-    final statusBg = isActive
-        ? HrStatusColors.of(context).success.withValues(alpha: 0.12)
-        : colorScheme.surfaceContainerHighest;
     final city = delegate.city.isNotEmpty
         ? delegate.city
         : (delegate.companyName.isNotEmpty ? delegate.companyName : '—');
 
-    final mono = theme.textTheme.bodySmall?.copyWith(
-      fontWeight: FontWeight.w600,
-      color: colorScheme.onSurface,
-      letterSpacing: 0.3,
-    );
+    final mono = hrTabularStyle(context);
     final nameStyle = theme.textTheme.bodyMedium?.copyWith(
       fontWeight: FontWeight.bold,
       color: colorScheme.onSurface,
@@ -1065,27 +977,10 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
       ),
     );
 
-    final status = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: statusBg,
-        borderRadius: BorderRadius.circular(HrRadius.chip),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.circle, size: 7, color: statusColor),
-          const SizedBox(width: 5),
-          Text(
-            isActive ? 'نشط' : 'متوقف',
-            style: TextStyle(
-              color: statusColor,
-              fontSize: HrFont.labelMedium,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
+    final status = HrStatusChip(
+      label: isActive ? 'نشط' : 'متوقف',
+      tone: isActive ? HrStatusTone.success : HrStatusTone.neutral,
+      icon: isActive ? Icons.check_circle_rounded : Icons.pause_circle_rounded,
     );
 
     final actions = Row(
@@ -1108,7 +1003,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                 plain(delegate.nationalityID),
                 plain(
                   delegate.phoneNumber,
-                  style: mono?.copyWith(color: colorScheme.onSurfaceVariant),
+                  style: mono.copyWith(color: colorScheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -1141,15 +1036,10 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
             actions,
           ];
 
-    return Container(
+    return HrTableRow(
       key: Key('hr_delegate_row_${delegate.uid}'),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      constraints: const BoxConstraints(minHeight: 52),
-      child: Row(
-        children: [
-          for (var i = 0; i < cols.length; i++) _webCell(cols[i], cells[i]),
-        ],
-      ),
+      columns: cols,
+      cells: cells,
     );
   }
 
@@ -1933,13 +1823,4 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
       ),
     );
   }
-}
-
-/// One web table column: same flex, padding and alignment for the header
-/// and every cell.
-class _WebCol {
-  const _WebCol(this.title, this.flex, {this.center = false});
-  final String title;
-  final int flex;
-  final bool center;
 }
