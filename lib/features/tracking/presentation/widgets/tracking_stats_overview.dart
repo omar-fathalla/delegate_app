@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 import 'package:flutter/material.dart';
 
 class TrackingStatsOverview extends StatelessWidget {
@@ -9,6 +10,11 @@ class TrackingStatsOverview extends StatelessWidget {
   final String? selectedFilter;
   final ValueChanged<String>? onFilterChanged;
 
+  /// HR web (TAS-148): every card shares one surface style and only the
+  /// status cards (inside / outside) color their icon. False keeps the
+  /// original colored cards.
+  final bool uniformStyle;
+
   const TrackingStatsOverview({
     super.key,
     required this.totalCount,
@@ -18,12 +24,14 @@ class TrackingStatsOverview extends StatelessWidget {
     required this.offlineCount,
     this.selectedFilter,
     this.onFilterChanged,
+    this.uniformStyle = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    if (uniformStyle) return _buildUniform(context);
 
     final cards = [
       _StatCardData(
@@ -165,6 +173,146 @@ class TrackingStatsOverview extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+extension on TrackingStatsOverview {
+  Widget _buildUniform(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final status = HrStatusColors.of(context);
+    final neutral = colorScheme.onSurfaceVariant;
+    final cards = <(String, String, int, IconData, Color)>[
+      ('all', 'الإجمالي', totalCount, Icons.groups_outlined, neutral),
+      (
+        'tracking_active',
+        'التتبع مفعّل',
+        activeTrackingCount,
+        Icons.radar_rounded,
+        neutral,
+      ),
+      (
+        'inside',
+        'داخل النطاق',
+        insideCount,
+        Icons.check_circle_outline_rounded,
+        status.success,
+      ),
+      (
+        'outside',
+        'خارج النطاق',
+        outsideCount,
+        Icons.warning_amber_rounded,
+        status.warning,
+      ),
+      ('offline', 'غير متصل', offlineCount, Icons.cloud_off_rounded, neutral),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Narrow windows stack icon, number and label in each card.
+        final compact = constraints.maxWidth < 720;
+        return Row(
+          children: [
+            for (int i = 0; i < cards.length; i++) ...[
+              if (i > 0) SizedBox(width: compact ? 8 : 12),
+              Expanded(
+                child: _uniformCard(
+                  context,
+                  filterKey: cards[i].$1,
+                  title: cards[i].$2,
+                  value: cards[i].$3,
+                  icon: cards[i].$4,
+                  iconColor: cards[i].$5,
+                  compact: compact,
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _uniformCard(
+    BuildContext context, {
+    required String filterKey,
+    required String title,
+    required int value,
+    required IconData icon,
+    required Color iconColor,
+    required bool compact,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final selected = selectedFilter == filterKey;
+    final radius = BorderRadius.circular(HrRadius.card);
+    final valueText = Text(
+      '$value',
+      textDirection: TextDirection.ltr,
+      style: TextStyle(
+        fontSize: compact ? HrFont.titleMedium : HrFont.titleLarge,
+        fontWeight: FontWeight.w600,
+        color: colorScheme.onSurface,
+      ),
+    );
+    final titleText = Text(
+      title,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: compact ? TextAlign.center : TextAlign.start,
+      style: TextStyle(
+        fontSize: HrFont.labelMedium,
+        color: colorScheme.onSurfaceVariant,
+      ),
+    );
+    final onTap = onFilterChanged == null
+        ? null
+        : () => onFilterChanged!(selected ? 'all' : filterKey);
+
+    return Material(
+      key: ValueKey('tracking_kpi_$filterKey'),
+      color: selected
+          ? colorScheme.secondaryContainer
+          : colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: radius,
+        side: BorderSide(
+          color: selected ? colorScheme.primary : colorScheme.outlineVariant,
+        ),
+      ),
+      child: InkWell(
+        borderRadius: radius,
+        onTap: onTap,
+        child: Padding(
+          padding: compact
+              ? const EdgeInsets.symmetric(horizontal: 4, vertical: 8)
+              : const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: compact
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 20, color: iconColor),
+                    const SizedBox(height: 4),
+                    valueText,
+                    titleText,
+                  ],
+                )
+              : Row(
+                  children: [
+                    Icon(icon, size: 24, color: iconColor),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [valueText, titleText],
+                      ),
+                    ),
+                  ],
+                ),
         ),
       ),
     );
