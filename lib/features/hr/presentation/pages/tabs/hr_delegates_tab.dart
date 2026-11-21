@@ -362,14 +362,14 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                             ? HrStatusColors.of(
                                 context,
                               ).success.withValues(alpha: 0.08)
-                            : Colors.amber.withValues(alpha: 0.1),
+                            : HrStatusColors.of(context).warning.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(HrRadius.card),
                         border: Border.all(
                           color: isEnabled
                               ? HrStatusColors.of(
                                   context,
                                 ).success.withValues(alpha: 0.25)
-                              : Colors.amber.withValues(alpha: 0.35),
+                              : HrStatusColors.of(context).warning.withValues(alpha: 0.35),
                         ),
                       ),
                       child: Row(
@@ -422,13 +422,16 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                     const SizedBox(height: 16),
 
                     // مفتاح التفعيل M3 SwitchListTile
-                    Container(
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHigh.withValues(
-                          alpha: 0.5,
-                        ),
+                    // A Material (not a decorated Container) so the tile's
+                    // ink and background paint on it.
+                    Material(
+                      color: colorScheme.surfaceContainerHigh.withValues(
+                        alpha: 0.5,
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(HrRadius.card),
-                        border: Border.all(
+                        side: BorderSide(
                           color: colorScheme.outlineVariant.withValues(
                             alpha: 0.4,
                           ),
