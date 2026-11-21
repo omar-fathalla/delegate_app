@@ -16,6 +16,7 @@ import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/features/admin/data/company_chains.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_home_screen.dart';
+import 'package:delegate_app/features/hr/presentation/hr_account_pages.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_delegate_attendance_detail_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/tabs/hr_attendance_tab.dart';
@@ -138,7 +139,8 @@ class HrHomeOverviewWeb extends StatelessWidget {
       }
       showHrNotificationsSideSheet(context, delegate: delegate);
     },
-    onOpenProfile: () => context.push('/user-profile', extra: delegate),
+    // Inner page inside the shell (TAS-157).
+    onOpenProfile: () => HrAccountPages.openProfile(context, delegate),
     onOpenAttendanceLog: () => onNavigateToTab(kHrTabAttendance),
     onOpenDelegates: () => onNavigateToTab(kHrTabDelegates),
     onAddDelegate: () => openAdminHomeAddDelegate(context, delegate),

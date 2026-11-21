@@ -3,20 +3,28 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import 'package:delegate_app/config/theme/app_motion.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/services/device_binding_service.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/device_unbind_labels.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_adaptive_sheet.dart';
 
 /// شاشة إدارة واعتماد طلبات فك وربط أجهزة المناديب لمسؤولي الموارد البشرية (HR)
 class HRDeviceUnbindRequestsScreen extends StatefulWidget {
   final Delegate hrDelegate;
   final bool showAppBar;
 
+  /// Firestore for the requests list. Null uses the default instance; tests
+  /// pass a fake one.
+  final FirebaseFirestore? firestore;
+
   const HRDeviceUnbindRequestsScreen({
     super.key,
     required this.hrDelegate,
     this.showAppBar = true,
+    this.firestore,
   });
 
   @override
@@ -41,7 +49,8 @@ class _HRDeviceUnbindRequestsScreenState
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    Query<Map<String, dynamic>> query = FirebaseFirestore.instance
+    Query<Map<String, dynamic>> query =
+        (widget.firestore ?? FirebaseFirestore.instance)
         .collection('device_unbind_requests')
         .where('companyUID', isEqualTo: widget.hrDelegate.companyUID);
 
@@ -642,7 +651,12 @@ class _HRDeviceUnbindRequestsScreenState
             ],
 
             // Action Buttons for Pending Requests
-            if (status == 'pending') ...[
+            if (status == 'pending' && WebRuntimePolicy.isWeb) ...[
+              // Web (TAS-154): theme buttons at their own width, at the
+              // card's end. Mobile keeps the full-width pair below.
+              const SizedBox(height: 12),
+              _buildWebActions(req),
+            ] else if (status == 'pending') ...[
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -661,7 +675,7 @@ class _HRDeviceUnbindRequestsScreenState
                       onPressed: () => _rejectRequest(req),
                       icon: const Icon(Icons.close_rounded, size: 18),
                       label: const Text(
-                        'رفض الطلب',
+                        DeviceUnbindLabels.reject,
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -681,7 +695,7 @@ class _HRDeviceUnbindRequestsScreenState
                       onPressed: () => _approveRequest(req),
                       icon: const Icon(Icons.check_circle_rounded, size: 18),
                       label: const Text(
-                        'اعتماد وفك الارتباط',
+                        DeviceUnbindLabels.approve,
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -744,7 +758,7 @@ class _HRDeviceUnbindRequestsScreenState
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'تأكيد فك الارتباط',
+                  DeviceUnbindLabels.approveTitle,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -810,7 +824,7 @@ class _HRDeviceUnbindRequestsScreenState
                             Icon(Icons.check_circle_rounded, size: 18, color: Colors.white),
                             SizedBox(width: 6),
                             Text(
-                              'اعتماد وفك الارتباط',
+                              DeviceUnbindLabels.approve,
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -831,7 +845,9 @@ class _HRDeviceUnbindRequestsScreenState
     }
 
     final bool? confirm;
-    if (isMobile) {
+    if (WebRuntimePolicy.isWeb) {
+      confirm = await _confirmApproveWeb(delegateName);
+    } else if (isMobile) {
       confirm = await showModalBottomSheet<bool>(
         context: context,
         isScrollControlled: true,
@@ -942,7 +958,7 @@ class _HRDeviceUnbindRequestsScreenState
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'رفض طلب فك الارتباط',
+                  DeviceUnbindLabels.rejectTitle,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -1019,7 +1035,7 @@ class _HRDeviceUnbindRequestsScreenState
                             Icon(Icons.close_rounded, size: 18, color: Colors.white),
                             SizedBox(width: 6),
                             Text(
-                              'تأكيد الرفض',
+                              DeviceUnbindLabels.confirmReject,
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -1040,7 +1056,9 @@ class _HRDeviceUnbindRequestsScreenState
     }
 
     final bool? confirm;
-    if (isMobile) {
+    if (WebRuntimePolicy.isWeb) {
+      confirm = await _confirmRejectWeb(delegateName, reasonController);
+    } else if (isMobile) {
       confirm = await showModalBottomSheet<bool>(
         context: context,
         isScrollControlled: true,
@@ -1105,6 +1123,118 @@ class _HRDeviceUnbindRequestsScreenState
     }
   }
 
+  /// Approve and reject buttons of a pending request on web (TAS-154):
+  /// theme [FilledButton] and [OutlinedButton] at their own width, at the
+  /// card's end, with the shared labels (TAS-153).
+  Widget _buildWebActions(Map<String, dynamic> req) {
+    return Align(
+      alignment: AlignmentDirectional.centerEnd,
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        alignment: WrapAlignment.end,
+        children: [
+          OutlinedButton.icon(
+            key: const ValueKey('device_unbind_reject'),
+            onPressed: () => _rejectRequest(req),
+            icon: const Icon(Icons.close_rounded, size: 18),
+            label: const Text(DeviceUnbindLabels.reject),
+          ),
+          FilledButton.icon(
+            key: const ValueKey('device_unbind_approve'),
+            onPressed: () => _approveRequest(req),
+            icon: const Icon(Icons.check_rounded, size: 18),
+            label: const Text(DeviceUnbindLabels.approve),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Web approve confirmation in the shared HR dialog (bottom sheet on a
+  /// narrow window).
+  Future<bool?> _confirmApproveWeb(String delegateName) {
+    return showHrAdaptiveSheet<bool>(
+      context: context,
+      title: DeviceUnbindLabels.approveTitle,
+      builder: (ctx) => Text(
+        'هل تريد الموافقة على طلب فك ارتباط جهاز "$delegateName"؟\n\n'
+        'سيتم إلغاء قفل الجهاز القديم، وإشعار المندوب ليتمكن من الدخول من جهازه الجديد.',
+        style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+              height: 1.5,
+            ),
+      ),
+      actions: (ctx) => [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text(DeviceUnbindLabels.cancel),
+        ),
+        FilledButton(
+          key: const ValueKey('device_unbind_confirm_approve'),
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text(DeviceUnbindLabels.approve),
+        ),
+      ],
+    );
+  }
+
+  /// Web reject confirmation with an optional reason, in the shared HR
+  /// dialog (bottom sheet on a narrow window).
+  Future<bool?> _confirmRejectWeb(
+    String delegateName,
+    TextEditingController reasonController,
+  ) {
+    return showHrAdaptiveSheet<bool>(
+      context: context,
+      title: DeviceUnbindLabels.rejectTitle,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'هل تريد رفض طلب المندوب "$delegateName"؟',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              decoration: InputDecoration(
+                labelText: 'سبب الرفض (اختياري)',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(HrRadius.card),
+                ),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        );
+      },
+      actions: (ctx) {
+        final colorScheme = Theme.of(ctx).colorScheme;
+        return [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(DeviceUnbindLabels.cancel),
+          ),
+          FilledButton(
+            key: const ValueKey('device_unbind_confirm_reject'),
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.error,
+              foregroundColor: colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(DeviceUnbindLabels.confirmReject),
+          ),
+        ];
+      },
+    );
+  }
+
   Widget _buildFilterCard({
     required String statusKey,
     required String title,
@@ -1116,6 +1246,14 @@ class _HRDeviceUnbindRequestsScreenState
     required ThemeData theme,
   }) {
     final isSelected = _selectedStatusFilter == statusKey;
+    // Web (TAS-154): every HR page marks the selected stat card with the
+    // theme's primary container. Mobile keeps the status tint.
+    final web = WebRuntimePolicy.isWeb;
+    final selectedBg =
+        web ? colorScheme.primaryContainer : color.withValues(alpha: 0.08);
+    final selectedAccent = web ? colorScheme.primary : color;
+    final selectedFg = web ? colorScheme.onPrimaryContainer : color;
+    final selectedOnAccent = web ? colorScheme.onPrimary : Colors.white;
 
     return InkWell(
       onTap: () {
@@ -1128,20 +1266,18 @@ class _HRDeviceUnbindRequestsScreenState
         duration: AppMotionDurations.short4,
         curve: AppMotionCurves.standardDefaultEffects,
         decoration: BoxDecoration(
-          color: isSelected
-              ? color.withValues(alpha: 0.08)
-              : colorScheme.surfaceContainerLow,
+          color: isSelected ? selectedBg : colorScheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(HrRadius.card),
           border: Border.all(
             color: isSelected
-                ? color
+                ? selectedAccent
                 : colorScheme.outlineVariant.withValues(alpha: 0.35),
             width: isSelected ? 2.0 : 1.0,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: color.withValues(alpha: 0.12),
+                    color: selectedAccent.withValues(alpha: 0.12),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -1163,7 +1299,9 @@ class _HRDeviceUnbindRequestsScreenState
                       fontSize: HrFont.labelMedium,
                       fontWeight:
                           isSelected ? FontWeight.bold : FontWeight.w600,
-                      color: isSelected ? color : colorScheme.onSurfaceVariant,
+                      color: isSelected
+                          ? selectedFg
+                          : colorScheme.onSurfaceVariant,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -1172,13 +1310,15 @@ class _HRDeviceUnbindRequestsScreenState
                 Container(
                   padding: const EdgeInsets.all(5),
                   decoration: BoxDecoration(
-                    color: isSelected ? color : color.withValues(alpha: 0.12),
+                    color: isSelected
+                        ? selectedAccent
+                        : color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(HrRadius.chip),
                   ),
                   child: Icon(
                     isSelected ? Icons.check_rounded : icon,
                     size: 15,
-                    color: isSelected ? Colors.white : color,
+                    color: isSelected ? selectedOnAccent : color,
                   ),
                 ),
               ],
@@ -1189,7 +1329,7 @@ class _HRDeviceUnbindRequestsScreenState
               style: TextStyle(
                 fontSize: HrFont.titleLarge,
                 fontWeight: FontWeight.bold,
-                color: isSelected ? color : colorScheme.onSurface,
+                color: isSelected ? selectedFg : colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 2),
@@ -1198,7 +1338,7 @@ class _HRDeviceUnbindRequestsScreenState
               style: TextStyle(
                 fontSize: HrFont.labelSmall,
                 color: isSelected
-                    ? color.withValues(alpha: 0.85)
+                    ? selectedFg.withValues(alpha: 0.85)
                     : colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
               ),
               maxLines: 1,

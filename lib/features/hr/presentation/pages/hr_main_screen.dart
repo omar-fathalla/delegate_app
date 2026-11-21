@@ -9,9 +9,11 @@ import 'package:delegate_app/core/widgets/universal_app_header.dart';
 import 'package:delegate_app/core/widgets/app_logout_modal.dart';
 import 'package:delegate_app/features/admin/presentation/pages/subscription_renewal_screen.dart';
 import 'package:delegate_app/features/admin/domain/entities/subscription_renewal.dart';
+import 'package:delegate_app/features/hr/presentation/hr_account_pages.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_tab.dart';
+import 'package:delegate_app/features/hr/presentation/pages/tabs/hr_photos_tab.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_desktop_sidebar.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_desktop_top_bar.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_inner_page.dart';
@@ -58,11 +60,18 @@ class _HRMainScreenState extends State<HRMainScreen> {
   /// Web: delegate filter for «سجل تعديلات الحضور», set when the detail
   /// attendance page opens the log for one delegate (TAS-146).
   HrAdjustmentsDelegateFilter? _adjustmentsFilter;
+  /// Switches «الصور» to its permissions view when the retired
+  /// «أذونات التصوير» slot is selected (TAS-149).
+  final HrPhotosViewController _photosView = HrPhotosViewController();
 
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex ?? _homeIndex;
+    final initial = widget.initialIndex ?? _homeIndex;
+    if (initial == kHrTabPhotoPermissions) {
+      _photosView.show(HrPhotosView.permissions);
+    }
+    _currentIndex = hrShellResolveTab(initial);
     _loadedTabs = {_currentIndex};
     if (WebRuntimePolicy.isWeb) {
       HrShellLink.attach(
@@ -92,6 +101,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
   void dispose() {
     HrShellLink.detach(this);
     _headerBridge.dispose();
+    _photosView.dispose();
     super.dispose();
   }
 
@@ -112,6 +122,12 @@ class _HRMainScreenState extends State<HRMainScreen> {
   }) {
     // A sidebar click leaves any inner page of the previous tab.
     _innerNavigator.currentState?.popUntil((route) => route.isFirst);
+    // TAS-149: the retired permissions page opens «الصور» on its
+    // permissions view.
+    if (index == kHrTabPhotoPermissions) {
+      _photosView.show(HrPhotosView.permissions);
+      index = hrShellResolveTab(index);
+    }
     setState(() {
       _currentIndex = index;
       _loadedTabs.add(index);
@@ -206,6 +222,38 @@ class _HRMainScreenState extends State<HRMainScreen> {
     );
   }
 
+  /// Pending count of [collection] as plain trailing text for the narrow
+  /// web menu (TAS-154). Shows nothing when the count is zero.
+  Widget _buildPendingCountText(String collection, ColorScheme colorScheme) {
+    if (widget.delegate.companyUID.isEmpty) return const SizedBox.shrink();
+    final Stream<QuerySnapshot> stream;
+    try {
+      stream = FirebaseFirestore.instance
+          .collection(collection)
+          .where('companyUID', isEqualTo: widget.delegate.companyUID)
+          .where('status', isEqualTo: 'pending')
+          .snapshots();
+    } catch (_) {
+      // Firebase isn't ready (tests, or a build without a default app).
+      return const SizedBox.shrink();
+    }
+    return StreamBuilder<QuerySnapshot>(
+      stream: stream,
+      builder: (context, snapshot) {
+        final count = snapshot.hasError ? 0 : snapshot.data?.docs.length ?? 0;
+        if (count == 0) return const SizedBox.shrink();
+        return Text(
+          '$count',
+          style: TextStyle(
+            fontSize: HrFont.body,
+            fontWeight: FontWeight.w600,
+            color: colorScheme.onSurfaceVariant,
+          ),
+        );
+      },
+    );
+  }
+
   /// شارة طلبات فك وربط الأجهزة المعلقة
   Widget _buildDeviceRequestsBadge(Widget icon, ColorScheme colorScheme) {
     if (widget.delegate.companyUID.isEmpty) return icon;
@@ -237,6 +285,11 @@ class _HRMainScreenState extends State<HRMainScreen> {
 
     switch (value) {
       case 'profile':
+        if (_openAccountPageInShell(
+          (inner) => HrAccountPages.openProfile(inner, delegate),
+        )) {
+          break;
+        }
         context.push('/user-profile', extra: delegate);
         break;
       case 'attendance':
@@ -269,11 +322,13 @@ class _HRMainScreenState extends State<HRMainScreen> {
       case 'overview':
       case 'delegate_subscriptions':
       case 'tasks':
-      case 'supervisor_photo_permissions':
       case 'penalty_rules_catalog':
       case 'penalties_management':
         final tab = hrShellItemById(value)?.tabIndex;
         if (tab != null) _onTabSelected(tab);
+        break;
+      case kHrRetiredPhotoPermissionsId:
+        _onTabSelected(kHrTabPhotoPermissions);
         break;
       case 'delegate_renewal':
         if (WebRuntimePolicy.isWeb) {
@@ -291,6 +346,11 @@ class _HRMainScreenState extends State<HRMainScreen> {
         break;
       case 'settings':
         // Policy: Settings MUST always be the last item in the menu
+        if (_openAccountPageInShell(
+          (inner) => HrAccountPages.openSettings(inner, delegate),
+        )) {
+          break;
+        }
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) =>
@@ -299,6 +359,20 @@ class _HRMainScreenState extends State<HRMainScreen> {
         );
         break;
     }
+  }
+
+  /// Wide web: opens an account page (settings, profile) inside the content
+  /// area, on top of the shell tabs, so the sidebar and the top bar stay
+  /// (TAS-157). Returns false when there is no inner navigator (mobile,
+  /// narrow web); the caller then keeps the full-screen push.
+  bool _openAccountPageInShell(void Function(BuildContext inner) open) {
+    if (!WebRuntimePolicy.isWeb) return false;
+    final nav = _innerNavigator.currentState;
+    if (nav == null) return false;
+    // One account page at a time, opened from the current tab.
+    nav.popUntil((route) => route.isFirst);
+    open(nav.context);
+    return true;
   }
 
   void _showLogoutDialog(BuildContext context) {
@@ -490,22 +564,15 @@ class _HRMainScreenState extends State<HRMainScreen> {
                             delegate: delegate,
                             currentIndex: _currentIndex,
                             onSelected: _onMenuSelected,
-                            wrapIcon: (item, icon) {
-                              if (item.badgeCollection == 'leave_requests') {
-                                return _buildLeaveRequestsBadge(
-                                  icon,
-                                  colorScheme,
-                                );
-                              }
-                              if (item.badgeCollection ==
-                                  'device_unbind_requests') {
-                                return _buildDeviceRequestsBadge(
-                                  icon,
-                                  colorScheme,
-                                );
-                              }
-                              return icon;
-                            },
+                            // Pending counts sit beside the label, not on
+                            // the icon (TAS-154), like the web sidebar.
+                            trailingFor: (item) =>
+                                item.badgeCollection == null
+                                ? null
+                                : _buildPendingCountText(
+                                    item.badgeCollection!,
+                                    colorScheme,
+                                  ),
                           )
                         : null,
                   ),
@@ -559,6 +626,8 @@ class _HRMainScreenState extends State<HRMainScreen> {
                                   ? (showName) => HrWebAccountButton(
                                       delegate: delegate,
                                       showName: showName,
+                                      onOpenProfile: () =>
+                                          _onMenuSelected('profile'),
                                     )
                                   : null,
                             ),
@@ -681,6 +750,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
                   delegate: delegate,
                   onNavigateToTab: _onTabSelected,
                   adjustmentsFilter: _adjustmentsFilter,
+                  photosView: _photosView,
                 )
               : const SizedBox.shrink(),
       ],

@@ -27,10 +27,16 @@ class MonthlyPhotoReportScreen extends StatelessWidget {
   final Delegate delegate;
   final bool showAppBar;
 
+  /// Opt-in refresh button above the report, for hosts that hide the app
+  /// bar and its refresh action (the HR web shell inner page). Off by
+  /// default, so other callers are unchanged.
+  final bool showInlineRefresh;
+
   const MonthlyPhotoReportScreen({
     super.key,
     required this.delegate,
     this.showAppBar = true,
+    this.showInlineRefresh = false,
   });
 
   @override
@@ -46,6 +52,7 @@ class MonthlyPhotoReportScreen extends StatelessWidget {
       return _MonthlyPhotoReportContent(
         delegate: delegate,
         showAppBar: showAppBar,
+        showInlineRefresh: showInlineRefresh,
       );
     }
 
@@ -54,6 +61,7 @@ class MonthlyPhotoReportScreen extends StatelessWidget {
       child: _MonthlyPhotoReportContent(
         delegate: delegate,
         showAppBar: showAppBar,
+        showInlineRefresh: showInlineRefresh,
       ),
     );
   }
@@ -62,10 +70,12 @@ class MonthlyPhotoReportScreen extends StatelessWidget {
 class _MonthlyPhotoReportContent extends StatefulWidget {
   final Delegate delegate;
   final bool showAppBar;
+  final bool showInlineRefresh;
 
   const _MonthlyPhotoReportContent({
     required this.delegate,
     required this.showAppBar,
+    this.showInlineRefresh = false,
   });
 
   @override
@@ -546,7 +556,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
             )
           : null,
       backgroundColor: colorScheme.surfaceContainerLowest,
-      body: BlocConsumer<PhotoPermissionBloc, PhotoPermissionState>(
+      body: _withInlineRefresh(BlocConsumer<PhotoPermissionBloc, PhotoPermissionState>(
         listener: (context, state) {
           if (state is CapturedPhotosLoaded) {
             setState(() {
@@ -1023,7 +1033,31 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
 
           return const Center(child: M3DelayedLoading());
         },
-      ),
+      )),
+    );
+  }
+
+  /// Adds the opt-in refresh button above [body]; it runs the same reload
+  /// as the app bar action.
+  Widget _withInlineRefresh(Widget body) {
+    if (!widget.showInlineRefresh) return body;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 4, 8, 0),
+          child: Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: IconButton(
+              key: const ValueKey('monthly_report_inline_refresh'),
+              icon: const Icon(Symbols.refresh_rounded),
+              tooltip: 'تحديث',
+              onPressed: _loadPhotos,
+            ),
+          ),
+        ),
+        Expanded(child: body),
+      ],
     );
   }
 

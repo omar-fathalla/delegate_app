@@ -12,6 +12,8 @@ import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
+import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
 
 /// Max height of the web create-dialog dropdown menus. Keeps the open menu
 /// inside the dialog; longer lists scroll (TAS-151).
@@ -58,10 +60,38 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
     _loadCompanyDelegates();
   }
 
+  /// Web shell bridge, so the top-bar refresh reloads this tab (TAS-183).
+  HrWebHeaderBridge? _headerBridge;
+
+  /// Shell tab only: a page with its own AppBar is not inside the shell.
+  bool get _hrWebShellTab => WebRuntimePolicy.isWeb && !widget.showAppBar;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_hrWebShellTab) return;
+    final next = context
+        .getInheritedWidgetOfExactType<HrWebHeaderBridgeScope>()
+        ?.notifier;
+    if (identical(next, _headerBridge)) return;
+    _headerBridge?.releasePageReload(kHrTabLeaves, _reloadFromShell);
+    _headerBridge = next;
+    _headerBridge?.attachPageReload(kHrTabLeaves, _reloadFromShell);
+  }
+
   @override
   void dispose() {
+    _headerBridge?.releasePageReload(kHrTabLeaves, _reloadFromShell);
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Top-bar refresh: re-subscribes the requests stream (it is built in
+  /// [build]) and reloads the company delegates used by the dialogs.
+  Future<void> _reloadFromShell() async {
+    if (!mounted) return;
+    setState(() {});
+    await _loadCompanyDelegates();
   }
 
   Future<void> _loadCompanyDelegates() async {
@@ -323,6 +353,63 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
     );
   }
 
+  /// Width from which the toolbar is a single row (see the toolbar below).
+  static const double _toolbarRowMinWidth = 850;
+
+  /// «إدارة الأرصدة» when the page has no AppBar (shell tab, TAS-183).
+  ///
+  /// [inToolbar]: the wide web toolbar row, styled like its other controls.
+  /// Otherwise a compact button for the action row above the toolbar.
+  Widget _leaveManagerButton({required bool inToolbar}) {
+    const label = Text('إدارة الأرصدة');
+    const icon = Icon(Icons.beach_access_rounded, size: 18);
+    final button = inToolbar
+        ? OutlinedButton.icon(
+            key: const ValueKey('hr_leaves_manage_balances'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(HrRadius.pill),
+              ),
+            ),
+            onPressed: _openDelegatesLeaveManager,
+            icon: icon,
+            label: label,
+          )
+        : TextButton.icon(
+            key: const ValueKey('hr_leaves_manage_balances'),
+            onPressed: _openDelegatesLeaveManager,
+            icon: icon,
+            label: label,
+          );
+    return Tooltip(
+      message: 'إدارة إجازات وأرصدة المناديب',
+      child: button,
+    );
+  }
+
+  /// Action row above the toolbar when the page has no AppBar: mobile tab and
+  /// narrow web. Wide web shows the button in the toolbar row instead.
+  Widget _leaveManagerActionRow() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Same width test as the toolbar (it has 16 padding on each side).
+        final toolbarRow = constraints.maxWidth - 32 >= _toolbarRowMinWidth;
+        if (WebRuntimePolicy.isWeb && toolbarRow) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 8, 0),
+          child: Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: _leaveManagerButton(inToolbar: false),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -371,11 +458,13 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
             tooltip: 'إدارة إجازات وأرصدة المناديب',
             onPressed: _openDelegatesLeaveManager,
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'تحديث',
-            onPressed: () => setState(() {}),
-          ),
+          // The list is a live stream; web relies on the shell refresh.
+          if (!WebRuntimePolicy.isWeb)
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              tooltip: 'تحديث',
+              onPressed: () => setState(() {}),
+            ),
           const SizedBox(width: 8),
         ],
       )
@@ -526,12 +615,15 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                 ),
               ),
 
+              if (!widget.showAppBar) _leaveManagerActionRow(),
+
               // ── 2. Unified Single-Row Toolbar ──
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final isDesktop = constraints.maxWidth >= 850;
+                    final isDesktop =
+                        constraints.maxWidth >= _toolbarRowMinWidth;
 
                     final searchWidget = SizedBox(
                       height: 44,
@@ -655,6 +747,10 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                           Expanded(child: searchWidget),
                           const SizedBox(width: 12),
                           statusButtonGroup,
+                          if (web && !widget.showAppBar) ...[
+                            const SizedBox(width: 12),
+                            _leaveManagerButton(inToolbar: true),
+                          ],
                           if (web) ...[
                             const SizedBox(width: 12),
                             createButton,
