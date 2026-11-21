@@ -1,0 +1,8 @@
+# Test tags for `flutter test`.
+tags:
+  # Golden/screenshot tests (TAS-162). Pixels depend on the host renderer and
+  # fonts, so CI runs `flutter test --exclude-tags golden`. Run or re-record
+  # them locally:
+  #   flutter test --tags golden
+  #   flutter test --tags golden --update-goldens
+  golden:
