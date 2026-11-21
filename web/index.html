@@ -19,8 +19,14 @@
   <meta name="description" content="نظام موارد بشرية متكامل لشركات التجزئة مع الهايبرماركت">
   <meta name="google-site-verification" content="G3UJkFXDDb0OWlsPWsGSI0b5aAnUZk7OlheK2jovx88" />
 
-  <!-- Google Maps JavaScript API for Flutter Web (defer: no render blocking; runs before DOMContentLoaded) -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB4gLHxxHshJVbpOR5oq69lLotyfd6mwKs&libraries=drawing,marker" defer></script>
+  <!-- Google Maps JavaScript API for Flutter Web, loaded the recommended way
+       (async + loading=async + callback): never blocks parsing or first paint.
+       google.maps.Map is defined once the script and its libraries finish; the
+       map screens wait for it via isGoogleMapsAvailable() (google_maps_loader_web.dart).
+       The callback must exist before the script runs and stays global so a
+       retry (reloadGoogleMapsScript) can reuse the same src. -->
+  <script>window.__tashilMapsReady = function () { window.__tashilMapsLoaded = true; };</script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB4gLHxxHshJVbpOR5oq69lLotyfd6mwKs&libraries=drawing,marker&loading=async&callback=__tashilMapsReady" async></script>
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -56,8 +62,6 @@
   <meta name="twitter:title" content="تسهيل - بوابة الشركات والموارد البشرية | Switch Point">
   <meta name="twitter:description" content="نظام موارد بشرية متكامل لشركات التجزئة مع الهايبرماركت">
   <meta name="twitter:image" content="https://hr.sw-point.com/og-image.png">
-  <!-- Material Symbols Rounded (FILL 0) used by the HR web login. -->
-  <link rel="preload" href="assets/packages/material_symbols_icons/lib/fonts/MaterialSymbolsRounded.ttf" as="font" type="font/ttf" crossorigin>
   <style id="splash-screen-style">
     html {
       height: 100%
