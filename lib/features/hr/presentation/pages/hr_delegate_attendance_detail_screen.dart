@@ -8,6 +8,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/tashil_icon_button.dart';
@@ -2416,7 +2417,31 @@ class _HRDelegateAttendanceDetailScreenState
     final IconData icon;
     final String label;
 
-    if (s.isAutoCheckOut) {
+    final status = HrStatusColors.of(context);
+    final isWeb = WebRuntimePolicy.isWeb;
+
+    if (isWeb && s.isAutoCheckOut) {
+      // Web, approved status colors: auto check-out = warning.
+      bgColor = status.warningContainer;
+      borderColor = status.warning.withValues(alpha: 0.5);
+      textColor = status.onWarningContainer;
+      icon = Icons.auto_mode_rounded;
+      label = 'مكتمل (تلقائي)';
+    } else if (isWeb && isCompleted) {
+      // Web, approved status colors: normal check-out = info.
+      bgColor = status.infoContainer;
+      borderColor = status.info.withValues(alpha: 0.5);
+      textColor = status.onInfoContainer;
+      icon = Icons.check_circle_rounded;
+      label = 'مكتمل الانصراف';
+    } else if (isWeb && isOngoing) {
+      // Web, approved status colors: present = success.
+      bgColor = status.successContainer;
+      borderColor = status.success.withValues(alpha: 0.5);
+      textColor = status.onSuccessContainer;
+      icon = Icons.timelapse_rounded;
+      label = 'حاضر الآن';
+    } else if (s.isAutoCheckOut) {
       // Closed by the system: counted as complete, shown neutral (not an error).
       bgColor = colorScheme.secondaryContainer;
       borderColor = colorScheme.outlineVariant;
@@ -2444,6 +2469,7 @@ class _HRDelegateAttendanceDetailScreenState
     }
 
     final badgeWidget = Tooltip(
+      key: Key('hr_attendance_status_badge_${s.id}'),
       message: label,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
@@ -2490,14 +2516,27 @@ class _HRDelegateAttendanceDetailScreenState
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            color: Colors.blueGrey.shade50,
+            color: isWeb
+                ? colorScheme.surfaceContainerHigh
+                : Colors.blueGrey.shade50,
             borderRadius: BorderRadius.circular(HrRadius.chip),
-            border: Border.all(color: Colors.blueGrey.shade200, width: 0.8),
+            border: Border.all(
+              color: isWeb
+                  ? colorScheme.outlineVariant
+                  : Colors.blueGrey.shade200,
+              width: 0.8,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.edit_note_rounded, size: 11, color: Colors.blueGrey.shade800),
+              Icon(
+                Icons.edit_note_rounded,
+                size: 11,
+                color: isWeb
+                    ? colorScheme.onSurfaceVariant
+                    : Colors.blueGrey.shade800,
+              ),
               const SizedBox(width: 3),
               Flexible(
                 child: Text(
@@ -2507,7 +2546,9 @@ class _HRDelegateAttendanceDetailScreenState
                   style: TextStyle(
                     fontSize: HrFont.labelSmall,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blueGrey.shade800,
+                    color: isWeb
+                        ? colorScheme.onSurfaceVariant
+                        : Colors.blueGrey.shade800,
                   ),
                 ),
               ),

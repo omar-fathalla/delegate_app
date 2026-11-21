@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_tab.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
@@ -407,6 +408,96 @@ void main() {
         expect(t.takeException(), isNull);
       });
     }
+  });
+
+  group('TAS-184: approved status colors on web', () {
+    Future<FakeFirebaseFirestore> store() async {
+      final fs = FakeFirebaseFirestore();
+      final logs = fs.collection(kAttendanceCollection);
+      Map<String, dynamic> log(String type, DateTime at) => {
+        'delegateId': 'fake-d1',
+        'companyId': 'co-alpha',
+        'type': type,
+        'timestamp': Timestamp.fromDate(at),
+        'branchName': 'فرع تجريبي',
+      };
+      // Normal check-out on 1 Oct, a past day left open (auto) on 2 Oct,
+      // and a check-in a minute ago (present).
+      await logs.doc('in-done').set(log('check_in', DateTime(2026, 10, 1, 9)));
+      await logs.doc('out-done').set({
+        ...log('check_out', DateTime(2026, 10, 1, 17)),
+        'relatedCheckInId': 'in-done',
+      });
+      await logs.doc('in-auto').set(log('check_in', DateTime(2026, 10, 2, 9)));
+      await logs.doc('in-now').set(
+        log('check_in', DateTime.now().subtract(const Duration(minutes: 1))),
+      );
+      return fs;
+    }
+
+    BoxDecoration badge(WidgetTester t, String id) {
+      final box = t.widget<Container>(
+        find
+            .descendant(
+              of: find.byKey(Key('hr_attendance_status_badge_$id')),
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      return box.decoration! as BoxDecoration;
+    }
+
+    Future<BuildContext> pump(WidgetTester t, DateTime month) async {
+      await t.pumpWidget(
+        MaterialApp(
+          home: Directionality(
+            textDirection: TextDirection.rtl,
+            child: HRDelegateAttendanceDetailScreen(
+              key: ValueKey(month),
+              delegate: _subject,
+              hrDelegate: _hr,
+              initialMonth: month,
+            ),
+          ),
+        ),
+      );
+      await t.pumpAndSettle();
+      return t.element(find.byType(HRDelegateAttendanceDetailScreen));
+    }
+
+    testWidgets('web: check-out = info, auto = warning, present = success', (
+      t,
+    ) async {
+      _webDesktop(t);
+      final fs = await store();
+      HRDelegateAttendanceDetailScreen.debugFirestore = () => fs;
+
+      var context = await pump(t, DateTime(2026, 10));
+      var status = HrStatusColors.of(context);
+      expect(badge(t, 'in-done').color, status.infoContainer);
+      expect(badge(t, 'in-auto').color, status.warningContainer);
+
+      final now = DateTime.now();
+      context = await pump(t, DateTime(now.year, now.month));
+      status = HrStatusColors.of(context);
+      expect(badge(t, 'in-now').color, status.successContainer);
+      expect(t.takeException(), isNull);
+    });
+
+    testWidgets('mobile keeps its badge colors', (t) async {
+      WebRuntimePolicy.debugIsWebOverride = false;
+      t.view.physicalSize = const Size(1440, 900);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.resetPhysicalSize);
+      addTearDown(t.view.resetDevicePixelRatio);
+      final fs = await store();
+      HRDelegateAttendanceDetailScreen.debugFirestore = () => fs;
+
+      final context = await pump(t, DateTime(2026, 10));
+      final cs = Theme.of(context).colorScheme;
+      expect(badge(t, 'in-done').color, Colors.green.shade50);
+      expect(badge(t, 'in-auto').color, cs.secondaryContainer);
+    });
   });
 
   group('TAS-163: attendance tab tokens', () {
