@@ -20,6 +20,15 @@ abstract final class HrInnerPageWidth {
   static const double wide = 1200;
 }
 
+/// Route-name prefix of inner pages. The shell counts these routes to keep
+/// `?inner=<n>` in the URL, so the browser back button closes them
+/// (TAS-139). Popups on the same navigator (menus, sheets) are not counted.
+const String kHrInnerRoutePrefix = 'hr-inner:';
+
+/// Whether [route] is an inner page pushed by [pushHrInnerPage].
+bool isHrInnerRoute(Route<dynamic> route) =>
+    route.settings.name?.startsWith(kHrInnerRoutePrefix) ?? false;
+
 /// Published by the web shell while its content area has a nested navigator.
 class HrInnerPageHost extends InheritedWidget {
   const HrInnerPageHost({
@@ -67,7 +76,7 @@ Future<T?> pushHrInnerPage<T>(
   final parentTitle = host.parentTitle;
   return nav.push<T>(
     PageRouteBuilder<T>(
-      settings: RouteSettings(name: 'hr-inner:$title'),
+      settings: RouteSettings(name: '$kHrInnerRoutePrefix$title'),
       transitionDuration: const Duration(milliseconds: 200),
       reverseTransitionDuration: const Duration(milliseconds: 150),
       pageBuilder: (ctx, _, _) => HrInnerPage(
