@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/core/utils/promo_clock_binding.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
@@ -10,6 +11,7 @@ import 'package:delegate_app/features/admin/domain/services/subscription_payment
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/features/admin/presentation/pages/subscription_renewal_receipt_page.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_empty_state.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -30,12 +32,18 @@ class SubscriptionRenewalScreen extends StatefulWidget {
   final SubscriptionPaymentGateway? paymentGateway;
   final DateTime Function()? clock;
 
+  /// Inside the HR web shell the top bar already shows the title, so the
+  /// screen swaps its AppBar for a slim toolbar with the same actions
+  /// (TAS-143).
+  final bool showAppBar;
+
   const SubscriptionRenewalScreen({
     super.key,
     required this.supervisor,
     this.repository,
     this.paymentGateway,
     this.clock,
+    this.showAppBar = true,
   });
 
   static const String title = 'تجديد المناديب';
@@ -341,7 +349,7 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen>
     if (!mounted) return;
     result.fold((f) => AppSnackBar.showError(context, f.message), (list) {
       if (list.isEmpty) {
-        AppSnackBar.showError(context, 'لا توجد إيصالات تجديد مدفوعة بعد.');
+        AppSnackBar.showInfo(context, 'لا توجد إيصالات تجديد مدفوعة بعد.');
         return;
       }
       showModalBottomSheet<void>(
@@ -439,24 +447,47 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen>
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text(SubscriptionRenewalScreen.title),
-          actions: [
-            IconButton(
-              tooltip: 'إيصالات التجديد',
-              key: const Key('renewal_receipts_button'),
-              icon: const Icon(Icons.receipt_long_rounded),
-              onPressed: _loading ? null : _openPaidReceipts,
-            ),
-            IconButton(
-              tooltip: 'تحديث',
-              icon: const Icon(Icons.refresh_rounded),
-              onPressed: _loading ? null : _load,
-            ),
-          ],
-        ),
+        appBar: widget.showAppBar
+            ? AppBar(
+                title: const Text(SubscriptionRenewalScreen.title),
+                actions: [
+                  IconButton(
+                    tooltip: 'إيصالات التجديد',
+                    key: const Key('renewal_receipts_button'),
+                    icon: const Icon(Icons.receipt_long_rounded),
+                    onPressed: _loading ? null : _openPaidReceipts,
+                  ),
+                  IconButton(
+                    tooltip: 'تحديث',
+                    icon: const Icon(Icons.refresh_rounded),
+                    onPressed: _loading ? null : _load,
+                  ),
+                ],
+              )
+            : null,
         body: Column(
           children: [
+            if (!widget.showAppBar)
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 16, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton.icon(
+                      key: const Key('renewal_receipts_button'),
+                      icon: const Icon(Icons.receipt_long_rounded, size: 18),
+                      label: const Text('إيصالات التجديد'),
+                      onPressed: _loading ? null : _openPaidReceipts,
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: 'تحديث',
+                      icon: const Icon(Icons.refresh_rounded),
+                      onPressed: _loading ? null : _load,
+                    ),
+                  ],
+                ),
+              ),
             _PeriodBanner(
               now: now,
               isFree: isFree,
@@ -531,7 +562,20 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen>
       );
     }
     if (_delegates.isEmpty) {
-      final empty = _repo.isAdvanceRenewalOpen(_now)
+      final advanceOpen = _repo.isAdvanceRenewalOpen(_now);
+      if (WebRuntimePolicy.isWeb) {
+        return HrEmptyState(
+          key: const Key('renewal_empty_state'),
+          icon: Icons.event_available_rounded,
+          title: advanceOpen
+              ? 'لا يوجد مناديب بحاجة للتجديد'
+              : 'لا يوجد مناديب موقوفون',
+          message: advanceOpen
+              ? 'سيظهر هنا المناديب الذين يحتاجون إلى التجديد في الفترة الحالية أو في التجديد المقدَّم.'
+              : 'سيظهر هنا المناديب الموقوفون بانتهاء الاشتراك عند وجودهم.',
+        );
+      }
+      final empty = advanceOpen
           ? 'لا يوجد مناديب بحاجة للتجديد في الفترة الحالية أو التجديد المقدَّم حالياً.'
           : 'لا يوجد مناديب موقوفون بانتهاء الاشتراك حالياً.';
       return Center(
@@ -562,6 +606,16 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen>
         ),
     ];
     if (currentRows.isEmpty && nextRows.isEmpty && visible.isEmpty) {
+      if (WebRuntimePolicy.isWeb) {
+        return HrEmptyState(
+          icon: Icons.filter_alt_off_rounded,
+          title: 'لا يوجد مناديب في هذا التصنيف',
+          action: TextButton(
+            onPressed: () => setState(() => _filter = RenewalListFilter.all),
+            child: const Text('عرض الكل'),
+          ),
+        );
+      }
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(24),
@@ -813,6 +867,35 @@ class _PeriodBanner extends StatelessWidget {
           '$short • متبقٍ $months ${months == 1 ? 'شهر' : 'أشهر'}. '
           'الحد الأقصى ${SubscriptionCycleHelper.maxDelegatesPerRenewal} مندوبًا في طلب واحد. '
           'يمكنك تجديد بعض المناديب الآن والباقي لاحقاً.';
+    }
+    if (WebRuntimePolicy.isWeb) {
+      // M3 tonal info banner: leading icon and body text that wraps
+      // (TAS-143). Mobile keeps the compact card below.
+      return Container(
+        key: const Key('renewal_period_banner_web'),
+        width: double.infinity,
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+        padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 16, 12),
+        decoration: BoxDecoration(
+          color: cs.secondaryContainer,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.info_outline_rounded, color: cs.onSecondaryContainer),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                text,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: cs.onSecondaryContainer,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
     }
     return Container(
       width: double.infinity,
