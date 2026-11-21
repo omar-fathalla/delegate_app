@@ -15,7 +15,8 @@ void main() {
       kHrTabDelegates: 'مناديب الشركة',
       kHrTabTracking: 'الخريطة الحية',
       kHrTabPhotos: 'الصور',
-      kHrTabPhotoPermissions: 'أذونات التصوير',
+      // TAS-149: the retired permissions slot resolves to «الصور».
+      kHrTabPhotoPermissions: 'الصور',
       kHrTabAdjustments: 'تعديلات الحضور',
       kHrTabLeaves: 'طلبات الإجازات',
       kHrTabPayroll: 'الرواتب',

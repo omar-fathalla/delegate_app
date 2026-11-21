@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:material_symbols_icons/symbols.dart';
 
 import 'package:delegate_app/features/admin/domain/entities/subscription_renewal.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -17,6 +16,10 @@ const int kHrTabAdjustments = 8;
 const int kHrTabSubscriptions = 9;
 const int kHrTabRenewal = 10;
 const int kHrTabTasks = 11;
+/// Retired slot of the old «أذونات التصوير» page (TAS-149). Permissions now
+/// live only in «الصور». The shell redirects this index (and the old
+/// `supervisor_photo_permissions` menu id) to [kHrTabPhotos] on its
+/// permissions view, so old links keep working. Not in the catalog.
 const int kHrTabPhotoPermissions = 12;
 const int kHrTabPenaltyCatalog = 13;
 const int kHrTabPenalties = 14;
@@ -157,17 +160,6 @@ const List<HrShellItem> kHrShellCatalog = [
     tabIndex: kHrTabPhotos,
   ),
   HrShellItem(
-    id: 'supervisor_photo_permissions',
-    title: 'أذونات التصوير',
-    subtitle: 'اعتماد أذونات التصوير الميداني',
-    // Web sidebar: directly under «الصور» in this group.
-    section: 'الحضور والميدان',
-    icon: Symbols.add_a_photo,
-    selectedIcon: Symbols.add_a_photo_rounded,
-    tabIndex: kHrTabPhotoPermissions,
-    webOnly: true,
-  ),
-  HrShellItem(
     id: 'attendance_adjustments',
     title: 'سجل تعديلات الحضور والانصراف',
     webTitle: 'تعديلات الحضور',
@@ -272,6 +264,15 @@ List<int> hrBottomNavTabs({required bool isWeb}) => [
   kHrTabLeaves,
 ];
 
+/// Menu id of the retired «أذونات التصوير» page. Selecting it opens
+/// «الصور» on its permissions view (TAS-149).
+const String kHrRetiredPhotoPermissionsId = 'supervisor_photo_permissions';
+
+/// The tab a selection of [index] really shows. The retired permissions
+/// slot shows «الصور».
+int hrShellResolveTab(int index) =>
+    index == kHrTabPhotoPermissions ? kHrTabPhotos : index;
+
 HrShellItem? hrShellItemById(String id) {
   for (final item in kHrShellCatalog) {
     if (item.id == id) return item;
@@ -317,6 +318,7 @@ List<HrShellItem> hrShellItems({
 }
 
 String hrShellHeaderTitle(int index) {
+  index = hrShellResolveTab(index);
   for (final item in kHrShellCatalog) {
     if (item.tabIndex == index) return item.title;
   }
@@ -326,6 +328,7 @@ String hrShellHeaderTitle(int index) {
 /// Short page name of a shell tab: the sidebar label on web, the full title
 /// on mobile. Used as the first breadcrumb item of inner pages.
 String hrShellPageLabel(int index, {required bool isWeb}) {
+  index = hrShellResolveTab(index);
   for (final item in kHrShellCatalog) {
     if (item.tabIndex == index) return item.menuLabel(isWeb: isWeb);
   }
@@ -333,6 +336,7 @@ String hrShellPageLabel(int index, {required bool isWeb}) {
 }
 
 IconData hrShellHeaderIcon(int index) {
+  index = hrShellResolveTab(index);
   for (final item in kHrShellCatalog) {
     if (item.tabIndex == index) return item.selectedIcon;
   }
