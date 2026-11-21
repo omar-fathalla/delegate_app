@@ -778,44 +778,27 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                     padding: const EdgeInsets.all(16),
                     children: [
                       if (!widget.showAppBar) ...[
+                        // The shell's top bar already shows the page title,
+                        // so the page keeps only its actions, with labels
+                        // (TAS-152).
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'مسيرات الرواتب الشهرية',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14.5,
-                                      letterSpacing: -0.2,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  Text(
-                                    widget.hrDelegate.companyName,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.tune_rounded),
-                              tooltip: 'قواعد وسياسة الرواتب للشركة',
+                            TextButton.icon(
+                              icon: const Icon(Icons.tune_rounded, size: 18),
+                              label: const Text('قواعد الرواتب'),
                               onPressed: _openCompanyPayrollPolicyDialog,
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.file_download_outlined),
-                              tooltip: 'تصدير مسير الرواتب إلى Excel',
+                            const SizedBox(width: 8),
+                            OutlinedButton.icon(
+                              icon: const Icon(
+                                Icons.file_download_outlined,
+                                size: 18,
+                              ),
+                              label: const Text('تصدير Excel'),
                               onPressed: _exportPayrollToExcel,
                             ),
+                            const SizedBox(width: 4),
                             IconButton(
                               icon: const Icon(Icons.refresh_rounded),
                               tooltip: 'إعادة الاحتساب والتحديث',
@@ -2827,7 +2810,7 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'لا توجد أي جزاءات مسجلة على المندوب في هذا الشهر 👍',
+                              'لا توجد أي جزاءات مسجلة على المندوب في هذا الشهر',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: const Color(0xFF2E7D32),
