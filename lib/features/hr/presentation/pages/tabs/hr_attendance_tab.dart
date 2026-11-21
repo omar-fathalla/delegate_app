@@ -22,6 +22,7 @@ import 'package:delegate_app/features/hr/presentation/pages/hr_delegate_attendan
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_table.dart';
 
 /// Model representing a delegate's attendance record on a specific date for HR
 class HRAttendanceRecord {
@@ -2305,160 +2306,64 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     );
   }
 
+  /// Attendance table on the shared HR table (TAS-115): 12px card, 56px
+  /// header, 64px rows, status chips; scrolls sideways when narrow.
   Widget _buildTableView(
     List<HRAttendanceRecord> records,
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
-    // Minimum width for the unified 6-column layout
-    const double tableMinWidth = 1260.0;
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Container(
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(HrRadius.card),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: colorScheme.shadow.withValues(alpha: 0.03),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+      child: HrTableCard(
+        key: const Key('hr_attendance_table'),
+        minWidth: kHrAttendanceTableMinWidth,
+        horizontalController: _hScrollCtrl,
+        builder: (context, width) => Column(
+          children: [
+            const HrTableHeader(
+              columns: hrAttendanceTableColumns,
+              keyPrefix: 'hr_attendance_header_',
+            ),
+            Expanded(
+              child: ListView.separated(
+                controller: _vScrollCtrl,
+                itemCount: records.length,
+                separatorBuilder: (context, index) => const HrTableDivider(),
+                itemBuilder: (context, index) {
+                  final record = records[index];
+                  return _HRAttendanceTableRowItem(
+                    key: ValueKey('row_${record.delegate.uid}_$index'),
+                    record: record,
+                    theme: theme,
+                    colorScheme: colorScheme,
+                    branchesByName: _branchesByName,
+                    hrDelegate: widget.hrDelegate,
+                    selectedDate: _selectedDate,
+                    securityBadgeBuilder: _buildSecurityBadge,
+                    onCallPhone: _callPhone,
+                    onOpenWhatsApp: _openWhatsApp,
+                    onOpenGoogleMaps: _openGoogleMaps,
+                    onInspectGeofence: (rec) =>
+                        _showGeofenceInspectionDialog(context, rec),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => HRDelegateAttendanceDetailScreen(
+                            delegate: record.delegate,
+                            initialMonth: _selectedDate,
+                            branchesByName: _branchesByName,
+                            hrDelegate: widget.hrDelegate,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final availableWidth = constraints.maxWidth;
-            final contentWidth =
-                availableWidth > tableMinWidth ? availableWidth : tableMinWidth;
-            final isScrollable = contentWidth > availableWidth;
-
-            return Scrollbar(
-              controller: _hScrollCtrl,
-              thumbVisibility: isScrollable,
-              trackVisibility: isScrollable,
-              interactive: isScrollable,
-              thickness: 10.0,
-              radius: const Radius.circular(HrRadius.chip),
-              notificationPredicate: (notification) =>
-                  notification.depth == 0 &&
-                  notification.metrics.axis == Axis.horizontal,
-              child: SingleChildScrollView(
-                controller: _hScrollCtrl,
-                scrollDirection: Axis.horizontal,
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: SizedBox(
-                  width: contentWidth,
-                  child: Column(
-                    children: [
-                      // ── Table Header (Perfect Symmetry with Data Rows) ──
-                      Container(
-                        height: 52,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest
-                              .withValues(alpha: 0.45),
-                          border: Border(
-                            bottom: BorderSide(
-                              color: colorScheme.outlineVariant
-                                  .withValues(alpha: 0.6),
-                              width: 1.5,
-                            ),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            _buildHeaderCell('المندوب', flex: 19, theme: theme, colorScheme: colorScheme),
-                            _buildHeaderCell('الحالة', flex: 10, theme: theme, colorScheme: colorScheme, isCenter: true),
-                            _buildHeaderCell('الفرع', flex: 14, theme: theme, colorScheme: colorScheme),
-                            _buildHeaderCell('الحضور • الانصراف • الساعات', flex: 29, theme: theme, colorScheme: colorScheme, isCenter: true),
-                            _buildHeaderCell('النطاق الجغرافي', flex: 16, theme: theme, colorScheme: colorScheme),
-                            _buildHeaderCell('الإجراءات', flex: 12, theme: theme, colorScheme: colorScheme, isCenter: true),
-                          ],
-                        ),
-                      ),
-
-                      // ── Table Rows ──
-                      Expanded(
-                        child: ListView.separated(
-                          controller: _vScrollCtrl,
-                          itemCount: records.length,
-                          separatorBuilder: (context, index) => Divider(
-                            height: 1,
-                            thickness: 1,
-                            color: colorScheme.outlineVariant
-                                .withValues(alpha: 0.22),
-                          ),
-                          itemBuilder: (context, index) {
-                            final record = records[index];
-                            return _HRAttendanceTableRowItem(
-                              key: ValueKey('row_${record.delegate.uid}_$index'),
-                              record: record,
-                              isEven: index.isEven,
-                              theme: theme,
-                              colorScheme: colorScheme,
-                              branchesByName: _branchesByName,
-                              hrDelegate: widget.hrDelegate,
-                              selectedDate: _selectedDate,
-                              securityBadgeBuilder: _buildSecurityBadge,
-                              onCallPhone: _callPhone,
-                              onOpenWhatsApp: _openWhatsApp,
-                              onOpenGoogleMaps: _openGoogleMaps,
-                              onInspectGeofence: (rec) => _showGeofenceInspectionDialog(context, rec),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => HRDelegateAttendanceDetailScreen(
-                                      delegate: record.delegate,
-                                      initialMonth: _selectedDate,
-                                      branchesByName: _branchesByName,
-                                      hrDelegate: widget.hrDelegate,
-                                    ),
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeaderCell(
-    String title, {
-    required int flex,
-    required ThemeData theme,
-    required ColorScheme colorScheme,
-    bool isCenter = false,
-  }) {
-    return Expanded(
-      flex: flex,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        child: Text(
-          title,
-          textAlign: isCenter ? TextAlign.center : TextAlign.start,
-          style: theme.textTheme.labelMedium?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.2,
-            fontSize: HrFont.labelMedium,
-          ),
         ),
       ),
     );
@@ -3681,9 +3586,59 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
   }
 }
 
+/// Below this width the attendance table scrolls sideways.
+const double kHrAttendanceTableMinWidth = 1260;
+
+/// Attendance table columns (TAS-115). Header and rows share them.
+const List<HrTableColumn> hrAttendanceTableColumns = [
+  HrTableColumn('المندوب', 19),
+  HrTableColumn('الحالة', 10, center: true),
+  HrTableColumn('الفرع', 14),
+  HrTableColumn('الحضور • الانصراف • الساعات', 29, center: true),
+  HrTableColumn('النطاق الجغرافي', 16),
+  HrTableColumn('الإجراءات', 12, center: true),
+];
+
+/// Status chip label, tone and icon for an attendance record.
+({String label, HrStatusTone tone, IconData icon}) hrAttendanceStatus(
+  HRAttendanceRecord record,
+) {
+  if (record.isPresent) {
+    return (
+      label: 'حاضر الآن',
+      tone: HrStatusTone.success,
+      icon: Icons.check_circle_rounded,
+    );
+  }
+  if (record.isDeparted) {
+    return record.isAutoCheckOut
+        ? (
+            label: 'انصرف (تلقائي)',
+            tone: HrStatusTone.warning,
+            icon: Icons.auto_mode_rounded,
+          )
+        : (
+            label: 'انصرف اليوم',
+            tone: HrStatusTone.warning,
+            icon: Icons.timelapse_rounded,
+          );
+  }
+  if (record.isOnLeave) {
+    return (
+      label: record.formattedLeaveType,
+      tone: HrStatusTone.neutral,
+      icon: Icons.event_available_rounded,
+    );
+  }
+  return (
+    label: 'لم يسجل',
+    tone: HrStatusTone.neutral,
+    icon: Icons.schedule_rounded,
+  );
+}
+
 class _HRAttendanceTableRowItem extends StatefulWidget {
   final HRAttendanceRecord record;
-  final bool isEven;
   final ThemeData theme;
   final ColorScheme colorScheme;
   final Map<String, Branch> branchesByName;
@@ -3699,7 +3654,6 @@ class _HRAttendanceTableRowItem extends StatefulWidget {
   const _HRAttendanceTableRowItem({
     super.key,
     required this.record,
-    required this.isEven,
     required this.theme,
     required this.colorScheme,
     required this.branchesByName,
@@ -3718,43 +3672,15 @@ class _HRAttendanceTableRowItem extends StatefulWidget {
 }
 
 class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
-  bool _isHovered = false;
-
   @override
   Widget build(BuildContext context) {
     final record = widget.record;
     final theme = widget.theme;
     final colorScheme = widget.colorScheme;
+    final statusColors = HrStatusColors.of(context);
     final isPresent = record.isPresent;
-    final isDeparted = record.isDeparted;
-
-    Color statusColor;
-    String statusText;
-    IconData statusIcon;
-
-    if (isPresent) {
-      statusColor = HrStatusColors.of(context).success;
-      statusText = 'حاضر الآن';
-      statusIcon = Icons.check_circle_rounded;
-    } else if (isDeparted) {
-      if (record.isAutoCheckOut) {
-        statusColor = HrStatusColors.of(context).warning;
-        statusText = 'انصرف (تلقائي)';
-        statusIcon = Icons.auto_mode_rounded;
-      } else {
-        statusColor = HrStatusColors.of(context).warning;
-        statusText = 'انصرف اليوم';
-        statusIcon = Icons.timelapse_rounded;
-      }
-    } else if (record.isOnLeave) {
-      statusColor = const Color(0xFF00796B);
-      statusText = record.formattedLeaveType;
-      statusIcon = Icons.event_available_rounded;
-    } else {
-      statusColor = colorScheme.outline;
-      statusText = 'لم يسجل';
-      statusIcon = Icons.schedule_rounded;
-    }
+    final status = hrAttendanceStatus(record);
+    final hasLocation = record.latitude != null && record.longitude != null;
 
     final checkInStr = record.checkInTime != null
         ? DateFormat('hh:mm a', 'ar').format(record.checkInTime!)
@@ -3764,346 +3690,217 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
         ? DateFormat('hh:mm a', 'ar').format(record.checkOutTime!)
         : '—';
 
-    // RTL-aware start border indicator (lights up in Arabic on the right side)
-    final Color startIndicatorColor = isPresent
-        ? HrStatusColors.of(context).success
-        : isDeparted
-            ? HrStatusColors.of(context).warning
-            : record.isOnLeave
-                ? const Color(0xFF00796B)
-                : (_isHovered
-                    ? colorScheme.primary.withValues(alpha: 0.35)
-                    : Colors.transparent);
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: AppMotionDurations.short3, // 150ms M3 Token
-          curve: AppMotionCurves.standard,
-          constraints: const BoxConstraints(minHeight: 68),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: _isHovered
-                ? colorScheme.primary.withValues(alpha: 0.045)
-                : (widget.isEven
-                    ? colorScheme.surface
-                    : colorScheme.surfaceContainerHighest.withValues(alpha: 0.16)),
-            border: BorderDirectional(
-              start: BorderSide(
-                color: startIndicatorColor,
-                width: 3.5,
-              ),
+    // 1. Delegate: avatar + name, security badge under it.
+    final delegateCell = Row(
+      children: [
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            AppAvatar(
+              imageUrl: record.delegate.personalPhotoUrl,
+              fallbackText: record.delegate.fullName,
+              radius: 20,
             ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            if (isPresent)
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  width: 11,
+                  height: 11,
+                  decoration: BoxDecoration(
+                    color: statusColors.success,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: colorScheme.surface, width: 2),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // 1. Delegate (flex: 19) - Avatar + Full Name (Line 1) + Security Integrity Badge (Line 2)
-              Expanded(
-                flex: 19,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Row(
-                    children: [
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          AppAvatar(
-                            imageUrl: record.delegate.personalPhotoUrl,
-                            fallbackText: record.delegate.fullName,
-                            radius: 20,
-                          ),
-                          if (isPresent)
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: Container(
-                                width: 11,
-                                height: 11,
-                                decoration: BoxDecoration(
-                                  color: HrStatusColors.of(context).success,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: colorScheme.surface,
-                                    width: 2,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Line 1: Full name
-                            Text(
-                              record.delegate.fullName,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                fontSize: HrFont.body,
-                                letterSpacing: 0.1,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (record.checkInTime != null) ...[
-                              const SizedBox(height: 4),
-                              // Line 2: Security Verification Badge (100% موثوق)
-                              widget.securityBadgeBuilder(record, colorScheme),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+              Text(
+                record.delegate.fullName,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  fontSize: HrFont.body,
+                  color: colorScheme.onSurface,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
+              if (record.checkInTime != null) ...[
+                const SizedBox(height: 4),
+                widget.securityBadgeBuilder(record, colorScheme),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
 
-              // 2. Status Badge (flex: 10) - Centered Pill
+    // 2. Status chip with icon and semantic color.
+    final statusCell = HrStatusChip(
+      key: Key('hr_attendance_status_${record.delegate.uid}'),
+      label: status.label,
+      tone: status.tone,
+      icon: status.icon,
+    );
+
+    // 3. Branch.
+    final branchCell = Tooltip(
+      message: record.branchName ?? 'غير محدد',
+      child: BranchNameLabel(
+        branchName: record.branchName,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          fontSize: HrFont.body,
+          color: colorScheme.onSurface,
+        ),
+      ),
+    );
+
+    // 4. Check-in, check-out and hours.
+    final timesCell = _buildTimeHoursGroup(
+      record,
+      theme,
+      colorScheme,
+      checkInStr,
+      checkOutStr,
+    );
+
+    // 5. Geofence and distance, tap to inspect, map button.
+    final geoColor = record.isInsideGeofence == true
+        ? statusColors.success
+        : record.isInsideGeofence == false
+            ? statusColors.danger
+            : hasLocation
+                ? colorScheme.primary
+                : colorScheme.onSurfaceVariant;
+    final geofenceCell = Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(HrRadius.chip),
+        onTap: () => widget.onInspectGeofence(record),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Row(
+            children: [
+              Icon(
+                record.isInsideGeofence == true
+                    ? Icons.verified_user_rounded
+                    : record.isInsideGeofence == false
+                        ? Icons.warning_amber_rounded
+                        : hasLocation
+                            ? Icons.location_on_outlined
+                            : Icons.location_off_outlined,
+                size: 18,
+                color: geoColor,
+              ),
+              const SizedBox(width: 6),
               Expanded(
-                flex: 10,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(HrRadius.card),
-                        border: Border.all(
-                          color: statusColor.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(statusIcon, size: 13, color: statusColor),
-                          const SizedBox(width: 5),
-                          Text(
-                            statusText,
-                            style: TextStyle(
-                              color: statusColor,
-                              fontSize: HrFont.labelSmall,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
+                child: Tooltip(
+                  message: 'انقر للاطلاع على تفاصيل النطاق الجغرافي والخريطة',
+                  child: Text(
+                    record.isInsideGeofence == true
+                        ? 'داخل النطاق (${record.distanceMeters!.toStringAsFixed(0)}م)'
+                        : record.isInsideGeofence == false
+                            ? 'خارج النطاق (${record.distanceMeters!.toStringAsFixed(0)}م)'
+                            : hasLocation
+                                ? 'موقع مسجل 📍'
+                                : (record.checkInTime != null
+                                    ? 'غير محدد'
+                                    : 'لم يسجل'),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: HrFont.body,
+                      fontWeight: FontWeight.w500,
+                      color: geoColor,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),
-
-              // 3. Branch (flex: 14) - Storefront Icon Container + Branch Name
-              Expanded(
-                flex: 14,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(HrRadius.chip),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Tooltip(
-                          message: record.branchName ?? 'غير محدد',
-                          child: BranchNameLabel(
-                            branchName: record.branchName,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              fontSize: HrFont.labelMedium,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+              if (hasLocation)
+                TashilIconButton.standard(
+                  icon: Icons.map_outlined,
+                  tooltip: 'عرض الإحداثيات على الخريطة',
+                  size: 32,
+                  iconSize: 18,
+                  onPressed: () => widget.onOpenGoogleMaps(
+                    record.latitude!,
+                    record.longitude!,
                   ),
                 ),
-              ),
-
-              // 4. Unified Attendance & Working Hours (flex: 29) - Connected Group Capsule
-              Expanded(
-                flex: 29,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: _buildTimeHoursGroup(
-                    record,
-                    theme,
-                    colorScheme,
-                    checkInStr,
-                    checkOutStr,
-                  ),
-                ),
-              ),
-
-              // 5. Geofence & Distance (flex: 16) - Interactive Status + Map Button
-              Expanded(
-                flex: 16,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(HrRadius.chip),
-                      onTap: () => widget.onInspectGeofence(record),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                        child: Row(
-                          children: [
-                            Icon(
-                              record.isInsideGeofence == true
-                                  ? Icons.verified_user_rounded
-                                  : record.isInsideGeofence == false
-                                      ? Icons.warning_amber_rounded
-                                      : (record.latitude != null && record.longitude != null)
-                                          ? Icons.location_on_outlined
-                                          : Icons.location_off_outlined,
-                              size: 15,
-                              color: record.isInsideGeofence == true
-                                  ? HrStatusColors.of(context).success
-                                  : record.isInsideGeofence == false
-                                      ? HrStatusColors.of(context).danger
-                                      : (record.latitude != null && record.longitude != null)
-                                          ? colorScheme.primary
-                                          : colorScheme.outline,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Tooltip(
-                                message: 'انقر للاطلاع على تفاصيل النطاق الجغرافي والخريطة',
-                                child: Text(
-                                  record.isInsideGeofence == true
-                                      ? 'داخل النطاق (${record.distanceMeters!.toStringAsFixed(0)}م)'
-                                      : record.isInsideGeofence == false
-                                          ? 'خارج النطاق (${record.distanceMeters!.toStringAsFixed(0)}م)'
-                                          : (record.latitude != null && record.longitude != null)
-                                              ? 'موقع مسجل 📍'
-                                              : (record.checkInTime != null ? 'غير محدد' : 'لم يسجل'),
-                                  style: TextStyle(
-                                    fontSize: HrFont.labelSmall,
-                                    fontWeight: FontWeight.w600,
-                                    color: record.isInsideGeofence == true
-                                        ? HrStatusColors.of(context).success
-                                        : record.isInsideGeofence == false
-                                            ? HrStatusColors.of(context).danger
-                                            : (record.latitude != null && record.longitude != null)
-                                                ? colorScheme.primary
-                                                : colorScheme.onSurfaceVariant,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ),
-                            if (record.latitude != null && record.longitude != null)
-                              TashilIconButton.standard(
-                                icon: Icons.map_outlined,
-                                tooltip: 'عرض الإحداثيات على الخريطة',
-                                size: 28,
-                                iconSize: 15,
-                                onPressed: () => widget.onOpenGoogleMaps(
-                                  record.latitude!,
-                                  record.longitude!,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // 6. Actions (flex: 12) - Sleek Connected Action Capsule
-              Expanded(
-                flex: 12,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Center(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Container(
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(HrRadius.pill),
-                          border: Border.all(
-                            color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-                            width: 1.0,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (record.delegate.phoneNumber.isNotEmpty) ...[
-                              IconButton(
-                                icon: const Icon(Icons.call_outlined),
-                                iconSize: 15,
-                                color: HrStatusColors.of(context).success,
-                                tooltip: 'اتصال هاتفي',
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
-                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                splashRadius: 16,
-                                onPressed: () => widget.onCallPhone(record.delegate.phoneNumber),
-                              ),
-                              Container(
-                                width: 1,
-                                height: 16,
-                                color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.chat_outlined),
-                                iconSize: 15,
-                                color: const Color(0xFF25D366),
-                                tooltip: 'محادثة واتساب',
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
-                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                splashRadius: 16,
-                                onPressed: () => widget.onOpenWhatsApp(record.delegate.phoneNumber),
-                              ),
-                              Container(
-                                width: 1,
-                                height: 16,
-                                color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-                              ),
-                            ],
-                            IconButton(
-                              icon: const Icon(Icons.history_rounded),
-                              iconSize: 16,
-                              color: colorScheme.primary,
-                              tooltip: 'السجل الشهري والتفصيلي',
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                              splashRadius: 16,
-                              onPressed: widget.onTap,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
       ),
+    );
+
+    // 6. Actions: call, WhatsApp, monthly record.
+    Widget action({
+      required IconData icon,
+      required String tooltip,
+      required Color color,
+      required VoidCallback onPressed,
+    }) =>
+        IconButton(
+          icon: Icon(icon),
+          iconSize: 18,
+          color: color,
+          tooltip: tooltip,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          onPressed: onPressed,
+        );
+    final actionsCell = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (record.delegate.phoneNumber.isNotEmpty) ...[
+            action(
+              icon: Icons.call_outlined,
+              tooltip: 'اتصال هاتفي',
+              color: statusColors.success,
+              onPressed: () => widget.onCallPhone(record.delegate.phoneNumber),
+            ),
+            action(
+              icon: Icons.chat_outlined,
+              tooltip: 'محادثة واتساب',
+              color: statusColors.success,
+              onPressed: () =>
+                  widget.onOpenWhatsApp(record.delegate.phoneNumber),
+            ),
+          ],
+          action(
+            icon: Icons.history_rounded,
+            tooltip: 'السجل الشهري والتفصيلي',
+            color: colorScheme.primary,
+            onPressed: widget.onTap,
+          ),
+        ],
+      ),
+    );
+
+    return HrTableRow(
+      key: Key('hr_attendance_row_${record.delegate.uid}'),
+      columns: hrAttendanceTableColumns,
+      cells: [
+        delegateCell,
+        statusCell,
+        branchCell,
+        timesCell,
+        geofenceCell,
+        actionsCell,
+      ],
+      onTap: widget.onTap,
     );
   }
 
