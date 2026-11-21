@@ -1,11 +1,13 @@
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/features/admin/data/repositories/subscription_renewal_repository.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/admin/domain/entities/subscription_renewal.dart';
 import 'package:delegate_app/features/admin/domain/services/subscription_payment_gateway.dart';
 import 'package:delegate_app/features/admin/presentation/pages/subscription_renewal_screen.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_empty_state.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -981,4 +983,62 @@ void main() {
       expect(find.textContaining('للنصف'), findsOneWidget);
     },
   );
+
+  group('SubscriptionRenewalScreen on web (TAS-143)', () {
+    setUp(() => WebRuntimePolicy.debugIsWebOverride = true);
+    tearDown(WebRuntimePolicy.debugReset);
+
+    Future<void> pumpScreen(
+      WidgetTester tester,
+      FakeFirebaseFirestore db,
+    ) async {
+      final repo = SubscriptionRenewalRepository(
+        firestore: db,
+        clock: () => feb2027,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SubscriptionRenewalScreen(
+            supervisor: supervisor(),
+            repository: repo,
+            paymentGateway: FakeGateway(),
+            clock: () => feb2027,
+            showAppBar: false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('period banner is a tonal info banner with bodyMedium text', (
+      tester,
+    ) async {
+      await pumpScreen(tester, await seed());
+      final banner = find.byKey(const Key('renewal_period_banner_web'));
+      expect(banner, findsOneWidget);
+      expect(
+        find.descendant(
+          of: banner,
+          matching: find.byIcon(Icons.info_outline_rounded),
+        ),
+        findsOneWidget,
+      );
+      final context = tester.element(banner);
+      final theme = Theme.of(context);
+      final box = tester.widget<Container>(banner).decoration! as BoxDecoration;
+      expect(box.color, theme.colorScheme.secondaryContainer);
+      expect(box.borderRadius, BorderRadius.circular(12));
+      final text = tester.widget<Text>(
+        find.descendant(of: banner, matching: find.byType(Text)),
+      );
+      expect(text.style?.fontSize, theme.textTheme.bodyMedium?.fontSize);
+      expect(text.maxLines, isNull);
+    });
+
+    testWidgets('no delegates shows HrEmptyState', (tester) async {
+      await pumpScreen(tester, FakeFirebaseFirestore());
+      expect(find.byKey(const Key('renewal_empty_state')), findsOneWidget);
+      expect(find.byType(HrEmptyState), findsOneWidget);
+    });
+  });
 }
