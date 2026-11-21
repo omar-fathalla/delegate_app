@@ -23,6 +23,7 @@ import 'package:delegate_app/features/hr/presentation/pages/hr_delegate_attendan
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_selected_card_colors.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_table.dart';
 
 /// Model representing a delegate's attendance record on a specific date for HR
@@ -2419,6 +2420,14 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     int flex = 2,
   }) {
     final colorScheme = theme.colorScheme;
+    // Web (TAS-185): the selected card uses the primary container like every
+    // HR web page; the status color stays on the icon and the number.
+    // Mobile keeps the status tint.
+    final web =
+        WebRuntimePolicy.isWeb ? HrSelectedCardColors.of(colorScheme) : null;
+    final selectedBg = web?.background ?? color.withValues(alpha: 0.14);
+    final selectedAccent = web?.accent ?? color;
+    final selectedFg = web?.foreground ?? color;
     return Expanded(
       flex: flex,
       child: Material(
@@ -2436,19 +2445,19 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
             ),
             decoration: BoxDecoration(
               color: isSelected
-                  ? color.withValues(alpha: 0.14)
+                  ? selectedBg
                   : colorScheme.surfaceContainerHighest.withValues(alpha: 0.28),
               borderRadius: BorderRadius.circular(HrRadius.card),
               border: Border.all(
                 color: isSelected
-                    ? color
+                    ? selectedAccent
                     : colorScheme.outlineVariant.withValues(alpha: 0.45),
                 width: isSelected ? 2.0 : 1.0,
               ),
               boxShadow: isSelected
                   ? [
                       BoxShadow(
-                        color: color.withValues(alpha: 0.18),
+                        color: selectedAccent.withValues(alpha: 0.18),
                         blurRadius: 6,
                         offset: const Offset(0, 2),
                       ),
@@ -2477,7 +2486,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: isSelected ? color : colorScheme.onSurfaceVariant,
+                          color: isSelected ? selectedFg : colorScheme.onSurfaceVariant,
                           fontWeight: isSelected ? FontWeight.w900 : FontWeight.bold,
                           fontSize: _kpiLabelSize(isWide),
                         ),

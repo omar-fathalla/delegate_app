@@ -17,6 +17,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
+import 'package:delegate_app/web/hr_system/delegate_subscription_requests_web.dart';
 import 'package:delegate_app/web/hr_system/hr_home_overview_web.dart';
 import 'package:delegate_app/web/hr_system/hr_home_side_cards_web.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -1018,6 +1019,52 @@ void main() {
         await expectWebGolden(find.byType(MaterialApp), 'goldens/${c.$2}.png');
       });
     }
+    testWidgets(
+      'chains «عرض الكل» opens subscriptions on «طلبات السلاسل» (TAS-117)',
+      (t) async {
+        addTearDown(
+          () => DelegateSubscriptionRequestsWeb.requestedTab.value = null,
+        );
+        HrHomeOverviewWeb.debugData = (_) => HrHomeOverviewData(
+          delegate: _supervisor,
+          isLoading: false,
+          errorMessage: null,
+          records: _records(),
+          chains: _chains,
+          pendingChainRequests: const ['Fake Pending Chain'],
+        );
+        HrHomeOverviewWeb.debugClock = () => _clockNow;
+        t.view.physicalSize = const Size(1440, 900);
+        t.view.devicePixelRatio = 1;
+        final navigated = <(int, SubscriptionRequestsWebTab?)>[];
+        await t.pumpWidget(
+          _app(
+            Scaffold(
+              body: HrHomeOverviewWeb(
+                delegate: _supervisor,
+                // Record the requested tab at the moment the shell switches,
+                // so a kept-alive page already sees it.
+                onNavigateToTab: (i) => navigated.add(
+                  (i, DelegateSubscriptionRequestsWeb.requestedTab.value),
+                ),
+              ),
+            ),
+          ),
+        );
+        await t.pump(const Duration(milliseconds: 400));
+
+        final all = find.byKey(HrHomeChainsCard.pendingAllKey);
+        await t.ensureVisible(all);
+        await t.pump();
+        await t.tap(all);
+        await t.pump();
+
+        expect(navigated, [
+          (kHrTabSubscriptions, SubscriptionRequestsWebTab.chains),
+        ]);
+        expect(t.takeException(), isNull);
+      },
+    );
   });
 
   group('mobile path unchanged', () {

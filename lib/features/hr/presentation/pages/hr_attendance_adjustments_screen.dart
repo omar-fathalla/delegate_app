@@ -13,6 +13,7 @@ import 'package:delegate_app/features/admin/domain/usecases/get_company_delegate
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_empty_state.dart';
 
 /// نموذج سجل تعديل الحضور والانصراف الإداري
 class AttendanceAdjustmentRecord {
@@ -147,6 +148,21 @@ class HrAdjustmentsDelegateFilter {
 }
 
 /// شاشة سجل تعديلات الحضور والانصراف الإدارية (Audit Trail)
+/// Arabic message for a failed adjustments-log load (TAS-186). Never shows
+/// the raw Firebase text.
+String hrAdjustmentsLoadErrorMessage(Object error) {
+  if (error is FirebaseException) {
+    switch (error.code) {
+      case 'permission-denied':
+        return 'ليس لديك صلاحية لعرض سجل التعديلات.';
+      case 'unavailable':
+      case 'deadline-exceeded':
+        return 'تعذر الاتصال بالخادم. تحقق من الاتصال بالإنترنت ثم أعد المحاولة.';
+    }
+  }
+  return 'حدث خطأ أثناء تحميل سجل التعديلات. يرجى المحاولة مرة أخرى.';
+}
+
 class HRAttendanceAdjustmentsScreen extends StatefulWidget {
   final Delegate hrDelegate;
   final bool showAppBar;
@@ -180,6 +196,9 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
   Map<String, Delegate> _delegatesByUid = {};
   int? _hoveredRowIndex;
   HrAdjustmentsDelegateFilter? _delegateFilter;
+
+  /// Bumped by «إعادة المحاولة» to listen to the log again.
+  int _loadAttempt = 0;
 
   @override
   void initState() {
@@ -397,20 +416,22 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
             )
           : null,
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        // A new key on retry drops the old error and listens again.
+        key: ValueKey(_loadAttempt),
         stream: query.snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
-                    const SizedBox(height: 12),
-                    Text('حدث خطأ أثناء تحميل السجلات: ${snapshot.error}', textAlign: TextAlign.center),
-                  ],
-                ),
+            // Same pattern as the detail log's error state (TAS-120): a
+            // readable Arabic message, never the raw Firebase text.
+            return HrEmptyState(
+              key: const Key('hr_adjustments_error'),
+              icon: Icons.error_outline_rounded,
+              title: 'تعذر تحميل سجل التعديلات',
+              message: hrAdjustmentsLoadErrorMessage(snapshot.error!),
+              action: FilledButton.tonal(
+                key: const Key('hr_adjustments_retry'),
+                onPressed: () => setState(() => _loadAttempt++),
+                child: const Text('إعادة المحاولة'),
               ),
             );
           }

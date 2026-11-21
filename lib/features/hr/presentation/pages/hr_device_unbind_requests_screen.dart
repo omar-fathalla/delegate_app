@@ -10,6 +10,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 import 'package:delegate_app/features/hr/presentation/device_unbind_labels.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_adaptive_sheet.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_selected_card_colors.dart';
 
 /// شاشة إدارة واعتماد طلبات فك وربط أجهزة المناديب لمسؤولي الموارد البشرية (HR)
 class HRDeviceUnbindRequestsScreen extends StatefulWidget {
@@ -1248,12 +1249,12 @@ class _HRDeviceUnbindRequestsScreenState
     final isSelected = _selectedStatusFilter == statusKey;
     // Web (TAS-154): every HR page marks the selected stat card with the
     // theme's primary container. Mobile keeps the status tint.
-    final web = WebRuntimePolicy.isWeb;
-    final selectedBg =
-        web ? colorScheme.primaryContainer : color.withValues(alpha: 0.08);
-    final selectedAccent = web ? colorScheme.primary : color;
-    final selectedFg = web ? colorScheme.onPrimaryContainer : color;
-    final selectedOnAccent = web ? colorScheme.onPrimary : Colors.white;
+    final web =
+        WebRuntimePolicy.isWeb ? HrSelectedCardColors.of(colorScheme) : null;
+    final selectedBg = web?.background ?? color.withValues(alpha: 0.08);
+    final selectedAccent = web?.accent ?? color;
+    final selectedFg = web?.foreground ?? color;
+    final selectedOnAccent = web?.onAccent ?? Colors.white;
 
     return InkWell(
       onTap: () {

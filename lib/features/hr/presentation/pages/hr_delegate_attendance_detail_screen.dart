@@ -1797,10 +1797,15 @@ class _HRDelegateAttendanceDetailScreenState
       ('completed', 'مكتمل', completed),
       ('incomplete', 'غير مكتمل', base.length - completed),
     ];
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    // Wrap, not Row: on a 360 px phone with a wide fallback font the three
+    // chips do not fit on one line (TAS-187). In the wide layout the parent
+    // scrolls horizontally, so they still stay on one line there.
+    return Wrap(
+      key: const Key('hr_attendance_status_filter'),
+      spacing: 6,
+      runSpacing: 6,
       children: [
-        for (final (value, label, count) in options) ...[
+        for (final (value, label, count) in options)
           ChoiceChip(
             showCheckmark: false,
             visualDensity: VisualDensity.compact,
@@ -1820,8 +1825,6 @@ class _HRDelegateAttendanceDetailScreenState
               ],
             ),
           ),
-          const SizedBox(width: 6),
-        ],
       ],
     );
   }
