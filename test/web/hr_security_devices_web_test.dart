@@ -282,7 +282,10 @@ void main() {
         ),
         findsOneWidget,
       );
+      expect(DeviceUnbindLabels.approve, 'فك الارتباط');
+      expect(DeviceUnbindLabels.reject, 'رفض');
       expect(find.text('اعتماد وفك الارتباط'), findsNothing);
+      expect(find.text('موافقة وفك الارتباط'), findsNothing);
       expect(find.text('رفض الطلب'), findsNothing);
 
       final approveWidget = t.widget(approve.first);
@@ -375,7 +378,9 @@ void main() {
       expect(find.byType(Dialog), findsNothing);
     });
 
-    testWidgets('mobile keeps the full-width buttons', (t) async {
+    testWidgets('mobile keeps the full-width buttons with the shared labels', (
+      t,
+    ) async {
       WebRuntimePolicy.debugIsWebOverride = false;
       t.view.physicalSize = const Size(412, 900);
       t.view.devicePixelRatio = 1;
@@ -383,8 +388,17 @@ void main() {
       await _pumpUnbind(t, await _unbindDb());
 
       expect(find.byKey(const ValueKey('device_unbind_approve')), findsNothing);
-      expect(find.text('اعتماد وفك الارتباط'), findsWidgets);
-      expect(find.text('رفض الطلب'), findsWidgets);
+      // Owner decision: the same labels on mobile and web.
+      expect(find.text(DeviceUnbindLabels.approve), findsNWidgets(2));
+      expect(find.text(DeviceUnbindLabels.reject), findsNWidgets(2));
+      expect(find.text('اعتماد وفك الارتباط'), findsNothing);
+      expect(find.text('رفض الطلب'), findsNothing);
+      // Layout unchanged: the approve button still fills its Expanded slot.
+      final approve = find.ancestor(
+        of: find.text(DeviceUnbindLabels.approve).first,
+        matching: find.byType(Expanded),
+      );
+      expect(approve, findsWidgets);
     });
   });
 

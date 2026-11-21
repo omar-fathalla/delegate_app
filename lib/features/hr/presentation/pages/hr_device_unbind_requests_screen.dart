@@ -675,7 +675,7 @@ class _HRDeviceUnbindRequestsScreenState
                       onPressed: () => _rejectRequest(req),
                       icon: const Icon(Icons.close_rounded, size: 18),
                       label: const Text(
-                        'رفض الطلب',
+                        DeviceUnbindLabels.reject,
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -695,7 +695,7 @@ class _HRDeviceUnbindRequestsScreenState
                       onPressed: () => _approveRequest(req),
                       icon: const Icon(Icons.check_circle_rounded, size: 18),
                       label: const Text(
-                        'اعتماد وفك الارتباط',
+                        DeviceUnbindLabels.approve,
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -758,7 +758,7 @@ class _HRDeviceUnbindRequestsScreenState
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'تأكيد فك الارتباط',
+                  DeviceUnbindLabels.approveTitle,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -824,7 +824,7 @@ class _HRDeviceUnbindRequestsScreenState
                             Icon(Icons.check_circle_rounded, size: 18, color: Colors.white),
                             SizedBox(width: 6),
                             Text(
-                              'اعتماد وفك الارتباط',
+                              DeviceUnbindLabels.approve,
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -958,7 +958,7 @@ class _HRDeviceUnbindRequestsScreenState
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'رفض طلب فك الارتباط',
+                  DeviceUnbindLabels.rejectTitle,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -1035,7 +1035,7 @@ class _HRDeviceUnbindRequestsScreenState
                             Icon(Icons.close_rounded, size: 18, color: Colors.white),
                             SizedBox(width: 6),
                             Text(
-                              'تأكيد الرفض',
+                              DeviceUnbindLabels.confirmReject,
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
