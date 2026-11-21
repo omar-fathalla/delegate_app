@@ -67,5 +67,56 @@ out="$(LOCAL_CI_FIRESTORE_PORT=$LOCAL_CI_FIRESTORE_PORT LOCAL_CI_FIRESTORE_HUB_P
   && fail "emulators_exec.sh ran on a busy port"
 [[ "$out" == *"emulator ports busy"* && "$out" == *"pid $holder"* ]] || fail "unclear busy error: $out"
 echo "ok: emulators_exec.sh fails fast and names pid $holder"
+kill "$holder" 2>/dev/null || true
+wait "$holder" 2>/dev/null || true
+
+# 6. TAS-111: an orphaned "emulator" that ignores SIGTERM gets SIGKILLed, and
+#    emulators_exec.sh clears its own leftovers after the run (keeping the exit code).
+SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/emu-orphan.XXXXXX")"
+cat > "$SCRATCH/fake-emulator.py" <<'PY'
+import signal, socket, sys, time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+s = socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("127.0.0.1", int(sys.argv[1]))); s.listen(1)
+open(sys.argv[2], "w").write(str(__import__("os").getpid()))
+time.sleep(120)
+PY
+# Double fork so the listener is re-parented to launchd/init (ppid 1), like a
+# JVM left behind by firebase.
+spawn_orphan() { ( python3 "$SCRATCH/fake-emulator.py" "$1" "$2" </dev/null >/dev/null 2>&1 & ); }
+wait_listen() { for _ in $(seq 1 40); do lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1 && return 0; sleep 0.25; done; return 1; }
+trap 'kill $holder 2>/dev/null || true; [[ -f $SCRATCH/pid ]] && kill -9 "$(cat "$SCRATCH/pid")" 2>/dev/null; rm -rf "$SCRATCH"' EXIT
+
+emulator_pick_local_slot || fail "no free local slot for the orphan test"
+port="$LOCAL_CI_FIRESTORE_HUB_PORT"
+spawn_orphan "$port" "$SCRATCH/pid"
+wait_listen "$port" || fail "fake orphan never listened on $port"
+opid="$(cat "$SCRATCH/pid")"
+[[ "$(ps -o ppid= -p "$opid" | tr -d ' ')" == 1 ]] || fail "fake orphan $opid is not re-parented to pid 1"
+out="$(EMULATOR_KILL_GRACE_SECONDS=1 emulator_kill_orphans_on_ports 2>&1)"
+kill -0 "$opid" 2>/dev/null && fail "orphan $opid survived: $out"
+[[ "$out" == *"ignored SIGTERM, sending SIGKILL"* ]] || fail "no SIGKILL escalation: $out"
+emulator_ports_free || fail "slot ports still busy after the kill"
+echo "ok: orphan that ignores SIGTERM is SIGKILLed"
+
+cat > "$SCRATCH/fake-firebase.sh" <<EOF
+#!/usr/bin/env bash
+( python3 "$SCRATCH/fake-emulator.py" "\$LOCAL_CI_FIRESTORE_PORT" "$SCRATCH/pid" </dev/null >/dev/null 2>&1 & )
+for _ in \$(seq 1 40); do lsof -nP -iTCP:"\$LOCAL_CI_FIRESTORE_PORT" -sTCP:LISTEN >/dev/null 2>&1 && break; sleep 0.25; done
+exit 3
+EOF
+chmod +x "$SCRATCH/fake-firebase.sh"
+rm -f "$SCRATCH/pid"
+set +e
+out="$(EMULATOR_KILL_GRACE_SECONDS=1 FIREBASE_TOOLS_BIN="$SCRATCH/fake-firebase.sh" \
+  bash "$ROOT/scripts/emulators_exec.sh" --only firestore true 2>&1)"
+rc=$?
+set -e
+[[ "$rc" == 3 ]] || fail "emulators_exec.sh lost the exit code ($rc): $out"
+[[ -f "$SCRATCH/pid" ]] || fail "fake firebase never started its emulator: $out"
+fs_port="$LOCAL_CI_FIRESTORE_PORT" # exported above, so emulators_exec.sh uses these ports as given
+kill -0 "$(cat "$SCRATCH/pid")" 2>/dev/null && fail "leftover emulator still running after emulators_exec.sh: $out"
+lsof -nP -iTCP:"$fs_port" -sTCP:LISTEN >/dev/null 2>&1 && fail "port $fs_port still busy after emulators_exec.sh"
+echo "ok: emulators_exec.sh clears its leftovers and keeps the exit code"
 
 echo "ok: emulator port slot tests passed"

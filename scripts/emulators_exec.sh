@@ -47,5 +47,14 @@ trap 'rm -f "$CFG"' EXIT
 node "$ROOT/scripts/generate_emulator_firebase_config.js" "$CFG"
 
 FB_TOOLS="${FIREBASE_TOOLS_BIN:-npx --yes firebase-tools@14.15.1}"
+status=0
 # shellcheck disable=SC2086
-$FB_TOOLS emulators:exec --config "$CFG" "$@"
+$FB_TOOLS emulators:exec --config "$CFG" "$@" || status=$?
+
+# TAS-111: firebase sometimes logs "Error stopping Firestore Emulator" and
+# leaves the JVM running on our ports; the next step in the same job then
+# reuses this slot. Clean up our own leftovers now instead of later.
+if ! emulator_ports_free; then
+  emulator_kill_orphans_on_ports
+fi
+exit "${status}"
