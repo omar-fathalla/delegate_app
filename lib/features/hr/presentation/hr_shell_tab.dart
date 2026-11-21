@@ -59,6 +59,8 @@ Widget hrShellTab({
         delegate: delegate,
         showAppBar: false,
         initialTab: 'violations',
+        // Device unbind requests live on the «فك الأجهزة» tab on web.
+        hrWebLayout: WebRuntimePolicy.isWeb,
       );
     case kHrTabPhotos:
       return HRPhotosTab(hrDelegate: delegate);
