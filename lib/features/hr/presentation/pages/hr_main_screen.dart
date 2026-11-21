@@ -11,6 +11,7 @@ import 'package:delegate_app/features/admin/presentation/pages/subscription_rene
 import 'package:delegate_app/features/admin/domain/entities/subscription_renewal.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_tab.dart';
+import 'package:delegate_app/features/hr/presentation/pages/tabs/hr_photos_tab.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_desktop_sidebar.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_desktop_top_bar.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_inner_page.dart';
@@ -54,10 +55,18 @@ class _HRMainScreenState extends State<HRMainScreen> {
   final GlobalKey<NavigatorState> _innerNavigator =
       GlobalKey<NavigatorState>(debugLabel: 'hr_inner_navigator');
 
+  /// Switches «الصور» to its permissions view when the retired
+  /// «أذونات التصوير» slot is selected (TAS-149).
+  final HrPhotosViewController _photosView = HrPhotosViewController();
+
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex ?? _homeIndex;
+    final initial = widget.initialIndex ?? _homeIndex;
+    if (initial == kHrTabPhotoPermissions) {
+      _photosView.show(HrPhotosView.permissions);
+    }
+    _currentIndex = hrShellResolveTab(initial);
     _loadedTabs = {_currentIndex};
     if (WebRuntimePolicy.isWeb) {
       HrShellLink.attach(
@@ -77,6 +86,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
   void dispose() {
     HrShellLink.detach(this);
     _headerBridge.dispose();
+    _photosView.dispose();
     super.dispose();
   }
 
@@ -94,6 +104,12 @@ class _HRMainScreenState extends State<HRMainScreen> {
   void _onTabSelected(int index) {
     // A sidebar click leaves any inner page of the previous tab.
     _innerNavigator.currentState?.popUntil((route) => route.isFirst);
+    // TAS-149: the retired permissions page opens «الصور» on its
+    // permissions view.
+    if (index == kHrTabPhotoPermissions) {
+      _photosView.show(HrPhotosView.permissions);
+      index = hrShellResolveTab(index);
+    }
     setState(() {
       _currentIndex = index;
       _loadedTabs.add(index);
@@ -248,11 +264,13 @@ class _HRMainScreenState extends State<HRMainScreen> {
       case 'overview':
       case 'delegate_subscriptions':
       case 'tasks':
-      case 'supervisor_photo_permissions':
       case 'penalty_rules_catalog':
       case 'penalties_management':
         final tab = hrShellItemById(value)?.tabIndex;
         if (tab != null) _onTabSelected(tab);
+        break;
+      case kHrRetiredPhotoPermissionsId:
+        _onTabSelected(kHrTabPhotoPermissions);
         break;
       case 'delegate_renewal':
         if (WebRuntimePolicy.isWeb) {
@@ -659,6 +677,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
                   index: index,
                   delegate: delegate,
                   onNavigateToTab: _onTabSelected,
+                  photosView: _photosView,
                 )
               : const SizedBox.shrink(),
       ],
