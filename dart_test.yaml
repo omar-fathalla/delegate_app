@@ -1,0 +1,9 @@
+# Test tags for `flutter test`.
+tags:
+  # Golden/screenshot tests (TAS-162, TAS-195). CI runs them in their own step
+  # (`flutter test --tags golden`) after the main `--exclude-tags golden` run.
+  # test/flutter_test_config.dart tolerates up to 0.5% pixel diff (Mac vs
+  # Linux text antialiasing). Run or re-record them locally:
+  #   flutter test --tags golden
+  #   flutter test --tags golden --update-goldens
+  golden:

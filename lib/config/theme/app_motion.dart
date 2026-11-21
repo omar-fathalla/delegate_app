@@ -350,14 +350,18 @@ abstract final class AppMotionPage {
   }
 
   /// Returns a [CustomTransitionPage] implementing M3 Fade Through transition.
+  ///
+  /// [key] overrides [GoRouterState.pageKey] when several URLs show one
+  /// page (the HR shell, TAS-139).
   static CustomTransitionPage<T> fadeThrough<T>({
     required GoRouterState state,
     required Widget child,
+    LocalKey? key,
     Duration duration = AppMotionDurations.medium2, // 300ms
     Duration reverseDuration = AppMotionDurations.short4, // 200ms
   }) {
     return CustomTransitionPage<T>(
-      key: state.pageKey,
+      key: key ?? state.pageKey,
       child: child,
       transitionDuration: duration,
       reverseTransitionDuration: reverseDuration,

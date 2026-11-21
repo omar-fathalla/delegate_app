@@ -253,10 +253,13 @@ async function resolveCredentialProject(sources) {
 
 /**
  * @param {string[]} argv
- * @return {{project: string, apply: boolean, cleanup: boolean, rotatePasswords: boolean, dryRun: boolean}}
+ * @return {{project: string, apply: boolean, cleanup: boolean, rotatePasswords: boolean, dryRun: boolean, resetDeviceBindings: boolean}}
  */
 function parseArgs(argv) {
-  const out = {project: "", apply: false, cleanup: false, rotatePasswords: false, dryRun: false};
+  const out = {
+    project: "", apply: false, cleanup: false, rotatePasswords: false, dryRun: false,
+    resetDeviceBindings: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--apply") {
@@ -275,6 +278,10 @@ function parseArgs(argv) {
       out.rotatePasswords = true;
       continue;
     }
+    if (arg === "--reset-device-bindings") {
+      out.resetDeviceBindings = true;
+      continue;
+    }
     if (arg.startsWith("--allow-prod")) {
       throw new Error("Refusing --allow-prod: this script never runs on production.");
     }
@@ -288,6 +295,9 @@ function parseArgs(argv) {
   }
   if (out.dryRun && out.apply) {
     throw new Error("Cannot use --dry-run together with --apply.");
+  }
+  if (out.resetDeviceBindings && (out.cleanup || out.rotatePasswords)) {
+    throw new Error("--reset-device-bindings runs on its own (with or without --apply).");
   }
   if (out.rotatePasswords && (!out.apply || out.cleanup)) {
     throw new Error("--rotate-passwords is only valid with --apply (not with --cleanup).");
@@ -613,6 +623,23 @@ function buildPlan() {
     const company = spec.company ? COMPANIES.find((c) => c.id.endsWith(spec.company)) : null;
     addAccount({...spec, company, omitCompany: !company});
   }
+
+  // Added last so every account above keeps its phone number (phones are
+  // handed out in order). Covers the two UserRole values that had no account.
+  addAccount({
+    uid: "seed-fake-accountant",
+    email: "fake.accountant@example.com",
+    role: "accountant",
+    displayName: "Fake Accountant",
+    omitCompany: true,
+  });
+  addAccount({
+    uid: "seed-fake-marketing-promotion-alpha",
+    email: "fake.marketing-promotion.alpha@example.com",
+    role: "marketing_promotion",
+    displayName: "Fake Marketing Promotion alpha",
+    company: COMPANIES[0],
+  });
 
   assertPlanSafe({seedTag: SEED_TAG, organizationId: ORG_ID, accounts, writes});
   return {seedTag: SEED_TAG, organizationId: ORG_ID, accounts, writes};
@@ -1031,6 +1058,60 @@ function publicCatalog(plan = buildPlan()) {
   }));
 }
 
+const DEVICE_BINDINGS_COLLECTION = "deviceBindings";
+const DEVICE_RESET_FIELDS = Object.freeze({
+  boundDeviceId: "",
+  boundDeviceModel: "",
+  isDeviceLocked: false,
+});
+
+/**
+ * Device-binding docs to clear for the fake delegates, so any simulator or
+ * emulator can log in as them (delegateLoginV2 binds the first device and then
+ * blocks every other one). Only seed-fake-del-* delegates of this seed.
+ * @param {ReturnType<typeof buildPlan>} plan
+ * @return {{uid: string, phone: string, deletes: string[], updates: string[]}[]}
+ */
+function deviceResetTargets(plan) {
+  const targets = [];
+  for (const account of plan.accounts) {
+    if (account.role !== "delegate" || !String(account.uid).startsWith("seed-fake-del-")) continue;
+    const delegateDoc = plan.writes.find((w) => w.kind === "delegate" && w.path.endsWith(`/delegates/${account.uid}`));
+    targets.push({
+      uid: account.uid,
+      phone: account.phoneNumber,
+      deletes: [`${DEVICE_BINDINGS_COLLECTION}/${account.uid}`],
+      updates: [`users/${account.uid}`, ...(delegateDoc ? [delegateDoc.path] : [])],
+    });
+  }
+  return targets;
+}
+
+/**
+ * @param {{plan: ReturnType<typeof buildPlan>, db: {get: Function, set: Function, delete: Function}, apply: boolean}} input
+ * @return {Promise<{cleared: string[], planned: string[]}>}
+ */
+async function resetDeviceBindings({plan, db, apply}) {
+  const cleared = [];
+  const planned = [];
+  for (const target of deviceResetTargets(plan)) {
+    planned.push(target.uid);
+    if (!apply) continue;
+    for (const docPath of target.deletes) {
+      await db.delete(docPath);
+    }
+    for (const docPath of target.updates) {
+      const current = await db.get(docPath);
+      // Only touch docs this seed owns.
+      if (current && docDeletable(current)) {
+        await db.set(docPath, {...DEVICE_RESET_FIELDS}, {merge: true});
+      }
+    }
+    cleared.push(target.uid);
+  }
+  return {cleared, planned};
+}
+
 module.exports = {
   ALLOWED_PROJECT,
   PROD_PROJECT,
@@ -1046,6 +1127,8 @@ module.exports = {
   assertLocalCredentialSignals,
   resolveCredentialProject,
   parseArgs,
+  deviceResetTargets,
+  resetDeviceBindings,
   fakePhone,
   fakeNationalId,
   generatePassword,

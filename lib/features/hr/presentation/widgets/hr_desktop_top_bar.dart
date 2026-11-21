@@ -325,6 +325,8 @@ class HRDesktopTopBar extends StatelessWidget {
           const SizedBox(width: 10),
 
           // ── Theme Mode Toggle Button (Light/Dark Mode) ──
+          // Web moved it to the account menu (approved 21 Nov 2026, TAS-174).
+          if (webAccount == null)
           BlocBuilder<ThemeCubit, ThemeState>(
             builder: (context, themeState) {
               final isDark =

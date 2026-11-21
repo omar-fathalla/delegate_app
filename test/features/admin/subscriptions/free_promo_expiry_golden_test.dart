@@ -1,3 +1,11 @@
+// Golden/screenshot tests (TAS-162, TAS-195). CI runs them in a separate
+// step (`flutter test --tags golden`) on Linux; small host antialiasing
+// differences are tolerated by test/flutter_test_config.dart.
+// Run locally: flutter test --tags golden
+// Re-record: flutter test --tags golden --update-goldens
+@Tags(['golden'])
+library;
+
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/features/admin/data/repositories/subscription_renewal_repository.dart';

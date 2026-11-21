@@ -8,7 +8,7 @@ const {readFileSync} = require("fs");
 const {resolve} = require("path");
 const {
   initializeTestEnvironment, assertFails, assertSucceeds,
-} = require("@firebase/rules-unit-testing");
+} = require("./_rules_testing");
 const {Timestamp} = require("firebase/firestore");
 
 const PROJECT_ID = "demo-tashil-p0";

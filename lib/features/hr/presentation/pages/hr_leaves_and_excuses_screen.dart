@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import 'package:delegate_app/config/theme/app_motion.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/tashil_button_group.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
@@ -11,6 +12,12 @@ import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
+import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
+
+/// Max height of the web create-dialog dropdown menus. Keeps the open menu
+/// inside the dialog; longer lists scroll (TAS-151).
+const double kHrLeaveDialogMenuHeight = 240;
 
 /// شاشة تقديم ومراجعة واعتماد طلبات الإجازات ومبررات الغياب (HR Leaves & Excuses)
 class HRLeavesAndExcusesScreen extends StatefulWidget {
@@ -22,12 +29,17 @@ class HRLeavesAndExcusesScreen extends StatefulWidget {
   final ValueChanged<HRLeaveSelection>? onSelectLeave;
   final String? selectedLeaveKey;
 
+  /// Firestore used for the requests list stream. Null means
+  /// [FirebaseFirestore.instance]; tests pass a fake.
+  final FirebaseFirestore? firestore;
+
   const HRLeavesAndExcusesScreen({
     super.key,
     required this.hrDelegate,
     this.showAppBar = true,
     this.onSelectLeave,
     this.selectedLeaveKey,
+    this.firestore,
   });
 
   @override
@@ -48,10 +60,38 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
     _loadCompanyDelegates();
   }
 
+  /// Web shell bridge, so the top-bar refresh reloads this tab (TAS-183).
+  HrWebHeaderBridge? _headerBridge;
+
+  /// Shell tab only: a page with its own AppBar is not inside the shell.
+  bool get _hrWebShellTab => WebRuntimePolicy.isWeb && !widget.showAppBar;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_hrWebShellTab) return;
+    final next = context
+        .getInheritedWidgetOfExactType<HrWebHeaderBridgeScope>()
+        ?.notifier;
+    if (identical(next, _headerBridge)) return;
+    _headerBridge?.releasePageReload(kHrTabLeaves, _reloadFromShell);
+    _headerBridge = next;
+    _headerBridge?.attachPageReload(kHrTabLeaves, _reloadFromShell);
+  }
+
   @override
   void dispose() {
+    _headerBridge?.releasePageReload(kHrTabLeaves, _reloadFromShell);
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Top-bar refresh: re-subscribes the requests stream (it is built in
+  /// [build]) and reloads the company delegates used by the dialogs.
+  Future<void> _reloadFromShell() async {
+    if (!mounted) return;
+    setState(() {});
+    await _loadCompanyDelegates();
   }
 
   Future<void> _loadCompanyDelegates() async {
@@ -313,12 +353,72 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
     );
   }
 
+  /// Width from which the toolbar is a single row (see the toolbar below).
+  static const double _toolbarRowMinWidth = 850;
+
+  /// «إدارة الأرصدة» when the page has no AppBar (shell tab, TAS-183).
+  ///
+  /// [inToolbar]: the wide web toolbar row, styled like its other controls.
+  /// Otherwise a compact button for the action row above the toolbar.
+  Widget _leaveManagerButton({required bool inToolbar}) {
+    const label = Text('إدارة الأرصدة');
+    const icon = Icon(Icons.beach_access_rounded, size: 18);
+    final button = inToolbar
+        ? OutlinedButton.icon(
+            key: const ValueKey('hr_leaves_manage_balances'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(HrRadius.pill),
+              ),
+            ),
+            onPressed: _openDelegatesLeaveManager,
+            icon: icon,
+            label: label,
+          )
+        : TextButton.icon(
+            key: const ValueKey('hr_leaves_manage_balances'),
+            onPressed: _openDelegatesLeaveManager,
+            icon: icon,
+            label: label,
+          );
+    return Tooltip(
+      message: 'إدارة إجازات وأرصدة المناديب',
+      child: button,
+    );
+  }
+
+  /// Action row above the toolbar when the page has no AppBar: mobile tab and
+  /// narrow web. Wide web shows the button in the toolbar row instead.
+  Widget _leaveManagerActionRow() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Same width test as the toolbar (it has 16 padding on each side).
+        final toolbarRow = constraints.maxWidth - 32 >= _toolbarRowMinWidth;
+        if (WebRuntimePolicy.isWeb && toolbarRow) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 8, 0),
+          child: Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: _leaveManagerButton(inToolbar: false),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    Query<Map<String, dynamic>> query = FirebaseFirestore.instance
+    final web = WebRuntimePolicy.isWeb;
+
+    Query<Map<String, dynamic>> query =
+        (widget.firestore ?? FirebaseFirestore.instance)
         .collection('leave_requests')
         .where('companyUID', isEqualTo: widget.hrDelegate.companyUID);
 
@@ -358,21 +458,26 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
             tooltip: 'إدارة إجازات وأرصدة المناديب',
             onPressed: _openDelegatesLeaveManager,
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'تحديث',
-            onPressed: () => setState(() {}),
-          ),
+          // The list is a live stream; web relies on the shell refresh.
+          if (!WebRuntimePolicy.isWeb)
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              tooltip: 'تحديث',
+              onPressed: () => setState(() {}),
+            ),
           const SizedBox(width: 8),
         ],
       )
           : null,
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'hr_leaves_create_fab',
-        onPressed: _showCreateLeaveDialog,
-        icon: const Icon(Icons.add_task_rounded),
-        label: const Text('تسجيل'),
-      ),
+      // Web uses the toolbar button instead of a FAB (TAS-151).
+      floatingActionButton: web
+          ? null
+          : FloatingActionButton.extended(
+              heroTag: 'hr_leaves_create_fab',
+              onPressed: _showCreateLeaveDialog,
+              icon: const Icon(Icons.add_task_rounded),
+              label: const Text('تسجيل'),
+            ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: query.snapshots(),
         builder: (context, snapshot) {
@@ -510,12 +615,15 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                 ),
               ),
 
+              if (!widget.showAppBar) _leaveManagerActionRow(),
+
               // ── 2. Unified Single-Row Toolbar ──
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final isDesktop = constraints.maxWidth >= 850;
+                    final isDesktop =
+                        constraints.maxWidth >= _toolbarRowMinWidth;
 
                     final searchWidget = SizedBox(
                       height: 44,
@@ -608,12 +716,45 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                       ],
                     );
 
+                    // Web: primary action lives in the toolbar (TAS-151).
+                    final createButton = FilledButton.icon(
+                      key: const ValueKey('hr_leaves_create_button'),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 44),
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(HrRadius.pill),
+                        ),
+                      ),
+                      onPressed: _showCreateLeaveDialog,
+                      icon: const Icon(Icons.add_task_rounded, size: 18),
+                      label: const Text('تسجيل إجازة'),
+                    );
+
+                    final searchRow = web
+                        ? Row(
+                            children: [
+                              Expanded(child: searchWidget),
+                              const SizedBox(width: 12),
+                              createButton,
+                            ],
+                          )
+                        : searchWidget;
+
                     if (isDesktop) {
                       return Row(
                         children: [
                           Expanded(child: searchWidget),
                           const SizedBox(width: 12),
                           statusButtonGroup,
+                          if (web && !widget.showAppBar) ...[
+                            const SizedBox(width: 12),
+                            _leaveManagerButton(inToolbar: true),
+                          ],
+                          if (web) ...[
+                            const SizedBox(width: 12),
+                            createButton,
+                          ],
                         ],
                       );
                     }
@@ -629,7 +770,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          searchWidget,
+                          searchRow,
                           const SizedBox(height: 10),
                           Wrap(
                             spacing: 8,
@@ -654,7 +795,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        searchWidget,
+                        searchRow,
                         const SizedBox(height: 10),
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
@@ -1175,6 +1316,40 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
     );
   }
 
+  /// Web-only dropdown for the create dialog (TAS-151). The menu matches the
+  /// field width and has a capped height, so it stays inside the dialog.
+  Widget _dialogWebDropdown<T>({
+    required Key key,
+    required T? initialSelection,
+    required List<DropdownMenuEntry<T>> entries,
+    required ValueChanged<T?> onSelected,
+    required TextStyle textStyle,
+    required ColorScheme colorScheme,
+  }) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(HrRadius.chip),
+      borderSide: BorderSide(
+        color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+      ),
+    );
+    return DropdownMenu<T>(
+      key: key,
+      initialSelection: initialSelection,
+      expandedInsets: EdgeInsets.zero,
+      requestFocusOnTap: false,
+      menuHeight: kHrLeaveDialogMenuHeight,
+      textStyle: textStyle,
+      dropdownMenuEntries: entries,
+      onSelected: onSelected,
+      inputDecorationTheme: InputDecorationTheme(
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        border: border,
+        enabledBorder: border,
+      ),
+    );
+  }
+
   Future<void> _showCreateLeaveDialog() async {
     if (_companyDelegates.isEmpty) {
       await _loadCompanyDelegates();
@@ -1195,6 +1370,42 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
         builder: (context, setDlgState) {
           final days = endDate.difference(startDate).inDays + 1;
           final colorScheme = Theme.of(context).colorScheme;
+          // Web uses the M3 type scale (never below 12); mobile keeps its
+          // original sizes (TAS-151).
+          final web = WebRuntimePolicy.isWeb;
+          final textTheme = Theme.of(context).textTheme;
+          final fieldLabelStyle = web
+              ? textTheme.labelLarge!.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurface,
+                )
+              : TextStyle(
+                  fontSize: HrFont.labelMedium,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurface,
+                );
+          final fieldTextStyle = web
+              ? textTheme.bodyMedium!.copyWith(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                )
+              : TextStyle(
+                  fontSize: HrFont.labelMedium,
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                );
+          final captionStyle = web
+              ? textTheme.labelMedium!
+              : const TextStyle(fontSize: HrFont.labelSmall);
+          final valueStyle = web
+              ? textTheme.bodyMedium!.copyWith(fontWeight: FontWeight.bold)
+              : const TextStyle(
+                  fontSize: HrFont.labelMedium,
+                  fontWeight: FontWeight.bold,
+                );
+          final buttonTextStyle = web
+              ? textTheme.labelLarge!
+              : const TextStyle(fontSize: HrFont.labelMedium);
 
           return Dialog(
             backgroundColor: colorScheme.surface,
@@ -1271,21 +1482,27 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                         children: [
                           Text(
                             'المندوب:',
-                            style: TextStyle(
-                              fontSize: HrFont.labelMedium,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onSurface,
-                            ),
+                            style: fieldLabelStyle,
                           ),
                           const SizedBox(height: 6),
+                          if (web)
+                            _dialogWebDropdown<Delegate>(
+                              key: const ValueKey('hr_leave_delegate_menu'),
+                              initialSelection: selectedDelegate,
+                              entries: [
+                                for (final d in _companyDelegates)
+                                  DropdownMenuEntry(value: d, label: d.fullName),
+                              ],
+                              onSelected: (val) =>
+                                  setDlgState(() => selectedDelegate = val),
+                              textStyle: fieldTextStyle,
+                              colorScheme: colorScheme,
+                            )
+                          else
                           DropdownButtonFormField<Delegate>(
                             initialValue: selectedDelegate,
                             isExpanded: true,
-                            style: TextStyle(
-                              fontSize: HrFont.labelMedium,
-                              color: colorScheme.onSurface,
-                              fontWeight: FontWeight.w500,
-                            ),
+                            style: fieldTextStyle,
                             items: _companyDelegates
                                 .map((d) => DropdownMenuItem(
                                       value: d,
@@ -1315,21 +1532,37 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                           const SizedBox(height: 12),
                           Text(
                             'نوع الطلب:',
-                            style: TextStyle(
-                              fontSize: HrFont.labelMedium,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onSurface,
-                            ),
+                            style: fieldLabelStyle,
                           ),
                           const SizedBox(height: 6),
+                          if (web)
+                            _dialogWebDropdown<String>(
+                              key: const ValueKey('hr_leave_type_menu'),
+                              initialSelection: selectedType,
+                              entries: const [
+                                DropdownMenuEntry(
+                                    value: 'annual', label: 'إجازة اعتيادية'),
+                                DropdownMenuEntry(
+                                    value: 'sick', label: 'إجازة مرضية'),
+                                DropdownMenuEntry(
+                                    value: 'emergency', label: 'إجازة عارضة'),
+                                DropdownMenuEntry(
+                                    value: 'unpaid', label: 'إجازة بدون أجر'),
+                                DropdownMenuEntry(
+                                    value: 'delay', label: 'عذر تأخير'),
+                                DropdownMenuEntry(
+                                    value: 'absence', label: 'عذر غياب'),
+                              ],
+                              onSelected: (val) =>
+                                  setDlgState(() => selectedType = val ?? 'annual'),
+                              textStyle: fieldTextStyle,
+                              colorScheme: colorScheme,
+                            )
+                          else
                           DropdownButtonFormField<String>(
                             initialValue: selectedType,
                             isExpanded: true,
-                            style: TextStyle(
-                              fontSize: HrFont.labelMedium,
-                              color: colorScheme.onSurface,
-                              fontWeight: FontWeight.w500,
-                            ),
+                            style: fieldTextStyle,
                             items: const [
                               DropdownMenuItem(
                                   value: 'annual', child: Text('إجازة اعتيادية')),
@@ -1371,11 +1604,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                             children: [
                               Text(
                                 'الفترة بالأيام:',
-                                style: TextStyle(
-                                  fontSize: HrFont.labelMedium,
-                                  fontWeight: FontWeight.w600,
-                                  color: colorScheme.onSurface,
-                                ),
+                                style: fieldLabelStyle,
                               ),
                               const Spacer(),
                               Container(
@@ -1389,8 +1618,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                 ),
                                 child: Text(
                                   'المدة: $days ${days == 1 ? 'يوم' : 'أيام'}',
-                                  style: TextStyle(
-                                    fontSize: HrFont.labelSmall,
+                                  style: captionStyle.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: colorScheme.primary,
                                   ),
@@ -1451,8 +1679,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                               children: [
                                                 Text(
                                                   'من تاريخ',
-                                                  style: TextStyle(
-                                                    fontSize: HrFont.labelSmall,
+                                                  style: captionStyle.copyWith(
                                                     fontWeight: FontWeight.w600,
                                                     color: colorScheme.onSurfaceVariant,
                                                   ),
@@ -1460,10 +1687,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                                 const SizedBox(height: 1),
                                                 Text(
                                                   DateFormat('dd-MM-yyyy').format(startDate),
-                                                  style: const TextStyle(
-                                                    fontSize: HrFont.labelMedium,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
+                                                  style: valueStyle,
                                                 ),
                                               ],
                                             ),
@@ -1515,8 +1739,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                               children: [
                                                 Text(
                                                   'إلى تاريخ',
-                                                  style: TextStyle(
-                                                    fontSize: HrFont.labelSmall,
+                                                  style: captionStyle.copyWith(
                                                     fontWeight: FontWeight.w600,
                                                     color: colorScheme.onSurfaceVariant,
                                                   ),
@@ -1524,10 +1747,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                                 const SizedBox(height: 1),
                                                 Text(
                                                   DateFormat('dd-MM-yyyy').format(endDate),
-                                                  style: const TextStyle(
-                                                    fontSize: HrFont.labelMedium,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
+                                                  style: valueStyle,
                                                 ),
                                               ],
                                             ),
@@ -1543,20 +1763,17 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                           const SizedBox(height: 12),
                           Text(
                             'سبب الطلب:',
-                            style: TextStyle(
-                              fontSize: HrFont.labelMedium,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onSurface,
-                            ),
+                            style: fieldLabelStyle,
                           ),
                           const SizedBox(height: 6),
                           TextField(
                             controller: reasonCtrl,
-                            style: const TextStyle(fontSize: HrFont.labelMedium),
+                            style: web
+                                ? textTheme.bodyMedium
+                                : const TextStyle(fontSize: HrFont.labelMedium),
                             decoration: InputDecoration(
                               hintText: 'اكتب السبب باختصار...',
-                              hintStyle: TextStyle(
-                                fontSize: HrFont.labelSmall,
+                              hintStyle: captionStyle.copyWith(
                                 color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                               ),
                               contentPadding: const EdgeInsets.symmetric(
@@ -1618,10 +1835,9 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                               ),
                               onPressed: () => Navigator.pop(ctx),
                               icon: const Icon(Icons.close_rounded, size: 16),
-                              label: const Text(
+                              label: Text(
                                 'إلغاء',
-                                style: TextStyle(
-                                  fontSize: HrFont.labelMedium,
+                                style: buttonTextStyle.copyWith(
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -1680,10 +1896,9 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                 }
                               },
                               icon: const Icon(Icons.check_rounded, size: 16),
-                              label: const Text(
+                              label: Text(
                                 'حفظ واعتماد',
-                                style: TextStyle(
-                                  fontSize: HrFont.labelMedium,
+                                style: buttonTextStyle.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),

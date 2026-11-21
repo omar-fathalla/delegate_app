@@ -8,6 +8,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/tashil_icon_button.dart';
@@ -15,8 +16,13 @@ import 'package:delegate_app/core/attendance/attendance_branch_resolve.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
+import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_empty_state.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_inner_page.dart';
+import 'package:delegate_app/web/hr_system/hr_shell_link.dart';
 
 /// Model representing a single attendance session for a delegate
 class DelegateAttendanceSession {
@@ -105,17 +111,225 @@ class HRDelegateAttendanceDetailScreen extends StatefulWidget {
   final Map<String, Branch>? branchesByName;
   final Delegate? hrDelegate;
 
+  /// True inside the web HR shell (TAS-145): the breadcrumb carries the
+  /// title and the back button, so the page draws no app bar and shows its
+  /// actions in a toolbar instead.
+  final bool inShell;
+
   const HRDelegateAttendanceDetailScreen({
     super.key,
     required this.delegate,
     this.initialMonth,
     this.branchesByName,
     this.hrDelegate,
+    this.inShell = false,
   });
+
+  /// Tests swap in a fake Firestore for the reads.
+  @visibleForTesting
+  static FirebaseFirestore Function()? debugFirestore;
 
   @override
   State<HRDelegateAttendanceDetailScreen> createState() =>
       _HRDelegateAttendanceDetailScreenState();
+}
+
+/// Opens «سجل الحضور والانصراف التفصيلي» for [delegate] (TAS-145).
+///
+/// Inside the wide web HR shell it is an inner page with the breadcrumb
+/// «current page › delegate name»; elsewhere (mobile, narrow web) it is
+/// pushed full screen with its own app bar, as before.
+Future<void> openHrDelegateAttendanceDetail(
+  BuildContext context, {
+  required Delegate delegate,
+  DateTime? initialMonth,
+  Map<String, Branch>? branchesByName,
+  Delegate? hrDelegate,
+}) {
+  return pushHrInnerPage<void>(
+    context,
+    title: delegate.fullName,
+    maxWidth: HrInnerPageWidth.wide,
+    // Web address `/hr/<tab>/delegate/<id>` (TAS-190): the id only.
+    urlPath: delegate.uid.trim().isEmpty
+        ? null
+        : hrDelegateDetailUrlPath(delegate.uid),
+    builder: (_, inShell) => HRDelegateAttendanceDetailScreen(
+      delegate: delegate,
+      initialMonth: initialMonth,
+      branchesByName: branchesByName,
+      hrDelegate: hrDelegate,
+      inShell: inShell,
+    ),
+  );
+}
+
+/// Title of the detail page when the delegate of its URL cannot be shown.
+const String kHrDelegateDetailMissingTitle = 'سجل الحضور';
+
+/// Opens the attendance detail of the delegate [delegateId] named by a web
+/// URL (`/hr/<tab>/delegate/<id>`, TAS-190): a direct visit, a reload or the
+/// browser forward button.
+///
+/// The delegate is read from Firestore and must be in [hrDelegate]'s
+/// company. A missing id, a delegate of another company or a failed read
+/// opens the same address with an [HrEmptyState] instead. [shouldOpen] is
+/// asked after the read: false (the URL moved on meanwhile) opens nothing.
+Future<void> openHrDelegateAttendanceDetailById(
+  BuildContext context, {
+  required String delegateId,
+  required Delegate hrDelegate,
+  bool Function()? shouldOpen,
+}) async {
+  final delegate = await loadHrDelegateForDetailUrl(
+    firestore:
+        HRDelegateAttendanceDetailScreen.debugFirestore?.call() ??
+        FirebaseFirestore.instance,
+    delegateId: delegateId,
+    hrDelegate: hrDelegate,
+  );
+  if (!context.mounted || !(shouldOpen?.call() ?? true)) return;
+  if (delegate != null) {
+    return openHrDelegateAttendanceDetail(
+      context,
+      delegate: delegate,
+      hrDelegate: hrDelegate,
+    );
+  }
+  return pushHrInnerPage<void>(
+    context,
+    title: kHrDelegateDetailMissingTitle,
+    maxWidth: HrInnerPageWidth.wide,
+    urlPath: hrDelegateDetailUrlPath(delegateId),
+    builder: (_, inShell) => _HrDelegateDetailMissing(inShell: inShell),
+  );
+}
+
+/// The delegate of a detail URL (TAS-190), or null when there is no such
+/// delegate in [hrDelegate]'s company or the read fails.
+///
+/// Reads the company's delegate directory
+/// (`organizations/{org}/companies/{company}/delegates/{id}`) first, then the
+/// `users/{id}` profile, which must carry the same `companyUID`. Without a
+/// company the HR user cannot be scoped, so nothing is shown.
+Future<Delegate?> loadHrDelegateForDetailUrl({
+  required FirebaseFirestore firestore,
+  required String delegateId,
+  required Delegate hrDelegate,
+}) async {
+  final companyUID = hrDelegate.companyUID.trim();
+  final id = delegateId.trim();
+  if (companyUID.isEmpty || id.isEmpty) return null;
+  final org = hrDelegate.organizationUID.trim();
+  if (org.isNotEmpty && org != 'all') {
+    try {
+      final doc = await firestore
+          .collection('organizations')
+          .doc(org)
+          .collection('companies')
+          .doc(companyUID)
+          .collection('delegates')
+          .doc(id)
+          .get();
+      final data = doc.data();
+      if (doc.exists && data != null) {
+        final fields = Map<String, dynamic>.from(data);
+        final docCompany = fields['companyUID']?.toString().trim() ?? '';
+        if (docCompany.isNotEmpty && docCompany != companyUID) return null;
+        if (fields['organizationUID']?.toString().isEmpty ?? true) {
+          fields['organizationUID'] = org;
+        }
+        fields['companyUID'] = companyUID;
+        return DelegateModel.fromJson(fields, doc.id);
+      }
+    } catch (_) {
+      // Fall back to the profile below.
+    }
+  }
+  try {
+    final doc = await firestore.collection('users').doc(id).get();
+    final data = doc.data();
+    if (!doc.exists || data == null) return null;
+    if (data['companyUID']?.toString().trim() != companyUID) return null;
+    return DelegateModel.fromJson(Map<String, dynamic>.from(data), doc.id);
+  } catch (_) {
+    // Another company's profile is denied by the rules: same empty state.
+    return null;
+  }
+}
+
+class _HrDelegateDetailMissing extends StatelessWidget {
+  const _HrDelegateDetailMissing({required this.inShell});
+
+  final bool inShell;
+
+  @override
+  Widget build(BuildContext context) {
+    const body = HrEmptyState(
+      key: ValueKey('hr_delegate_detail_missing'),
+      icon: Icons.person_off_outlined,
+      title: 'المندوب غير موجود',
+      message: 'لا يوجد مندوب بهذا الرابط في شركتك.',
+    );
+    if (inShell) return body;
+    return Scaffold(
+      appBar: AppBar(title: const Text(kHrDelegateDetailMissingTitle)),
+      body: body,
+    );
+  }
+}
+
+/// Reads a delegate's attendance logs, scoped to one company (TAS-120).
+///
+/// HR and other company staff may only read logs whose `companyId` (or
+/// `companyUID`) is their own company (`canReadAttendance` in
+/// firestore.rules). Firestore checks a query against the rules before it
+/// runs, so a query on `delegateId`/`userId` alone is rejected with
+/// permission-denied even when every matching log is in the company. The
+/// `companyId` filter makes the query provable. Attendance writes always set
+/// `companyId`.
+///
+/// Returns the merged docs (by id) from the `delegateId` and legacy `userId`
+/// queries. An empty [companyId] leaves the query unscoped (global staff).
+@visibleForTesting
+Future<Map<String, Map<String, dynamic>>> fetchDelegateAttendanceDocs({
+  required FirebaseFirestore firestore,
+  required List<String> identifiers,
+  required String companyId,
+}) async {
+  final ids = identifiers.take(30).toList();
+  if (ids.isEmpty) return {};
+  Query<Map<String, dynamic>> base = firestore.collection(
+    kAttendanceCollection,
+  );
+  if (companyId.isNotEmpty) {
+    base = base.where('companyId', isEqualTo: companyId);
+  }
+  final results = await Future.wait([
+    base.where('delegateId', whereIn: ids).get(),
+    // Legacy logs keyed by userId.
+    base.where('userId', whereIn: ids).get(),
+  ]);
+  return {
+    for (final snap in results)
+      for (final doc in snap.docs) doc.id: doc.data(),
+  };
+}
+
+/// Clear Arabic message for a failed attendance load. Never shows the raw
+/// Firebase text (TAS-120).
+@visibleForTesting
+String hrAttendanceLoadErrorMessage(Object error) {
+  if (error is FirebaseException) {
+    switch (error.code) {
+      case 'permission-denied':
+        return 'ليس لديك صلاحية لعرض سجل حضور هذا المندوب.';
+      case 'unavailable':
+      case 'deadline-exceeded':
+        return 'تعذر الاتصال بالخادم. تحقق من الاتصال بالإنترنت ثم أعد المحاولة.';
+    }
+  }
+  return 'حدث خطأ أثناء تحميل سجل الحضور. يرجى المحاولة مرة أخرى.';
 }
 
 class _HRDelegateAttendanceDetailScreenState
@@ -165,6 +379,36 @@ class _HRDelegateAttendanceDetailScreenState
     _loadBranchesAndAttendance();
   }
 
+  FirebaseFirestore get _db =>
+      HRDelegateAttendanceDetailScreen.debugFirestore?.call() ??
+      FirebaseFirestore.instance;
+
+  /// The viewer's company. The screen is only opened from the HR shell, so
+  /// this is the HR user's company; the delegate's company is a fallback.
+  String get _scopeCompanyId {
+    final hrCompany = widget.hrDelegate?.companyUID.trim() ?? '';
+    return hrCompany.isNotEmpty
+        ? hrCompany
+        : widget.delegate.companyUID.trim();
+  }
+
+  void _showLoadError(Object e) {
+    debugPrint('HRDelegateAttendanceDetailScreen load failed: $e');
+    if (!mounted) return;
+    setState(() {
+      _errorMessage = hrAttendanceLoadErrorMessage(e);
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _refreshLogs() async {
+    try {
+      await _fetchDelegateLogs();
+    } catch (e) {
+      _showLoadError(e);
+    }
+  }
+
   Future<void> _loadBranchesAndAttendance() async {
     setState(() {
       _isLoading = true;
@@ -174,8 +418,7 @@ class _HRDelegateAttendanceDetailScreenState
     try {
       // 1. Load branches if not provided
       if (_branchesByName.isEmpty) {
-        final branchesSnap =
-            await FirebaseFirestore.instance.collection('branches').get();
+        final branchesSnap = await _db.collection('branches').get();
         final Map<String, Branch> bMap = {};
         for (final doc in branchesSnap.docs) {
           final b = BranchModel.fromFirestore(doc);
@@ -187,12 +430,7 @@ class _HRDelegateAttendanceDetailScreenState
       // 2. Fetch all attendance logs for this delegate across all history
       await _fetchDelegateLogs();
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'حدث خطأ أثناء تحميل سجل الحضور: $e';
-          _isLoading = false;
-        });
-      }
+      _showLoadError(e);
     }
   }
 
@@ -208,28 +446,12 @@ class _HRDelegateAttendanceDetailScreenState
       if (clean.isNotEmpty) identifiers.add(clean);
     }
 
-    final queryList = identifiers.take(30).toList();
-
-    // Query logs where delegateId matches
-    final snapDelegateId = await FirebaseFirestore.instance
-        .collection(kAttendanceCollection)
-        .where('delegateId', whereIn: queryList)
-        .get();
-
-    // Also query logs where userId matches (legacy compatibility)
-    final snapUserId = await FirebaseFirestore.instance
-        .collection(kAttendanceCollection)
-        .where('userId', whereIn: queryList)
-        .get();
-
-    // Merge and deduplicate by document ID
-    final Map<String, Map<String, dynamic>> rawDocs = {};
-    for (final doc in snapDelegateId.docs) {
-      rawDocs[doc.id] = doc.data();
-    }
-    for (final doc in snapUserId.docs) {
-      rawDocs[doc.id] = doc.data();
-    }
+    // Company-scoped, merged and deduplicated by document ID.
+    final rawDocs = await fetchDelegateAttendanceDocs(
+      firestore: _db,
+      identifiers: identifiers.toList(),
+      companyId: _scopeCompanyId,
+    );
 
     // Separate check-ins and check-outs
     final Map<String, MapEntry<String, Map<String, dynamic>>> checkOutsByRelatedId = {};
@@ -958,6 +1180,15 @@ class _HRDelegateAttendanceDetailScreenState
   }
 
   void _navigateToAdjustments() {
+    // Web shell (TAS-146): one «سجل تعديلات الحضور» page, the sidebar tab,
+    // filtered to this delegate. Mobile keeps the full-screen push.
+    if (widget.inShell && HrShellLink.canOpenAdjustments) {
+      HrShellLink.openAdjustmentsFor(
+        delegateUID: widget.delegate.uid,
+        delegateName: widget.delegate.fullName,
+      );
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -974,6 +1205,75 @@ class _HRDelegateAttendanceDetailScreenState
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isWide = MediaQuery.of(context).size.width > 768;
+
+    final body = _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? HrEmptyState(
+                  key: const Key('hr_attendance_detail_error'),
+                  icon: Icons.error_outline_rounded,
+                  title: 'تعذر تحميل سجل الحضور',
+                  message: _errorMessage,
+                  action: FilledButton.tonal(
+                    onPressed: _loadBranchesAndAttendance,
+                    child: const Text('إعادة المحاولة'),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _refreshLogs,
+                  child: SingleChildScrollView(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isWide ? 24 : 12,
+                      vertical: 16,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // 1. Delegate Profile Card
+                        AnimatedScale(
+                          scale: _headerShrunk ? 0.96 : 1.0,
+                          duration: const Duration(milliseconds: 200),
+                          child: AnimatedOpacity(
+                            opacity: _showCompactHeader ? 0.4 : 1.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: _buildDelegateProfileHeader(colorScheme, isWide),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // 2. Month Selector Navigation Bar
+                        _buildMonthSelectorBar(colorScheme, isWide),
+                        const SizedBox(height: 16),
+
+                        // 3. Monthly Analytics KPI Cards
+                        _buildMonthlyKpiCards(colorScheme, isWide),
+                        const SizedBox(height: 20),
+
+                        // 4. Filter & Search Controls
+                        _buildFilterBar(colorScheme, isWide),
+                        const SizedBox(height: 16),
+
+                        // 5. Attendance History Table / Cards
+                        _buildHistorySection(colorScheme, isWide),
+                      ],
+                    ),
+                  ),
+                );
+
+    if (widget.inShell) {
+      return Scaffold(
+        backgroundColor: colorScheme.surfaceContainerLowest,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildShellToolbar(),
+            Expanded(child: body),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
@@ -1047,66 +1347,34 @@ class _HRDelegateAttendanceDetailScreenState
           const SizedBox(width: 4),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
-                      const SizedBox(height: 12),
-                      Text(_errorMessage!, style: TextStyle(color: colorScheme.error)),
-                      const SizedBox(height: 16),
-                      FilledButton.tonal(
-                        onPressed: _loadBranchesAndAttendance,
-                        child: const Text('إعادة المحاولة'),
-                      ),
-                    ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _fetchDelegateLogs,
-                  child: SingleChildScrollView(
-                    controller: _scrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isWide ? 24 : 12,
-                      vertical: 16,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // 1. Delegate Profile Card
-                        AnimatedScale(
-                          scale: _headerShrunk ? 0.96 : 1.0,
-                          duration: const Duration(milliseconds: 200),
-                          child: AnimatedOpacity(
-                            opacity: _showCompactHeader ? 0.4 : 1.0,
-                            duration: const Duration(milliseconds: 200),
-                            child: _buildDelegateProfileHeader(colorScheme, isWide),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
+      body: body,
+    );
+  }
 
-                        // 2. Month Selector Navigation Bar
-                        _buildMonthSelectorBar(colorScheme, isWide),
-                        const SizedBox(height: 16),
-
-                        // 3. Monthly Analytics KPI Cards
-                        _buildMonthlyKpiCards(colorScheme, isWide),
-                        const SizedBox(height: 20),
-
-                        // 4. Filter & Search Controls
-                        _buildFilterBar(colorScheme, isWide),
-                        const SizedBox(height: 16),
-
-                        // 5. Attendance History Table / Cards
-                        _buildHistorySection(colorScheme, isWide),
-                      ],
-                    ),
-                  ),
-                ),
+  /// Actions of the page inside the web shell, where there is no app bar.
+  Widget _buildShellToolbar() {
+    return Padding(
+      key: const Key('hr_attendance_detail_toolbar'),
+      padding: const EdgeInsetsDirectional.fromSTEB(24, 4, 24, 0),
+      child: Wrap(
+        alignment: WrapAlignment.end,
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          OutlinedButton.icon(
+            key: const Key('hr_attendance_detail_open_edits'),
+            onPressed: _navigateToAdjustments,
+            icon: const Icon(Icons.history_edu_rounded, size: 18),
+            label: const Text('سجل تعديلات الحضور'),
+          ),
+          OutlinedButton.icon(
+            key: const Key('hr_attendance_detail_export'),
+            onPressed: _exportMonthlyReportToCSV,
+            icon: const Icon(Icons.download_rounded, size: 18),
+            label: const Text('تصدير التقرير الشهري'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1650,10 +1918,15 @@ class _HRDelegateAttendanceDetailScreenState
       ('completed', 'مكتمل', completed),
       ('incomplete', 'غير مكتمل', base.length - completed),
     ];
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    // Wrap, not Row: on a 360 px phone with a wide fallback font the three
+    // chips do not fit on one line (TAS-187). In the wide layout the parent
+    // scrolls horizontally, so they still stay on one line there.
+    return Wrap(
+      key: const Key('hr_attendance_status_filter'),
+      spacing: 6,
+      runSpacing: 6,
       children: [
-        for (final (value, label, count) in options) ...[
+        for (final (value, label, count) in options)
           ChoiceChip(
             showCheckmark: false,
             visualDensity: VisualDensity.compact,
@@ -1673,8 +1946,6 @@ class _HRDelegateAttendanceDetailScreenState
               ],
             ),
           ),
-          const SizedBox(width: 6),
-        ],
       ],
     );
   }
@@ -2049,12 +2320,16 @@ class _HRDelegateAttendanceDetailScreenState
                                       children: [
                                         Icon(Icons.login_rounded, size: 16, color: HrStatusColors.of(context).success),
                                         const SizedBox(width: 6),
-                                        Text(
-                                          inTimeStr,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: HrFont.body,
-                                            color: HrStatusColors.of(context).success,
+                                        Flexible(
+                                          child: Text(
+                                            inTimeStr,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: HrFont.body,
+                                              color: HrStatusColors.of(context).success,
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -2146,12 +2421,16 @@ class _HRDelegateAttendanceDetailScreenState
                                           color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                                         ),
                                         const SizedBox(width: 6),
-                                        Text(
-                                          s.formattedDuration,
-                                          style: TextStyle(
-                                            fontSize: HrFont.labelMedium,
-                                            fontWeight: FontWeight.w600,
-                                            color: colorScheme.onSurface,
+                                        Flexible(
+                                          child: Text(
+                                            s.formattedDuration,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: HrFont.labelMedium,
+                                              fontWeight: FontWeight.w600,
+                                              color: colorScheme.onSurface,
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -2262,7 +2541,31 @@ class _HRDelegateAttendanceDetailScreenState
     final IconData icon;
     final String label;
 
-    if (s.isAutoCheckOut) {
+    final status = HrStatusColors.of(context);
+    final isWeb = WebRuntimePolicy.isWeb;
+
+    if (isWeb && s.isAutoCheckOut) {
+      // Web, approved status colors: auto check-out = warning.
+      bgColor = status.warningContainer;
+      borderColor = status.warning.withValues(alpha: 0.5);
+      textColor = status.onWarningContainer;
+      icon = Icons.auto_mode_rounded;
+      label = 'مكتمل (تلقائي)';
+    } else if (isWeb && isCompleted) {
+      // Web, approved status colors: normal check-out = info.
+      bgColor = status.infoContainer;
+      borderColor = status.info.withValues(alpha: 0.5);
+      textColor = status.onInfoContainer;
+      icon = Icons.check_circle_rounded;
+      label = 'مكتمل الانصراف';
+    } else if (isWeb && isOngoing) {
+      // Web, approved status colors: present = success.
+      bgColor = status.successContainer;
+      borderColor = status.success.withValues(alpha: 0.5);
+      textColor = status.onSuccessContainer;
+      icon = Icons.timelapse_rounded;
+      label = 'حاضر الآن';
+    } else if (s.isAutoCheckOut) {
       // Closed by the system: counted as complete, shown neutral (not an error).
       bgColor = colorScheme.secondaryContainer;
       borderColor = colorScheme.outlineVariant;
@@ -2289,27 +2592,38 @@ class _HRDelegateAttendanceDetailScreenState
       label = 'غير مكتمل - لم يسجل انصراف';
     }
 
-    final badgeWidget = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(HrRadius.card),
-        border: Border.all(color: borderColor, width: 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: textColor),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: HrFont.labelSmall,
-              fontWeight: FontWeight.bold,
-              color: textColor,
+    final badgeWidget = Tooltip(
+      key: Key('hr_attendance_status_badge_${s.id}'),
+      message: label,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(HrRadius.card),
+          border: Border.all(color: borderColor, width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: textColor),
+            const SizedBox(width: 5),
+            // Shrinks with an ellipsis in a narrow column or with a wider font
+            // instead of overflowing (TAS-184).
+            Flexible(
+              child: Text(
+                label,
+                key: const Key('hr_attendance_status_badge_label'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: HrFont.labelSmall,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
 
@@ -2326,21 +2640,40 @@ class _HRDelegateAttendanceDetailScreenState
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            color: Colors.blueGrey.shade50,
+            color: isWeb
+                ? colorScheme.surfaceContainerHigh
+                : Colors.blueGrey.shade50,
             borderRadius: BorderRadius.circular(HrRadius.chip),
-            border: Border.all(color: Colors.blueGrey.shade200, width: 0.8),
+            border: Border.all(
+              color: isWeb
+                  ? colorScheme.outlineVariant
+                  : Colors.blueGrey.shade200,
+              width: 0.8,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.edit_note_rounded, size: 11, color: Colors.blueGrey.shade800),
+              Icon(
+                Icons.edit_note_rounded,
+                size: 11,
+                color: isWeb
+                    ? colorScheme.onSurfaceVariant
+                    : Colors.blueGrey.shade800,
+              ),
               const SizedBox(width: 3),
-              Text(
-                'مُعدّل إدارياً',
-                style: TextStyle(
-                  fontSize: HrFont.labelSmall,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blueGrey.shade800,
+              Flexible(
+                child: Text(
+                  'مُعدّل إدارياً',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: HrFont.labelSmall,
+                    fontWeight: FontWeight.bold,
+                    color: isWeb
+                        ? colorScheme.onSurfaceVariant
+                        : Colors.blueGrey.shade800,
+                  ),
                 ),
               ),
             ],
@@ -3445,7 +3778,7 @@ class _SessionDetailsSheet extends StatelessWidget {
                         const SizedBox(height: 6),
                         Text(
                           session.autoCheckOutReason ??
-                              'تم إغلاق الجلسة أوتوماتيكياً لاكتمال مدة الشفت (11.5 ساعة) دون تسجيل انصراف يدوي من المندوب.',
+                              'تم إغلاق الجلسة تلقائياً لاكتمال مدة الوردية (11.5 ساعة) دون تسجيل انصراف يدوي من المندوب.',
                           style: TextStyle(fontSize: HrFont.labelMedium, color: Colors.deepPurple.shade900),
                         ),
                       ],

@@ -8,7 +8,7 @@ const assert = require("node:assert");
 const {describe, test, before, after, beforeEach} = require("node:test");
 const {readFileSync} = require("fs");
 const {resolve} = require("path");
-const {initializeTestEnvironment, assertFails, assertSucceeds} = require("@firebase/rules-unit-testing");
+const {initializeTestEnvironment, assertFails, assertSucceeds} = require("./_rules_testing");
 const {doc, setDoc, updateDoc, getDoc, deleteDoc, writeBatch} = require("firebase/firestore");
 
 const PROJECT_ID = "demo-docs-pending";
@@ -200,8 +200,11 @@ describe("docs-pending round 2", () => {
   const as = (uid, c = {}) => env.authenticatedContext(uid, {firebase: {sign_in_provider: "password"}, ...c}).firestore();
   const del = () => as("d1", {role: "delegate"});
   // A rules evaluation error makes the emulator client retry forever; fail
-  // fast instead of hanging (B1 regression).
-  const T = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error("TIMEOUT_EMULATOR_ERROR")), 5000))]);
+  // fast instead of hanging (B1 regression). 20 s, not 5 s: with several CI
+  // jobs sharing one Mac a single emulator write took over 5 s and failed
+  // "ALLOW ID back re-upload" (run 44501337926). A real hang is still caught.
+  const OP_TIMEOUT_MS = Number(process.env.RULES_OP_TIMEOUT_MS || 20000);
+  const T = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error("TIMEOUT_EMULATOR_ERROR")), OP_TIMEOUT_MS))]);
   const ok = (p) => T(assertSucceeds(p));
   const no = (p) => T(assertFails(p));
   const ALL = {

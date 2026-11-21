@@ -24,11 +24,16 @@ class AdminPenaltiesListPage extends StatefulWidget {
   /// Read-only list of the penalties issued to [adminDelegate] only.
   final bool ownPenaltiesOnly;
 
+  /// Read-only view of every penalty in the caller's company (HR web).
+  /// Ignored when [ownPenaltiesOnly] is set.
+  final bool companyViewOnly;
+
   const AdminPenaltiesListPage({
     super.key,
     required this.adminDelegate,
     this.showAppBar = true,
     this.ownPenaltiesOnly = false,
+    this.companyViewOnly = false,
   });
 
   @override
@@ -68,7 +73,8 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
   void _loadData() {
     if (widget.ownPenaltiesOnly) {
       context.read<PenaltyBloc>().add(LoadOwnPenaltiesEvent(widget.adminDelegate));
-    } else if (widget.adminDelegate.role == UserRole.admin) {
+    } else if (widget.companyViewOnly ||
+        widget.adminDelegate.role == UserRole.admin) {
       context.read<PenaltyBloc>().add(LoadCompanyPenaltiesEvent(widget.adminDelegate.companyUID));
     } else {
       context.read<PenaltyBloc>().add(const LoadAllPenaltiesEvent());
@@ -1021,6 +1027,11 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
     return false;
   }
 
+  bool get _readOnly =>
+      widget.ownPenaltiesOnly ||
+      widget.companyViewOnly ||
+      widget.adminDelegate.role == UserRole.admin;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1064,8 +1075,7 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
               ],
             )
           : null,
-      floatingActionButton:
-          widget.ownPenaltiesOnly || widget.adminDelegate.role == UserRole.admin
+      floatingActionButton: _readOnly
           ? null
           : FloatingActionButton.extended(
               onPressed: () async {
@@ -1199,8 +1209,7 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                                       child: _AdminPenaltyCard(
                                         penalty: p,
                                         currentDelegate: widget.adminDelegate,
-                                        isReadOnly: widget.ownPenaltiesOnly ||
-                                            widget.adminDelegate.role == UserRole.admin,
+                                        isReadOnly: _readOnly,
                                         onStatusChanged: (newStatus) {
                                           context.read<PenaltyBloc>().add(
                                                 UpdatePenaltyStatusEvent(

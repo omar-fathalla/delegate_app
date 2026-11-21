@@ -370,7 +370,7 @@ class _HrNotificationsSheetState extends State<_HrNotificationsSheet> {
       return _Message(
         key: const ValueKey('hr_notifications_empty'),
         icon: Icons.notifications_off_rounded,
-        text: unreadFilter ? 'مفيش إشعارات غير مقروءة' : 'مفيش إشعارات',
+        text: unreadFilter ? 'لا توجد إشعارات غير مقروءة' : 'لا توجد إشعارات',
       );
     }
 
@@ -948,8 +948,8 @@ List<_DayGroup> _group(List<NotificationEntity> items, DateTime now) {
     }
   }
   return [
-    if (today.isNotEmpty) _DayGroup('النهاردة', today),
-    if (yesterday.isNotEmpty) _DayGroup('امبارح', yesterday),
+    if (today.isNotEmpty) _DayGroup('اليوم', today),
+    if (yesterday.isNotEmpty) _DayGroup('أمس', yesterday),
     if (older.isNotEmpty) _DayGroup('أقدم', older),
   ];
 }
@@ -990,7 +990,7 @@ String _formatWhen(DateTime created, DateTime now) {
   }
   final cairo = CairoClock.toCairo(created);
   final clock = _clock(cairo.hour, cairo.minute);
-  if (_isCairoYesterday(created, now)) return 'امبارح · $clock';
+  if (_isCairoYesterday(created, now)) return 'أمس · $clock';
   return '${cairo.day} ${_kMonths[cairo.month - 1]} · $clock';
 }
 

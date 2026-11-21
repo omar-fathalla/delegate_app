@@ -13,6 +13,11 @@ class SmokeDevPatrolCredentials {
   /// Default staff supervisor dev phone ([docs/DEV_ENVIRONMENT.md]).
   static const String defaultStaffPhone = '01500000002';
 
+  /// Seeded fake company-alpha supervisor (`functions/scripts/hr-web-fake-accounts.js`,
+  /// role `supervisor`). Local CI logs in with it; password from the seed's
+  /// local file via `PATROL_DEV_SECRET`.
+  static const String seededSupervisorAlphaPhone = '01000000005';
+
   /// Default delegate dev phone ([docs/DEV_ENVIRONMENT.md]).
   static const String defaultDelegatePhone = '01500000003';
 
@@ -34,7 +39,8 @@ class SmokeDevPatrolCredentials {
   /// Resolves the profile role badge for known tashil-dev Patrol accounts.
   static String expectedProfileRoleLabelForPatrolPhone(String phone) {
     switch (phone) {
-      case defaultPhone:
+      case defaultStaffPhone:
+      case seededSupervisorAlphaPhone:
         return staffSupervisorProfileRoleLabel;
       default:
         throw ArgumentError(
@@ -53,11 +59,17 @@ class SmokeDevPatrolCredentials {
   bool get hasDelegateNationalId => nationalId.isNotEmpty;
 
   /// Staff supervisor account for Patrol setup (`01500000002`).
+  ///
+  /// `PATROL_DEV_STAFF_PHONE` sets the staff phone only, so one run can log in
+  /// staff and delegate tests with different accounts; `PATROL_DEV_PHONE`
+  /// still works for single-account runs.
   static SmokeDevPatrolCredentials staffFromEnvironment() {
-    const phone = String.fromEnvironment(
+    const staffPhone = String.fromEnvironment('PATROL_DEV_STAFF_PHONE');
+    const sharedPhone = String.fromEnvironment(
       'PATROL_DEV_PHONE',
       defaultValue: defaultStaffPhone,
     );
+    const phone = staffPhone == '' ? sharedPhone : staffPhone;
     const secret = String.fromEnvironment('PATROL_DEV_SECRET');
     const roleOverride = String.fromEnvironment('PATROL_DEV_ROLE_LABEL');
     final expectedRoleLabel = roleOverride.isNotEmpty
@@ -72,11 +84,16 @@ class SmokeDevPatrolCredentials {
   }
 
   /// Dev delegate account for Patrol setup (`01500000003` + national ID).
+  ///
+  /// `PATROL_DEV_DELEGATE_PHONE` sets the delegate phone only (local CI uses a
+  /// seeded fake delegate whose device lock it resets before each run).
   static SmokeDevPatrolCredentials delegateFromEnvironment() {
-    const phone = String.fromEnvironment(
+    const delegatePhone = String.fromEnvironment('PATROL_DEV_DELEGATE_PHONE');
+    const sharedPhone = String.fromEnvironment(
       'PATROL_DEV_PHONE',
       defaultValue: defaultDelegatePhone,
     );
+    const phone = delegatePhone == '' ? sharedPhone : delegatePhone;
     const nationalId = String.fromEnvironment(
       'PATROL_DEV_NATIONAL_ID',
       defaultValue: defaultDelegateNationalId,

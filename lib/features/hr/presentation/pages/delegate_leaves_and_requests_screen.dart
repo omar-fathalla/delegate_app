@@ -11,6 +11,8 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/hr/domain/services/leave_notification_target.dart';
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_selected_card_colors.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 
 class DelegateLeavesAndRequestsScreen extends StatefulWidget {
   final Delegate delegate;
@@ -808,6 +810,12 @@ class _DelegateLeavesAndRequestsScreenState
     required ColorScheme colorScheme,
   }) {
     final isSelected = _selectedStatusFilter == value;
+    // Web (TAS-185): the selected filter uses the primary container like
+    // every HR web page. Mobile keeps the secondary container.
+    final web =
+        WebRuntimePolicy.isWeb ? HrSelectedCardColors.of(colorScheme) : null;
+    final selectedBg = web?.background ?? colorScheme.secondaryContainer;
+    final selectedFg = web?.foreground ?? colorScheme.onSecondaryContainer;
 
     return Expanded(
       child: InkWell(
@@ -816,7 +824,7 @@ class _DelegateLeavesAndRequestsScreenState
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           decoration: BoxDecoration(
-            color: isSelected ? colorScheme.secondaryContainer : Colors.transparent,
+            color: isSelected ? selectedBg : Colors.transparent,
             borderRadius: BorderRadius.circular(HrRadius.chip),
             boxShadow: isSelected
                 ? [
@@ -840,7 +848,7 @@ class _DelegateLeavesAndRequestsScreenState
                     fontSize: HrFont.labelSmall,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                     color: isSelected
-                        ? colorScheme.onSecondaryContainer
+                        ? selectedFg
                         : colorScheme.onSurfaceVariant,
                   ),
                   maxLines: 1,
@@ -852,7 +860,7 @@ class _DelegateLeavesAndRequestsScreenState
                 padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? colorScheme.onSecondaryContainer.withValues(alpha: 0.12)
+                      ? selectedFg.withValues(alpha: 0.12)
                       : colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
@@ -862,7 +870,7 @@ class _DelegateLeavesAndRequestsScreenState
                     fontSize: HrFont.labelSmall,
                     fontWeight: FontWeight.bold,
                     color: isSelected
-                        ? colorScheme.onSecondaryContainer
+                        ? selectedFg
                         : colorScheme.onSurfaceVariant,
                   ),
                 ),

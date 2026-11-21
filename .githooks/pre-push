@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Tashil pre-push gate (docs/DEV_WORKFLOW_RULES_AR.md (هـ)).
+#  - refuses pushes to dev / main (merge through a PR + scripts/ci/merge_guard.sh)
+#  - fast check (1-3 min), because CI runs the full jobs right after the push
+#    on the same Mac and running them twice is what overloaded it:
+#      Dart files changed  -> flutter analyze
+#      test files changed  -> flutter test <those files only>
+#    Node-only changes (rules, functions) are left to CI.
+#
+#   TASHIL_PREPUSH=full git push ...   full local CI on changed files instead
+#                                      (scripts/local_ci.sh --changed --no-apk)
+#   TASHIL_SKIP_PREPUSH=1 git push ... no check (the dev/main block stays)
+set -uo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT" || exit 1
+zero=0000000000000000000000000000000000000000
+status=0
+
+fast_check() {
+  local sha="$1" files dart tests
+  if [[ "$(git rev-parse HEAD)" != "$sha" ]]; then
+    echo "pre-push: pushing ${sha:0:8} but HEAD is $(git rev-parse --short HEAD); fast check skipped (CI will test it)" >&2
+    return 0
+  fi
+  files="$(git diff --name-only "origin/dev...$sha" 2>/dev/null || true)"
+  dart="$(grep -E '^(lib|test)/.*\.dart$|^pubspec\.yaml$|^analysis_options\.yaml$' <<<"$files" || true)"
+  tests="$(grep -E '^test/.*_test\.dart$' <<<"$files" | while read -r f; do [[ -f "$f" ]] && echo "$f"; done || true)"
+  if [[ -z "$dart" ]]; then
+    echo "pre-push: no Dart changes; nothing to check locally (CI runs the rest)" >&2
+    return 0
+  fi
+  echo "pre-push: flutter analyze ..." >&2
+  flutter analyze --no-pub --no-fatal-warnings --no-fatal-infos >&2 || return 1   # same as CI (job_analyze)
+  if [[ -n "$tests" ]]; then
+    echo "pre-push: flutter test on $(wc -l <<<"$tests" | tr -d ' ') changed test file(s) ..." >&2
+    # shellcheck disable=SC2086
+    flutter test --no-pub $tests >&2 || return 1
+  fi
+}
+
+while read -r local_ref local_sha remote_ref _remote_sha; do
+  [[ "$local_sha" == "$zero" ]] && continue          # branch delete
+  case "$remote_ref" in
+    refs/heads/dev|refs/heads/main)
+      echo "pre-push: ممنوع push مباشر على ${remote_ref#refs/heads/}. افتح PR وادمج بـ scripts/ci/merge_guard.sh" >&2
+      exit 1 ;;
+    refs/heads/*) ;;
+    *) continue ;;                                     # tags etc.
+  esac
+  if [[ "${TASHIL_SKIP_PREPUSH:-0}" == 1 ]]; then
+    echo "pre-push: TASHIL_SKIP_PREPUSH=1, no local check for ${local_ref#refs/heads/}" >&2
+    continue
+  fi
+  if [[ "${TASHIL_PREPUSH:-fast}" == full && -f "$ROOT/scripts/local_ci.sh" ]]; then
+    echo "pre-push: full local CI on ${local_sha:0:8} ..." >&2
+    bash "$ROOT/scripts/local_ci.sh" --changed --no-apk "$local_sha" >&2 \
+      || { echo "pre-push: local CI FAILED. Summary: /tmp/local-ci.noindex/${local_sha}/SUMMARY.md" >&2; status=1; }
+    continue
+  fi
+  if ! fast_check "$local_sha"; then
+    echo "pre-push: الفحص السريع فشل. صلّح وجرّب تاني، أو TASHIL_SKIP_PREPUSH=1 لو متأكد." >&2
+    status=1
+  fi
+done
+exit $status

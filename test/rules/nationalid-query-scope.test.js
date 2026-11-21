@@ -8,7 +8,7 @@ const {
   initializeTestEnvironment,
   assertFails,
   assertSucceeds,
-} = require("@firebase/rules-unit-testing");
+} = require("./_rules_testing");
 const {collection, query, where, getDocs} = require("firebase/firestore");
 
 const PROJECT_ID = "demo-nationalid-scope";

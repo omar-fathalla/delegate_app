@@ -11,7 +11,7 @@ const {describe, test, before, after} = require("node:test");
 const assert = require("node:assert");
 const {readFileSync} = require("fs");
 const {resolve} = require("path");
-const {initializeTestEnvironment, assertFails, assertSucceeds} = require("@firebase/rules-unit-testing");
+const {initializeTestEnvironment, assertFails, assertSucceeds} = require("./_rules_testing");
 const {
   doc, getDoc, getDocs, setDoc, updateDoc, collection, collectionGroup, query, where,
 } = require("firebase/firestore");

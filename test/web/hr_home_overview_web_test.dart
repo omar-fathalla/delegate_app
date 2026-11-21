@@ -17,6 +17,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
+import 'package:delegate_app/web/hr_system/delegate_subscription_requests_web.dart';
 import 'package:delegate_app/web/hr_system/hr_home_overview_web.dart';
 import 'package:delegate_app/web/hr_system/hr_home_side_cards_web.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -382,7 +383,7 @@ void main() {
       await t.pumpAndSettle();
       final list = find.byKey(const ValueKey('hr_home_absent_list'));
       expect(list, findsOneWidget);
-      expect(find.text('الغايبين النهاردة (3)'), findsOneWidget);
+      expect(find.text('الغائبون اليوم (3)'), findsOneWidget);
       for (final name in ['وليد فتحي', 'أسماء رجب', 'باسم عاطف']) {
         expect(
           find.descendant(of: list, matching: find.text(name)),
@@ -436,33 +437,20 @@ void main() {
       expect(_visibleRowUids(t).length, 10);
     });
 
-    testWidgets('feature card: Expressive shape, free chip, wired buttons', (
+    testWidgets('feature card: side-card style, free chip, wired buttons', (
       t,
     ) async {
       await _pumpView(t, const Size(1440, 2000), _data());
       final card = find.byKey(const ValueKey('hr_home_feature_card'));
       final cs = _theme().colorScheme;
-      final deco = t.widget<Container>(card).decoration! as ShapeDecoration;
-      expect(deco.color, cs.primaryContainer);
-      final shape = deco.shape as RoundedRectangleBorder;
-      final radius = (shape.borderRadius as BorderRadiusDirectional).resolve(
-        TextDirection.rtl,
-      );
-      final corners = [
-        radius.topLeft.x,
-        radius.topRight.x,
-        radius.bottomLeft.x,
-        radius.bottomRight.x,
-      ];
-      expect(corners.where((c) => c == 72).length, 1);
-      expect(corners.where((c) => c == 28).length, 3);
+      expect(t.widget(card), isA<HrSideCard>());
       expect(
         find.descendant(of: card, matching: find.byIcon(Icons.hub_rounded)),
         findsOneWidget,
       );
       expect(
         find.descendant(of: card, matching: find.byType(HrExpressiveShape)),
-        findsNWidgets(3),
+        findsNothing,
       );
       expect(
         _boxColor(t, find.byKey(const ValueKey('hr_home_free_chip'))),
@@ -545,13 +533,13 @@ void main() {
       expect(find.text('1–10 من 14'), findsOneWidget);
     });
 
-    testWidgets('open check-ins say «لسه موجود» and count up to now', (
+    testWidgets('open check-ins say «لم ينصرف بعد» and count up to now', (
       t,
     ) async {
       await _pumpView(t, const Size(1440, 2000), _data());
       final row = find.byKey(const ValueKey('hr_home_row_1001'));
       expect(
-        find.descendant(of: row, matching: find.text('لسه موجود')),
+        find.descendant(of: row, matching: find.text('لم ينصرف بعد')),
         findsOneWidget,
       );
       expect(
@@ -588,7 +576,7 @@ void main() {
     ) async {
       await _pumpView(t, const Size(1440, 2000), _data());
       expect(find.text('الكل  14'), findsOneWidget);
-      expect(find.text('لسه موجود  12'), findsOneWidget);
+      expect(find.text('لم ينصرف بعد  12'), findsOneWidget);
       expect(find.text('انصرف  2'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('hr_home_filter_departed')));
       await t.pump();
@@ -717,7 +705,7 @@ void main() {
       expect(find.textContaining('آخر تحديث'), findsNothing);
     });
 
-    testWidgets('empty: cookie, message, tonal button, «لسه مسجلوش N»', (
+    testWidgets('empty: cookie, message, tonal button, «لم يسجلوا بعد N»', (
       t,
     ) async {
       await _pumpView(t, const Size(1440, 2000), _data(records: _absentOnly()));
@@ -739,10 +727,10 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('لسه محدش سجّل حضور النهاردة'), findsOneWidget);
+      expect(find.text('لم يسجّل أحد حضوره اليوم بعد'), findsOneWidget);
       final absent = find.byKey(const ValueKey('hr_home_stat_absent'));
       expect(
-        find.descendant(of: absent, matching: find.text('لسه مسجلوش')),
+        find.descendant(of: absent, matching: find.text('لم يسجلوا بعد')),
         findsOneWidget,
       );
       final n = t.widget<Text>(
@@ -782,7 +770,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('مقدرناش نحمّل حضور النهاردة'), findsOneWidget);
+      expect(find.text('تعذر تحميل حضور اليوم'), findsOneWidget);
       expect(find.text('رمز الخطأ: permission-denied'), findsOneWidget);
       for (final key in ['total', 'present', 'absent']) {
         final stat = find.byKey(ValueKey('hr_home_stat_$key'));
@@ -1031,6 +1019,52 @@ void main() {
         await expectWebGolden(find.byType(MaterialApp), 'goldens/${c.$2}.png');
       });
     }
+    testWidgets(
+      'chains «عرض الكل» opens subscriptions on «طلبات السلاسل» (TAS-117)',
+      (t) async {
+        addTearDown(
+          () => DelegateSubscriptionRequestsWeb.requestedTab.value = null,
+        );
+        HrHomeOverviewWeb.debugData = (_) => HrHomeOverviewData(
+          delegate: _supervisor,
+          isLoading: false,
+          errorMessage: null,
+          records: _records(),
+          chains: _chains,
+          pendingChainRequests: const ['Fake Pending Chain'],
+        );
+        HrHomeOverviewWeb.debugClock = () => _clockNow;
+        t.view.physicalSize = const Size(1440, 900);
+        t.view.devicePixelRatio = 1;
+        final navigated = <(int, SubscriptionRequestsWebTab?)>[];
+        await t.pumpWidget(
+          _app(
+            Scaffold(
+              body: HrHomeOverviewWeb(
+                delegate: _supervisor,
+                // Record the requested tab at the moment the shell switches,
+                // so a kept-alive page already sees it.
+                onNavigateToTab: (i) => navigated.add(
+                  (i, DelegateSubscriptionRequestsWeb.requestedTab.value),
+                ),
+              ),
+            ),
+          ),
+        );
+        await t.pump(const Duration(milliseconds: 400));
+
+        final all = find.byKey(HrHomeChainsCard.pendingAllKey);
+        await t.ensureVisible(all);
+        await t.pump();
+        await t.tap(all);
+        await t.pump();
+
+        expect(navigated, [
+          (kHrTabSubscriptions, SubscriptionRequestsWebTab.chains),
+        ]);
+        expect(t.takeException(), isNull);
+      },
+    );
   });
 
   group('mobile path unchanged', () {

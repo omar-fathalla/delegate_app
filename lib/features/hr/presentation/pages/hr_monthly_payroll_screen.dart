@@ -4,6 +4,10 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_table.dart';
+import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
@@ -152,6 +156,13 @@ class HRMonthlyPayrollScreen extends StatefulWidget {
     this.showAppBar = true,
   });
 
+  /// Tests swap in a fake Firestore here. Null uses the real instance.
+  @visibleForTesting
+  static FirebaseFirestore Function()? debugFirestore;
+
+  static FirebaseFirestore get _firestore =>
+      debugFirestore?.call() ?? FirebaseFirestore.instance;
+
   @override
   State<HRMonthlyPayrollScreen> createState() => _HRMonthlyPayrollScreenState();
 }
@@ -181,8 +192,26 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
     _loadPayrollData();
   }
 
+  /// Web shell header bridge. The top-bar refresh reloads this page through
+  /// it, so the web toolbar has no refresh button of its own (TAS-119).
+  HrWebHeaderBridge? _headerBridge;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!WebRuntimePolicy.isWeb) return;
+    final next = context
+        .getInheritedWidgetOfExactType<HrWebHeaderBridgeScope>()
+        ?.notifier;
+    if (identical(next, _headerBridge)) return;
+    _headerBridge?.releasePageReload(kHrTabPayroll, _loadPayrollData);
+    _headerBridge = next;
+    _headerBridge?.attachPageReload(kHrTabPayroll, _loadPayrollData);
+  }
+
   @override
   void dispose() {
+    _headerBridge?.releasePageReload(kHrTabPayroll, _loadPayrollData);
     _searchController.dispose();
     super.dispose();
   }
@@ -196,7 +225,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
     try {
       // 1. Fetch Company Payroll Configuration
       try {
-        final configDoc = await FirebaseFirestore.instance
+        final configDoc = await HRMonthlyPayrollScreen._firestore
             .collection('company_payroll_configs')
             .doc(widget.hrDelegate.companyUID)
             .get();
@@ -239,7 +268,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
       final monthEnd = nextMonth.subtract(const Duration(seconds: 1));
 
       // 3. Fetch User Wallets for base salary and individual shift overrides
-      final walletsSnap = await FirebaseFirestore.instance
+      final walletsSnap = await HRMonthlyPayrollScreen._firestore
           .collection('user_wallets')
           .where('companyUID', isEqualTo: widget.hrDelegate.companyUID)
           .get();
@@ -251,7 +280,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
       }
 
       // 4. Fetch Penalties approved in this month
-      final penaltiesSnap = await FirebaseFirestore.instance
+      final penaltiesSnap = await HRMonthlyPayrollScreen._firestore
           .collection('penalties')
           .where('companyId', isEqualTo: widget.hrDelegate.companyUID)
           .get();
@@ -276,7 +305,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
       }
 
       // 5. Fetch Approved Leaves in this month
-      final leavesSnap = await FirebaseFirestore.instance
+      final leavesSnap = await HRMonthlyPayrollScreen._firestore
           .collection('leave_requests')
           .where('companyUID', isEqualTo: widget.hrDelegate.companyUID)
           .where('status', isEqualTo: 'approved')
@@ -310,7 +339,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
       }
 
       // 6. Fetch Attendance logs for the month
-      final attendanceSnap = await FirebaseFirestore.instance
+      final attendanceSnap = await HRMonthlyPayrollScreen._firestore
           .collection(kAttendanceCollection)
           .where('companyId', isEqualTo: widget.hrDelegate.companyUID)
           .get();
@@ -580,7 +609,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
 
   Future<void> _saveCompanyPayrollPolicy(CompanyPayrollConfigModel newConfig) async {
     try {
-      await FirebaseFirestore.instance
+      await HRMonthlyPayrollScreen._firestore
           .collection('company_payroll_configs')
           .doc(widget.hrDelegate.companyUID)
           .set(newConfig.toMap(), SetOptions(merge: true));
@@ -658,7 +687,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
     PayrollCalculationMode selectedMode,
   ) async {
     try {
-      await FirebaseFirestore.instance.collection('user_wallets').doc(item.delegate.uid).set({
+      await HRMonthlyPayrollScreen._firestore.collection('user_wallets').doc(item.delegate.uid).set({
         'monthlyAllocation': baseSal,
         'baseSalary': baseSal,
         'dailyShiftHours': shiftH,
@@ -778,6 +807,8 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                     style: TextStyle(color: colorScheme.error),
                   ),
                 )
+              : WebRuntimePolicy.isWeb
+              ? _buildWebBody(context, filtered)
               : RefreshIndicator(
                   onRefresh: _loadPayrollData,
                   child: ListView(
@@ -1182,6 +1213,428 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                     ],
                   ),
                 ),
+    );
+  }
+
+  // ── Web layout (TAS-119) ──────────────────────────────────────────────
+  // Presentation only: every number below comes from the same
+  // _DelegatePayrollItem getters the mobile layout and the export use.
+
+  static final NumberFormat _webMoneyFormat = NumberFormat('#,##0', 'en');
+
+  static String _webMoney(double value) => '${_webMoneyFormat.format(value.round())} ج.م';
+
+  /// Table columns for the web payroll table. The last one holds the «⋮» menu.
+  static const List<HrTableColumn> _webColumns = [
+    HrTableColumn('المندوب', 24),
+    HrTableColumn('الحضور', 9, center: true),
+    HrTableColumn('الإجازات', 9, center: true),
+    HrTableColumn('الغياب', 9, center: true),
+    HrTableColumn('الأساسي', 12),
+    HrTableColumn('الاستحقاق', 12),
+    HrTableColumn('الخصومات', 12),
+    HrTableColumn('الصافي', 13),
+    HrTableColumn('', 7, center: true),
+  ];
+
+  void _changeMonth(DateTime month) {
+    if (month == _selectedMonth) return;
+    setState(() => _selectedMonth = month);
+    _loadPayrollData();
+  }
+
+  Future<void> _pickMonth() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedMonth,
+      firstDate: DateTime(2023),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDatePickerMode: DatePickerMode.year,
+    );
+    if (picked != null) _changeMonth(DateTime(picked.year, picked.month, 1));
+  }
+
+  Widget _buildWebBody(BuildContext context, List<_DelegatePayrollItem> filtered) {
+    return ListView(
+      key: const Key('payroll_web_body'),
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildWebToolbar(context),
+        const SizedBox(height: 16),
+        _buildWebSummary(context, filtered),
+        const SizedBox(height: 16),
+        _buildWebTable(context, filtered),
+      ],
+    );
+  }
+
+  /// One row: month chip, search, rules (outlined), export (filled).
+  Widget _buildWebToolbar(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final search = SizedBox(
+      height: 40,
+      child: TextField(
+        key: const Key('payroll_web_search'),
+        controller: _searchController,
+        onChanged: (val) => setState(() => _searchQuery = val.trim()),
+        textAlignVertical: TextAlignVertical.center,
+        style: theme.textTheme.bodyMedium,
+        decoration: InputDecoration(
+          hintText: 'بحث باسم المندوب أو رقم الهاتف',
+          hintStyle: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+          prefixIcon: Icon(Icons.search_rounded, size: 20, color: colorScheme.onSurfaceVariant),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear_rounded, size: 18),
+                  tooltip: 'مسح البحث',
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: colorScheme.surfaceContainerHigh,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          isDense: true,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(HrRadius.pill),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(HrRadius.pill),
+            borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
+          ),
+        ),
+      ),
+    );
+
+    final rules = OutlinedButton.icon(
+      key: const Key('payroll_web_rules'),
+      icon: const Icon(Icons.tune_rounded, size: 18),
+      label: const Text('قواعد الرواتب'),
+      onPressed: _openCompanyPayrollPolicyDialog,
+    );
+    final export = FilledButton.icon(
+      key: const Key('payroll_web_export'),
+      icon: const Icon(Icons.file_download_outlined, size: 18),
+      label: const Text('تصدير Excel'),
+      onPressed: _exportPayrollToExcel,
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Narrow windows put the search on its own line.
+        if (constraints.maxWidth < 760) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              search,
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [_buildWebMonthChip(context), rules, export],
+              ),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            _buildWebMonthChip(context),
+            const SizedBox(width: 12),
+            Expanded(child: search),
+            const SizedBox(width: 12),
+            rules,
+            const SizedBox(width: 8),
+            export,
+          ],
+        );
+      },
+    );
+  }
+
+  /// Month chip: previous / month name (opens the picker) / next, plus a
+  /// shortcut back to the current month.
+  Widget _buildWebMonthChip(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final now = DateTime.now();
+    final isCurrentMonth = _selectedMonth.year == now.year && _selectedMonth.month == now.month;
+    final monthStr = DateFormat('MMMM yyyy', 'ar').format(_selectedMonth);
+
+    return Container(
+      key: const Key('payroll_web_month_chip'),
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(HrRadius.button),
+        border: Border.all(color: colorScheme.outline),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: 'الشهر السابق',
+            visualDensity: VisualDensity.compact,
+            iconSize: 20,
+            icon: const Icon(Icons.chevron_right_rounded),
+            onPressed: () => _changeMonth(DateTime(_selectedMonth.year, _selectedMonth.month - 1, 1)),
+          ),
+          InkWell(
+            onTap: _pickMonth,
+            borderRadius: BorderRadius.circular(HrRadius.chip),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.calendar_month_rounded, size: 18, color: colorScheme.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    monthStr,
+                    style: theme.textTheme.labelLarge?.copyWith(color: colorScheme.onSurface),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'الشهر التالي',
+            visualDensity: VisualDensity.compact,
+            iconSize: 20,
+            icon: const Icon(Icons.chevron_left_rounded),
+            onPressed: () => _changeMonth(DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1)),
+          ),
+          if (!isCurrentMonth)
+            TextButton(
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+              onPressed: () => _changeMonth(DateTime(now.year, now.month, 1)),
+              child: const Text('الشهر الحالي'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Four month totals for the filtered list.
+  Widget _buildWebSummary(BuildContext context, List<_DelegatePayrollItem> filtered) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final status = HrStatusColors.of(context);
+
+    final totalGross = filtered.fold<double>(0.0, (acc, item) => acc + item.grossEarned);
+    final totalDeductions = filtered.fold<double>(0.0, (acc, item) => acc + item.totalDeductions);
+    final totalNet = filtered.fold<double>(0.0, (acc, item) => acc + item.netSalary);
+
+    final cards = <Widget>[
+      _WebSummaryCard(
+        key: const Key('payroll_summary_count'),
+        title: 'عدد المناديب',
+        value: '${filtered.length}',
+        icon: Icons.groups_rounded,
+      ),
+      _WebSummaryCard(
+        key: const Key('payroll_summary_gross'),
+        title: 'إجمالي الاستحقاق',
+        value: _webMoney(totalGross),
+        icon: Icons.account_balance_wallet_rounded,
+      ),
+      _WebSummaryCard(
+        key: const Key('payroll_summary_deductions'),
+        title: 'إجمالي الخصومات',
+        value: totalDeductions > 0 ? '-${_webMoney(totalDeductions)}' : _webMoney(0),
+        icon: Icons.remove_circle_outline_rounded,
+        valueColor: totalDeductions > 0 ? colorScheme.error : null,
+      ),
+      _WebSummaryCard(
+        key: const Key('payroll_summary_net'),
+        title: 'صافي الصرف',
+        value: _webMoney(totalNet),
+        icon: Icons.payments_rounded,
+        background: status.successContainer,
+        foreground: status.onSuccessContainer,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 720) {
+          return Column(
+            children: [
+              Row(children: [Expanded(child: cards[0]), const SizedBox(width: 12), Expanded(child: cards[1])]),
+              const SizedBox(height: 12),
+              Row(children: [Expanded(child: cards[2]), const SizedBox(width: 12), Expanded(child: cards[3])]),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            for (var i = 0; i < cards.length; i++) ...[
+              if (i > 0) const SizedBox(width: 12),
+              Expanded(child: cards[i]),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildWebTable(BuildContext context, List<_DelegatePayrollItem> filtered) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final status = HrStatusColors.of(context);
+    final muted = colorScheme.onSurfaceVariant;
+
+    Widget days(int count, {Color? activeColor}) => Text(
+          '$count يوم',
+          style: hrTabularStyle(
+            context,
+            color: count > 0 ? (activeColor ?? colorScheme.onSurface) : muted,
+          ),
+        );
+
+    Widget row(_DelegatePayrollItem item) {
+      final d = item.delegate;
+      final position = d.position == DelegatePosition.supervisor ? 'مشرف' : 'مندوب / مروج';
+      final hasDeductions = item.totalDeductions > 0;
+      final deductionsText = Text(
+        hasDeductions ? '-${_webMoney(item.totalDeductions)}' : _webMoney(0),
+        key: Key('payroll_deductions_${d.uid}'),
+        style: hrTabularStyle(context, color: hasDeductions ? colorScheme.error : muted),
+      );
+
+      return HrTableRow(
+        key: Key('payroll_row_${d.uid}'),
+        columns: _webColumns,
+        onTap: () => _showEmployeePayrollDetail(item),
+        cells: [
+          // المندوب: name, then role and phone.
+          Row(
+            children: [
+              AppAvatar(
+                imageUrl: d.personalPhotoUrl,
+                fallbackText: d.fullName,
+                radius: 18,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      d.fullName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    Row(
+                      children: [
+                        Text(position, style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+                        if (d.phoneNumber.isNotEmpty) ...[
+                          Text(' · ', style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+                          Flexible(
+                            child: Text(
+                              d.phoneNumber,
+                              textDirection: TextDirection.ltr,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: muted,
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          days(item.attendedDays),
+          days(item.approvedLeaveDays, activeColor: colorScheme.primary),
+          days(item.absentDays, activeColor: colorScheme.error),
+          Text(_webMoney(item.baseSalary), style: hrTabularStyle(context)),
+          Text(_webMoney(item.grossEarned), style: hrTabularStyle(context)),
+          hasDeductions
+              ? Tooltip(
+                  message: 'غياب: ${_webMoney(item.absenceDeductionAmount)}'
+                      '${item.penaltiesDeductions > 0 ? ' | جزاءات: ${_webMoney(item.penaltiesDeductions)}' : ''}',
+                  child: deductionsText,
+                )
+              : deductionsText,
+          Container(
+            key: Key('payroll_net_${d.uid}'),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: status.successContainer,
+              borderRadius: BorderRadius.circular(HrRadius.chip),
+            ),
+            child: Text(
+              _webMoney(item.netSalary),
+              style: hrTabularStyle(context, color: status.onSuccessContainer)
+                  .copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+          PopupMenuButton<String>(
+            key: Key('payroll_actions_${d.uid}'),
+            tooltip: 'الإجراءات',
+            icon: Icon(Icons.more_vert_rounded, color: muted),
+            onSelected: (value) {
+              if (value == 'edit') {
+                _openDelegateSalaryDialog(item);
+              } else if (value == 'details') {
+                _showEmployeePayrollDetail(item);
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'edit',
+                child: ListTile(
+                  leading: Icon(Icons.tune_rounded),
+                  title: Text('تعديل الراتب'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'details',
+                child: ListTile(
+                  leading: Icon(Icons.visibility_outlined),
+                  title: Text('عرض التفاصيل'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
+    return HrTableCard(
+      key: const Key('payroll_web_table'),
+      minWidth: 1000,
+      builder: (context, width) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const HrTableHeader(columns: _webColumns, keyPrefix: 'payroll_col_'),
+          if (filtered.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: Text(
+                _searchQuery.isEmpty ? 'لا توجد بيانات رواتب لهذا الشهر.' : 'لا توجد نتائج مطابقة للبحث.',
+                style: theme.textTheme.bodyMedium?.copyWith(color: muted),
+              ),
+            ),
+          for (var i = 0; i < filtered.length; i++) ...[
+            if (i > 0) const HrTableDivider(),
+            row(filtered[i]),
+          ],
+        ],
+      ),
     );
   }
 
@@ -3017,5 +3470,74 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
     }
 
     return content;
+  }
+}
+
+/// Web summary card (TAS-119): title in labelLarge, value in headlineSmall
+/// with tabular figures. [background] / [foreground] tint the whole card
+/// (used for the net payout card).
+class _WebSummaryCard extends StatelessWidget {
+  const _WebSummaryCard({
+    super.key,
+    required this.title,
+    required this.value,
+    required this.icon,
+    this.valueColor,
+    this.background,
+    this.foreground,
+  });
+
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color? valueColor;
+  final Color? background;
+  final Color? foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final labelColor = foreground ?? colorScheme.onSurfaceVariant;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: background ?? colorScheme.surface,
+        borderRadius: BorderRadius.circular(HrRadius.card),
+        border: background == null ? Border.all(color: colorScheme.outlineVariant) : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 20, color: labelColor),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelLarge?.copyWith(color: labelColor),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: valueColor ?? foreground ?? colorScheme.onSurface,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -5,7 +5,7 @@
 const {describe, test, before, after, beforeEach} = require("node:test");
 const {readFileSync} = require("fs");
 const {resolve} = require("path");
-const {initializeTestEnvironment, assertFails, assertSucceeds} = require("@firebase/rules-unit-testing");
+const {initializeTestEnvironment, assertFails, assertSucceeds} = require("./_rules_testing");
 const {doc, updateDoc, setDoc, deleteDoc} = require("firebase/firestore");
 
 /** Mirrors `pendingDelegateDataFor` in delegate_subscription_repository_impl.dart */

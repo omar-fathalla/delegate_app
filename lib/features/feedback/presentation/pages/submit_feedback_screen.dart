@@ -14,7 +14,15 @@ import 'package:go_router/go_router.dart';
 class SubmitFeedbackScreen extends StatefulWidget {
   final Delegate delegate;
 
-  const SubmitFeedbackScreen({super.key, required this.delegate});
+  /// False inside the web HR shell, where the inner page breadcrumb carries
+  /// the title and the back button (TAS-157).
+  final bool showAppBar;
+
+  const SubmitFeedbackScreen({
+    super.key,
+    required this.delegate,
+    this.showAppBar = true,
+  });
 
   @override
   State<SubmitFeedbackScreen> createState() => _SubmitFeedbackScreenState();
@@ -75,10 +83,12 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(AppLocalizations.of(context)!.sendFeedback),
-        centerTitle: true,
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: Text(AppLocalizations.of(context)!.sendFeedback),
+              centerTitle: true,
+            )
+          : null,
       body: BlocListener<FeedbackBloc, FeedbackState>(
         listener: (context, state) {
           if (state is FeedbackSubmitted) {
@@ -297,7 +307,13 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop(); // إغلاق الـ Dialog
-              context.pop(); // العودة للصفحة السابقة
+              // Back to the previous page. In the web shell the page sits on
+              // the shell's inner navigator, not on the router.
+              if (widget.showAppBar) {
+                context.pop();
+              } else {
+                Navigator.of(this.context).pop();
+              }
             },
             child: Text(AppLocalizations.of(context)!.okAction),
           ),

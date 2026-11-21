@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
@@ -22,6 +23,7 @@ import 'package:delegate_app/features/hr/presentation/pages/hr_delegate_attendan
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_selected_card_colors.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_table.dart';
 
 /// Model representing a delegate's attendance record on a specific date for HR
@@ -2032,7 +2034,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                       title: 'انصرف',
                       count: departedCount,
                       icon: Icons.timelapse_rounded,
-                      color: HrStatusColors.of(context).warning,
+                      color: HrStatusColors.of(context).info,
                       theme: theme,
                       isSelected: _statusFilter == 'departed',
                       onTap: () => setState(() => _statusFilter = 'departed'),
@@ -2045,7 +2047,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         title: 'إجازة معتمدة',
                         count: onLeaveCount,
                         icon: Icons.event_available_rounded,
-                        color: const Color(0xFF00796B),
+                        color: HrStatusColors.of(context).info,
                         theme: theme,
                         isSelected: _statusFilter == 'leave',
                         onTap: () => setState(() => _statusFilter = 'leave'),
@@ -2129,7 +2131,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     title: 'انصرف',
                     count: departedCount,
                     icon: Icons.timelapse_rounded,
-                    color: HrStatusColors.of(context).warning,
+                    color: HrStatusColors.of(context).info,
                     theme: theme,
                     isSelected: _statusFilter == 'departed',
                     onTap: () => setState(() => _statusFilter = 'departed'),
@@ -2141,7 +2143,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                       title: 'إجازات',
                       count: onLeaveCount,
                       icon: Icons.event_available_rounded,
-                      color: const Color(0xFF00796B),
+                      color: HrStatusColors.of(context).info,
                       theme: theme,
                       isSelected: _statusFilter == 'leave',
                       onTap: () => setState(() => _statusFilter = 'leave'),
@@ -2388,16 +2390,12 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     onInspectGeofence: (rec) =>
                         _showGeofenceInspectionDialog(context, rec),
                     onTap: () {
-                      Navigator.push(
+                      openHrDelegateAttendanceDetail(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => HRDelegateAttendanceDetailScreen(
-                            delegate: record.delegate,
-                            initialMonth: _selectedDate,
-                            branchesByName: _branchesByName,
-                            hrDelegate: widget.hrDelegate,
-                          ),
-                        ),
+                        delegate: record.delegate,
+                        initialMonth: _selectedDate,
+                        branchesByName: _branchesByName,
+                        hrDelegate: widget.hrDelegate,
                       );
                     },
                   );
@@ -2422,6 +2420,14 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     int flex = 2,
   }) {
     final colorScheme = theme.colorScheme;
+    // Web (TAS-185): the selected card uses the primary container like every
+    // HR web page; the status color stays on the icon and the number.
+    // Mobile keeps the status tint.
+    final web =
+        WebRuntimePolicy.isWeb ? HrSelectedCardColors.of(colorScheme) : null;
+    final selectedBg = web?.background ?? color.withValues(alpha: 0.14);
+    final selectedAccent = web?.accent ?? color;
+    final selectedFg = web?.foreground ?? color;
     return Expanded(
       flex: flex,
       child: Material(
@@ -2439,19 +2445,19 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
             ),
             decoration: BoxDecoration(
               color: isSelected
-                  ? color.withValues(alpha: 0.14)
+                  ? selectedBg
                   : colorScheme.surfaceContainerHighest.withValues(alpha: 0.28),
               borderRadius: BorderRadius.circular(HrRadius.card),
               border: Border.all(
                 color: isSelected
-                    ? color
+                    ? selectedAccent
                     : colorScheme.outlineVariant.withValues(alpha: 0.45),
                 width: isSelected ? 2.0 : 1.0,
               ),
               boxShadow: isSelected
                   ? [
                       BoxShadow(
-                        color: color.withValues(alpha: 0.18),
+                        color: selectedAccent.withValues(alpha: 0.18),
                         blurRadius: 6,
                         offset: const Offset(0, 2),
                       ),
@@ -2480,9 +2486,9 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: isSelected ? color : colorScheme.onSurfaceVariant,
+                          color: isSelected ? selectedFg : colorScheme.onSurfaceVariant,
                           fontWeight: isSelected ? FontWeight.w900 : FontWeight.bold,
-                          fontSize: isWide ? 11.5 : 10,
+                          fontSize: _kpiLabelSize(isWide),
                         ),
                       ),
                     ),
@@ -2499,7 +2505,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         ?.copyWith(
                       fontWeight: FontWeight.w900,
                       color: color,
-                      fontSize: isWide ? 22 : 16,
+                      fontSize: isWide ? HrFont.titleLarge : HrFont.titleMedium,
                     ),
                   ),
                 ),
@@ -2654,6 +2660,11 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     );
   }
 
+  /// Title size of the date card and the KPI cards (TAS-163): never below
+  /// 12 on the web; mobile keeps M3 labelSmall on narrow screens.
+  static double _kpiLabelSize(bool isWide) =>
+      isWide || WebRuntimePolicy.isWeb ? HrFont.labelMedium : HrFont.labelSmall;
+
   Widget _buildDateCard(
     ThemeData theme,
     ColorScheme colorScheme,
@@ -2704,7 +2715,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.bold,
-                  fontSize: isWide ? 11.5 : 10,
+                  fontSize: _kpiLabelSize(isWide),
                 ),
               ),
               if (!isToday) ...[
@@ -2719,7 +2730,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                     decoration: BoxDecoration(
                       color: colorScheme.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(HrRadius.chip),
                     ),
                     child: Text(
                       'اليوم',
@@ -2765,7 +2776,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
               // Date Text (Tap to open DatePicker)
               InkWell(
                 onTap: _pickDate,
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(HrRadius.chip),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                   child: Tooltip(
@@ -2778,7 +2789,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                           ?.copyWith(
                         fontWeight: FontWeight.w900,
                         color: colorScheme.primary,
-                        fontSize: isWide ? 12.5 : 11,
+                        fontSize: isWide ? HrFont.body : HrFont.labelMedium,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -2825,7 +2836,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       child: InkWell(
         key: const Key('hr_attendance_date_card'),
         onTap: _pickDate,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         child: cardContent,
       ),
     );
@@ -3262,12 +3273,14 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
         statusText = 'انصرف (تلقائي)';
         statusIcon = Icons.auto_mode_rounded;
       } else {
-        statusColor = HrStatusColors.of(context).warning;
+        // Approved 21 Nov 2026: a normal check-out is calm (info), not a
+        // warning. Auto check-out stays a warning.
+        statusColor = HrStatusColors.of(context).info;
         statusText = 'انصرف اليوم';
         statusIcon = Icons.timelapse_rounded;
       }
     } else if (record.isOnLeave) {
-      statusColor = const Color(0xFF00796B);
+      statusColor = HrStatusColors.of(context).info;
       statusText = record.formattedLeaveType;
       statusIcon = Icons.event_available_rounded;
     } else {
@@ -3621,16 +3634,12 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                   icon: const Icon(Icons.history_rounded, size: 16),
                   label: const Text('السجل الشهري والتفصيلي'),
                   onPressed: () {
-                    Navigator.push(
+                    openHrDelegateAttendanceDetail(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => HRDelegateAttendanceDetailScreen(
-                          delegate: record.delegate,
-                          initialMonth: _selectedDate,
-                          branchesByName: _branchesByName,
-                          hrDelegate: widget.hrDelegate,
-                        ),
-                      ),
+                      delegate: record.delegate,
+                      initialMonth: _selectedDate,
+                      branchesByName: _branchesByName,
+                      hrDelegate: widget.hrDelegate,
                     );
                   },
                 ),
@@ -3676,14 +3685,14 @@ const List<HrTableColumn> hrAttendanceTableColumns = [
           )
         : (
             label: 'انصرف اليوم',
-            tone: HrStatusTone.warning,
+            tone: HrStatusTone.info,
             icon: Icons.timelapse_rounded,
           );
   }
   if (record.isOnLeave) {
     return (
       label: record.formattedLeaveType,
-      tone: HrStatusTone.neutral,
+      tone: HrStatusTone.info,
       icon: Icons.event_available_rounded,
     );
   }
@@ -3925,13 +3934,13 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
             action(
               icon: Icons.call_outlined,
               tooltip: 'اتصال هاتفي',
-              color: statusColors.success,
+              color: colorScheme.onSurfaceVariant,
               onPressed: () => widget.onCallPhone(record.delegate.phoneNumber),
             ),
             action(
               icon: Icons.chat_outlined,
               tooltip: 'محادثة واتساب',
-              color: statusColors.success,
+              color: colorScheme.onSurfaceVariant,
               onPressed: () =>
                   widget.onOpenWhatsApp(record.delegate.phoneNumber),
             ),
@@ -3939,7 +3948,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
           action(
             icon: Icons.history_rounded,
             tooltip: 'السجل الشهري والتفصيلي',
-            color: colorScheme.primary,
+            color: colorScheme.onSurfaceVariant,
             onPressed: widget.onTap,
           ),
         ],
@@ -3984,6 +3993,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
     final isPresent = record.isPresent;
     final isDeparted = record.isDeparted;
 
+    final status = HrStatusColors.of(context);
     final durationColor = isPresent
         ? HrStatusColors.of(context).success
         : (isDeparted ? HrStatusColors.of(context).warning : colorScheme.onSurfaceVariant);
@@ -4055,7 +4065,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                       record.isAutoCheckOut ? Icons.auto_mode_rounded : Icons.logout_rounded,
                       size: 13,
                       color: record.isAutoCheckOut
-                          ? Colors.amber[800]
+                          ? status.warning
                           : (record.checkOutTime != null
                               ? HrStatusColors.of(context).warning
                               : colorScheme.outlineVariant),
@@ -4069,7 +4079,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                           fontSize: HrFont.labelSmall,
                           fontWeight: FontWeight.bold,
                           color: record.isAutoCheckOut
-                              ? Colors.amber[900]
+                              ? status.warning
                               : (record.checkOutTime != null
                                   ? HrStatusColors.of(context).warning
                                   : colorScheme.outlineVariant),
@@ -4081,16 +4091,16 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                         decoration: BoxDecoration(
-                          color: Colors.amber.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                          color: status.warningContainer,
+                          borderRadius: BorderRadius.circular(HrRadius.chip),
+                          border: Border.all(color: status.warning.withValues(alpha: 0.5)),
                         ),
                         child: Text(
                           'تلقائي (11.5 س)',
                           style: TextStyle(
                             fontSize: HrFont.labelSmall,
                             fontWeight: FontWeight.bold,
-                            color: Colors.amber[900],
+                            color: status.onWarningContainer,
                           ),
                         ),
                       ),
@@ -4116,7 +4126,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: durationColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(HrRadius.chip),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,

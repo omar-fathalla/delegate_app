@@ -303,10 +303,17 @@ class UniversalAppHeader extends StatelessWidget
             )
           : useDrawer
           ? Builder(
-              builder: (ctx) => IconButton(
-                icon: const Icon(Symbols.menu_rounded),
-                tooltip: AppLocalizations.of(ctx)?.mainMenu,
-                onPressed: () => Scaffold.of(ctx).openDrawer(),
+              // Same Maestro id as the popup menu: drawer roles (delegates)
+              // have no popup menu, so the id stays unique on screen.
+              builder: (ctx) => tashilMaestroDevSemantics(
+                identifier: 'tashil_main_menu_button',
+                label: 'القائمة الرئيسية',
+                button: true,
+                child: IconButton(
+                  icon: const Icon(Symbols.menu_rounded),
+                  tooltip: AppLocalizations.of(ctx)?.mainMenu,
+                  onPressed: () => Scaffold.of(ctx).openDrawer(),
+                ),
               ),
             )
           : null,

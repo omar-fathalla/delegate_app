@@ -1,6 +1,9 @@
 appId: com.tashil.delegate.dev
 ---
 # GoRouter /user-profile: Maestro `back` does not pop the AppBar leading control on iOS.
+# Each fallback runs only while the profile is still on screen. Without the
+# guard, a successful «رجوع» was followed by the corner tap, which then hit the
+# main screen's menu button and left the menu open over it.
 - runFlow:
     when:
       visible:
@@ -10,14 +13,32 @@ appId: com.tashil.delegate.dev
           text: "Back"
           optional: true
           retryTapIfNoChange: false
+
+- runFlow:
+    when:
+      visible:
+        id: "tashil_profile_phone_value"
+    commands:
       - tapOn:
           text: "رجوع"
           optional: true
           retryTapIfNoChange: false
+
+- runFlow:
+    when:
+      visible:
+        id: "tashil_profile_phone_value"
+    commands:
       - tapOn:
           point: "6%,9%"
           optional: true
           retryTapIfNoChange: false
+
+- runFlow:
+    when:
+      visible:
+        id: "tashil_profile_phone_value"
+    commands:
       - swipe:
           start: "2%,50%"
           end: "45%,50%"

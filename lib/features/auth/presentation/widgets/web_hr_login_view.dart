@@ -1,6 +1,8 @@
+import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/config/app_env.dart';
 import 'package:delegate_app/features/auth/domain/delegate_login_validator.dart';
 import 'package:delegate_app/features/auth/presentation/widgets/tashil_m3.dart';
+import 'package:delegate_app/features/auth/presentation/widgets/web_hr_login_map.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,11 +10,12 @@ import 'package:material_symbols_icons/symbols.dart';
 
 /// HR web login. Mounted only when [WebRuntimePolicy.isWeb] is true.
 ///
-/// Wide windows (≥840) are a split screen: the form sits on the start side
-/// and the brand panel on the end side. From 1440 the panes are equal and the
-/// form stays at most 400 wide, centred in its pane. Narrower split widths
-/// keep the 360/400 form column. Below 840, a compact brand band, the form,
-/// and all eight features stack in one column.
+/// Wide windows (≥840) use the brand hero (TAS-188): the whole page is the
+/// theme purple with a light map of the Nile Delta and red branch pins, the
+/// headline sits on the start side, and the form is a floating side sheet on
+/// the end side (520 wide from 1200, 440 below). The fields stay at most 400
+/// wide. Below 840, a compact brand band, the form, and all eight features
+/// stack in one column.
 class WebHrLoginView extends StatelessWidget {
   const WebHrLoginView({
     super.key,
@@ -33,12 +36,12 @@ class WebHrLoginView extends StatelessWidget {
     required this.onSubmit,
     required this.onForgot,
     required this.onSupport,
+    required this.onSupportWhatsApp,
     required this.onLanguage,
   });
 
   static const double wideBreakpoint = 840;
   static const double comfortableBreakpoint = 1200;
-  static const double equalPaneBreakpoint = 1440;
   static const double formMaxWidth = 400;
 
   final GlobalKey<FormState> formKey;
@@ -57,7 +60,12 @@ class WebHrLoginView extends StatelessWidget {
   final VoidCallback onToggleRemember;
   final VoidCallback onSubmit;
   final VoidCallback onForgot;
+
+  /// Calls the support number.
   final VoidCallback onSupport;
+
+  /// Opens a WhatsApp chat with the support number.
+  final VoidCallback onSupportWhatsApp;
   final VoidCallback onLanguage;
 
   @override
@@ -65,43 +73,7 @@ class WebHrLoginView extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth >= wideBreakpoint) {
-          final tight = constraints.maxWidth < comfortableBreakpoint;
-          final brand = _BrandPanel(
-            isArabic: isArabic,
-            onLanguage: onLanguage,
-            tight: tight,
-          );
-          // 1440 is about 28% form / 72% brand when the form pane is 400.
-          // Equal panes put at least 560 on the form side; the fields stay
-          // at most [formMaxWidth] and centred. 1024 keeps the 360 column.
-          if (constraints.maxWidth >= equalPaneBreakpoint) {
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: KeyedSubtree(
-                    key: const ValueKey('login_web_form_column'),
-                    child: _FormColumn(view: this),
-                  ),
-                ),
-                Expanded(child: brand),
-              ],
-            );
-          }
-          final formWidth = constraints.maxWidth >= comfortableBreakpoint
-              ? formMaxWidth
-              : 360.0;
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                key: const ValueKey('login_web_form_column'),
-                width: formWidth,
-                child: _FormColumn(view: this),
-              ),
-              Expanded(child: brand),
-            ],
-          );
+          return _HeroLayout(view: this, size: constraints.biggest);
         }
         return _NarrowColumn(view: this);
       },
@@ -109,51 +81,384 @@ class WebHrLoginView extends StatelessWidget {
   }
 }
 
-class _FormColumn extends StatelessWidget {
-  const _FormColumn({required this.view});
+/// Wide layout: brand hero with the map, and the form in a side sheet.
+class _HeroLayout extends StatelessWidget {
+  const _HeroLayout({required this.view, required this.size});
 
   final WebHrLoginView view;
+  final Size size;
+
+  static const double _sheetMargin = 16;
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final brand = _BrandColors.of(context);
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    final comfortable = size.width >= WebHrLoginView.comfortableBreakpoint;
+    final sheetWidth = comfortable ? 520.0 : 440.0;
+    final copyInset = comfortable ? 64.0 : 40.0;
+
+    // Free hero area beside the sheet; the map sits under the headline.
+    final sheetEdge = _sheetMargin + sheetWidth + 40;
+    final freeLeft = rtl ? sheetEdge : 40.0;
+    final freeRight = rtl ? size.width - 40 : size.width - sheetEdge;
+    final freeWidth = (freeRight - freeLeft).clamp(0.0, double.infinity);
+    final mapTop = (size.height * .42).clamp(340.0, double.infinity);
+    // Keep Cairo (the lowest pins) above the bottom edge.
+    final byHeight =
+        ((size.height - 40 - mapTop) / (kHrLoginMapCairoY + .06)) *
+        kHrLoginMapAspect;
+    final mapWidth = freeWidth < byHeight ? freeWidth : byHeight;
+    final mapBox = Rect.fromLTWH(
+      freeLeft + (freeWidth - mapWidth) / 2,
+      mapTop,
+      mapWidth,
+      mapWidth / kHrLoginMapAspect,
+    );
+    final copyWidth = (freeWidth + 40 - copyInset).clamp(240.0, 600.0);
+
     return ColoredBox(
-      color: cs.surface,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final minHeight = constraints.maxHeight.isFinite
-              ? (constraints.maxHeight - 64).clamp(0.0, double.infinity)
-              : 0.0;
-          return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: minHeight),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: WebHrLoginView.formMaxWidth,
-                  ),
-                  child: _FormBody(view: view),
+      color: brand.panel,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: IgnorePointer(
+              // Decorative: screen readers skip the map and pins.
+              child: ExcludeSemantics(
+                child: HrLoginMap(
+                  key: const ValueKey('login_web_map'),
+                  box: mapBox,
+                  ink: brand.onPanel,
+                  water: brand.onPanelMuted,
+                  isArabic: view.isArabic,
                 ),
               ),
             ),
-          );
-        },
+          ),
+          PositionedDirectional(
+            start: copyInset,
+            top: 40,
+            width: copyWidth,
+            child: _HeroCopy(
+              isArabic: view.isArabic,
+              brand: brand,
+              large: comfortable,
+            ),
+          ),
+          PositionedDirectional(
+            end: _sheetMargin,
+            top: _sheetMargin,
+            bottom: _sheetMargin,
+            width: sheetWidth,
+            child: _SideSheet(view: view, roomy: comfortable),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _FormBody extends StatelessWidget {
-  const _FormBody({required this.view});
+class _HeroCopy extends StatelessWidget {
+  const _HeroCopy({
+    required this.isArabic,
+    required this.brand,
+    required this.large,
+  });
+
+  final bool isArabic;
+  final _BrandColors brand;
+  final bool large;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final text = Theme.of(context).textTheme;
+    final headline = large ? text.displayMedium : text.displaySmall;
+    return _EnterFade(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            key: const ValueKey('login_web_brand_header'),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TashilLogoTile(size: large ? 56 : 48),
+              const SizedBox(width: 14),
+              Text(
+                l10n.appTitle,
+                style: text.headlineSmall?.copyWith(
+                  color: brand.onPanel,
+                  fontWeight: FontWeight.w800,
+                  height: 1.2,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Container(
+                width: 1,
+                height: 24,
+                color: brand.onPanel.withValues(alpha: .35),
+              ),
+              const SizedBox(width: 14),
+              Flexible(
+                child: Text(
+                  isArabic ? 'نظام الموارد البشرية' : 'HR system',
+                  overflow: TextOverflow.ellipsis,
+                  style: text.titleMedium?.copyWith(
+                    color: brand.onPanelMuted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: large ? 72 : 48),
+          Text(
+            key: const ValueKey('login_web_headline'),
+            isArabic
+                ? 'فريقك في الفروع في نظام واحد'
+                : 'Your branch teams, in one system',
+            style: headline?.copyWith(
+              color: brand.onPanel,
+              fontWeight: FontWeight.w800,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            isArabic
+                ? 'لشركات التجزئة العاملة مع الهايبرماركت'
+                : 'For retail companies working with hypermarkets',
+            style: text.titleMedium?.copyWith(
+              color: brand.onPanelMuted,
+              fontSize: large ? 18 : 16,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Fades and slides its child in once when the page opens.
+class _EnterFade extends StatelessWidget {
+  const _EnterFade({required this.child, this.fromEnd = false});
+
+  final Widget child;
+  final bool fromEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) return child;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    final dx = fromEnd ? (rtl ? -24.0 : 24.0) : 0.0;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: AppMotionDurations.long2,
+      curve: AppMotionCurves.emphasizedDecelerate,
+      child: child,
+      builder: (context, t, child) => Opacity(
+        opacity: t,
+        child: Transform.translate(
+          offset: Offset(dx * (1 - t), fromEnd ? 0 : 12 * (1 - t)),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// The floating sheet that holds the form (M3 side sheet, radius 28).
+class _SideSheet extends StatelessWidget {
+  const _SideSheet({required this.view, required this.roomy});
+
+  final WebHrLoginView view;
+  final bool roomy;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return _EnterFade(
+      fromEnd: true,
+      child: Material(
+        key: const ValueKey('login_web_sheet'),
+        color: cs.surface,
+        elevation: 6,
+        shadowColor: Colors.black.withValues(alpha: .35),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            roomy ? 48 : 24,
+            24,
+            roomy ? 48 : 24,
+            20,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: _LanguageChip(
+                  isArabic: view.isArabic,
+                  onPressed: view.onLanguage,
+                ),
+              ),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) => SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: (constraints.maxHeight - 32).clamp(
+                          0.0,
+                          double.infinity,
+                        ),
+                      ),
+                      child: Center(
+                        child: ConstrainedBox(
+                          key: const ValueKey('login_web_form_column'),
+                          constraints: const BoxConstraints(
+                            maxWidth: WebHrLoginView.formMaxWidth,
+                          ),
+                          child: _FormBody(view: view),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Divider(height: 1, color: cs.outlineVariant),
+              const SizedBox(height: 12),
+              _LoginFooter(view: view),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Support (WhatsApp, call) and the app version.
+class _LoginFooter extends StatelessWidget {
+  const _LoginFooter({required this.view});
 
   final WebHrLoginView view;
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    final ar = view.isArabic;
+    ButtonStyle tonal() => FilledButton.styleFrom(
+      backgroundColor: cs.secondaryContainer,
+      foregroundColor: cs.onSecondaryContainer,
+      visualDensity: VisualDensity.standard,
+      minimumSize: const Size(48, 40),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      textStyle: text.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+    );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          runSpacing: 8,
+          spacing: 8,
+          children: [
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Text(
+                  ar ? 'الدعم الفني' : 'Support',
+                  style: text.labelMedium?.copyWith(color: cs.onSurfaceVariant),
+                ),
+                FilledButton.icon(
+                  key: const ValueKey('login_support_whatsapp'),
+                  onPressed: view.onSupportWhatsApp,
+                  style: tonal(),
+                  icon: const Icon(Symbols.chat_rounded, size: 18),
+                  label: Text(ar ? 'واتساب' : 'WhatsApp'),
+                ),
+                FilledButton.icon(
+                  key: const ValueKey('login_support_button'),
+                  onPressed: view.onSupport,
+                  style: tonal(),
+                  icon: const Icon(Symbols.call_rounded, size: 18),
+                  label: Text(ar ? 'اتصال' : 'Call'),
+                ),
+              ],
+            ),
+            TashilVersionText(color: cs.onSurfaceVariant, isArabic: ar),
+          ],
+        ),
+        if (AppEnv.isDev)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'GIT_SHA=${AppEnv.gitSha.isEmpty ? 'unset' : AppEnv.gitSha}',
+              key: const ValueKey('login_git_sha'),
+              textAlign: TextAlign.center,
+              style: text.labelSmall?.copyWith(
+                color: cs.onSurfaceVariant,
+                fontSize: 10,
+                height: 1.2,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _FormBody extends StatefulWidget {
+  const _FormBody({required this.view});
+
+  final WebHrLoginView view;
+
+  @override
+  State<_FormBody> createState() => _FormBodyState();
+}
+
+class _FormBodyState extends State<_FormBody> {
+  bool _passwordFocused = false;
+  bool _capsLock = false;
+
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_onKey);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onKey);
+    super.dispose();
+  }
+
+  bool _onKey(KeyEvent event) {
+    final caps = HardwareKeyboard.instance.lockModesEnabled.contains(
+      KeyboardLockMode.capsLock,
+    );
+    if (caps != _capsLock && mounted) setState(() => _capsLock = caps);
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final view = widget.view;
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
+    final ar = view.isArabic;
+    final rememberLabel = ar
+        ? 'البقاء متصلاً على هذا الجهاز'
+        : 'Stay signed in on this device';
     return Shake(
       key: view.shakeKey,
       child: Form(
@@ -166,7 +471,7 @@ class _FormBody extends StatelessWidget {
             children: [
               Text(
                 l10n.loginButton,
-                style: text.headlineSmall?.copyWith(
+                style: text.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: cs.onSurface,
                   height: 1.3,
@@ -175,11 +480,26 @@ class _FormBody extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 key: const ValueKey('login_web_subtitle'),
-                view.isArabic
-                    ? 'لحسابات الموظفين والإدارة'
-                    : 'For staff and admin accounts',
-                style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                ar
+                    ? 'تسجيل الدخول للموظفين الإداريين'
+                    : 'Sign in for administrative staff',
+                style: text.bodyLarge?.copyWith(color: cs.onSurfaceVariant),
               ),
+              if (view.formError != null) ...[
+                const SizedBox(height: 20),
+                _FormErrorBanner(
+                  key: ValueKey(
+                    view.delegateNotice && !view.credentialError
+                        ? 'login_web_delegate_notice'
+                        : 'login_form_error',
+                  ),
+                  message: view.formError!,
+                  supportLabel: view.credentialError
+                      ? (ar ? 'تواصل مع الدعم الفني' : 'Contact support')
+                      : null,
+                  onSupport: view.onSupportWhatsApp,
+                ),
+              ],
               const SizedBox(height: 28),
               TextFormField(
                 key: const ValueKey('login_phone'),
@@ -195,18 +515,20 @@ class _FormBody extends StatelessWidget {
                 // Web maps telephoneNumber to autocomplete="tel".
                 autofillHints: const [AutofillHints.telephoneNumber],
                 textDirection: TextDirection.ltr,
-                // LTR digits, aligned to the ambient start (right) under the label.
-                textAlign: TextAlign.right,
+                // LTR digits next to the fixed +20 code.
+                textAlign: TextAlign.left,
                 onFieldSubmitted: (_) => view.onSubmit(),
                 style: TextStyle(fontSize: 16, color: cs.onSurface),
                 decoration: _fieldDecoration(
                   context,
                   label: l10n.mobileNumber,
-                  helper: view.isArabic
-                      ? 'رقم الجوال المسجل في الشركة'
-                      : l10n.phoneHelper,
+                  helper: ar
+                      ? 'رقم الجوال المسجل في الشركة، من غير الصفر الأول'
+                      : 'Your company-registered mobile, without the leading 0',
                   credentialError: view.credentialError,
+                  suffixIcon: const _CountryCode(),
                 ),
+                // 1012345678 and 01012345678 are both accepted.
                 validator: (value) => validateLoginPhone(
                   value,
                   emptyMessage: l10n.enterMobileNumber,
@@ -214,43 +536,69 @@ class _FormBody extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                key: const ValueKey('login_staff_password'),
-                controller: view.passwordController,
-                keyboardType: TextInputType.visiblePassword,
-                textInputAction: TextInputAction.done,
-                autocorrect: false,
-                enableSuggestions: false,
-                // Web maps password to autocomplete="current-password".
-                autofillHints: const [AutofillHints.password],
-                obscureText: view.obscurePassword,
-                textDirection: TextDirection.ltr,
-                textAlign: TextAlign.left,
-                onFieldSubmitted: (_) => view.onSubmit(),
-                style: TextStyle(fontSize: 16, color: cs.onSurface),
-                decoration: _fieldDecoration(
-                  context,
-                  label: l10n.password,
-                  credentialError: view.credentialError,
-                  suffixIcon: IconButton(
-                    key: const ValueKey('login_password_eye'),
-                    tooltip: view.obscurePassword
-                        ? l10n.showAction
-                        : l10n.hideAction,
-                    onPressed: view.onToggleObscure,
-                    icon: Icon(
-                      view.obscurePassword
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      color: cs.onSurfaceVariant,
+              Focus(
+                canRequestFocus: false,
+                skipTraversal: true,
+                onFocusChange: (f) => setState(() => _passwordFocused = f),
+                child: TextFormField(
+                  key: const ValueKey('login_staff_password'),
+                  controller: view.passwordController,
+                  keyboardType: TextInputType.visiblePassword,
+                  textInputAction: TextInputAction.done,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  // Web maps password to autocomplete="current-password".
+                  autofillHints: const [AutofillHints.password],
+                  obscureText: view.obscurePassword,
+                  textDirection: TextDirection.ltr,
+                  textAlign: TextAlign.left,
+                  onFieldSubmitted: (_) => view.onSubmit(),
+                  style: TextStyle(fontSize: 16, color: cs.onSurface),
+                  decoration: _fieldDecoration(
+                    context,
+                    label: l10n.password,
+                    credentialError: view.credentialError,
+                    suffixIcon: IconButton(
+                      key: const ValueKey('login_password_eye'),
+                      tooltip: view.obscurePassword
+                          ? l10n.showAction
+                          : l10n.hideAction,
+                      onPressed: view.onToggleObscure,
+                      icon: Icon(
+                        view.obscurePassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                   ),
-                ),
-                validator: (value) => validateStaffPassword(
-                  value,
-                  emptyMessage: l10n.enterPassword2,
+                  validator: (value) => validateStaffPassword(
+                    value,
+                    emptyMessage: l10n.enterPassword2,
+                  ),
                 ),
               ),
+              if (_capsLock && _passwordFocused)
+                Padding(
+                  key: const ValueKey('login_caps_lock_hint'),
+                  padding: const EdgeInsetsDirectional.only(start: 16, top: 6),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Symbols.keyboard_capslock_rounded,
+                        size: 16,
+                        color: cs.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        ar ? 'زر Caps Lock مفعّل' : 'Caps Lock is on',
+                        style: text.labelMedium?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -264,7 +612,7 @@ class _FormBody extends StatelessWidget {
                         child: Row(
                           children: [
                             Semantics(
-                              label: l10n.rememberMe,
+                              label: rememberLabel,
                               child: Checkbox(
                                 value: view.rememberMe,
                                 materialTapTargetSize:
@@ -276,8 +624,8 @@ class _FormBody extends StatelessWidget {
                             const SizedBox(width: 4),
                             Flexible(
                               child: Text(
-                                l10n.rememberMe,
-                                style: text.bodyLarge?.copyWith(
+                                rememberLabel,
+                                style: text.bodyMedium?.copyWith(
                                   color: cs.onSurface,
                                 ),
                               ),
@@ -301,17 +649,6 @@ class _FormBody extends StatelessWidget {
                   ),
                 ],
               ),
-              if (view.formError != null) ...[
-                const SizedBox(height: 8),
-                _FormErrorBanner(
-                  key: ValueKey(
-                    view.delegateNotice && !view.credentialError
-                        ? 'login_web_delegate_notice'
-                        : 'login_form_error',
-                  ),
-                  message: view.formError!,
-                ),
-              ],
               const SizedBox(height: 16),
               Semantics(
                 liveRegion: view.loading,
@@ -357,33 +694,6 @@ class _FormBody extends StatelessWidget {
                         ),
                 ),
               ),
-              const SizedBox(height: 4),
-              Center(
-                child: TextButton(
-                  key: const ValueKey('login_support_button'),
-                  onPressed: view.onSupport,
-                  style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
-                  child: Text(l10n.contactSupport),
-                ),
-              ),
-              TashilVersionText(
-                color: cs.onSurfaceVariant,
-                isArabic: view.isArabic,
-              ),
-              if (AppEnv.isDev)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    'GIT_SHA=${AppEnv.gitSha.isEmpty ? 'unset' : AppEnv.gitSha}',
-                    key: const ValueKey('login_git_sha'),
-                    textAlign: TextAlign.center,
-                    style: text.labelSmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                      fontSize: 10,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
             ],
           ),
         ),
@@ -392,10 +702,45 @@ class _FormBody extends StatelessWidget {
   }
 }
 
+/// Fixed Egyptian country code at the end of the phone field.
+class _CountryCode extends StatelessWidget {
+  const _CountryCode();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      key: const ValueKey('login_phone_country_code'),
+      padding: const EdgeInsetsDirectional.only(start: 4, end: 12),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(width: 1, height: 24, color: cs.outlineVariant),
+          const SizedBox(width: 12),
+          Text(
+            '+20',
+            textDirection: TextDirection.ltr,
+            style: TextStyle(fontSize: 16, color: cs.onSurface),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _FormErrorBanner extends StatelessWidget {
-  const _FormErrorBanner({super.key, required this.message});
+  const _FormErrorBanner({
+    super.key,
+    required this.message,
+    this.supportLabel,
+    this.onSupport,
+  });
 
   final String message;
+
+  /// Shown under the message after a wrong phone or password.
+  final String? supportLabel;
+  final VoidCallback? onSupport;
 
   @override
   Widget build(BuildContext context) {
@@ -415,13 +760,35 @@ class _FormErrorBanner extends StatelessWidget {
             Icon(Icons.error_outline_rounded, color: cs.onErrorContainer),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                message,
-                style: text.bodyMedium?.copyWith(
-                  color: cs.onErrorContainer,
-                  fontWeight: FontWeight.w600,
-                  height: 1.4,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message,
+                    style: text.bodyMedium?.copyWith(
+                      color: cs.onErrorContainer,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                    ),
+                  ),
+                  if (supportLabel != null && onSupport != null)
+                    InkWell(
+                      key: const ValueKey('login_error_support'),
+                      onTap: onSupport,
+                      borderRadius: BorderRadius.circular(4),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Text(
+                          supportLabel!,
+                          style: text.bodyMedium?.copyWith(
+                            color: cs.onErrorContainer,
+                            decoration: TextDecoration.underline,
+                            decorationColor: cs.onErrorContainer,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ],
@@ -461,18 +828,32 @@ InputDecoration _fieldDecoration(
 }
 
 class _LanguageChip extends StatelessWidget {
-  const _LanguageChip({required this.isArabic, required this.onPressed});
+  const _LanguageChip({
+    required this.isArabic,
+    required this.onPressed,
+    this.onBrand = false,
+  });
 
   final bool isArabic;
   final VoidCallback onPressed;
+
+  /// On the purple brand band (narrow layout) the chip stays light so it
+  /// reads; on the sheet it is a light mauve tonal chip.
+  final bool onBrand;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    // Light chip, dark label: AA on the purple panel and on a dark surface.
-    final background = dark ? cs.inverseSurface : cs.surfaceContainerLowest;
-    final foreground = dark ? cs.onInverseSurface : cs.onSurface;
+    final Color background;
+    final Color foreground;
+    if (onBrand) {
+      background = dark ? cs.inverseSurface : cs.surfaceContainerLowest;
+      foreground = dark ? cs.onInverseSurface : cs.onSurface;
+    } else {
+      background = cs.primaryContainer;
+      foreground = cs.onPrimaryContainer;
+    }
     return Material(
       color: background,
       shape: const StadiumBorder(),
@@ -506,13 +887,11 @@ class _LanguageChip extends StatelessWidget {
   }
 }
 
-/// Brand fill for the web login panel.
+/// Brand fill for the web login hero and the narrow brand band.
 ///
-/// Light mode uses [ColorScheme.primary] (#6750A4). Dark mode uses
-/// [ColorScheme.onPrimary] (#381E72 for the default seed): a deep purple,
-/// not the neutral near-black [ColorScheme.surfaceContainer]. Feature chips
-/// stay on [ColorScheme.primaryContainer] / [ColorScheme.onPrimaryContainer]
-/// (#4F378A / #E9DDFF in dark).
+/// Light mode uses [ColorScheme.primary] (#6750A4) with white ink. Dark mode
+/// uses [ColorScheme.primaryContainer] (#4F378A for the default seed) with
+/// [ColorScheme.onPrimaryContainer] ink, as approved in TAS-188.
 class _BrandColors {
   const _BrandColors({
     required this.panel,
@@ -520,7 +899,6 @@ class _BrandColors {
     required this.onPanelMuted,
     required this.chip,
     required this.onChip,
-    required this.shape,
   });
 
   final Color panel;
@@ -528,169 +906,16 @@ class _BrandColors {
   final Color onPanelMuted;
   final Color chip;
   final Color onChip;
-  final Color shape;
 
   factory _BrandColors.of(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final onPanel = dark ? cs.onPrimaryContainer : cs.onPrimary;
     return _BrandColors(
-      panel: dark ? cs.onPrimary : cs.primary,
-      onPanel: onPanel,
-      onPanelMuted: onPanel.withValues(alpha: 0.88),
+      panel: dark ? cs.primaryContainer : cs.primary,
+      onPanel: dark ? cs.onPrimaryContainer : cs.onPrimary,
+      onPanelMuted: dark ? cs.primary : cs.primaryContainer,
       chip: cs.primaryContainer,
       onChip: cs.onPrimaryContainer,
-      shape: (dark ? cs.primary : cs.onPrimary).withValues(
-        alpha: dark ? 0.16 : 0.08,
-      ),
-    );
-  }
-}
-
-class _BrandPanel extends StatelessWidget {
-  const _BrandPanel({
-    required this.isArabic,
-    required this.onLanguage,
-    required this.tight,
-  });
-
-  final bool isArabic;
-  final VoidCallback onLanguage;
-  final bool tight;
-
-  @override
-  Widget build(BuildContext context) {
-    final brand = _BrandColors.of(context);
-    return ColoredBox(
-      color: brand.panel,
-      child: Stack(
-        children: [
-          PositionedDirectional(
-            bottom: -140,
-            end: -140,
-            child: IgnorePointer(
-              child: Container(
-                width: 280,
-                height: 280,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: brand.shape,
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              tight ? 28 : 48,
-              16,
-              tight ? 28 : 48,
-              24,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: _LanguageChip(
-                    isArabic: isArabic,
-                    onPressed: onLanguage,
-                  ),
-                ),
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return SingleChildScrollView(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            minHeight: constraints.maxHeight,
-                          ),
-                          child: Center(
-                            child: _BrandCopy(
-                              isArabic: isArabic,
-                              onPanel: brand.onPanel,
-                              onPanelMuted: brand.onPanelMuted,
-                              tight: tight,
-                              chipColor: brand.chip,
-                              iconColor: brand.onChip,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BrandCopy extends StatelessWidget {
-  const _BrandCopy({
-    required this.isArabic,
-    required this.onPanel,
-    required this.onPanelMuted,
-    required this.tight,
-    required this.chipColor,
-    required this.iconColor,
-  });
-
-  final bool isArabic;
-  final Color onPanel;
-  final Color onPanelMuted;
-  final bool tight;
-  final Color chipColor;
-  final Color iconColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final text = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        TashilLogoTile(size: tight ? 56 : 72),
-        const SizedBox(height: 16),
-        Text(
-          l10n.appTitle,
-          style: text.headlineMedium?.copyWith(
-            color: onPanel,
-            fontWeight: FontWeight.w700,
-            height: 1.2,
-          ),
-        ),
-        SizedBox(height: tight ? 12 : 20),
-        Text(
-          isArabic
-              ? 'نظام موارد بشرية متكامل'
-              : 'A complete human resources system',
-          style: text.titleLarge?.copyWith(
-            color: onPanel,
-            fontWeight: FontWeight.w700,
-            height: 1.35,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          isArabic
-              ? 'لشركات التجزئة العاملة مع الهايبرماركت'
-              : 'For retail companies working with hypermarkets',
-          style: text.bodyLarge?.copyWith(color: onPanelMuted, height: 1.4),
-        ),
-        SizedBox(height: tight ? 20 : 32),
-        _FeatureGrid(
-          isArabic: isArabic,
-          tight: tight,
-          labelColor: onPanel,
-          chipColor: chipColor,
-          iconColor: iconColor,
-          features: _features,
-        ),
-      ],
     );
   }
 }
@@ -724,6 +949,7 @@ class _NarrowColumn extends StatelessWidget {
                       child: _LanguageChip(
                         isArabic: view.isArabic,
                         onPressed: view.onLanguage,
+                        onBrand: true,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -768,6 +994,10 @@ class _NarrowColumn extends StatelessWidget {
             child: _FormBody(view: view),
           ),
           Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+            child: _LoginFooter(view: view),
+          ),
+          Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
             child: Column(
               children: [
@@ -788,49 +1018,6 @@ class _NarrowColumn extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _FeatureGrid extends StatelessWidget {
-  const _FeatureGrid({
-    required this.isArabic,
-    required this.tight,
-    required this.labelColor,
-    required this.chipColor,
-    required this.iconColor,
-    required this.features,
-  });
-
-  final bool isArabic;
-  final bool tight;
-  final Color labelColor;
-  final Color chipColor;
-  final Color iconColor;
-  final List<_LoginFeature> features;
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: features.length,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisExtent: tight ? 44 : 52,
-        mainAxisSpacing: tight ? 8 : 16,
-        crossAxisSpacing: tight ? 12 : 20,
-      ),
-      itemBuilder: (context, index) {
-        return _FeatureTile(
-          feature: features[index],
-          isArabic: isArabic,
-          tight: tight,
-          labelColor: labelColor,
-          chipColor: chipColor,
-          iconColor: iconColor,
-        );
-      },
     );
   }
 }
