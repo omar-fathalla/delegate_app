@@ -24,6 +24,8 @@ import 'package:delegate_app/features/admin/domain/repositories/delegate_subscri
 import 'package:delegate_app/features/admin/presentation/pages/delegate_subscription_requests_page.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/admin/presentation/pages/add_delegate_form_screen.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_inner_page.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_delegates_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -823,14 +825,7 @@ mixin _AdminHomeHelpers {
             FilledButton(
               onPressed: () {
                 Navigator.pop(dialogCtx);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => AddDelegateFormScreen(
-                      supervisor: adminDelegate,
-                    ),
-                  ),
-                );
+                openAdminHomeAddDelegate(context, adminDelegate);
               },
               child: Text(isArabic ? 'ابدأ الإضافة الآن' : 'Start Adding Now'),
             ),
@@ -859,7 +854,8 @@ mixin _AdminHomeHelpers {
           child: Text(
             number,
             style: TextStyle(
-              fontSize: 11,
+              // 12 on the web, 11 on mobile as before (TAS-141).
+              fontSize: HrFont.labelSmall,
               fontWeight: FontWeight.bold,
               color: colorScheme.onPrimaryContainer,
             ),
@@ -1392,11 +1388,26 @@ class AdminHomePromoCard extends StatelessWidget with _AdminHomeHelpers {
 }
 
 /// The promo card's «إضافة مندوب» action.
-void openAdminHomeAddDelegate(BuildContext context, Delegate supervisor) {
-  Navigator.push(
+///
+/// Inside the web HR shell the form opens as an inner page with a
+/// breadcrumb (TAS-140). Elsewhere (mobile, narrow web) it is a normal
+/// full-screen push, as before.
+///
+/// [debugOrganizationsLoader] is for tests only (fake chains, no Firestore).
+void openAdminHomeAddDelegate(
+  BuildContext context,
+  Delegate supervisor, {
+  @visibleForTesting
+  Future<List<Map<String, dynamic>>> Function()? debugOrganizationsLoader,
+}) {
+  pushHrInnerPage<bool>(
     context,
-    MaterialPageRoute(
-      builder: (_) => AddDelegateFormScreen(supervisor: supervisor),
+    title: 'إضافة مندوب',
+    maxWidth: HrInnerPageWidth.wide,
+    builder: (_, inShell) => AddDelegateFormScreen(
+      supervisor: supervisor,
+      inShell: inShell,
+      debugOrganizationsLoader: debugOrganizationsLoader,
     ),
   );
 }

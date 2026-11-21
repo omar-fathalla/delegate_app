@@ -98,7 +98,10 @@ jobs:
         # TAS-175: 4 test files at a time. At --concurrency=1 the suite took
         # 25-30 min on the shared Mac and often hit timeout-minutes: 30; at 4 the
         # same suite ran in under 2 min locally on this Mac.
-        run: flutter test --concurrency=4
+        # TAS-162: golden/screenshot tests (tag `golden`, see dart_test.yaml)
+        # depend on the host renderer, so they are skipped here. Run them
+        # locally: flutter test --tags golden [--update-goldens]
+        run: flutter test --concurrency=4 --exclude-tags golden
 
   p0-scripts:
     name: P0 scripts (emulators)
@@ -255,7 +258,13 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","macOS","ARM64","delegate-app"]') || 'ubuntu-latest' }}
     # TAS-107: 17+ suites; 20 min ran out on a busy Mac (#384, 20 Nov 2026).
-    timeout-minutes: 35
+    # TAS-182: measured 21 Nov 2026. ubuntu-latest: whole job ~6 min (Rules
+    # tests ~5 min, ~12-15 s per suite). Self-hosted Mac under load (#406):
+    # Rules tests 30m22s (~1.5-4 min per suite, every phase 5-8x slower:
+    # CLI boot, rules load, test bodies; no download or install step stood
+    # out), then both e2e suites ~2 min each, so 35 min cut off the last
+    # one. Mac: 50 min (~36 min measured + headroom); hosted: 20 min.
+    timeout-minutes: ${{ github.event.repository.private && 50 || 20 }}
     steps:
       - uses: actions/checkout@v4
       - name: Sanitize PATH for delegate-ci

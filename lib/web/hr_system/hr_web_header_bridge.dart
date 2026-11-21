@@ -42,6 +42,22 @@ class HrWebHeaderBridge extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Per-page reloads run by the shell's top-bar refresh, keyed by the
+  /// shell tab. A page with its own data (for example «الخريطة الحية»)
+  /// registers here instead of drawing its own refresh button (TAS-148).
+  final Map<Object, Future<void> Function()> _pageReloads = {};
+
+  void attachPageReload(Object page, Future<void> Function() reload) {
+    _pageReloads[page] = reload;
+  }
+
+  /// Removes [reload] only if it is still the one registered for [page].
+  void releasePageReload(Object page, Future<void> Function() reload) {
+    if (_pageReloads[page] == reload) _pageReloads.remove(page);
+  }
+
+  Future<void> Function()? pageReload(Object page) => _pageReloads[page];
+
   /// Drops the callbacks when the overview leaves the tree. The count stays
   /// so a disposing child does not rebuild the header mid-unmount.
   void release() {
