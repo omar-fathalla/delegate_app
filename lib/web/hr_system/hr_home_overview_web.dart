@@ -702,7 +702,7 @@ class _AbsentList extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
           child: HrCardTitle(
             icon: Icons.person_off_outlined,
-            text: 'الغايبين النهاردة (${absent.length})',
+            text: 'الغائبون اليوم (${absent.length})',
           ),
         ),
         Flexible(

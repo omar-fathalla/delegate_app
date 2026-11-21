@@ -999,7 +999,7 @@ class _FilterBar extends StatelessWidget {
           ),
           chip(
             RenewalListFilter.expiringSoon,
-            'قرب ينتهي الاشتراك',
+            'يقترب انتهاء اشتراكهم',
             const Key('renewal_filter_expiring'),
           ),
         ],

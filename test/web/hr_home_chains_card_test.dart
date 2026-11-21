@@ -47,7 +47,7 @@ void main() {
     );
     expect(find.byKey(HrHomeChainsCard.addChainKey), findsNothing);
     expect(find.byKey(HrHomeChainsCard.addFirstChainKey), findsNothing);
-    expect(find.text('لسه مفيش سلاسل مرتبطة بمناديبك'), findsOneWidget);
+    expect(find.text('لا توجد سلاسل مرتبطة بمناديبك بعد'), findsOneWidget);
   });
 
   testWidgets('empty: main action is «أضف أول سلسلة», no header button', (

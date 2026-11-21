@@ -383,7 +383,7 @@ void main() {
       await t.pumpAndSettle();
       final list = find.byKey(const ValueKey('hr_home_absent_list'));
       expect(list, findsOneWidget);
-      expect(find.text('الغايبين النهاردة (3)'), findsOneWidget);
+      expect(find.text('الغائبون اليوم (3)'), findsOneWidget);
       for (final name in ['وليد فتحي', 'أسماء رجب', 'باسم عاطف']) {
         expect(
           find.descendant(of: list, matching: find.text(name)),
@@ -533,13 +533,13 @@ void main() {
       expect(find.text('1–10 من 14'), findsOneWidget);
     });
 
-    testWidgets('open check-ins say «لسه موجود» and count up to now', (
+    testWidgets('open check-ins say «لم ينصرف بعد» and count up to now', (
       t,
     ) async {
       await _pumpView(t, const Size(1440, 2000), _data());
       final row = find.byKey(const ValueKey('hr_home_row_1001'));
       expect(
-        find.descendant(of: row, matching: find.text('لسه موجود')),
+        find.descendant(of: row, matching: find.text('لم ينصرف بعد')),
         findsOneWidget,
       );
       expect(
@@ -576,7 +576,7 @@ void main() {
     ) async {
       await _pumpView(t, const Size(1440, 2000), _data());
       expect(find.text('الكل  14'), findsOneWidget);
-      expect(find.text('لسه موجود  12'), findsOneWidget);
+      expect(find.text('لم ينصرف بعد  12'), findsOneWidget);
       expect(find.text('انصرف  2'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('hr_home_filter_departed')));
       await t.pump();
@@ -705,7 +705,7 @@ void main() {
       expect(find.textContaining('آخر تحديث'), findsNothing);
     });
 
-    testWidgets('empty: cookie, message, tonal button, «لسه مسجلوش N»', (
+    testWidgets('empty: cookie, message, tonal button, «لم يسجلوا بعد N»', (
       t,
     ) async {
       await _pumpView(t, const Size(1440, 2000), _data(records: _absentOnly()));
@@ -727,10 +727,10 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('لسه محدش سجّل حضور النهاردة'), findsOneWidget);
+      expect(find.text('لم يسجّل أحد حضوره اليوم بعد'), findsOneWidget);
       final absent = find.byKey(const ValueKey('hr_home_stat_absent'));
       expect(
-        find.descendant(of: absent, matching: find.text('لسه مسجلوش')),
+        find.descendant(of: absent, matching: find.text('لم يسجلوا بعد')),
         findsOneWidget,
       );
       final n = t.widget<Text>(
@@ -770,7 +770,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('مقدرناش نحمّل حضور النهاردة'), findsOneWidget);
+      expect(find.text('تعذر تحميل حضور اليوم'), findsOneWidget);
       expect(find.text('رمز الخطأ: permission-denied'), findsOneWidget);
       for (final key in ['total', 'present', 'absent']) {
         final stat = find.byKey(ValueKey('hr_home_stat_$key'));
