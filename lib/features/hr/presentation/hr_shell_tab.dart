@@ -72,7 +72,7 @@ Widget hrShellTab({
     case kHrTabSubscriptions:
       return DelegateSubscriptionRequestsPage(currentAdmin: delegate);
     case kHrTabRenewal:
-      return SubscriptionRenewalScreen(supervisor: delegate);
+      return SubscriptionRenewalScreen(supervisor: delegate, showAppBar: false);
     case kHrTabTasks:
       return AdminTasksScreen(adminDelegate: delegate);
     case kHrTabPhotoPermissions:

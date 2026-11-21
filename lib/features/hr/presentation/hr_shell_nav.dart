@@ -33,7 +33,9 @@ enum HrShellPlacement { sidebar, compactMenu, moreSheet }
 
 /// One destination of the web HR shell.
 ///
-/// Titles match the company-supervisor mobile menu. Items that already lived
+/// Titles match the company-supervisor mobile menu. On web, [menuLabel] is
+/// the one page name (TAS-138): the sidebar, the top bar title and the
+/// inner-page breadcrumb all show it. Items that already lived
 /// in the HR shell keep their tab index. Tools that only the supervisor menu
 /// had are [webOnly] so the mobile HR shell stays as it is.
 class HrShellItem {
@@ -118,6 +120,7 @@ const List<HrShellItem> kHrShellCatalog = [
   HrShellItem(
     id: 'attendance',
     title: 'سجل الحضور والانصراف',
+    webTitle: 'الحضور والانصراف',
     subtitle: 'متابعة حضور وانصراف مناديب الشركة',
     section: 'الحضور والميدان',
     icon: Icons.event_available_outlined,
@@ -136,6 +139,7 @@ const List<HrShellItem> kHrShellCatalog = [
   HrShellItem(
     id: 'delegate_tracking',
     title: 'Live Tracking',
+    webTitle: 'الخريطة الحية',
     subtitle: 'المواقع الميدانية اللحظية',
     section: 'الحضور والميدان',
     icon: Icons.radar_outlined,
@@ -317,6 +321,15 @@ String hrShellHeaderTitle(int index) {
     if (item.tabIndex == index) return item.title;
   }
   return 'بوابة الموارد البشرية';
+}
+
+/// Short page name of a shell tab: the sidebar label on web, the full title
+/// on mobile. Used as the first breadcrumb item of inner pages.
+String hrShellPageLabel(int index, {required bool isWeb}) {
+  for (final item in kHrShellCatalog) {
+    if (item.tabIndex == index) return item.menuLabel(isWeb: isWeb);
+  }
+  return 'الرئيسية';
 }
 
 IconData hrShellHeaderIcon(int index) {

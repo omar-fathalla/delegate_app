@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_home_screen.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/company_exclusive_card_intro.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// Tabular figures so times and counts do not shift while they update.
 const List<FontFeature> kHrTabularFigures = [FontFeature.tabularFigures()];
@@ -190,7 +191,7 @@ class HrOverviewCard extends StatelessWidget {
     clipBehavior: Clip.antiAlias,
     decoration: BoxDecoration(
       color: Theme.of(context).colorScheme.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(28),
+      borderRadius: BorderRadius.circular(HrRadius.pill),
     ),
     child: child,
   );
@@ -280,7 +281,7 @@ class HrHomeChainsCard extends StatelessWidget {
           if (chains.isEmpty)
             Text(
               'لسه مفيش سلاسل مرتبطة بمناديبك',
-              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+              style: TextStyle(fontSize: HrFont.body, color: cs.onSurfaceVariant),
             )
           else
             LayoutBuilder(
@@ -342,7 +343,7 @@ class _ChainGridChip extends StatelessWidget {
         child: Material(
           color: selected ? cs.secondaryContainer : cs.surfaceContainerLowest,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(HrRadius.chip),
             side: BorderSide(
               color: selected ? Colors.transparent : cs.outlineVariant,
             ),
@@ -362,7 +363,7 @@ class _ChainGridChip extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: HrFont.body,
                         fontWeight: FontWeight.w600,
                         color: enabled ? fg : fg.withValues(alpha: 0.38),
                       ),
@@ -395,10 +396,10 @@ class HrHomeFeatureCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     const radius = BorderRadiusDirectional.only(
-      topStart: Radius.circular(28),
+      topStart: Radius.circular(HrRadius.pill),
       topEnd: Radius.circular(72),
-      bottomStart: Radius.circular(28),
-      bottomEnd: Radius.circular(28),
+      bottomStart: Radius.circular(HrRadius.pill),
+      bottomEnd: Radius.circular(HrRadius.pill),
     );
     return Container(
       key: const ValueKey('hr_home_feature_card'),
@@ -446,7 +447,7 @@ class HrHomeFeatureCard extends StatelessWidget {
                           Text(
                             CompanyExclusiveCardIntro.badgeAr,
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: HrFont.body,
                               fontWeight: FontWeight.w700,
                               color: cs.onPrimaryContainer,
                             ),
@@ -460,7 +461,7 @@ class HrHomeFeatureCard extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 color: cs.tertiaryContainer,
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(HrRadius.chip),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -474,7 +475,7 @@ class HrHomeFeatureCard extends StatelessWidget {
                                   Text(
                                     CompanyExclusiveCardIntro.freeUntilAr,
                                     style: TextStyle(
-                                      fontSize: 12,
+                                      fontSize: HrFont.labelMedium,
                                       fontWeight: FontWeight.w700,
                                       color: cs.onTertiaryContainer,
                                       fontFeatures: kHrTabularFigures,
@@ -516,7 +517,7 @@ class HrHomeFeatureCard extends StatelessWidget {
                       ? CompanyExclusiveCardIntro.bodyFreeAr
                       : CompanyExclusiveCardIntro.bodyAr,
                   style: TextStyle(
-                    fontSize: 15,
+                    fontSize: HrFont.titleMedium,
                     height: 1.55,
                     color: cs.onPrimaryContainer.withValues(alpha: 0.86),
                   ),
@@ -537,7 +538,7 @@ class HrHomeFeatureCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         textStyle: Theme.of(context).textTheme.labelLarge
                             ?.copyWith(
-                              fontSize: 14,
+                              fontSize: HrFont.body,
                               fontWeight: FontWeight.w700,
                             ),
                       ).copyWith(overlayColor: hrStateLayer(cs.onPrimary)),
@@ -556,7 +557,7 @@ class HrHomeFeatureCard extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 20),
                             textStyle: Theme.of(context).textTheme.labelLarge
                                 ?.copyWith(
-                                  fontSize: 14,
+                                  fontSize: HrFont.body,
                                   fontWeight: FontWeight.w600,
                                 ),
                           ).copyWith(
@@ -589,7 +590,7 @@ class HrHomeDutiesCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     const tileShape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.all(Radius.circular(16)),
+      borderRadius: BorderRadius.all(Radius.circular(HrRadius.card)),
     );
     return HrOverviewCard(
       key: const ValueKey('hr_home_duties_card'),
@@ -653,7 +654,7 @@ class HrHomeDutiesCard extends StatelessWidget {
                     Text(
                       duties[i].desc,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: HrFont.body,
                         height: 1.55,
                         color: cs.onSurfaceVariant,
                       ),

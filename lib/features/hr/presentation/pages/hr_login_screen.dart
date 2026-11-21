@@ -13,6 +13,7 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
 import 'package:delegate_app/core/widgets/device_lock_dialog.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// Dedicated Web HR Portal Login Screen.
 /// Designed specifically for desktop web browsers and HR administration.
@@ -102,7 +103,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
                   backgroundColor: colorScheme.error,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(HrRadius.card),
                   ),
                 ),
               );
@@ -216,7 +217,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF0F172A),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(HrRadius.pill),
         border: Border.all(
           color: const Color(0xFF1E293B),
           width: 1.5,
@@ -246,7 +247,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
                   ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF6366F1).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(HrRadius.button),
                     border: Border.all(
                       color: const Color(0xFF6366F1).withValues(alpha: 0.35),
                     ),
@@ -265,7 +266,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
                             ? 'بوابة الموارد البشرية (HR Portal)'
                             : 'HR Portal',
                         style: const TextStyle(
-                          fontSize: 12.5,
+                          fontSize: HrFont.labelMedium,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFFA5B4FC),
                         ),
@@ -295,7 +296,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
                           ? 'تطبيق المندوب وإدارة العمليات'
                           : 'Delegate & Operations App',
                       style: const TextStyle(
-                        fontSize: 13.5,
+                        fontSize: HrFont.body,
                         color: Color(0xFF94A3B8),
                         fontWeight: FontWeight.w500,
                       ),
@@ -309,7 +310,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
               Text(
                 l10n.login,
                 style: const TextStyle(
-                  fontSize: 22,
+                  fontSize: HrFont.titleLarge,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
                 ),
@@ -318,7 +319,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
               Text(
                 l10n.loginToContinue,
                 style: const TextStyle(
-                  fontSize: 13.5,
+                  fontSize: HrFont.body,
                   color: Color(0xFF94A3B8),
                 ),
               ),
@@ -334,7 +335,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
                 autofillHints: const [AutofillHints.telephoneNumber],
                 textDirection: TextDirection.ltr,
                 textAlign: TextAlign.end,
-                style: const TextStyle(fontSize: 15, color: Colors.white),
+                style: const TextStyle(fontSize: HrFont.titleMedium, color: Colors.white),
                 decoration: _darkInputDecoration(
                   hintText: l10n.mobileNumber,
                   prefixIcon: Icons.phone_android_rounded,
@@ -360,7 +361,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
                 textDirection: TextDirection.ltr,
                 textAlign: TextAlign.end,
                 obscureText: _obscurePassword,
-                style: const TextStyle(fontSize: 15, color: Colors.white),
+                style: const TextStyle(fontSize: HrFont.titleMedium, color: Colors.white),
                 decoration: _darkInputDecoration(
                   hintText: l10n.password,
                   prefixIcon: Icons.lock_outline_rounded,
@@ -411,7 +412,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
                   Text(
                     l10n.rememberMe,
                     style: const TextStyle(
-                      fontSize: 13.5,
+                      fontSize: HrFont.body,
                       color: Color(0xFFCBD5E1),
                     ),
                   ),
@@ -435,11 +436,11 @@ class _HrLoginScreenState extends State<HrLoginScreen>
                     ).withValues(alpha: 0.5),
                     elevation: 3,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
+                      borderRadius: BorderRadius.circular(HrRadius.pill),
                     ),
                     textStyle: const TextStyle(
                       fontFamily: 'Cairo',
-                      fontSize: 16,
+                      fontSize: HrFont.titleMedium,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -469,13 +470,13 @@ class _HrLoginScreenState extends State<HrLoginScreen>
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(HrRadius.button),
         onTap: () => localeProvider.toggleLocale(),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           decoration: BoxDecoration(
             color: const Color(0xFF1E293B),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(HrRadius.button),
             border: Border.all(color: const Color(0xFF334155)),
           ),
           child: Row(
@@ -486,7 +487,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
               Text(
                 isArabic ? 'English' : 'العربية',
                 style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: HrFont.body,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
                 ),
@@ -508,31 +509,31 @@ class _HrLoginScreenState extends State<HrLoginScreen>
   }) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
+      hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: HrFont.body),
       filled: true,
       fillColor: const Color(0xFF131B26),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       prefixIcon: Icon(prefixIcon, color: const Color(0xFF94A3B8), size: 20),
       suffixIcon: suffixIcon,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         borderSide: const BorderSide(color: Color(0xFF263345), width: 1.2),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         borderSide: const BorderSide(color: Color(0xFF263345), width: 1.2),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.8),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.2),
+        borderRadius: BorderRadius.circular(HrRadius.card),
+        borderSide: BorderSide(color: HrStatusColors.of(context).danger, width: 1.2),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.8),
+        borderRadius: BorderRadius.circular(HrRadius.card),
+        borderSide: BorderSide(color: HrStatusColors.of(context).danger, width: 1.8),
       ),
     );
   }
@@ -572,7 +573,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
         return Container(
           decoration: BoxDecoration(
             color: colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(HrRadius.pill)),
           ),
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
           child: Column(
@@ -593,7 +594,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
               Text(
                 isArabic ? 'اختر المنظمة' : 'Select Organization',
                 style: TextStyle(
-                  fontSize: 20,
+                  fontSize: HrFont.titleLarge,
                   fontWeight: FontWeight.bold,
                   color: colorScheme.onSurface,
                 ),
@@ -604,7 +605,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
                     ? 'أنت مسجل في أكثر من منظمة. اختر للمتابعة.'
                     : 'You are registered in multiple organizations.',
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: HrFont.body,
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
@@ -633,9 +634,9 @@ class _HrLoginScreenState extends State<HrLoginScreen>
     final colorScheme = Theme.of(blocContext).colorScheme;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         onTap: () {
           Navigator.pop(sheetContext);
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -653,7 +654,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(HrRadius.card),
                 ),
                 child: Icon(
                   Icons.business_rounded,
@@ -668,7 +669,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
                     Text(
                       delegate.organizationName,
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: HrFont.titleMedium,
                         fontWeight: FontWeight.w600,
                         color: colorScheme.onSurface,
                       ),
@@ -677,7 +678,7 @@ class _HrLoginScreenState extends State<HrLoginScreen>
                     Text(
                       delegate.companyName,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: HrFont.body,
                         color: colorScheme.onSurfaceVariant,
                       ),
                     ),

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:delegate_app/features/hr/presentation/pages/tabs/hr_attendance_tab.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -163,5 +165,41 @@ void main() {
       expect(recordMock.hasSecurityViolation, isTrue);
       expect(recordMock.isMockLocation, isTrue);
     });
+  });
+
+  group('Cards grid column count (TAS-147)', () {
+    test('every column is at least the card min width', () {
+      for (final w in [400.0, 718.0, 760.0, 1000.0, 1208.0, 1600.0, 2400.0]) {
+        final cols = hrAttendanceCardColumns(w);
+        final cell = (w - (cols - 1) * kHrAttendanceCardsGridSpacing) / cols;
+        expect(cols, inInclusiveRange(1, kHrAttendanceCardsMaxColumns));
+        if (cols > 1) {
+          expect(cell, greaterThanOrEqualTo(kHrAttendanceCardMinWidth),
+              reason: 'width $w -> $cols columns of $cell');
+        }
+      }
+    });
+
+    test('column count follows the width', () {
+      // Grid starts at 750 => 718 inside the 16px padding.
+      expect(hrAttendanceCardColumns(718), 1);
+      expect(hrAttendanceCardColumns(732), 2);
+      expect(hrAttendanceCardColumns(1104), 3);
+      expect(hrAttendanceCardColumns(1476), 4);
+      expect(hrAttendanceCardColumns(3000), kHrAttendanceCardsMaxColumns);
+      expect(hrAttendanceCardColumns(0), 1);
+    });
+  });
+
+  test('view toggle uses the agreed names «جدول» / «بطاقات»', () {
+    for (final path in [
+      'lib/features/hr/presentation/pages/tabs/hr_attendance_tab.dart',
+      'lib/features/hr/presentation/pages/tabs/hr_delegates_tab.dart',
+    ]) {
+      final src = File(path).readAsStringSync();
+      expect(src.contains("label: 'كروت'"), isFalse, reason: path);
+      expect(src.contains("label: 'بطاقات'"), isTrue, reason: path);
+      expect(src.contains("label: 'جدول'"), isTrue, reason: path);
+    }
   });
 }

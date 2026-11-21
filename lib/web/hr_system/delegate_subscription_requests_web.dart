@@ -15,6 +15,7 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// Two panes from this content width up. 600–839 stays a single pane.
 const double kSubscriptionTwoPaneMinWidth = 840;
@@ -752,7 +753,7 @@ class _DelegateSubscriptionRequestsWebState
         focusNode: _searchFocus,
         textInputAction: TextInputAction.search,
         style: TextStyle(
-          fontSize: 14,
+          fontSize: HrFont.body,
           fontWeight: FontWeight.normal,
           color: cs.onSurface,
         ),
@@ -761,7 +762,7 @@ class _DelegateSubscriptionRequestsWebState
           fillColor: cs.surfaceContainerHigh,
           hintText: 'ابحث بالاسم أو الموبايل أو الرقم القومي',
           hintStyle: TextStyle(
-            fontSize: 14,
+            fontSize: HrFont.body,
             fontWeight: FontWeight.normal,
             color: cs.onSurfaceVariant.withValues(alpha: 0.7),
           ),
@@ -778,15 +779,15 @@ class _DelegateSubscriptionRequestsWebState
                 ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 20),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(HrRadius.pill),
             borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(HrRadius.pill),
             borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(HrRadius.pill),
             borderSide: BorderSide(color: cs.primary, width: 1.5),
           ),
         ),
@@ -865,7 +866,7 @@ class _DelegateSubscriptionRequestsWebState
           color: cs.surfaceContainerHigh,
           elevation: 3,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(HrRadius.card),
             side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
           ),
           onSelected: (value) => setState(() => _newestFirst = value),
@@ -1133,15 +1134,15 @@ class _RequestRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 4),
       child: Material(
         color: selected ? cs.secondaryContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(HrRadius.card),
           onTap: onTap,
           child: Container(
             constraints: const BoxConstraints(minHeight: 72),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(HrRadius.card),
               border: focused
                   ? Border.all(color: cs.primary, width: 2)
                   : null,
@@ -1256,7 +1257,7 @@ class _StatusChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(HrRadius.chip),
         border: outlined ? Border.all(color: cs.outline) : null,
       ),
       child: Row(
@@ -1567,7 +1568,7 @@ class _DetailContent extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(HrRadius.chip),
       ),
       child: Text(
         label,
@@ -1853,7 +1854,7 @@ class _DetailContent extends StatelessWidget {
         showDragHandle: false,
         backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(HrRadius.pill)),
         ),
         builder: (ctx) => Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
@@ -1869,7 +1870,7 @@ class _DetailContent extends StatelessWidget {
       context: context,
       builder: (ctx) => Dialog(
         backgroundColor: Theme.of(ctx).colorScheme.surfaceContainerLow,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.pill)),
         clipBehavior: Clip.antiAlias,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
@@ -1940,7 +1941,7 @@ class _ImageSheetState extends State<_ImageSheet> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(HrRadius.card),
             child: InteractiveViewer(
               child: _photo(cs),
             ),
@@ -2203,7 +2204,7 @@ class _OutcomeCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2302,7 +2303,7 @@ class _SkeletonList extends StatelessWidget {
             height: 72,
             decoration: BoxDecoration(
               color: cs.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(HrRadius.card),
             ),
           ),
         );

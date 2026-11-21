@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:delegate_app/features/profile/presentation/utils/document_review.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/core/widgets/tashil_maestro_dev_semantics.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_adaptive_sheet.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
@@ -1447,6 +1448,17 @@ void showUserChangePasswordSheet(
   Map<String, dynamic>? firestoreData,
   void Function(String newPassword)? onPasswordChanged,
 }) {
+  // Wide web windows get a dialog with the buttons in its footer (TAS-158).
+  // Mobile and narrow windows keep the original bottom sheet unchanged.
+  if (HrSheet.useDesktop(context)) {
+    _showChangePasswordDialog(
+      context,
+      delegate: delegate,
+      firestoreData: firestoreData,
+      onPasswordChanged: onPasswordChanged,
+    );
+    return;
+  }
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -1460,15 +1472,76 @@ void showUserChangePasswordSheet(
   );
 }
 
+void _showChangePasswordDialog(
+  BuildContext context, {
+  Delegate? delegate,
+  Map<String, dynamic>? firestoreData,
+  void Function(String newPassword)? onPasswordChanged,
+}) {
+  final l10n = AppLocalizations.of(context)!;
+  final formKey = GlobalKey<_ChangePasswordBottomSheetState>();
+  // Mirrors the form's busy state for the footer buttons. Not disposed on
+  // close: a submit still in flight may report to it after the dialog pops.
+  final busy = ValueNotifier<bool>(false);
+  showHrAdaptiveSheet<void>(
+    context: context,
+    title: l10n.changePassword,
+    dialogWidth: 480,
+    builder: (_) => _ChangePasswordBottomSheet(
+      key: formKey,
+      delegate: delegate,
+      firestoreData: firestoreData,
+      onPasswordChanged: onPasswordChanged ?? (_) {},
+      inDialog: true,
+      busy: busy,
+    ),
+    actions: (dialogContext) => [
+      ValueListenableBuilder<bool>(
+        valueListenable: busy,
+        builder: (_, isBusy, _) => TextButton(
+          key: const ValueKey('change_password_cancel'),
+          onPressed: isBusy ? null : () => Navigator.of(dialogContext).pop(),
+          child: const Text('إلغاء'),
+        ),
+      ),
+      ValueListenableBuilder<bool>(
+        valueListenable: busy,
+        builder: (_, isBusy, _) => FilledButton(
+          key: const ValueKey('change_password_submit'),
+          onPressed: isBusy
+              ? null
+              : () => formKey.currentState?._changePassword(),
+          child: isBusy
+              ? const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(l10n.saveAction),
+        ),
+      ),
+    ],
+  );
+}
+
 class _ChangePasswordBottomSheet extends StatefulWidget {
   final Delegate? delegate;
   final Map<String, dynamic>? firestoreData;
   final void Function(String newPassword)? onPasswordChanged;
 
+  /// True inside the web dialog: only the fields are built, the dialog frame
+  /// draws the title and the buttons.
+  final bool inDialog;
+
+  /// Receives the busy state so the dialog footer can disable its buttons.
+  final ValueNotifier<bool>? busy;
+
   const _ChangePasswordBottomSheet({
+    super.key,
     this.delegate,
     this.firestoreData,
     this.onPasswordChanged,
+    this.inDialog = false,
+    this.busy,
   });
 
   @override
@@ -1494,9 +1567,14 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
     super.dispose();
   }
 
+  void _setLoading(bool value) {
+    setState(() => _isLoading = value);
+    widget.busy?.value = value;
+  }
+
   Future<void> _changePassword() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _isLoading = true);
+    _setLoading(true);
 
     try {
       final String currentPass = _currentPasswordController.text.trim();
@@ -1559,7 +1637,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
       }
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        _setLoading(false);
       }
     }
   }
@@ -1604,10 +1682,86 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
     );
   }
 
+  /// The three password fields with their validators.
+  List<Widget> _buildFields(BuildContext context, ColorScheme colorScheme) {
+    return [
+      // Current Password
+      _buildTextField(
+        controller: _currentPasswordController,
+        label: AppLocalizations.of(context)!.currentPassword,
+        obscureText: _obscureCurrentPassword,
+        colorScheme: colorScheme,
+        onToggleVisibility: () {
+          setState(() => _obscureCurrentPassword = !_obscureCurrentPassword);
+        },
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return AppLocalizations.of(context)!.enterCurrentPassword;
+          }
+          return null;
+        },
+      ),
+
+      const SizedBox(height: 16),
+
+      // New Password
+      _buildTextField(
+        controller: _newPasswordController,
+        label: AppLocalizations.of(context)!.newPassword,
+        obscureText: _obscureNewPassword,
+        colorScheme: colorScheme,
+        onToggleVisibility: () {
+          setState(() => _obscureNewPassword = !_obscureNewPassword);
+        },
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return AppLocalizations.of(context)!.enterNewPassword;
+          }
+          if (value.length < 6) {
+            return AppLocalizations.of(context)!.passwordMin6;
+          }
+          return null;
+        },
+      ),
+
+      const SizedBox(height: 16),
+
+      // Confirm Password
+      _buildTextField(
+        controller: _confirmPasswordController,
+        label: AppLocalizations.of(context)!.confirmPassword,
+        obscureText: _obscureConfirmPassword,
+        colorScheme: colorScheme,
+        onToggleVisibility: () {
+          setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
+        },
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return AppLocalizations.of(context)!.enterConfirmPassword;
+          }
+          if (value != _newPasswordController.text) {
+            return AppLocalizations.of(context)!.passwordsDontMatch;
+          }
+          return null;
+        },
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    if (widget.inDialog) {
+      return Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: _buildFields(context, colorScheme),
+        ),
+      );
+    }
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Container(
@@ -1653,66 +1807,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
               ),
               const SizedBox(height: 32),
 
-              // Current Password
-              _buildTextField(
-                controller: _currentPasswordController,
-                label: AppLocalizations.of(context)!.currentPassword,
-                obscureText: _obscureCurrentPassword,
-                colorScheme: colorScheme,
-                onToggleVisibility: () {
-                  setState(() => _obscureCurrentPassword = !_obscureCurrentPassword);
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return AppLocalizations.of(context)!.enterCurrentPassword;
-                  }
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // New Password
-              _buildTextField(
-                controller: _newPasswordController,
-                label: AppLocalizations.of(context)!.newPassword,
-                obscureText: _obscureNewPassword,
-                colorScheme: colorScheme,
-                onToggleVisibility: () {
-                  setState(() => _obscureNewPassword = !_obscureNewPassword);
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return AppLocalizations.of(context)!.enterNewPassword;
-                  }
-                  if (value.length < 6) {
-                    return AppLocalizations.of(context)!.passwordMin6;
-                  }
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 16),
-
-              // Confirm Password
-              _buildTextField(
-                controller: _confirmPasswordController,
-                label: AppLocalizations.of(context)!.confirmPassword,
-                obscureText: _obscureConfirmPassword,
-                colorScheme: colorScheme,
-                onToggleVisibility: () {
-                  setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return AppLocalizations.of(context)!.enterConfirmPassword;
-                  }
-                  if (value != _newPasswordController.text) {
-                    return AppLocalizations.of(context)!.passwordsDontMatch;
-                  }
-                  return null;
-                },
-              ),
+              ..._buildFields(context, colorScheme),
 
               const SizedBox(height: 32),
 

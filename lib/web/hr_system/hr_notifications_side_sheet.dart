@@ -17,6 +17,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_adaptive_sheet.dart';
 
 /// Pinned clock for screenshots and tests. Production leaves this null.
 @visibleForTesting
@@ -28,12 +30,11 @@ bool hrNotificationsSheetDebugOpenFirstMenu = false;
 
 DateTime _sheetNow() => hrNotificationsSheetDebugNow?.call() ?? DateTime.now();
 
-const double _kSheetWidth = 440;
-const double _kSheetMaxWidth = 480;
 const double _kFullScreenBreakpoint = 600;
 const int _kPageSize = 15;
 
-/// Opens the HR notifications side sheet from the physical right edge.
+/// Opens the HR notifications side sheet from the reading end (the left
+/// edge in RTL), like every other HR side sheet (TAS-137).
 ///
 /// No-ops unless [WebRuntimePolicy.isWeb] is true, so a mobile call cannot
 /// replace [NotificationsPage]. [bloc] is for previews; the app builds one
@@ -110,8 +111,6 @@ class _HrNotificationsSheetRoute extends PopupRoute<void> {
 
   final Widget child;
   final Color _barrier;
-  Animation<double>? _source;
-  CurvedAnimation? _slide;
 
   @override
   Color get barrierColor => _barrier;
@@ -144,30 +143,9 @@ class _HrNotificationsSheetRoute extends PopupRoute<void> {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    if (_source != animation) {
-      _slide?.dispose();
-      _source = animation;
-      _slide = CurvedAnimation(
-        parent: animation,
-        curve: AppMotionCurves.emphasizedDecelerate,
-        reverseCurve: AppMotionCurves.emphasizedAccelerate,
-      );
-    }
-    return SlideTransition(
-      textDirection: TextDirection.ltr,
-      position: Tween<Offset>(
-        begin: const Offset(1, 0),
-        end: Offset.zero,
-      ).animate(_slide!),
-      child: child,
-    );
+    return HrSideSheetTransition(animation: animation, child: child);
   }
 
-  @override
-  void dispose() {
-    _slide?.dispose();
-    super.dispose();
-  }
 }
 
 class _HrNotificationsSheet extends StatefulWidget {
@@ -347,9 +325,9 @@ class _HrNotificationsSheetState extends State<_HrNotificationsSheet> {
 
     if (fullScreen) return SizedBox.expand(child: sheet);
     return Align(
-      alignment: Alignment.centerRight,
+      alignment: AlignmentDirectional.centerEnd,
       child: SizedBox(
-        width: _kSheetWidth.clamp(400, _kSheetMaxWidth).toDouble(),
+        width: HrSheet.sideWidth,
         height: MediaQuery.sizeOf(context).height,
         child: sheet,
       ),
@@ -430,7 +408,7 @@ class _HrNotificationsSheetState extends State<_HrNotificationsSheet> {
                   foregroundColor: cs.onSurface,
                   textStyle: const TextStyle(
                     fontFamily: 'Cairo',
-                    fontSize: 13,
+                    fontSize: HrFont.body,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -490,7 +468,7 @@ class _Header extends StatelessWidget {
                             fontFamily: 'Cairo',
                             fontWeight: FontWeight.w700,
                             color: cs.onSurface,
-                            fontSize: 22,
+                            fontSize: HrFont.titleLarge,
                           ),
                         ),
                       ),
@@ -513,7 +491,7 @@ class _Header extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       textStyle: const TextStyle(
                         fontFamily: 'Cairo',
-                        fontSize: 13,
+                        fontSize: HrFont.body,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -567,13 +545,13 @@ class _UnreadCount extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: cs.primaryContainer,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(HrRadius.card),
       ),
       child: Text(
         label,
         style: TextStyle(
           fontFamily: 'Cairo',
-          fontSize: 12,
+          fontSize: HrFont.labelMedium,
           fontWeight: FontWeight.w700,
           color: cs.onPrimaryContainer,
         ),
@@ -606,7 +584,7 @@ class _FilterChip extends StatelessWidget {
       onSelected: (_) => onSelected(),
       labelStyle: TextStyle(
         fontFamily: 'Cairo',
-        fontSize: 13,
+        fontSize: HrFont.body,
         fontWeight: FontWeight.w600,
         color: selected ? cs.onSecondaryContainer : cs.onSurfaceVariant,
       ),
@@ -634,7 +612,7 @@ class _GroupLabel extends StatelessWidget {
         label,
         style: TextStyle(
           fontFamily: 'Cairo',
-          fontSize: 13,
+          fontSize: HrFont.body,
           fontWeight: FontWeight.w700,
           color: cs.onSurfaceVariant,
         ),
@@ -709,7 +687,7 @@ class _NotificationRowState extends State<_NotificationRow> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontFamily: 'Cairo',
-                            fontSize: 14,
+                            fontSize: HrFont.body,
                             height: 1.3,
                             fontWeight: unread
                                 ? FontWeight.w700
@@ -723,7 +701,7 @@ class _NotificationRowState extends State<_NotificationRow> {
                         _formatWhen(notification.createdAt, widget.now),
                         style: TextStyle(
                           fontFamily: 'Cairo',
-                          fontSize: 12,
+                          fontSize: HrFont.labelMedium,
                           color: cs.onSurfaceVariant,
                         ),
                       ),
@@ -740,7 +718,7 @@ class _NotificationRowState extends State<_NotificationRow> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontFamily: 'Cairo',
-                          fontSize: 13,
+                          fontSize: HrFont.body,
                           height: 1.35,
                           color: cs.onSurfaceVariant,
                         ),
@@ -805,7 +783,7 @@ class _OverflowMenuState extends State<_OverflowMenu> {
       color: cs.surfaceContainerHigh,
       elevation: 3,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       items: [
@@ -864,7 +842,7 @@ class _MenuRow extends StatelessWidget {
           label,
           style: TextStyle(
             fontFamily: 'Cairo',
-            fontSize: 13,
+            fontSize: HrFont.body,
             fontWeight: FontWeight.w600,
             color: ink,
           ),
@@ -936,7 +914,7 @@ class _Message extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Cairo',
-                fontSize: 14,
+                fontSize: HrFont.body,
                 color: cs.onSurfaceVariant,
               ),
             ),

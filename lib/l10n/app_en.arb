@@ -676,6 +676,15 @@
       }
     }
   },
+  "webVersion": "Version {version}",
+  "@webVersion": {
+    "description": "Version label in web settings (no mobile app name)",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "account": "Account",
   "@account": {
     "description": "Account section header"

@@ -9,6 +9,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
 import 'package:delegate_app/web/hr_system/hr_overlay_scrollbar.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// عنصر في القائمة الجانبية المكتبية
 class HRSidebarItemData {
@@ -17,7 +18,8 @@ class HRSidebarItemData {
   final IconData icon;
   final IconData selectedIcon;
   final String? badgeCollection; // اسم المجموعة في فايرستور لعد الطلبات المعلقة
-  final Color? badgeColor;
+  /// Rail badge tone. `true` = warning (amber), `false` = danger (error).
+  final bool badgeWarning;
   final bool destructive;
 
   const HRSidebarItemData({
@@ -26,7 +28,7 @@ class HRSidebarItemData {
     required this.icon,
     required this.selectedIcon,
     this.badgeCollection,
-    this.badgeColor,
+    this.badgeWarning = false,
     this.destructive = false,
   });
 }
@@ -185,16 +187,14 @@ class HRDesktopSidebar extends StatelessWidget {
         HrSidebarEntry(
           child: showLabels
               ? Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+                  // M3 drawer section headline: titleSmall, onSurfaceVariant.
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                   child: Text(
                     sections[i].sectionTitle,
                     style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: colorScheme.onSurfaceVariant.withValues(
-                        alpha: 0.7,
-                      ),
-                      letterSpacing: 0.4,
+                      fontSize: HrFont.body,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 )
@@ -235,7 +235,7 @@ class HRDesktopSidebar extends StatelessWidget {
   }
 
   /// Mobile HR sidebar. Titles and order are the ones the phone already ships.
-  List<HRSidebarSectionData> _mobileSections() => const [
+  List<HRSidebarSectionData> _mobileSections() => [
     HRSidebarSectionData(
       sectionTitle: 'العمليات والميدان',
       items: [
@@ -274,7 +274,6 @@ class HRDesktopSidebar extends StatelessWidget {
           icon: Icons.phonelink_lock_outlined,
           selectedIcon: Icons.phonelink_lock_rounded,
           badgeCollection: 'device_unbind_requests',
-          badgeColor: Color(0xFFDC2626),
         ),
       ],
     ),
@@ -287,7 +286,7 @@ class HRDesktopSidebar extends StatelessWidget {
           icon: Icons.event_note_outlined,
           selectedIcon: Icons.event_note_rounded,
           badgeCollection: 'leave_requests',
-          badgeColor: Color(0xFFD97706),
+          badgeWarning: true,
         ),
         HRSidebarItemData(
           index: 4,
@@ -388,7 +387,7 @@ class HRDesktopSidebar extends StatelessWidget {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                       boxShadow: [
                         BoxShadow(
                           color: colorScheme.primary.withValues(alpha: 0.3),
@@ -412,7 +411,7 @@ class HRDesktopSidebar extends StatelessWidget {
                         const Text(
                           'تسهيل',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: HrFont.titleMedium,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 0.5,
                           ),
@@ -424,7 +423,7 @@ class HRDesktopSidebar extends StatelessWidget {
                               ? delegate.companyName
                               : 'بوابة الموارد البشرية',
                           style: TextStyle(
-                            fontSize: 11.5,
+                            fontSize: HrFont.labelSmall,
                             fontWeight: FontWeight.w600,
                             color: colorScheme.primary,
                           ),
@@ -447,7 +446,7 @@ class HRDesktopSidebar extends StatelessWidget {
               onPressed: onToggleExpanded,
               style: IconButton.styleFrom(
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
               ),
             ),
@@ -462,7 +461,7 @@ class HRDesktopSidebar extends StatelessWidget {
               onPressed: onToggleExpanded,
               style: IconButton.styleFrom(
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
               ),
             ),
@@ -504,44 +503,68 @@ class HRDesktopSidebar extends StatelessWidget {
     );
 
     // إضافة شارة العداد الحي إذا كان العنصر مرتبطاً بطلبات معلقة
+    Stream<int>? pendingCount;
     if (item.badgeCollection != null) {
-      Stream<QuerySnapshot>? pending;
       try {
-        pending = FirebaseFirestore.instance
+        pendingCount = FirebaseFirestore.instance
             .collection(item.badgeCollection!)
             .where('companyUID', isEqualTo: delegate.companyUID)
             .where('status', isEqualTo: 'pending')
-            .snapshots();
+            .snapshots()
+            .map((s) => s.docs.length);
       } catch (_) {
-        pending = null;
-      }
-      if (pending == null) {
         // Firebase isn't ready (tests, or a build without a default app).
-      } else {
-        iconWidget = StreamBuilder<QuerySnapshot>(
-          stream: pending,
-          builder: (context, snapshot) {
-            final count = snapshot.data?.docs.length ?? 0;
-            return Badge(
-              isLabelVisible: count > 0,
-              label: Text(
-                '$count',
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              backgroundColor: item.badgeColor ?? colorScheme.error,
-              textColor: Colors.white,
-              child: Icon(
-                isSelected ? item.selectedIcon : item.icon,
-                size: 20,
-                color: iconColor,
-              ),
-            );
-          },
-        );
+        pendingCount = null;
       }
+    }
+
+    // Web drawer rows show the count as trailing text beside the label
+    // (M3 navigation drawer badge). The collapsed rail and mobile keep a
+    // Badge on the icon, toned danger or warning from the theme.
+    final trailingBadge = web && showLabels;
+    Widget? trailing;
+    if (pendingCount != null && trailingBadge) {
+      trailing = StreamBuilder<int>(
+        stream: pendingCount,
+        builder: (context, snapshot) {
+          final count = snapshot.data ?? 0;
+          if (count == 0) return const SizedBox.shrink();
+          return Text(
+            '$count',
+            style: TextStyle(
+              fontSize: HrFont.body,
+              fontWeight: FontWeight.w600,
+              color: isSelected ? selectedColor : colorScheme.onSurfaceVariant,
+            ),
+          );
+        },
+      );
+    } else if (pendingCount != null) {
+      final status = HrStatusColors.of(context);
+      iconWidget = StreamBuilder<int>(
+        stream: pendingCount,
+        builder: (context, snapshot) {
+          final count = snapshot.data ?? 0;
+          return Badge(
+            isLabelVisible: count > 0,
+            label: Text(
+              '$count',
+              style: const TextStyle(
+                fontSize: HrFont.labelSmall,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            backgroundColor:
+                item.badgeWarning ? status.warning : status.danger,
+            textColor: item.badgeWarning ? status.onWarning : status.onDanger,
+            child: Icon(
+              isSelected ? item.selectedIcon : item.icon,
+              size: 20,
+              color: iconColor,
+            ),
+          );
+        },
+      );
     }
 
     void open() {
@@ -560,6 +583,7 @@ class HRDesktopSidebar extends StatelessWidget {
         iconWidget: iconWidget,
         labelColor: labelColor,
         showLabels: showLabels,
+        trailing: trailing,
         onTap: open,
       );
     }
@@ -574,7 +598,7 @@ class HRDesktopSidebar extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: isSelected ? colorScheme.primaryContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(HrRadius.card),
       ),
       child: Row(
         mainAxisAlignment: showLabels
@@ -588,7 +612,7 @@ class HRDesktopSidebar extends StatelessWidget {
               child: Text(
                 item.title,
                 style: TextStyle(
-                  fontSize: 13.5,
+                  fontSize: HrFont.body,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   color: labelColor,
                 ),
@@ -605,7 +629,7 @@ class HRDesktopSidebar extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: open,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         hoverColor: colorScheme.onSurface.withValues(alpha: 0.06),
         child: showLabels
             ? content
@@ -627,6 +651,7 @@ class HRDesktopSidebar extends StatelessWidget {
     required Color labelColor,
     required bool showLabels,
     required VoidCallback onTap,
+    Widget? trailing,
   }) {
     final indicator = BoxDecoration(
       color: isSelected ? colorScheme.secondaryContainer : Colors.transparent,
@@ -649,7 +674,7 @@ class HRDesktopSidebar extends StatelessWidget {
                   child: Text(
                     item.title,
                     style: TextStyle(
-                      fontSize: 13.5,
+                      fontSize: HrFont.body,
                       fontWeight: isSelected
                           ? FontWeight.w700
                           : FontWeight.w500,
@@ -659,6 +684,10 @@ class HRDesktopSidebar extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                if (trailing != null) ...[
+                  const SizedBox(width: 8),
+                  trailing,
+                ],
               ],
             ),
           )
@@ -713,7 +742,7 @@ class HRDesktopSidebar extends StatelessWidget {
             if (showLabels)
               InkWell(
                 onTap: onOpenProfile,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(HrRadius.card),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 6,
@@ -738,7 +767,7 @@ class HRDesktopSidebar extends StatelessWidget {
                                   ? delegate.fullName
                                   : 'مسؤول الموارد البشرية',
                               style: const TextStyle(
-                                fontSize: 13,
+                                fontSize: HrFont.body,
                                 fontWeight: FontWeight.w700,
                               ),
                               maxLines: 1,
@@ -759,7 +788,7 @@ class HRDesktopSidebar extends StatelessWidget {
                                     ? 'مشرف الشركة'
                                     : 'موارد بشرية (HR)',
                                 style: TextStyle(
-                                  fontSize: 10,
+                                  fontSize: HrFont.labelSmall,
                                   fontWeight: FontWeight.w600,
                                   color: colorScheme.onPrimaryContainer,
                                 ),
@@ -791,7 +820,7 @@ class HRDesktopSidebar extends StatelessWidget {
           if (showLabels)
             InkWell(
               onTap: onOpenSettings,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(HrRadius.card),
               hoverColor: colorScheme.onSurface.withValues(alpha: 0.06),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -810,7 +839,7 @@ class HRDesktopSidebar extends StatelessWidget {
                       child: Text(
                         l10n.settings,
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: HrFont.body,
                           fontWeight: FontWeight.w600,
                           color: colorScheme.onSurface,
                         ),

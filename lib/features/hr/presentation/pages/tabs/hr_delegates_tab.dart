@@ -19,6 +19,8 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:delegate_app/features/profile/presentation/pages/profile_screen.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_table.dart';
 
 enum HRDelegatesViewMode { table, cards }
 
@@ -245,7 +247,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
         builder: (dialogContext, setDialogState) {
           return AlertDialog(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(HrRadius.button),
             ),
             titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
             contentPadding: const EdgeInsets.symmetric(horizontal: 20),
@@ -256,17 +258,17 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: isEnabled
-                        ? const Color(0xFF2E7D32).withValues(alpha: 0.12)
+                        ? HrStatusColors.of(context).success.withValues(alpha: 0.12)
                         : Colors.amber.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(HrRadius.chip),
                   ),
                   child: Icon(
                     isEnabled
                         ? Icons.beach_access_rounded
                         : Icons.event_repeat_rounded,
                     color: isEnabled
-                        ? const Color(0xFF2E7D32)
-                        : Colors.amber.shade900,
+                        ? HrStatusColors.of(context).success
+                        : HrStatusColors.of(context).warning,
                     size: 22,
                   ),
                 ),
@@ -278,14 +280,14 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                       const Text(
                         'إدارة نظام الإجازات',
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: HrFont.titleMedium,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
                         delegate.fullName,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: HrFont.labelMedium,
                           color: colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.normal,
                         ),
@@ -310,12 +312,12 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: isEnabled
-                            ? const Color(0xFF2E7D32).withValues(alpha: 0.08)
+                            ? HrStatusColors.of(context).success.withValues(alpha: 0.08)
                             : Colors.amber.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(HrRadius.card),
                         border: Border.all(
                           color: isEnabled
-                              ? const Color(0xFF2E7D32).withValues(alpha: 0.25)
+                              ? HrStatusColors.of(context).success.withValues(alpha: 0.25)
                               : Colors.amber.withValues(alpha: 0.35),
                         ),
                       ),
@@ -328,8 +330,8 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                                 : Icons.info_outline_rounded,
                             size: 20,
                             color: isEnabled
-                                ? const Color(0xFF2E7D32)
-                                : Colors.amber.shade900,
+                                ? HrStatusColors.of(context).success
+                                : HrStatusColors.of(context).warning,
                           ),
                           const SizedBox(width: 10),
                           Expanded(
@@ -342,10 +344,10 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                                       : 'نظام الإجازات الأسبوعية فقط',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 13,
+                                    fontSize: HrFont.body,
                                     color: isEnabled
-                                        ? const Color(0xFF2E7D32)
-                                        : Colors.amber.shade900,
+                                        ? HrStatusColors.of(context).success
+                                        : HrStatusColors.of(context).warning,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -354,7 +356,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                                       ? 'المندوب مثبت ويحق له التقديم على إجازات اعتيادية تُخصم من رصيده السنوي.'
                                       : 'المندوب جديد أو في فترة اختبار؛ يحصل على الإجازات الأسبوعية الاعتيادية فقط (يوم أسبوعياً بمعدل 4 أيام شهرياً). لا يظهر له رصيد الـ 21 يوماً السنوي.',
                                   style: TextStyle(
-                                    fontSize: 11.5,
+                                    fontSize: HrFont.labelSmall,
                                     color: colorScheme.onSurfaceVariant,
                                     height: 1.4,
                                   ),
@@ -371,7 +373,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                     Container(
                       decoration: BoxDecoration(
                         color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(HrRadius.card),
                         border: Border.all(
                           color: colorScheme.outlineVariant.withValues(alpha: 0.4),
                         ),
@@ -383,14 +385,14 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                         activeThumbColor: colorScheme.onPrimary,
                         title: const Text(
                           'تفعيل الإجازات السنوية',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.body),
                         ),
                         subtitle: Text(
                           isEnabled
                               ? 'إتاحة رصيد الإجازات السنوي والتقديم الاعتيادي'
                               : 'اقتصار المندوب على الإجازات الأسبوعية فقط',
                           style: TextStyle(
-                            fontSize: 11.5,
+                            fontSize: HrFont.labelSmall,
                             color: colorScheme.onSurfaceVariant,
                           ),
                         ),
@@ -405,7 +407,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                       Text(
                         'إجمالي رصيد الإجازات السنوية (أيام):',
                         style: TextStyle(
-                          fontSize: 12.5,
+                          fontSize: HrFont.labelMedium,
                           fontWeight: FontWeight.w600,
                           color: colorScheme.onSurface,
                         ),
@@ -422,7 +424,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                             vertical: 10,
                           ),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(HrRadius.card),
                           ),
                         ),
                         onChanged: (val) {
@@ -567,7 +569,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                   constraints: const BoxConstraints(minHeight: 44, maxHeight: 44),
                   shape: WidgetStatePropertyAll(
                     RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(22),
+                      borderRadius: BorderRadius.circular(HrRadius.pill),
                       side: BorderSide(
                         color: colorScheme.outlineVariant.withValues(alpha: 0.35),
                       ),
@@ -608,13 +610,13 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                       value: DelegateStatus.active,
                       label: activeCount > 0 ? 'نشط ($activeCount)' : 'نشط',
                       icon: Icons.check_circle_outline_rounded,
-                      activeColor: const Color(0xFF2E7D32),
+                      activeColor: HrStatusColors.of(context).success,
                     ),
                     TashilConnectedButtonItem<DelegateStatus?>(
                       value: DelegateStatus.suspended,
                       label: suspendedCount > 0 ? 'متوقف ($suspendedCount)' : 'متوقف',
                       icon: Icons.pause_circle_outline_rounded,
-                      activeColor: const Color(0xFFC62828),
+                      activeColor: HrStatusColors.of(context).danger,
                     ),
                   ],
                   onSelected: (val) {
@@ -650,7 +652,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                           minimumSize: const Size(0, 44),
                           padding: const EdgeInsets.symmetric(horizontal: 18),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(22),
+                            borderRadius: BorderRadius.circular(HrRadius.pill),
                           ),
                         ),
                         onPressed: _openAddCompanyChains,
@@ -665,7 +667,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                 final refreshButton = IconButton.filledTonal(
                   style: IconButton.styleFrom(
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(22),
+                      borderRadius: BorderRadius.circular(HrRadius.pill),
                     ),
                     minimumSize: const Size(44, 44),
                     maximumSize: const Size(44, 44),
@@ -832,39 +834,24 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
 
   /// Web table columns (MD3 Model 3). Header and cells use the same list,
   /// the same cell padding and the same alignment, so they always line up.
-  List<_WebCol> _webColumns(bool merged) => merged
+  List<HrTableColumn> _webColumns(bool merged) => merged
       ? const [
-          _WebCol('المندوب / المروج', 3),
-          _WebCol('الرقم القومي / الهاتف', 3),
-          _WebCol('السلاسل', 2, center: true),
-          _WebCol('الحالة', 2, center: true),
-          _WebCol('الإجراءات', 2, center: true),
+          HrTableColumn('المندوب / المروج', 3),
+          HrTableColumn('الرقم القومي / الهاتف', 3),
+          HrTableColumn('السلاسل', 2, center: true),
+          HrTableColumn('الحالة', 2, center: true),
+          HrTableColumn('الإجراءات', 2, center: true),
         ]
       : const [
-          _WebCol('#', 1, center: true),
-          _WebCol('المندوب / المروج', 4),
-          _WebCol('الرقم القومي', 3),
-          _WebCol('رقم الهاتف', 3),
-          _WebCol('المدينة', 3),
-          _WebCol('السلاسل', 2, center: true),
-          _WebCol('الحالة', 2, center: true),
-          _WebCol('الإجراءات', 3, center: true),
+          HrTableColumn('#', 1, center: true),
+          HrTableColumn('المندوب / المروج', 4),
+          HrTableColumn('الرقم القومي', 3),
+          HrTableColumn('رقم الهاتف', 3),
+          HrTableColumn('المدينة', 3),
+          HrTableColumn('السلاسل', 2, center: true),
+          HrTableColumn('الحالة', 2, center: true),
+          HrTableColumn('الإجراءات', 3, center: true),
         ];
-
-  static const double _webCellPadding = 8;
-
-  Widget _webCell(_WebCol col, Widget child) => Expanded(
-        flex: col.flex,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: _webCellPadding),
-          child: Align(
-            alignment: col.center
-                ? Alignment.center
-                : AlignmentDirectional.centerStart,
-            child: child,
-          ),
-        ),
-      );
 
   /// Web table (MD3 Model 3): no row tap, icon actions, and the ID/phone
   /// and name/city columns merge on narrower tables.
@@ -873,100 +860,35 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
-    const minWidth = 860.0;
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Container(
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final available = constraints.maxWidth;
-            final width = available > minWidth ? available : minWidth;
-            final merged = width < HRDelegatesWebBreakpoints.mergedColumnsBelow;
-            final scrollable = width > available;
-            final cols = _webColumns(merged);
-
-            final table = SizedBox(
-              width: width,
-              child: Column(
-                children: [
-                  Container(
-                    height: 44,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerLow,
-                      border: Border(
-                        bottom: BorderSide(
-                          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                        ),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        for (final c in cols)
-                          _webCell(
-                            c,
-                            Text(
-                              c.title,
-                              key: Key('hr_delegates_header_${c.title}'),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12.5,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+      child: HrTableCard(
+        horizontalController: _hScrollCtrl,
+        builder: (context, width) {
+          final merged = width < HRDelegatesWebBreakpoints.mergedColumnsBelow;
+          final cols = _webColumns(merged);
+          return Column(
+            children: [
+              HrTableHeader(columns: cols, keyPrefix: 'hr_delegates_header_'),
+              Expanded(
+                child: ListView.separated(
+                  controller: _vScrollCtrl,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: delegates.length,
+                  separatorBuilder: (_, _) => const HrTableDivider(),
+                  itemBuilder: (context, index) => _buildWebRow(
+                    delegates[index],
+                    index,
+                    cols: cols,
+                    merged: merged,
+                    theme: theme,
+                    colorScheme: colorScheme,
                   ),
-                  Expanded(
-                    child: ListView.separated(
-                      controller: _vScrollCtrl,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: delegates.length,
-                      separatorBuilder: (_, _) => Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: colorScheme.outlineVariant.withValues(alpha: 0.3),
-                      ),
-                      itemBuilder: (context, index) => _buildWebRow(
-                        delegates[index],
-                        index,
-                        cols: cols,
-                        merged: merged,
-                        theme: theme,
-                        colorScheme: colorScheme,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            );
-
-            if (!scrollable) return table;
-            return Scrollbar(
-              controller: _hScrollCtrl,
-              thumbVisibility: true,
-              notificationPredicate: (n) =>
-                  n.depth == 0 && n.metrics.axis == Axis.horizontal,
-              child: SingleChildScrollView(
-                controller: _hScrollCtrl,
-                scrollDirection: Axis.horizontal,
-                child: table,
-              ),
-            );
-          },
-        ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -974,26 +896,17 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
   Widget _buildWebRow(
     Delegate delegate,
     int index, {
-    required List<_WebCol> cols,
+    required List<HrTableColumn> cols,
     required bool merged,
     required ThemeData theme,
     required ColorScheme colorScheme,
   }) {
     final isActive = delegate.status == DelegateStatus.active;
-    final statusColor =
-        isActive ? const Color(0xFF2E7D32) : colorScheme.onSurfaceVariant;
-    final statusBg = isActive
-        ? const Color(0xFF2E7D32).withValues(alpha: 0.12)
-        : colorScheme.surfaceContainerHighest;
     final city = delegate.city.isNotEmpty
         ? delegate.city
         : (delegate.companyName.isNotEmpty ? delegate.companyName : '—');
 
-    final mono = theme.textTheme.bodySmall?.copyWith(
-      fontWeight: FontWeight.w600,
-      color: colorScheme.onSurface,
-      letterSpacing: 0.3,
-    );
+    final mono = hrTabularStyle(context);
     final nameStyle = theme.textTheme.bodyMedium?.copyWith(
       fontWeight: FontWeight.bold,
       color: colorScheme.onSurface,
@@ -1024,7 +937,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                       city,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
-                        fontSize: 11.5,
+                        fontSize: HrFont.labelSmall,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1044,7 +957,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
         decoration: BoxDecoration(
           border: Border.all(color: colorScheme.outlineVariant),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(HrRadius.chip),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1054,7 +967,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
             Text(
               '$chainCount',
               style: TextStyle(
-                fontSize: 12.5,
+                fontSize: HrFont.labelMedium,
                 fontWeight: FontWeight.w700,
                 color: colorScheme.onSurface,
               ),
@@ -1064,27 +977,10 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
       ),
     );
 
-    final status = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: statusBg,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.circle, size: 7, color: statusColor),
-          const SizedBox(width: 5),
-          Text(
-            isActive ? 'نشط' : 'متوقف',
-            style: TextStyle(
-              color: statusColor,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
+    final status = HrStatusChip(
+      label: isActive ? 'نشط' : 'متوقف',
+      tone: isActive ? HrStatusTone.success : HrStatusTone.neutral,
+      icon: isActive ? Icons.check_circle_rounded : Icons.pause_circle_rounded,
     );
 
     final actions = Row(
@@ -1107,7 +1003,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                 plain(delegate.nationalityID),
                 plain(
                   delegate.phoneNumber,
-                  style: mono?.copyWith(color: colorScheme.onSurfaceVariant),
+                  style: mono.copyWith(color: colorScheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -1140,15 +1036,10 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
             actions,
           ];
 
-    return Container(
+    return HrTableRow(
       key: Key('hr_delegate_row_${delegate.uid}'),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      constraints: const BoxConstraints(minHeight: 52),
-      child: Row(
-        children: [
-          for (var i = 0; i < cols.length; i++) _webCell(cols[i], cells[i]),
-        ],
-      ),
+      columns: cols,
+      cells: cells,
     );
   }
 
@@ -1165,7 +1056,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
       child: Container(
         decoration: BoxDecoration(
           color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(HrRadius.card),
           border: Border.all(
             color: colorScheme.outlineVariant.withValues(alpha: 0.6),
           ),
@@ -1191,7 +1082,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
               trackVisibility: isScrollable,
               interactive: isScrollable,
               thickness: 10.0,
-              radius: const Radius.circular(8),
+              radius: const Radius.circular(HrRadius.chip),
               notificationPredicate: (notification) =>
                   notification.depth == 0 &&
                   notification.metrics.axis == Axis.horizontal,
@@ -1247,7 +1138,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                             final delegate = delegates[index];
                             final isActive = delegate.status == DelegateStatus.active;
                             final statusColor =
-                                isActive ? const Color(0xFF2E7D32) : const Color(0xFFC62828);
+                                isActive ? HrStatusColors.of(context).success : HrStatusColors.of(context).danger;
                             final statusText = isActive ? 'نشط' : 'متوقف';
 
                             final posName = delegate.position == DelegatePosition.supervisor
@@ -1309,7 +1200,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                                                   style: theme.textTheme.bodySmall?.copyWith(
                                                     color: colorScheme.primary,
                                                     fontWeight: FontWeight.w600,
-                                                    fontSize: 11,
+                                                    fontSize: HrFont.labelSmall,
                                                   ),
                                                 ),
                                               ],
@@ -1434,7 +1325,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                                               const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                           decoration: BoxDecoration(
                                             color: statusColor.withValues(alpha: 0.12),
-                                            borderRadius: BorderRadius.circular(20),
+                                            borderRadius: BorderRadius.circular(HrRadius.button),
                                             border:
                                                 Border.all(color: statusColor.withValues(alpha: 0.3)),
                                           ),
@@ -1447,7 +1338,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                                                 statusText,
                                                 style: TextStyle(
                                                   color: statusColor,
-                                                  fontSize: 11,
+                                                  fontSize: HrFont.labelSmall,
                                                   fontWeight: FontWeight.bold,
                                                 ),
                                               ),
@@ -1501,7 +1392,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
             color: colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.bold,
             letterSpacing: 0.2,
-            fontSize: 12.5,
+            fontSize: HrFont.labelMedium,
           ),
         ),
       ),
@@ -1565,7 +1456,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
   ) {
     final isActive = delegate.status == DelegateStatus.active;
     final statusColor =
-        isActive ? const Color(0xFF2E7D32) : const Color(0xFFC62828);
+        isActive ? HrStatusColors.of(context).success : HrStatusColors.of(context).danger;
     final statusText = isActive ? 'نشط' : 'متوقف';
 
     final posName = delegate.position == DelegatePosition.supervisor
@@ -1575,7 +1466,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(
           color: colorScheme.outlineVariant.withValues(alpha: 0.5),
         ),
@@ -1617,12 +1508,12 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                         decoration: BoxDecoration(
                           color: delegate.isAnnualLeaveEnabled
-                              ? const Color(0xFF2E7D32).withValues(alpha: 0.1)
+                              ? HrStatusColors.of(context).success.withValues(alpha: 0.1)
                               : Colors.amber.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
                             color: delegate.isAnnualLeaveEnabled
-                                ? const Color(0xFF2E7D32).withValues(alpha: 0.25)
+                                ? HrStatusColors.of(context).success.withValues(alpha: 0.25)
                                 : Colors.amber.withValues(alpha: 0.3),
                           ),
                         ),
@@ -1635,8 +1526,8 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                                   : Icons.event_repeat_rounded,
                               size: 10,
                               color: delegate.isAnnualLeaveEnabled
-                                  ? const Color(0xFF2E7D32)
-                                  : Colors.amber.shade900,
+                                  ? HrStatusColors.of(context).success
+                                  : HrStatusColors.of(context).warning,
                             ),
                             const SizedBox(width: 4),
                             Text(
@@ -1644,11 +1535,11 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                                   ? 'سنوي (${delegate.annualLeaveQuota} يوم)'
                                   : 'أسبوعي فقط (تجربة)',
                               style: TextStyle(
-                                fontSize: 10,
+                                fontSize: HrFont.labelSmall,
                                 fontWeight: FontWeight.bold,
                                 color: delegate.isAnnualLeaveEnabled
-                                    ? const Color(0xFF2E7D32)
-                                    : Colors.amber.shade900,
+                                    ? HrStatusColors.of(context).success
+                                    : HrStatusColors.of(context).warning,
                               ),
                             ),
                           ],
@@ -1677,7 +1568,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(HrRadius.button),
                     border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                   ),
                   child: Row(
@@ -1689,7 +1580,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                         statusText,
                         style: TextStyle(
                           color: statusColor,
-                          fontSize: 11,
+                          fontSize: HrFont.labelSmall,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -1736,7 +1627,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
       height: 32,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.5),
           width: 1,
@@ -1809,8 +1700,8 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
               child: InkWell(
                 onTap: () => _showAnnualLeaveManagementDialog(delegate),
                 hoverColor: (delegate.isAnnualLeaveEnabled
-                        ? const Color(0xFF2E7D32)
-                        : Colors.amber.shade800)
+                        ? HrStatusColors.of(context).success
+                        : HrStatusColors.of(context).warning)
                     .withValues(alpha: 0.1),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1823,18 +1714,18 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                             : Icons.event_repeat_rounded,
                         size: 14,
                         color: delegate.isAnnualLeaveEnabled
-                            ? const Color(0xFF2E7D32)
-                            : Colors.amber.shade800,
+                            ? HrStatusColors.of(context).success
+                            : HrStatusColors.of(context).warning,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         delegate.isAnnualLeaveEnabled ? 'سنوية' : 'أسبوعية',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: HrFont.labelSmall,
                           fontWeight: FontWeight.bold,
                           color: delegate.isAnnualLeaveEnabled
-                              ? const Color(0xFF2E7D32)
-                              : Colors.amber.shade800,
+                              ? HrStatusColors.of(context).success
+                              : HrStatusColors.of(context).warning,
                         ),
                       ),
                     ],
@@ -1879,7 +1770,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                       Text(
                         'سجل الحضور',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: HrFont.labelSmall,
                           fontWeight: FontWeight.w600,
                           color: colorScheme.onSurface,
                         ),
@@ -1917,7 +1808,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                       Text(
                         'الملف',
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: HrFont.labelSmall,
                           fontWeight: FontWeight.w600,
                           color: colorScheme.onSurface,
                         ),
@@ -1932,13 +1823,4 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
       ),
     );
   }
-}
-
-/// One web table column: same flex, padding and alignment for the header
-/// and every cell.
-class _WebCol {
-  const _WebCol(this.title, this.flex, {this.center = false});
-  final String title;
-  final int flex;
-  final bool center;
 }
