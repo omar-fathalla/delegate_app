@@ -17,6 +17,7 @@ import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_empty_state.dart';
 
 /// Model representing a single attendance session for a delegate
 class DelegateAttendanceSession {
@@ -113,9 +114,66 @@ class HRDelegateAttendanceDetailScreen extends StatefulWidget {
     this.hrDelegate,
   });
 
+  /// Tests swap in a fake Firestore for the reads.
+  @visibleForTesting
+  static FirebaseFirestore Function()? debugFirestore;
+
   @override
   State<HRDelegateAttendanceDetailScreen> createState() =>
       _HRDelegateAttendanceDetailScreenState();
+}
+
+/// Reads a delegate's attendance logs, scoped to one company (TAS-120).
+///
+/// HR and other company staff may only read logs whose `companyId` (or
+/// `companyUID`) is their own company (`canReadAttendance` in
+/// firestore.rules). Firestore checks a query against the rules before it
+/// runs, so a query on `delegateId`/`userId` alone is rejected with
+/// permission-denied even when every matching log is in the company. The
+/// `companyId` filter makes the query provable. Attendance writes always set
+/// `companyId`.
+///
+/// Returns the merged docs (by id) from the `delegateId` and legacy `userId`
+/// queries. An empty [companyId] leaves the query unscoped (global staff).
+@visibleForTesting
+Future<Map<String, Map<String, dynamic>>> fetchDelegateAttendanceDocs({
+  required FirebaseFirestore firestore,
+  required List<String> identifiers,
+  required String companyId,
+}) async {
+  final ids = identifiers.take(30).toList();
+  if (ids.isEmpty) return {};
+  Query<Map<String, dynamic>> base = firestore.collection(
+    kAttendanceCollection,
+  );
+  if (companyId.isNotEmpty) {
+    base = base.where('companyId', isEqualTo: companyId);
+  }
+  final results = await Future.wait([
+    base.where('delegateId', whereIn: ids).get(),
+    // Legacy logs keyed by userId.
+    base.where('userId', whereIn: ids).get(),
+  ]);
+  return {
+    for (final snap in results)
+      for (final doc in snap.docs) doc.id: doc.data(),
+  };
+}
+
+/// Clear Arabic message for a failed attendance load. Never shows the raw
+/// Firebase text (TAS-120).
+@visibleForTesting
+String hrAttendanceLoadErrorMessage(Object error) {
+  if (error is FirebaseException) {
+    switch (error.code) {
+      case 'permission-denied':
+        return 'ليس لديك صلاحية لعرض سجل حضور هذا المندوب.';
+      case 'unavailable':
+      case 'deadline-exceeded':
+        return 'تعذر الاتصال بالخادم. تحقق من الاتصال بالإنترنت ثم أعد المحاولة.';
+    }
+  }
+  return 'حدث خطأ أثناء تحميل سجل الحضور. يرجى المحاولة مرة أخرى.';
 }
 
 class _HRDelegateAttendanceDetailScreenState
@@ -165,6 +223,36 @@ class _HRDelegateAttendanceDetailScreenState
     _loadBranchesAndAttendance();
   }
 
+  FirebaseFirestore get _db =>
+      HRDelegateAttendanceDetailScreen.debugFirestore?.call() ??
+      FirebaseFirestore.instance;
+
+  /// The viewer's company. The screen is only opened from the HR shell, so
+  /// this is the HR user's company; the delegate's company is a fallback.
+  String get _scopeCompanyId {
+    final hrCompany = widget.hrDelegate?.companyUID.trim() ?? '';
+    return hrCompany.isNotEmpty
+        ? hrCompany
+        : widget.delegate.companyUID.trim();
+  }
+
+  void _showLoadError(Object e) {
+    debugPrint('HRDelegateAttendanceDetailScreen load failed: $e');
+    if (!mounted) return;
+    setState(() {
+      _errorMessage = hrAttendanceLoadErrorMessage(e);
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _refreshLogs() async {
+    try {
+      await _fetchDelegateLogs();
+    } catch (e) {
+      _showLoadError(e);
+    }
+  }
+
   Future<void> _loadBranchesAndAttendance() async {
     setState(() {
       _isLoading = true;
@@ -174,8 +262,7 @@ class _HRDelegateAttendanceDetailScreenState
     try {
       // 1. Load branches if not provided
       if (_branchesByName.isEmpty) {
-        final branchesSnap =
-            await FirebaseFirestore.instance.collection('branches').get();
+        final branchesSnap = await _db.collection('branches').get();
         final Map<String, Branch> bMap = {};
         for (final doc in branchesSnap.docs) {
           final b = BranchModel.fromFirestore(doc);
@@ -187,12 +274,7 @@ class _HRDelegateAttendanceDetailScreenState
       // 2. Fetch all attendance logs for this delegate across all history
       await _fetchDelegateLogs();
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'حدث خطأ أثناء تحميل سجل الحضور: $e';
-          _isLoading = false;
-        });
-      }
+      _showLoadError(e);
     }
   }
 
@@ -208,28 +290,12 @@ class _HRDelegateAttendanceDetailScreenState
       if (clean.isNotEmpty) identifiers.add(clean);
     }
 
-    final queryList = identifiers.take(30).toList();
-
-    // Query logs where delegateId matches
-    final snapDelegateId = await FirebaseFirestore.instance
-        .collection(kAttendanceCollection)
-        .where('delegateId', whereIn: queryList)
-        .get();
-
-    // Also query logs where userId matches (legacy compatibility)
-    final snapUserId = await FirebaseFirestore.instance
-        .collection(kAttendanceCollection)
-        .where('userId', whereIn: queryList)
-        .get();
-
-    // Merge and deduplicate by document ID
-    final Map<String, Map<String, dynamic>> rawDocs = {};
-    for (final doc in snapDelegateId.docs) {
-      rawDocs[doc.id] = doc.data();
-    }
-    for (final doc in snapUserId.docs) {
-      rawDocs[doc.id] = doc.data();
-    }
+    // Company-scoped, merged and deduplicated by document ID.
+    final rawDocs = await fetchDelegateAttendanceDocs(
+      firestore: _db,
+      identifiers: identifiers.toList(),
+      companyId: _scopeCompanyId,
+    );
 
     // Separate check-ins and check-outs
     final Map<String, MapEntry<String, Map<String, dynamic>>> checkOutsByRelatedId = {};
@@ -1050,23 +1116,18 @@ class _HRDelegateAttendanceDetailScreenState
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
-                      const SizedBox(height: 12),
-                      Text(_errorMessage!, style: TextStyle(color: colorScheme.error)),
-                      const SizedBox(height: 16),
-                      FilledButton.tonal(
-                        onPressed: _loadBranchesAndAttendance,
-                        child: const Text('إعادة المحاولة'),
-                      ),
-                    ],
+              ? HrEmptyState(
+                  key: const Key('hr_attendance_detail_error'),
+                  icon: Icons.error_outline_rounded,
+                  title: 'تعذر تحميل سجل الحضور',
+                  message: _errorMessage,
+                  action: FilledButton.tonal(
+                    onPressed: _loadBranchesAndAttendance,
+                    child: const Text('إعادة المحاولة'),
                   ),
                 )
               : RefreshIndicator(
-                  onRefresh: _fetchDelegateLogs,
+                  onRefresh: _refreshLogs,
                   child: SingleChildScrollView(
                     controller: _scrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
