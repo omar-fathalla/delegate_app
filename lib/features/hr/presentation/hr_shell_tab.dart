@@ -45,6 +45,7 @@ Widget hrShellTab({
         adminDelegate: delegate,
         initialMapView: true,
         showAppBar: false,
+        hrWebShell: WebRuntimePolicy.isWeb,
       );
     case kHrTabDevices:
       return HRDeviceUnbindRequestsScreen(
@@ -100,14 +101,14 @@ Widget hrShellTab({
 
 /// Penalty bloc the supervisor menu wraps around the penalties list.
 ///
-/// On web an HR user sees only the penalties issued to them (owner decision);
-/// company supervisors keep the company list.
+/// On web an HR user sees every penalty in their company, read-only, like the
+/// company supervisor (owner decision, TAS-156). Mobile is unchanged.
 class HrPenaltiesHost extends StatelessWidget {
   final Delegate admin;
 
   const HrPenaltiesHost({super.key, required this.admin});
 
-  bool get ownPenaltiesOnly =>
+  bool get companyViewOnly =>
       WebRuntimePolicy.isWeb && admin.role == UserRole.hr;
 
   @override
@@ -116,7 +117,7 @@ class HrPenaltiesHost extends StatelessWidget {
       create: (_) => di.sl<PenaltyBloc>(),
       child: AdminPenaltiesListPage(
         adminDelegate: admin,
-        ownPenaltiesOnly: ownPenaltiesOnly,
+        companyViewOnly: companyViewOnly,
       ),
     );
   }
