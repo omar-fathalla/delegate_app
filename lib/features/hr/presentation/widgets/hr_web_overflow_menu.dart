@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// Narrow web overflow menu for the HR shell.
 ///
@@ -184,7 +185,7 @@ class HrWebOverflowMenu extends StatelessWidget {
       child: Text(
         item.menuLabel(isWeb: true),
         style: TextStyle(
-          fontSize: 13.5,
+          fontSize: HrFont.body,
           fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           color: labelColor,
         ),

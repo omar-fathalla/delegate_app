@@ -21,6 +21,7 @@ import 'package:delegate_app/features/admin/presentation/pages/anti_fraud_audit_
 import 'package:delegate_app/features/hr/presentation/pages/hr_delegate_attendance_detail_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// Model representing a delegate's attendance record on a specific date for HR
 class HRAttendanceRecord {
@@ -974,9 +975,9 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('تم تصدير كشف الحضور اليومي بنجاح'),
-            backgroundColor: Color(0xFF2E7D32),
+            backgroundColor: HrStatusColors.of(context).success,
           ),
         );
       }
@@ -1190,9 +1191,9 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('تم تصدير التقرير الشهري التجميعي بنجاح'),
-            backgroundColor: Color(0xFF2E7D32),
+            backgroundColor: HrStatusColors.of(context).success,
           ),
         );
       }
@@ -1216,19 +1217,19 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     String tooltipMsg;
 
     if (status == 'violation') {
-      color = const Color(0xFFC62828);
+      color = HrStatusColors.of(context).danger;
       icon = Icons.gpp_bad_rounded;
       label = '${record.trustScore}% مخالفة';
       tooltipMsg =
           'مخالفة أمنية خطيرة (${record.trustScore}%): ${record.violationReason ?? 'Fake GPS'} - اضغط لعرض تفاصيل الفحص الأمني';
     } else if (status == 'warning') {
-      color = const Color(0xFFE65100);
+      color = HrStatusColors.of(context).warning;
       icon = Icons.warning_amber_rounded;
       label = '${record.trustScore}% تنبيه';
       tooltipMsg =
           'تنبيه أمني مشبوه (${record.trustScore}%): ${record.violationReason ?? 'خارج النطاق الآمن'} - اضغط لعرض تفاصيل الفحص الأمني';
     } else {
-      color = const Color(0xFF2E7D32);
+      color = HrStatusColors.of(context).success;
       icon = Icons.verified_user_rounded;
       label = '100% موثوق';
       tooltipMsg =
@@ -1240,13 +1241,13 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(HrRadius.chip),
           onTap: () => _showTrustScoreDialog(context, record),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(HrRadius.chip),
               border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
             ),
             child: Row(
@@ -1257,7 +1258,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                 Text(
                   label,
                   style: TextStyle(
-                    fontSize: 10.5,
+                    fontSize: HrFont.labelSmall,
                     fontWeight: FontWeight.bold,
                     color: color,
                     letterSpacing: -0.2,
@@ -1286,17 +1287,17 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     IconData statusIcon;
 
     if (record.integrityStatus == 'violation') {
-      statusColor = const Color(0xFFC62828);
+      statusColor = HrStatusColors.of(context).danger;
       statusTitle = 'مخالفة أمنية خطيرة (Fake GPS)';
       statusSubtitle = 'تم رصد محاولة تلاعب أو تزييف بالموقع الجغرافي';
       statusIcon = Icons.gpp_bad_rounded;
     } else if (record.integrityStatus == 'warning') {
-      statusColor = const Color(0xFFE65100);
+      statusColor = HrStatusColors.of(context).warning;
       statusTitle = 'تنبيه أمني (سجل مشبوه)';
       statusSubtitle = 'تم رصد مؤشرات اشتباه أو تسجيل خارج النطاق الآمن';
       statusIcon = Icons.warning_amber_rounded;
     } else {
-      statusColor = const Color(0xFF2E7D32);
+      statusColor = HrStatusColors.of(context).success;
       statusTitle = 'موثوق بنسبة 100%';
       statusSubtitle = 'سجل حضور سليم ومطابق تماماً للنطاق الجغرافي المعتمد';
       statusIcon = Icons.verified_user_rounded;
@@ -1307,7 +1308,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       builder: (dialogCtx) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(HrRadius.pill),
           ),
           backgroundColor: colorScheme.surface,
           contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
@@ -1364,7 +1365,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         begin: AlignmentDirectional.topStart,
                         end: AlignmentDirectional.bottomEnd,
                       ),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                       border: Border.all(
                         color: statusColor.withValues(alpha: 0.35),
                         width: 1.5,
@@ -1385,7 +1386,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                             child: Text(
                               '${record.trustScore}%',
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: HrFont.titleMedium,
                                 fontWeight: FontWeight.w900,
                                 color: statusColor,
                               ),
@@ -1400,7 +1401,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                               Text(
                                 statusTitle,
                                 style: TextStyle(
-                                  fontSize: 15,
+                                  fontSize: HrFont.titleMedium,
                                   fontWeight: FontWeight.bold,
                                   color: statusColor,
                                 ),
@@ -1436,8 +1437,8 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         ? Icons.location_off_rounded
                         : Icons.verified_user_rounded,
                     iconColor: (record.isMockLocation || record.hasSecurityViolation)
-                        ? const Color(0xFFC62828)
-                        : const Color(0xFF2E7D32),
+                        ? HrStatusColors.of(context).danger
+                        : HrStatusColors.of(context).success,
                     title: 'تطبيقات تزييف الموقع (Fake GPS)',
                     value: (record.isMockLocation || record.hasSecurityViolation)
                         ? 'تم رصد Fake GPS / Mock Location ⚠️'
@@ -1452,8 +1453,8 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         ? Icons.vpn_lock_rounded
                         : Icons.shield_outlined,
                     iconColor: record.isVpnUsed
-                        ? const Color(0xFFE65100)
-                        : const Color(0xFF2E7D32),
+                        ? HrStatusColors.of(context).warning
+                        : HrStatusColors.of(context).success,
                     title: 'برامج إخفاء الهوية والبروكسي (VPN)',
                     value: record.isVpnUsed
                         ? 'تم رصد استخدام VPN / Proxy ⚠️'
@@ -1466,8 +1467,8 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                   _buildAuditMetricRow(
                     icon: Icons.store_rounded,
                     iconColor: (record.distanceMeters != null && record.distanceMeters! <= 50)
-                        ? const Color(0xFF2E7D32)
-                        : const Color(0xFFE65100),
+                        ? HrStatusColors.of(context).success
+                        : HrStatusColors.of(context).warning,
                     title: 'المسافة عن الصيدلية / الفرع',
                     value: record.distanceMeters != null
                         ? '${record.distanceMeters!.toStringAsFixed(1)} متر (${record.distanceMeters! <= 50 ? 'نطاق دقيق < 50م' : 'خارج النطاق الدقيق'})'
@@ -1529,7 +1530,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                 backgroundColor: statusColor,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(HrRadius.card),
                 ),
               ),
               icon: const Icon(Icons.security_rounded, size: 18),
@@ -1570,7 +1571,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.3),
         ),
@@ -1582,7 +1583,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: iconColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(HrRadius.chip),
             ),
             child: Icon(icon, color: iconColor, size: 18),
           ),
@@ -1611,7 +1612,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     subtitle,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
-                      fontSize: 11,
+                      fontSize: HrFont.labelSmall,
                     ),
                   ),
                 ],
@@ -1700,13 +1701,13 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     final String statusSubtitle;
 
     if (record.isInsideGeofence == true) {
-      statusColor = const Color(0xFF2E7D32);
+      statusColor = HrStatusColors.of(context).success;
       statusIcon = Icons.verified_user_rounded;
       statusTitle = 'داخل النطاق الجغرافي المعتمد ✅';
       statusSubtitle =
           'المندوب سجل حضوره على مسافة ${record.distanceMeters?.toStringAsFixed(1) ?? '—'} متراً من نقطة الفرع، ضمن النطاق المسموح (${matchedBranch?.geofenceRadius.toInt() ?? 100} متر).';
     } else if (record.isInsideGeofence == false) {
-      statusColor = const Color(0xFFC62828);
+      statusColor = HrStatusColors.of(context).danger;
       statusIcon = Icons.warning_amber_rounded;
       statusTitle = 'خارج النطاق الجغرافي المحدد ⚠️';
       statusSubtitle =
@@ -1731,7 +1732,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       builder: (dialogCtx) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(HrRadius.pill),
           ),
           backgroundColor: colorScheme.surface,
           contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
@@ -1788,7 +1789,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         begin: AlignmentDirectional.topStart,
                         end: AlignmentDirectional.bottomEnd,
                       ),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                       border: Border.all(
                         color: statusColor.withValues(alpha: 0.35),
                         width: 1.5,
@@ -1800,7 +1801,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         Text(
                           statusTitle,
                           style: TextStyle(
-                            fontSize: 15,
+                            fontSize: HrFont.titleMedium,
                             fontWeight: FontWeight.bold,
                             color: statusColor,
                           ),
@@ -1909,7 +1910,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                   backgroundColor: statusColor,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(HrRadius.card),
                   ),
                 ),
                 icon: const Icon(Icons.map_rounded, size: 18),
@@ -1988,7 +1989,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                       title: 'حاضر الآن',
                       count: presentCount,
                       icon: Icons.check_circle_rounded,
-                      color: const Color(0xFF2E7D32),
+                      color: HrStatusColors.of(context).success,
                       theme: theme,
                       isSelected: _statusFilter == 'present',
                       onTap: () => setState(() => _statusFilter = 'present'),
@@ -2000,7 +2001,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                       title: 'انصرف',
                       count: departedCount,
                       icon: Icons.timelapse_rounded,
-                      color: const Color(0xFFE65100),
+                      color: HrStatusColors.of(context).warning,
                       theme: theme,
                       isSelected: _statusFilter == 'departed',
                       onTap: () => setState(() => _statusFilter = 'departed'),
@@ -2039,7 +2040,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         title: 'مخالفات أمنية',
                         count: violationCount,
                         icon: Icons.gpp_bad_rounded,
-                        color: const Color(0xFFC62828),
+                        color: HrStatusColors.of(context).danger,
                         theme: theme,
                         isSelected: _statusFilter == 'violation',
                         onTap: () => setState(() => _statusFilter = 'violation'),
@@ -2086,7 +2087,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     title: 'حاضر الآن',
                     count: presentCount,
                     icon: Icons.check_circle_rounded,
-                    color: const Color(0xFF2E7D32),
+                    color: HrStatusColors.of(context).success,
                     theme: theme,
                     isSelected: _statusFilter == 'present',
                     onTap: () => setState(() => _statusFilter = 'present'),
@@ -2097,7 +2098,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     title: 'انصرف',
                     count: departedCount,
                     icon: Icons.timelapse_rounded,
-                    color: const Color(0xFFE65100),
+                    color: HrStatusColors.of(context).warning,
                     theme: theme,
                     isSelected: _statusFilter == 'departed',
                     onTap: () => setState(() => _statusFilter = 'departed'),
@@ -2133,7 +2134,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                       title: 'مخالفات',
                       count: violationCount,
                       icon: Icons.gpp_bad_rounded,
-                      color: const Color(0xFFC62828),
+                      color: HrStatusColors.of(context).danger,
                       theme: theme,
                       isSelected: _statusFilter == 'violation',
                       onTap: () => setState(() => _statusFilter = 'violation'),
@@ -2317,7 +2318,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       child: Container(
         decoration: BoxDecoration(
           color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(HrRadius.card),
           border: Border.all(
             color: colorScheme.outlineVariant.withValues(alpha: 0.6),
           ),
@@ -2343,7 +2344,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
               trackVisibility: isScrollable,
               interactive: isScrollable,
               thickness: 10.0,
-              radius: const Radius.circular(8),
+              radius: const Radius.circular(HrRadius.chip),
               notificationPredicate: (notification) =>
                   notification.depth == 0 &&
                   notification.metrics.axis == Axis.horizontal,
@@ -2456,7 +2457,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
             color: colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.bold,
             letterSpacing: 0.2,
-            fontSize: 12.5,
+            fontSize: HrFont.labelMedium,
           ),
         ),
       ),
@@ -2481,7 +2482,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(HrRadius.card),
           child: AnimatedContainer(
             duration: AppMotionDurations.short3, // 150ms M3 Token
             curve: AppMotionCurves.standard,
@@ -2494,7 +2495,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
               color: isSelected
                   ? color.withValues(alpha: 0.14)
                   : colorScheme.surfaceContainerHighest.withValues(alpha: 0.28),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(HrRadius.card),
               border: Border.all(
                 color: isSelected
                     ? color
@@ -2576,7 +2577,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.28),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.35),
           width: 0.8,
@@ -2592,7 +2593,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
               });
               _fetchAttendanceForSelectedDate();
             },
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(HrRadius.chip),
             child: Padding(
               padding: const EdgeInsets.all(4),
               child: Icon(
@@ -2620,7 +2621,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                 _fetchAttendanceForSelectedDate();
               }
             },
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(HrRadius.chip),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Row(
@@ -2637,7 +2638,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: colorScheme.primary,
-                      fontSize: 13,
+                      fontSize: HrFont.body,
                     ),
                   ),
                   const SizedBox(width: 4),
@@ -2668,7 +2669,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                 child: Text(
                   'اليوم',
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: HrFont.labelSmall,
                     fontWeight: FontWeight.bold,
                     color: colorScheme.primary,
                   ),
@@ -2689,7 +2690,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     });
                     _fetchAttendanceForSelectedDate();
                   },
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(HrRadius.chip),
             child: Padding(
               padding: const EdgeInsets.all(4),
               child: Icon(
@@ -2725,7 +2726,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       ),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.28),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.45),
           width: 1.0,
@@ -2767,7 +2768,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     setState(() => _selectedDate = DateTime.now());
                     _fetchAttendanceForSelectedDate();
                   },
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                     decoration: BoxDecoration(
@@ -2777,7 +2778,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     child: Text(
                       'اليوم',
                       style: TextStyle(
-                        fontSize: 9.5,
+                        fontSize: HrFont.labelSmall,
                         fontWeight: FontWeight.bold,
                         color: colorScheme.primary,
                       ),
@@ -2802,7 +2803,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                   });
                   _fetchAttendanceForSelectedDate();
                 },
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(HrRadius.chip),
                 child: Padding(
                   padding: const EdgeInsets.all(1.5),
                   child: Icon(
@@ -2851,7 +2852,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         });
                         _fetchAttendanceForSelectedDate();
                       },
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(HrRadius.chip),
                 child: Padding(
                   padding: const EdgeInsets.all(1.5),
                   child: Icon(
@@ -2916,14 +2917,14 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
         hintStyle: WidgetStateProperty.all(
           TextStyle(
             color: colorScheme.onSurfaceVariant.withValues(alpha: 0.55),
-            fontSize: 12.5,
+            fontSize: HrFont.labelMedium,
             fontWeight: FontWeight.normal,
           ),
         ),
         textStyle: WidgetStateProperty.all(
           TextStyle(
             color: colorScheme.onSurface,
-            fontSize: 12.5,
+            fontSize: HrFont.labelMedium,
           ),
         ),
         elevation: WidgetStateProperty.all(0),
@@ -2932,7 +2933,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
         ),
         shape: WidgetStateProperty.all(
           RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(HrRadius.pill),
             side: BorderSide(
               color: colorScheme.outlineVariant.withValues(alpha: 0.35),
             ),
@@ -2973,10 +2974,10 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
 
     return PopupMenuButton<String>(
       tooltip: 'تصفية حسب السلسلة',
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(HrRadius.pill),
       offset: const Offset(0, 48),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(
           color: colorScheme.outlineVariant.withValues(alpha: 0.4),
         ),
@@ -3067,7 +3068,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(HrRadius.pill),
           border: Border.all(
             color: colorScheme.outlineVariant.withValues(alpha: 0.35),
             width: 1.0,
@@ -3125,10 +3126,10 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
 
     return PopupMenuButton<String>(
       tooltip: 'تصفية حسب الفرع',
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(HrRadius.pill),
       offset: const Offset(0, 48),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(
           color: colorScheme.outlineVariant.withValues(alpha: 0.4),
         ),
@@ -3212,7 +3213,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(HrRadius.pill),
           border: Border.all(
             color: colorScheme.outlineVariant.withValues(alpha: 0.35),
             width: 1.0,
@@ -3306,16 +3307,16 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     IconData statusIcon;
 
     if (isPresent) {
-      statusColor = const Color(0xFF2E7D32);
+      statusColor = HrStatusColors.of(context).success;
       statusText = 'حاضر الآن';
       statusIcon = Icons.check_circle_rounded;
     } else if (isDeparted) {
       if (record.isAutoCheckOut) {
-        statusColor = const Color(0xFFD97706);
+        statusColor = HrStatusColors.of(context).warning;
         statusText = 'انصرف (تلقائي)';
         statusIcon = Icons.auto_mode_rounded;
       } else {
-        statusColor = const Color(0xFFE65100);
+        statusColor = HrStatusColors.of(context).warning;
         statusText = 'انصرف اليوم';
         statusIcon = Icons.timelapse_rounded;
       }
@@ -3336,7 +3337,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(
           color: isPresent
               ? statusColor.withValues(alpha: 0.4)
@@ -3404,7 +3405,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                   ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(HrRadius.card),
                     border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                   ),
                   child: Row(
@@ -3416,7 +3417,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         statusText,
                         style: TextStyle(
                           color: statusColor,
-                          fontSize: 11,
+                          fontSize: HrFont.labelSmall,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -3452,7 +3453,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                   // Check-in Time
                   if (record.checkInTime != null) ...[
                     Icon(Icons.login_rounded,
-                        size: 15, color: const Color(0xFF2E7D32)),
+                        size: 15, color: HrStatusColors.of(context).success),
                     const SizedBox(width: 4),
                     Directionality(
                       textDirection: TextDirection.ltr,
@@ -3460,7 +3461,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         DateFormat('hh:mm a', 'ar').format(record.checkInTime!),
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: const Color(0xFF2E7D32),
+                          color: HrStatusColors.of(context).success,
                         ),
                       ),
                     ),
@@ -3472,7 +3473,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     Icon(
                       record.isAutoCheckOut ? Icons.auto_mode_rounded : Icons.logout_rounded,
                       size: 15,
-                      color: record.isAutoCheckOut ? Colors.amber[800] : const Color(0xFFE65100),
+                      color: record.isAutoCheckOut ? Colors.amber[800] : HrStatusColors.of(context).warning,
                     ),
                     const SizedBox(width: 4),
                     Directionality(
@@ -3481,7 +3482,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         DateFormat('hh:mm a', 'ar').format(record.checkOutTime!),
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: record.isAutoCheckOut ? Colors.amber[900] : const Color(0xFFE65100),
+                          color: record.isAutoCheckOut ? Colors.amber[900] : HrStatusColors.of(context).warning,
                         ),
                       ),
                     ),
@@ -3506,7 +3507,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: Colors.amber[900],
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 10,
+                                  fontSize: HrFont.labelSmall,
                                 ),
                               ),
                             ],
@@ -3528,7 +3529,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                       size: 15,
                       color: record.isDeparted
                           ? colorScheme.secondary
-                          : const Color(0xFF2E7D32),
+                          : HrStatusColors.of(context).success,
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -3543,7 +3544,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         fontWeight: FontWeight.bold,
                         color: record.isDeparted
                             ? colorScheme.secondary
-                            : const Color(0xFF2E7D32),
+                            : HrStatusColors.of(context).success,
                       ),
                     ),
                   ],
@@ -3558,16 +3559,16 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: () => _showGeofenceInspectionDialog(context, record),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: (record.isInsideGeofence == true)
-                          ? const Color(0xFF2E7D32).withValues(alpha: 0.08)
+                          ? HrStatusColors.of(context).success.withValues(alpha: 0.08)
                           : (record.isInsideGeofence == false)
-                              ? const Color(0xFFC62828).withValues(alpha: 0.08)
+                              ? HrStatusColors.of(context).danger.withValues(alpha: 0.08)
                               : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(HrRadius.chip),
                     ),
                     child: Row(
                       children: [
@@ -3579,9 +3580,9 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                                   : Icons.location_on_outlined,
                           size: 16,
                           color: record.isInsideGeofence == true
-                              ? const Color(0xFF2E7D32)
+                              ? HrStatusColors.of(context).success
                               : record.isInsideGeofence == false
-                                  ? const Color(0xFFC62828)
+                                  ? HrStatusColors.of(context).danger
                                   : colorScheme.primary,
                         ),
                         const SizedBox(width: 6),
@@ -3593,12 +3594,12 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                                     ? 'تنبيه: خارج حدود الفرع بمسافة ${record.distanceMeters!.toStringAsFixed(0)}م'
                                     : 'إحداثيات الحضور مسجلة',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: HrFont.labelMedium,
                               fontWeight: FontWeight.w600,
                               color: record.isInsideGeofence == true
-                                  ? const Color(0xFF2E7D32)
+                                  ? HrStatusColors.of(context).success
                                   : record.isInsideGeofence == false
-                                      ? const Color(0xFFC62828)
+                                      ? HrStatusColors.of(context).danger
                                       : colorScheme.onSurfaceVariant,
                             ),
                           ),
@@ -3668,7 +3669,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                     ),
                   ),
                   icon: const Icon(Icons.history_rounded, size: 16),
@@ -3748,16 +3749,16 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
     IconData statusIcon;
 
     if (isPresent) {
-      statusColor = const Color(0xFF2E7D32);
+      statusColor = HrStatusColors.of(context).success;
       statusText = 'حاضر الآن';
       statusIcon = Icons.check_circle_rounded;
     } else if (isDeparted) {
       if (record.isAutoCheckOut) {
-        statusColor = const Color(0xFFD97706);
+        statusColor = HrStatusColors.of(context).warning;
         statusText = 'انصرف (تلقائي)';
         statusIcon = Icons.auto_mode_rounded;
       } else {
-        statusColor = const Color(0xFFE65100);
+        statusColor = HrStatusColors.of(context).warning;
         statusText = 'انصرف اليوم';
         statusIcon = Icons.timelapse_rounded;
       }
@@ -3781,9 +3782,9 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
 
     // RTL-aware start border indicator (lights up in Arabic on the right side)
     final Color startIndicatorColor = isPresent
-        ? const Color(0xFF2E7D32)
+        ? HrStatusColors.of(context).success
         : isDeparted
-            ? const Color(0xFFE65100)
+            ? HrStatusColors.of(context).warning
             : record.isOnLeave
                 ? const Color(0xFF00796B)
                 : (_isHovered
@@ -3840,7 +3841,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                                 width: 11,
                                 height: 11,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF2E7D32),
+                                  color: HrStatusColors.of(context).success,
                                   shape: BoxShape.circle,
                                   border: Border.all(
                                     color: colorScheme.surface,
@@ -3863,7 +3864,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                               record.delegate.fullName,
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 13.5,
+                                fontSize: HrFont.body,
                                 letterSpacing: 0.1,
                               ),
                               maxLines: 1,
@@ -3895,7 +3896,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                       ),
                       decoration: BoxDecoration(
                         color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(HrRadius.card),
                         border: Border.all(
                           color: statusColor.withValues(alpha: 0.3),
                         ),
@@ -3909,7 +3910,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                             statusText,
                             style: TextStyle(
                               color: statusColor,
-                              fontSize: 11.5,
+                              fontSize: HrFont.labelSmall,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -3931,7 +3932,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                         padding: const EdgeInsets.all(5),
                         decoration: BoxDecoration(
                           color: colorScheme.primaryContainer.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(HrRadius.chip),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -3942,7 +3943,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                             branchName: record.branchName,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w600,
-                              fontSize: 12.5,
+                              fontSize: HrFont.labelMedium,
                             ),
                           ),
                         ),
@@ -3975,7 +3976,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(HrRadius.chip),
                       onTap: () => widget.onInspectGeofence(record),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -3991,9 +3992,9 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                                           : Icons.location_off_outlined,
                               size: 15,
                               color: record.isInsideGeofence == true
-                                  ? const Color(0xFF2E7D32)
+                                  ? HrStatusColors.of(context).success
                                   : record.isInsideGeofence == false
-                                      ? const Color(0xFFC62828)
+                                      ? HrStatusColors.of(context).danger
                                       : (record.latitude != null && record.longitude != null)
                                           ? colorScheme.primary
                                           : colorScheme.outline,
@@ -4011,12 +4012,12 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                                               ? 'موقع مسجل 📍'
                                               : (record.checkInTime != null ? 'غير محدد' : 'لم يسجل'),
                                   style: TextStyle(
-                                    fontSize: 11.5,
+                                    fontSize: HrFont.labelSmall,
                                     fontWeight: FontWeight.w600,
                                     color: record.isInsideGeofence == true
-                                        ? const Color(0xFF2E7D32)
+                                        ? HrStatusColors.of(context).success
                                         : record.isInsideGeofence == false
-                                            ? const Color(0xFFC62828)
+                                            ? HrStatusColors.of(context).danger
                                             : (record.latitude != null && record.longitude != null)
                                                 ? colorScheme.primary
                                                 : colorScheme.onSurfaceVariant,
@@ -4057,7 +4058,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                         height: 34,
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(17),
+                          borderRadius: BorderRadius.circular(HrRadius.pill),
                           border: Border.all(
                             color: colorScheme.outlineVariant.withValues(alpha: 0.4),
                             width: 1.0,
@@ -4070,7 +4071,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                               IconButton(
                                 icon: const Icon(Icons.call_outlined),
                                 iconSize: 15,
-                                color: const Color(0xFF2E7D32),
+                                color: HrStatusColors.of(context).success,
                                 tooltip: 'اتصال هاتفي',
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
@@ -4136,7 +4137,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
           style: TextStyle(
             color: colorScheme.outlineVariant,
             fontWeight: FontWeight.bold,
-            fontSize: 14,
+            fontSize: HrFont.body,
           ),
         ),
       );
@@ -4146,15 +4147,15 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
     final isDeparted = record.isDeparted;
 
     final durationColor = isPresent
-        ? const Color(0xFF2E7D32)
-        : (isDeparted ? const Color(0xFFE65100) : colorScheme.onSurfaceVariant);
+        ? HrStatusColors.of(context).success
+        : (isDeparted ? HrStatusColors.of(context).warning : colorScheme.onSurfaceVariant);
 
     return Center(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(HrRadius.chip),
           border: Border.all(
             color: colorScheme.outlineVariant.withValues(alpha: 0.4),
             width: 1,
@@ -4173,20 +4174,20 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.login_rounded,
                       size: 13,
-                      color: Color(0xFF2E7D32),
+                      color: HrStatusColors.of(context).success,
                     ),
                     const SizedBox(width: 4),
                     Directionality(
                       textDirection: TextDirection.ltr,
                       child: Text(
                         checkInStr,
-                        style: const TextStyle(
-                          fontSize: 11.5,
+                        style: TextStyle(
+                          fontSize: HrFont.labelSmall,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF2E7D32),
+                          color: HrStatusColors.of(context).success,
                         ),
                       ),
                     ),
@@ -4218,7 +4219,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                       color: record.isAutoCheckOut
                           ? Colors.amber[800]
                           : (record.checkOutTime != null
-                              ? const Color(0xFFE65100)
+                              ? HrStatusColors.of(context).warning
                               : colorScheme.outlineVariant),
                     ),
                     const SizedBox(width: 4),
@@ -4227,12 +4228,12 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                       child: Text(
                         checkOutStr,
                         style: TextStyle(
-                          fontSize: 11.5,
+                          fontSize: HrFont.labelSmall,
                           fontWeight: FontWeight.bold,
                           color: record.isAutoCheckOut
                               ? Colors.amber[900]
                               : (record.checkOutTime != null
-                                  ? const Color(0xFFE65100)
+                                  ? HrStatusColors.of(context).warning
                                   : colorScheme.outlineVariant),
                         ),
                       ),
@@ -4249,7 +4250,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                         child: Text(
                           'تلقائي (11.5 س)',
                           style: TextStyle(
-                            fontSize: 9.5,
+                            fontSize: HrFont.labelSmall,
                             fontWeight: FontWeight.bold,
                             color: Colors.amber[900],
                           ),
@@ -4293,7 +4294,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                       Text(
                         record.formattedDuration,
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: HrFont.labelSmall,
                           fontWeight: FontWeight.bold,
                           color: durationColor,
                         ),
@@ -4344,8 +4345,8 @@ class _ExportMenuButtonState extends State<_ExportMenuButton> {
       onExit: (_) => setState(() => _isHovered = false),
       child: PopupMenuButton<String>(
         tooltip: 'خيارات تصدير Excel',
-        borderRadius: BorderRadius.circular(22),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        borderRadius: BorderRadius.circular(HrRadius.pill),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
         constraints: const BoxConstraints(minWidth: 220, maxWidth: 280),
         elevation: 4,
         onSelected: (val) {
@@ -4372,7 +4373,7 @@ class _ExportMenuButtonState extends State<_ExportMenuButton> {
                         'كشف يومي',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 13.5,
+                          fontSize: HrFont.body,
                           color: colorScheme.onSurface,
                         ),
                       ),
@@ -4380,7 +4381,7 @@ class _ExportMenuButtonState extends State<_ExportMenuButton> {
                         DateFormat('yyyy-MM-dd').format(widget.selectedDate),
                         style: TextStyle(
                           color: colorScheme.onSurfaceVariant,
-                          fontSize: 11,
+                          fontSize: HrFont.labelSmall,
                         ),
                       ),
                     ],
@@ -4394,8 +4395,8 @@ class _ExportMenuButtonState extends State<_ExportMenuButton> {
             value: 'monthly',
             child: Row(
               children: [
-                const Icon(Icons.calendar_month_rounded,
-                    color: Color(0xFF2E7D32), size: 22),
+                Icon(Icons.calendar_month_rounded,
+                    color: HrStatusColors.of(context).success, size: 22),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -4406,7 +4407,7 @@ class _ExportMenuButtonState extends State<_ExportMenuButton> {
                         'تقرير شهري',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 13.5,
+                          fontSize: HrFont.body,
                           color: colorScheme.onSurface,
                         ),
                       ),
@@ -4414,7 +4415,7 @@ class _ExportMenuButtonState extends State<_ExportMenuButton> {
                         DateFormat('MMMM yyyy', 'ar').format(widget.selectedDate),
                         style: TextStyle(
                           color: colorScheme.onSurfaceVariant,
-                          fontSize: 11,
+                          fontSize: HrFont.labelSmall,
                         ),
                       ),
                     ],
@@ -4434,7 +4435,7 @@ class _ExportMenuButtonState extends State<_ExportMenuButton> {
             color: _isHovered
                 ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.75)
                 : colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(HrRadius.pill),
             border: Border.all(
               color: _isHovered
                   ? colorScheme.primary.withValues(alpha: 0.45)
@@ -4455,7 +4456,7 @@ class _ExportMenuButtonState extends State<_ExportMenuButton> {
                       'Excel',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 12.5,
+                        fontSize: HrFont.labelMedium,
                         color: colorScheme.primary,
                       ),
                     ),

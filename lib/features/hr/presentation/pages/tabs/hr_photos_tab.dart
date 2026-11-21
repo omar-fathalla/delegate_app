@@ -17,6 +17,7 @@ import 'package:delegate_app/features/photo_permission/presentation/pages/captur
 import 'package:delegate_app/features/photo_permission/presentation/pages/monthly_photo_report_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 class HRPhotosTab extends StatefulWidget {
   final Delegate hrDelegate;
@@ -91,11 +92,11 @@ class HRPhotosTabState extends State<HRPhotosTab> {
 
       if (hasActiveOrPending) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
               '⚠️ يوجد بالفعل إذن تصوير فعال أو معلق قيد المراجعة لهذه الشركة. لا يمكن تقديم طلب جديد حتى انتهاء الإذن الحالي.',
             ),
-            backgroundColor: Colors.orange,
+            backgroundColor: HrStatusColors.of(context).warning,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -126,15 +127,15 @@ class HRPhotosTabState extends State<HRPhotosTab> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
         title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 28),
+            Icon(Icons.warning_amber_rounded, color: HrStatusColors.of(context).danger, size: 28),
             const SizedBox(width: 8),
             const Expanded(
               child: Text(
                 'تأكيد حذف الصورة',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.titleMedium),
               ),
             ),
           ],
@@ -145,24 +146,24 @@ class HRPhotosTabState extends State<HRPhotosTab> {
           children: [
             Text(
               'هل أنت متأكد من حذف هذه الصورة المرسلة من المندوب "${photo.delegateName}" بفرع "${BranchDisplayCache.instance.displayName(photo.branchName)}"؟',
-              style: const TextStyle(fontSize: 14),
+              style: const TextStyle(fontSize: HrFont.body),
             ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: Colors.red.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(HrRadius.chip),
                 border: Border.all(color: Colors.red.shade200),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline_rounded, size: 18, color: Colors.red.shade700),
+                  Icon(Icons.info_outline_rounded, size: 18, color: HrStatusColors.of(context).danger),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'سيتم حذف الصورة بشكل نهائي من قاعدة البيانات ومساحة التخزين.',
-                      style: TextStyle(fontSize: 12, color: Colors.red),
+                      style: TextStyle(fontSize: HrFont.labelMedium, color: HrStatusColors.of(context).danger),
                     ),
                   ),
                 ],
@@ -177,9 +178,9 @@ class HRPhotosTabState extends State<HRPhotosTab> {
           ),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: HrStatusColors.of(context).danger,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.chip)),
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
             icon: const Icon(Icons.delete_forever_rounded, size: 18),
@@ -210,7 +211,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
         title: const Text('إلغاء طلب إذن التصوير'),
         content: const Text('هل أنت متأكد من رغبتك في إلغاء هذا الطلب المعلق؟'),
         actions: [
@@ -220,9 +221,9 @@ class HRPhotosTabState extends State<HRPhotosTab> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: HrStatusColors.of(context).danger,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.chip)),
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('تأكيد الإلغاء'),
@@ -271,7 +272,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                             : 'معاينة الصورة الميدانية',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 16,
+                          fontSize: HrFont.titleMedium,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -286,7 +287,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                   // Interactive Image Viewer
                   Flexible(
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                       child: InteractiveViewer(
                         panEnabled: true,
                         minScale: 0.5,
@@ -305,7 +306,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                       border: Border.all(color: Colors.white24),
                     ),
                     child: Column(
@@ -319,7 +320,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                               photo.branchName.isNotEmpty ? BranchDisplayCache.instance.displayName(photo.branchName) : 'الفرع غير محدد',
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 13,
+                                fontSize: HrFont.body,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -330,7 +331,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                               DateFormat('yyyy/MM/dd - hh:mm a', 'ar').format(photo.capturedAt),
                               style: const TextStyle(
                                 color: Colors.white70,
-                                fontSize: 12,
+                                fontSize: HrFont.labelMedium,
                               ),
                             ),
                           ],
@@ -341,7 +342,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                             'ملاحظات: ${photo.comment}',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 13,
+                              fontSize: HrFont.body,
                             ),
                           ),
                         ],
@@ -366,7 +367,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(color: colorScheme.error),
                           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -424,7 +425,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                           style: FilledButton.styleFrom(
                             backgroundColor: saveSuccess ? colorScheme.primary : null,
                             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
                           ),
                         ),
                       ),
@@ -436,13 +437,13 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: saveSuccess ? colorScheme.primaryContainer : colorScheme.errorContainer,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(HrRadius.chip),
                       ),
                       child: Text(
                         statusText!,
                         style: TextStyle(
                           color: saveSuccess ? colorScheme.onPrimaryContainer : colorScheme.onErrorContainer,
-                          fontSize: 12,
+                          fontSize: HrFont.labelMedium,
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
@@ -471,7 +472,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
-                backgroundColor: Colors.green,
+                backgroundColor: HrStatusColors.of(context).success,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -480,7 +481,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
-                backgroundColor: Colors.green,
+                backgroundColor: HrStatusColors.of(context).success,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -489,7 +490,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
-                backgroundColor: Colors.red,
+                backgroundColor: HrStatusColors.of(context).danger,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -784,12 +785,12 @@ class HRPhotosTabState extends State<HRPhotosTab> {
           final photo = filtered[index];
           return InkWell(
             onTap: () => _openPhotoDetail(photo),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(HrRadius.card),
             child: Card(
               elevation: 0,
               clipBehavior: Clip.antiAlias,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(HrRadius.card),
                 side: BorderSide(
                   color: colorScheme.outlineVariant.withValues(alpha: 0.5),
                 ),
@@ -832,7 +833,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                           photo.delegateName.isNotEmpty ? photo.delegateName : 'مندوب',
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 13,
+                            fontSize: HrFont.body,
                             fontWeight: FontWeight.bold,
                           ),
                           maxLines: 1,
@@ -848,7 +849,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                                 branchName: photo.branchName,
                                 style: const TextStyle(
                                   color: Colors.white70,
-                                  fontSize: 11,
+                                  fontSize: HrFont.labelSmall,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -861,7 +862,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                           DateFormat('MM/dd - hh:mm a', 'ar').format(photo.capturedAt),
                           style: const TextStyle(
                             color: Colors.white54,
-                            fontSize: 10,
+                            fontSize: HrFont.labelSmall,
                           ),
                         ),
                       ],
@@ -913,7 +914,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                     Text(
                       'طلب إذن تصوير',
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: HrFont.labelSmall,
                         fontWeight: FontWeight.w600,
                         color: colorScheme.onPrimary,
                       ),
@@ -961,7 +962,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                     Text(
                       'التقرير الشهري',
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: HrFont.labelSmall,
                         fontWeight: FontWeight.w600,
                         color: colorScheme.onSurface,
                       ),
@@ -1000,7 +1001,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
               maxWidth: 320,
             ),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(HrRadius.card),
               side: BorderSide(
                 color: colorScheme.outlineVariant.withValues(alpha: 0.4),
                 width: 1,
@@ -1060,7 +1061,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                     child: Text(
                       currentLabel,
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: HrFont.labelSmall,
                         fontWeight: FontWeight.w600,
                         color: isFiltered
                             ? colorScheme.primary
@@ -1108,7 +1109,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
               maxWidth: 320,
             ),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(HrRadius.card),
               side: BorderSide(
                 color: colorScheme.outlineVariant.withValues(alpha: 0.4),
                 width: 1,
@@ -1168,7 +1169,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                     child: Text(
                       currentLabel,
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: HrFont.labelSmall,
                         fontWeight: FontWeight.w600,
                         color: isFiltered
                             ? colorScheme.primary
@@ -1220,7 +1221,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
             child: Text(
               label,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: HrFont.body,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 color: isSelected ? colorScheme.primary : colorScheme.onSurface,
               ),
@@ -1235,12 +1236,12 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                 color: isSelected
                     ? colorScheme.primary.withValues(alpha: 0.15)
                     : colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(HrRadius.chip),
               ),
               child: Text(
                 '$count',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: HrFont.labelSmall,
                   fontWeight: FontWeight.bold,
                   color: isSelected
                       ? colorScheme.primary
@@ -1486,10 +1487,10 @@ class HRPhotosTabState extends State<HRPhotosTab> {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(
           color: isActive
-              ? const Color(0xFF2E7D32).withValues(alpha: 0.4)
+              ? HrStatusColors.of(context).success.withValues(alpha: 0.4)
               : isPending
                   ? Colors.orange.withValues(alpha: 0.5)
                   : colorScheme.outlineVariant.withValues(alpha: 0.5),
@@ -1508,11 +1509,11 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: isActive
-                        ? const Color(0xFF2E7D32).withValues(alpha: 0.12)
+                        ? HrStatusColors.of(context).success.withValues(alpha: 0.12)
                         : isPending
                             ? Colors.orange.withValues(alpha: 0.12)
                             : colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(HrRadius.chip),
                   ),
                   child: Icon(
                     isActive
@@ -1521,9 +1522,9 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                             ? Icons.hourglass_top_rounded
                             : Icons.assignment_outlined,
                     color: isActive
-                        ? const Color(0xFF2E7D32)
+                        ? HrStatusColors.of(context).success
                         : isPending
-                            ? Colors.orange.shade800
+                            ? HrStatusColors.of(context).warning
                             : colorScheme.onSurfaceVariant,
                     size: 20,
                   ),
@@ -1555,14 +1556,14 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: (isActive
-                            ? const Color(0xFF2E7D32)
+                            ? HrStatusColors.of(context).success
                             : isPending
-                                ? Colors.orange
+                                ? HrStatusColors.of(context).warning
                                 : isExpired
-                                    ? Colors.red
+                                    ? HrStatusColors.of(context).danger
                                     : colorScheme.outline)
                         .withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(HrRadius.button),
                   ),
                   child: Text(
                     isActive
@@ -1574,13 +1575,13 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                                 : 'مرفوض',
                     style: TextStyle(
                       color: isActive
-                          ? const Color(0xFF2E7D32)
+                          ? HrStatusColors.of(context).success
                           : isPending
-                              ? Colors.orange.shade800
+                              ? HrStatusColors.of(context).warning
                               : isExpired
-                                  ? Colors.red.shade800
+                                  ? HrStatusColors.of(context).danger
                                   : colorScheme.outline,
-                      fontSize: 11,
+                      fontSize: HrFont.labelSmall,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -1595,7 +1596,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1605,7 +1606,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                     Text(
                       'القسم: ${perm.department}',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: HrFont.labelSmall,
                         fontWeight: FontWeight.bold,
                         color: colorScheme.primary,
                       ),
@@ -1640,7 +1641,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                     icon: Icon(Icons.cancel_outlined, size: 16, color: colorScheme.error),
                     label: Text(
                       'إلغاء الطلب',
-                      style: TextStyle(color: colorScheme.error, fontSize: 12, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: colorScheme.error, fontSize: HrFont.labelMedium, fontWeight: FontWeight.bold),
                     ),
                   )
                 else
@@ -1649,7 +1650,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                 FilledButton.tonalIcon(
                   style: FilledButton.styleFrom(
                     visualDensity: VisualDensity.compact,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
                   ),
                   onPressed: () {
                     Navigator.push(
@@ -1660,7 +1661,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                     );
                   },
                   icon: const Icon(Icons.collections_rounded, size: 16),
-                  label: const Text('عرض صور هذا الإذن', style: TextStyle(fontSize: 12)),
+                  label: const Text('عرض صور هذا الإذن', style: TextStyle(fontSize: HrFont.labelMedium)),
                 ),
               ],
             ),
@@ -1704,7 +1705,7 @@ class _HRBranchNamesListState extends State<_HRBranchNamesList> {
         children: [
           Text(
             text,
-            style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+            style: theme.textTheme.bodySmall?.copyWith(fontSize: HrFont.labelMedium),
             maxLines: _isExpanded ? null : 2,
             overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
           ),
@@ -1715,7 +1716,7 @@ class _HRBranchNamesListState extends State<_HRBranchNamesList> {
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.primary,
                 fontWeight: FontWeight.bold,
-                fontSize: 11,
+                fontSize: HrFont.labelSmall,
               ),
             ),
           ],
@@ -1764,7 +1765,7 @@ class _HRCreatePhotoRequestBottomSheetState
 
     return Material(
       color: colorScheme.surface,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(HrRadius.pill)),
       clipBehavior: Clip.antiAlias,
       child: Padding(
         padding: EdgeInsets.only(
@@ -1809,7 +1810,7 @@ class _HRCreatePhotoRequestBottomSheetState
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                       border: Border.all(
                         color: colorScheme.outlineVariant.withValues(alpha: 0.5),
                       ),
@@ -1835,7 +1836,7 @@ class _HRCreatePhotoRequestBottomSheetState
                           isExpanded: true,
                           decoration: InputDecoration(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
                             filled: true,
                             fillColor: colorScheme.surface,
                           ),
@@ -1844,7 +1845,7 @@ class _HRCreatePhotoRequestBottomSheetState
                               value: dept,
                               child: Text(
                                 dept,
-                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: HrFont.body),
                               ),
                             );
                           }).toList(),
@@ -1864,7 +1865,7 @@ class _HRCreatePhotoRequestBottomSheetState
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: colorScheme.primaryContainer.withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                       border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
                     ),
                     child: Column(
@@ -1889,14 +1890,14 @@ class _HRCreatePhotoRequestBottomSheetState
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
                                 color: colorScheme.primary,
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(HrRadius.button),
                               ),
                               child: const Text(
                                 'شهر واحد (30 يوم)',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 13,
+                                  fontSize: HrFont.body,
                                 ),
                               ),
                             ),
@@ -1934,7 +1935,7 @@ class _HRCreatePhotoRequestBottomSheetState
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: colorScheme.secondaryContainer.withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                       border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.3)),
                     ),
                     child: Column(
@@ -1966,14 +1967,14 @@ class _HRCreatePhotoRequestBottomSheetState
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
                                   color: colorScheme.secondary,
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(HrRadius.button),
                                 ),
                                 child: Text(
                                   'جميع الفروع (${branches.length})',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 13,
+                                    fontSize: HrFont.body,
                                   ),
                                 ),
                               ),
@@ -1995,7 +1996,7 @@ class _HRCreatePhotoRequestBottomSheetState
                   FilledButton.icon(
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
                     ),
                     onPressed: (isLoadingBranches || branches.isEmpty)
                         ? null
@@ -2019,7 +2020,7 @@ class _HRCreatePhotoRequestBottomSheetState
                     icon: const Icon(Icons.send_rounded, size: 18),
                     label: const Text(
                       'إرسال الطلب للاعتماد (شامل كل الفروع)',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.titleMedium),
                     ),
                   ),
                 ],

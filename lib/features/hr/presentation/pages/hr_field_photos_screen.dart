@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:delegate_app/features/hr/presentation/pages/tabs/hr_photos_tab.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// شاشة مستقلة لعرض الصور والزيارات الميدانية وأذونات التصوير
 /// (تُستخدم عند فتح الأرشيف من قائمة المشرف أو الأدمن دون استبدال شريط التنقل السفلي)
@@ -51,7 +52,7 @@ class _HRFieldPhotosScreenState extends State<HRFieldPhotosScreen> {
                     isArabic ? 'الصور والزيارات الميدانية' : 'Field Photos & Visits',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14.5,
+                      fontSize: HrFont.body,
                       letterSpacing: -0.2,
                     ),
                     maxLines: 1,
@@ -61,7 +62,7 @@ class _HRFieldPhotosScreenState extends State<HRFieldPhotosScreen> {
                     Text(
                       widget.hrDelegate.companyName,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: HrFont.labelSmall,
                         color: colorScheme.onSurfaceVariant,
                       ),
                       maxLines: 1,
