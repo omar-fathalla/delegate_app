@@ -1,6 +1,8 @@
 appId: com.tashil.delegate.dev
 ---
 # Maestro — delegate (**مندوب**) journey: login, home tab, profile, settings, logout.
+# The delegate menu is a NavigationDrawer: each item's accessible text is
+# "<label>\nعلامة التبويب n من 6", so taps use "<label>(\\n.*)?".
 
 - launchApp:
     clearState: true
@@ -17,9 +19,9 @@ appId: com.tashil.delegate.dev
     visible: "الرئيسية"
     timeout: 60000
 
-- runFlow:
-    file: ../subflows/open-main-menu.yaml
-- tapOn: "الملف الشخصي"
+- tapOn:
+    id: "tashil_main_menu_button"
+- tapOn: "الملف الشخصي(\\n.*)?"
 
 - extendedWaitUntil:
     visible: "الملف الشخصي"
@@ -31,9 +33,9 @@ appId: com.tashil.delegate.dev
 - runFlow:
     file: ../subflows/wait-for-main-menu-button.yaml
 
-- runFlow:
-    file: ../subflows/open-main-menu.yaml
-- tapOn: "الإعدادات"
+- tapOn:
+    id: "tashil_main_menu_button"
+- tapOn: "الإعدادات(\\n.*)?"
 
 - extendedWaitUntil:
     visible: "الإعدادات"

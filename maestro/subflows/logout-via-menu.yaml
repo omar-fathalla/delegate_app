@@ -12,7 +12,8 @@ appId: com.tashil.delegate.dev
       - tapOn:
           id: "tashil_main_menu_button"
 
-- tapOn: "تسجيل الخروج"
+# Optional "\n…" suffix: drawer items (delegates) carry a tab-position label.
+- tapOn: "تسجيل الخروج(\\n.*)?"
 
 # Confirm sheet: tap the button by id; the same text is also the sheet title.
 - extendedWaitUntil:

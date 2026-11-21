@@ -16,13 +16,14 @@ appId: com.tashil.delegate.dev
 - pressKey: Enter
 
 # Submit by id: the text "تسجيل الدخول" is also the form title, and the
-# button can sit under the keyboard. Enter alone does not submit the
-# delegate form. Skipped when Enter already logged in. No hideKeyboard: the
-# iOS number pad has no dismiss key, so it fails; scrolling reaches the button.
+# button can sit below the fold. Enter alone does not submit the
+# delegate form. Skipped when Enter already logged in.
 - runFlow:
     when:
       visible: "رقم الجوال"
     commands:
+      # No hideKeyboard: Enter already closes it on iOS, and hideKeyboard
+      # fails when there is no keyboard (mac-gate b252a762).
       - scrollUntilVisible:
           element:
             id: "tashil_login_submit_button"
