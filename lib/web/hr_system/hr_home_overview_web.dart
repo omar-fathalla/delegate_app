@@ -145,16 +145,12 @@ class HrHomeOverviewWeb extends StatelessWidget {
     onAddChain: () => _addChain(context),
     onOpenChainRequests: () => onNavigateToTab(kHrTabSubscriptions),
     onHowToLink: () => showAdminHomeLinkingGuide(context, delegate),
-    onOpenRecord: (record) => Navigator.push(
+    onOpenRecord: (record) => openHrDelegateAttendanceDetail(
       context,
-      MaterialPageRoute(
-        builder: (_) => HRDelegateAttendanceDetailScreen(
-          delegate: record.delegate,
-          initialMonth: month,
-          branchesByName: branchesByName,
-          hrDelegate: delegate,
-        ),
-      ),
+      delegate: record.delegate,
+      initialMonth: month,
+      branchesByName: branchesByName,
+      hrDelegate: delegate,
     ),
   );
 

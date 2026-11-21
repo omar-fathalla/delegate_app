@@ -4,6 +4,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/tashil_button_group.dart';
@@ -135,18 +136,37 @@ class AttendanceAdjustmentRecord {
   }
 }
 
+/// A request from the web shell to show «سجل تعديلات الحضور» for one
+/// delegate (TAS-146). Each request is a new object, so asking again for the
+/// same delegate after the user cleared the filter applies it again.
+class HrAdjustmentsDelegateFilter {
+  HrAdjustmentsDelegateFilter({required this.uid, required this.name});
+
+  final String uid;
+  final String name;
+}
+
 /// شاشة سجل تعديلات الحضور والانصراف الإدارية (Audit Trail)
 class HRAttendanceAdjustmentsScreen extends StatefulWidget {
   final Delegate hrDelegate;
   final bool showAppBar;
   final String? initialDelegateUID;
 
+  /// Web shell: delegate filter opened from «سجل الحضور والانصراف التفصيلي»
+  /// (TAS-146). Shown as a chip the user can clear.
+  final HrAdjustmentsDelegateFilter? delegateFilter;
+
   const HRAttendanceAdjustmentsScreen({
     super.key,
     required this.hrDelegate,
     this.showAppBar = true,
     this.initialDelegateUID,
+    this.delegateFilter,
   });
+
+  /// Tests swap in a fake Firestore for the reads.
+  @visibleForTesting
+  static FirebaseFirestore Function()? debugFirestore;
 
   @override
   State<HRAttendanceAdjustmentsScreen> createState() => _HRAttendanceAdjustmentsScreenState();
@@ -159,10 +179,12 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
   String _searchQuery = '';
   Map<String, Delegate> _delegatesByUid = {};
   int? _hoveredRowIndex;
+  HrAdjustmentsDelegateFilter? _delegateFilter;
 
   @override
   void initState() {
     super.initState();
+    _delegateFilter = widget.delegateFilter;
     _loadCompanyDelegates();
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.trim());
@@ -185,6 +207,14 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
         }
       });
     } catch (_) {}
+  }
+
+  @override
+  void didUpdateWidget(covariant HRAttendanceAdjustmentsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.delegateFilter, widget.delegateFilter)) {
+      _delegateFilter = widget.delegateFilter;
+    }
   }
 
   @override
@@ -223,6 +253,12 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
       if (widget.initialDelegateUID != null &&
           widget.initialDelegateUID!.isNotEmpty &&
           r.delegateUID != widget.initialDelegateUID) {
+        return false;
+      }
+
+      // 2b. Delegate filter from the web shell (TAS-146)
+      final delegateFilter = _delegateFilter;
+      if (delegateFilter != null && r.delegateUID != delegateFilter.uid) {
         return false;
       }
 
@@ -314,8 +350,11 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
     final isWide = MediaQuery.of(context).size.width >= 900;
 
     // Strict multi-tenant query
-    Query<Map<String, dynamic>> query = FirebaseFirestore.instance
-        .collection(kAttendanceAdjustmentLogsCollection);
+    final db = HRAttendanceAdjustmentsScreen.debugFirestore?.call() ??
+        FirebaseFirestore.instance;
+    Query<Map<String, dynamic>> query = db.collection(
+      kAttendanceAdjustmentLogsCollection,
+    );
 
     if (widget.hrDelegate.companyUID.isNotEmpty) {
       query = query.where('companyUID', isEqualTo: widget.hrDelegate.companyUID);
@@ -610,6 +649,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
         runSpacing: 10,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
+          if (_delegateFilter != null) _buildDelegateFilterChip(colorScheme),
           SizedBox(
             width: 260,
             height: 42,
@@ -626,7 +666,12 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
             ],
             onSelected: (val) => setState(() => _selectedPeriodFilter = val),
           ),
-          _buildReasonSelector(distinctReasons, colorScheme),
+          // Web: a normal dropdown sized to its content, not a bar across
+          // the whole page (TAS-146). Mobile keeps its selector.
+          if (WebRuntimePolicy.isWeb)
+            _buildReasonDropdown(distinctReasons, colorScheme)
+          else
+            _buildReasonSelector(distinctReasons, colorScheme),
           _buildCountAndExportGroup(recordCount, onExport, colorScheme),
         ],
       );
@@ -634,6 +679,13 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (_delegateFilter != null) ...[
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: _buildDelegateFilterChip(colorScheme),
+            ),
+            const SizedBox(height: 8),
+          ],
           SizedBox(
             height: 42,
             child: _buildSearchTextField(colorScheme),
@@ -706,6 +758,71 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
           borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
         ),
       ),
+    );
+  }
+
+  /// Active delegate filter from the web shell; deleting it shows every
+  /// delegate again (TAS-146).
+  Widget _buildDelegateFilterChip(ColorScheme colorScheme) {
+    final filter = _delegateFilter!;
+    final name = filter.name.isNotEmpty
+        ? filter.name
+        : (_delegatesByUid[filter.uid]?.fullName ?? '');
+    return InputChip(
+      key: const Key('hr_adjustments_delegate_filter'),
+      avatar: Icon(Icons.person_rounded, size: 18, color: colorScheme.primary),
+      label: Text(
+        name.isNotEmpty ? 'المندوب: $name' : 'مندوب محدد',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      deleteButtonTooltipMessage: 'عرض كل المناديب',
+      onDeleted: () => setState(() => _delegateFilter = null),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(HrRadius.chip),
+      ),
+    );
+  }
+
+  /// Web reason filter: a standard M3 dropdown with a fixed width (TAS-146).
+  Widget _buildReasonDropdown(
+    Set<String> distinctReasons,
+    ColorScheme colorScheme,
+  ) {
+    final reasons = ['all', ...distinctReasons];
+    final selected = reasons.contains(_selectedReasonFilter)
+        ? _selectedReasonFilter
+        : 'all';
+    return DropdownMenu<String>(
+      key: const Key('hr_adjustments_reason_filter'),
+      width: 240,
+      initialSelection: selected,
+      leadingIcon: Icon(
+        Icons.tune_rounded,
+        size: 18,
+        color: selected != 'all'
+            ? colorScheme.primary
+            : colorScheme.onSurfaceVariant,
+      ),
+      textStyle: TextStyle(fontSize: HrFont.body, color: colorScheme.onSurface),
+      inputDecorationTheme: InputDecorationTheme(
+        isDense: true,
+        constraints: const BoxConstraints(maxHeight: 42),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(HrRadius.pill),
+        ),
+      ),
+      onSelected: (val) {
+        if (val != null) setState(() => _selectedReasonFilter = val);
+      },
+      dropdownMenuEntries: [
+        for (final r in reasons)
+          DropdownMenuEntry<String>(
+            value: r,
+            label: r == 'all' ? 'جميع الأسباب' : r,
+          ),
+      ],
     );
   }
 

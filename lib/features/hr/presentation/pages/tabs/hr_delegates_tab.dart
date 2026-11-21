@@ -262,14 +262,10 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
   }
 
   void _openAttendance(Delegate delegate) {
-    Navigator.push(
+    openHrDelegateAttendanceDetail(
       context,
-      MaterialPageRoute(
-        builder: (_) => HRDelegateAttendanceDetailScreen(
-          delegate: delegate,
-          hrDelegate: widget.hrDelegate,
-        ),
-      ),
+      delegate: delegate,
+      hrDelegate: widget.hrDelegate,
     );
   }
 
@@ -2210,17 +2206,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
             child: Tooltip(
               message: 'سجل الحضور والانصراف',
               child: InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => HRDelegateAttendanceDetailScreen(
-                        delegate: delegate,
-                        hrDelegate: widget.hrDelegate,
-                      ),
-                    ),
-                  );
-                },
+                onTap: () => _openAttendance(delegate),
                 hoverColor: colorScheme.primary.withValues(alpha: 0.08),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 9),
