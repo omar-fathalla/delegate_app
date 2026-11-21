@@ -1,5 +1,7 @@
-// Golden/screenshot tests (TAS-162): skipped in CI because pixels depend on
-// the host renderer. Run locally: flutter test --tags golden
+// Golden/screenshot tests (TAS-162, TAS-195). CI runs them in a separate
+// step (`flutter test --tags golden`) on Linux; small host antialiasing
+// differences are tolerated by test/flutter_test_config.dart.
+// Run locally: flutter test --tags golden
 // Re-record: flutter test --tags golden --update-goldens
 @Tags(['golden'])
 library;
