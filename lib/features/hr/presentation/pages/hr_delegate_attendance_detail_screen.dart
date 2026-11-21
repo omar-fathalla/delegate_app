@@ -8,6 +8,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/tashil_icon_button.dart';
@@ -18,6 +19,8 @@ import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjust
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_empty_state.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_inner_page.dart';
+import 'package:delegate_app/web/hr_system/hr_shell_link.dart';
 
 /// Model representing a single attendance session for a delegate
 class DelegateAttendanceSession {
@@ -106,12 +109,18 @@ class HRDelegateAttendanceDetailScreen extends StatefulWidget {
   final Map<String, Branch>? branchesByName;
   final Delegate? hrDelegate;
 
+  /// True inside the web HR shell (TAS-145): the breadcrumb carries the
+  /// title and the back button, so the page draws no app bar and shows its
+  /// actions in a toolbar instead.
+  final bool inShell;
+
   const HRDelegateAttendanceDetailScreen({
     super.key,
     required this.delegate,
     this.initialMonth,
     this.branchesByName,
     this.hrDelegate,
+    this.inShell = false,
   });
 
   /// Tests swap in a fake Firestore for the reads.
@@ -121,6 +130,32 @@ class HRDelegateAttendanceDetailScreen extends StatefulWidget {
   @override
   State<HRDelegateAttendanceDetailScreen> createState() =>
       _HRDelegateAttendanceDetailScreenState();
+}
+
+/// Opens «سجل الحضور والانصراف التفصيلي» for [delegate] (TAS-145).
+///
+/// Inside the wide web HR shell it is an inner page with the breadcrumb
+/// «current page › delegate name»; elsewhere (mobile, narrow web) it is
+/// pushed full screen with its own app bar, as before.
+Future<void> openHrDelegateAttendanceDetail(
+  BuildContext context, {
+  required Delegate delegate,
+  DateTime? initialMonth,
+  Map<String, Branch>? branchesByName,
+  Delegate? hrDelegate,
+}) {
+  return pushHrInnerPage<void>(
+    context,
+    title: delegate.fullName,
+    maxWidth: HrInnerPageWidth.wide,
+    builder: (_, inShell) => HRDelegateAttendanceDetailScreen(
+      delegate: delegate,
+      initialMonth: initialMonth,
+      branchesByName: branchesByName,
+      hrDelegate: hrDelegate,
+      inShell: inShell,
+    ),
+  );
 }
 
 /// Reads a delegate's attendance logs, scoped to one company (TAS-120).
@@ -1024,6 +1059,15 @@ class _HRDelegateAttendanceDetailScreenState
   }
 
   void _navigateToAdjustments() {
+    // Web shell (TAS-146): one «سجل تعديلات الحضور» page, the sidebar tab,
+    // filtered to this delegate. Mobile keeps the full-screen push.
+    if (widget.inShell && HrShellLink.canOpenAdjustments) {
+      HrShellLink.openAdjustmentsFor(
+        delegateUID: widget.delegate.uid,
+        delegateName: widget.delegate.fullName,
+      );
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -1040,6 +1084,75 @@ class _HRDelegateAttendanceDetailScreenState
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isWide = MediaQuery.of(context).size.width > 768;
+
+    final body = _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? HrEmptyState(
+                  key: const Key('hr_attendance_detail_error'),
+                  icon: Icons.error_outline_rounded,
+                  title: 'تعذر تحميل سجل الحضور',
+                  message: _errorMessage,
+                  action: FilledButton.tonal(
+                    onPressed: _loadBranchesAndAttendance,
+                    child: const Text('إعادة المحاولة'),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _refreshLogs,
+                  child: SingleChildScrollView(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isWide ? 24 : 12,
+                      vertical: 16,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // 1. Delegate Profile Card
+                        AnimatedScale(
+                          scale: _headerShrunk ? 0.96 : 1.0,
+                          duration: const Duration(milliseconds: 200),
+                          child: AnimatedOpacity(
+                            opacity: _showCompactHeader ? 0.4 : 1.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: _buildDelegateProfileHeader(colorScheme, isWide),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // 2. Month Selector Navigation Bar
+                        _buildMonthSelectorBar(colorScheme, isWide),
+                        const SizedBox(height: 16),
+
+                        // 3. Monthly Analytics KPI Cards
+                        _buildMonthlyKpiCards(colorScheme, isWide),
+                        const SizedBox(height: 20),
+
+                        // 4. Filter & Search Controls
+                        _buildFilterBar(colorScheme, isWide),
+                        const SizedBox(height: 16),
+
+                        // 5. Attendance History Table / Cards
+                        _buildHistorySection(colorScheme, isWide),
+                      ],
+                    ),
+                  ),
+                );
+
+    if (widget.inShell) {
+      return Scaffold(
+        backgroundColor: colorScheme.surfaceContainerLowest,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildShellToolbar(),
+            Expanded(child: body),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLowest,
@@ -1113,61 +1226,34 @@ class _HRDelegateAttendanceDetailScreenState
           const SizedBox(width: 4),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-              ? HrEmptyState(
-                  key: const Key('hr_attendance_detail_error'),
-                  icon: Icons.error_outline_rounded,
-                  title: 'تعذر تحميل سجل الحضور',
-                  message: _errorMessage,
-                  action: FilledButton.tonal(
-                    onPressed: _loadBranchesAndAttendance,
-                    child: const Text('إعادة المحاولة'),
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _refreshLogs,
-                  child: SingleChildScrollView(
-                    controller: _scrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isWide ? 24 : 12,
-                      vertical: 16,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // 1. Delegate Profile Card
-                        AnimatedScale(
-                          scale: _headerShrunk ? 0.96 : 1.0,
-                          duration: const Duration(milliseconds: 200),
-                          child: AnimatedOpacity(
-                            opacity: _showCompactHeader ? 0.4 : 1.0,
-                            duration: const Duration(milliseconds: 200),
-                            child: _buildDelegateProfileHeader(colorScheme, isWide),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
+      body: body,
+    );
+  }
 
-                        // 2. Month Selector Navigation Bar
-                        _buildMonthSelectorBar(colorScheme, isWide),
-                        const SizedBox(height: 16),
-
-                        // 3. Monthly Analytics KPI Cards
-                        _buildMonthlyKpiCards(colorScheme, isWide),
-                        const SizedBox(height: 20),
-
-                        // 4. Filter & Search Controls
-                        _buildFilterBar(colorScheme, isWide),
-                        const SizedBox(height: 16),
-
-                        // 5. Attendance History Table / Cards
-                        _buildHistorySection(colorScheme, isWide),
-                      ],
-                    ),
-                  ),
-                ),
+  /// Actions of the page inside the web shell, where there is no app bar.
+  Widget _buildShellToolbar() {
+    return Padding(
+      key: const Key('hr_attendance_detail_toolbar'),
+      padding: const EdgeInsetsDirectional.fromSTEB(24, 4, 24, 0),
+      child: Wrap(
+        alignment: WrapAlignment.end,
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          OutlinedButton.icon(
+            key: const Key('hr_attendance_detail_open_edits'),
+            onPressed: _navigateToAdjustments,
+            icon: const Icon(Icons.history_edu_rounded, size: 18),
+            label: const Text('سجل تعديلات الحضور'),
+          ),
+          OutlinedButton.icon(
+            key: const Key('hr_attendance_detail_export'),
+            onPressed: _exportMonthlyReportToCSV,
+            icon: const Icon(Icons.download_rounded, size: 18),
+            label: const Text('تصدير التقرير الشهري'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2110,12 +2196,16 @@ class _HRDelegateAttendanceDetailScreenState
                                       children: [
                                         Icon(Icons.login_rounded, size: 16, color: HrStatusColors.of(context).success),
                                         const SizedBox(width: 6),
-                                        Text(
-                                          inTimeStr,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: HrFont.body,
-                                            color: HrStatusColors.of(context).success,
+                                        Flexible(
+                                          child: Text(
+                                            inTimeStr,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: HrFont.body,
+                                              color: HrStatusColors.of(context).success,
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -2207,12 +2297,16 @@ class _HRDelegateAttendanceDetailScreenState
                                           color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                                         ),
                                         const SizedBox(width: 6),
-                                        Text(
-                                          s.formattedDuration,
-                                          style: TextStyle(
-                                            fontSize: HrFont.labelMedium,
-                                            fontWeight: FontWeight.w600,
-                                            color: colorScheme.onSurface,
+                                        Flexible(
+                                          child: Text(
+                                            s.formattedDuration,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: HrFont.labelMedium,
+                                              fontWeight: FontWeight.w600,
+                                              color: colorScheme.onSurface,
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -2323,7 +2417,31 @@ class _HRDelegateAttendanceDetailScreenState
     final IconData icon;
     final String label;
 
-    if (s.isAutoCheckOut) {
+    final status = HrStatusColors.of(context);
+    final isWeb = WebRuntimePolicy.isWeb;
+
+    if (isWeb && s.isAutoCheckOut) {
+      // Web, approved status colors: auto check-out = warning.
+      bgColor = status.warningContainer;
+      borderColor = status.warning.withValues(alpha: 0.5);
+      textColor = status.onWarningContainer;
+      icon = Icons.auto_mode_rounded;
+      label = 'مكتمل (تلقائي)';
+    } else if (isWeb && isCompleted) {
+      // Web, approved status colors: normal check-out = info.
+      bgColor = status.infoContainer;
+      borderColor = status.info.withValues(alpha: 0.5);
+      textColor = status.onInfoContainer;
+      icon = Icons.check_circle_rounded;
+      label = 'مكتمل الانصراف';
+    } else if (isWeb && isOngoing) {
+      // Web, approved status colors: present = success.
+      bgColor = status.successContainer;
+      borderColor = status.success.withValues(alpha: 0.5);
+      textColor = status.onSuccessContainer;
+      icon = Icons.timelapse_rounded;
+      label = 'حاضر الآن';
+    } else if (s.isAutoCheckOut) {
       // Closed by the system: counted as complete, shown neutral (not an error).
       bgColor = colorScheme.secondaryContainer;
       borderColor = colorScheme.outlineVariant;
@@ -2350,27 +2468,38 @@ class _HRDelegateAttendanceDetailScreenState
       label = 'غير مكتمل - لم يسجل انصراف';
     }
 
-    final badgeWidget = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(HrRadius.card),
-        border: Border.all(color: borderColor, width: 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: textColor),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: HrFont.labelSmall,
-              fontWeight: FontWeight.bold,
-              color: textColor,
+    final badgeWidget = Tooltip(
+      key: Key('hr_attendance_status_badge_${s.id}'),
+      message: label,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(HrRadius.card),
+          border: Border.all(color: borderColor, width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: textColor),
+            const SizedBox(width: 5),
+            // Shrinks with an ellipsis in a narrow column or with a wider font
+            // instead of overflowing (TAS-184).
+            Flexible(
+              child: Text(
+                label,
+                key: const Key('hr_attendance_status_badge_label'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: HrFont.labelSmall,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
 
@@ -2387,21 +2516,40 @@ class _HRDelegateAttendanceDetailScreenState
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            color: Colors.blueGrey.shade50,
+            color: isWeb
+                ? colorScheme.surfaceContainerHigh
+                : Colors.blueGrey.shade50,
             borderRadius: BorderRadius.circular(HrRadius.chip),
-            border: Border.all(color: Colors.blueGrey.shade200, width: 0.8),
+            border: Border.all(
+              color: isWeb
+                  ? colorScheme.outlineVariant
+                  : Colors.blueGrey.shade200,
+              width: 0.8,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.edit_note_rounded, size: 11, color: Colors.blueGrey.shade800),
+              Icon(
+                Icons.edit_note_rounded,
+                size: 11,
+                color: isWeb
+                    ? colorScheme.onSurfaceVariant
+                    : Colors.blueGrey.shade800,
+              ),
               const SizedBox(width: 3),
-              Text(
-                'مُعدّل إدارياً',
-                style: TextStyle(
-                  fontSize: HrFont.labelSmall,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blueGrey.shade800,
+              Flexible(
+                child: Text(
+                  'مُعدّل إدارياً',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: HrFont.labelSmall,
+                    fontWeight: FontWeight.bold,
+                    color: isWeb
+                        ? colorScheme.onSurfaceVariant
+                        : Colors.blueGrey.shade800,
+                  ),
                 ),
               ),
             ],

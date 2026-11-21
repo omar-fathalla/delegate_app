@@ -11,6 +11,7 @@ import 'package:delegate_app/features/admin/presentation/pages/subscription_rene
 import 'package:delegate_app/features/admin/domain/entities/subscription_renewal.dart';
 import 'package:delegate_app/features/hr/presentation/hr_account_pages.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
+import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_tab.dart';
 import 'package:delegate_app/features/hr/presentation/pages/tabs/hr_photos_tab.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_desktop_sidebar.dart';
@@ -56,6 +57,9 @@ class _HRMainScreenState extends State<HRMainScreen> {
   final GlobalKey<NavigatorState> _innerNavigator =
       GlobalKey<NavigatorState>(debugLabel: 'hr_inner_navigator');
 
+  /// Web: delegate filter for «سجل تعديلات الحضور», set when the detail
+  /// attendance page opens the log for one delegate (TAS-146).
+  HrAdjustmentsDelegateFilter? _adjustmentsFilter;
   /// Switches «الصور» to its permissions view when the retired
   /// «أذونات التصوير» slot is selected (TAS-149).
   final HrPhotosViewController _photosView = HrPhotosViewController();
@@ -79,6 +83,16 @@ class _HRMainScreenState extends State<HRMainScreen> {
           if (mounted) _onMenuSelected(id);
         },
         bridge: _headerBridge,
+        openAdjustments: ({required delegateUID, required delegateName}) {
+          if (!mounted) return;
+          _onTabSelected(
+            kHrTabAdjustments,
+            adjustmentsFilter: HrAdjustmentsDelegateFilter(
+              uid: delegateUID,
+              name: delegateName,
+            ),
+          );
+        },
       );
     }
   }
@@ -102,7 +116,10 @@ class _HRMainScreenState extends State<HRMainScreen> {
     }
   }
 
-  void _onTabSelected(int index) {
+  void _onTabSelected(
+    int index, {
+    HrAdjustmentsDelegateFilter? adjustmentsFilter,
+  }) {
     // A sidebar click leaves any inner page of the previous tab.
     _innerNavigator.currentState?.popUntil((route) => route.isFirst);
     // TAS-149: the retired permissions page opens «الصور» on its
@@ -114,6 +131,9 @@ class _HRMainScreenState extends State<HRMainScreen> {
     setState(() {
       _currentIndex = index;
       _loadedTabs.add(index);
+      // Opening the log from the sidebar shows every delegate; the detail
+      // attendance page passes its delegate (TAS-146).
+      if (index == kHrTabAdjustments) _adjustmentsFilter = adjustmentsFilter;
     });
   }
 
@@ -729,6 +749,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
                   index: index,
                   delegate: delegate,
                   onNavigateToTab: _onTabSelected,
+                  adjustmentsFilter: _adjustmentsFilter,
                   photosView: _photosView,
                 )
               : const SizedBox.shrink(),

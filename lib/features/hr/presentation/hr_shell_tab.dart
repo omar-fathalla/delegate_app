@@ -32,6 +32,7 @@ Widget hrShellTab({
   required int index,
   required Delegate delegate,
   required ValueChanged<int> onNavigateToTab,
+  HrAdjustmentsDelegateFilter? adjustmentsFilter,
   HrPhotosViewController? photosView,
 }) {
   switch (index) {
@@ -72,6 +73,7 @@ Widget hrShellTab({
       return HRAttendanceAdjustmentsScreen(
         hrDelegate: delegate,
         showAppBar: false,
+        delegateFilter: adjustmentsFilter,
       );
     case kHrTabSubscriptions:
       return DelegateSubscriptionRequestsPage(currentAdmin: delegate);

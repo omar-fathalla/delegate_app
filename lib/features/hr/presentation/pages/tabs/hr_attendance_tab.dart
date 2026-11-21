@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
@@ -2388,16 +2389,12 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     onInspectGeofence: (rec) =>
                         _showGeofenceInspectionDialog(context, rec),
                     onTap: () {
-                      Navigator.push(
+                      openHrDelegateAttendanceDetail(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => HRDelegateAttendanceDetailScreen(
-                            delegate: record.delegate,
-                            initialMonth: _selectedDate,
-                            branchesByName: _branchesByName,
-                            hrDelegate: widget.hrDelegate,
-                          ),
-                        ),
+                        delegate: record.delegate,
+                        initialMonth: _selectedDate,
+                        branchesByName: _branchesByName,
+                        hrDelegate: widget.hrDelegate,
                       );
                     },
                   );
@@ -2482,7 +2479,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: isSelected ? color : colorScheme.onSurfaceVariant,
                           fontWeight: isSelected ? FontWeight.w900 : FontWeight.bold,
-                          fontSize: isWide ? 11.5 : 10,
+                          fontSize: _kpiLabelSize(isWide),
                         ),
                       ),
                     ),
@@ -2499,7 +2496,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         ?.copyWith(
                       fontWeight: FontWeight.w900,
                       color: color,
-                      fontSize: isWide ? 22 : 16,
+                      fontSize: isWide ? HrFont.titleLarge : HrFont.titleMedium,
                     ),
                   ),
                 ),
@@ -2654,6 +2651,11 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     );
   }
 
+  /// Title size of the date card and the KPI cards (TAS-163): never below
+  /// 12 on the web; mobile keeps M3 labelSmall on narrow screens.
+  static double _kpiLabelSize(bool isWide) =>
+      isWide || WebRuntimePolicy.isWeb ? HrFont.labelMedium : HrFont.labelSmall;
+
   Widget _buildDateCard(
     ThemeData theme,
     ColorScheme colorScheme,
@@ -2704,7 +2706,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.bold,
-                  fontSize: isWide ? 11.5 : 10,
+                  fontSize: _kpiLabelSize(isWide),
                 ),
               ),
               if (!isToday) ...[
@@ -2719,7 +2721,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                     decoration: BoxDecoration(
                       color: colorScheme.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(HrRadius.chip),
                     ),
                     child: Text(
                       'اليوم',
@@ -2765,7 +2767,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
               // Date Text (Tap to open DatePicker)
               InkWell(
                 onTap: _pickDate,
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(HrRadius.chip),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                   child: Tooltip(
@@ -2778,7 +2780,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                           ?.copyWith(
                         fontWeight: FontWeight.w900,
                         color: colorScheme.primary,
-                        fontSize: isWide ? 12.5 : 11,
+                        fontSize: isWide ? HrFont.body : HrFont.labelMedium,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -2825,7 +2827,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       child: InkWell(
         key: const Key('hr_attendance_date_card'),
         onTap: _pickDate,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         child: cardContent,
       ),
     );
@@ -3623,16 +3625,12 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                   icon: const Icon(Icons.history_rounded, size: 16),
                   label: const Text('السجل الشهري والتفصيلي'),
                   onPressed: () {
-                    Navigator.push(
+                    openHrDelegateAttendanceDetail(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => HRDelegateAttendanceDetailScreen(
-                          delegate: record.delegate,
-                          initialMonth: _selectedDate,
-                          branchesByName: _branchesByName,
-                          hrDelegate: widget.hrDelegate,
-                        ),
-                      ),
+                      delegate: record.delegate,
+                      initialMonth: _selectedDate,
+                      branchesByName: _branchesByName,
+                      hrDelegate: widget.hrDelegate,
                     );
                   },
                 ),
@@ -3986,6 +3984,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
     final isPresent = record.isPresent;
     final isDeparted = record.isDeparted;
 
+    final status = HrStatusColors.of(context);
     final durationColor = isPresent
         ? HrStatusColors.of(context).success
         : (isDeparted ? HrStatusColors.of(context).warning : colorScheme.onSurfaceVariant);
@@ -4057,7 +4056,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                       record.isAutoCheckOut ? Icons.auto_mode_rounded : Icons.logout_rounded,
                       size: 13,
                       color: record.isAutoCheckOut
-                          ? Colors.amber[800]
+                          ? status.warning
                           : (record.checkOutTime != null
                               ? HrStatusColors.of(context).warning
                               : colorScheme.outlineVariant),
@@ -4071,7 +4070,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                           fontSize: HrFont.labelSmall,
                           fontWeight: FontWeight.bold,
                           color: record.isAutoCheckOut
-                              ? Colors.amber[900]
+                              ? status.warning
                               : (record.checkOutTime != null
                                   ? HrStatusColors.of(context).warning
                                   : colorScheme.outlineVariant),
@@ -4083,16 +4082,16 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                         decoration: BoxDecoration(
-                          color: Colors.amber.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                          color: status.warningContainer,
+                          borderRadius: BorderRadius.circular(HrRadius.chip),
+                          border: Border.all(color: status.warning.withValues(alpha: 0.5)),
                         ),
                         child: Text(
                           'تلقائي (11.5 س)',
                           style: TextStyle(
                             fontSize: HrFont.labelSmall,
                             fontWeight: FontWeight.bold,
-                            color: Colors.amber[900],
+                            color: status.onWarningContainer,
                           ),
                         ),
                       ),
@@ -4118,7 +4117,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: durationColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(HrRadius.chip),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
