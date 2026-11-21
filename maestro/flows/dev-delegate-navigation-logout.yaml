@@ -17,8 +17,8 @@ appId: com.tashil.delegate.dev
     visible: "الرئيسية"
     timeout: 60000
 
-- tapOn:
-    id: "tashil_main_menu_button"
+- runFlow:
+    file: ../subflows/open-main-menu.yaml
 - tapOn: "الملف الشخصي"
 
 - extendedWaitUntil:
@@ -31,8 +31,8 @@ appId: com.tashil.delegate.dev
 - runFlow:
     file: ../subflows/wait-for-main-menu-button.yaml
 
-- tapOn:
-    id: "tashil_main_menu_button"
+- runFlow:
+    file: ../subflows/open-main-menu.yaml
 - tapOn: "الإعدادات"
 
 - extendedWaitUntil:
