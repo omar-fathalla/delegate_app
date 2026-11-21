@@ -87,7 +87,10 @@ jobs:
       - name: Install dependencies
         run: flutter pub get --enforce-lockfile
       - name: Test
-        run: flutter test --concurrency=1
+        # TAS-175: 4 test files at a time. At --concurrency=1 the suite took
+        # 25-30 min on the shared Mac and often hit timeout-minutes: 30; at 4 the
+        # same suite ran in under 2 min locally on this Mac.
+        run: flutter test --concurrency=4
 
   p0-scripts:
     name: P0 scripts (emulators)
