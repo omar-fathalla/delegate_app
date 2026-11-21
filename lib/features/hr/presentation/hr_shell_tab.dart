@@ -44,6 +44,7 @@ Widget hrShellTab({
         adminDelegate: delegate,
         initialMapView: true,
         showAppBar: false,
+        hrWebShell: WebRuntimePolicy.isWeb,
       );
     case kHrTabDevices:
       return HRDeviceUnbindRequestsScreen(
