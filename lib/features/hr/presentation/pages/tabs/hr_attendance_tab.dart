@@ -2817,18 +2817,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
 
               // Date Text (Tap to open DatePicker)
               InkWell(
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _selectedDate,
-                    firstDate: DateTime(2023),
-                    lastDate: DateTime.now().add(const Duration(days: 7)),
-                  );
-                  if (picked != null && !_isSameDay(picked, _selectedDate)) {
-                    setState(() => _selectedDate = picked);
-                    _fetchAttendanceForSelectedDate();
-                  }
-                },
+                onTap: _pickDate,
                 borderRadius: BorderRadius.circular(6),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
@@ -2881,13 +2870,40 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
       ),
     );
 
+    // The whole card opens the date picker (TAS-147): it reads as one
+    // control, and clicks beside the small date text used to do nothing.
+    // The chevrons and «اليوم» keep their own taps.
+    final tappable = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: const Key('hr_attendance_date_card'),
+        onTap: _pickDate,
+        borderRadius: BorderRadius.circular(14),
+        child: cardContent,
+      ),
+    );
+
     if (isFullWidth) {
-      return cardContent;
+      return tappable;
     }
     return Expanded(
       flex: flex,
-      child: cardContent,
+      child: tappable,
     );
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2023),
+      lastDate: DateTime.now().add(const Duration(days: 7)),
+    );
+    if (!mounted) return;
+    if (picked != null && !_isSameDay(picked, _selectedDate)) {
+      setState(() => _selectedDate = picked);
+      _fetchAttendanceForSelectedDate();
+    }
   }
 
   Widget _buildSearchBar(ColorScheme colorScheme) {
