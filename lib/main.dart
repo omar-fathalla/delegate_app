@@ -7,6 +7,7 @@ import 'package:delegate_app/core/services/app_bloc_observer.dart';
 import 'package:delegate_app/core/services/firestore_client_health.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:delegate_app/core/services/task_push_route.dart';
+import 'package:delegate_app/core/services/web_path_to_hash.dart';
 import 'package:delegate_app/core/config/app_env.dart';
 import 'package:delegate_app/core/time/cairo_clock.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -118,6 +119,9 @@ Future<void> bootstrapDelegateAppForPatrol() async {
 }
 
 void main() async {
+  // TAS-197: `/hr/home` → `/#/hr/home` before the router reads the address.
+  normalizeWebPathToHash();
+
   if (!_delegateAppBootstrapped) {
     await bootstrapDelegateAppForPatrol();
   }
