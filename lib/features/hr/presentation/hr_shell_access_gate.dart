@@ -28,9 +28,15 @@ Delegate? hrShellSessionUser(BuildContext context) {
 /// restores the session. A role that does not own the shell is sent away
 /// before [HRMainScreen] is built.
 ///
-/// Web passes the tab and the inner-page count from the URL (TAS-139);
-/// mobile leaves them null and keeps its own tab state.
-Widget hrHomeRouteChild(Delegate? actor, {int? routeTab, int routeInner = 0}) {
+/// Web passes the tab and the inner-page count from the URL (TAS-139), and
+/// the address of an inner page that has one (TAS-190); mobile leaves them
+/// null and keeps its own tab state.
+Widget hrHomeRouteChild(
+  Delegate? actor, {
+  int? routeTab,
+  int routeInner = 0,
+  String? routeInnerUrl,
+}) {
   if (actor == null) return const SplashScreen();
   if (hrShellDeniedLocation(actor.role, isWeb: WebRuntimePolicy.isWeb) !=
       null) {
@@ -41,6 +47,7 @@ Widget hrHomeRouteChild(Delegate? actor, {int? routeTab, int routeInner = 0}) {
         delegate: actor,
         routeTab: routeTab,
         routeInner: routeInner,
+        routeInnerUrl: routeInnerUrl,
       );
 }
 
@@ -63,9 +70,9 @@ Widget hrShellRouteChild(BuildContext context, GoRouterState state) {
   if (!WebRuntimePolicy.isWeb) return hrHomeRouteChild(actor);
   return hrHomeRouteChild(
     actor,
-    routeTab: hrShellTabForPath(state.uri.path) ??
-        hrShellHomeTab(isWeb: true),
+    routeTab: hrShellTabForPath(state.uri.path) ?? hrShellHomeTab(isWeb: true),
     routeInner: hrShellInnerDepth(state.uri),
+    routeInnerUrl: hrShellInnerUrlForPath(state.uri.path),
   );
 }
 
@@ -80,7 +87,6 @@ String? hrShellRedirect(BuildContext context, GoRouterState state) {
   if (actor == null || !canOpenHrShell(actor.role)) return null;
   return hrShellTabAllowed(actor, tab, isWeb: true) ? null : kWebHrSystemPath;
 }
-
 
 /// `/hr/delegate-attendance`. [subject] is the field delegate on the screen.
 /// The guard uses the signed-in user. No session yet → splash, same as a

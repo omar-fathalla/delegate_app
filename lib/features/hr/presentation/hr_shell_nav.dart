@@ -18,6 +18,7 @@ const int kHrTabAdjustments = 8;
 const int kHrTabSubscriptions = 9;
 const int kHrTabRenewal = 10;
 const int kHrTabTasks = 11;
+
 /// Retired slot of the old «أذونات التصوير» page (TAS-149). Permissions now
 /// live only in «الصور». The shell redirects this index (and the old
 /// `supervisor_photo_permissions` menu id) to [kHrTabPhotos] on its
@@ -382,6 +383,60 @@ List<String> hrShellRoutePaths() => [
     if (item.webSlug != null && item.tabIndex != null) '/hr/${item.webSlug}',
 ];
 
+/// Path segment of the delegate attendance detail page (TAS-190):
+/// `/hr/<slug>/delegate/<delegateId>`. Only the id goes in the URL.
+const String kHrDelegateDetailSegment = 'delegate';
+
+/// Inner-page URL part ([pushHrInnerPage]'s `urlPath`) of the attendance
+/// detail page of [delegateId].
+String hrDelegateDetailUrlPath(String delegateId) =>
+    '$kHrDelegateDetailSegment/${Uri.encodeComponent(delegateId)}';
+
+/// The delegate id of a [hrDelegateDetailUrlPath], or null.
+String? hrDelegateIdFromUrlPath(String? urlPath) {
+  const prefix = '$kHrDelegateDetailSegment/';
+  if (urlPath == null || !urlPath.startsWith(prefix)) return null;
+  final raw = urlPath.substring(prefix.length);
+  if (raw.isEmpty || raw.contains('/')) return null;
+  try {
+    final id = Uri.decodeComponent(raw);
+    return id.trim().isEmpty ? null : id;
+  } on ArgumentError {
+    return null;
+  }
+}
+
+/// Router paths of the delegate attendance detail page under every shell
+/// page (`/hr/attendance/delegate/:delegateId`, ...), so a reload keeps the
+/// tab it was opened from.
+List<String> hrShellDelegateDetailRoutePaths() => [
+  for (final path in hrShellRoutePaths())
+    '$path/$kHrDelegateDetailSegment/:delegateId',
+];
+
+/// Splits a shell [path] into its tab path and the inner-page URL part
+/// (`/hr/attendance/delegate/x` → (`/hr/attendance`, `delegate/x`)).
+({String tabPath, String? innerUrl}) _splitShellPath(String path) {
+  const marker = '/$kHrDelegateDetailSegment/';
+  final at = path.lastIndexOf(marker);
+  if (at > 0) {
+    final inner = path.substring(at + 1);
+    if (hrDelegateIdFromUrlPath(inner) != null) {
+      return (tabPath: path.substring(0, at), innerUrl: inner);
+    }
+  }
+  return (tabPath: path, innerUrl: null);
+}
+
+/// The inner-page URL part of a shell [path] (`delegate/<id>`), or null.
+String? hrShellInnerUrlForPath(String path) {
+  final split = _splitShellPath(path);
+  if (split.innerUrl == null || _tabForSlugPath(split.tabPath) == null) {
+    return null;
+  }
+  return split.innerUrl;
+}
+
 /// `/hr/<slug>` of [index]. The retired permissions slot is «الصور».
 /// A tab without a slug falls back to `/hr/home`.
 String hrShellPathForTab(int index) {
@@ -395,7 +450,11 @@ String hrShellPathForTab(int index) {
 }
 
 /// The tab of a shell [path], or null when [path] is not a shell page.
-int? hrShellTabForPath(String path) {
+/// A delegate detail path (`/hr/<slug>/delegate/<id>`) is on its tab.
+int? hrShellTabForPath(String path) =>
+    _tabForSlugPath(_splitShellPath(path).tabPath);
+
+int? _tabForSlugPath(String path) {
   if (!path.startsWith('/hr/')) return null;
   final slug = path.substring(4);
   for (final item in kHrShellCatalog) {
@@ -405,25 +464,31 @@ int? hrShellTabForPath(String path) {
 }
 
 /// Location of [index] with [inner] inner pages open.
-String hrShellLocation(int index, {int inner = 0}) {
-  final path = hrShellPathForTab(index);
-  return inner > 0 ? '$path?$kHrInnerQueryKey=$inner' : path;
+///
+/// When the first inner page has its own address ([innerUrl], TAS-190) it
+/// is part of the path and `?inner=` counts only the pages above it:
+/// `/hr/attendance/delegate/<id>?inner=1` is two inner pages.
+String hrShellLocation(int index, {int inner = 0, String? innerUrl}) {
+  var path = hrShellPathForTab(index);
+  var count = inner;
+  if (innerUrl != null && inner > 0) {
+    path = '$path/$innerUrl';
+    count--;
+  }
+  return count > 0 ? '$path?$kHrInnerQueryKey=$count' : path;
 }
 
 /// Inner-page count in a shell [uri]; anything that is not a positive
-/// number reads as 0.
+/// number reads as 0. A delegate detail path counts as one more page.
 int hrShellInnerDepth(Uri uri) {
   final value = int.tryParse(uri.queryParameters[kHrInnerQueryKey] ?? '');
-  return value == null || value < 0 ? 0 : value;
+  final query = value == null || value < 0 ? 0 : value;
+  return query + (hrShellInnerUrlForPath(uri.path) == null ? 0 : 1);
 }
 
 /// Whether [delegate] may open [index] on this platform: the same rules as
 /// the menus ([hrShellItems]), so a hidden tab cannot be opened by URL.
-bool hrShellTabAllowed(
-  Delegate delegate,
-  int index, {
-  required bool isWeb,
-}) {
+bool hrShellTabAllowed(Delegate delegate, int index, {required bool isWeb}) {
   index = hrShellResolveTab(index);
   return hrShellItems(
     delegate: delegate,
@@ -434,7 +499,8 @@ bool hrShellTabAllowed(
 
 /// Where the splash sends a restored session. On the web, a reload of a
 /// shell URL (`/hr/payroll`) stays on that page instead of `/hr/home`. Inner
-/// pages are not restored, so the query is dropped.
+/// pages are not restored, so the query is dropped; a page with its own
+/// address (`/hr/attendance/delegate/<id>`, TAS-190) is kept.
 String hrShellRestoreLocation(String landing, Uri? current) {
   if (!WebRuntimePolicy.isWeb || landing != kWebHrSystemPath) return landing;
   if (current == null || hrShellTabForPath(current.path) == null) {

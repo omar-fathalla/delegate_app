@@ -185,7 +185,12 @@ final appRouter = GoRouter(
     // HR shell: `/hr/home` and one URL per sidebar page (TAS-139). All of
     // them share one page key, so a URL change updates the mounted shell
     // (its tab follows the URL) instead of building a new one.
-    for (final path in hrShellRoutePaths())
+    // TAS-190: `/hr/<slug>/delegate/<id>` is the delegate attendance detail
+    // page over that tab, on the same shell page.
+    for (final path in [
+      ...hrShellRoutePaths(),
+      ...hrShellDelegateDetailRoutePaths(),
+    ])
       GoRoute(
         path: path,
         redirect: hrShellRedirect,

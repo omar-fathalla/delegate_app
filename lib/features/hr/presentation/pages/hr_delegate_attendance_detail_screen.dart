@@ -16,8 +16,10 @@ import 'package:delegate_app/core/attendance/attendance_branch_resolve.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
+import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_empty_state.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_inner_page.dart';
 import 'package:delegate_app/web/hr_system/hr_shell_link.dart';
@@ -148,6 +150,10 @@ Future<void> openHrDelegateAttendanceDetail(
     context,
     title: delegate.fullName,
     maxWidth: HrInnerPageWidth.wide,
+    // Web address `/hr/<tab>/delegate/<id>` (TAS-190): the id only.
+    urlPath: delegate.uid.trim().isEmpty
+        ? null
+        : hrDelegateDetailUrlPath(delegate.uid),
     builder: (_, inShell) => HRDelegateAttendanceDetailScreen(
       delegate: delegate,
       initialMonth: initialMonth,
@@ -156,6 +162,121 @@ Future<void> openHrDelegateAttendanceDetail(
       inShell: inShell,
     ),
   );
+}
+
+/// Title of the detail page when the delegate of its URL cannot be shown.
+const String kHrDelegateDetailMissingTitle = 'سجل الحضور';
+
+/// Opens the attendance detail of the delegate [delegateId] named by a web
+/// URL (`/hr/<tab>/delegate/<id>`, TAS-190): a direct visit, a reload or the
+/// browser forward button.
+///
+/// The delegate is read from Firestore and must be in [hrDelegate]'s
+/// company. A missing id, a delegate of another company or a failed read
+/// opens the same address with an [HrEmptyState] instead. [shouldOpen] is
+/// asked after the read: false (the URL moved on meanwhile) opens nothing.
+Future<void> openHrDelegateAttendanceDetailById(
+  BuildContext context, {
+  required String delegateId,
+  required Delegate hrDelegate,
+  bool Function()? shouldOpen,
+}) async {
+  final delegate = await loadHrDelegateForDetailUrl(
+    firestore:
+        HRDelegateAttendanceDetailScreen.debugFirestore?.call() ??
+        FirebaseFirestore.instance,
+    delegateId: delegateId,
+    hrDelegate: hrDelegate,
+  );
+  if (!context.mounted || !(shouldOpen?.call() ?? true)) return;
+  if (delegate != null) {
+    return openHrDelegateAttendanceDetail(
+      context,
+      delegate: delegate,
+      hrDelegate: hrDelegate,
+    );
+  }
+  return pushHrInnerPage<void>(
+    context,
+    title: kHrDelegateDetailMissingTitle,
+    maxWidth: HrInnerPageWidth.wide,
+    urlPath: hrDelegateDetailUrlPath(delegateId),
+    builder: (_, inShell) => _HrDelegateDetailMissing(inShell: inShell),
+  );
+}
+
+/// The delegate of a detail URL (TAS-190), or null when there is no such
+/// delegate in [hrDelegate]'s company or the read fails.
+///
+/// Reads the company's delegate directory
+/// (`organizations/{org}/companies/{company}/delegates/{id}`) first, then the
+/// `users/{id}` profile, which must carry the same `companyUID`. Without a
+/// company the HR user cannot be scoped, so nothing is shown.
+Future<Delegate?> loadHrDelegateForDetailUrl({
+  required FirebaseFirestore firestore,
+  required String delegateId,
+  required Delegate hrDelegate,
+}) async {
+  final companyUID = hrDelegate.companyUID.trim();
+  final id = delegateId.trim();
+  if (companyUID.isEmpty || id.isEmpty) return null;
+  final org = hrDelegate.organizationUID.trim();
+  if (org.isNotEmpty && org != 'all') {
+    try {
+      final doc = await firestore
+          .collection('organizations')
+          .doc(org)
+          .collection('companies')
+          .doc(companyUID)
+          .collection('delegates')
+          .doc(id)
+          .get();
+      final data = doc.data();
+      if (doc.exists && data != null) {
+        final fields = Map<String, dynamic>.from(data);
+        final docCompany = fields['companyUID']?.toString().trim() ?? '';
+        if (docCompany.isNotEmpty && docCompany != companyUID) return null;
+        if (fields['organizationUID']?.toString().isEmpty ?? true) {
+          fields['organizationUID'] = org;
+        }
+        fields['companyUID'] = companyUID;
+        return DelegateModel.fromJson(fields, doc.id);
+      }
+    } catch (_) {
+      // Fall back to the profile below.
+    }
+  }
+  try {
+    final doc = await firestore.collection('users').doc(id).get();
+    final data = doc.data();
+    if (!doc.exists || data == null) return null;
+    if (data['companyUID']?.toString().trim() != companyUID) return null;
+    return DelegateModel.fromJson(Map<String, dynamic>.from(data), doc.id);
+  } catch (_) {
+    // Another company's profile is denied by the rules: same empty state.
+    return null;
+  }
+}
+
+class _HrDelegateDetailMissing extends StatelessWidget {
+  const _HrDelegateDetailMissing({required this.inShell});
+
+  final bool inShell;
+
+  @override
+  Widget build(BuildContext context) {
+    const body = HrEmptyState(
+      key: ValueKey('hr_delegate_detail_missing'),
+      icon: Icons.person_off_outlined,
+      title: 'المندوب غير موجود',
+      message: 'لا يوجد مندوب بهذا الرابط في شركتك.',
+    );
+    if (inShell) return body;
+    return Scaffold(
+      appBar: AppBar(title: const Text(kHrDelegateDetailMissingTitle)),
+      body: body,
+    );
+  }
 }
 
 /// Reads a delegate's attendance logs, scoped to one company (TAS-120).
