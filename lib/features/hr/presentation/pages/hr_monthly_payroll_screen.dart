@@ -5,7 +5,9 @@ import 'package:intl/intl.dart' hide TextDirection;
 
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_table.dart';
+import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
@@ -190,8 +192,26 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
     _loadPayrollData();
   }
 
+  /// Web shell header bridge. The top-bar refresh reloads this page through
+  /// it, so the web toolbar has no refresh button of its own (TAS-119).
+  HrWebHeaderBridge? _headerBridge;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!WebRuntimePolicy.isWeb) return;
+    final next = context
+        .getInheritedWidgetOfExactType<HrWebHeaderBridgeScope>()
+        ?.notifier;
+    if (identical(next, _headerBridge)) return;
+    _headerBridge?.releasePageReload(kHrTabPayroll, _loadPayrollData);
+    _headerBridge = next;
+    _headerBridge?.attachPageReload(kHrTabPayroll, _loadPayrollData);
+  }
+
   @override
   void dispose() {
+    _headerBridge?.releasePageReload(kHrTabPayroll, _loadPayrollData);
     _searchController.dispose();
     super.dispose();
   }
@@ -1303,12 +1323,6 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
       label: const Text('تصدير Excel'),
       onPressed: _exportPayrollToExcel,
     );
-    final refresh = IconButton(
-      tooltip: 'إعادة الاحتساب والتحديث',
-      icon: const Icon(Icons.refresh_rounded),
-      onPressed: _loadPayrollData,
-    );
-
     return LayoutBuilder(
       builder: (context, constraints) {
         // Narrow windows put the search on its own line.
@@ -1322,7 +1336,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                 spacing: 8,
                 runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
-                children: [_buildWebMonthChip(context), rules, export, refresh],
+                children: [_buildWebMonthChip(context), rules, export],
               ),
             ],
           );
@@ -1336,8 +1350,6 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
             rules,
             const SizedBox(width: 8),
             export,
-            const SizedBox(width: 4),
-            refresh,
           ],
         );
       },

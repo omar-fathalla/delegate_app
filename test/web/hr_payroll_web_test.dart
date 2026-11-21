@@ -9,11 +9,13 @@ import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/admin/domain/repositories/admin_repository.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_monthly_payroll_screen.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_table.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -106,7 +108,7 @@ Future<FakeFirebaseFirestore> _seed() async {
   return fs;
 }
 
-Future<void> _pump(WidgetTester t) async {
+Future<void> _pump(WidgetTester t, {HrWebHeaderBridge? bridge}) async {
   t.view.physicalSize = const Size(1440, 900);
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.resetPhysicalSize);
@@ -121,7 +123,15 @@ Future<void> _pump(WidgetTester t) async {
       supportedLocales: AppLocalizations.supportedLocales,
       home: Directionality(
         textDirection: TextDirection.rtl,
-        child: HRMonthlyPayrollScreen(hrDelegate: _hr, showAppBar: false),
+        child: bridge == null
+            ? HRMonthlyPayrollScreen(hrDelegate: _hr, showAppBar: false)
+            : HrWebHeaderBridgeScope(
+                bridge: bridge,
+                child: HRMonthlyPayrollScreen(
+                  hrDelegate: _hr,
+                  showAppBar: false,
+                ),
+              ),
       ),
     ),
   );
@@ -173,6 +183,14 @@ void main() {
           matching: find.byWidgetPredicate((w) => w is FilledButton),
         ),
         findsOneWidget,
+      );
+      // One refresh on web: the shell top bar, not the page (TAS-119).
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('payroll_web_body')),
+          matching: find.byIcon(Icons.refresh_rounded),
+        ),
+        findsNothing,
       );
       // The old mobile KPI row is gone on web.
       expect(find.text('إجمالي الرواتب'), findsNothing);
@@ -324,6 +342,38 @@ void main() {
       expect(find.byType(Dialog), findsOneWidget);
     });
 
+    testWidgets('top-bar refresh reloads payroll through the bridge', (
+      t,
+    ) async {
+      final bridge = HrWebHeaderBridge();
+      await _pump(t, bridge: bridge);
+      expect(
+        t.widget<Text>(find.byKey(const Key('payroll_deductions_fake-d2'))).data,
+        '0 ج.م',
+      );
+
+      // New data, then the shell runs the payroll tab's registered reload.
+      await fs.collection('penalties').add({
+        'companyId': _co,
+        'targetDelegateId': 'fake-d2',
+        'status': 'approved',
+        'fineAmount': 150,
+        'createdAt': Timestamp.fromDate(DateTime.now()),
+      });
+      final reload = bridge.pageReload(kHrTabPayroll);
+      expect(reload, isNotNull);
+      await t.runAsync(reload!);
+      await t.pumpAndSettle();
+      expect(
+        t.widget<Text>(find.byKey(const Key('payroll_deductions_fake-d2'))).data,
+        '-150 ج.م',
+      );
+
+      // Leaving the page releases the hook.
+      await t.pumpWidget(const SizedBox());
+      expect(bridge.pageReload(kHrTabPayroll), isNull);
+    });
+
     testWidgets('table scrolls sideways on a narrow window', (t) async {
       t.view.physicalSize = const Size(700, 900);
       t.view.devicePixelRatio = 1;
@@ -360,7 +410,9 @@ void main() {
 
   testWidgets('mobile keeps the original layout', (t) async {
     WebRuntimePolicy.debugIsWebOverride = false;
-    await _pump(t);
+    final bridge = HrWebHeaderBridge();
+    await _pump(t, bridge: bridge);
+    expect(bridge.pageReload(kHrTabPayroll), isNull);
     expect(find.byKey(const Key('payroll_web_body')), findsNothing);
     expect(find.byType(HrTableCard), findsNothing);
     expect(find.text('إجمالي الرواتب'), findsOneWidget);
