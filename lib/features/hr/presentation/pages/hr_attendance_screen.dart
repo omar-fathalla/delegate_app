@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/tabs/hr_attendance_tab.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// شاشة مستقلة لعرض ومتابعة سجل الحضور والانصراف
 /// (تُستخدم عند فتح السجل من قائمة المشرف أو الأدمن دون استبدال شريط التنقل السفلي)
@@ -50,7 +51,7 @@ class _HRAttendanceScreenState extends State<HRAttendanceScreen> {
                     isArabic ? 'سجل الحضور والانصراف' : 'Attendance & Departure',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14.5,
+                      fontSize: HrFont.body,
                       letterSpacing: -0.2,
                     ),
                     maxLines: 1,
@@ -60,7 +61,7 @@ class _HRAttendanceScreenState extends State<HRAttendanceScreen> {
                     Text(
                       widget.hrDelegate.companyName,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: HrFont.labelSmall,
                         color: colorScheme.onSurfaceVariant,
                       ),
                       maxLines: 1,
