@@ -436,33 +436,20 @@ void main() {
       expect(_visibleRowUids(t).length, 10);
     });
 
-    testWidgets('feature card: Expressive shape, free chip, wired buttons', (
+    testWidgets('feature card: side-card style, free chip, wired buttons', (
       t,
     ) async {
       await _pumpView(t, const Size(1440, 2000), _data());
       final card = find.byKey(const ValueKey('hr_home_feature_card'));
       final cs = _theme().colorScheme;
-      final deco = t.widget<Container>(card).decoration! as ShapeDecoration;
-      expect(deco.color, cs.primaryContainer);
-      final shape = deco.shape as RoundedRectangleBorder;
-      final radius = (shape.borderRadius as BorderRadiusDirectional).resolve(
-        TextDirection.rtl,
-      );
-      final corners = [
-        radius.topLeft.x,
-        radius.topRight.x,
-        radius.bottomLeft.x,
-        radius.bottomRight.x,
-      ];
-      expect(corners.where((c) => c == 72).length, 1);
-      expect(corners.where((c) => c == 28).length, 3);
+      expect(t.widget(card), isA<HrSideCard>());
       expect(
         find.descendant(of: card, matching: find.byIcon(Icons.hub_rounded)),
         findsOneWidget,
       );
       expect(
         find.descendant(of: card, matching: find.byType(HrExpressiveShape)),
-        findsNWidgets(3),
+        findsNothing,
       );
       expect(
         _boxColor(t, find.byKey(const ValueKey('hr_home_free_chip'))),
