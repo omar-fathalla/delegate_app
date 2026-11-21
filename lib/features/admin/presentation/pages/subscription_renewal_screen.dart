@@ -567,12 +567,11 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen>
         return HrEmptyState(
           key: const Key('renewal_empty_state'),
           icon: Icons.event_available_rounded,
-          title: advanceOpen
-              ? 'لا يوجد مناديب بحاجة للتجديد'
-              : 'لا يوجد مناديب موقوفون',
+          // Wording approved 21 Nov 2026 (TAS-174).
+          title: advanceOpen ? 'كل الاشتراكات سارية' : 'لا يوجد مندوب موقوف',
           message: advanceOpen
-              ? 'سيظهر هنا المناديب الذين يحتاجون إلى التجديد في الفترة الحالية أو في التجديد المقدَّم.'
-              : 'سيظهر هنا المناديب الموقوفون بانتهاء الاشتراك عند وجودهم.',
+              ? 'أي مندوب يقترب اشتراكه من الانتهاء سيظهر هنا لتجديده.'
+              : 'إذا انتهى اشتراك مندوب، سيظهر هنا لتجديده.',
         );
       }
       final empty = advanceOpen
@@ -609,10 +608,10 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen>
       if (WebRuntimePolicy.isWeb) {
         return HrEmptyState(
           icon: Icons.filter_alt_off_rounded,
-          title: 'لا يوجد مناديب في هذا التصنيف',
+          title: 'لا توجد نتائج لهذا التصنيف',
           action: TextButton(
             onPressed: () => setState(() => _filter = RenewalListFilter.all),
-            child: const Text('عرض الكل'),
+            child: const Text('عرض كل المناديب'),
           ),
         );
       }

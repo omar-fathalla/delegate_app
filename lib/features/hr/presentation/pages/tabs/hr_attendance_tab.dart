@@ -2032,7 +2032,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                       title: 'انصرف',
                       count: departedCount,
                       icon: Icons.timelapse_rounded,
-                      color: HrStatusColors.of(context).warning,
+                      color: HrStatusColors.of(context).info,
                       theme: theme,
                       isSelected: _statusFilter == 'departed',
                       onTap: () => setState(() => _statusFilter = 'departed'),
@@ -2045,7 +2045,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                         title: 'إجازة معتمدة',
                         count: onLeaveCount,
                         icon: Icons.event_available_rounded,
-                        color: const Color(0xFF00796B),
+                        color: HrStatusColors.of(context).info,
                         theme: theme,
                         isSelected: _statusFilter == 'leave',
                         onTap: () => setState(() => _statusFilter = 'leave'),
@@ -2129,7 +2129,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                     title: 'انصرف',
                     count: departedCount,
                     icon: Icons.timelapse_rounded,
-                    color: HrStatusColors.of(context).warning,
+                    color: HrStatusColors.of(context).info,
                     theme: theme,
                     isSelected: _statusFilter == 'departed',
                     onTap: () => setState(() => _statusFilter = 'departed'),
@@ -2141,7 +2141,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                       title: 'إجازات',
                       count: onLeaveCount,
                       icon: Icons.event_available_rounded,
-                      color: const Color(0xFF00796B),
+                      color: HrStatusColors.of(context).info,
                       theme: theme,
                       isSelected: _statusFilter == 'leave',
                       onTap: () => setState(() => _statusFilter = 'leave'),
@@ -3262,12 +3262,14 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
         statusText = 'انصرف (تلقائي)';
         statusIcon = Icons.auto_mode_rounded;
       } else {
-        statusColor = HrStatusColors.of(context).warning;
+        // Approved 21 Nov 2026: a normal check-out is calm (info), not a
+        // warning. Auto check-out stays a warning.
+        statusColor = HrStatusColors.of(context).info;
         statusText = 'انصرف اليوم';
         statusIcon = Icons.timelapse_rounded;
       }
     } else if (record.isOnLeave) {
-      statusColor = const Color(0xFF00796B);
+      statusColor = HrStatusColors.of(context).info;
       statusText = record.formattedLeaveType;
       statusIcon = Icons.event_available_rounded;
     } else {
@@ -3676,14 +3678,14 @@ const List<HrTableColumn> hrAttendanceTableColumns = [
           )
         : (
             label: 'انصرف اليوم',
-            tone: HrStatusTone.warning,
+            tone: HrStatusTone.info,
             icon: Icons.timelapse_rounded,
           );
   }
   if (record.isOnLeave) {
     return (
       label: record.formattedLeaveType,
-      tone: HrStatusTone.neutral,
+      tone: HrStatusTone.info,
       icon: Icons.event_available_rounded,
     );
   }
@@ -3925,13 +3927,13 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
             action(
               icon: Icons.call_outlined,
               tooltip: 'اتصال هاتفي',
-              color: statusColors.success,
+              color: colorScheme.onSurfaceVariant,
               onPressed: () => widget.onCallPhone(record.delegate.phoneNumber),
             ),
             action(
               icon: Icons.chat_outlined,
               tooltip: 'محادثة واتساب',
-              color: statusColors.success,
+              color: colorScheme.onSurfaceVariant,
               onPressed: () =>
                   widget.onOpenWhatsApp(record.delegate.phoneNumber),
             ),
@@ -3939,7 +3941,7 @@ class _HRAttendanceTableRowItemState extends State<_HRAttendanceTableRowItem> {
           action(
             icon: Icons.history_rounded,
             tooltip: 'السجل الشهري والتفصيلي',
-            color: colorScheme.primary,
+            color: colorScheme.onSurfaceVariant,
             onPressed: widget.onTap,
           ),
         ],

@@ -59,14 +59,15 @@ void main() {
               HrStatusChip(label: 'نشط', tone: HrStatusTone.success),
               HrStatusChip(label: 'قيد المراجعة', tone: HrStatusTone.warning),
               HrStatusChip(label: 'مرفوض', tone: HrStatusTone.danger),
+              HrStatusChip(label: 'إجازة', tone: HrStatusTone.info),
               HrStatusChip(label: 'متوقف', tone: HrStatusTone.neutral),
             ],
           ),
           brightness: brightness,
         ),
       );
-      expect(find.byType(Icon), findsNWidgets(4));
-      for (final label in ['نشط', 'قيد المراجعة', 'مرفوض', 'متوقف']) {
+      expect(find.byType(Icon), findsNWidgets(5));
+      for (final label in ['نشط', 'قيد المراجعة', 'مرفوض', 'إجازة', 'متوقف']) {
         expect(find.text(label), findsOneWidget);
       }
     });

@@ -39,7 +39,11 @@ permissions:
 jobs:
   check:
     name: Check indexes vs prod (read-only)
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    # Fork PRs get no secrets, so the prod check cannot run there (TAS-178).
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.draft == false &&
+       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
