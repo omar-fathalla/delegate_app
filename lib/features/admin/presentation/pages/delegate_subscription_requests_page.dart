@@ -20,9 +20,13 @@ import 'super_admin_subscription_financial_report_screen.dart';
 class DelegateSubscriptionRequestsPage extends StatefulWidget {
   final Delegate currentAdmin;
 
+  /// Web only: the tab to open first. Mobile ignores it.
+  final SubscriptionRequestsWebTab initialTab;
+
   const DelegateSubscriptionRequestsPage({
     super.key,
     required this.currentAdmin,
+    this.initialTab = SubscriptionRequestsWebTab.delegates,
   });
 
   @override
@@ -62,6 +66,7 @@ class _DelegateSubscriptionRequestsPageState
         currentAdmin: widget.currentAdmin,
         onApprove: _handleApprove,
         onReject: _handleReject,
+        initialTab: widget.initialTab,
       );
     }
     final theme = Theme.of(context);

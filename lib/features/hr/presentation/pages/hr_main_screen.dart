@@ -85,6 +85,11 @@ class _HRMainScreenState extends State<HRMainScreen> {
     setState(() {});
     final reload = _headerBridge.reloadHome;
     if (reload != null) unawaited(reload());
+    // The open page's own data, when it registered a reload (TAS-148).
+    if (_currentIndex != _homeIndex) {
+      final page = _headerBridge.pageReload(_currentIndex);
+      if (page != null) unawaited(page());
+    }
   }
 
   void _onTabSelected(int index) {

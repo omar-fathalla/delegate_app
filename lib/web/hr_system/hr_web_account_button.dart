@@ -45,6 +45,7 @@ class HrWebAccountButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isLight = cs.brightness == Brightness.light;
     final l10n = AppLocalizations.of(context)!;
     final name = _name;
     final role = UniversalAppHeader.roleLabelFor(
@@ -153,15 +154,31 @@ class HrWebAccountButton extends StatelessWidget {
             decoration: BoxDecoration(
               color: cs.surfaceContainer,
               borderRadius: BorderRadius.circular(HrRadius.card),
-              // M3 level-2 lift. Material elevation paints a hard edge in this
-              // renderer, so the shadow is a soft blur with no outline.
-              boxShadow: [
-                BoxShadow(
-                  color: cs.shadow.withValues(alpha: 0.16),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              // In light mode the panel sits on a near-white page, so it gets
+              // a hairline outline and the M3 level-3 key + ambient shadows
+              // (TAS-141). Dark mode keeps the soft level-2 lift.
+              border: isLight ? Border.all(color: cs.outlineVariant) : null,
+              boxShadow: isLight
+                  ? [
+                      BoxShadow(
+                        color: cs.shadow.withValues(alpha: 0.30),
+                        blurRadius: 3,
+                        offset: const Offset(0, 1),
+                      ),
+                      BoxShadow(
+                        color: cs.shadow.withValues(alpha: 0.15),
+                        blurRadius: 16,
+                        spreadRadius: 2,
+                        offset: const Offset(0, 6),
+                      ),
+                    ]
+                  : [
+                      BoxShadow(
+                        color: cs.shadow.withValues(alpha: 0.16),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(HrRadius.card),

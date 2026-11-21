@@ -18,6 +18,10 @@ class AddDelegateDesktopBreakpoints {
   /// Two columns (form + sticky summary) from here.
   static const double twoColumns = 1024;
 
+  /// Two columns inside the web HR shell (TAS-140). This is the width of the
+  /// shell's content area, which already excludes the side navigation.
+  static const double twoColumnsInShell = 880;
+
   /// The side navigation is expanded from here; below it is the rail.
   static const double expandedNav = 1200;
 

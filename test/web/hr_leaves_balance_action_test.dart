@@ -1,10 +1,30 @@
+import 'package:dartz/dartz.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
+import 'package:delegate_app/features/admin/domain/repositories/admin_repository.dart';
+import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_leaves_and_excuses_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/injection_container.dart';
+import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
+
+/// Counts company-delegate loads, so the shell reload can be observed.
+class _CountingGetCompanyDelegates extends Fake implements GetCompanyDelegates {
+  int calls = 0;
+
+  @override
+  Future<Either<Failure, CompanyDelegatesResult>> call(
+    GetCompanyDelegatesParams params,
+  ) async {
+    calls++;
+    return const Left(ServerFailure('fake'));
+  }
+}
 
 final _hr = Delegate(
   uid: 'hr-1',
@@ -54,17 +74,22 @@ void main() {
     addTearDown(tester.view.reset);
   }
 
-  Future<void> pump(WidgetTester tester, {required bool showAppBar}) async {
+  Future<void> pump(
+    WidgetTester tester, {
+    required bool showAppBar,
+    HrWebHeaderBridge? bridge,
+  }) async {
+    Widget screen = HRLeavesAndExcusesScreen(
+      hrDelegate: _hr,
+      showAppBar: showAppBar,
+      firestore: FakeFirebaseFirestore(),
+    );
+    if (bridge != null) {
+      screen = HrWebHeaderBridgeScope(bridge: bridge, child: screen);
+    }
     await tester.pumpWidget(
       MaterialApp(
-        home: Directionality(
-          textDirection: TextDirection.rtl,
-          child: HRLeavesAndExcusesScreen(
-            hrDelegate: _hr,
-            showAppBar: showAppBar,
-            firestore: FakeFirebaseFirestore(),
-          ),
-        ),
+        home: Directionality(textDirection: TextDirection.rtl, child: screen),
       ),
     );
     await tester.pumpAndSettle();
@@ -139,5 +164,39 @@ void main() {
     await pump(tester, showAppBar: true);
     expect(find.byKey(manage), findsNothing);
     expect(find.byIcon(Icons.refresh_rounded), findsNothing);
+  });
+
+  testWidgets('web shell: the top-bar refresh reloads this tab', (
+    tester,
+  ) async {
+    sl.allowReassignment = true;
+    final delegates = _CountingGetCompanyDelegates();
+    sl.registerFactory<GetCompanyDelegates>(() => delegates);
+    addTearDown(() => sl.unregister<GetCompanyDelegates>());
+    final bridge = HrWebHeaderBridge();
+    addTearDown(bridge.dispose);
+
+    WebRuntimePolicy.debugIsWebOverride = true;
+    window(tester, const Size(1440, 900));
+    await pump(tester, showAppBar: false, bridge: bridge);
+    final reload = bridge.pageReload(kHrTabLeaves);
+    expect(reload, isNotNull);
+    final before = delegates.calls;
+    await tester.runAsync(reload!);
+    await tester.pumpAndSettle();
+    expect(delegates.calls, before + 1);
+
+    // Leaving the tree releases the hook.
+    await tester.pumpWidget(const SizedBox());
+    expect(bridge.pageReload(kHrTabLeaves), isNull);
+  });
+
+  testWidgets('mobile tab does not register a shell reload', (tester) async {
+    final bridge = HrWebHeaderBridge();
+    addTearDown(bridge.dispose);
+    WebRuntimePolicy.debugIsWebOverride = false;
+    window(tester, const Size(400, 860));
+    await pump(tester, showAppBar: false, bridge: bridge);
+    expect(bridge.pageReload(kHrTabLeaves), isNull);
   });
 }
