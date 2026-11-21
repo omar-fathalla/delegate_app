@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// Thin overlay scrollbar for the web HR shell.
 ///
@@ -21,7 +22,7 @@ class HrOverlayScrollbar extends StatelessWidget {
             if (states.contains(WidgetState.hovered)) return 6.0;
             return 4.0;
           }),
-          radius: const Radius.circular(8),
+          radius: const Radius.circular(HrRadius.chip),
           thumbColor: WidgetStateProperty.resolveWith((states) {
             final alpha = states.contains(WidgetState.dragged)
                 ? 0.55

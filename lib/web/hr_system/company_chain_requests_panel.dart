@@ -5,6 +5,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/features/admin/data/company_chains.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// «طلبات ضم سلاسل» on the web requests page: company-level requests (no
 /// delegate on them). Super admin / technical support see all; a chain
@@ -128,14 +129,14 @@ class _CompanyChainRequestsPanelState extends State<CompanyChainRequestsPanel> {
       margin: const EdgeInsets.only(top: 8),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           InkWell(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(HrRadius.card),
             onTap: () => setState(() => _expanded = !_expanded),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
@@ -146,7 +147,7 @@ class _CompanyChainRequestsPanelState extends State<CompanyChainRequestsPanel> {
                   Expanded(
                     child: Text(
                       'طلبات ضم سلاسل (${all.length})',
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: HrFont.body),
                     ),
                   ),
                   Icon(_expanded ? Symbols.expand_less_rounded : Symbols.expand_more_rounded),
@@ -178,7 +179,7 @@ class _CompanyChainRequestsPanelState extends State<CompanyChainRequestsPanel> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(HrRadius.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -195,7 +196,7 @@ class _CompanyChainRequestsPanelState extends State<CompanyChainRequestsPanel> {
                         style: const TextStyle(fontWeight: FontWeight.w700)),
                     Text(
                       'طلب ضم ${list.length} سلسلة · ${first.supervisorName}',
-                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                      style: TextStyle(fontSize: HrFont.labelMedium, color: cs.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -215,7 +216,7 @@ class _CompanyChainRequestsPanelState extends State<CompanyChainRequestsPanel> {
                 children: [
                   const SizedBox(width: 26),
                   Expanded(
-                    child: Text(r.organizationName, style: const TextStyle(fontSize: 13.5)),
+                    child: Text(r.organizationName, style: const TextStyle(fontSize: HrFont.body)),
                   ),
                   IconButton(
                     key: CompanyChainRequestsPanel.rejectKey(r.id),

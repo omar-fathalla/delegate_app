@@ -22,6 +22,7 @@ import 'package:delegate_app/main.dart';
 import 'package:delegate_app/web/hr_system/hr_web_account_button.dart';
 import 'package:delegate_app/web/hr_system/hr_shell_link.dart';
 import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 class HRMainScreen extends StatefulWidget {
   final Delegate delegate;
@@ -161,7 +162,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
         return Badge(
           label: Text(
             '$count',
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: HrFont.labelSmall, fontWeight: FontWeight.bold),
           ),
           backgroundColor: colorScheme.error,
           textColor: colorScheme.onError,
@@ -187,7 +188,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
         return Badge(
           label: Text(
             '$count',
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: HrFont.labelSmall, fontWeight: FontWeight.bold),
           ),
           backgroundColor: colorScheme.error,
           textColor: colorScheme.onError,
@@ -291,7 +292,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
               child: Text(
                 title,
                 style: TextStyle(
-                  fontSize: 13.5,
+                  fontSize: HrFont.body,
                   fontWeight: FontWeight.w500,
                   color: color,
                 ),

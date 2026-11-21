@@ -8,6 +8,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/profile/presentation/pages/user_profile_screen.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/web/hr_system/hr_western_digits.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// Header account control for the web HR shell.
 ///
@@ -73,7 +74,7 @@ class HrWebAccountButton extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: cs.secondaryContainer,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -142,7 +143,7 @@ class HrWebAccountButton extends StatelessWidget {
             width: 300,
             decoration: BoxDecoration(
               color: cs.surfaceContainer,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(HrRadius.card),
               // M3 level-2 lift. Material elevation paints a hard edge in this
               // renderer, so the shadow is a soft blur with no outline.
               boxShadow: [
@@ -154,7 +155,7 @@ class HrWebAccountButton extends StatelessWidget {
               ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(HrRadius.card),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -181,7 +182,7 @@ class HrWebAccountButton extends StatelessWidget {
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      fontSize: 16,
+                                      fontSize: HrFont.titleMedium,
                                       fontWeight: FontWeight.w700,
                                       color: cs.onSurface,
                                     ),
@@ -194,12 +195,12 @@ class HrWebAccountButton extends StatelessWidget {
                                     ),
                                     decoration: BoxDecoration(
                                       color: cs.secondaryContainer,
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(HrRadius.chip),
                                     ),
                                     child: Text(
                                       role,
                                       style: TextStyle(
-                                        fontSize: 12,
+                                        fontSize: HrFont.labelMedium,
                                         fontWeight: FontWeight.w700,
                                         color: cs.onSecondaryContainer,
                                       ),
@@ -292,7 +293,7 @@ class HrWebAccountButton extends StatelessWidget {
               child: InkWell(
                 key: const ValueKey('hr_web_header_account'),
                 focusColor: cs.primary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(HrRadius.pill),
                 onTap: () {
                   if (controller.isOpen) {
                     controller.close();
@@ -344,7 +345,7 @@ class _ContactRow extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             textDirection: textDirection,
             locale: ltr ? const Locale('en') : null,
-            style: TextStyle(fontSize: 13, color: cs.onSurface),
+            style: TextStyle(fontSize: HrFont.body, color: cs.onSurface),
           ),
         ),
       ],
