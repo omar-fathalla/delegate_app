@@ -17,12 +17,20 @@ on:
 permissions:
   contents: read
 
-# Shared with PR User Test builds so both workflows take the single
-# tashil-delegate-mac runner one at a time instead of interleaving jobs.
-# cancel-in-progress is false so CI and User Test do not cancel each other.
+# Where jobs run (TAS-178): while the repo is private they run on the Mac
+# self-hosted runners (delegate-app labels). Once the repo is public they run
+# on GitHub-hosted runners (ubuntu-latest, iOS on macos-latest), which are free
+# for public repos, and nothing from a fork PR ever reaches the Mac.
+
+# One group per workflow per PR (TAS-172): a new push to a PR cancels that PR's
+# older CI run, so superseded commits stop holding runner slots. The group name
+# is different from PR User Test builds (user-test-…), so CI and User Test
+# never cancel each other. Pushes to dev and manual runs are never cancelled.
+# Heavy Mac builds still run one at a time: they only run on the slot-3
+# runner (see build-web below).
 concurrency:
-  group: tashil-delegate-mac-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  group: ci-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   PATH: /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
@@ -33,7 +41,7 @@ jobs:
   analyze:
     name: Analyze
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: [self-hosted, macOS, ARM64, delegate-app]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","macOS","ARM64","delegate-app"]') || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +61,7 @@ jobs:
           # Self-hosted tashil-delegate-mac already has the SDK in the
           # runner tool cache. GitHub Actions cache upload of the Flutter
           # SDK stalled the Analyze post-step for 10+ minutes.
-          cache: false
+          cache: ${{ !github.event.repository.private }}
       - name: Install dependencies
         run: flutter pub get --enforce-lockfile
       # Fails only on errors; warnings/infos are reported but don't fail the job.
@@ -63,7 +71,7 @@ jobs:
   test:
     name: Test
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: [self-hosted, macOS, ARM64, delegate-app]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","macOS","ARM64","delegate-app"]') || 'ubuntu-latest' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -83,7 +91,7 @@ jobs:
           # Self-hosted tashil-delegate-mac already has the SDK in the
           # runner tool cache. GitHub Actions cache upload of the Flutter
           # SDK stalled the Analyze post-step for 10+ minutes.
-          cache: false
+          cache: ${{ !github.event.repository.private }}
       - name: Install dependencies
         run: flutter pub get --enforce-lockfile
       - name: Test
@@ -92,7 +100,7 @@ jobs:
   p0-scripts:
     name: P0 scripts (emulators)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: [self-hosted, macOS, ARM64, delegate-app]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","macOS","ARM64","delegate-app"]') || 'ubuntu-latest' }}
     timeout-minutes: 15
     defaults:
       run:
@@ -127,12 +135,13 @@ jobs:
   build-web:
     name: Build web (release)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: [self-hosted, macOS, ARM64, delegate-app]
+    # One heavy delegate_app build at a time on the Mac (TAS-172): heavy builds
+    # run only on the runner labelled slot-3, so they wait in GitHub's normal
+    # job queue one behind the other. The old repo-wide concurrency group
+    # (delegate-mac-heavy-build) kept only ONE pending job, so each new PR
+    # cancelled the previous PR's waiting build.
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","macOS","ARM64","delegate-app","slot-3"]') || 'ubuntu-latest' }}
     timeout-minutes: 180
-    # One heavy delegate_app build at a time on the Mac (replaces ~/mac-resources lock).
-    concurrency:
-      group: delegate-mac-heavy-build
-      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - name: Sanitize PATH for delegate-ci
@@ -151,7 +160,7 @@ jobs:
           # Self-hosted tashil-delegate-mac already has the SDK in the
           # runner tool cache. GitHub Actions cache upload of the Flutter
           # SDK stalled the Analyze post-step for 10+ minutes.
-          cache: false
+          cache: ${{ !github.event.repository.private }}
       - name: Install dependencies
         run: flutter pub get --enforce-lockfile
       - name: Build web
@@ -160,7 +169,7 @@ jobs:
   ios-dev-config-check:
     name: iOS dev config (static)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: [self-hosted, macOS, ARM64, delegate-app]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","macOS","ARM64","delegate-app"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -187,7 +196,7 @@ jobs:
   android-dev-config-check:
     name: Android dev config (static)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: [self-hosted, macOS, ARM64, delegate-app]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","macOS","ARM64","delegate-app"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -203,7 +212,7 @@ jobs:
   functions:
     name: Functions lint & test
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: [self-hosted, macOS, ARM64, delegate-app]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","macOS","ARM64","delegate-app"]') || 'ubuntu-latest' }}
     timeout-minutes: 15
     defaults:
       run:
@@ -241,7 +250,7 @@ jobs:
   rules:
     name: Firestore rules & delegate login e2e (emulators)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: [self-hosted, macOS, ARM64, delegate-app]
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","macOS","ARM64","delegate-app"]') || 'ubuntu-latest' }}
     # TAS-107: 17+ suites; 20 min ran out on a busy Mac (#384, 20 Nov 2026).
     timeout-minutes: 35
     steps:
