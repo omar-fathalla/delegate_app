@@ -26,7 +26,11 @@ Do **not** store passwords in this file.
 
 1. Mint a Firebase custom token for the Auth UID (service account with sign capability).
 2. Client `signInWithCustomToken`, then rely on auto-login cache **or** use
-   `lib/main_real_test.dart` with `--dart-define=REAL_TEST_CUSTOM_TOKEN=...`.
+   `lib/main_real_test.dart` with `--dart-define=ENV=dev` (or `ENV=prod` on
+   purpose) plus `REAL_TEST_CUSTOM_TOKEN`, `REAL_TEST_UID`, `REAL_TEST_EMAIL`,
+   `REAL_TEST_ORG` and optionally `REAL_TEST_PHONE` dart-defines. The
+   entrypoint holds no account data and refuses to start without an explicit
+   `ENV` (TAS-78).
 3. UI email/password login needs the Auth password; if unknown, do not reset —
    use the custom-token path instead.
 
