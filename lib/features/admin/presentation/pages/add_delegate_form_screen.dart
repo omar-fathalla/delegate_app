@@ -38,10 +38,17 @@ class AddDelegateFormScreen extends StatefulWidget {
   @visibleForTesting
   final Future<List<Map<String, dynamic>>> Function()? debugOrganizationsLoader;
 
+  /// True when the page is opened inside the web HR shell with
+  /// [pushHrInnerPage] (TAS-140). The shell already shows the side
+  /// navigation, the top bar and a breadcrumb, so the page draws only its
+  /// form and summary.
+  final bool inShell;
+
   const AddDelegateFormScreen({
     super.key,
     required this.supervisor,
     this.debugOrganizationsLoader,
+    this.inShell = false,
   });
 
   @override
@@ -599,6 +606,15 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
     final colorScheme = theme.colorScheme;
 
     final width = MediaQuery.sizeOf(context).width;
+    if (widget.inShell) {
+      return Directionality(
+        textDirection: TextDirection.rtl,
+        child: LayoutBuilder(
+          builder: (context, constraints) =>
+              _buildShellBody(colorScheme, constraints.maxWidth),
+        ),
+      );
+    }
     if (AddDelegateDesktopBreakpoints.useDesktop(
       isWeb: WebRuntimePolicy.isWeb,
       width: width,
@@ -1100,6 +1116,19 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
     );
   }
 
+  /// The page inside the web HR shell: no sidebar and no header of its own.
+  Widget _buildShellBody(ColorScheme colorScheme, double width) {
+    if (_isLoadingOrgs) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return Form(
+      key: _formKey,
+      child: width >= AddDelegateDesktopBreakpoints.twoColumnsInShell
+          ? _buildTwoColumnBody(colorScheme, width)
+          : _buildSingleColumnBody(colorScheme),
+    );
+  }
+
   Widget _buildDesktopHeader(ColorScheme colorScheme) {
     final l10n = AppLocalizations.of(context);
     final bridge = HrShellLink.bridge;
@@ -1252,16 +1281,18 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
           ],
         ),
       ),
-      const SizedBox(height: 16),
-      AddDelegateSectionCard(
-        icon: _isFreePromotion ? Icons.card_giftcard_rounded : Symbols.payments_rounded,
-        title: _isFreePromotion
-            ? 'الاشتراك والربط (مجاناً حتى 31/12)'
-            : 'الاشتراك والدفع الإلكتروني (${SubscriptionCycleHelper.getRemainingMonthsInCycle()} أشهر - ${SubscriptionCycleHelper.formatEgp(SubscriptionCycleHelper.getProratedSubscriptionFee(null, _companyUID))} ج.م)',
-        child: _isFreePromotion
-            ? _buildFreePromotionCard(colorScheme)
-            : _buildPaymobCard(colorScheme),
-      ),
+      // The free offer is announced once, by the cycle banner (in the
+      // summary column when there are two columns). Only a paid plan needs
+      // its own section here (TAS-140).
+      if (!_isFreePromotion) ...[
+        const SizedBox(height: 16),
+        AddDelegateSectionCard(
+          key: const ValueKey('add_delegate_payment_section'),
+          icon: Symbols.payments_rounded,
+          title: 'الاشتراك والدفع الإلكتروني (${SubscriptionCycleHelper.getRemainingMonthsInCycle()} أشهر - ${SubscriptionCycleHelper.formatEgp(SubscriptionCycleHelper.getProratedSubscriptionFee(null, _companyUID))} ج.م)',
+          child: _buildPaymobCard(colorScheme),
+        ),
+      ],
     ];
   }
 
