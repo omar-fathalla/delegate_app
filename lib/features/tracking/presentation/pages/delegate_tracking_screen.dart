@@ -1,5 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_table.dart';
+import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
 import 'package:flutter/material.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
@@ -19,11 +23,22 @@ class DelegateTrackingScreen extends StatefulWidget {
   final bool initialMapView;
   final bool showAppBar;
 
+  /// The tab inside the HR web shell (TAS-148). Takes effect on web only:
+  /// the shell's top-bar refresh is the page's only refresh, the map opens
+  /// on the company's branches, and the list uses the HR web styles.
+  /// Mobile and other roles leave it false.
+  final bool hrWebShell;
+
+  /// Test seam; defaults to the real service.
+  final DelegateTrackingService? trackingService;
+
   const DelegateTrackingScreen({
     super.key,
     required this.adminDelegate,
     this.initialMapView = false,
     this.showAppBar = true,
+    this.hrWebShell = false,
+    @visibleForTesting this.trackingService,
   });
 
   @override
@@ -47,16 +62,35 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
   /// Injectable clock for tests (Cairo "today" filtering).
   DateTime Function() now = DateTime.now;
 
+  /// HR web shell: the shell's header bridge that runs this page's reload.
+  HrWebHeaderBridge? _headerBridge;
+
+  bool get _hrWeb => widget.hrWebShell && WebRuntimePolicy.isWeb;
+
   @override
   void initState() {
     super.initState();
     _isMapView = widget.initialMapView;
-    _trackingService = DelegateTrackingService();
+    _trackingService = widget.trackingService ?? DelegateTrackingService();
     _populateInitialData();
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_hrWeb) return;
+    final next = context
+        .getInheritedWidgetOfExactType<HrWebHeaderBridgeScope>()
+        ?.notifier;
+    if (identical(next, _headerBridge)) return;
+    _headerBridge?.releasePageReload(kHrTabTracking, _populateInitialData);
+    _headerBridge = next;
+    _headerBridge?.attachPageReload(kHrTabTracking, _populateInitialData);
+  }
+
+  @override
   void dispose() {
+    _headerBridge?.releasePageReload(kHrTabTracking, _populateInitialData);
     _searchController.dispose();
     super.dispose();
   }
@@ -437,6 +471,11 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
 
           final Widget content;
           if (_isMapView) {
+            // HR web: draw the company's branches (from its own tracking
+            // sessions, any day) so the map never opens on a blank Cairo.
+            final mapBranches = _hrWeb
+                ? TrackingMapBranch.fromSessions(rawSessions)
+                : const <TrackingMapBranch>[];
             content = TrackingLiveMapView(
               sessions: filteredSessions,
               initialSelectedDelegateId: _selectedDelegateId,
@@ -444,6 +483,12 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
                 _handleToggleTracking(session, !session.isTrackingEnabled);
               },
               onRefresh: _populateInitialData,
+              showRefreshControls: !_hrWeb,
+              branches: mapBranches,
+              emptyMapTitle: _hrWeb ? _emptyMapTitle(allSessions) : null,
+              emptyMapMessage: _hrWeb
+                  ? _emptyMapMessage(allSessions, mapBranches)
+                  : null,
             );
           } else {
             content = RefreshIndicator(
@@ -456,6 +501,7 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
                       padding: const EdgeInsetsDirectional.fromSTEB(
                           16.0, 12.0, 16.0, 8.0),
                       child: TrackingStatsOverview(
+                        uniformStyle: _hrWeb,
                         totalCount: totalCount,
                         activeTrackingCount: activeTrackingCount,
                         insideCount: insideCount,
@@ -672,6 +718,20 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
                 const SliverToBoxAdapter(child: SizedBox(height: 32)),
               ],
             ),
+          );
+        }
+
+        if (!widget.showAppBar && _hrWeb) {
+          return Column(
+            children: [
+              _buildHrWebTopBar(
+                context: context,
+                totalCount: totalCount,
+                insideCount: insideCount,
+                outsideCount: outsideCount,
+              ),
+              Expanded(child: content),
+            ],
           );
         }
 
@@ -1136,6 +1196,108 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
           else
             const SizedBox(width: 18),
         ],
+      ),
+    );
+  }
+
+  String _emptyMapTitle(List<DelegateTrackingSession> allSessions) =>
+      allSessions.isEmpty
+          ? 'لا يوجد مناديب حاضرون الآن'
+          : 'لا توجد نتائج مطابقة للفلترة الحالية';
+
+  String _emptyMapMessage(
+    List<DelegateTrackingSession> allSessions,
+    List<TrackingMapBranch> branches,
+  ) {
+    if (allSessions.isNotEmpty) {
+      return 'غيّر البحث أو الفلترة لعرض المناديب على الخريطة.';
+    }
+    return branches.isEmpty
+        ? 'سيظهر المناديب على الخريطة عند تسجيل حضورهم.'
+        : 'تظهر فروع الشركة على الخريطة، وسيظهر المناديب عند تسجيل حضورهم.';
+  }
+
+  /// HR web shell bar: view switch and live status only. The shell's top
+  /// bar owns the refresh.
+  Widget _buildHrWebTopBar({
+    required BuildContext context,
+    required int totalCount,
+    required int insideCount,
+    required int outsideCount,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      key: const ValueKey('tracking_hr_web_bar'),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(color: colorScheme.outlineVariant),
+        ),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: 40,
+              child: SegmentedButton<bool>(
+                key: const ValueKey('tracking_view_switch'),
+                showSelectedIcon: false,
+                style: SegmentedButton.styleFrom(
+                  visualDensity: VisualDensity.standard,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  minimumSize: const Size(0, 40),
+                ),
+                segments: [
+                  const ButtonSegment<bool>(
+                    value: true,
+                    label: Text('الخريطة الحية'),
+                    icon: Icon(Icons.map_outlined),
+                  ),
+                  ButtonSegment<bool>(
+                    value: false,
+                    label: Text('قائمة تفصيلية ($totalCount)'),
+                    icon: const Icon(Icons.view_list_outlined),
+                  ),
+                ],
+                selected: {_isMapView},
+                onSelectionChanged: (selection) {
+                  final val = selection.first;
+                  setState(() {
+                    if (!val) _selectedDelegateId = null;
+                    _isMapView = val;
+                  });
+                },
+              ),
+            ),
+            if (totalCount > 0) ...[
+              const SizedBox(width: 12),
+              HrStatusChip(
+                label: '$insideCount داخل النطاق',
+                tone: HrStatusTone.success,
+              ),
+              if (outsideCount > 0) ...[
+                const SizedBox(width: 8),
+                HrStatusChip(
+                  label: '$outsideCount خارج النطاق',
+                  tone: HrStatusTone.warning,
+                  icon: Icons.warning_amber_rounded,
+                ),
+              ],
+            ],
+            if (_isSyncing || _isBulkUpdating) ...[
+              const SizedBox(width: 12),
+              const SizedBox(
+                key: ValueKey('tracking_syncing'),
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
