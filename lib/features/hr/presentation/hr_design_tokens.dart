@@ -65,6 +65,9 @@ class HrStatusColors {
     required this.onDanger,
     required this.dangerContainer,
     required this.onDangerContainer,
+    required this.info,
+    required this.infoContainer,
+    required this.onInfoContainer,
   });
 
   final Color success;
@@ -80,8 +83,14 @@ class HrStatusColors {
   final Color dangerContainer;
   final Color onDangerContainer;
 
+  /// Calm, expected states (checked out, on leave). Approved 21 Nov 2026.
+  final Color info;
+  final Color infoContainer;
+  final Color onInfoContainer;
+
   static const Color _successSeed = Color(0xFF2E7D32);
   static const Color _warningSeed = Color(0xFFE65100);
+  static const Color _infoSeed = Color(0xFF1565C0);
 
   static final Map<(Brightness, int), HrStatusColors> _cache = {};
 
@@ -97,6 +106,10 @@ class HrStatusColors {
         seedColor: _warningSeed,
         brightness: scheme.brightness,
       );
+      final info = ColorScheme.fromSeed(
+        seedColor: _infoSeed,
+        brightness: scheme.brightness,
+      );
       return HrStatusColors._(
         success: ok.primary,
         onSuccess: ok.onPrimary,
@@ -110,6 +123,9 @@ class HrStatusColors {
         onDanger: scheme.onError,
         dangerContainer: scheme.errorContainer,
         onDangerContainer: scheme.onErrorContainer,
+        info: info.primary,
+        infoContainer: info.primaryContainer,
+        onInfoContainer: info.onPrimaryContainer,
       );
     });
   }

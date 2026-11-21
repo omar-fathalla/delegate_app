@@ -173,11 +173,10 @@ void main() {
       });
 
       test('Responsive Grid Extents for Web and Mobile are ergonomically configured', () {
-        // Attendance tab responsive grid
-        const double attendanceWebMaxCrossAxisExtent = 600.0;
-        const double attendanceWebMainAxisExtent = 235.0;
-        expect(attendanceWebMaxCrossAxisExtent, equals(600.0));
-        expect(attendanceWebMainAxisExtent, equals(235.0));
+        // Attendance tab cards grid: fixed column count from the width
+        // (TAS-147), cards at least 360 wide and 235 tall.
+        expect(kHrAttendanceCardMinWidth, equals(360.0));
+        expect(kHrAttendanceCardHeight, equals(235.0));
 
         // Delegates tab responsive grid
         const double delegatesWebMaxCrossAxisExtent = 550.0;

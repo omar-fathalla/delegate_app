@@ -559,8 +559,13 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
         builder: (ctx) => Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.pill)),
           backgroundColor: Theme.of(context).colorScheme.surface,
+          // Size to content: capped width on web, and a max height relative
+          // to the screen so short content leaves no empty area (TAS-152).
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 540, maxHeight: 780),
+            constraints: BoxConstraints(
+              maxWidth: 560,
+              maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+            ),
             child: _CompanyPayrollPolicySheet(
               config: _companyPayrollConfig,
               hrDelegate: widget.hrDelegate,
@@ -779,44 +784,27 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                     padding: const EdgeInsets.all(16),
                     children: [
                       if (!widget.showAppBar) ...[
+                        // The shell's top bar already shows the page title,
+                        // so the page keeps only its actions, with labels
+                        // (TAS-152).
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'مسيرات الرواتب الشهرية',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: HrFont.body,
-                                      letterSpacing: -0.2,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  Text(
-                                    widget.hrDelegate.companyName,
-                                    style: TextStyle(
-                                      fontSize: HrFont.labelSmall,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.tune_rounded),
-                              tooltip: 'قواعد وسياسة الرواتب للشركة',
+                            TextButton.icon(
+                              icon: const Icon(Icons.tune_rounded, size: 18),
+                              label: const Text('قواعد الرواتب'),
                               onPressed: _openCompanyPayrollPolicyDialog,
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.file_download_outlined),
-                              tooltip: 'تصدير مسير الرواتب إلى Excel',
+                            const SizedBox(width: 8),
+                            OutlinedButton.icon(
+                              icon: const Icon(
+                                Icons.file_download_outlined,
+                                size: 18,
+                              ),
+                              label: const Text('تصدير Excel'),
                               onPressed: _exportPayrollToExcel,
                             ),
+                            const SizedBox(width: 4),
                             IconButton(
                               icon: const Icon(Icons.refresh_rounded),
                               tooltip: 'إعادة الاحتساب والتحديث',
@@ -1652,8 +1640,11 @@ class _CompanyPayrollPolicySheetState
         ),
         const Divider(height: 1),
 
-        // 3. Scrollable Body
-        Expanded(
+        // 3. Scrollable Body. The bottom sheet has a fixed height, so the body
+        // fills it; the dialog has only a max height, so the body takes just
+        // the space its content needs and scrolls past that (TAS-152).
+        Flexible(
+          fit: widget.isBottomSheet ? FlexFit.tight : FlexFit.loose,
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Column(
@@ -2828,7 +2819,7 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'لا توجد أي جزاءات مسجلة على المندوب في هذا الشهر 👍',
+                              'لا توجد أي جزاءات مسجلة على المندوب في هذا الشهر',
                               style: TextStyle(
                                 fontSize: HrFont.labelMedium,
                                 color: HrStatusColors.of(context).success,

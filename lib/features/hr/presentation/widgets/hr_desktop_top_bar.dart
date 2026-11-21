@@ -38,6 +38,8 @@ class HRDesktopTopBar extends StatelessWidget {
   });
 
   String _getTitle(int index) {
+    // Web: one name per page, the same as the sidebar (TAS-138).
+    if (WebRuntimePolicy.isWeb) return hrShellPageLabel(index, isWeb: true);
     switch (index) {
       case 0:
         return 'لوحة الحضور والانصراف';
@@ -190,10 +192,17 @@ class HRDesktopTopBar extends StatelessWidget {
                     Flexible(
                       child: Text(
                         _getTitle(activeIndex),
-                        style: const TextStyle(
-                          fontSize: HrFont.titleMedium,
-                          fontWeight: FontWeight.w800,
-                        ),
+                        key: const ValueKey('hr_top_bar_title'),
+                        // Web: M3 titleLarge now that page names are short
+                        // (TAS-114). Mobile keeps its 16.
+                        style: WebRuntimePolicy.isWeb
+                            ? Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              )
+                            : const TextStyle(
+                                fontSize: HrFont.titleMedium,
+                                fontWeight: FontWeight.w800,
+                              ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -316,6 +325,8 @@ class HRDesktopTopBar extends StatelessWidget {
           const SizedBox(width: 10),
 
           // ── Theme Mode Toggle Button (Light/Dark Mode) ──
+          // Web moved it to the account menu (approved 21 Nov 2026, TAS-174).
+          if (webAccount == null)
           BlocBuilder<ThemeCubit, ThemeState>(
             builder: (context, themeState) {
               final isDark =

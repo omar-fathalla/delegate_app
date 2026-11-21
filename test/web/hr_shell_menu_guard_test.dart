@@ -48,9 +48,9 @@ const _supervisorMenu = [
   'الملف الشخصي',
   'طلبات الاشتراك',
   'تجديد المناديب',
-  'سجل الحضور والانصراف',
+  'الحضور والانصراف',
   'مناديب الشركة',
-  'Live Tracking',
+  'الخريطة الحية',
   'الصور',
   'أذونات التصوير',
   'تعديلات الحضور',
@@ -275,7 +275,8 @@ void main() {
       expect(find.text('الملف الشخصي'), findsNothing);
       expect(find.text('الإعدادات'), findsOneWidget);
       expect(find.byType(AppAvatar), findsNothing);
-      expect(find.text('الحضور والانصراف'), findsNothing);
+      // TAS-138: the web name is now «الحضور والانصراف», like mobile.
+      expect(find.text('سجل الحضور والانصراف'), findsNothing);
       await tester.tap(find.text('المهام'));
       expect(selected, kHrTabTasks);
       await tester.tap(find.text('أذونات التصوير'));
@@ -324,7 +325,7 @@ void main() {
         expect(find.text('لائحة الغرامات'), findsOneWidget);
         expect(find.text('نظام الغرامات'), findsOneWidget);
         expect(find.text('طلبات الاشتراك'), findsOneWidget);
-        expect(find.text('سجل الحضور والانصراف'), findsOneWidget);
+        expect(find.text('الحضور والانصراف'), findsOneWidget);
         expect(find.text('الرئيسية'), findsNothing);
       },
     );
