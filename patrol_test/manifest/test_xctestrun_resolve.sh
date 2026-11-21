@@ -19,9 +19,15 @@ touch "$tmpdir/Runner.app/Runner"
 touch "$tmpdir/RunnerUITests-Runner.app/PlugIns/RunnerUITests.xctest/RunnerUITests"
 cp "$FIXTURE" "$tmpdir/sample.xctestrun"
 
-declare -A got=()
+# Plain variables instead of `declare -A`: macOS ships bash 3.2 (no associative arrays).
+got_ui_target_app="" got_test_runner_app="" got_test_bundle="" got_blueprint_name=""
 while IFS='=' read -r key value; do
-  got["$key"]="$value"
+  case "$key" in
+    ui_target_app) got_ui_target_app="$value" ;;
+    test_runner_app) got_test_runner_app="$value" ;;
+    test_bundle) got_test_bundle="$value" ;;
+    blueprint_name) got_blueprint_name="$value" ;;
+  esac
 done < <(python3 "$RESOLVER" "$tmpdir/sample.xctestrun")
 
 expected_ui="$tmpdir/Runner.app"
@@ -36,9 +42,9 @@ assert_eq() {
   fi
 }
 
-assert_eq ui_target_app "$expected_ui" "${got[ui_target_app]}"
-assert_eq test_runner_app "$expected_host" "${got[test_runner_app]}"
-assert_eq test_bundle "$expected_bundle" "${got[test_bundle]}"
-assert_eq blueprint_name "RunnerUITests" "${got[blueprint_name]}"
+assert_eq ui_target_app "$expected_ui" "$got_ui_target_app"
+assert_eq test_runner_app "$expected_host" "$got_test_runner_app"
+assert_eq test_bundle "$expected_bundle" "$got_test_bundle"
+assert_eq blueprint_name "RunnerUITests" "$got_blueprint_name"
 
 echo "OK patrol_test/manifest/test_xctestrun_resolve.sh"

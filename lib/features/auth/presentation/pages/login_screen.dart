@@ -14,6 +14,7 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
 import 'package:delegate_app/core/widgets/device_lock_dialog.dart';
+import 'package:delegate_app/core/widgets/tashil_maestro_dev_semantics.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/semantics.dart';
@@ -820,6 +821,10 @@ class _LoginScreenState extends State<LoginScreen>
         child: ConstrainedBox(
           // min 52dp; grows with large text scales instead of clipping.
           constraints: const BoxConstraints(minHeight: 52),
+          // Maestro id: "تسجيل الدخول" is also the form title above.
+          child: tashilMaestroDevSemantics(
+          identifier: 'tashil_login_submit_button',
+          button: true,
           child: FilledButton(
             key: const ValueKey('login_submit'),
             // IgnorePointer keeps the primary colour while loading (spec §3).
@@ -865,6 +870,7 @@ class _LoginScreenState extends State<LoginScreen>
                       ),
               ),
             ),
+          ),
           ),
         ),
       ),
