@@ -972,25 +972,32 @@ service cloud.firestore {
         || (metaKeys && !changedKeys().hasAny(['status']));
     }
 
+    // TAS-106: a ternary chain, so only the caller's role branch is evaluated
+    // (`||`/`&&` evaluate every term in the rules engine; the old form ran
+    // techRequestReviewOk's getAfter and the meta checks even for a
+    // super-admin). The four role lists are disjoint, so the result is the
+    // same as the old `A || (B && …) || (C && …) || (D && …)`.
     function requestStaffUpdateOk(requestId) {
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
       let r = u.get('role', '');
-      let scopedSafe = staffDelegateRequestMetaOnly(u);
-      return signedIn() && (
-        r in [
-          'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN']
-        || (r in techRoleList() && techRequestReviewOk(requestId))
-        || (r in [
+      return !signedIn() ? false
+        : r in [
+            'super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN']
+          ? true
+        : r in techRoleList()
+          ? techRequestReviewOk(requestId)
+        : r in [
             'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
             'hr', 'company-hr', 'company_hr', 'human_resources']
-          && u.get('companyUID', '') != ''
-          && u.get('companyUID', '') == resource.data.get('companyUID', '')
-          && scopedSafe)
-        || (r in [
+          ? (u.get('companyUID', '') != ''
+            && u.get('companyUID', '') == resource.data.get('companyUID', '')
+            && staffDelegateRequestMetaOnly(u))
+        : r in [
             'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin']
-          && u.get('organizationUID', '') != ''
-          && u.get('organizationUID', '') == resource.data.get('organizationUID', '')
-          && scopedSafe));
+          ? (u.get('organizationUID', '') != ''
+            && u.get('organizationUID', '') == resource.data.get('organizationUID', '')
+            && staffDelegateRequestMetaOnly(u))
+        : false;
     }
 
     function techRequestReviewOk(requestId) {
@@ -2604,25 +2611,50 @@ service cloud.firestore {
       // status, or any other field. Review fields are written only by
       // reviewNationalIdUpdate (Admin SDK). Clients also cannot convert
       // another request into update_national_id.
-      allow update: if ((signedIn() && request.auth.uid == requestId
-          && changedKeys().hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
-            'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'])
-          && delegateDocsOk() && delegateUrlsWithDocs())
-        || (requestStaffUpdateOk(requestId) && subscriptionPaymentUntouched()))
-        && !changedKeys().hasAny(['proposedNationalId'])
-        && (resource.data.get('requestType', '') == 'update_national_id'
-          || request.resource.data.get('requestType', '') != 'update_national_id')
-        && (resource.data.get('actionType', '') == 'update_national_id'
-          || request.resource.data.get('actionType', '') != 'update_national_id')
-        // N-1: once created, an update_national_id request is immutable to
-        // clients (including existingDelegateUid, delegateUid, status, notes).
-        // Only Admin SDK review/submit callables write review fields.
-        && resource.data.get('requestType', '') != 'update_national_id'
-        && resource.data.get('actionType', '') != 'update_national_id'
-        && (!changedKeys().hasAny(['organizationUIDs', 'organizationUID', 'organizationId', 'companyUID', 'companyId'])
-          || (requestOrganizationUIDsOk() && requestPrimaryOrgExists()))
-        && orgCompanyCheckKeysLocked()
-        && requestApprovalOrgCheckOk();
+      // TAS-106 (1000-expression budget). Measured on the emulator (20 Nov
+      // 2026): `&&` does NOT stop at a term that evaluates to false — every
+      // term is evaluated, so the expensive role helpers (users/{uid} get,
+      // role lists, getAfter) ran even when a cheap check had already
+      // failed, and denials such as F14 came from the budget, not from a
+      // condition. A ternary evaluates only one branch, so the rule is laid
+      // out as `cheap ? (next ? … : false) : false`:
+      //   A && B      ->  A ? B : false
+      //   (A && B)||C ->  (A && B) ? true : C
+      // Same truth table as before (allowed requests are unchanged); the
+      // difference is only which terms get evaluated.
+      // - F14: approving an unpaid Paymob new_delegate/renewal is denied by the
+      //   first guard. The staff branch already required it (through
+      //   subscriptionPaymentUntouched); the self branch cannot touch status.
+      allow update: if (signedIn()
+          && (!changedKeys().hasAny(['status']) || newDelegateApprovalPaymentOk())
+          && !changedKeys().hasAny(['proposedNationalId'])
+          && (resource.data.get('requestType', '') == 'update_national_id'
+            || request.resource.data.get('requestType', '') != 'update_national_id')
+          && (resource.data.get('actionType', '') == 'update_national_id'
+            || request.resource.data.get('actionType', '') != 'update_national_id')
+          // N-1: once created, an update_national_id request is immutable to
+          // clients (including existingDelegateUid, delegateUid, status, notes).
+          // Only Admin SDK review/submit callables write review fields.
+          && resource.data.get('requestType', '') != 'update_national_id'
+          && resource.data.get('actionType', '') != 'update_national_id'
+          && orgCompanyCheckKeysLocked()
+          && requestApprovalOrgCheckOk())
+        ? ((!changedKeys().hasAny(['organizationUIDs', 'organizationUID', 'organizationId', 'companyUID', 'companyId'])
+            || (requestOrganizationUIDsOk() && requestPrimaryOrgExists()))
+          // Actor branches. Self clause: the document checks (8 entries + URL
+          // checks) run only when the caller IS the delegate and touches only
+          // the upload keys. Staff branch: reads users/{uid} only after the
+          // payment checks pass. Same as `(A && B && C && D) || S`, written as
+          // `(A && B) ? ((C && D) ? true : S) : S`.
+          ? ((request.auth.uid == requestId
+                && changedKeys().hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
+                  'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents']))
+              ? ((delegateDocsOk() && delegateUrlsWithDocs())
+                ? true
+                : (subscriptionPaymentUntouched() ? requestStaffUpdateOk(requestId) : false))
+              : (subscriptionPaymentUntouched() ? requestStaffUpdateOk(requestId) : false))
+          : false)
+        : false;
       allow delete: if isSuperAdmin()
         || (isOrgAdmin()
           && (resource.data.get('organizationUID', '') == callerOrg()

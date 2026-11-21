@@ -1,7 +1,7 @@
 const {describe, test, before, after, beforeEach} = require("node:test");
 const {readFileSync} = require("fs");
 const {resolve} = require("path");
-const {initializeTestEnvironment, assertFails, assertSucceeds} = require("@firebase/rules-unit-testing");
+const {initializeTestEnvironment, assertFails, assertSucceeds} = require("./_rules_testing");
 const {Timestamp, doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, collection, query, where, collectionGroup} = require("firebase/firestore");
 const U = {
   sa:{role:"super-admin",organizationUID:"o1"}, oa:{role:"organization-admin",organizationUID:"o1"},
