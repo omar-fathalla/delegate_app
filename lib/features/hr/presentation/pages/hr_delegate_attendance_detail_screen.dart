@@ -3657,7 +3657,7 @@ class _SessionDetailsSheet extends StatelessWidget {
                         const SizedBox(height: 6),
                         Text(
                           session.autoCheckOutReason ??
-                              'تم إغلاق الجلسة أوتوماتيكياً لاكتمال مدة الشفت (11.5 ساعة) دون تسجيل انصراف يدوي من المندوب.',
+                              'تم إغلاق الجلسة تلقائياً لاكتمال مدة الوردية (11.5 ساعة) دون تسجيل انصراف يدوي من المندوب.',
                           style: TextStyle(fontSize: HrFont.labelMedium, color: Colors.deepPurple.shade900),
                         ),
                       ],

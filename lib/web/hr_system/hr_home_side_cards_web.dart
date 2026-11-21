@@ -486,7 +486,7 @@ class _ChainsEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final text = Text(
-      'لسه مفيش سلاسل مرتبطة بمناديبك',
+      'لا توجد سلاسل مرتبطة بمناديبك بعد',
       style: TextStyle(fontSize: HrFont.body, color: cs.onSurfaceVariant),
     );
     if (onAddChain == null) return text;

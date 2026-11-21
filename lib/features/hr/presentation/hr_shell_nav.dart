@@ -83,7 +83,7 @@ const List<HrShellItem> kHrShellCatalog = [
   HrShellItem(
     id: 'overview',
     title: 'الرئيسية',
-    subtitle: 'حضور النهاردة والسلاسل',
+    subtitle: 'حضور اليوم والسلاسل',
     section: 'الرئيسية',
     icon: Icons.home_outlined,
     selectedIcon: Icons.home_rounded,

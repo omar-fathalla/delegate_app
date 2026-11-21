@@ -53,7 +53,7 @@ class LiveTrackingLoadError extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'حصل خطأ أثناء جلب بيانات المناديب. تأكد من الاتصال ثم أعد المحاولة.',
+                'حدث خطأ أثناء جلب بيانات المناديب. تأكد من الاتصال ثم أعد المحاولة.',
                 style: textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),

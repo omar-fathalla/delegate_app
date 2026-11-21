@@ -212,7 +212,7 @@ class HrHomeAttendanceCard extends StatelessWidget {
         children: [
           HrCardTitle(
             icon: Icons.how_to_reg_rounded,
-            text: 'حضور النهاردة',
+            text: 'حضور اليوم',
             fontSize: _compact ? 19 : 22,
             trailing: TextButton.icon(
               key: const ValueKey('hr_home_attendance_log_link'),
@@ -379,8 +379,8 @@ class _StatsRow extends StatelessWidget {
                   ? Icons.hourglass_empty_rounded
                   : Icons.person_off_outlined,
               label: state == HrAttendanceCardState.empty
-                  ? 'لسه مسجلوش'
-                  : 'غايبين',
+                  ? 'لم يسجلوا بعد'
+                  : 'غائبون',
               value: known ? '${summary.absent.length}' : '—',
               onTap:
                   state == HrAttendanceCardState.data &&
@@ -531,7 +531,7 @@ class _FilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final chips = <Widget>[
       _chip(context, HrPresenceFilter.all, 'الكل', summary.attended),
-      _chip(context, HrPresenceFilter.present, 'لسه موجود', summary.present),
+      _chip(context, HrPresenceFilter.present, 'لم ينصرف بعد', summary.present),
       _chip(context, HrPresenceFilter.departed, 'انصرف', summary.departed),
       _ChainFilterChip(
         enabled: enabled,
@@ -812,7 +812,7 @@ class _StillHere extends StatelessWidget {
         const SizedBox(width: 6),
         Flexible(
           child: Text(
-            'لسه موجود',
+            'لم ينصرف بعد',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -1338,7 +1338,7 @@ class _EmptyPanel extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'لسه محدش سجّل حضور النهاردة',
+            'لم يسجّل أحد حضوره اليوم بعد',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: HrFont.titleMedium,
@@ -1385,7 +1385,7 @@ class _ErrorPanel extends StatelessWidget {
           Icon(Icons.cloud_off_rounded, size: 44, color: cs.onErrorContainer),
           const SizedBox(height: 12),
           Text(
-            'مقدرناش نحمّل حضور النهاردة',
+            'تعذر تحميل حضور اليوم',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: HrFont.titleMedium,
@@ -1441,7 +1441,7 @@ class _NoMatches extends StatelessWidget {
           Icon(Icons.search_off_rounded, size: 36, color: cs.onSurfaceVariant),
           const SizedBox(height: 8),
           Text(
-            'مفيش نتايج مطابقة للفلتر أو البحث',
+            'لا توجد نتائج مطابقة للفلتر أو البحث',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: HrFont.titleMedium, color: cs.onSurfaceVariant),
           ),

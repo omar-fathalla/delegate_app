@@ -18,7 +18,7 @@ void main() {
 
     expect(find.byKey(const Key('live_tracking_load_error')), findsOneWidget);
     expect(find.text('تعذّر تحميل التتبع المباشر'), findsOneWidget);
-    expect(find.textContaining('حصل خطأ أثناء جلب بيانات المناديب'), findsOneWidget);
+    expect(find.textContaining('حدث خطأ أثناء جلب بيانات المناديب'), findsOneWidget);
     expect(find.byKey(const Key('live_tracking_retry')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('live_tracking_retry')));
