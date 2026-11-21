@@ -1,6 +1,12 @@
 // Web-only list-detail for «طلبات اشتراك واعتماد المناديب».
 // Built only when WebRuntimePolicy.isWeb. Mobile keeps the card list.
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/features/admin/data/company_chain_request_history.dart';
+import 'package:delegate_app/features/admin/data/company_chains.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_empty_state.dart';
+import 'package:delegate_app/web/hr_system/company_chain_requests_history.dart';
 import 'package:delegate_app/web/hr_system/company_chain_requests_panel.dart';
+import 'package:delegate_app/web/hr_system/subscription_filter_chips.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
@@ -15,6 +21,7 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// Two panes from this content width up. 600–839 stays a single pane.
 const double kSubscriptionTwoPaneMinWidth = 840;
@@ -186,24 +193,24 @@ String subscriptionRelativeTime(DateTime time, [DateTime? now]) {
   if (diff.isNegative || diff.inMinutes < 1) return 'الآن';
   if (day == today && diff.inMinutes < 60) {
     final m = diff.inMinutes;
-    if (m == 1) return 'من دقيقة';
-    if (m == 2) return 'من دقيقتين';
-    if (m <= 10) return 'من $m دقايق';
-    return 'من $m دقيقة';
+    if (m == 1) return 'منذ دقيقة';
+    if (m == 2) return 'منذ دقيقتين';
+    if (m <= 10) return 'منذ $m دقائق';
+    return 'منذ $m دقيقة';
   }
   if (day == today) {
     final h = diff.inHours.clamp(1, 23);
-    if (h == 1) return 'من ساعة';
-    if (h == 2) return 'من ساعتين';
-    if (h <= 10) return 'من $h ساعات';
-    return 'من $h ساعة';
+    if (h == 1) return 'منذ ساعة';
+    if (h == 2) return 'منذ ساعتين';
+    if (h <= 10) return 'منذ $h ساعات';
+    return 'منذ $h ساعة';
   }
   final yesterday = today.subtract(const Duration(days: 1));
-  if (day == yesterday) return 'امبارح';
+  if (day == yesterday) return 'أمس';
   final days = today.difference(day).inDays;
   if (days >= 2 && days < 7) {
-    if (days == 2) return 'من يومين';
-    return 'من $days أيام';
+    if (days == 2) return 'منذ يومين';
+    return 'منذ $days أيام';
   }
   return subscriptionDateTimeLabel(local);
 }
@@ -274,8 +281,36 @@ Widget subscriptionLtrText(String value, TextStyle? style) {
   return null;
 }
 
+/// Tabs on the HR web «طلبات الاشتراك» page (TAS-118).
+enum SubscriptionRequestsWebTab { delegates, chains }
+
 class DelegateSubscriptionRequestsWeb extends StatefulWidget {
   final Delegate currentAdmin;
+
+  /// Tab shown first. Only used when the «طلبات السلاسل» tab is visible
+  /// (see [canViewCompanyChainRequestHistory]).
+  final SubscriptionRequestsWebTab initialTab;
+
+  /// Firestore for the «طلبات السلاسل» tab. Defaults to the app instance.
+  final FirebaseFirestore? firestore;
+
+  /// Fake chain requests for tests / screenshots; skips Firestore.
+  final List<CompanyChainRequest>? chainRequestsOverride;
+
+  /// Asks an already-built page to switch tab, for example a «عرض الكل»
+  /// link on the HR home that opens the shell's subscriptions tab, which
+  /// is kept alive and so never sees a new [initialTab]. Set the value,
+  /// then navigate; the page switches and clears it.
+  static final ValueNotifier<SubscriptionRequestsWebTab?> requestedTab =
+      ValueNotifier(null);
+
+  static const delegatesTabKey = Key('subscription_requests_tab_delegates');
+  static const chainsTabKey = Key('subscription_requests_tab_chains');
+  static const detailEmptyKey = Key('subscription_requests_detail_empty');
+  static const pendingEmptyKey = Key('subscription_requests_pending_empty');
+  static const noMatchesKey = Key('subscription_requests_no_matches');
+  static Key filterKey(SubscriptionRequestStatus? s) =>
+      Key('subscription_requests_filter_${s?.name ?? 'all'}');
   final Future<bool?> Function(DelegateSubscriptionRequest request) onApprove;
   final Future<bool?> Function(DelegateSubscriptionRequest request) onReject;
 
@@ -303,6 +338,9 @@ class DelegateSubscriptionRequestsWeb extends StatefulWidget {
     this.initialSelectedId,
     this.initialDetailOpen = false,
     this.initialNewestFirst = true,
+    this.initialTab = SubscriptionRequestsWebTab.delegates,
+    this.firestore,
+    this.chainRequestsOverride,
   });
 
   @override
@@ -311,7 +349,11 @@ class DelegateSubscriptionRequestsWeb extends StatefulWidget {
 }
 
 class _DelegateSubscriptionRequestsWebState
-    extends State<DelegateSubscriptionRequestsWeb> {
+    extends State<DelegateSubscriptionRequestsWeb>
+    with SingleTickerProviderStateMixin {
+  /// Null when the viewer has no «طلبات السلاسل» tab (reviewers keep the
+  /// single list with the decision panel).
+  TabController? _tabs;
   late SubscriptionRequestStatus? _statusFilter;
   late bool _newestFirst;
   final TextEditingController _searchController = TextEditingController();
@@ -345,10 +387,46 @@ class _DelegateSubscriptionRequestsWebState
     if (widget.requestsOverride == null) {
       _stream = _openStream();
     }
+    if (canViewCompanyChainRequestHistory(widget.currentAdmin)) {
+      final requested = DelegateSubscriptionRequestsWeb.requestedTab.value;
+      _tabs = TabController(
+        length: SubscriptionRequestsWebTab.values.length,
+        vsync: this,
+        animationDuration: Duration.zero,
+        initialIndex: (requested ?? widget.initialTab).index,
+      )..addListener(_onTabChanged);
+      if (requested != null) {
+        DelegateSubscriptionRequestsWeb.requestedTab.value = null;
+      }
+      DelegateSubscriptionRequestsWeb.requestedTab.addListener(_onTabRequest);
+    }
+  }
+
+  void _onTabChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _onTabRequest() {
+    final requested = DelegateSubscriptionRequestsWeb.requestedTab.value;
+    final tabs = _tabs;
+    if (requested == null || tabs == null) return;
+    tabs.index = requested.index;
+    // Clear after the frame so other listeners still see the request.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (DelegateSubscriptionRequestsWeb.requestedTab.value == requested) {
+        DelegateSubscriptionRequestsWeb.requestedTab.value = null;
+      }
+    });
   }
 
   @override
   void dispose() {
+    if (_tabs != null) {
+      DelegateSubscriptionRequestsWeb.requestedTab.removeListener(
+        _onTabRequest,
+      );
+      _tabs!.dispose();
+    }
     _searchController.dispose();
     _searchFocus.dispose();
     _listFocus.dispose();
@@ -520,6 +598,74 @@ class _DelegateSubscriptionRequestsWebState
 
   @override
   Widget build(BuildContext context) {
+    final tabs = _tabs;
+    if (tabs == null) return _delegatesTab(context);
+    final cs = Theme.of(context).colorScheme;
+    final current = tabs.index;
+    // Both tabs stay mounted (Offstage, not IndexedStack, so the list's
+    // back-button check is unchanged) to keep their streams and state.
+    return Scaffold(
+      backgroundColor: cs.surface,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 16, 0),
+            child: TabBar(
+              controller: tabs,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              dividerColor: cs.outlineVariant,
+              labelStyle: const TextStyle(
+                fontSize: HrFont.body,
+                fontWeight: FontWeight.w600,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontSize: HrFont.body,
+                fontWeight: FontWeight.w500,
+              ),
+              tabs: const [
+                Tab(
+                  key: DelegateSubscriptionRequestsWeb.delegatesTabKey,
+                  text: 'اشتراكات المناديب',
+                ),
+                Tab(
+                  key: DelegateSubscriptionRequestsWeb.chainsTabKey,
+                  text: 'طلبات السلاسل',
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                for (final tab in SubscriptionRequestsWebTab.values)
+                  Offstage(
+                    offstage: current != tab.index,
+                    child: TickerMode(
+                      enabled: current == tab.index,
+                      child: switch (tab) {
+                        SubscriptionRequestsWebTab.delegates =>
+                          _delegatesTab(context),
+                        SubscriptionRequestsWebTab.chains =>
+                          CompanyChainRequestsHistory(
+                            companyUID: widget.currentAdmin.companyUID,
+                            firestore: widget.firestore,
+                            requestsOverride: widget.chainRequestsOverride,
+                          ),
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _delegatesTab(BuildContext context) {
     final override = widget.requestsOverride;
     if (override != null) {
       return _scaffold(
@@ -603,6 +749,13 @@ class _DelegateSubscriptionRequestsWebState
         ? kSubscriptionListPaneWide
         : kSubscriptionListPaneNarrow;
     final selected = _find(loaded, _selectedId);
+    // No outlined card around an empty detail pane (TAS-142): the empty
+    // state sits on the page surface.
+    final hasDetail =
+        !loading &&
+        error == null &&
+        selected != null &&
+        !_detailPendingEmpty(loaded);
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -619,6 +772,7 @@ class _DelegateSubscriptionRequestsWebState
           Expanded(
             child: _pane(
               surface: false,
+              plain: !hasDetail,
               child: loading
                   ? const SizedBox.expand()
                   : error != null
@@ -657,8 +811,10 @@ class _DelegateSubscriptionRequestsWebState
     required bool surface,
     required Widget child,
     EdgeInsetsGeometry margin = EdgeInsets.zero,
+    bool plain = false,
   }) {
     final cs = Theme.of(context).colorScheme;
+    if (plain) return Padding(padding: margin, child: child);
     return Padding(
       padding: margin,
       child: DecoratedBox(
@@ -752,7 +908,7 @@ class _DelegateSubscriptionRequestsWebState
         focusNode: _searchFocus,
         textInputAction: TextInputAction.search,
         style: TextStyle(
-          fontSize: 14,
+          fontSize: HrFont.body,
           fontWeight: FontWeight.normal,
           color: cs.onSurface,
         ),
@@ -761,7 +917,7 @@ class _DelegateSubscriptionRequestsWebState
           fillColor: cs.surfaceContainerHigh,
           hintText: 'ابحث بالاسم أو الموبايل أو الرقم القومي',
           hintStyle: TextStyle(
-            fontSize: 14,
+            fontSize: HrFont.body,
             fontWeight: FontWeight.normal,
             color: cs.onSurfaceVariant.withValues(alpha: 0.7),
           ),
@@ -778,15 +934,15 @@ class _DelegateSubscriptionRequestsWebState
                 ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 20),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(HrRadius.pill),
             borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(HrRadius.pill),
             borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(HrRadius.pill),
             borderSide: BorderSide(color: cs.primary, width: 1.5),
           ),
         ),
@@ -801,49 +957,26 @@ class _DelegateSubscriptionRequestsWebState
     required int rejected,
     required int total,
   }) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        _filterChip('الكل', total, null),
-        _filterChip('قيد المراجعة', pending, SubscriptionRequestStatus.pending),
-        _filterChip('المعتمدة', approved, SubscriptionRequestStatus.approved),
-        _filterChip('المرفوضة', rejected, SubscriptionRequestStatus.rejected),
-      ],
+    SubscriptionFilterOption<SubscriptionRequestStatus> option(
+      String label,
+      int count,
+      SubscriptionRequestStatus? status,
+    ) => SubscriptionFilterOption(
+      key: DelegateSubscriptionRequestsWeb.filterKey(status),
+      label: label,
+      count: count,
+      value: status,
     );
-  }
-
-  Widget _filterChip(
-    String label,
-    int count,
-    SubscriptionRequestStatus? status,
-  ) {
-    final cs = Theme.of(context).colorScheme;
-    final selected = _statusFilter == status;
-    final base = Theme.of(context).textTheme.labelLarge;
-    return FilterChip(
-      label: Text.rich(
-        TextSpan(
-          children: [
-            TextSpan(text: label),
-            TextSpan(
-              text: ' $count',
-              style: subscriptionNumberStyle(base),
-            ),
-          ],
-        ),
-      ),
-      selected: selected,
-      showCheckmark: true,
-      checkmarkColor: cs.onSecondaryContainer,
-      selectedColor: cs.secondaryContainer,
-      backgroundColor: cs.surfaceContainerHigh,
-      side: BorderSide(color: cs.outlineVariant),
-      labelStyle: base?.copyWith(
-        color: selected ? cs.onSecondaryContainer : cs.onSurfaceVariant,
-        fontWeight: FontWeight.w600,
-      ),
-      onSelected: (_) => setState(() => _statusFilter = status),
+    return SubscriptionFilterChipRow<SubscriptionRequestStatus>(
+      selected: _statusFilter,
+      onSelected: (status) => setState(() => _statusFilter = status),
+      countStyle: subscriptionNumberStyle,
+      options: [
+        option('الكل', total, null),
+        option('قيد المراجعة', pending, SubscriptionRequestStatus.pending),
+        option('المعتمدة', approved, SubscriptionRequestStatus.approved),
+        option('المرفوضة', rejected, SubscriptionRequestStatus.rejected),
+      ],
     );
   }
 
@@ -865,13 +998,13 @@ class _DelegateSubscriptionRequestsWebState
           color: cs.surfaceContainerHigh,
           elevation: 3,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(HrRadius.card),
             side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
           ),
           onSelected: (value) => setState(() => _newestFirst = value),
           itemBuilder: (context) => [
-            _sortItem(true, 'الأحدث فوق'),
-            _sortItem(false, 'الأقدم فوق'),
+            _sortItem(true, 'الأحدث أولًا'),
+            _sortItem(false, 'الأقدم أولًا'),
           ],
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
@@ -879,7 +1012,7 @@ class _DelegateSubscriptionRequestsWebState
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  _newestFirst ? 'الأحدث فوق' : 'الأقدم فوق',
+                  _newestFirst ? 'الأحدث أولًا' : 'الأقدم أولًا',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     color: cs.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
@@ -947,42 +1080,25 @@ class _DelegateSubscriptionRequestsWebState
   }
 
   Widget _pendingEmpty({bool action = true}) {
-    final cs = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.inbox_rounded, size: 48, color: cs.onSurfaceVariant),
-            const SizedBox(height: 12),
-            Text(
-              'مفيش طلبات مستنية مراجعتك',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            if (action) ...[
-              const SizedBox(height: 16),
-              FilledButton.tonal(
-                onPressed: () => setState(() => _statusFilter = null),
-                child: const Text('عرض الكل'),
-              ),
-            ],
-          ],
-        ),
-      ),
+    return HrEmptyState(
+      key: DelegateSubscriptionRequestsWeb.pendingEmptyKey,
+      icon: Icons.inbox_rounded,
+      title: 'لا توجد طلبات قيد المراجعة',
+      action: action
+          ? FilledButton.tonal(
+              onPressed: () => setState(() => _statusFilter = null),
+              child: const Text('عرض كل الطلبات'),
+            )
+          : null,
     );
   }
 
   Widget _noMatches() {
-    final cs = Theme.of(context).colorScheme;
-    return Center(
-      child: Text(
-        'لا توجد نتائج مطابقة',
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: cs.onSurfaceVariant,
-        ),
-      ),
+    return const HrEmptyState(
+      key: DelegateSubscriptionRequestsWeb.noMatchesKey,
+      icon: Icons.search_off_rounded,
+      title: 'لا توجد نتائج مطابقة',
+      message: 'جرّب كلمة بحث أخرى أو حالة مختلفة.',
     );
   }
 
@@ -1034,29 +1150,28 @@ class _DelegateSubscriptionRequestsWebState
     return null;
   }
 
+  /// The list already shows «لا توجد طلبات قيد المراجعة»; the detail pane
+  /// stays blank then, so there is one empty state on screen.
+  bool _detailPendingEmpty(List<DelegateSubscriptionRequest> loaded) =>
+      _query.isEmpty &&
+      _statusFilter == SubscriptionRequestStatus.pending &&
+      loaded
+          .where((r) => r.status == SubscriptionRequestStatus.pending)
+          .isEmpty;
+
   Widget _detailOrPlaceholder(
     List<DelegateSubscriptionRequest> loaded,
     DelegateSubscriptionRequest? selected, {
     required bool pinnedBar,
   }) {
-    final pendingEmpty =
-        _query.isEmpty &&
-        _statusFilter == SubscriptionRequestStatus.pending &&
-        loaded
-            .where((r) => r.status == SubscriptionRequestStatus.pending)
-            .isEmpty;
-    if (pendingEmpty) {
+    if (_detailPendingEmpty(loaded)) {
       return const SizedBox.expand();
     }
     if (selected == null) {
-      final cs = Theme.of(context).colorScheme;
-      return Center(
-        child: Text(
-          'اختار طلب من القائمة',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: cs.onSurfaceVariant,
-          ),
-        ),
+      return const HrEmptyState(
+        key: DelegateSubscriptionRequestsWeb.detailEmptyKey,
+        icon: Icons.assignment_outlined,
+        title: 'اختر طلبًا من القائمة لعرض تفاصيله',
       );
     }
     return _DetailBody(
@@ -1133,15 +1248,15 @@ class _RequestRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 4),
       child: Material(
         color: selected ? cs.secondaryContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(HrRadius.card),
           onTap: onTap,
           child: Container(
             constraints: const BoxConstraints(minHeight: 72),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(HrRadius.card),
               border: focused
                   ? Border.all(color: cs.primary, width: 2)
                   : null,
@@ -1256,7 +1371,7 @@ class _StatusChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(HrRadius.chip),
         border: outlined ? Border.all(color: cs.outline) : null,
       ),
       child: Row(
@@ -1567,7 +1682,7 @@ class _DetailContent extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(HrRadius.chip),
       ),
       child: Text(
         label,
@@ -1759,7 +1874,7 @@ class _DetailContent extends StatelessWidget {
           )
         else
           Text(
-            'مفيش صور',
+            'لا توجد صور',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
@@ -1853,7 +1968,7 @@ class _DetailContent extends StatelessWidget {
         showDragHandle: false,
         backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(HrRadius.pill)),
         ),
         builder: (ctx) => Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
@@ -1869,7 +1984,7 @@ class _DetailContent extends StatelessWidget {
       context: context,
       builder: (ctx) => Dialog(
         backgroundColor: Theme.of(ctx).colorScheme.surfaceContainerLow,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.pill)),
         clipBehavior: Clip.antiAlias,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
@@ -1940,7 +2055,7 @@ class _ImageSheetState extends State<_ImageSheet> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(HrRadius.card),
             child: InteractiveViewer(
               child: _photo(cs),
             ),
@@ -2203,7 +2318,7 @@ class _OutcomeCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2302,7 +2417,7 @@ class _SkeletonList extends StatelessWidget {
             height: 72,
             decoration: BoxDecoration(
               color: cs.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(HrRadius.card),
             ),
           ),
         );

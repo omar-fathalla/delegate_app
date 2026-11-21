@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:material_symbols_icons/symbols.dart';
 
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/admin/domain/entities/subscription_renewal.dart';
+import 'package:delegate_app/features/auth/domain/role_home.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 /// Indexed-stack slots of the HR shell. 0–8 are the original mobile tabs.
@@ -17,6 +18,10 @@ const int kHrTabAdjustments = 8;
 const int kHrTabSubscriptions = 9;
 const int kHrTabRenewal = 10;
 const int kHrTabTasks = 11;
+/// Retired slot of the old «أذونات التصوير» page (TAS-149). Permissions now
+/// live only in «الصور». The shell redirects this index (and the old
+/// `supervisor_photo_permissions` menu id) to [kHrTabPhotos] on its
+/// permissions view, so old links keep working. Not in the catalog.
 const int kHrTabPhotoPermissions = 12;
 const int kHrTabPenaltyCatalog = 13;
 const int kHrTabPenalties = 14;
@@ -33,7 +38,9 @@ enum HrShellPlacement { sidebar, compactMenu, moreSheet }
 
 /// One destination of the web HR shell.
 ///
-/// Titles match the company-supervisor mobile menu. Items that already lived
+/// Titles match the company-supervisor mobile menu. On web, [menuLabel] is
+/// the one page name (TAS-138): the sidebar, the top bar title and the
+/// inner-page breadcrumb all show it. Items that already lived
 /// in the HR shell keep their tab index. Tools that only the supervisor menu
 /// had are [webOnly] so the mobile HR shell stays as it is.
 class HrShellItem {
@@ -50,6 +57,10 @@ class HrShellItem {
   final IconData selectedIcon;
   final int? tabIndex;
   final String? badgeCollection;
+
+  /// Web URL of the tab: `/hr/<webSlug>` (TAS-139). Stable English slugs,
+  /// never a name or other personal data. Null for items without a tab.
+  final String? webSlug;
   final bool webOnly;
   final bool destructive;
   final bool requiresRenewalPermission;
@@ -64,6 +75,7 @@ class HrShellItem {
     required this.selectedIcon,
     this.tabIndex,
     this.badgeCollection,
+    this.webSlug,
     this.webOnly = false,
     this.destructive = false,
     this.requiresRenewalPermission = false,
@@ -77,8 +89,9 @@ class HrShellItem {
 const List<HrShellItem> kHrShellCatalog = [
   HrShellItem(
     id: 'overview',
+    webSlug: 'home',
     title: 'الرئيسية',
-    subtitle: 'حضور النهاردة والسلاسل',
+    subtitle: 'حضور اليوم والسلاسل',
     section: 'الرئيسية',
     icon: Icons.home_outlined,
     selectedIcon: Icons.home_rounded,
@@ -95,6 +108,7 @@ const List<HrShellItem> kHrShellCatalog = [
   ),
   HrShellItem(
     id: 'delegate_subscriptions',
+    webSlug: 'subscriptions',
     title: 'طلبات اشتراك واعتماد المناديب',
     webTitle: 'طلبات الاشتراك',
     subtitle: 'اعتماد طلبات تسجيل المناديب واشتراكاتهم',
@@ -106,6 +120,7 @@ const List<HrShellItem> kHrShellCatalog = [
   ),
   HrShellItem(
     id: 'delegate_renewal',
+    webSlug: 'renewal',
     title: 'تجديد المناديب',
     subtitle: 'تجديد اشتراك مناديب الشركة',
     section: 'الكوادر والاشتراكات',
@@ -117,7 +132,9 @@ const List<HrShellItem> kHrShellCatalog = [
   ),
   HrShellItem(
     id: 'attendance',
+    webSlug: 'attendance',
     title: 'سجل الحضور والانصراف',
+    webTitle: 'الحضور والانصراف',
     subtitle: 'متابعة حضور وانصراف مناديب الشركة',
     section: 'الحضور والميدان',
     icon: Icons.event_available_outlined,
@@ -126,6 +143,7 @@ const List<HrShellItem> kHrShellCatalog = [
   ),
   HrShellItem(
     id: 'delegates',
+    webSlug: 'delegates',
     title: 'مناديب الشركة',
     subtitle: 'دليل مناديب الشركة',
     section: 'الكوادر والاشتراكات',
@@ -135,7 +153,9 @@ const List<HrShellItem> kHrShellCatalog = [
   ),
   HrShellItem(
     id: 'delegate_tracking',
+    webSlug: 'tracking',
     title: 'Live Tracking',
+    webTitle: 'الخريطة الحية',
     subtitle: 'المواقع الميدانية اللحظية',
     section: 'الحضور والميدان',
     icon: Icons.radar_outlined,
@@ -144,6 +164,7 @@ const List<HrShellItem> kHrShellCatalog = [
   ),
   HrShellItem(
     id: 'field_photos',
+    webSlug: 'photos',
     title: 'الصور والزيارات الميدانية',
     webTitle: 'الصور',
     subtitle: 'صور الزيارات وأذونات التصوير',
@@ -153,18 +174,8 @@ const List<HrShellItem> kHrShellCatalog = [
     tabIndex: kHrTabPhotos,
   ),
   HrShellItem(
-    id: 'supervisor_photo_permissions',
-    title: 'أذونات التصوير',
-    subtitle: 'اعتماد أذونات التصوير الميداني',
-    // Web sidebar: directly under «الصور» in this group.
-    section: 'الحضور والميدان',
-    icon: Symbols.add_a_photo,
-    selectedIcon: Symbols.add_a_photo_rounded,
-    tabIndex: kHrTabPhotoPermissions,
-    webOnly: true,
-  ),
-  HrShellItem(
     id: 'attendance_adjustments',
+    webSlug: 'attendance/edits',
     title: 'سجل تعديلات الحضور والانصراف',
     webTitle: 'تعديلات الحضور',
     subtitle: 'التعديلات اليدوية على البصمات',
@@ -175,6 +186,7 @@ const List<HrShellItem> kHrShellCatalog = [
   ),
   HrShellItem(
     id: 'leaves_and_excuses',
+    webSlug: 'leaves',
     title: 'طلبات الإجازات والأعذار',
     webTitle: 'طلبات الإجازات',
     subtitle: 'اعتماد الإجازات والأعذار',
@@ -186,6 +198,7 @@ const List<HrShellItem> kHrShellCatalog = [
   ),
   HrShellItem(
     id: 'monthly_payroll',
+    webSlug: 'payroll',
     title: 'مسير الرواتب والعمولات',
     webTitle: 'الرواتب',
     subtitle: 'كشوف الرواتب والبدلات',
@@ -196,6 +209,7 @@ const List<HrShellItem> kHrShellCatalog = [
   ),
   HrShellItem(
     id: 'anti_fraud',
+    webSlug: 'security',
     title: 'تدقيق الأمان ومكافحة الاحتيال',
     webTitle: 'تدقيق الأمان',
     subtitle: 'محاولات التلاعب بالموقع والجهاز',
@@ -206,6 +220,7 @@ const List<HrShellItem> kHrShellCatalog = [
   ),
   HrShellItem(
     id: 'device_unbind_requests',
+    webSlug: 'devices',
     title: 'طلبات فك وربط الأجهزة',
     webTitle: 'فك الأجهزة',
     subtitle: 'طلبات تغيير هاتف المندوب',
@@ -218,6 +233,7 @@ const List<HrShellItem> kHrShellCatalog = [
   ),
   HrShellItem(
     id: 'tasks',
+    webSlug: 'tasks',
     title: 'المهام',
     subtitle: 'مهام المناديب ومتابعتها',
     section: 'الرقابة والأدوات',
@@ -228,6 +244,7 @@ const List<HrShellItem> kHrShellCatalog = [
   ),
   HrShellItem(
     id: 'penalty_rules_catalog',
+    webSlug: 'penalties/rules',
     title: 'لائحة الغرامات والجزاءات',
     webTitle: 'لائحة الغرامات',
     subtitle: 'اللائحة المعتمدة للجزاءات',
@@ -239,6 +256,7 @@ const List<HrShellItem> kHrShellCatalog = [
   ),
   HrShellItem(
     id: 'penalties_management',
+    webSlug: 'penalties',
     title: 'نظام الغرامات والمخالفات',
     webTitle: 'نظام الغرامات',
     subtitle: 'إصدار ومتابعة الغرامات',
@@ -267,6 +285,15 @@ List<int> hrBottomNavTabs({required bool isWeb}) => [
   kHrTabTracking,
   kHrTabLeaves,
 ];
+
+/// Menu id of the retired «أذونات التصوير» page. Selecting it opens
+/// «الصور» on its permissions view (TAS-149).
+const String kHrRetiredPhotoPermissionsId = 'supervisor_photo_permissions';
+
+/// The tab a selection of [index] really shows. The retired permissions
+/// slot shows «الصور».
+int hrShellResolveTab(int index) =>
+    index == kHrTabPhotoPermissions ? kHrTabPhotos : index;
 
 HrShellItem? hrShellItemById(String id) {
   for (final item in kHrShellCatalog) {
@@ -313,15 +340,105 @@ List<HrShellItem> hrShellItems({
 }
 
 String hrShellHeaderTitle(int index) {
+  index = hrShellResolveTab(index);
   for (final item in kHrShellCatalog) {
     if (item.tabIndex == index) return item.title;
   }
   return 'بوابة الموارد البشرية';
 }
 
+/// Short page name of a shell tab: the sidebar label on web, the full title
+/// on mobile. Used as the first breadcrumb item of inner pages.
+String hrShellPageLabel(int index, {required bool isWeb}) {
+  index = hrShellResolveTab(index);
+  for (final item in kHrShellCatalog) {
+    if (item.tabIndex == index) return item.menuLabel(isWeb: isWeb);
+  }
+  return 'الرئيسية';
+}
+
 IconData hrShellHeaderIcon(int index) {
+  index = hrShellResolveTab(index);
   for (final item in kHrShellCatalog) {
     if (item.tabIndex == index) return item.selectedIcon;
   }
   return Icons.business_center_rounded;
+}
+
+// ---------------------------------------------------------------------------
+// Web URLs of the shell (TAS-139). The slugs live in [kHrShellCatalog]
+// ([HrShellItem.webSlug]), so the sidebar, the top bar and the router read
+// one table. Mobile never writes these URLs; it stays on `/hr/home`.
+// ---------------------------------------------------------------------------
+
+/// Query parameter that counts the inner pages open over a tab
+/// (`/hr/attendance?inner=1`). It only gives the browser back button a
+/// history entry to close; the page itself is never rebuilt from the URL.
+const String kHrInnerQueryKey = 'inner';
+
+/// Every shell path the router serves, `/hr/home` first.
+List<String> hrShellRoutePaths() => [
+  for (final item in kHrShellCatalog)
+    if (item.webSlug != null && item.tabIndex != null) '/hr/${item.webSlug}',
+];
+
+/// `/hr/<slug>` of [index]. The retired permissions slot is «الصور».
+/// A tab without a slug falls back to `/hr/home`.
+String hrShellPathForTab(int index) {
+  index = hrShellResolveTab(index);
+  for (final item in kHrShellCatalog) {
+    if (item.tabIndex == index && item.webSlug != null) {
+      return '/hr/${item.webSlug}';
+    }
+  }
+  return '/hr/home';
+}
+
+/// The tab of a shell [path], or null when [path] is not a shell page.
+int? hrShellTabForPath(String path) {
+  if (!path.startsWith('/hr/')) return null;
+  final slug = path.substring(4);
+  for (final item in kHrShellCatalog) {
+    if (item.webSlug == slug) return item.tabIndex;
+  }
+  return null;
+}
+
+/// Location of [index] with [inner] inner pages open.
+String hrShellLocation(int index, {int inner = 0}) {
+  final path = hrShellPathForTab(index);
+  return inner > 0 ? '$path?$kHrInnerQueryKey=$inner' : path;
+}
+
+/// Inner-page count in a shell [uri]; anything that is not a positive
+/// number reads as 0.
+int hrShellInnerDepth(Uri uri) {
+  final value = int.tryParse(uri.queryParameters[kHrInnerQueryKey] ?? '');
+  return value == null || value < 0 ? 0 : value;
+}
+
+/// Whether [delegate] may open [index] on this platform: the same rules as
+/// the menus ([hrShellItems]), so a hidden tab cannot be opened by URL.
+bool hrShellTabAllowed(
+  Delegate delegate,
+  int index, {
+  required bool isWeb,
+}) {
+  index = hrShellResolveTab(index);
+  return hrShellItems(
+    delegate: delegate,
+    isWeb: isWeb,
+    placement: HrShellPlacement.compactMenu,
+  ).any((item) => item.tabIndex == index);
+}
+
+/// Where the splash sends a restored session. On the web, a reload of a
+/// shell URL (`/hr/payroll`) stays on that page instead of `/hr/home`. Inner
+/// pages are not restored, so the query is dropped.
+String hrShellRestoreLocation(String landing, Uri? current) {
+  if (!WebRuntimePolicy.isWeb || landing != kWebHrSystemPath) return landing;
+  if (current == null || hrShellTabForPath(current.path) == null) {
+    return landing;
+  }
+  return current.path;
 }

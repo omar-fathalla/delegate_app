@@ -9,16 +9,18 @@ source scripts/ci/jobs.sh
 
 fail() { echo "FAIL ci_tooling_test: $*" >&2; exit 1; }
 
-# 1. ci.yml runs every GitHub job through run_job.sh, and nothing inline.
+# 1. Every GitHub job has a body and a timeout in jobs.sh.
+# TAS-194: ci.yml keeps its inline commands for now. It runs on GitHub-hosted
+# ubuntu runners while the repo is public (TAS-178), and run_job.sh is
+# Mac-only (slot leases, TMPDIR under /Users/Shared). Keep the job bodies in
+# jobs.sh in step with ci.yml by hand until ci.yml moves to run_job.sh.
 for j in $CI_JOBS_GITHUB; do
-  grep -q "scripts/ci/run_job.sh $j\$" .github/workflows/ci.yml \
-    || fail "ci.yml does not run job '$j' via scripts/ci/run_job.sh"
   [[ "$(ci_job_timeout "$j")" -gt 0 ]] || fail "no timeout for job '$j'"
   declare -F "job_$j" >/dev/null || fail "no function job_$j"
 done
-if grep -nE 'npm run test:rules|flutter (analyze|test)( |$)' .github/workflows/ci.yml; then
-  fail "ci.yml has inline job commands; put them in scripts/ci/jobs.sh"
-fi
+grep -q -- '--exclude-tags golden' .github/workflows/ci.yml \
+  && ! declare -f job_test | grep -q -- '--exclude-tags golden' \
+  && fail "ci.yml skips golden tests but job_test in jobs.sh does not"
 
 # 2. Every rules suite in package.json is picked up.
 n_pkg="$(node -e 'const s=require("./package.json").scripts;console.log(Object.keys(s).filter(k=>/^test:rules(:|$)/.test(k)).length)')"
@@ -36,11 +38,7 @@ got="$(printf 'test/rules/x.test.js\n' | ci_jobs_for_paths)"
 [[ "$got" == "ios-guards android-guards rules" ]] || fail "rules test change ran Flutter jobs -> '$got'"
 got="$(printf 'docs/x.md\n' | ci_jobs_for_paths)"
 [[ "$got" == "ios-guards android-guards" ]] || fail "docs change -> '$got'"
-# ci.yml gates every job on the changes job, and ci_changes.sh --all is every job.
-for j in analyze test build-web ios-guards android-guards functions rules p0-scripts; do
-  grep -q "contains(needs.changes.outputs.jobs, ' $j ')" .github/workflows/ci.yml \
-    || fail "ci.yml job for '$j' is not gated on the changes job"
-done
+# ci_changes.sh --all is every GitHub job.
 [[ "$(bash scripts/ci/ci_changes.sh --all)" == " $CI_JOBS_GITHUB " ]] || fail "ci_changes --all is not every GitHub job"
 
 # 4. Leases: distinct slots, full pool fails fast, dead owner is reaped.

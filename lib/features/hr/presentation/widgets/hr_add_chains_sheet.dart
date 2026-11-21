@@ -4,6 +4,8 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import 'package:delegate_app/features/admin/data/company_chains.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_adaptive_sheet.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// Kept for the delegates table: suspended delegates never get chains
 /// (Mohamed, 17 Nov 2026). Chains now come from the company (see
@@ -38,7 +40,7 @@ class HrAddChainsSheet extends StatefulWidget {
   final bool fullScreen;
 
   static const double fullScreenBelow = 840;
-  static const double sheetWidth = 480;
+  static const double sheetWidth = HrSheet.sideWidth;
 
   static const titleKey = Key('hr_add_chains_title');
   static const counterKey = Key('hr_add_chains_counter');
@@ -77,7 +79,7 @@ class HrAddChainsSheet extends StatefulWidget {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'إغلاق',
-      barrierColor: Colors.black.withValues(alpha: 0.32),
+      barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.32),
       transitionDuration: const Duration(milliseconds: 250),
       pageBuilder: (_, _, _) => HrAddChainsSheet(
         supervisor: supervisor,
@@ -86,11 +88,13 @@ class HrAddChainsSheet extends StatefulWidget {
         fullScreen: fullScreen,
       ),
       transitionBuilder: (ctx, anim, _, child) {
-        final rtl = Directionality.of(ctx) == TextDirection.rtl;
+        if (!fullScreen) {
+          return HrSideSheetTransition(animation: anim, child: child);
+        }
         final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
         return SlideTransition(
           position: Tween<Offset>(
-            begin: fullScreen ? const Offset(0, 0.05) : Offset(rtl ? -1 : 1, 0),
+            begin: const Offset(0, 0.05),
             end: Offset.zero,
           ).animate(curved),
           child: FadeTransition(opacity: curved, child: child),
@@ -254,7 +258,7 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
         height: double.infinity,
         child: ClipRRect(
           borderRadius: const BorderRadiusDirectional.horizontal(
-            start: Radius.circular(16),
+            start: Radius.circular(HrRadius.card),
           ).resolve(Directionality.of(context)),
           child: body,
         ),
@@ -305,7 +309,7 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
             height: 40,
             decoration: BoxDecoration(
               color: cs.primaryContainer,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(HrRadius.card),
             ),
             child: Icon(Symbols.add_business_rounded, color: cs.onPrimaryContainer, size: 22),
           ),
@@ -317,11 +321,11 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
                 Text(
                   'إضافة سلاسل للشركة',
                   key: HrAddChainsSheet.titleKey,
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: cs.onSurface),
+                  style: TextStyle(fontSize: HrFont.titleLarge, fontWeight: FontWeight.w700, color: cs.onSurface),
                 ),
                 Text(
                   'طلب ضم سلسلة',
-                  style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant),
+                  style: TextStyle(fontSize: HrFont.labelMedium, color: cs.onSurfaceVariant),
                 ),
               ],
             ),
@@ -343,7 +347,7 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Row(
@@ -356,14 +360,14 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
               children: [
                 Text(
                   widget.companyName.trim().isEmpty ? 'الشركة' : widget.companyName.trim(),
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: HrFont.titleMedium),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   joined == null ? 'جاري تحميل السلاسل…' : 'مسجلة في $joined سلسلة',
-                  style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant),
+                  style: TextStyle(fontSize: HrFont.labelMedium, color: cs.onSurfaceVariant),
                 ),
               ],
             ),
@@ -406,14 +410,14 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
               children: [
                 Text(
                   '$title ($count)',
-                  style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: cs.onSurface),
+                  style: TextStyle(fontSize: HrFont.body, fontWeight: FontWeight.w700, color: cs.onSurface),
                 ),
                 if (subtitle != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
                       subtitle,
-                      style: TextStyle(fontSize: 12, height: 1.4, color: cs.onSurfaceVariant),
+                      style: TextStyle(fontSize: HrFont.labelMedium, height: 1.4, color: cs.onSurfaceVariant),
                     ),
                   ),
               ],
@@ -454,7 +458,7 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
       key: HrAddChainsSheet.chipKey(chain.uid),
       color: enabled ? bg : cs.surfaceContainerHigh,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(
           color: selected ? cs.primary : cs.outlineVariant.withValues(alpha: 0.6),
           width: selected ? 1.5 : 1,
@@ -499,7 +503,7 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 13.5,
+                          fontSize: HrFont.body,
                           fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                           color: enabled ? fg : cs.onSurfaceVariant,
                         ),
@@ -507,7 +511,7 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
                       if (stateLabel != null)
                         Text(
                           stateLabel,
-                          style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                          style: TextStyle(fontSize: HrFont.labelSmall, color: cs.onSurfaceVariant),
                         ),
                     ],
                   ),
@@ -539,7 +543,7 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
       if (joined.isEmpty)
         Text(
           _joined.isEmpty ? 'لا توجد سلاسل مسجلة بعد.' : 'لا توجد نتائج.',
-          style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant),
+          style: TextStyle(fontSize: HrFont.labelMedium, color: cs.onSurfaceVariant),
         )
       else
         _grid([
@@ -565,11 +569,11 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
             color: cs.secondaryContainer,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(HrRadius.chip),
           ),
           child: Text(
             '$count مختارة',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cs.onSecondaryContainer),
+            style: TextStyle(fontSize: HrFont.labelMedium, fontWeight: FontWeight.w700, color: cs.onSecondaryContainer),
           ),
         ),
       ),
@@ -598,9 +602,9 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
         ),
       const SizedBox(height: 4),
       if (_others.isEmpty)
-        Text('الشركة مسجلة في كل السلاسل المتاحة.', style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant))
+        Text('الشركة مسجلة في كل السلاسل المتاحة.', style: TextStyle(fontSize: HrFont.labelMedium, color: cs.onSurfaceVariant))
       else if (others.isEmpty)
-        Text('لا توجد سلاسل مطابقة للبحث', style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant))
+        Text('لا توجد سلاسل مطابقة للبحث', style: TextStyle(fontSize: HrFont.labelMedium, color: cs.onSurfaceVariant))
       else
         _grid([
           for (final c in others)
@@ -628,7 +632,7 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
       ],
       if (_submitError != null) ...[
         const SizedBox(height: 12),
-        Text(_submitError!, style: TextStyle(fontSize: 12.5, color: cs.error)),
+        Text(_submitError!, style: TextStyle(fontSize: HrFont.labelMedium, color: cs.error)),
       ],
     ];
   }
@@ -639,7 +643,7 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
           height: h,
           decoration: BoxDecoration(
             color: cs.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(HrRadius.chip),
           ),
         );
     return Column(
@@ -662,7 +666,7 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(HrRadius.card),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -670,7 +674,7 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
           Icon(icon, size: 18, color: cs.onSurfaceVariant),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(text, style: TextStyle(fontSize: 12.5, height: 1.5, color: cs.onSurfaceVariant)),
+            child: Text(text, style: TextStyle(fontSize: HrFont.labelMedium, height: 1.5, color: cs.onSurfaceVariant)),
           ),
         ],
       ),
@@ -717,7 +721,7 @@ class _HrAddChainsSheetState extends State<HrAddChainsSheet> {
                 child: Text(
                   'بعد الموافقة تظهر فروع السلسلة تلقائياً لكل مناديب الشركة النشطين '
                   'والمدفوع اشتراكهم. لا رسوم إضافية لكل سلسلة.',
-                  style: TextStyle(fontSize: 12, height: 1.5, color: cs.onSurfaceVariant),
+                  style: TextStyle(fontSize: HrFont.labelMedium, height: 1.5, color: cs.onSurfaceVariant),
                 ),
               ),
             ],

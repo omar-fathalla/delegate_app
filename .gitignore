@@ -109,3 +109,9 @@ functions/scripts/.hr-web-fake-accounts.local.json
 functions/scripts/.hr-web-fake-accounts.local.json.tmp
 **/.hr-web-fake-accounts.local.json
 **/.hr-web-fake-accounts.local.json.tmp
+
+# Secrets: never commit (TAS-10/TAS-12). CI reads them from GitHub Secrets.
+android/app/service_account.json
+**/service_account*.json
+android/app/keystore_base64*.txt
+*.keystore

@@ -684,6 +684,15 @@
       }
     }
   },
+  "webVersion": "الإصدار {version}",
+  "@webVersion": {
+    "description": "Version label in web settings (no mobile app name)",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "account": "الحساب",
   "@account": {
     "description": "Account section header"
@@ -1454,7 +1463,7 @@
   "roleTechSupport2": "الدعم الفني",
   "roleOrgAdmin2": "مسؤول المنظمة",
   "roleCompanyAdmin2": "مشرف الشركة",
-  "roleHrOfficer": "مسؤول موارد بشرية",
+  "roleHrOfficer": "موارد بشرية (HR)",
   "roleAccountant": "إدارة الحسابات",
   "roleMarketing2": "التسويق والعلاقات",
   "personalInfo": "المعلومات الشخصية",

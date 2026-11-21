@@ -16,11 +16,9 @@
 # lease a port slot (scripts/ci/lease.sh), so several local_ci.sh runs, GitHub
 # runners and agents can run at the same time on this Mac.
 #
-# Emulator port overrides (TA-39, e.g. parallel local runs):
-#   LOCAL_CI_FIRESTORE_PORT=18080 LOCAL_CI_FIRESTORE_HUB_PORT=14400 \
-#   LOCAL_CI_AUTH_PORT=19099 LOCAL_CI_STORAGE_PORT=19199 \
-#   LOCAL_CI_FUNCTIONS_PORT=15001 LOCAL_CI_LOGGING_PORT=14500 \
-#   LOCAL_CI_FIRESTORE_WEBSOCKET_PORT=19150 bash scripts/local_ci.sh <sha>
+# Emulator ports (TAS-107): scripts/emulators_exec.sh picks a free local slot
+# (31xxx..39xxx) by itself, so parallel runs need no overrides. To pin ports,
+# set all seven LOCAL_CI_* vars (see scripts/emulator_ports.env.sh).
 #
 # Creates a fresh detached worktree at the SHA, runs every CI job plus an
 # Android dev debug APK build, and writes logs + SUMMARY.md to

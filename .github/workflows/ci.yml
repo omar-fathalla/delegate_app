@@ -17,11 +17,19 @@ on:
 permissions:
   contents: read
 
-# One CI run per PR: a new push cancels the older run of the same PR, so the
-# Mac never tests a commit that is already outdated. Pushes to dev are never
-# cancelled (each merge gets its full run).
+# Where jobs run (TAS-178): while the repo is private they run on the Mac
+# self-hosted runners (delegate-app labels). Once the repo is public they run
+# on GitHub-hosted runners (ubuntu-latest, iOS on macos-latest), which are free
+# for public repos, and nothing from a fork PR ever reaches the Mac.
+
+# One group per workflow per PR (TAS-172): a new push to a PR cancels that PR's
+# older CI run, so superseded commits stop holding runner slots. The group name
+# is different from PR User Test builds (user-test-…), so CI and User Test
+# never cancel each other. Pushes to dev and manual runs are never cancelled.
+# Heavy Mac builds still run one at a time: they only run on the slot-3
+# runner (see build-web below).
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -30,35 +38,10 @@ env:
   LC_ALL: en_US.UTF-8
 
 jobs:
-  # Picks the jobs this change needs (scripts/ci/ci_changes.sh, same mapping as
-  # local_ci --changed). Docs-only PRs run just the static guards; push to dev
-  # and manual runs always run everything.
-  changes:
-    name: Changes
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: [self-hosted, macOS, ARM64, delegate-app]
-    timeout-minutes: 5
-    outputs:
-      jobs: ${{ steps.pick.outputs.jobs }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - id: pick
-        run: |
-          if [[ "${{ github.event_name }}" == pull_request ]]; then
-            jobs="$(bash scripts/ci/ci_changes.sh "origin/${{ github.base_ref }}")"
-          else
-            jobs="$(bash scripts/ci/ci_changes.sh --all)"
-          fi
-          echo "jobs=$jobs" >> "$GITHUB_OUTPUT"
-          echo "CI jobs:$jobs"
-
   analyze:
     name: Analyze
-    needs: changes
-    if: contains(needs.changes.outputs.jobs, ' analyze ')
-    runs-on: [self-hosted, macOS, ARM64, delegate-app]
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","macOS","ARM64","delegate-app"]') || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -78,18 +61,17 @@ jobs:
           # Self-hosted tashil-delegate-mac already has the SDK in the
           # runner tool cache. GitHub Actions cache upload of the Flutter
           # SDK stalled the Analyze post-step for 10+ minutes.
-          cache: false
+          cache: ${{ !github.event.repository.private }}
       - name: Install dependencies
         run: flutter pub get --enforce-lockfile
-      # Commands live in scripts/ci/jobs.sh (single source for CI, local_ci.sh, agents).
+      # Fails only on errors; warnings/infos are reported but don't fail the job.
       - name: Analyze
-        run: bash scripts/ci/run_job.sh analyze
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos
 
   test:
     name: Test
-    needs: changes
-    if: contains(needs.changes.outputs.jobs, ' test ')
-    runs-on: [self-hosted, macOS, ARM64, delegate-app]
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","macOS","ARM64","delegate-app"]') || 'ubuntu-latest' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -109,18 +91,26 @@ jobs:
           # Self-hosted tashil-delegate-mac already has the SDK in the
           # runner tool cache. GitHub Actions cache upload of the Flutter
           # SDK stalled the Analyze post-step for 10+ minutes.
-          cache: false
+          cache: ${{ !github.event.repository.private }}
       - name: Install dependencies
         run: flutter pub get --enforce-lockfile
       - name: Test
-        run: bash scripts/ci/run_job.sh test
+        # TAS-175: 4 test files at a time. At --concurrency=1 the suite took
+        # 25-30 min on the shared Mac and often hit timeout-minutes: 30; at 4 the
+        # same suite ran in under 2 min locally on this Mac.
+        # TAS-162: golden/screenshot tests (tag `golden`, see dart_test.yaml)
+        # depend on the host renderer, so they are skipped here. Run them
+        # locally: flutter test --tags golden [--update-goldens]
+        run: flutter test --concurrency=4 --exclude-tags golden
 
   p0-scripts:
     name: P0 scripts (emulators)
-    needs: changes
-    if: contains(needs.changes.outputs.jobs, ' p0-scripts ') || contains(needs.changes.outputs.jobs, ' emulator-ports ')
-    runs-on: [self-hosted, macOS, ARM64, delegate-app]
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","macOS","ARM64","delegate-app"]') || 'ubuntu-latest' }}
     timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: functions
     steps:
       - uses: actions/checkout@v4
       - name: Sanitize PATH for delegate-ci
@@ -135,31 +125,29 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          # No GitHub cache: the self-hosted Mac keeps ~/.npm locally, and the
-          # cache upload post-step stalled past the 15 min job timeout (2026-11-19).
-      # JDK 21 already on the Mac (Android Studio JBR). setup-java re-downloaded
-      # Temurin on fresh runners and hit the 15 min job timeout (2026-11-19).
-      - name: Use local JDK 21
-        run: |
-          JH="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
-          "$JH/bin/java" -version
-          echo "JAVA_HOME=$JH" >> "$GITHUB_ENV"
-          echo "$JH/bin" >> "$GITHUB_PATH"
-      - name: Emulator port override bind (TA-39)
-        run: bash scripts/ci/run_job.sh emulator-ports
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: npm ci
+      - name: Emulator port slots + override bind (TA-39, TAS-107)
+        working-directory: .
+        run: npm install --no-audit --no-fund && npm run test:scripts:emulator-slots && npm run test:scripts:emulator-ports
       - name: P0 scripts emulator test
-        run: bash scripts/ci/run_job.sh p0-scripts
+        run: bash ../scripts/emulators_exec.sh --only auth,firestore --project demo-p0-scripts "node --test scripts/p0-scripts.emulator.test.js"
 
   build-web:
     name: Build web (release)
-    needs: changes
-    if: contains(needs.changes.outputs.jobs, ' build-web ')
-    runs-on: [self-hosted, macOS, ARM64, delegate-app]
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    # One heavy delegate_app build at a time on the Mac (TAS-172): heavy builds
+    # run only on the runner labelled slot-3, so they wait in GitHub's normal
+    # job queue one behind the other. The old repo-wide concurrency group
+    # (delegate-mac-heavy-build) kept only ONE pending job, so each new PR
+    # cancelled the previous PR's waiting build.
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","macOS","ARM64","delegate-app","slot-3"]') || 'ubuntu-latest' }}
     timeout-minutes: 180
-    # One heavy delegate_app build at a time on the Mac (replaces ~/mac-resources lock).
-    concurrency:
-      group: delegate-mac-heavy-build
-      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - name: Sanitize PATH for delegate-ci
@@ -178,15 +166,16 @@ jobs:
           # Self-hosted tashil-delegate-mac already has the SDK in the
           # runner tool cache. GitHub Actions cache upload of the Flutter
           # SDK stalled the Analyze post-step for 10+ minutes.
-          cache: false
+          cache: ${{ !github.event.repository.private }}
+      - name: Install dependencies
+        run: flutter pub get --enforce-lockfile
       - name: Build web
-        run: bash scripts/ci/run_job.sh build-web
+        run: flutter build web --release
 
   ios-dev-config-check:
     name: iOS dev config (static)
-    needs: changes
-    if: contains(needs.changes.outputs.jobs, ' ios-guards ')
-    runs-on: [self-hosted, macOS, ARM64, delegate-app]
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","macOS","ARM64","delegate-app"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -203,14 +192,17 @@ jobs:
       # The self-test is also 3.9-safe (Optional[int], not int | None).
       - name: Prefer Homebrew Python
         run: echo /opt/homebrew/bin >> "$GITHUB_PATH"
-      - name: Static guards (iOS dev config, Maestro, Patrol, holds, CI tooling)
-        run: bash scripts/ci/run_job.sh ios-guards
+      - name: Static checks (scripts, pbxproj, firebase_config.sh)
+        run: bash scripts/ios_dev_config_check.sh
+      - name: Maestro flow header guard
+        run: bash scripts/maestro_check_flow_headers.sh
+      - name: Patrol integration guard
+        run: bash scripts/patrol_check_integration_targets.sh
 
   android-dev-config-check:
     name: Android dev config (static)
-    needs: changes
-    if: contains(needs.changes.outputs.jobs, ' android-guards ')
-    runs-on: [self-hosted, macOS, ARM64, delegate-app]
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","macOS","ARM64","delegate-app"]') || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -221,14 +213,16 @@ jobs:
           echo "LANG=en_US.UTF-8" >> "$GITHUB_ENV"
           echo "LC_ALL=en_US.UTF-8" >> "$GITHUB_ENV"
       - name: Static checks (dev flavor, google-services, docs)
-        run: bash scripts/ci/run_job.sh android-guards
+        run: bash scripts/android_dev_config_check.sh && npm run test:scripts:android-dev-distribute-guard
 
   functions:
     name: Functions lint & test
-    needs: changes
-    if: contains(needs.changes.outputs.jobs, ' functions ')
-    runs-on: [self-hosted, macOS, ARM64, delegate-app]
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","macOS","ARM64","delegate-app"]') || 'ubuntu-latest' }}
     timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: functions
     steps:
       - uses: actions/checkout@v4
       - name: Sanitize PATH for delegate-ci
@@ -243,25 +237,34 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          # No GitHub cache: the self-hosted Mac keeps ~/.npm locally, and the
-          # cache upload post-step stalled past the 15 min job timeout (2026-11-19).
-      # JDK 21 already on the Mac (Android Studio JBR). setup-java re-downloaded
-      # Temurin on fresh runners and hit the 15 min job timeout (2026-11-19).
-      - name: Use local JDK 21
-        run: |
-          JH="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
-          "$JH/bin/java" -version
-          echo "JAVA_HOME=$JH" >> "$GITHUB_ENV"
-          echo "$JH/bin" >> "$GITHUB_PATH"
-      - name: Functions lint, unit tests, staff e2e
-        run: bash scripts/ci/run_job.sh functions
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm test --if-present
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - name: Staff accounts e2e (createStaffUser / claimInvite on emulators)
+        working-directory: .
+        run: npm install --no-audit --no-fund && npm run test:e2e:staff
 
   rules:
     name: Firestore rules & delegate login e2e (emulators)
-    needs: changes
-    if: contains(needs.changes.outputs.jobs, ' rules ')
-    runs-on: [self-hosted, macOS, ARM64, delegate-app]
-    timeout-minutes: 30
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted","macOS","ARM64","delegate-app"]') || 'ubuntu-latest' }}
+    # TAS-107: 17+ suites; 20 min ran out on a busy Mac (#384, 20 Nov 2026).
+    # TAS-182: measured 21 Nov 2026. ubuntu-latest: whole job ~6 min (Rules
+    # tests ~5 min, ~12-15 s per suite). Self-hosted Mac under load (#406):
+    # Rules tests 30m22s (~1.5-4 min per suite, every phase 5-8x slower:
+    # CLI boot, rules load, test bodies; no download or install step stood
+    # out), then both e2e suites ~2 min each, so 35 min cut off the last
+    # one. Mac: 50 min (~36 min measured + headroom); hosted: 20 min.
+    timeout-minutes: ${{ github.event.repository.private && 50 || 20 }}
     steps:
       - uses: actions/checkout@v4
       - name: Sanitize PATH for delegate-ci
@@ -276,13 +279,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      # JDK 21 already on the Mac (Android Studio JBR). setup-java re-downloaded
-      # Temurin on fresh runners and hit the 15 min job timeout (2026-11-19).
-      - name: Use local JDK 21
-        run: |
-          JH="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
-          "$JH/bin/java" -version
-          echo "JAVA_HOME=$JH" >> "$GITHUB_ENV"
-          echo "$JH/bin" >> "$GITHUB_PATH"
-      - name: Rules + emulator e2e (every test:rules* in package.json)
-        run: bash scripts/ci/run_job.sh rules
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - name: Install root test deps
+        run: npm install --no-audit --no-fund
+      - name: Install functions deps
+        run: npm --prefix functions ci
+      - name: Rules tests
+        run: npm run test:rules && npm run test:rules:interim && npm run test:rules:p0 && npm run test:rules:adv && npm run test:rules:docs && npm run test:rules:subs && npm run test:rules:qa-hold && npm run test:rules:profile && npm run test:rules:m31 && npm run test:rules:source && npm run test:rules:gaps && npm run test:rules:security && npm run test:rules:ut-nb && npm run test:rules:nationalid-scope && npm run test:rules:users-nationalid-lock && npm run test:rules:paymob-superseded && npm run test:rules:privileged-reupload
+      - name: Subscriptions e2e (suspension job + Paymob hook on emulator)
+        run: npm run test:e2e:subscriptions
+      - name: Delegate login e2e (delegateLoginV2 -> custom token -> 1.14.3 query)
+        run: npm run test:e2e:delegate

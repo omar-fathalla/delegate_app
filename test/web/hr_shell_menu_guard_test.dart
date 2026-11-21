@@ -48,11 +48,10 @@ const _supervisorMenu = [
   'الملف الشخصي',
   'طلبات الاشتراك',
   'تجديد المناديب',
-  'سجل الحضور والانصراف',
+  'الحضور والانصراف',
   'مناديب الشركة',
-  'Live Tracking',
+  'الخريطة الحية',
   'الصور',
-  'أذونات التصوير',
   'تعديلات الحضور',
   'طلبات الإجازات',
   'الرواتب',
@@ -68,7 +67,6 @@ const _webOnlyTitles = [
   'الرئيسية',
   'طلبات اشتراك واعتماد المناديب',
   'المهام',
-  'أذونات التصوير',
   'لائحة الغرامات والجزاءات',
   'نظام الغرامات والمخالفات',
 ];
@@ -213,11 +211,12 @@ void main() {
         expect(tab(kHrTabTasks), isA<AdminTasksScreen>());
         expect(tab(kHrTabPenaltyCatalog), isA<PenaltyRulesCatalogPage>());
 
-        expect(tab(kHrTabPhotoPermissions), isA<HrSupervisorPermissionsHost>());
+        // TAS-149: the retired permissions slot is «الصور» on its
+        // permissions view.
+        expect(tab(kHrTabPhotoPermissions), isA<HRPhotosTab>());
         expect(
-          (tab(kHrTabPhotoPermissions) as HrSupervisorPermissionsHost)
-              .supervisor,
-          delegate,
+          (tab(kHrTabPhotoPermissions) as HRPhotosTab).initialView,
+          HrPhotosView.permissions,
         );
         expect(tab(kHrTabPenalties), isA<HrPenaltiesHost>());
         expect((tab(kHrTabPenalties) as HrPenaltiesHost).admin, delegate);
@@ -275,11 +274,14 @@ void main() {
       expect(find.text('الملف الشخصي'), findsNothing);
       expect(find.text('الإعدادات'), findsOneWidget);
       expect(find.byType(AppAvatar), findsNothing);
-      expect(find.text('الحضور والانصراف'), findsNothing);
+      // TAS-138: the web name is now «الحضور والانصراف», like mobile.
+      expect(find.text('سجل الحضور والانصراف'), findsNothing);
       await tester.tap(find.text('المهام'));
       expect(selected, kHrTabTasks);
-      await tester.tap(find.text('أذونات التصوير'));
-      expect(selected, kHrTabPhotoPermissions);
+      // TAS-149: permissions live inside «الصور»; no own sidebar entry.
+      expect(find.text('أذونات التصوير'), findsNothing);
+      await tester.tap(find.text('الصور'));
+      expect(selected, kHrTabPhotos);
       await tester.tap(find.text('نظام الغرامات'));
       expect(selected, kHrTabPenalties);
     });
@@ -320,11 +322,11 @@ void main() {
           ),
         );
         expect(find.text('المهام'), findsOneWidget);
-        expect(find.text('أذونات التصوير'), findsOneWidget);
+        expect(find.text('أذونات التصوير'), findsNothing);
         expect(find.text('لائحة الغرامات'), findsOneWidget);
         expect(find.text('نظام الغرامات'), findsOneWidget);
         expect(find.text('طلبات الاشتراك'), findsOneWidget);
-        expect(find.text('سجل الحضور والانصراف'), findsOneWidget);
+        expect(find.text('الحضور والانصراف'), findsOneWidget);
         expect(find.text('الرئيسية'), findsNothing);
       },
     );

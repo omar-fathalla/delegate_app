@@ -5,6 +5,7 @@ import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/auth/domain/role_home.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
@@ -54,7 +55,14 @@ class _SplashScreenState extends State<SplashScreen>
       listener: (context, state) {
         if (state is AuthAuthenticated) {
           final delegate = state.delegate;
-          context.go(landingPathForRole(delegate.role), extra: delegate);
+          // Web reload of an HR shell URL stays on that page (TAS-139).
+          context.go(
+            hrShellRestoreLocation(
+              landingPathForRole(delegate.role),
+              GoRouter.maybeOf(context)?.routeInformationProvider.value.uri,
+            ),
+            extra: delegate,
+          );
 
           // تهيئة الإشعارات في الخلفية بعد اكتمال الانتقال
           Future.delayed(const Duration(milliseconds: 1500), () {

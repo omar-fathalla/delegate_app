@@ -1,0 +1,18 @@
+appId: com.tashil.delegate.dev
+---
+# Opens the header menu and waits for its items. Right after login (or a pop)
+# the app can still be settling, so a tap may land without opening the menu
+# (mac-gate c0bea88f: the tap "COMPLETED" but no menu). Retry the tap until an
+# item shows.
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            notVisible: "الإعدادات"
+          commands:
+            - tapOn:
+                id: "tashil_main_menu_button"
+      - extendedWaitUntil:
+          visible: "الإعدادات"
+          timeout: 8000

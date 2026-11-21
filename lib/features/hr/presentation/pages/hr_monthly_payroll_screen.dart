@@ -4,6 +4,10 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_table.dart';
+import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
@@ -12,6 +16,7 @@ import 'package:delegate_app/features/hr/domain/services/payroll_day_rules.dart'
 import 'package:delegate_app/features/hr/domain/entities/company_payroll_config.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// عنصر مسير الراتب للمندوب متوافق مع كافة أنماط وقواعد الاحتساب
 class _DelegatePayrollItem {
@@ -151,6 +156,13 @@ class HRMonthlyPayrollScreen extends StatefulWidget {
     this.showAppBar = true,
   });
 
+  /// Tests swap in a fake Firestore here. Null uses the real instance.
+  @visibleForTesting
+  static FirebaseFirestore Function()? debugFirestore;
+
+  static FirebaseFirestore get _firestore =>
+      debugFirestore?.call() ?? FirebaseFirestore.instance;
+
   @override
   State<HRMonthlyPayrollScreen> createState() => _HRMonthlyPayrollScreenState();
 }
@@ -180,8 +192,26 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
     _loadPayrollData();
   }
 
+  /// Web shell header bridge. The top-bar refresh reloads this page through
+  /// it, so the web toolbar has no refresh button of its own (TAS-119).
+  HrWebHeaderBridge? _headerBridge;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!WebRuntimePolicy.isWeb) return;
+    final next = context
+        .getInheritedWidgetOfExactType<HrWebHeaderBridgeScope>()
+        ?.notifier;
+    if (identical(next, _headerBridge)) return;
+    _headerBridge?.releasePageReload(kHrTabPayroll, _loadPayrollData);
+    _headerBridge = next;
+    _headerBridge?.attachPageReload(kHrTabPayroll, _loadPayrollData);
+  }
+
   @override
   void dispose() {
+    _headerBridge?.releasePageReload(kHrTabPayroll, _loadPayrollData);
     _searchController.dispose();
     super.dispose();
   }
@@ -195,7 +225,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
     try {
       // 1. Fetch Company Payroll Configuration
       try {
-        final configDoc = await FirebaseFirestore.instance
+        final configDoc = await HRMonthlyPayrollScreen._firestore
             .collection('company_payroll_configs')
             .doc(widget.hrDelegate.companyUID)
             .get();
@@ -238,7 +268,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
       final monthEnd = nextMonth.subtract(const Duration(seconds: 1));
 
       // 3. Fetch User Wallets for base salary and individual shift overrides
-      final walletsSnap = await FirebaseFirestore.instance
+      final walletsSnap = await HRMonthlyPayrollScreen._firestore
           .collection('user_wallets')
           .where('companyUID', isEqualTo: widget.hrDelegate.companyUID)
           .get();
@@ -250,7 +280,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
       }
 
       // 4. Fetch Penalties approved in this month
-      final penaltiesSnap = await FirebaseFirestore.instance
+      final penaltiesSnap = await HRMonthlyPayrollScreen._firestore
           .collection('penalties')
           .where('companyId', isEqualTo: widget.hrDelegate.companyUID)
           .get();
@@ -275,7 +305,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
       }
 
       // 5. Fetch Approved Leaves in this month
-      final leavesSnap = await FirebaseFirestore.instance
+      final leavesSnap = await HRMonthlyPayrollScreen._firestore
           .collection('leave_requests')
           .where('companyUID', isEqualTo: widget.hrDelegate.companyUID)
           .where('status', isEqualTo: 'approved')
@@ -309,7 +339,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
       }
 
       // 6. Fetch Attendance logs for the month
-      final attendanceSnap = await FirebaseFirestore.instance
+      final attendanceSnap = await HRMonthlyPayrollScreen._firestore
           .collection(kAttendanceCollection)
           .where('companyId', isEqualTo: widget.hrDelegate.companyUID)
           .get();
@@ -516,9 +546,9 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('تم تصدير كشف مسير الرواتب بنجاح'),
-            backgroundColor: Color(0xFF2E7D32),
+            backgroundColor: HrStatusColors.of(context).success,
           ),
         );
       }
@@ -543,7 +573,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         barrierColor: Colors.black54,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(HrRadius.pill)),
         ),
         builder: (ctx) => _CompanyPayrollPolicySheet(
           config: _companyPayrollConfig,
@@ -556,10 +586,15 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
       showDialog(
         context: context,
         builder: (ctx) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.pill)),
           backgroundColor: Theme.of(context).colorScheme.surface,
+          // Size to content: capped width on web, and a max height relative
+          // to the screen so short content leaves no empty area (TAS-152).
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 540, maxHeight: 780),
+            constraints: BoxConstraints(
+              maxWidth: 560,
+              maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+            ),
             child: _CompanyPayrollPolicySheet(
               config: _companyPayrollConfig,
               hrDelegate: widget.hrDelegate,
@@ -574,7 +609,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
 
   Future<void> _saveCompanyPayrollPolicy(CompanyPayrollConfigModel newConfig) async {
     try {
-      await FirebaseFirestore.instance
+      await HRMonthlyPayrollScreen._firestore
           .collection('company_payroll_configs')
           .doc(widget.hrDelegate.companyUID)
           .set(newConfig.toMap(), SetOptions(merge: true));
@@ -586,9 +621,9 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
         _loadPayrollData();
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('تم حفظ وتطبيق سياسة الرواتب بنجاح على كافة المناديب'),
-            backgroundColor: Color(0xFF2E7D32),
+            backgroundColor: HrStatusColors.of(context).success,
           ),
         );
       }
@@ -613,7 +648,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         barrierColor: Colors.black54,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(HrRadius.pill)),
         ),
         builder: (ctx) => _DelegateSalarySheet(
           item: item,
@@ -627,7 +662,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
       showDialog(
         context: context,
         builder: (ctx) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.pill)),
           backgroundColor: Theme.of(context).colorScheme.surface,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520, maxHeight: 720),
@@ -652,7 +687,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
     PayrollCalculationMode selectedMode,
   ) async {
     try {
-      await FirebaseFirestore.instance.collection('user_wallets').doc(item.delegate.uid).set({
+      await HRMonthlyPayrollScreen._firestore.collection('user_wallets').doc(item.delegate.uid).set({
         'monthlyAllocation': baseSal,
         'baseSalary': baseSal,
         'dailyShiftHours': shiftH,
@@ -677,7 +712,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('تم تحديث إعدادات الراتب للمندوب ${item.delegate.fullName} بنجاح'),
-            backgroundColor: const Color(0xFF2E7D32),
+            backgroundColor: HrStatusColors.of(context).success,
           ),
         );
       }
@@ -717,7 +752,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                     'مسيرات الرواتب الشهرية',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14.5,
+                      fontSize: HrFont.body,
                       letterSpacing: -0.2,
                     ),
                     maxLines: 1,
@@ -726,7 +761,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                   Text(
                     widget.hrDelegate.companyName,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: HrFont.labelSmall,
                       color: colorScheme.onSurfaceVariant,
                     ),
                     maxLines: 1,
@@ -772,50 +807,35 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                     style: TextStyle(color: colorScheme.error),
                   ),
                 )
+              : WebRuntimePolicy.isWeb
+              ? _buildWebBody(context, filtered)
               : RefreshIndicator(
                   onRefresh: _loadPayrollData,
                   child: ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
                       if (!widget.showAppBar) ...[
+                        // The shell's top bar already shows the page title,
+                        // so the page keeps only its actions, with labels
+                        // (TAS-152).
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'مسيرات الرواتب الشهرية',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14.5,
-                                      letterSpacing: -0.2,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  Text(
-                                    widget.hrDelegate.companyName,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.tune_rounded),
-                              tooltip: 'قواعد وسياسة الرواتب للشركة',
+                            TextButton.icon(
+                              icon: const Icon(Icons.tune_rounded, size: 18),
+                              label: const Text('قواعد الرواتب'),
                               onPressed: _openCompanyPayrollPolicyDialog,
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.file_download_outlined),
-                              tooltip: 'تصدير مسير الرواتب إلى Excel',
+                            const SizedBox(width: 8),
+                            OutlinedButton.icon(
+                              icon: const Icon(
+                                Icons.file_download_outlined,
+                                size: 18,
+                              ),
+                              label: const Text('تصدير Excel'),
                               onPressed: _exportPayrollToExcel,
                             ),
+                            const SizedBox(width: 4),
                             IconButton(
                               icon: const Icon(Icons.refresh_rounded),
                               tooltip: 'إعادة الاحتساب والتحديث',
@@ -851,7 +871,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                             title: 'صافي المستحق للصرف',
                             value: '${totalNetPayout.toStringAsFixed(0)} ج.م',
                             icon: Icons.payments_rounded,
-                            color: const Color(0xFF2E7D32),
+                            color: HrStatusColors.of(context).success,
                             colorScheme: colorScheme,
                             subtitle: 'لـ ${filtered.length} مندوب ومروج',
                           );
@@ -904,11 +924,11 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                           controller: _searchController,
                           onChanged: (val) => setState(() => _searchQuery = val.trim()),
                           textAlignVertical: TextAlignVertical.center,
-                          style: TextStyle(fontSize: 13, color: colorScheme.onSurface),
+                          style: TextStyle(fontSize: HrFont.body, color: colorScheme.onSurface),
                           decoration: InputDecoration(
                             hintText: 'بحث باسم المندوب أو رقم الهاتف...',
                             hintStyle: TextStyle(
-                              fontSize: 12,
+                              fontSize: HrFont.labelMedium,
                               color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                             ),
                             prefixIcon: Icon(Icons.search_rounded, size: 19, color: colorScheme.primary),
@@ -926,15 +946,15 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
                             isDense: true,
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(22),
+                              borderRadius: BorderRadius.circular(HrRadius.pill),
                               borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.35)),
                             ),
                             enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(22),
+                              borderRadius: BorderRadius.circular(HrRadius.pill),
                               borderSide: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.35)),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(22),
+                              borderRadius: BorderRadius.circular(HrRadius.pill),
                               borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
                             ),
                           ),
@@ -947,7 +967,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                       Container(
                         decoration: BoxDecoration(
                           color: colorScheme.surface,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(HrRadius.card),
                           border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.6)),
                         ),
                         clipBehavior: Clip.antiAlias,
@@ -968,16 +988,16 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                                       color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                                       child: Row(
                                         children: const [
-                                          Expanded(flex: 22, child: Text('المندوب', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                                          Expanded(flex: 10, child: Text('الحضور', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                                          Expanded(flex: 10, child: Text('الإجازات', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                                          Expanded(flex: 10, child: Text('الغياب', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                                          Expanded(flex: 14, child: Text('ساعات العمل', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                                          Expanded(flex: 13, child: Text('الأساسي / الساعة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                                          Expanded(flex: 12, child: Text('الاستحقاق', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                                          Expanded(flex: 14, child: Text('إجمالي الخصومات', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                                          Expanded(flex: 13, child: Text('صافي الصرف', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                                          SizedBox(width: 44, child: Center(child: Text('إجراء', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)))),
+                                          Expanded(flex: 22, child: Text('المندوب', style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.body))),
+                                          Expanded(flex: 10, child: Text('الحضور', style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.body))),
+                                          Expanded(flex: 10, child: Text('الإجازات', style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.body))),
+                                          Expanded(flex: 10, child: Text('الغياب', style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.body))),
+                                          Expanded(flex: 14, child: Text('ساعات العمل', style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.body))),
+                                          Expanded(flex: 13, child: Text('الأساسي / الساعة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.body))),
+                                          Expanded(flex: 12, child: Text('الاستحقاق', style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.body))),
+                                          Expanded(flex: 14, child: Text('إجمالي الخصومات', style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.body))),
+                                          Expanded(flex: 13, child: Text('صافي الصرف', style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.body))),
+                                          SizedBox(width: 44, child: Center(child: Text('إجراء', style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.labelMedium)))),
                                         ],
                                       ),
                                     ),
@@ -1017,7 +1037,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                                                           children: [
                                                             Text(
                                                               item.delegate.fullName,
-                                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.body),
                                                               overflow: TextOverflow.ellipsis,
                                                             ),
                                                             Directionality(
@@ -1025,7 +1045,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                                                               child: Text(
                                                                 item.delegate.phoneNumber,
                                                                 style: TextStyle(
-                                                                  fontSize: 11,
+                                                                  fontSize: HrFont.labelSmall,
                                                                   color: colorScheme.onSurfaceVariant,
                                                                 ),
                                                               ),
@@ -1082,11 +1102,11 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                                                     children: [
                                                       Text(
                                                         item.formattedTotalHours,
-                                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                                        style: const TextStyle(fontSize: HrFont.labelMedium, fontWeight: FontWeight.bold),
                                                       ),
                                                       Text(
                                                         'من ${item.targetWorkHours.toStringAsFixed(0)} س مطلوب',
-                                                        style: TextStyle(fontSize: 10.5, color: colorScheme.onSurfaceVariant),
+                                                        style: TextStyle(fontSize: HrFont.labelSmall, color: colorScheme.onSurfaceVariant),
                                                       ),
                                                     ],
                                                   ),
@@ -1101,11 +1121,11 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                                                     children: [
                                                       Text(
                                                         '${item.baseSalary.toStringAsFixed(0)} ج.م',
-                                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5),
+                                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: HrFont.labelMedium),
                                                       ),
                                                       Text(
                                                         '${item.effectiveHourlyRate.toStringAsFixed(1)} ج.م/س',
-                                                        style: TextStyle(fontSize: 10.5, color: colorScheme.primary),
+                                                        style: TextStyle(fontSize: HrFont.labelSmall, color: colorScheme.primary),
                                                       ),
                                                     ],
                                                   ),
@@ -1116,7 +1136,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                                                   flex: 12,
                                                   child: Text(
                                                     '${item.grossEarned.toStringAsFixed(0)} ج.م',
-                                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5),
+                                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: HrFont.labelMedium),
                                                   ),
                                                 ),
 
@@ -1132,13 +1152,13 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                                                         style: TextStyle(
                                                           color: item.totalDeductions > 0 ? colorScheme.error : colorScheme.outline,
                                                           fontWeight: FontWeight.bold,
-                                                          fontSize: 12.5,
+                                                          fontSize: HrFont.labelMedium,
                                                         ),
                                                       ),
                                                       if (item.totalDeductions > 0)
                                                         Text(
                                                           'غياب: ${item.absenceDeductionAmount.toStringAsFixed(0)}${item.penaltiesDeductions > 0 ? ' | جزاء: ${item.penaltiesDeductions.toStringAsFixed(0)}' : ''}',
-                                                          style: TextStyle(fontSize: 10, color: colorScheme.error.withValues(alpha: 0.8)),
+                                                          style: TextStyle(fontSize: HrFont.labelSmall, color: colorScheme.error.withValues(alpha: 0.8)),
                                                         ),
                                                     ],
                                                   ),
@@ -1150,16 +1170,16 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                                                   child: Container(
                                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                                     decoration: BoxDecoration(
-                                                      color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
-                                                      borderRadius: BorderRadius.circular(8),
-                                                      border: Border.all(color: const Color(0xFF2E7D32).withValues(alpha: 0.3)),
+                                                      color: HrStatusColors.of(context).success.withValues(alpha: 0.12),
+                                                      borderRadius: BorderRadius.circular(HrRadius.chip),
+                                                      border: Border.all(color: HrStatusColors.of(context).success.withValues(alpha: 0.3)),
                                                     ),
                                                     child: Text(
                                                       '${item.netSalary.toStringAsFixed(0)} ج.م',
-                                                      style: const TextStyle(
-                                                        color: Color(0xFF2E7D32),
+                                                      style: TextStyle(
+                                                        color: HrStatusColors.of(context).success,
                                                         fontWeight: FontWeight.bold,
-                                                        fontSize: 12.5,
+                                                        fontSize: HrFont.labelMedium,
                                                       ),
                                                       textAlign: TextAlign.center,
                                                     ),
@@ -1196,6 +1216,428 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
     );
   }
 
+  // ── Web layout (TAS-119) ──────────────────────────────────────────────
+  // Presentation only: every number below comes from the same
+  // _DelegatePayrollItem getters the mobile layout and the export use.
+
+  static final NumberFormat _webMoneyFormat = NumberFormat('#,##0', 'en');
+
+  static String _webMoney(double value) => '${_webMoneyFormat.format(value.round())} ج.م';
+
+  /// Table columns for the web payroll table. The last one holds the «⋮» menu.
+  static const List<HrTableColumn> _webColumns = [
+    HrTableColumn('المندوب', 24),
+    HrTableColumn('الحضور', 9, center: true),
+    HrTableColumn('الإجازات', 9, center: true),
+    HrTableColumn('الغياب', 9, center: true),
+    HrTableColumn('الأساسي', 12),
+    HrTableColumn('الاستحقاق', 12),
+    HrTableColumn('الخصومات', 12),
+    HrTableColumn('الصافي', 13),
+    HrTableColumn('', 7, center: true),
+  ];
+
+  void _changeMonth(DateTime month) {
+    if (month == _selectedMonth) return;
+    setState(() => _selectedMonth = month);
+    _loadPayrollData();
+  }
+
+  Future<void> _pickMonth() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedMonth,
+      firstDate: DateTime(2023),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDatePickerMode: DatePickerMode.year,
+    );
+    if (picked != null) _changeMonth(DateTime(picked.year, picked.month, 1));
+  }
+
+  Widget _buildWebBody(BuildContext context, List<_DelegatePayrollItem> filtered) {
+    return ListView(
+      key: const Key('payroll_web_body'),
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildWebToolbar(context),
+        const SizedBox(height: 16),
+        _buildWebSummary(context, filtered),
+        const SizedBox(height: 16),
+        _buildWebTable(context, filtered),
+      ],
+    );
+  }
+
+  /// One row: month chip, search, rules (outlined), export (filled).
+  Widget _buildWebToolbar(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final search = SizedBox(
+      height: 40,
+      child: TextField(
+        key: const Key('payroll_web_search'),
+        controller: _searchController,
+        onChanged: (val) => setState(() => _searchQuery = val.trim()),
+        textAlignVertical: TextAlignVertical.center,
+        style: theme.textTheme.bodyMedium,
+        decoration: InputDecoration(
+          hintText: 'بحث باسم المندوب أو رقم الهاتف',
+          hintStyle: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+          prefixIcon: Icon(Icons.search_rounded, size: 20, color: colorScheme.onSurfaceVariant),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear_rounded, size: 18),
+                  tooltip: 'مسح البحث',
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: colorScheme.surfaceContainerHigh,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          isDense: true,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(HrRadius.pill),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(HrRadius.pill),
+            borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
+          ),
+        ),
+      ),
+    );
+
+    final rules = OutlinedButton.icon(
+      key: const Key('payroll_web_rules'),
+      icon: const Icon(Icons.tune_rounded, size: 18),
+      label: const Text('قواعد الرواتب'),
+      onPressed: _openCompanyPayrollPolicyDialog,
+    );
+    final export = FilledButton.icon(
+      key: const Key('payroll_web_export'),
+      icon: const Icon(Icons.file_download_outlined, size: 18),
+      label: const Text('تصدير Excel'),
+      onPressed: _exportPayrollToExcel,
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Narrow windows put the search on its own line.
+        if (constraints.maxWidth < 760) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              search,
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [_buildWebMonthChip(context), rules, export],
+              ),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            _buildWebMonthChip(context),
+            const SizedBox(width: 12),
+            Expanded(child: search),
+            const SizedBox(width: 12),
+            rules,
+            const SizedBox(width: 8),
+            export,
+          ],
+        );
+      },
+    );
+  }
+
+  /// Month chip: previous / month name (opens the picker) / next, plus a
+  /// shortcut back to the current month.
+  Widget _buildWebMonthChip(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final now = DateTime.now();
+    final isCurrentMonth = _selectedMonth.year == now.year && _selectedMonth.month == now.month;
+    final monthStr = DateFormat('MMMM yyyy', 'ar').format(_selectedMonth);
+
+    return Container(
+      key: const Key('payroll_web_month_chip'),
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(HrRadius.button),
+        border: Border.all(color: colorScheme.outline),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: 'الشهر السابق',
+            visualDensity: VisualDensity.compact,
+            iconSize: 20,
+            icon: const Icon(Icons.chevron_right_rounded),
+            onPressed: () => _changeMonth(DateTime(_selectedMonth.year, _selectedMonth.month - 1, 1)),
+          ),
+          InkWell(
+            onTap: _pickMonth,
+            borderRadius: BorderRadius.circular(HrRadius.chip),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.calendar_month_rounded, size: 18, color: colorScheme.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    monthStr,
+                    style: theme.textTheme.labelLarge?.copyWith(color: colorScheme.onSurface),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'الشهر التالي',
+            visualDensity: VisualDensity.compact,
+            iconSize: 20,
+            icon: const Icon(Icons.chevron_left_rounded),
+            onPressed: () => _changeMonth(DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1)),
+          ),
+          if (!isCurrentMonth)
+            TextButton(
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+              onPressed: () => _changeMonth(DateTime(now.year, now.month, 1)),
+              child: const Text('الشهر الحالي'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Four month totals for the filtered list.
+  Widget _buildWebSummary(BuildContext context, List<_DelegatePayrollItem> filtered) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final status = HrStatusColors.of(context);
+
+    final totalGross = filtered.fold<double>(0.0, (acc, item) => acc + item.grossEarned);
+    final totalDeductions = filtered.fold<double>(0.0, (acc, item) => acc + item.totalDeductions);
+    final totalNet = filtered.fold<double>(0.0, (acc, item) => acc + item.netSalary);
+
+    final cards = <Widget>[
+      _WebSummaryCard(
+        key: const Key('payroll_summary_count'),
+        title: 'عدد المناديب',
+        value: '${filtered.length}',
+        icon: Icons.groups_rounded,
+      ),
+      _WebSummaryCard(
+        key: const Key('payroll_summary_gross'),
+        title: 'إجمالي الاستحقاق',
+        value: _webMoney(totalGross),
+        icon: Icons.account_balance_wallet_rounded,
+      ),
+      _WebSummaryCard(
+        key: const Key('payroll_summary_deductions'),
+        title: 'إجمالي الخصومات',
+        value: totalDeductions > 0 ? '-${_webMoney(totalDeductions)}' : _webMoney(0),
+        icon: Icons.remove_circle_outline_rounded,
+        valueColor: totalDeductions > 0 ? colorScheme.error : null,
+      ),
+      _WebSummaryCard(
+        key: const Key('payroll_summary_net'),
+        title: 'صافي الصرف',
+        value: _webMoney(totalNet),
+        icon: Icons.payments_rounded,
+        background: status.successContainer,
+        foreground: status.onSuccessContainer,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 720) {
+          return Column(
+            children: [
+              Row(children: [Expanded(child: cards[0]), const SizedBox(width: 12), Expanded(child: cards[1])]),
+              const SizedBox(height: 12),
+              Row(children: [Expanded(child: cards[2]), const SizedBox(width: 12), Expanded(child: cards[3])]),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            for (var i = 0; i < cards.length; i++) ...[
+              if (i > 0) const SizedBox(width: 12),
+              Expanded(child: cards[i]),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildWebTable(BuildContext context, List<_DelegatePayrollItem> filtered) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final status = HrStatusColors.of(context);
+    final muted = colorScheme.onSurfaceVariant;
+
+    Widget days(int count, {Color? activeColor}) => Text(
+          '$count يوم',
+          style: hrTabularStyle(
+            context,
+            color: count > 0 ? (activeColor ?? colorScheme.onSurface) : muted,
+          ),
+        );
+
+    Widget row(_DelegatePayrollItem item) {
+      final d = item.delegate;
+      final position = d.position == DelegatePosition.supervisor ? 'مشرف' : 'مندوب / مروج';
+      final hasDeductions = item.totalDeductions > 0;
+      final deductionsText = Text(
+        hasDeductions ? '-${_webMoney(item.totalDeductions)}' : _webMoney(0),
+        key: Key('payroll_deductions_${d.uid}'),
+        style: hrTabularStyle(context, color: hasDeductions ? colorScheme.error : muted),
+      );
+
+      return HrTableRow(
+        key: Key('payroll_row_${d.uid}'),
+        columns: _webColumns,
+        onTap: () => _showEmployeePayrollDetail(item),
+        cells: [
+          // المندوب: name, then role and phone.
+          Row(
+            children: [
+              AppAvatar(
+                imageUrl: d.personalPhotoUrl,
+                fallbackText: d.fullName,
+                radius: 18,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      d.fullName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    Row(
+                      children: [
+                        Text(position, style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+                        if (d.phoneNumber.isNotEmpty) ...[
+                          Text(' · ', style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+                          Flexible(
+                            child: Text(
+                              d.phoneNumber,
+                              textDirection: TextDirection.ltr,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: muted,
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          days(item.attendedDays),
+          days(item.approvedLeaveDays, activeColor: colorScheme.primary),
+          days(item.absentDays, activeColor: colorScheme.error),
+          Text(_webMoney(item.baseSalary), style: hrTabularStyle(context)),
+          Text(_webMoney(item.grossEarned), style: hrTabularStyle(context)),
+          hasDeductions
+              ? Tooltip(
+                  message: 'غياب: ${_webMoney(item.absenceDeductionAmount)}'
+                      '${item.penaltiesDeductions > 0 ? ' | جزاءات: ${_webMoney(item.penaltiesDeductions)}' : ''}',
+                  child: deductionsText,
+                )
+              : deductionsText,
+          Container(
+            key: Key('payroll_net_${d.uid}'),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: status.successContainer,
+              borderRadius: BorderRadius.circular(HrRadius.chip),
+            ),
+            child: Text(
+              _webMoney(item.netSalary),
+              style: hrTabularStyle(context, color: status.onSuccessContainer)
+                  .copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+          PopupMenuButton<String>(
+            key: Key('payroll_actions_${d.uid}'),
+            tooltip: 'الإجراءات',
+            icon: Icon(Icons.more_vert_rounded, color: muted),
+            onSelected: (value) {
+              if (value == 'edit') {
+                _openDelegateSalaryDialog(item);
+              } else if (value == 'details') {
+                _showEmployeePayrollDetail(item);
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'edit',
+                child: ListTile(
+                  leading: Icon(Icons.tune_rounded),
+                  title: Text('تعديل الراتب'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'details',
+                child: ListTile(
+                  leading: Icon(Icons.visibility_outlined),
+                  title: Text('عرض التفاصيل'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
+    return HrTableCard(
+      key: const Key('payroll_web_table'),
+      minWidth: 1000,
+      builder: (context, width) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const HrTableHeader(columns: _webColumns, keyPrefix: 'payroll_col_'),
+          if (filtered.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: Text(
+                _searchQuery.isEmpty ? 'لا توجد بيانات رواتب لهذا الشهر.' : 'لا توجد نتائج مطابقة للبحث.',
+                style: theme.textTheme.bodyMedium?.copyWith(color: muted),
+              ),
+            ),
+          for (var i = 0; i < filtered.length; i++) ...[
+            if (i > 0) const HrTableDivider(),
+            row(filtered[i]),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildDateCard({
     required ColorScheme colorScheme,
     required ThemeData theme,
@@ -1209,7 +1651,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.6)),
       ),
       child: Column(
@@ -1223,7 +1665,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: colorScheme.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
                 child: Icon(
                   Icons.calendar_month_rounded,
@@ -1236,7 +1678,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                 child: Text(
                   'التاريخ / الشهر',
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: HrFont.labelSmall,
                     fontWeight: FontWeight.w600,
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -1261,7 +1703,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                     child: Text(
                       'الحالي',
                       style: TextStyle(
-                        fontSize: 9.5,
+                        fontSize: HrFont.labelSmall,
                         fontWeight: FontWeight.bold,
                         color: colorScheme.primary,
                       ),
@@ -1288,7 +1730,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                   });
                   _loadPayrollData();
                 },
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(HrRadius.chip),
                 child: Padding(
                   padding: const EdgeInsets.all(2),
                   child: Icon(
@@ -1319,7 +1761,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                       }
                     }
                   },
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
                     child: Tooltip(
@@ -1328,7 +1770,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                         monthStr,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 13.5,
+                          fontSize: HrFont.body,
                           fontWeight: FontWeight.w900,
                           color: colorScheme.primary,
                         ),
@@ -1352,7 +1794,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                   });
                   _loadPayrollData();
                 },
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(HrRadius.chip),
                 child: Padding(
                   padding: const EdgeInsets.all(2),
                   child: Icon(
@@ -1383,7 +1825,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.6)),
       ),
       child: Column(
@@ -1396,7 +1838,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
                 child: Icon(icon, color: color, size: 15),
               ),
@@ -1405,7 +1847,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
                 child: Text(
                   title,
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: HrFont.labelSmall,
                     fontWeight: FontWeight.w600,
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -1422,14 +1864,14 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
             children: [
               Text(
                 value,
-                style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold, color: color),
+                style: TextStyle(fontSize: HrFont.titleMedium, fontWeight: FontWeight.bold, color: color),
                 overflow: TextOverflow.ellipsis,
               ),
               if (subtitle != null)
                 Text(
                   subtitle,
                   style: TextStyle(
-                    fontSize: 9.5,
+                    fontSize: HrFont.labelSmall,
                     fontWeight: FontWeight.w500,
                     color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
                   ),
@@ -1453,7 +1895,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         barrierColor: Colors.black54,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(HrRadius.pill)),
         ),
         builder: (ctx) => _EmployeePayrollDetailSheet(
           item: item,
@@ -1468,7 +1910,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
       showDialog(
         context: context,
         builder: (ctx) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.pill)),
           backgroundColor: Theme.of(context).colorScheme.surface,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 540, maxHeight: 780),
@@ -1613,7 +2055,7 @@ class _CompanyPayrollPolicySheetState
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: colorScheme.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
                 child: Icon(
                   Icons.tune_rounded,
@@ -1629,12 +2071,12 @@ class _CompanyPayrollPolicySheetState
                   children: [
                     const Text(
                       'قواعد وسياسة الرواتب',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: HrFont.titleMedium, fontWeight: FontWeight.bold),
                     ),
                     Text(
                       'ضبط معايير الورديات واحتساب الساعات للشركة',
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: HrFont.labelSmall,
                         color: colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -1651,8 +2093,11 @@ class _CompanyPayrollPolicySheetState
         ),
         const Divider(height: 1),
 
-        // 3. Scrollable Body
-        Expanded(
+        // 3. Scrollable Body. The bottom sheet has a fixed height, so the body
+        // fills it; the dialog has only a max height, so the body takes just
+        // the space its content needs and scrolls past that (TAS-152).
+        Flexible(
+          fit: widget.isBottomSheet ? FlexFit.tight : FlexFit.loose,
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Column(
@@ -1661,13 +2106,13 @@ class _CompanyPayrollPolicySheetState
                 // نمط الاحتساب
                 const Text(
                   'طريقة احتساب مسير الرواتب:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.body),
                 ),
                 const SizedBox(height: 8),
                 Container(
                   decoration: BoxDecoration(
                     color: colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(HrRadius.card),
                     border: Border.all(
                       color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                     ),
@@ -1676,7 +2121,7 @@ class _CompanyPayrollPolicySheetState
                     children: [
                       InkWell(
                         borderRadius:
-                            const BorderRadius.vertical(top: Radius.circular(14)),
+                            const BorderRadius.vertical(top: Radius.circular(HrRadius.card)),
                         onTap: () => setState(() =>
                             _selectedMode = PayrollCalculationMode.monthlyWithDeductions),
                         child: Padding(
@@ -1705,7 +2150,7 @@ class _CompanyPayrollPolicySheetState
                                     const Text(
                                       'راتب شهري أساسي مع استقطاع الغياب ونقص الساعات',
                                       style: TextStyle(
-                                        fontSize: 13,
+                                        fontSize: HrFont.body,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -1713,7 +2158,7 @@ class _CompanyPayrollPolicySheetState
                                     Text(
                                       'يُحدد راتب أساسي ثابت، ويُخصم منه ما يعادل ساعات الغياب أو العجز عن ساعات الوردية المحددة لكل موظف',
                                       style: TextStyle(
-                                        fontSize: 11,
+                                        fontSize: HrFont.labelSmall,
                                         color: colorScheme.onSurfaceVariant,
                                       ),
                                     ),
@@ -1727,7 +2172,7 @@ class _CompanyPayrollPolicySheetState
                       const Divider(height: 1),
                       InkWell(
                         borderRadius: const BorderRadius.vertical(
-                            bottom: Radius.circular(14)),
+                            bottom: Radius.circular(HrRadius.card)),
                         onTap: () => setState(() =>
                             _selectedMode = PayrollCalculationMode.hourlyRate),
                         child: Padding(
@@ -1755,7 +2200,7 @@ class _CompanyPayrollPolicySheetState
                                     const Text(
                                       'احتساب بالساعات المنجزة (ساعات العمل × أجر الساعة)',
                                       style: TextStyle(
-                                        fontSize: 13,
+                                        fontSize: HrFont.body,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -1763,7 +2208,7 @@ class _CompanyPayrollPolicySheetState
                                     Text(
                                       'يتقاضى المندوب أجراً مباشراً عن كل ساعة عمل منجزة + الإجازات الرسمية المعتمدة',
                                       style: TextStyle(
-                                        fontSize: 11,
+                                        fontSize: HrFont.labelSmall,
                                         color: colorScheme.onSurfaceVariant,
                                       ),
                                     ),
@@ -1797,7 +2242,7 @@ class _CompanyPayrollPolicySheetState
                           filled: true,
                           fillColor: colorScheme.surface,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(HrRadius.card),
                           ),
                         ),
                       ),
@@ -1815,7 +2260,7 @@ class _CompanyPayrollPolicySheetState
                           filled: true,
                           fillColor: colorScheme.surface,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(HrRadius.card),
                           ),
                         ),
                       ),
@@ -1841,7 +2286,7 @@ class _CompanyPayrollPolicySheetState
                           filled: true,
                           fillColor: colorScheme.surface,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(HrRadius.card),
                           ),
                         ),
                       ),
@@ -1863,7 +2308,7 @@ class _CompanyPayrollPolicySheetState
                           filled: true,
                           fillColor: colorScheme.surface,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(HrRadius.card),
                           ),
                         ),
                       ),
@@ -1877,7 +2322,7 @@ class _CompanyPayrollPolicySheetState
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: colorScheme.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(HrRadius.card),
                     border: Border.all(
                       color: colorScheme.primary.withValues(alpha: 0.2),
                     ),
@@ -1891,7 +2336,7 @@ class _CompanyPayrollPolicySheetState
                           const Text(
                             'أجر الساعة الفعلي المعتمد:',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: HrFont.labelMedium,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -1900,7 +2345,7 @@ class _CompanyPayrollPolicySheetState
                             style: TextStyle(
                               color: colorScheme.primary,
                               fontWeight: FontWeight.bold,
-                              fontSize: 13,
+                              fontSize: HrFont.body,
                             ),
                           ),
                         ],
@@ -1911,13 +2356,13 @@ class _CompanyPayrollPolicySheetState
                         children: [
                           Text(
                             'أجر الوردية الكاملة (${shiftH.toStringAsFixed(0)} ساعات):',
-                            style: const TextStyle(fontSize: 12),
+                            style: const TextStyle(fontSize: HrFont.labelMedium),
                           ),
                           Text(
                             '${activeDailyRate.toStringAsFixed(2)} ج.م / يوم',
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: 13,
+                              fontSize: HrFont.body,
                             ),
                           ),
                         ],
@@ -1928,13 +2373,13 @@ class _CompanyPayrollPolicySheetState
                         children: [
                           const Text(
                             'الساعات المستهدفة للشهر:',
-                            style: TextStyle(fontSize: 12),
+                            style: TextStyle(fontSize: HrFont.labelMedium),
                           ),
                           Text(
                             '${(workD * shiftH).toStringAsFixed(0)} ساعة عمل',
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                              fontSize: HrFont.labelMedium,
                             ),
                           ),
                         ],
@@ -1954,7 +2399,7 @@ class _CompanyPayrollPolicySheetState
             height: 48,
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(HrRadius.pill),
               border: Border.all(
                 color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                 width: 1.2,
@@ -1983,7 +2428,7 @@ class _CompanyPayrollPolicySheetState
                             Text(
                               'إلغاء',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: HrFont.body,
                                 fontWeight: FontWeight.bold,
                                 color: colorScheme.onSurfaceVariant,
                               ),
@@ -2031,7 +2476,7 @@ class _CompanyPayrollPolicySheetState
                                   Text(
                                     'حفظ',
                                     style: TextStyle(
-                                      fontSize: 13,
+                                      fontSize: HrFont.body,
                                       fontWeight: FontWeight.bold,
                                       color: colorScheme.onPrimary,
                                     ),
@@ -2188,14 +2633,14 @@ class _DelegateSalarySheetState extends State<_DelegateSalarySheet> {
                     Text(
                       widget.item.delegate.fullName,
                       style: const TextStyle(
-                        fontSize: 16,
+                        fontSize: HrFont.titleMedium,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
                       'تعديل معايير الراتب وساعات الوردية الخاصة بالمندوب',
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: HrFont.labelSmall,
                         color: colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -2233,7 +2678,7 @@ class _DelegateSalarySheetState extends State<_DelegateSalarySheet> {
                     filled: true,
                     fillColor: colorScheme.surface,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                     ),
                   ),
                 ),
@@ -2255,7 +2700,7 @@ class _DelegateSalarySheetState extends State<_DelegateSalarySheet> {
                           filled: true,
                           fillColor: colorScheme.surface,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(HrRadius.card),
                           ),
                         ),
                       ),
@@ -2277,7 +2722,7 @@ class _DelegateSalarySheetState extends State<_DelegateSalarySheet> {
                           filled: true,
                           fillColor: colorScheme.surface,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(HrRadius.card),
                           ),
                         ),
                       ),
@@ -2289,7 +2734,7 @@ class _DelegateSalarySheetState extends State<_DelegateSalarySheet> {
                 // نمط الاحتساب
                 const Text(
                   'نمط الاحتساب الخاص بهذا المندوب:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.labelMedium),
                 ),
                 const SizedBox(height: 6),
                 Wrap(
@@ -2326,7 +2771,7 @@ class _DelegateSalarySheetState extends State<_DelegateSalarySheet> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(HrRadius.card),
                     border: Border.all(
                       color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                     ),
@@ -2336,7 +2781,7 @@ class _DelegateSalarySheetState extends State<_DelegateSalarySheet> {
                     children: [
                       const Text(
                         'أجر الساعة الناتج:',
-                        style: TextStyle(fontSize: 12),
+                        style: TextStyle(fontSize: HrFont.labelMedium),
                       ),
                       Text(
                         '${activeRate.toStringAsFixed(2)} ج.م/ساعة',
@@ -2360,7 +2805,7 @@ class _DelegateSalarySheetState extends State<_DelegateSalarySheet> {
             height: 48,
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(HrRadius.pill),
               border: Border.all(
                 color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                 width: 1.2,
@@ -2389,7 +2834,7 @@ class _DelegateSalarySheetState extends State<_DelegateSalarySheet> {
                             Text(
                               'إلغاء',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: HrFont.body,
                                 fontWeight: FontWeight.bold,
                                 color: colorScheme.onSurfaceVariant,
                               ),
@@ -2437,7 +2882,7 @@ class _DelegateSalarySheetState extends State<_DelegateSalarySheet> {
                                   Text(
                                     'حفظ',
                                     style: TextStyle(
-                                      fontSize: 13,
+                                      fontSize: HrFont.body,
                                       fontWeight: FontWeight.bold,
                                       color: colorScheme.onPrimary,
                                     ),
@@ -2495,7 +2940,7 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.5),
         ),
@@ -2509,7 +2954,7 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: iconColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
                 child: Icon(icon, size: 17, color: iconColor),
               ),
@@ -2518,7 +2963,7 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                 title,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 13,
+                  fontSize: HrFont.body,
                   color: colorScheme.onSurface,
                 ),
               ),
@@ -2548,13 +2993,13 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             label,
-            style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+            style: TextStyle(fontSize: HrFont.labelMedium, color: colorScheme.onSurfaceVariant),
           ),
           const Spacer(),
           Text(
             value,
             style: TextStyle(
-              fontSize: 12.5,
+              fontSize: HrFont.labelMedium,
               fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
               color: valueColor ?? colorScheme.onSurface,
             ),
@@ -2607,7 +3052,7 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                       item.delegate.fullName,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                        fontSize: HrFont.titleMedium,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -2624,7 +3069,7 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                                 ? 'مشرف ميداني'
                                 : 'مندوب / مروج',
                             style: TextStyle(
-                              fontSize: 10.5,
+                              fontSize: HrFont.labelSmall,
                               fontWeight: FontWeight.w600,
                               color: colorScheme.primary,
                             ),
@@ -2637,7 +3082,7 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                             item.delegate.phoneNumber,
                             style: TextStyle(
                               color: colorScheme.onSurfaceVariant,
-                              fontSize: 12,
+                              fontSize: HrFont.labelMedium,
                             ),
                           ),
                         ),
@@ -2739,7 +3184,7 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                       icon: Icons.check_circle_outline_rounded,
                       label: 'أيام الحضور الفعلي:',
                       value: '${item.attendedDays} يوم',
-                      valueColor: const Color(0xFF2E7D32),
+                      valueColor: HrStatusColors.of(context).success,
                       isBold: true,
                     ),
                     if (item.approvedLeaveDays > 0)
@@ -2771,7 +3216,7 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                       icon: Icons.fact_check_rounded,
                       label: 'الأيام المستحقة للصرف:',
                       value: '${item.payableDays} يوم (${(item.payableDays * item.effectiveDailyRate).toStringAsFixed(0)} ج.م)',
-                      valueColor: const Color(0xFF2E7D32),
+                      valueColor: HrStatusColors.of(context).success,
                       isBold: true,
                     ),
                     _buildDetailRow(
@@ -2787,7 +3232,7 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                         decoration: BoxDecoration(
                           color: colorScheme.errorContainer.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(HrRadius.chip),
                           border: Border.all(
                             color: colorScheme.error.withValues(alpha: 0.25),
                           ),
@@ -2801,7 +3246,7 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                                 'استقطاع أيام الغياب${item.unpaidLeaveDays > 0 ? ' والإجازات غير المدفوعة' : ''} (${item.deductibleDays} يوم × ${item.effectiveDailyRate.toStringAsFixed(1)} ج.م): -${item.absenceDeductionAmount.toStringAsFixed(0)} ج.م',
                                 style: TextStyle(
                                   color: colorScheme.error,
-                                  fontSize: 11.5,
+                                  fontSize: HrFont.labelSmall,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -2823,14 +3268,14 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                     if (item.appliedPenalties.isEmpty)
                       Row(
                         children: [
-                          const Icon(Icons.verified_rounded, size: 18, color: Color(0xFF2E7D32)),
+                          Icon(Icons.verified_rounded, size: 18, color: HrStatusColors.of(context).success),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'لا توجد أي جزاءات مسجلة على المندوب في هذا الشهر 👍',
+                              'لا توجد أي جزاءات مسجلة على المندوب في هذا الشهر',
                               style: TextStyle(
-                                fontSize: 12,
-                                color: const Color(0xFF2E7D32),
+                                fontSize: HrFont.labelMedium,
+                                color: HrStatusColors.of(context).success,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -2857,10 +3302,10 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2E7D32).withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(16),
+                    color: HrStatusColors.of(context).success.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(HrRadius.card),
                     border: Border.all(
-                      color: const Color(0xFF2E7D32).withValues(alpha: 0.35),
+                      color: HrStatusColors.of(context).success.withValues(alpha: 0.35),
                       width: 1.2,
                     ),
                   ),
@@ -2870,12 +3315,12 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                         width: 44,
                         height: 44,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2E7D32).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(12),
+                          color: HrStatusColors.of(context).success.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(HrRadius.card),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.payments_rounded,
-                          color: Color(0xFF2E7D32),
+                          color: HrStatusColors.of(context).success,
                           size: 24,
                         ),
                       ),
@@ -2885,18 +3330,18 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text(
+                            Text(
                               'صافي المستحق للصرف',
                               style: TextStyle(
-                                fontSize: 12.5,
+                                fontSize: HrFont.labelMedium,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF1B5E20),
+                                color: HrStatusColors.of(context).success,
                               ),
                             ),
                             Text(
                               'مستحق عن ${item.payableDays} يوم عمل (بعد الخصومات والجزاءات)',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: HrFont.labelSmall,
                                 color: colorScheme.onSurfaceVariant,
                               ),
                             ),
@@ -2905,10 +3350,10 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                       ),
                       Text(
                         '${item.netSalary.toStringAsFixed(0)} ج.م',
-                        style: const TextStyle(
-                          fontSize: 20,
+                        style: TextStyle(
+                          fontSize: HrFont.titleLarge,
                           fontWeight: FontWeight.w900,
-                          color: Color(0xFF2E7D32),
+                          color: HrStatusColors.of(context).success,
                         ),
                       ),
                     ],
@@ -2927,7 +3372,7 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
             height: 48,
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(HrRadius.pill),
               border: Border.all(
                 color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                 width: 1.2,
@@ -2956,7 +3401,7 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                             Text(
                               'غلق',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: HrFont.body,
                                 fontWeight: FontWeight.bold,
                                 color: colorScheme.onSurfaceVariant,
                               ),
@@ -2995,7 +3440,7 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
                             Text(
                               'تعديل',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: HrFont.body,
                                 fontWeight: FontWeight.bold,
                                 color: colorScheme.onPrimary,
                               ),
@@ -3025,5 +3470,74 @@ class _EmployeePayrollDetailSheet extends StatelessWidget {
     }
 
     return content;
+  }
+}
+
+/// Web summary card (TAS-119): title in labelLarge, value in headlineSmall
+/// with tabular figures. [background] / [foreground] tint the whole card
+/// (used for the net payout card).
+class _WebSummaryCard extends StatelessWidget {
+  const _WebSummaryCard({
+    super.key,
+    required this.title,
+    required this.value,
+    required this.icon,
+    this.valueColor,
+    this.background,
+    this.foreground,
+  });
+
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color? valueColor;
+  final Color? background;
+  final Color? foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final labelColor = foreground ?? colorScheme.onSurfaceVariant;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: background ?? colorScheme.surface,
+        borderRadius: BorderRadius.circular(HrRadius.card),
+        border: background == null ? Border.all(color: colorScheme.outlineVariant) : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 20, color: labelColor),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelLarge?.copyWith(color: labelColor),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: valueColor ?? foreground ?? colorScheme.onSurface,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

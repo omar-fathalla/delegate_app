@@ -361,7 +361,7 @@ void main() {
   });
 
   group('penalties tab scope', () {
-    test('web HR opens only their own penalties', () {
+    test('web HR opens the company penalties, read-only', () {
       WebRuntimePolicy.debugIsWebOverride = true;
       final host =
           hrShellTab(
@@ -370,7 +370,7 @@ void main() {
                 onNavigateToTab: (_) {},
               )
               as HrPenaltiesHost;
-      expect(host.ownPenaltiesOnly, isTrue);
+      expect(host.companyViewOnly, isTrue);
     });
 
     test('web supervisors keep the company list', () {
@@ -382,13 +382,13 @@ void main() {
                 onNavigateToTab: (_) {},
               )
               as HrPenaltiesHost;
-      expect(host.ownPenaltiesOnly, isFalse);
+      expect(host.companyViewOnly, isFalse);
     });
 
     test('mobile is untouched', () {
       WebRuntimePolicy.debugIsWebOverride = false;
       expect(
-        HrPenaltiesHost(admin: _delegate(UserRole.hr)).ownPenaltiesOnly,
+        HrPenaltiesHost(admin: _delegate(UserRole.hr)).companyViewOnly,
         isFalse,
       );
     });

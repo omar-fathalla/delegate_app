@@ -5,15 +5,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
-# Port offset for the override part: the CI slot's ports when run_job.sh
-# leased one (LOCAL_CI_* already set, e.g. slot 2 = 28080), else +10000.
-# Hardcoding 18080 made this collide with whatever job held slot 1.
-if [[ -n "${LOCAL_CI_FIRESTORE_PORT:-}" && "$LOCAL_CI_FIRESTORE_PORT" != 8080 ]]; then
-  PORT_OFF=$(( LOCAL_CI_FIRESTORE_PORT - 8080 ))
-else
-  PORT_OFF=10000
-fi
-
 # shellcheck disable=SC1091
 source "$ROOT/scripts/emulator_ports.env.sh"
 
@@ -52,15 +43,19 @@ if (e.firestore.websocketPort !== 9150) {
 console.log('ok: default generated emulator ports match firebase.json behavior');
 "
 
-FS_PORT=$(( 8080 + PORT_OFF ))
-WS_PORT=$(( 9150 + PORT_OFF ))
-export LOCAL_CI_FIRESTORE_PORT=$FS_PORT
-export LOCAL_CI_FIRESTORE_HUB_PORT=$(( 4400 + PORT_OFF ))
-export LOCAL_CI_AUTH_PORT=$(( 9099 + PORT_OFF ))
-export LOCAL_CI_STORAGE_PORT=$(( 9199 + PORT_OFF ))
-export LOCAL_CI_FUNCTIONS_PORT=$(( 5001 + PORT_OFF ))
-export LOCAL_CI_LOGGING_PORT=$(( 4500 + PORT_OFF ))
-export LOCAL_CI_FIRESTORE_WEBSOCKET_PORT=$WS_PORT
+# TAS-107: never a fixed port set (18080 was shared by every P0 job and local
+# run on the Mac). CI uses this runner's slot; locally the first free slot.
+if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+  emulator_use_slot 20000 "$(emulator_runner_slot "${RUNNER_NAME:-}")"
+else
+  emulator_pick_local_slot || { echo "no free local emulator slot" >&2; emulator_ports_busy_report >&2; exit 1; }
+fi
+FS_PORT="${LOCAL_CI_FIRESTORE_PORT}"
+WS_PORT="${LOCAL_CI_FIRESTORE_WEBSOCKET_PORT}"
+if [[ "${FS_PORT}" == 8080 ]]; then
+  echo "bind test must run on a non-default port, got ${FS_PORT}" >&2
+  exit 1
+fi
 emulator_export_hosts
 
 if [[ "${FIRESTORE_EMULATOR_HOST}" != "127.0.0.1:${FS_PORT}" ]]; then
@@ -68,7 +63,7 @@ if [[ "${FIRESTORE_EMULATOR_HOST}" != "127.0.0.1:${FS_PORT}" ]]; then
   exit 1
 fi
 
-wait_emulator_ports_free
+wait_emulator_ports_free || { echo "slot ports busy:" >&2; emulator_ports_busy_report >&2; exit 1; }
 
 # Short-lived firestore emulator on non-default port; assert listen + env inside exec.
 bash "$ROOT/scripts/emulators_exec.sh" \

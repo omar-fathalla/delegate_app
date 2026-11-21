@@ -1,9 +1,9 @@
 appId: com.tashil.delegate.dev
 ---
 # GoRouter /user-profile: Maestro `back` does not pop the AppBar leading control on iOS.
-# Each fallback runs only while the profile is still on screen. Running them all
-# after one already popped (tap 6%,9% + edge swipe on the home screen) opened the
-# side drawer and hid tashil_main_menu_button (mac-gate a87285ae).
+# Each fallback runs only while the profile is still on screen. Without the
+# guard, a successful «رجوع» was followed by the corner tap, which then hit the
+# main screen's menu button and left the menu open over it.
 - runFlow:
     when:
       visible:

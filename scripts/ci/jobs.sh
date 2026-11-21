@@ -75,11 +75,13 @@ job_analyze() {
 
 job_test() {
   flutter pub get --enforce-lockfile
-  flutter test --concurrency=1
+  # Same as ci.yml (TAS-175: 4 files at a time; TAS-162: goldens run apart).
+  flutter test --concurrency=4 --exclude-tags golden
 }
 
 job_emulator-ports() {
   npm install --no-audit --no-fund
+  npm run test:scripts:emulator-slots
   npm run test:scripts:emulator-ports
 }
 

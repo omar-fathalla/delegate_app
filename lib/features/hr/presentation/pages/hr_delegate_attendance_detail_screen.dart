@@ -8,6 +8,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/tashil_icon_button.dart';
@@ -16,6 +17,10 @@ import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_empty_state.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_inner_page.dart';
+import 'package:delegate_app/web/hr_system/hr_shell_link.dart';
 
 /// Model representing a single attendance session for a delegate
 class DelegateAttendanceSession {
@@ -104,17 +109,106 @@ class HRDelegateAttendanceDetailScreen extends StatefulWidget {
   final Map<String, Branch>? branchesByName;
   final Delegate? hrDelegate;
 
+  /// True inside the web HR shell (TAS-145): the breadcrumb carries the
+  /// title and the back button, so the page draws no app bar and shows its
+  /// actions in a toolbar instead.
+  final bool inShell;
+
   const HRDelegateAttendanceDetailScreen({
     super.key,
     required this.delegate,
     this.initialMonth,
     this.branchesByName,
     this.hrDelegate,
+    this.inShell = false,
   });
+
+  /// Tests swap in a fake Firestore for the reads.
+  @visibleForTesting
+  static FirebaseFirestore Function()? debugFirestore;
 
   @override
   State<HRDelegateAttendanceDetailScreen> createState() =>
       _HRDelegateAttendanceDetailScreenState();
+}
+
+/// Opens «سجل الحضور والانصراف التفصيلي» for [delegate] (TAS-145).
+///
+/// Inside the wide web HR shell it is an inner page with the breadcrumb
+/// «current page › delegate name»; elsewhere (mobile, narrow web) it is
+/// pushed full screen with its own app bar, as before.
+Future<void> openHrDelegateAttendanceDetail(
+  BuildContext context, {
+  required Delegate delegate,
+  DateTime? initialMonth,
+  Map<String, Branch>? branchesByName,
+  Delegate? hrDelegate,
+}) {
+  return pushHrInnerPage<void>(
+    context,
+    title: delegate.fullName,
+    maxWidth: HrInnerPageWidth.wide,
+    builder: (_, inShell) => HRDelegateAttendanceDetailScreen(
+      delegate: delegate,
+      initialMonth: initialMonth,
+      branchesByName: branchesByName,
+      hrDelegate: hrDelegate,
+      inShell: inShell,
+    ),
+  );
+}
+
+/// Reads a delegate's attendance logs, scoped to one company (TAS-120).
+///
+/// HR and other company staff may only read logs whose `companyId` (or
+/// `companyUID`) is their own company (`canReadAttendance` in
+/// firestore.rules). Firestore checks a query against the rules before it
+/// runs, so a query on `delegateId`/`userId` alone is rejected with
+/// permission-denied even when every matching log is in the company. The
+/// `companyId` filter makes the query provable. Attendance writes always set
+/// `companyId`.
+///
+/// Returns the merged docs (by id) from the `delegateId` and legacy `userId`
+/// queries. An empty [companyId] leaves the query unscoped (global staff).
+@visibleForTesting
+Future<Map<String, Map<String, dynamic>>> fetchDelegateAttendanceDocs({
+  required FirebaseFirestore firestore,
+  required List<String> identifiers,
+  required String companyId,
+}) async {
+  final ids = identifiers.take(30).toList();
+  if (ids.isEmpty) return {};
+  Query<Map<String, dynamic>> base = firestore.collection(
+    kAttendanceCollection,
+  );
+  if (companyId.isNotEmpty) {
+    base = base.where('companyId', isEqualTo: companyId);
+  }
+  final results = await Future.wait([
+    base.where('delegateId', whereIn: ids).get(),
+    // Legacy logs keyed by userId.
+    base.where('userId', whereIn: ids).get(),
+  ]);
+  return {
+    for (final snap in results)
+      for (final doc in snap.docs) doc.id: doc.data(),
+  };
+}
+
+/// Clear Arabic message for a failed attendance load. Never shows the raw
+/// Firebase text (TAS-120).
+@visibleForTesting
+String hrAttendanceLoadErrorMessage(Object error) {
+  if (error is FirebaseException) {
+    switch (error.code) {
+      case 'permission-denied':
+        return 'ليس لديك صلاحية لعرض سجل حضور هذا المندوب.';
+      case 'unavailable':
+      case 'deadline-exceeded':
+        return 'تعذر الاتصال بالخادم. تحقق من الاتصال بالإنترنت ثم أعد المحاولة.';
+    }
+  }
+  return 'حدث خطأ أثناء تحميل سجل الحضور. يرجى المحاولة مرة أخرى.';
 }
 
 class _HRDelegateAttendanceDetailScreenState
@@ -164,6 +258,36 @@ class _HRDelegateAttendanceDetailScreenState
     _loadBranchesAndAttendance();
   }
 
+  FirebaseFirestore get _db =>
+      HRDelegateAttendanceDetailScreen.debugFirestore?.call() ??
+      FirebaseFirestore.instance;
+
+  /// The viewer's company. The screen is only opened from the HR shell, so
+  /// this is the HR user's company; the delegate's company is a fallback.
+  String get _scopeCompanyId {
+    final hrCompany = widget.hrDelegate?.companyUID.trim() ?? '';
+    return hrCompany.isNotEmpty
+        ? hrCompany
+        : widget.delegate.companyUID.trim();
+  }
+
+  void _showLoadError(Object e) {
+    debugPrint('HRDelegateAttendanceDetailScreen load failed: $e');
+    if (!mounted) return;
+    setState(() {
+      _errorMessage = hrAttendanceLoadErrorMessage(e);
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _refreshLogs() async {
+    try {
+      await _fetchDelegateLogs();
+    } catch (e) {
+      _showLoadError(e);
+    }
+  }
+
   Future<void> _loadBranchesAndAttendance() async {
     setState(() {
       _isLoading = true;
@@ -173,8 +297,7 @@ class _HRDelegateAttendanceDetailScreenState
     try {
       // 1. Load branches if not provided
       if (_branchesByName.isEmpty) {
-        final branchesSnap =
-            await FirebaseFirestore.instance.collection('branches').get();
+        final branchesSnap = await _db.collection('branches').get();
         final Map<String, Branch> bMap = {};
         for (final doc in branchesSnap.docs) {
           final b = BranchModel.fromFirestore(doc);
@@ -186,12 +309,7 @@ class _HRDelegateAttendanceDetailScreenState
       // 2. Fetch all attendance logs for this delegate across all history
       await _fetchDelegateLogs();
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'حدث خطأ أثناء تحميل سجل الحضور: $e';
-          _isLoading = false;
-        });
-      }
+      _showLoadError(e);
     }
   }
 
@@ -207,28 +325,12 @@ class _HRDelegateAttendanceDetailScreenState
       if (clean.isNotEmpty) identifiers.add(clean);
     }
 
-    final queryList = identifiers.take(30).toList();
-
-    // Query logs where delegateId matches
-    final snapDelegateId = await FirebaseFirestore.instance
-        .collection(kAttendanceCollection)
-        .where('delegateId', whereIn: queryList)
-        .get();
-
-    // Also query logs where userId matches (legacy compatibility)
-    final snapUserId = await FirebaseFirestore.instance
-        .collection(kAttendanceCollection)
-        .where('userId', whereIn: queryList)
-        .get();
-
-    // Merge and deduplicate by document ID
-    final Map<String, Map<String, dynamic>> rawDocs = {};
-    for (final doc in snapDelegateId.docs) {
-      rawDocs[doc.id] = doc.data();
-    }
-    for (final doc in snapUserId.docs) {
-      rawDocs[doc.id] = doc.data();
-    }
+    // Company-scoped, merged and deduplicated by document ID.
+    final rawDocs = await fetchDelegateAttendanceDocs(
+      firestore: _db,
+      identifiers: identifiers.toList(),
+      companyId: _scopeCompanyId,
+    );
 
     // Separate check-ins and check-outs
     final Map<String, MapEntry<String, Map<String, dynamic>>> checkOutsByRelatedId = {};
@@ -671,7 +773,7 @@ class _HRDelegateAttendanceDetailScreenState
         backgroundColor: Theme.of(context).colorScheme.surface,
         barrierColor: Colors.black54,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(HrRadius.pill)),
         ),
         builder: (ctx) => _SessionDetailsSheet(
           session: session,
@@ -684,7 +786,7 @@ class _HRDelegateAttendanceDetailScreenState
       showDialog(
         context: context,
         builder: (ctx) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.pill)),
           backgroundColor: Theme.of(context).colorScheme.surface,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520, maxHeight: 720),
@@ -711,7 +813,7 @@ class _HRDelegateAttendanceDetailScreenState
         backgroundColor: Theme.of(context).colorScheme.surface,
         barrierColor: Colors.black54,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(HrRadius.pill)),
         ),
         builder: (ctx) => _EditAttendanceSheet(
           session: session,
@@ -739,7 +841,7 @@ class _HRDelegateAttendanceDetailScreenState
         context: context,
         barrierDismissible: false,
         builder: (ctx) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.pill)),
           backgroundColor: Theme.of(context).colorScheme.surface,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520, maxHeight: 720),
@@ -945,11 +1047,11 @@ class _HRDelegateAttendanceDetailScreenState
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
             'تم تعديل توقيت جلسة الحضور بنجاح وتسجيل العملية في سجل التدقيق.',
           ),
-          backgroundColor: Color(0xFF2E7D32),
+          backgroundColor: HrStatusColors.of(context).success,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -957,6 +1059,15 @@ class _HRDelegateAttendanceDetailScreenState
   }
 
   void _navigateToAdjustments() {
+    // Web shell (TAS-146): one «سجل تعديلات الحضور» page, the sidebar tab,
+    // filtered to this delegate. Mobile keeps the full-screen push.
+    if (widget.inShell && HrShellLink.canOpenAdjustments) {
+      HrShellLink.openAdjustmentsFor(
+        delegateUID: widget.delegate.uid,
+        delegateName: widget.delegate.fullName,
+      );
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -974,98 +1085,21 @@ class _HRDelegateAttendanceDetailScreenState
     final colorScheme = Theme.of(context).colorScheme;
     final isWide = MediaQuery.of(context).size.width > 768;
 
-    return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerLowest,
-      appBar: AppBar(
-        titleSpacing: 0,
-        title: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 220),
-          child: _showCompactHeader
-              ? Row(
-                  key: const ValueKey('compact'),
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    AppAvatar(
-                      imageUrl: widget.delegate.personalPhotoUrl,
-                      fallbackText: widget.delegate.fullName,
-                      radius: 16,
-                    ),
-                    const SizedBox(width: 10),
-                    Flexible(
-                      child: Text(
-                        widget.delegate.fullName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                )
-              : KeyedSubtree(
-                  key: const ValueKey('full'),
-                  child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              isWide ? 'سجل الحضور والانصراف التفصيلي' : 'سجل حضور المندوب',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14.5,
-                letterSpacing: -0.2,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            Text(
-              widget.delegate.fullName,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.normal,
-                color: colorScheme.onSurfaceVariant,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-                ),
-        ),
-        centerTitle: false,
-        actions: [
-          IconButton(
-            tooltip: 'سجل التعديلات الإدارية',
-            onPressed: _navigateToAdjustments,
-            icon: const Icon(Icons.history_edu_rounded),
-          ),
-          IconButton(
-            tooltip: 'تصدير التقرير الشهري (CSV)',
-            onPressed: _exportMonthlyReportToCSV,
-            icon: const Icon(Icons.download_rounded),
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-      body: _isLoading
+    final body = _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
-                      const SizedBox(height: 12),
-                      Text(_errorMessage!, style: TextStyle(color: colorScheme.error)),
-                      const SizedBox(height: 16),
-                      FilledButton.tonal(
-                        onPressed: _loadBranchesAndAttendance,
-                        child: const Text('إعادة المحاولة'),
-                      ),
-                    ],
+              ? HrEmptyState(
+                  key: const Key('hr_attendance_detail_error'),
+                  icon: Icons.error_outline_rounded,
+                  title: 'تعذر تحميل سجل الحضور',
+                  message: _errorMessage,
+                  action: FilledButton.tonal(
+                    onPressed: _loadBranchesAndAttendance,
+                    child: const Text('إعادة المحاولة'),
                   ),
                 )
               : RefreshIndicator(
-                  onRefresh: _fetchDelegateLogs,
+                  onRefresh: _refreshLogs,
                   child: SingleChildScrollView(
                     controller: _scrollController,
                     physics: const AlwaysScrollableScrollPhysics(),
@@ -1105,7 +1139,121 @@ class _HRDelegateAttendanceDetailScreenState
                       ],
                     ),
                   ),
+                );
+
+    if (widget.inShell) {
+      return Scaffold(
+        backgroundColor: colorScheme.surfaceContainerLowest,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildShellToolbar(),
+            Expanded(child: body),
+          ],
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: colorScheme.surfaceContainerLowest,
+      appBar: AppBar(
+        titleSpacing: 0,
+        title: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          child: _showCompactHeader
+              ? Row(
+                  key: const ValueKey('compact'),
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AppAvatar(
+                      imageUrl: widget.delegate.personalPhotoUrl,
+                      fallbackText: widget.delegate.fullName,
+                      radius: 16,
+                    ),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        widget.delegate.fullName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                )
+              : KeyedSubtree(
+                  key: const ValueKey('full'),
+                  child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isWide ? 'سجل الحضور والانصراف التفصيلي' : 'سجل حضور المندوب',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: HrFont.body,
+                letterSpacing: -0.2,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              widget.delegate.fullName,
+              style: TextStyle(
+                fontSize: HrFont.labelSmall,
+                fontWeight: FontWeight.normal,
+                color: colorScheme.onSurfaceVariant,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
                 ),
+        ),
+        centerTitle: false,
+        actions: [
+          IconButton(
+            tooltip: 'سجل التعديلات الإدارية',
+            onPressed: _navigateToAdjustments,
+            icon: const Icon(Icons.history_edu_rounded),
+          ),
+          IconButton(
+            tooltip: 'تصدير التقرير الشهري (CSV)',
+            onPressed: _exportMonthlyReportToCSV,
+            icon: const Icon(Icons.download_rounded),
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
+      body: body,
+    );
+  }
+
+  /// Actions of the page inside the web shell, where there is no app bar.
+  Widget _buildShellToolbar() {
+    return Padding(
+      key: const Key('hr_attendance_detail_toolbar'),
+      padding: const EdgeInsetsDirectional.fromSTEB(24, 4, 24, 0),
+      child: Wrap(
+        alignment: WrapAlignment.end,
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          OutlinedButton.icon(
+            key: const Key('hr_attendance_detail_open_edits'),
+            onPressed: _navigateToAdjustments,
+            icon: const Icon(Icons.history_edu_rounded, size: 18),
+            label: const Text('سجل تعديلات الحضور'),
+          ),
+          OutlinedButton.icon(
+            key: const Key('hr_attendance_detail_export'),
+            onPressed: _exportMonthlyReportToCSV,
+            icon: const Icon(Icons.download_rounded, size: 18),
+            label: const Text('تصدير التقرير الشهري'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1124,7 +1272,7 @@ class _HRDelegateAttendanceDetailScreenState
       elevation: 0,
       color: colorScheme.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
       ),
       child: Padding(
@@ -1171,7 +1319,7 @@ class _HRDelegateAttendanceDetailScreenState
                   children: [
                     TashilIconButton(
                       icon: Icons.call_rounded,
-                      color: Colors.green.shade700,
+                      color: HrStatusColors.of(context).success,
                       size: isWide ? 36 : 32,
                       iconSize: isWide ? 18 : 16,
                       tooltip: 'اتصال هاتفي بالمندوب',
@@ -1193,12 +1341,12 @@ class _HRDelegateAttendanceDetailScreenState
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(HrRadius.chip),
                   ),
                   child: Text(
                     widget.delegate.role == UserRole.delegate ? 'مندوب / مروج' : 'مشرف',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: HrFont.labelSmall,
                       fontWeight: FontWeight.w600,
                       color: colorScheme.onPrimaryContainer,
                     ),
@@ -1220,7 +1368,7 @@ class _HRDelegateAttendanceDetailScreenState
         Icon(icon, size: 14, color: colorScheme.onSurfaceVariant),
         const SizedBox(width: 4),
         Flexible(
-          child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+          child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: HrFont.labelMedium, color: colorScheme.onSurfaceVariant)),
         ),
       ],
     );
@@ -1234,7 +1382,7 @@ class _HRDelegateAttendanceDetailScreenState
       padding: EdgeInsets.symmetric(horizontal: isWide ? 16 : 8, vertical: isWide ? 10 : 6),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
@@ -1252,7 +1400,7 @@ class _HRDelegateAttendanceDetailScreenState
               onPressed: _goToPreviousMonth,
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
               ),
               icon: const Icon(Icons.chevron_right_rounded, size: 18, textDirection: TextDirection.ltr),
               label: const Text('الشهر السابق'),
@@ -1291,7 +1439,7 @@ class _HRDelegateAttendanceDetailScreenState
                     ActionChip(
                       visualDensity: VisualDensity.compact,
                       avatar: const Icon(Icons.today_rounded, size: 16),
-                      label: const Text('الشهر الحالي', style: TextStyle(fontSize: 11)),
+                      label: const Text('الشهر الحالي', style: TextStyle(fontSize: HrFont.labelSmall)),
                       onPressed: _goToCurrentMonth,
                     )
                   else
@@ -1313,7 +1461,7 @@ class _HRDelegateAttendanceDetailScreenState
               onPressed: _goToNextMonth,
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
               ),
               label: const Text('الشهر التالي'),
               icon: const Icon(Icons.chevron_left_rounded, size: 18, textDirection: TextDirection.ltr),
@@ -1337,7 +1485,7 @@ class _HRDelegateAttendanceDetailScreenState
         value: '$_uniquePresentDaysCount يوم',
         subtitle: 'خلال هذا الشهر',
         icon: Icons.how_to_reg_rounded,
-        color: Colors.green,
+        color: HrStatusColors.of(context).success,
       ),
       _KpiItem(
         title: 'مرات الانصراف',
@@ -1379,7 +1527,7 @@ class _HRDelegateAttendanceDetailScreenState
               margin: EdgeInsets.zero,
               clipBehavior: Clip.antiAlias,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(HrRadius.card),
                 side: BorderSide(color: colorScheme.outlineVariant),
               ),
               child: ExpansionTile(
@@ -1407,7 +1555,7 @@ class _HRDelegateAttendanceDetailScreenState
                           Expanded(
                             child: BranchNameLabel(
                               branchName: _branchesInCurrentMonth.elementAt(i),
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              style: const TextStyle(fontSize: HrFont.body, fontWeight: FontWeight.w600),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -1442,7 +1590,7 @@ class _HRDelegateAttendanceDetailScreenState
           constraints: const BoxConstraints(maxWidth: 120),
           decoration: BoxDecoration(
             color: colorScheme.secondaryContainer,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(HrRadius.chip),
           ),
           child: Text(
             chain,
@@ -1470,7 +1618,7 @@ class _HRDelegateAttendanceDetailScreenState
     return Card.outlined(
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(color: colorScheme.outlineVariant),
       ),
       child: Padding(
@@ -1506,7 +1654,7 @@ class _HRDelegateAttendanceDetailScreenState
                         items[i].title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: textTheme.labelSmall?.copyWith(fontSize: 9.5, color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w400),
+                        style: textTheme.labelSmall?.copyWith(fontSize: HrFont.labelSmall, color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w400),
                       ),
                     ],
                   ),
@@ -1567,7 +1715,7 @@ class _HRDelegateAttendanceDetailScreenState
       height: 38,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(19),
+        borderRadius: BorderRadius.circular(HrRadius.pill),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.35),
           width: 1.0,
@@ -1575,7 +1723,7 @@ class _HRDelegateAttendanceDetailScreenState
       ),
       child: PopupMenuButton<String>(
         tooltip: 'تصفية حسب الفرع',
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
         initialValue: selectedBranch,
         onSelected: (val) {
           setState(() => _selectedBranchFilter = val);
@@ -1596,7 +1744,7 @@ class _HRDelegateAttendanceDetailScreenState
                   child: Text(
                     b == 'all' ? 'جميع الفروع (${_branchesInCurrentMonth.length})' : BranchDisplayCache.instance.displayName(b),
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: HrFont.body,
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                       color: isSelected ? colorScheme.primary : colorScheme.onSurface,
                     ),
@@ -1622,7 +1770,7 @@ class _HRDelegateAttendanceDetailScreenState
                 child: Text(
                   label,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: HrFont.labelMedium,
                     fontWeight: FontWeight.w600,
                     color: colorScheme.onSurface,
                   ),
@@ -1649,10 +1797,15 @@ class _HRDelegateAttendanceDetailScreenState
       ('completed', 'مكتمل', completed),
       ('incomplete', 'غير مكتمل', base.length - completed),
     ];
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    // Wrap, not Row: on a 360 px phone with a wide fallback font the three
+    // chips do not fit on one line (TAS-187). In the wide layout the parent
+    // scrolls horizontally, so they still stay on one line there.
+    return Wrap(
+      key: const Key('hr_attendance_status_filter'),
+      spacing: 6,
+      runSpacing: 6,
       children: [
-        for (final (value, label, count) in options) ...[
+        for (final (value, label, count) in options)
           ChoiceChip(
             showCheckmark: false,
             visualDensity: VisualDensity.compact,
@@ -1662,7 +1815,7 @@ class _HRDelegateAttendanceDetailScreenState
             label: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                Text(label, style: const TextStyle(fontSize: HrFont.labelMedium, fontWeight: FontWeight.w600)),
                 const SizedBox(width: 6),
                 Badge(
                   label: Text('$count'),
@@ -1672,8 +1825,6 @@ class _HRDelegateAttendanceDetailScreenState
               ],
             ),
           ),
-          const SizedBox(width: 6),
-        ],
       ],
     );
   }
@@ -1687,7 +1838,7 @@ class _HRDelegateAttendanceDetailScreenState
         elevation: 0,
         color: colorScheme.surface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(HrRadius.card),
           side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
         ),
         child: Padding(
@@ -1700,7 +1851,7 @@ class _HRDelegateAttendanceDetailScreenState
               Text(
                 'لا توجد سجلات حضور مسجلة لهذا المندوب في شهر ${DateFormat('MMMM yyyy', 'ar').format(_selectedMonth)}',
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize: HrFont.titleMedium,
                   fontWeight: FontWeight.w600,
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -1710,7 +1861,7 @@ class _HRDelegateAttendanceDetailScreenState
               Text(
                 'يمكنك التنقل للأشهر السابقة أو التالية باستخدام أزرار التنقل أعلاه.',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: HrFont.labelMedium,
                   color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                 ),
                 textAlign: TextAlign.center,
@@ -1775,7 +1926,7 @@ class _HRDelegateAttendanceDetailScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label, style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
+            Text(label, style: TextStyle(fontSize: HrFont.labelSmall, color: colorScheme.onSurfaceVariant)),
             const SizedBox(height: 4),
             Row(
               children: [
@@ -1786,7 +1937,7 @@ class _HRDelegateAttendanceDetailScreenState
                     value,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: valueColor),
+                    style: TextStyle(fontSize: HrFont.labelMedium, fontWeight: FontWeight.w600, color: valueColor),
                   ),
                 ),
               ],
@@ -1801,7 +1952,7 @@ class _HRDelegateAttendanceDetailScreenState
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(
           color: isAlert ? colorScheme.error.withValues(alpha: 0.55) : colorScheme.outlineVariant,
         ),
@@ -1824,9 +1975,9 @@ class _HRDelegateAttendanceDetailScreenState
                 children: [
                   Icon(Icons.calendar_today_rounded, size: 16, color: colorScheme.primary),
                   const SizedBox(width: 8),
-                  Text(dayStr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  Text(dayStr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.body)),
                   const SizedBox(width: 8),
-                  Text(dateStr, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+                  Text(dateStr, style: TextStyle(fontSize: HrFont.labelMedium, color: colorScheme.onSurfaceVariant)),
                   const Spacer(),
                   TashilIconButton(
                     icon: Icons.edit_calendar_rounded,
@@ -1858,7 +2009,7 @@ class _HRDelegateAttendanceDetailScreenState
                   Expanded(
                     child: BranchNameLabel(
                       branchName: s.branchName,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: HrFont.body),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1875,7 +2026,7 @@ class _HRDelegateAttendanceDetailScreenState
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    metric(Icons.login_rounded, Colors.green.shade700, 'الحضور', inTimeStr, Colors.green.shade800),
+                    metric(Icons.login_rounded, HrStatusColors.of(context).success, 'الحضور', inTimeStr, HrStatusColors.of(context).success),
                     metric(
                       s.isAutoCheckOut ? Icons.auto_mode_rounded : Icons.logout_rounded,
                       outIconColor,
@@ -1907,7 +2058,7 @@ class _HRDelegateAttendanceDetailScreenState
       elevation: 0,
       color: colorScheme.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
       ),
       clipBehavior: Clip.antiAlias,
@@ -1989,12 +2140,12 @@ class _HRDelegateAttendanceDetailScreenState
                                       children: [
                                         Text(
                                           dayStr,
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.body),
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
                                           dateStr,
-                                          style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
+                                          style: TextStyle(fontSize: HrFont.labelSmall, color: colorScheme.onSurfaceVariant),
                                         ),
                                       ],
                                     ),
@@ -2023,7 +2174,7 @@ class _HRDelegateAttendanceDetailScreenState
                                                   margin: const EdgeInsets.only(bottom: 2)),
                                               BranchNameLabel(
                                                 branchName: s.branchName,
-                                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: HrFont.body),
                                                 maxLines: 2,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
@@ -2046,14 +2197,18 @@ class _HRDelegateAttendanceDetailScreenState
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(Icons.login_rounded, size: 16, color: Colors.green.shade700),
+                                        Icon(Icons.login_rounded, size: 16, color: HrStatusColors.of(context).success),
                                         const SizedBox(width: 6),
-                                        Text(
-                                          inTimeStr,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 13,
-                                            color: Colors.green.shade800,
+                                        Flexible(
+                                          child: Text(
+                                            inTimeStr,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: HrFont.body,
+                                              color: HrStatusColors.of(context).success,
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -2093,7 +2248,7 @@ class _HRDelegateAttendanceDetailScreenState
                                               outTimeStr,
                                               style: TextStyle(
                                                 fontWeight: FontWeight.w600,
-                                                fontSize: 12.5,
+                                                fontSize: HrFont.labelMedium,
                                                 color: s.isAutoCheckOut
                                                     ? Colors.deepPurple.shade900
                                                     : (s.checkOutTime != null
@@ -2116,7 +2271,7 @@ class _HRDelegateAttendanceDetailScreenState
                                               child: Text(
                                                 'تلقائي (11.5 س)',
                                                 style: TextStyle(
-                                                  fontSize: 9.5,
+                                                  fontSize: HrFont.labelSmall,
                                                   fontWeight: FontWeight.bold,
                                                   color: Colors.deepPurple.shade800,
                                                 ),
@@ -2145,12 +2300,16 @@ class _HRDelegateAttendanceDetailScreenState
                                           color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                                         ),
                                         const SizedBox(width: 6),
-                                        Text(
-                                          s.formattedDuration,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: colorScheme.onSurface,
+                                        Flexible(
+                                          child: Text(
+                                            s.formattedDuration,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: HrFont.labelMedium,
+                                              fontWeight: FontWeight.w600,
+                                              color: colorScheme.onSurface,
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -2237,7 +2396,7 @@ class _HRDelegateAttendanceDetailScreenState
           child: Text(
             text,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: HrFont.labelMedium,
               fontWeight: FontWeight.bold,
               color: colorScheme.onSurfaceVariant,
             ),
@@ -2261,7 +2420,31 @@ class _HRDelegateAttendanceDetailScreenState
     final IconData icon;
     final String label;
 
-    if (s.isAutoCheckOut) {
+    final status = HrStatusColors.of(context);
+    final isWeb = WebRuntimePolicy.isWeb;
+
+    if (isWeb && s.isAutoCheckOut) {
+      // Web, approved status colors: auto check-out = warning.
+      bgColor = status.warningContainer;
+      borderColor = status.warning.withValues(alpha: 0.5);
+      textColor = status.onWarningContainer;
+      icon = Icons.auto_mode_rounded;
+      label = 'مكتمل (تلقائي)';
+    } else if (isWeb && isCompleted) {
+      // Web, approved status colors: normal check-out = info.
+      bgColor = status.infoContainer;
+      borderColor = status.info.withValues(alpha: 0.5);
+      textColor = status.onInfoContainer;
+      icon = Icons.check_circle_rounded;
+      label = 'مكتمل الانصراف';
+    } else if (isWeb && isOngoing) {
+      // Web, approved status colors: present = success.
+      bgColor = status.successContainer;
+      borderColor = status.success.withValues(alpha: 0.5);
+      textColor = status.onSuccessContainer;
+      icon = Icons.timelapse_rounded;
+      label = 'حاضر الآن';
+    } else if (s.isAutoCheckOut) {
       // Closed by the system: counted as complete, shown neutral (not an error).
       bgColor = colorScheme.secondaryContainer;
       borderColor = colorScheme.outlineVariant;
@@ -2271,7 +2454,7 @@ class _HRDelegateAttendanceDetailScreenState
     } else if (isCompleted) {
       bgColor = Colors.green.shade50;
       borderColor = Colors.green.shade200;
-      textColor = Colors.green.shade800;
+      textColor = HrStatusColors.of(context).success;
       icon = Icons.check_circle_rounded;
       label = 'مكتمل الانصراف';
     } else if (isOngoing) {
@@ -2288,27 +2471,38 @@ class _HRDelegateAttendanceDetailScreenState
       label = 'غير مكتمل - لم يسجل انصراف';
     }
 
-    final badgeWidget = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor, width: 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: textColor),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: textColor,
+    final badgeWidget = Tooltip(
+      key: Key('hr_attendance_status_badge_${s.id}'),
+      message: label,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(HrRadius.card),
+          border: Border.all(color: borderColor, width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: textColor),
+            const SizedBox(width: 5),
+            // Shrinks with an ellipsis in a narrow column or with a wider font
+            // instead of overflowing (TAS-184).
+            Flexible(
+              child: Text(
+                label,
+                key: const Key('hr_attendance_status_badge_label'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: HrFont.labelSmall,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
 
@@ -2325,21 +2519,40 @@ class _HRDelegateAttendanceDetailScreenState
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            color: Colors.blueGrey.shade50,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.blueGrey.shade200, width: 0.8),
+            color: isWeb
+                ? colorScheme.surfaceContainerHigh
+                : Colors.blueGrey.shade50,
+            borderRadius: BorderRadius.circular(HrRadius.chip),
+            border: Border.all(
+              color: isWeb
+                  ? colorScheme.outlineVariant
+                  : Colors.blueGrey.shade200,
+              width: 0.8,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.edit_note_rounded, size: 11, color: Colors.blueGrey.shade800),
+              Icon(
+                Icons.edit_note_rounded,
+                size: 11,
+                color: isWeb
+                    ? colorScheme.onSurfaceVariant
+                    : Colors.blueGrey.shade800,
+              ),
               const SizedBox(width: 3),
-              Text(
-                'مُعدّل إدارياً',
-                style: TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blueGrey.shade800,
+              Flexible(
+                child: Text(
+                  'مُعدّل إدارياً',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: HrFont.labelSmall,
+                    fontWeight: FontWeight.bold,
+                    color: isWeb
+                        ? colorScheme.onSurfaceVariant
+                        : Colors.blueGrey.shade800,
+                  ),
                 ),
               ),
             ],
@@ -2558,7 +2771,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
         final m = absMins % 60;
         final formattedDiff = h > 0 ? '$h س ${m > 0 ? "و $m د" : ""}' : '$m دقيقة';
         durationDiffText = '${isPositive ? "+" : "-"}$formattedDiff';
-        durationDiffColor = isPositive ? Colors.green.shade700 : Colors.red.shade700;
+        durationDiffColor = isPositive ? HrStatusColors.of(context).success : HrStatusColors.of(context).danger;
       } else {
         durationDiffText = 'بدون تغيير في المدة';
         durationDiffColor = colorScheme.onSurfaceVariant;
@@ -2594,7 +2807,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
                 child: Icon(Icons.edit_calendar_rounded, color: colorScheme.primary, size: 22),
               ),
@@ -2606,11 +2819,11 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                   children: [
                     const Text(
                       'تعديل توقيت جلسة الحضور',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: HrFont.titleMedium, fontWeight: FontWeight.bold),
                     ),
                     Text(
                       '${widget.delegate.fullName} • $dateStr',
-                      style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                      style: TextStyle(fontSize: HrFont.labelMedium, color: colorScheme.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -2637,7 +2850,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(HrRadius.card),
                     border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
                   ),
                   child: Row(
@@ -2648,7 +2861,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                         child: BranchNameLabel(
                           branchName: widget.session.branchName,
                           prefix: 'الفرع: ',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          style: const TextStyle(fontSize: HrFont.body, fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],
@@ -2661,7 +2874,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: colorScheme.surface,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(HrRadius.card),
                     border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
                   ),
                   child: Column(
@@ -2677,7 +2890,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                               const SizedBox(width: 6),
                               const Text(
                                 'ضبط الأوقات',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.body),
                               ),
                             ],
                           ),
@@ -2687,7 +2900,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                               Text(
                                 _hasCheckOut ? 'تسجيل الانصراف' : 'بدون انصراف',
                                 style: TextStyle(
-                                  fontSize: 11.5,
+                                  fontSize: HrFont.labelSmall,
                                   fontWeight: FontWeight.w600,
                                   color: _hasCheckOut
                                       ? colorScheme.primary
@@ -2718,7 +2931,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                       Container(
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(HrRadius.card),
                           border: Border.all(
                             color: colorScheme.outlineVariant.withValues(alpha: 0.4),
                           ),
@@ -2758,15 +2971,15 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                                             Icon(
                                               Icons.login_rounded,
                                               size: 15,
-                                              color: Colors.green.shade700,
+                                              color: HrStatusColors.of(context).success,
                                             ),
                                             const SizedBox(width: 4),
                                             Text(
                                               'وقت الحضور',
                                               style: TextStyle(
-                                                fontSize: 11.5,
+                                                fontSize: HrFont.labelSmall,
                                                 fontWeight: FontWeight.bold,
-                                                color: Colors.green.shade800,
+                                                color: HrStatusColors.of(context).success,
                                               ),
                                             ),
                                           ],
@@ -2779,7 +2992,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                                           ),
                                           decoration: BoxDecoration(
                                             color: Colors.green.withValues(alpha: 0.12),
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius: BorderRadius.circular(HrRadius.chip),
                                             border: Border.all(
                                               color: Colors.green.withValues(alpha: 0.3),
                                             ),
@@ -2790,15 +3003,15 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                                               Icon(
                                                 Icons.access_time_rounded,
                                                 size: 14,
-                                                color: Colors.green.shade800,
+                                                color: HrStatusColors.of(context).success,
                                               ),
                                               const SizedBox(width: 4),
                                               Text(
                                                 _formatTime(_selectedCheckInTime),
                                                 style: TextStyle(
-                                                  fontSize: 13,
+                                                  fontSize: HrFont.body,
                                                   fontWeight: FontWeight.bold,
-                                                  color: Colors.green.shade900,
+                                                  color: HrStatusColors.of(context).success,
                                                 ),
                                               ),
                                             ],
@@ -2808,8 +3021,8 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                                         Text(
                                           'انقر للتعديل',
                                           style: TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.green.shade700.withValues(alpha: 0.8),
+                                            fontSize: HrFont.labelSmall,
+                                            color: HrStatusColors.of(context).success.withValues(alpha: 0.8),
                                           ),
                                         ),
                                       ],
@@ -2866,7 +3079,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                                             Text(
                                               'وقت الانصراف',
                                               style: TextStyle(
-                                                fontSize: 11.5,
+                                                fontSize: HrFont.labelSmall,
                                                 fontWeight: FontWeight.bold,
                                                 color: _hasCheckOut
                                                     ? Colors.indigo.shade900
@@ -2887,7 +3100,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                                                 : colorScheme.surfaceContainerHighest.withValues(
                                                     alpha: 0.4,
                                                   ),
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius: BorderRadius.circular(HrRadius.chip),
                                             border: Border.all(
                                               color: _hasCheckOut
                                                   ? Colors.indigo.withValues(alpha: 0.25)
@@ -2912,7 +3125,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                                                     ? _formatTime(_selectedCheckOutTime)
                                                     : 'غير مسجل',
                                                 style: TextStyle(
-                                                  fontSize: 13,
+                                                  fontSize: HrFont.body,
                                                   fontWeight: FontWeight.bold,
                                                   color: _hasCheckOut
                                                       ? Colors.indigo.shade900
@@ -2926,7 +3139,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                                         Text(
                                           _hasCheckOut ? 'انقر للتعديل' : 'تفعيل من المفتاح',
                                           style: TextStyle(
-                                            fontSize: 10,
+                                            fontSize: HrFont.labelSmall,
                                             color: _hasCheckOut
                                                 ? Colors.indigo.shade700
                                                 : colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
@@ -2952,19 +3165,19 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
                       color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                       border: Border.all(color: Colors.red.shade200),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.error_outline_rounded, color: Colors.red.shade700, size: 20),
+                        Icon(Icons.error_outline_rounded, color: HrStatusColors.of(context).danger, size: 20),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'تنبيه: وقت الانصراف يجب أن يكون بعد وقت الحضور!',
                             style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.red.shade900,
+                              fontSize: HrFont.labelMedium,
+                              color: HrStatusColors.of(context).danger,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -2977,7 +3190,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: colorScheme.primaryContainer.withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                       border: Border.all(color: colorScheme.primary.withValues(alpha: 0.2)),
                     ),
                     child: Row(
@@ -2994,14 +3207,14 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                                   Text(
                                     'المدة الجديدة: ',
                                     style: TextStyle(
-                                      fontSize: 12,
+                                      fontSize: HrFont.labelMedium,
                                       color: colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                   Text(
                                     '${newDuration.inHours} س و ${newDuration.inMinutes.remainder(60)} د',
                                     style: TextStyle(
-                                      fontSize: 13,
+                                      fontSize: HrFont.body,
                                       fontWeight: FontWeight.bold,
                                       color: colorScheme.primary,
                                     ),
@@ -3012,7 +3225,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                                 Text(
                                   'الفارق عن السابق: $durationDiffText (سابقاً: ${widget.session.formattedDuration})',
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: HrFont.labelSmall,
                                     fontWeight: FontWeight.w600,
                                     color: durationDiffColor,
                                   ),
@@ -3028,21 +3241,21 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                 // Reason Dropdown (Material 3 Animated Popup Menu)
                 const Text(
                   'سبب التعديل الإداري (إلزامي للتدقيق):',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: HrFont.body, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Container(
                   height: 48,
                   decoration: BoxDecoration(
                     color: colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(HrRadius.card),
                     border: Border.all(
                       color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                     ),
                   ),
                   child: PopupMenuButton<String>(
                     tooltip: 'تحديد سبب التعديل',
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
                     elevation: 4,
                     color: colorScheme.surfaceContainerHigh,
                     initialValue: _selectedReason,
@@ -3070,7 +3283,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                               child: Text(
                                 r,
                                 style: TextStyle(
-                                  fontSize: 12.5,
+                                  fontSize: HrFont.labelMedium,
                                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                   color: isSelected ? colorScheme.primary : colorScheme.onSurface,
                                 ),
@@ -3094,7 +3307,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                             child: Text(
                               _selectedReason,
                               style: TextStyle(
-                                fontSize: 12.5,
+                                fontSize: HrFont.labelMedium,
                                 fontWeight: FontWeight.w600,
                                 color: colorScheme.onSurface,
                               ),
@@ -3116,7 +3329,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                 // Additional Notes (Optional)
                 const Text(
                   'ملاحظات إضافية (اختياري):',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: HrFont.body, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -3126,10 +3339,10 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                   decoration: InputDecoration(
                     hintText: 'أدخل أي تفاصيل إدارية توضيحية لتسجيلها في ملف التدقيق...',
                     hintStyle: TextStyle(
-                      fontSize: 12,
+                      fontSize: HrFont.labelMedium,
                       color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                     ),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   ),
                 ),
@@ -3140,7 +3353,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: colorScheme.errorContainer.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(HrRadius.chip),
                       border: Border.all(color: colorScheme.error.withValues(alpha: 0.4)),
                     ),
                     child: Row(
@@ -3151,7 +3364,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                           child: Text(
                             _localValidationError!,
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: HrFont.labelMedium,
                               color: colorScheme.error,
                               fontWeight: FontWeight.bold,
                             ),
@@ -3173,7 +3386,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
             height: 48,
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(HrRadius.pill),
               border: Border.all(
                 color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                 width: 1.2,
@@ -3198,7 +3411,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                             Text(
                               'إلغاء',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: HrFont.body,
                                 fontWeight: FontWeight.bold,
                                 color: colorScheme.onSurfaceVariant,
                               ),
@@ -3251,7 +3464,7 @@ class _EditAttendanceSheetState extends State<_EditAttendanceSheet> {
                             Text(
                               _isSaving ? 'جارٍ الحفظ...' : 'حفظ التعديل',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: HrFont.body,
                                 fontWeight: FontWeight.bold,
                                 color: canSave
                                     ? colorScheme.onPrimary
@@ -3321,14 +3534,14 @@ class _SessionDetailsSheet extends StatelessWidget {
             width: 130,
             child: Text(
               label,
-              style: TextStyle(fontSize: 12.5, color: colorScheme.onSurfaceVariant),
+              style: TextStyle(fontSize: HrFont.labelMedium, color: colorScheme.onSurfaceVariant),
             ),
           ),
           Expanded(
             child: Text(
               value,
               style: TextStyle(
-                fontSize: 12.5,
+                fontSize: HrFont.labelMedium,
                 fontWeight: FontWeight.w600,
                 color: valueColor ?? colorScheme.onSurface,
               ),
@@ -3388,11 +3601,11 @@ class _SessionDetailsSheet extends StatelessWidget {
                   children: [
                     const Text(
                       'تفاصيل جلسة الحضور',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: HrFont.titleMedium, fontWeight: FontWeight.bold),
                     ),
                     Text(
                       '${delegate.fullName} • $dateStr',
-                      style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                      style: TextStyle(fontSize: HrFont.labelMedium, color: colorScheme.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -3421,7 +3634,7 @@ class _SessionDetailsSheet extends StatelessWidget {
                     margin: const EdgeInsets.only(bottom: 14),
                     decoration: BoxDecoration(
                       color: Colors.deepPurple.shade50,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                       border: Border.all(color: Colors.deepPurple.shade200),
                     ),
                     child: Column(
@@ -3435,7 +3648,7 @@ class _SessionDetailsSheet extends StatelessWidget {
                               'تم إغلاق الانصراف تلقائياً (نظام الـ 11.5 ساعة)',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 13,
+                                fontSize: HrFont.body,
                                 color: Colors.deepPurple.shade900,
                               ),
                             ),
@@ -3444,8 +3657,8 @@ class _SessionDetailsSheet extends StatelessWidget {
                         const SizedBox(height: 6),
                         Text(
                           session.autoCheckOutReason ??
-                              'تم إغلاق الجلسة أوتوماتيكياً لاكتمال مدة الشفت (11.5 ساعة) دون تسجيل انصراف يدوي من المندوب.',
-                          style: TextStyle(fontSize: 12, color: Colors.deepPurple.shade900),
+                              'تم إغلاق الجلسة تلقائياً لاكتمال مدة الوردية (11.5 ساعة) دون تسجيل انصراف يدوي من المندوب.',
+                          style: TextStyle(fontSize: HrFont.labelMedium, color: Colors.deepPurple.shade900),
                         ),
                       ],
                     ),
@@ -3458,7 +3671,7 @@ class _SessionDetailsSheet extends StatelessWidget {
                     margin: const EdgeInsets.only(bottom: 14),
                     decoration: BoxDecoration(
                       color: Colors.blueGrey.shade50,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                       border: Border.all(color: Colors.blueGrey.shade200),
                     ),
                     child: Column(
@@ -3472,7 +3685,7 @@ class _SessionDetailsSheet extends StatelessWidget {
                               'تم تعديل هذه الجلسة إدارياً',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 13,
+                                fontSize: HrFont.body,
                                 color: Colors.blueGrey.shade900,
                               ),
                             ),
@@ -3481,17 +3694,17 @@ class _SessionDetailsSheet extends StatelessWidget {
                         const SizedBox(height: 6),
                         Text(
                           'المسؤول: ${session.lastAdjustedBy ?? "إدارة الموارد البشرية"}',
-                          style: TextStyle(fontSize: 12, color: Colors.blueGrey.shade900),
+                          style: TextStyle(fontSize: HrFont.labelMedium, color: Colors.blueGrey.shade900),
                         ),
                         if (session.adjustmentReason != null && session.adjustmentReason!.isNotEmpty)
                           Text(
                             'السبب: ${session.adjustmentReason}',
-                            style: TextStyle(fontSize: 12, color: Colors.blueGrey.shade900),
+                            style: TextStyle(fontSize: HrFont.labelMedium, color: Colors.blueGrey.shade900),
                           ),
                         if (session.lastAdjustedAt != null)
                           Text(
                             'تاريخ التعديل: ${DateFormat('yyyy/MM/dd hh:mm a', 'ar').format(session.lastAdjustedAt!)}',
-                            style: TextStyle(fontSize: 11, color: Colors.blueGrey.shade700),
+                            style: TextStyle(fontSize: HrFont.labelSmall, color: Colors.blueGrey.shade700),
                           ),
                       ],
                     ),
@@ -3504,7 +3717,7 @@ class _SessionDetailsSheet extends StatelessWidget {
                   Icons.login_rounded,
                   'وقت الحضور الدقيق',
                   inTimeStr,
-                  valueColor: Colors.green.shade700,
+                  valueColor: HrStatusColors.of(context).success,
                 ),
                 if (session.latitude != null && session.longitude != null)
                   _buildDetailRow(
@@ -3546,7 +3759,7 @@ class _SessionDetailsSheet extends StatelessWidget {
                     Icons.radar_rounded,
                     'المسافة من الفرع',
                     '${session.distanceMeters!.round()} متر (${session.isInsideGeofence == true ? 'داخل النطاق الجغرافي' : 'خارج النطاق الجغرافي'})',
-                    valueColor: session.isInsideGeofence == true ? Colors.green.shade700 : Colors.red.shade700,
+                    valueColor: session.isInsideGeofence == true ? HrStatusColors.of(context).success : HrStatusColors.of(context).danger,
                   ),
               ],
             ),
@@ -3560,7 +3773,7 @@ class _SessionDetailsSheet extends StatelessWidget {
             height: 48,
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(HrRadius.pill),
               border: Border.all(
                 color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                 width: 1.2,
@@ -3585,7 +3798,7 @@ class _SessionDetailsSheet extends StatelessWidget {
                             Text(
                               'إغلاق',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: HrFont.body,
                                 fontWeight: FontWeight.bold,
                                 color: colorScheme.onSurfaceVariant,
                               ),
@@ -3623,7 +3836,7 @@ class _SessionDetailsSheet extends StatelessWidget {
                             Text(
                               'تعديل التوقيت',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: HrFont.body,
                                 fontWeight: FontWeight.bold,
                                 color: colorScheme.onPrimary,
                               ),
