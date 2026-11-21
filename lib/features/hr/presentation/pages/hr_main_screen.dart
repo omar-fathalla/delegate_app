@@ -15,6 +15,7 @@ import 'package:delegate_app/features/admin/domain/entities/subscription_renewal
 import 'package:delegate_app/features/hr/presentation/hr_account_pages.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
+import 'package:delegate_app/features/hr/presentation/pages/hr_delegate_attendance_detail_screen.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_tab.dart';
 import 'package:delegate_app/features/hr/presentation/pages/tabs/hr_photos_tab.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_desktop_sidebar.dart';
@@ -47,18 +48,36 @@ class HRMainScreen extends StatefulWidget {
   /// the open inner pages closes the extra ones (browser back).
   final int routeInner;
 
+  /// Web: address of the first inner page when it has one (TAS-190), for
+  /// example `delegate/<id>` from `/hr/attendance/delegate/<id>`. The shell
+  /// opens that page when it is not open yet (direct visit, reload,
+  /// browser forward).
+  final String? routeInnerUrl;
+
   const HRMainScreen({
     super.key,
     required this.delegate,
     this.initialIndex,
     this.routeTab,
     this.routeInner = 0,
+    this.routeInnerUrl,
   });
 
   /// Test hook: replaces the tab bodies (they need a live Firestore).
   /// Always null in the app.
   @visibleForTesting
   static Widget Function(int index)? debugTabBuilder;
+
+  /// Test hook: replaces [openHrDelegateAttendanceDetailById] when a URL
+  /// opens the delegate detail page. Always null in the app.
+  @visibleForTesting
+  static Future<void> Function(
+    BuildContext context, {
+    required String delegateId,
+    required Delegate hrDelegate,
+    bool Function()? shouldOpen,
+  })?
+  debugOpenDelegateDetail;
 
   @override
   State<HRMainScreen> createState() => _HRMainScreenState();
@@ -78,12 +97,14 @@ class _HRMainScreenState extends State<HRMainScreen> {
 
   /// Web, wide windows: inner pages open in this navigator so the sidebar
   /// and the top bar stay (TAS-136).
-  final GlobalKey<NavigatorState> _innerNavigator =
-      GlobalKey<NavigatorState>(debugLabel: 'hr_inner_navigator');
+  final GlobalKey<NavigatorState> _innerNavigator = GlobalKey<NavigatorState>(
+    debugLabel: 'hr_inner_navigator',
+  );
 
   /// Web: delegate filter for «سجل تعديلات الحضور», set when the detail
   /// attendance page opens the log for one delegate (TAS-146).
   HrAdjustmentsDelegateFilter? _adjustmentsFilter;
+
   /// Switches «الصور» to its permissions view when the retired
   /// «أذونات التصوير» slot is selected (TAS-149).
   final HrPhotosViewController _photosView = HrPhotosViewController();
@@ -94,6 +115,20 @@ class _HRMainScreenState extends State<HRMainScreen> {
 
   /// Inner pages ([pushHrInnerPage]) open over the current tab.
   int _innerDepth = 0;
+
+  /// Address of the first open inner page, when it has one (TAS-190).
+  String? _innerUrl;
+
+  /// Inner-page address the shell is opening from the URL right now.
+  String? _openingInnerUrl;
+
+  /// Narrow web: inner pages pushed full screen on the root navigator,
+  /// oldest first (TAS-189).
+  final List<Route<dynamic>> _fullScreenInner = [];
+
+  /// Narrow web: a context under the [HrInnerPageTracker], for pages the
+  /// shell opens itself (settings, profile, a detail URL).
+  final GlobalKey _scaffoldKey = GlobalKey(debugLabel: 'hr_shell_scaffold');
 
   /// True while the shell itself closes inner pages (tab switch, URL
   /// change). Those closes must not step the browser history back.
@@ -144,6 +179,13 @@ class _HRMainScreenState extends State<HRMainScreen> {
         },
       );
     }
+    if (_urlSync && widget.routeInnerUrl != null) {
+      // A direct visit or reload of `/hr/<tab>/delegate/<id>` (TAS-190):
+      // open the page once the content area is built.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _applyRoute();
+      });
+    }
   }
 
   @override
@@ -151,7 +193,8 @@ class _HRMainScreenState extends State<HRMainScreen> {
     super.didUpdateWidget(oldWidget);
     if (!_urlSync) return;
     if (widget.routeTab == oldWidget.routeTab &&
-        widget.routeInner == oldWidget.routeInner) {
+        widget.routeInner == oldWidget.routeInner &&
+        widget.routeInnerUrl == oldWidget.routeInnerUrl) {
       return;
     }
     // Navigator and setState work runs after this build.
@@ -172,42 +215,113 @@ class _HRMainScreenState extends State<HRMainScreen> {
   }
 
   /// Follows a URL change: switches to its tab and closes inner pages the
-  /// URL no longer counts. Inner pages are never rebuilt from the URL.
+  /// URL no longer counts. Inner pages are never rebuilt from the URL,
+  /// except a page with its own address (TAS-190), which is opened again.
   void _applyRoute() {
     if (!_urlSync) return;
     if (hrShellResolveTab(widget.routeTab!) != _currentIndex) {
       _onTabSelected(widget.routeTab!, syncUrl: false);
     }
+    final url = widget.routeInnerUrl;
+    if (url != null && _innerDepth > 0 && _innerUrl != url) {
+      // Another addressed page is open: the URL names a different one.
+      _closeInnerPages();
+    }
     if (widget.routeInner < _innerDepth) {
       _closeInnerPages(keep: widget.routeInner);
     }
+    if (url != null && _innerDepth == 0) _openRouteInnerPage(url);
   }
+
+  /// Opens the inner page named by the URL ([HRMainScreen.routeInnerUrl]).
+  Future<void> _openRouteInnerPage(String url) async {
+    final delegateId = hrDelegateIdFromUrlPath(url);
+    if (delegateId == null || _openingInnerUrl == url) return;
+    final context = _innerPageContext;
+    if (context == null) return;
+    _openingInnerUrl = url;
+    try {
+      await (HRMainScreen.debugOpenDelegateDetail ??
+          openHrDelegateAttendanceDetailById)(
+        context,
+        delegateId: delegateId,
+        hrDelegate: widget.delegate,
+        shouldOpen: () =>
+            mounted &&
+            _urlSync &&
+            widget.routeInnerUrl == url &&
+            _innerDepth == 0,
+      );
+    } finally {
+      if (_openingInnerUrl == url) _openingInnerUrl = null;
+    }
+  }
+
+  /// A context inside the content area, where [pushHrInnerPage] finds the
+  /// inner navigator (wide web) or the tracker (narrow web).
+  BuildContext? get _innerPageContext =>
+      _innerNavigator.currentState?.context ?? _scaffoldKey.currentContext;
 
   /// Closes inner pages down to [keep]. Popups above them close too.
   void _closeInnerPages({int keep = 0}) {
     final nav = _innerNavigator.currentState;
+    if (nav != null) {
+      var close = _innerDepth - keep;
+      _shellPopping = true;
+      try {
+        nav.popUntil((route) {
+          if (route.isFirst) return true;
+          if (keep > 0 && close <= 0) return true;
+          if (isHrInnerRoute(route)) close--;
+          return false;
+        });
+      } finally {
+        _shellPopping = false;
+      }
+    }
+    _closeFullScreenInnerPages(keep: keep);
+  }
+
+  /// Narrow web: pops the full-screen inner pages above the first [keep]
+  /// ones, with anything opened over them (TAS-189).
+  void _closeFullScreenInnerPages({int keep = 0}) {
+    if (_fullScreenInner.length <= keep) return;
+    final nav = _fullScreenInner.first.navigator;
     if (nav == null) return;
-    var close = _innerDepth - keep;
+    final stopAt = keep > 0 ? _fullScreenInner[keep - 1] : null;
+    final shellRoute = ModalRoute.of(context);
     _shellPopping = true;
     try {
-      nav.popUntil((route) {
-        if (route.isFirst) return true;
-        if (keep > 0 && close <= 0) return true;
-        if (isHrInnerRoute(route)) close--;
-        return false;
-      });
+      nav.popUntil(
+        (route) =>
+            route.isFirst ||
+            (stopAt != null ? route == stopAt : route == shellRoute),
+      );
     } finally {
       _shellPopping = false;
     }
   }
 
-  void _innerPageOpened() {
+  void _fullScreenInnerOpened(Route<dynamic> route) {
+    _fullScreenInner.add(route);
+    _innerPageOpened(route);
+  }
+
+  void _fullScreenInnerClosed(Route<dynamic> route) {
+    if (!_fullScreenInner.remove(route)) return;
+    if (!mounted) return;
+    _innerPageClosed(route);
+  }
+
+  void _innerPageOpened(Route<dynamic> route) {
+    if (_innerDepth == 0) _innerUrl = hrInnerRouteUrl(route);
     _innerDepth++;
     _scheduleUrlSync();
   }
 
-  void _innerPageClosed() {
+  void _innerPageClosed(Route<dynamic> route) {
     if (_innerDepth > 0) _innerDepth--;
+    if (_innerDepth == 0) _innerUrl = null;
     if (!_urlSync || _shellPopping) return;
     // Closed inside the app (its back button, or the page popped itself).
     // Step the browser history back over the entry its opening added, so
@@ -260,10 +374,15 @@ class _HRMainScreenState extends State<HRMainScreen> {
     }
     final router = GoRouter.maybeOf(context);
     if (router == null) return;
-    final location = hrShellLocation(_currentIndex, inner: _innerDepth);
+    final location = hrShellLocation(
+      _currentIndex,
+      inner: _innerDepth,
+      innerUrl: _innerUrl,
+    );
     final current = hrShellLocation(
       widget.routeTab!,
       inner: widget.routeInner,
+      innerUrl: widget.routeInnerUrl,
     );
     if (location == current) return;
     router.go(location, extra: widget.delegate);
@@ -388,7 +507,10 @@ class _HRMainScreenState extends State<HRMainScreen> {
         return Badge(
           label: Text(
             '$count',
-            style: const TextStyle(fontSize: HrFont.labelSmall, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: HrFont.labelSmall,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           backgroundColor: colorScheme.error,
           textColor: colorScheme.onError,
@@ -446,7 +568,10 @@ class _HRMainScreenState extends State<HRMainScreen> {
         return Badge(
           label: Text(
             '$count',
-            style: const TextStyle(fontSize: HrFont.labelSmall, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: HrFont.labelSmall,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           backgroundColor: colorScheme.error,
           textColor: colorScheme.onError,
@@ -539,15 +664,16 @@ class _HRMainScreenState extends State<HRMainScreen> {
 
   /// Wide web: opens an account page (settings, profile) inside the content
   /// area, on top of the shell tabs, so the sidebar and the top bar stay
-  /// (TAS-157). Returns false when there is no inner navigator (mobile,
-  /// narrow web); the caller then keeps the full-screen push.
+  /// (TAS-157). Narrow web opens it full screen through the tracker, so the
+  /// browser back button closes it (TAS-189). Returns false on mobile; the
+  /// caller then keeps the full-screen push.
   bool _openAccountPageInShell(void Function(BuildContext inner) open) {
     if (!WebRuntimePolicy.isWeb) return false;
-    final nav = _innerNavigator.currentState;
-    if (nav == null) return false;
+    final inner = _innerPageContext;
+    if (inner == null) return false;
     // One account page at a time, opened from the current tab.
     _closeInnerPages();
-    open(nav.context);
+    open(inner);
     return true;
   }
 
@@ -708,13 +834,14 @@ class _HRMainScreenState extends State<HRMainScreen> {
     final isWideScreen = MediaQuery.of(context).size.width > 768;
     final isArabic = localeProvider.isArabic;
     final web = WebRuntimePolicy.isWeb;
-    final delegatesRail = web &&
+    final delegatesRail =
+        web &&
         _currentIndex == kHrTabDelegates &&
         MediaQuery.sizeOf(context).width < _delegatesRailBelow;
     final menuItems = web
         ? const <PopupMenuEntry<String>>[]
         : _buildMenuItems(context, l10n, colorScheme);
-    return Directionality(
+    final shell = Directionality(
       textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
       child: HrWebHeaderBridgeScope(
         bridge: _headerBridge,
@@ -727,6 +854,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
             }
           },
           child: Scaffold(
+            key: _scaffoldKey,
             backgroundColor: colorScheme.surfaceContainerLowest,
             appBar: isWideScreen
                 ? null
@@ -742,8 +870,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
                             onSelected: _onMenuSelected,
                             // Pending counts sit beside the label, not on
                             // the icon (TAS-154), like the web sidebar.
-                            trailingFor: (item) =>
-                                item.badgeCollection == null
+                            trailingFor: (item) => item.badgeCollection == null
                                 ? null
                                 : _buildPendingCountText(
                                     item.badgeCollection!,
@@ -874,6 +1001,15 @@ class _HRMainScreenState extends State<HRMainScreen> {
         ),
       ),
     );
+    // Web: inner pages pushed without the wide shell's inner navigator
+    // (narrow windows) report to the shell, which counts them in the URL
+    // (TAS-189). Mobile is unchanged.
+    if (!web) return shell;
+    return HrInnerPageTracker(
+      onOpened: _fullScreenInnerOpened,
+      onClosed: _fullScreenInnerClosed,
+      child: shell,
+    );
   }
 
   List<Widget> _narrowWebHeaderActions() => [
@@ -923,13 +1059,13 @@ class _HRMainScreenState extends State<HRMainScreen> {
         for (var index = 0; index < kHrShellTabCount; index++)
           index == _homeIndex || _loadedTabs.contains(index)
               ? HRMainScreen.debugTabBuilder?.call(index) ??
-                  hrShellTab(
-                  index: index,
-                  delegate: delegate,
-                  onNavigateToTab: _onTabSelected,
-                  adjustmentsFilter: _adjustmentsFilter,
-                  photosView: _photosView,
-                )
+                    hrShellTab(
+                      index: index,
+                      delegate: delegate,
+                      onNavigateToTab: _onTabSelected,
+                      adjustmentsFilter: _adjustmentsFilter,
+                      photosView: _photosView,
+                    )
               : const SizedBox.shrink(),
       ],
     );
@@ -944,24 +1080,24 @@ class _HrInnerUrlObserver extends NavigatorObserver {
 
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    if (isHrInnerRoute(route)) _shell._innerPageOpened();
+    if (isHrInnerRoute(route)) _shell._innerPageOpened(route);
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    if (isHrInnerRoute(route)) _shell._innerPageClosed();
+    if (isHrInnerRoute(route)) _shell._innerPageClosed(route);
   }
 
   @override
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    if (isHrInnerRoute(route)) _shell._innerPageClosed();
+    if (isHrInnerRoute(route)) _shell._innerPageClosed(route);
   }
 
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
     final wasInner = oldRoute != null && isHrInnerRoute(oldRoute);
     final isInner = newRoute != null && isHrInnerRoute(newRoute);
-    if (wasInner && !isInner) _shell._innerPageClosed();
-    if (isInner && !wasInner) _shell._innerPageOpened();
+    if (wasInner && !isInner) _shell._innerPageClosed(oldRoute);
+    if (isInner && !wasInner) _shell._innerPageOpened(newRoute);
   }
 }

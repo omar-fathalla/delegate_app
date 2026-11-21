@@ -9,7 +9,10 @@ import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 /// [pushHrInnerPage] then open inside the content area: the sidebar and top
 /// bar stay, and the page gets a breadcrumb («الصفحة › الصفحة الداخلية»),
 /// a back button and a max content width. Without a host (mobile, narrow
-/// web, tests) the page is pushed full screen as before.
+/// web, tests) the page is pushed full screen as before. On narrow web the
+/// shell publishes an [HrInnerPageTracker] instead, so the full-screen page
+/// is still counted in the URL and the browser back button closes it
+/// (TAS-189).
 
 /// Content widths for inner pages.
 abstract final class HrInnerPageWidth {
@@ -28,6 +31,78 @@ const String kHrInnerRoutePrefix = 'hr-inner:';
 /// Whether [route] is an inner page pushed by [pushHrInnerPage].
 bool isHrInnerRoute(Route<dynamic> route) =>
     route.settings.name?.startsWith(kHrInnerRoutePrefix) ?? false;
+
+/// URL part of an inner page that has its own address (TAS-190), relative
+/// to the shell page: `delegate/<id>` gives `/hr/<tab>/delegate/<id>`.
+/// Stored in the route's [RouteSettings.arguments].
+class HrInnerPageUrl {
+  const HrInnerPageUrl(this.path);
+
+  final String path;
+}
+
+/// The [HrInnerPageUrl.path] of an inner [route], or null.
+String? hrInnerRouteUrl(Route<dynamic> route) {
+  final args = route.settings.arguments;
+  return args is HrInnerPageUrl ? args.path : null;
+}
+
+/// Published by the narrow web shell, which has no inner navigator
+/// (TAS-189). [pushHrInnerPage] then pushes the page full screen and reports
+/// it here, so the shell can count it in the URL (`?inner=<n>`) and close it
+/// when the browser back button shortens the URL. Mobile never publishes it.
+class HrInnerPageTracker extends InheritedWidget {
+  const HrInnerPageTracker({
+    super.key,
+    required this.onOpened,
+    required this.onClosed,
+    required super.child,
+  });
+
+  /// A full-screen inner page was pushed.
+  final void Function(Route<dynamic> route) onOpened;
+
+  /// A full-screen inner page left its navigator (popped or removed).
+  final void Function(Route<dynamic> route) onClosed;
+
+  static HrInnerPageTracker? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<HrInnerPageTracker>();
+
+  @override
+  bool updateShouldNotify(HrInnerPageTracker oldWidget) =>
+      onOpened != oldWidget.onOpened || onClosed != oldWidget.onClosed;
+}
+
+/// Full-screen inner page on narrow web: reports its close once, as soon as
+/// the navigator pops or removes it.
+class _TrackedInnerPageRoute<T> extends MaterialPageRoute<T> {
+  _TrackedInnerPageRoute({
+    required super.builder,
+    required super.settings,
+    required this.onClosed,
+  });
+
+  final void Function(Route<dynamic> route) onClosed;
+  bool _reported = false;
+
+  void _report() {
+    if (_reported) return;
+    _reported = true;
+    onClosed(this);
+  }
+
+  @override
+  void didComplete(T? result) {
+    super.didComplete(result);
+    _report();
+  }
+
+  @override
+  void dispose() {
+    _report();
+    super.dispose();
+  }
+}
 
 /// Published by the web shell while its content area has a nested navigator.
 class HrInnerPageHost extends InheritedWidget {
@@ -60,23 +135,44 @@ class HrInnerPageHost extends InheritedWidget {
 /// shell, where it must not draw its own app bar (the breadcrumb already
 /// carries the title and the back button). When false the page is pushed
 /// full screen and should keep its app bar.
+///
+/// [urlPath] gives the page its own web address under the shell page
+/// (TAS-190), for example `delegate/<id>`. Ids only, never names or other
+/// personal data.
 Future<T?> pushHrInnerPage<T>(
   BuildContext context, {
   required String title,
   required Widget Function(BuildContext context, bool inShell) builder,
   double maxWidth = HrInnerPageWidth.form,
+  String? urlPath,
 }) {
+  final settings = RouteSettings(
+    name: '$kHrInnerRoutePrefix$title',
+    arguments: urlPath == null ? null : HrInnerPageUrl(urlPath),
+  );
   final host = HrInnerPageHost.maybeOf(context);
   final nav = host?.navigatorKey.currentState;
   if (host == null || nav == null) {
-    return Navigator.of(
-      context,
-    ).push<T>(MaterialPageRoute(builder: (ctx) => builder(ctx, false)));
+    final tracker = HrInnerPageTracker.maybeOf(context);
+    if (tracker == null) {
+      return Navigator.of(
+        context,
+      ).push<T>(MaterialPageRoute(builder: (ctx) => builder(ctx, false)));
+    }
+    // Narrow web (TAS-189): full screen as before, but counted in the URL.
+    final route = _TrackedInnerPageRoute<T>(
+      settings: settings,
+      builder: (ctx) => builder(ctx, false),
+      onClosed: tracker.onClosed,
+    );
+    final opened = Navigator.of(context).push<T>(route);
+    tracker.onOpened(route);
+    return opened;
   }
   final parentTitle = host.parentTitle;
   return nav.push<T>(
     PageRouteBuilder<T>(
-      settings: RouteSettings(name: '$kHrInnerRoutePrefix$title'),
+      settings: settings,
       transitionDuration: const Duration(milliseconds: 200),
       reverseTransitionDuration: const Duration(milliseconds: 150),
       pageBuilder: (ctx, _, _) => HrInnerPage(

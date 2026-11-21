@@ -79,12 +79,12 @@ class _AdminTasksScreenState extends State<AdminTasksScreen> {
                     ),
                   )
                 : AppBar(
-              title: const SizedBox.shrink(),
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(110),
-                child: _FilterBar(adminDelegate: widget.adminDelegate),
-              ),
-            ),
+                    title: const SizedBox.shrink(),
+                    bottom: PreferredSize(
+                      preferredSize: const Size.fromHeight(110),
+                      child: _FilterBar(adminDelegate: widget.adminDelegate),
+                    ),
+                  ),
             body: BlocBuilder<AdminTasksBloc, AdminTasksState>(
               builder: (context, state) {
                 if (state is AdminTasksInitial) {
@@ -190,6 +190,15 @@ class _AdminTasksScreenState extends State<AdminTasksScreen> {
           adminDelegate: widget.adminDelegate,
           showAppBar: !shell,
         ),
+      );
+    } else if (HrInnerPageTracker.maybeOf(context) != null) {
+      // Narrow web HR shell (TAS-189): full screen as before, counted in
+      // the URL so the browser back button closes it.
+      opened = pushHrInnerPage<void>(
+        context,
+        title: AppLocalizations.of(context)!.createTask,
+        builder: (_, _) =>
+            CreateTaskScreen(adminDelegate: widget.adminDelegate),
       );
     } else {
       opened = Navigator.push(
@@ -399,7 +408,9 @@ class _DateHeader extends StatelessWidget {
     } else if (checkDate == yesterday) {
       text = l10n.yesterday;
     } else {
-      text = DateFormat.yMMMMd(Localizations.localeOf(context).toLanguageTag()).format(date);
+      text = DateFormat.yMMMMd(
+        Localizations.localeOf(context).toLanguageTag(),
+      ).format(date);
     }
 
     return Padding(

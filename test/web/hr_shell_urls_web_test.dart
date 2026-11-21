@@ -2,6 +2,9 @@
 // sidebar writes the URL, a URL (deep link, reload, browser back) selects the
 // tab on the same mounted shell, inner pages add `?inner=<n>`, unknown slugs
 // fall back to `/hr/home`. Mobile keeps `/hr/home` only. Fake data only.
+// TAS-189: narrow web counts its full-screen inner pages in the URL too.
+// TAS-190: the delegate attendance detail has its own address,
+// `/hr/<tab>/delegate/<id>`.
 import 'dart:async';
 
 import 'package:delegate_app/config/routes/app_router.dart';
@@ -10,6 +13,7 @@ import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/features/auth/domain/role_home.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:delegate_app/features/hr/presentation/hr_account_pages.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_main_screen.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_desktop_sidebar.dart';
@@ -117,8 +121,43 @@ class _StubTabState extends State<_StubTab> {
         ),
         child: const Text('open inner'),
       ),
+      TextButton(
+        key: ValueKey('detail_${widget.index}'),
+        onPressed: () => _pushFakeDetail(context, 'seed-fake-delegate-1'),
+        child: const Text('open detail'),
+      ),
+      TextButton(
+        key: ValueKey('profile_${widget.index}'),
+        onPressed: () =>
+            HrAccountPages.openProfile(context, _delegate(UserRole.admin)),
+        child: const Text('open profile'),
+      ),
     ],
   );
+}
+
+/// Stand-in for the delegate attendance detail page (TAS-190): an inner
+/// page with the same address as the real one.
+Future<void> _pushFakeDetail(BuildContext context, String delegateId) =>
+    pushHrInnerPage<void>(
+      context,
+      title: 'مندوب وهمي',
+      urlPath: hrDelegateDetailUrlPath(delegateId),
+      builder: (_, _) => Text('detail $delegateId'),
+    );
+
+/// Delegate ids the shell opened from a URL.
+final List<String> _openedFromUrl = [];
+
+Future<void> _fakeOpenDetail(
+  BuildContext context, {
+  required String delegateId,
+  required Delegate hrDelegate,
+  bool Function()? shouldOpen,
+}) async {
+  _openedFromUrl.add(delegateId);
+  if (!(shouldOpen?.call() ?? true)) return;
+  await _pushFakeDetail(context, delegateId);
 }
 
 /// The shell's badge streams talk to Firestore directly; the fake backend
@@ -165,17 +204,22 @@ void main() {
       sl.registerLazySingleton(() => ThemeCubit(sl<SharedPreferences>()));
     }
     bloc = _MockAuthBloc();
-    when(() => bloc.state).thenReturn(
-      AuthAuthenticated(delegate: _delegate(UserRole.admin)),
-    );
+    when(
+      () => bloc.state,
+    ).thenReturn(AuthAuthenticated(delegate: _delegate(UserRole.admin)));
     when(() => bloc.stream).thenAnswer((_) => const Stream.empty());
     when(() => bloc.close()).thenAnswer((_) async {});
     HRMainScreen.debugTabBuilder = (index) => _StubTab(index);
+    HRMainScreen.debugOpenDelegateDetail = _fakeOpenDetail;
+    HrAccountPages.debugProfileBuilder = (_, _) => const Text('profile body');
+    _openedFromUrl.clear();
     WebRuntimePolicy.debugIsWebOverride = true;
   });
 
   tearDown(() {
     HRMainScreen.debugTabBuilder = null;
+    HRMainScreen.debugOpenDelegateDetail = null;
+    HrAccountPages.debugProfileBuilder = null;
     HrShellLink.debugReset();
     WebRuntimePolicy.debugReset();
   });
@@ -223,6 +267,58 @@ void main() {
       expect(hrShellInnerDepth(Uri.parse('/hr/payroll?inner=-3')), 0);
       expect(hrShellInnerDepth(Uri.parse('/hr/payroll?inner=x')), 0);
       expect(hrShellInnerDepth(Uri.parse('/hr/payroll')), 0);
+    });
+
+    test('TAS-190: the delegate detail address carries the id only', () {
+      const id = 'seed-fake-delegate-1';
+      final url = hrDelegateDetailUrlPath(id);
+      expect(url, 'delegate/$id');
+      expect(hrDelegateIdFromUrlPath(url), id);
+      expect(hrDelegateIdFromUrlPath('delegate/'), isNull);
+      expect(hrDelegateIdFromUrlPath('delegate/a/b'), isNull);
+      expect(hrDelegateIdFromUrlPath('other/x'), isNull);
+      expect(hrDelegateIdFromUrlPath(null), isNull);
+
+      expect(
+        hrShellLocation(kHrTabAttendance, inner: 1, innerUrl: url),
+        '/hr/attendance/delegate/$id',
+      );
+      expect(
+        hrShellLocation(kHrTabDelegates, inner: 2, innerUrl: url),
+        '/hr/delegates/delegate/$id?inner=1',
+      );
+      // No page open: the address is not written.
+      expect(
+        hrShellLocation(kHrTabAttendance, innerUrl: url),
+        '/hr/attendance',
+      );
+
+      final path = '/hr/attendance/delegate/$id';
+      expect(hrShellTabForPath(path), kHrTabAttendance);
+      expect(
+        hrShellTabForPath('/hr/attendance/edits/delegate/$id'),
+        kHrTabAdjustments,
+      );
+      expect(hrShellInnerUrlForPath(path), url);
+      expect(hrShellInnerDepth(Uri.parse(path)), 1);
+      expect(hrShellInnerDepth(Uri.parse('$path?inner=1')), 2);
+      for (final bad in [
+        '/hr/attendance/delegate/',
+        '/hr/nope/delegate/$id',
+        '/hr/attendance/delegate/$id/x',
+      ]) {
+        expect(hrShellInnerUrlForPath(bad), isNull, reason: bad);
+      }
+      expect(hrShellTabForPath('/hr/nope/delegate/$id'), isNull);
+      // A reload keeps the detail address.
+      expect(
+        hrShellRestoreLocation(kWebHrSystemPath, Uri.parse('$path?inner=1')),
+        path,
+      );
+      expect(
+        hrShellDelegateDetailRoutePaths(),
+        contains('/hr/attendance/delegate/:delegateId'),
+      );
     });
 
     test('a web reload of a shell URL stays on it after the splash', () {
@@ -295,8 +391,9 @@ void main() {
     int shownTab(WidgetTester t) => t
         .widget<IndexedStack>(
           find.descendant(
-            of: find.byType(HRMainScreen),
-            matching: find.byType(IndexedStack),
+            of: find.byType(HRMainScreen, skipOffstage: false),
+            matching: find.byType(IndexedStack, skipOffstage: false),
+            skipOffstage: false,
           ),
         )
         .index!;
@@ -463,6 +560,150 @@ void main() {
       expect(shownTab(t), kHrTabDelegates);
     });
 
+    group('TAS-189: narrow web inner pages', () {
+      const narrow = Size(412, 900);
+
+      testWidgets('a full-screen inner page adds ?inner=1; back closes it', (
+        t,
+      ) async {
+        final r = await pumpShell(t, initial: '/hr/home', size: narrow);
+        expect(find.byType(HRDesktopSidebar), findsNothing);
+
+        await t.tap(find.byKey(const ValueKey('inner_$kHrTabOverview')));
+        await settleLong(t);
+        expect(find.text('inner body'), findsOneWidget);
+        // Full screen: no breadcrumb, the bottom bar is covered.
+        expect(find.byKey(const ValueKey('hr_inner_page_back')), findsNothing);
+        expect(location(r), '/hr/home?inner=1');
+
+        // Browser back.
+        r.go('/hr/home');
+        await settleLong(t);
+        expect(find.text('inner body'), findsNothing);
+        expect(shownTab(t), kHrTabOverview);
+        expect(location(r), '/hr/home');
+
+        // The page's own back (app bar arrow) takes the URL back too.
+        await t.tap(find.byKey(const ValueKey('inner_$kHrTabOverview')));
+        await settleLong(t);
+        expect(location(r), '/hr/home?inner=1');
+        Navigator.of(t.element(find.text('inner body'))).pop();
+        await settleLong(t);
+        expect(find.text('inner body'), findsNothing);
+        expect(location(r), '/hr/home');
+      });
+
+      testWidgets('two pages count 2 and the browser back closes one', (
+        t,
+      ) async {
+        final r = await pumpShell(t, initial: '/hr/home', size: narrow);
+        await t.tap(find.byKey(const ValueKey('inner_$kHrTabOverview')));
+        await settleLong(t);
+        final tab = t.element(
+          find.byKey(
+            const ValueKey('inner_$kHrTabOverview'),
+            skipOffstage: false,
+          ),
+        );
+        pushHrInnerPage<void>(
+          tab,
+          title: 'ثانية',
+          builder: (_, _) => const Text('second body'),
+        );
+        await settleLong(t);
+        expect(location(r), '/hr/home?inner=2');
+
+        r.go('/hr/home?inner=1');
+        await settleLong(t);
+        expect(find.text('second body'), findsNothing);
+        expect(find.text('inner body'), findsOneWidget);
+
+        r.go('/hr/home');
+        await settleLong(t);
+        expect(find.text('inner body'), findsNothing);
+        expect(find.byType(HRMainScreen), findsOneWidget);
+      });
+
+      testWidgets('account pages (profile) are counted too', (t) async {
+        final r = await pumpShell(t, initial: '/hr/home', size: narrow);
+        await t.tap(find.byKey(const ValueKey('profile_$kHrTabOverview')));
+        await settleLong(t);
+        expect(find.text('profile body'), findsOneWidget);
+        expect(location(r), '/hr/home?inner=1');
+
+        r.go('/hr/home');
+        await settleLong(t);
+        expect(find.text('profile body'), findsNothing);
+      });
+
+      testWidgets('mobile keeps the plain push and /hr/home', (t) async {
+        WebRuntimePolicy.debugIsWebOverride = false;
+        final r = await pumpShell(t, size: narrow);
+        await t.tap(find.byKey(const ValueKey('inner_$kHrTabAttendance')));
+        await settleLong(t);
+        expect(find.text('inner body'), findsOneWidget);
+        expect(location(r), '/hr/home');
+        final route = ModalRoute.of(t.element(find.text('inner body')))!;
+        expect(route.settings.name, isNull);
+      });
+    });
+
+    group('TAS-190: delegate detail address', () {
+      const path = '/hr/attendance/delegate/seed-fake-delegate-1';
+
+      testWidgets('opening the detail writes its address; back closes it', (
+        t,
+      ) async {
+        final r = await pumpShell(t, initial: '/hr/attendance');
+        await t.tap(find.byKey(const ValueKey('detail_$kHrTabAttendance')));
+        await settle(t);
+        expect(find.text('detail seed-fake-delegate-1'), findsOneWidget);
+        expect(location(r), path);
+        expect(_openedFromUrl, isEmpty);
+
+        // Browser back, then forward: the page opens again from the URL.
+        r.go('/hr/attendance');
+        await settle(t);
+        expect(find.text('detail seed-fake-delegate-1'), findsNothing);
+        r.go(path);
+        await settle(t);
+        expect(_openedFromUrl, ['seed-fake-delegate-1']);
+        expect(find.text('detail seed-fake-delegate-1'), findsOneWidget);
+        expect(location(r), path);
+
+        // In-app back.
+        await t.tap(find.byKey(const ValueKey('hr_inner_page_back')));
+        await settle(t);
+        expect(location(r), '/hr/attendance');
+      });
+
+      testWidgets('a direct visit opens the tab and the detail', (t) async {
+        final r = await pumpShell(t, initial: path);
+        expect(shownTab(t), kHrTabAttendance);
+        expect(_openedFromUrl, ['seed-fake-delegate-1']);
+        expect(find.text('detail seed-fake-delegate-1'), findsOneWidget);
+        expect(location(r), path);
+      });
+
+      testWidgets('the address keeps the tab it was opened from', (t) async {
+        final r = await pumpShell(t, initial: '/hr/delegates');
+        await t.tap(find.byKey(const ValueKey('detail_$kHrTabDelegates')));
+        await settle(t);
+        expect(location(r), '/hr/delegates/delegate/seed-fake-delegate-1');
+        expect(shownTab(t), kHrTabDelegates);
+      });
+
+      testWidgets('narrow web: a direct visit opens it full screen', (t) async {
+        final r = await pumpShell(t, initial: path, size: const Size(412, 900));
+        expect(find.text('detail seed-fake-delegate-1'), findsOneWidget);
+        expect(location(r), path);
+        r.go('/hr/attendance');
+        await settleLong(t);
+        expect(find.text('detail seed-fake-delegate-1'), findsNothing);
+        expect(shownTab(t), kHrTabAttendance);
+      });
+    });
+
     testWidgets('mobile stays on /hr/home while switching tabs', (t) async {
       WebRuntimePolicy.debugIsWebOverride = false;
       final r = await pumpShell(t, size: const Size(412, 900));
@@ -487,6 +728,13 @@ void main() {
 /// pumpAndSettle can hang on spinners; a few fixed frames are enough here.
 Future<void> settle(WidgetTester t) async {
   for (var i = 0; i < 6; i++) {
+    await t.pump(const Duration(milliseconds: 100));
+  }
+}
+
+/// Full-screen routes (narrow web) take longer to leave than inner pages.
+Future<void> settleLong(WidgetTester t) async {
+  for (var i = 0; i < 15; i++) {
     await t.pump(const Duration(milliseconds: 100));
   }
 }

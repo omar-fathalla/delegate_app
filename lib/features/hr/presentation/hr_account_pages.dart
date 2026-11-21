@@ -30,8 +30,11 @@ abstract final class HrAccountPages {
   @visibleForTesting
   static Widget Function(Delegate delegate, bool inShell)? debugFeedbackBuilder;
 
+  /// Wide web shell (inner navigator) or narrow web shell (tracker,
+  /// TAS-189): open through [pushHrInnerPage] so the URL counts the page.
   static bool _hasHost(BuildContext context) =>
-      HrInnerPageHost.maybeOf(context)?.navigatorKey.currentState != null;
+      HrInnerPageHost.maybeOf(context)?.navigatorKey.currentState != null ||
+      HrInnerPageTracker.maybeOf(context) != null;
 
   static Future<void> openSettings(BuildContext context, Delegate delegate) {
     if (!_hasHost(context)) {
