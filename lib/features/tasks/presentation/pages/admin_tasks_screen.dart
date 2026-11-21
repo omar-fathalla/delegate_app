@@ -9,6 +9,7 @@ import 'package:delegate_app/features/tasks/presentation/bloc/admin_tasks_event.
 import 'package:delegate_app/features/tasks/presentation/bloc/admin_tasks_state.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/create_task_screen.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_inner_page.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:intl/intl.dart';
@@ -65,8 +66,19 @@ class _AdminTasksScreenState extends State<AdminTasksScreen> {
         builder: (context) {
           final l10n = AppLocalizations.of(context)!;
           final theme = Theme.of(context);
+          // Web HR shell (TAS-155): filters and «إنشاء مهمة» share one
+          // toolbar row, and the form opens as an inner page.
+          final inShell = HrInnerPageHost.maybeOf(context) != null;
           return Scaffold(
-            appBar: AppBar(
+            appBar: inShell
+                ? PreferredSize(
+                    preferredSize: const Size.fromHeight(64),
+                    child: _ShellToolbar(
+                      adminDelegate: widget.adminDelegate,
+                      onCreate: () => _openCreateTask(context, inShell: true),
+                    ),
+                  )
+                : AppBar(
               title: const SizedBox.shrink(),
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(110),
@@ -154,37 +166,121 @@ class _AdminTasksScreenState extends State<AdminTasksScreen> {
                 return const SizedBox.shrink();
               },
             ),
-            floatingActionButton: FloatingActionButton(
-              heroTag: 'admin_tasks_add_task_fab',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        CreateTaskScreen(adminDelegate: widget.adminDelegate),
+            floatingActionButton: inShell
+                ? null
+                : FloatingActionButton(
+                    heroTag: 'admin_tasks_add_task_fab',
+                    tooltip: l10n.createTask,
+                    onPressed: () => _openCreateTask(context, inShell: false),
+                    child: const Icon(Icons.add_task_rounded),
                   ),
-                ).then((_) {
-                  if (!context.mounted) return;
-                  context.read<AdminTasksBloc>().add(
-                    LoadAdminTasksRequested(
-                      organizationId: widget.adminDelegate.organizationUID,
-                      companyId: widget.adminDelegate.companyUID,
-                    ),
-                  );
-                });
-              },
-              child: const Icon(Icons.add_task_rounded),
-            ),
           );
         },
       ),
     );
   }
 
+  void _openCreateTask(BuildContext context, {required bool inShell}) {
+    final Future<void> opened;
+    if (inShell) {
+      opened = pushHrInnerPage<void>(
+        context,
+        title: AppLocalizations.of(context)!.createTask,
+        builder: (_, shell) => CreateTaskScreen(
+          adminDelegate: widget.adminDelegate,
+          showAppBar: !shell,
+        ),
+      );
+    } else {
+      opened = Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              CreateTaskScreen(adminDelegate: widget.adminDelegate),
+        ),
+      );
+    }
+    opened.then((_) {
+      if (!context.mounted) return;
+      context.read<AdminTasksBloc>().add(
+        LoadAdminTasksRequested(
+          organizationId: widget.adminDelegate.organizationUID,
+          companyId: widget.adminDelegate.companyUID,
+        ),
+      );
+    });
+  }
+
   bool _isSameDay(DateTime date1, DateTime date2) {
     return date1.year == date2.year &&
         date1.month == date2.month &&
         date1.day == date2.day;
+  }
+}
+
+/// Web HR shell toolbar: all status filters in one row, and the primary
+/// «إنشاء مهمة» button with its label at the end.
+class _ShellToolbar extends StatelessWidget {
+  final Delegate adminDelegate;
+  final VoidCallback onCreate;
+
+  const _ShellToolbar({required this.adminDelegate, required this.onCreate});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: cs.surface,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: BlocBuilder<AdminTasksBloc, AdminTasksState>(
+                builder: (context, state) {
+                  final current = state.statusFilter;
+                  final options = <(String, TaskStatus?)>[
+                    (l10n.all, null),
+                    (l10n.taskPending, TaskStatus.pending),
+                    (l10n.taskInProgress, TaskStatus.inProgress),
+                    (l10n.taskCompleted, TaskStatus.completed),
+                    (l10n.taskCancelled, TaskStatus.cancelled),
+                  ];
+                  return SingleChildScrollView(
+                    key: const ValueKey('admin_tasks_shell_filters'),
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final (label, status) in options) ...[
+                          FilterChip(
+                            label: Text(label),
+                            selected: current == status,
+                            onSelected: (_) => _FilterBar.updateFilter(
+                              context,
+                              adminDelegate,
+                              status,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            FilledButton.icon(
+              key: const ValueKey('admin_tasks_create_button'),
+              onPressed: onCreate,
+              icon: const Icon(Icons.add_task_rounded),
+              label: Text(l10n.createTask),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -262,7 +358,14 @@ class _FilterBar extends StatelessWidget {
     );
   }
 
-  void _updateFilter(BuildContext context, TaskStatus? status) {
+  void _updateFilter(BuildContext context, TaskStatus? status) =>
+      updateFilter(context, adminDelegate, status);
+
+  static void updateFilter(
+    BuildContext context,
+    Delegate adminDelegate,
+    TaskStatus? status,
+  ) {
     context.read<AdminTasksBloc>().add(
       StatusFilterChanged(
         organizationId: adminDelegate.organizationUID,

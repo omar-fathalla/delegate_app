@@ -14,7 +14,15 @@ import 'package:intl/intl.dart' hide TextDirection;
 class CreateTaskScreen extends StatefulWidget {
   final Delegate adminDelegate;
 
-  const CreateTaskScreen({super.key, required this.adminDelegate});
+  /// False inside the web HR shell, where the inner-page breadcrumb carries
+  /// the title and the back button (TAS-155).
+  final bool showAppBar;
+
+  const CreateTaskScreen({
+    super.key,
+    required this.adminDelegate,
+    this.showAppBar = true,
+  });
 
   @override
   State<CreateTaskScreen> createState() => _CreateTaskScreenState();
@@ -108,7 +116,16 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
 
             return Scaffold(
               backgroundColor: theme.colorScheme.surfaceContainerLowest,
-              appBar: AppBar(
+              appBar: !widget.showAppBar
+                  ? PreferredSize(
+                      preferredSize: const Size.fromHeight(4),
+                      child: BlocBuilder<CreateTaskBloc, CreateTaskState>(
+                        builder: (context, state) => state is LoadingDelegates
+                            ? const LinearProgressIndicator()
+                            : const SizedBox.shrink(),
+                      ),
+                    )
+                  : AppBar(
                 backgroundColor: theme.colorScheme.surfaceContainer,
                 elevation: 0,
                 scrolledUnderElevation: 2.0,
