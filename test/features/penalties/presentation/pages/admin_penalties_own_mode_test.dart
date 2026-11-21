@@ -72,7 +72,11 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  Future<_MockPenaltyBloc> pump(WidgetTester tester, {required bool own}) async {
+  Future<_MockPenaltyBloc> pump(
+    WidgetTester tester, {
+    required bool own,
+    bool company = false,
+  }) async {
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -93,6 +97,7 @@ void main() {
             child: AdminPenaltiesListPage(
               adminDelegate: _hr(),
               ownPenaltiesOnly: own,
+              companyViewOnly: company,
             ),
           ),
         ),
@@ -127,6 +132,22 @@ void main() {
     expect(events.whereType<LoadOwnPenaltiesEvent>(), isEmpty);
     expect(events.whereType<LoadAllPenaltiesEvent>(), hasLength(1));
     expect(find.text('سجل المخالفات والغرامات'), findsOneWidget);
+    expect(find.text('مخالفة وهمية سرية'), findsNothing);
+  });
+
+  testWidgets('company view loads the company list, read-only (TAS-156)', (
+    tester,
+  ) async {
+    final bloc = await pump(tester, own: false, company: true);
+    final events = verify(() => bloc.add(captureAny())).captured;
+    expect(events.whereType<LoadOwnPenaltiesEvent>(), isEmpty);
+    expect(events.whereType<LoadAllPenaltiesEvent>(), isEmpty);
+    final company = events.whereType<LoadCompanyPenaltiesEvent>().toList();
+    expect(company, hasLength(1));
+    expect(company.single.companyId, 'seed-fake-co-alpha');
+    expect(find.text('سجل المخالفات والغرامات'), findsOneWidget);
+    expect(find.byType(FloatingActionButton), findsNothing);
+    // Confidential penalties stay limited to the roles allowed to see them.
     expect(find.text('مخالفة وهمية سرية'), findsNothing);
   });
 }
