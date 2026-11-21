@@ -5,6 +5,7 @@ import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// بيانات عنصر في قائمة "المزيد" لمسؤولي الموارد البشرية والمشرفين
 class HRMoreItemData {
@@ -49,7 +50,7 @@ class HRMoreBottomSheet extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(HrRadius.pill)),
         border: Border(
           top: BorderSide(
             color: colorScheme.outlineVariant.withValues(alpha: 0.35),
@@ -73,7 +74,7 @@ class HRMoreBottomSheet extends StatelessWidget {
                   height: 4.5,
                   decoration: BoxDecoration(
                     color: colorScheme.outlineVariant.withValues(alpha: 0.8),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(HrRadius.chip),
                   ),
                 ),
               ),
@@ -93,7 +94,7 @@ class HRMoreBottomSheet extends StatelessWidget {
                         color: colorScheme.primaryContainer.withValues(
                           alpha: 0.7,
                         ),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(HrRadius.card),
                       ),
                       child: Icon(
                         Icons.grid_view_rounded,
@@ -242,7 +243,7 @@ class HRMoreBottomSheet extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         onTap: () {
           Navigator.pop(context);
           onSelectTab(item.index);
@@ -255,7 +256,7 @@ class HRMoreBottomSheet extends StatelessWidget {
             color: isSelected
                 ? colorScheme.primaryContainer.withValues(alpha: 0.25)
                 : colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(HrRadius.card),
             border: Border.all(
               color: isSelected
                   ? colorScheme.primary.withValues(alpha: 0.7)
@@ -284,7 +285,7 @@ class HRMoreBottomSheet extends StatelessWidget {
                         color: isSelected
                             ? colorScheme.primary
                             : colorScheme.onSurface,
-                        fontSize: 14.5,
+                        fontSize: HrFont.body,
                       ),
                     ),
                     const SizedBox(height: 3),
@@ -292,7 +293,7 @@ class HRMoreBottomSheet extends StatelessWidget {
                       item.subtitle,
                       style: textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
-                        fontSize: 11.5,
+                        fontSize: HrFont.labelSmall,
                         height: 1.25,
                       ),
                       maxLines: 2,
@@ -362,7 +363,7 @@ class HRMoreBottomSheet extends StatelessWidget {
             isLabelVisible: count > 0,
             label: Text(
               '$count',
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: HrFont.labelSmall, fontWeight: FontWeight.bold),
             ),
             backgroundColor: colorScheme.error,
             textColor: colorScheme.onError,
@@ -385,7 +386,7 @@ class HRMoreBottomSheet extends StatelessWidget {
         color: isSelected
             ? colorScheme.primary.withValues(alpha: 0.12)
             : colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(HrRadius.card),
       ),
       alignment: Alignment.center,
       child: icon,

@@ -10,6 +10,7 @@ import 'package:delegate_app/features/admin/domain/usecases/get_company_delegate
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// شاشة تقديم ومراجعة واعتماد طلبات الإجازات ومبررات الغياب (HR Leaves & Excuses)
 class HRLeavesAndExcusesScreen extends StatefulWidget {
@@ -81,7 +82,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
       isScrollControlled: true,
       backgroundColor: colorScheme.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(HrRadius.pill)),
       ),
       builder: (sheetContext) {
         return StatefulBuilder(
@@ -113,7 +114,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: colorScheme.primary.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(HrRadius.card),
                             ),
                             child: Icon(
                               Icons.beach_access_rounded,
@@ -130,13 +131,13 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                   'إدارة رصيد الإجازات السنوية للمناديب',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 16,
+                                    fontSize: HrFont.titleMedium,
                                   ),
                                 ),
                                 Text(
                                   'تفعيل أو إيقاف رصيد الإجازات السنوية (21 يوم) للمناديب الجدد وفترة التجربة',
                                   style: TextStyle(
-                                    fontSize: 11.5,
+                                    fontSize: HrFont.labelSmall,
                                     color: colorScheme.onSurfaceVariant,
                                   ),
                                 ),
@@ -163,10 +164,10 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
                                     color: colorScheme.surfaceContainerLow,
-                                    borderRadius: BorderRadius.circular(14),
+                                    borderRadius: BorderRadius.circular(HrRadius.card),
                                     border: Border.all(
                                       color: isEnabled
-                                          ? const Color(0xFF2E7D32).withValues(alpha: 0.3)
+                                          ? HrStatusColors.of(context).success.withValues(alpha: 0.3)
                                           : colorScheme.outlineVariant.withValues(alpha: 0.4),
                                     ),
                                   ),
@@ -186,7 +187,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                               del.fullName,
                                               style: const TextStyle(
                                                 fontWeight: FontWeight.bold,
-                                                fontSize: 13.5,
+                                                fontSize: HrFont.body,
                                               ),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
@@ -197,11 +198,11 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                                   ? 'رصيد سنوي مفعّل (${del.annualLeaveQuota} يوم)'
                                                   : 'إجازات أسبوعية فقط (فترة تجربة)',
                                               style: TextStyle(
-                                                fontSize: 11,
+                                                fontSize: HrFont.labelSmall,
                                                 fontWeight: FontWeight.w600,
                                                 color: isEnabled
-                                                    ? const Color(0xFF2E7D32)
-                                                    : Colors.amber.shade900,
+                                                    ? HrStatusColors.of(context).success
+                                                    : HrStatusColors.of(context).warning,
                                               ),
                                             ),
                                           ],
@@ -334,7 +335,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                     'الإجازات',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14.5,
+                      fontSize: HrFont.body,
                       letterSpacing: -0.2,
                     ),
                     maxLines: 1,
@@ -343,7 +344,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                   Text(
                     widget.hrDelegate.companyName,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: HrFont.labelSmall,
                       color: colorScheme.onSurfaceVariant,
                     ),
                     maxLines: 1,
@@ -450,7 +451,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                         value: '$pendingCount',
                         subtitle: 'تحتاج إجراء من الإدارة',
                         icon: Icons.hourglass_top_rounded,
-                        color: pendingCount > 0 ? const Color(0xFFD97706) : colorScheme.outline,
+                        color: pendingCount > 0 ? HrStatusColors.of(context).warning : colorScheme.outline,
                         colorScheme: colorScheme,
                       ),
                       _buildKpiCard(
@@ -458,7 +459,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                         value: '$approvedCount',
                         subtitle: 'إجازات مقبولة',
                         icon: Icons.check_circle_rounded,
-                        color: const Color(0xFF2E7D32),
+                        color: HrStatusColors.of(context).success,
                         colorScheme: colorScheme,
                       ),
                       _buildKpiCard(
@@ -466,7 +467,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                         value: '$rejectedCount',
                         subtitle: 'تم رفض الإجازة',
                         icon: Icons.cancel_outlined,
-                        color: rejectedCount > 0 ? const Color(0xFFC62828) : colorScheme.outline,
+                        color: rejectedCount > 0 ? HrStatusColors.of(context).danger : colorScheme.outline,
                         colorScheme: colorScheme,
                       ),
                     ];
@@ -523,11 +524,11 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                         onChanged: (val) =>
                             setState(() => _searchQuery = val.trim()),
                         textAlignVertical: TextAlignVertical.center,
-                        style: TextStyle(fontSize: 13, color: colorScheme.onSurface),
+                        style: TextStyle(fontSize: HrFont.body, color: colorScheme.onSurface),
                         decoration: InputDecoration(
                           hintText: 'بحث باسم المندوب أو رقم الهاتف أو العذر...',
                           hintStyle: TextStyle(
-                            fontSize: 12,
+                            fontSize: HrFont.labelMedium,
                             color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                           ),
                           prefixIcon: Icon(
@@ -549,19 +550,19 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
                           isDense: true,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(22),
+                            borderRadius: BorderRadius.circular(HrRadius.pill),
                             borderSide: BorderSide(
                               color: colorScheme.outlineVariant.withValues(alpha: 0.35),
                             ),
                           ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(22),
+                            borderRadius: BorderRadius.circular(HrRadius.pill),
                             borderSide: BorderSide(
                               color: colorScheme.outlineVariant.withValues(alpha: 0.35),
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(22),
+                            borderRadius: BorderRadius.circular(HrRadius.pill),
                             borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
                           ),
                         ),
@@ -581,7 +582,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                           label: 'قيد المراجعة ($pendingCount)',
                           icon: Icons.hourglass_top_rounded,
                           activeColor: pendingCount > 0
-                              ? const Color(0xFFD97706)
+                              ? HrStatusColors.of(context).warning
                               : colorScheme.primary,
                           activeForegroundColor: Colors.white,
                         ),
@@ -589,7 +590,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                           value: 'approved',
                           label: 'المعتمدة ($approvedCount)',
                           icon: Icons.check_circle_rounded,
-                          activeColor: const Color(0xFF2E7D32),
+                          activeColor: HrStatusColors.of(context).success,
                           activeForegroundColor: Colors.white,
                         ),
                         TashilConnectedButtonItem<String>(
@@ -772,7 +773,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
     IconData statusIcon;
 
     if (status == 'approved') {
-      statusColor = const Color(0xFF2E7D32);
+      statusColor = HrStatusColors.of(context).success;
       statusLabel = 'معتمد';
       statusIcon = Icons.check_circle_rounded;
     } else if (status == 'rejected') {
@@ -780,7 +781,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
       statusLabel = 'مرفوض';
       statusIcon = Icons.cancel_rounded;
     } else {
-      statusColor = const Color(0xFFE65100);
+      statusColor = HrStatusColors.of(context).warning;
       statusLabel = 'قيد المراجعة';
       statusIcon = Icons.hourglass_top_rounded;
     }
@@ -825,7 +826,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
       elevation: 0,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(
           color: status == 'pending'
               ? statusColor.withValues(alpha: 0.35)
@@ -837,7 +838,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
           ? colorScheme.secondaryContainer
           : colorScheme.surface,
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         onTap: () {
           final onSelect = widget.onSelectLeave;
           if (onSelect != null && !forceExpanded) {
@@ -894,7 +895,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                   name,
                                   style: theme.textTheme.titleSmall?.copyWith(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 13.5,
+                                    fontSize: HrFont.body,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -908,7 +909,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                     phone,
                                     style: theme.textTheme.bodySmall?.copyWith(
                                       color: colorScheme.onSurfaceVariant,
-                                      fontSize: 10.5,
+                                      fontSize: HrFont.labelSmall,
                                     ),
                                   ),
                                 ),
@@ -928,7 +929,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                               Text(
                                 typeLabel,
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: HrFont.labelSmall,
                                   fontWeight: FontWeight.bold,
                                   color: colorScheme.primary,
                                 ),
@@ -937,7 +938,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                               Text(
                                 '•',
                                 style: TextStyle(
-                                  fontSize: 10,
+                                  fontSize: HrFont.labelSmall,
                                   color: colorScheme.outline,
                                 ),
                               ),
@@ -946,7 +947,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                 child: Text(
                                   dateRangeStr,
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: HrFont.labelSmall,
                                     color: colorScheme.onSurfaceVariant,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -972,7 +973,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                 child: Text(
                                   durationText,
                                   style: const TextStyle(
-                                    fontSize: 10,
+                                    fontSize: HrFont.labelSmall,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -994,7 +995,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: statusColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(HrRadius.chip),
                             border: Border.all(
                               color: statusColor.withValues(alpha: 0.3),
                             ),
@@ -1008,7 +1009,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                 statusLabel,
                                 style: TextStyle(
                                   color: statusColor,
-                                  fontSize: 10.5,
+                                  fontSize: HrFont.labelSmall,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -1045,12 +1046,12 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                       decoration: BoxDecoration(
                         color: colorScheme.surfaceContainerHighest
                             .withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(HrRadius.chip),
                       ),
                       child: Text(
                         'السبب: $reason',
                         style: TextStyle(
-                          fontSize: 11.5,
+                          fontSize: HrFont.labelSmall,
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
@@ -1068,7 +1069,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: colorScheme.errorContainer.withValues(alpha: 0.25),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(HrRadius.chip),
                         border: Border.all(
                           color: colorScheme.error.withValues(alpha: 0.3),
                         ),
@@ -1076,7 +1077,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                       child: Text(
                         'سبب الرفض: $rejectReason',
                         style: TextStyle(
-                          fontSize: 11.5,
+                          fontSize: HrFont.labelSmall,
                           color: colorScheme.error,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1097,13 +1098,13 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                             vertical: 4,
                           ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(HrRadius.chip),
                           ),
                         ),
                         icon: const Icon(Icons.attachment_rounded, size: 15),
                         label: const Text(
                           'معاينة المرفق (تقرير / مستند)',
-                          style: TextStyle(fontSize: 11),
+                          style: TextStyle(fontSize: HrFont.labelSmall),
                         ),
                         onPressed: () => _viewAttachment(context, attachmentUrl),
                       ),
@@ -1125,7 +1126,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(HrRadius.chip),
                               ),
                             ),
                             onPressed: () => _rejectLeave(leave),
@@ -1134,7 +1135,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                               'رفض',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                                fontSize: HrFont.labelMedium,
                               ),
                             ),
                           ),
@@ -1144,11 +1145,11 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                           flex: 2,
                           child: FilledButton.icon(
                             style: FilledButton.styleFrom(
-                              backgroundColor: const Color(0xFF2E7D32),
+                              backgroundColor: HrStatusColors.of(context).success,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(HrRadius.chip),
                               ),
                             ),
                             onPressed: () => _approveLeave(leave),
@@ -1157,7 +1158,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                               'اعتماد الإجازة',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                                fontSize: HrFont.labelMedium,
                               ),
                             ),
                           ),
@@ -1199,7 +1200,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
             backgroundColor: colorScheme.surface,
             surfaceTintColor: Colors.transparent,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(HrRadius.button),
               side: BorderSide(
                 color: colorScheme.outlineVariant.withValues(alpha: 0.5),
               ),
@@ -1221,7 +1222,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                           padding: const EdgeInsets.all(7),
                           decoration: BoxDecoration(
                             color: colorScheme.primary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(HrRadius.chip),
                           ),
                           child: Icon(
                             Icons.edit_calendar_rounded,
@@ -1234,14 +1235,14 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                           child: Text(
                             'تسجيل إجازة / عذر غياب جديد',
                             style: TextStyle(
-                              fontSize: 15.5,
+                              fontSize: HrFont.titleMedium,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
                         InkWell(
                           onTap: () => Navigator.pop(ctx),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(HrRadius.button),
                           child: Padding(
                             padding: const EdgeInsets.all(4),
                             child: Icon(
@@ -1271,7 +1272,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                           Text(
                             'المندوب:',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: HrFont.labelMedium,
                               fontWeight: FontWeight.w600,
                               color: colorScheme.onSurface,
                             ),
@@ -1281,7 +1282,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                             initialValue: selectedDelegate,
                             isExpanded: true,
                             style: TextStyle(
-                              fontSize: 12.5,
+                              fontSize: HrFont.labelMedium,
                               color: colorScheme.onSurface,
                               fontWeight: FontWeight.w500,
                             ),
@@ -1298,13 +1299,13 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                 vertical: 8,
                               ),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(HrRadius.chip),
                                 borderSide: BorderSide(
                                   color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                                 ),
                               ),
                               enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(HrRadius.chip),
                                 borderSide: BorderSide(
                                   color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                                 ),
@@ -1315,7 +1316,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                           Text(
                             'نوع الطلب:',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: HrFont.labelMedium,
                               fontWeight: FontWeight.w600,
                               color: colorScheme.onSurface,
                             ),
@@ -1325,7 +1326,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                             initialValue: selectedType,
                             isExpanded: true,
                             style: TextStyle(
-                              fontSize: 12.5,
+                              fontSize: HrFont.labelMedium,
                               color: colorScheme.onSurface,
                               fontWeight: FontWeight.w500,
                             ),
@@ -1351,13 +1352,13 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                 vertical: 8,
                               ),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(HrRadius.chip),
                                 borderSide: BorderSide(
                                   color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                                 ),
                               ),
                               enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(HrRadius.chip),
                                 borderSide: BorderSide(
                                   color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                                 ),
@@ -1371,7 +1372,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                               Text(
                                 'الفترة بالأيام:',
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: HrFont.labelMedium,
                                   fontWeight: FontWeight.w600,
                                   color: colorScheme.onSurface,
                                 ),
@@ -1389,7 +1390,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                 child: Text(
                                   'المدة: $days ${days == 1 ? 'يوم' : 'أيام'}',
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: HrFont.labelSmall,
                                     fontWeight: FontWeight.bold,
                                     color: colorScheme.primary,
                                   ),
@@ -1401,7 +1402,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                           Container(
                             decoration: BoxDecoration(
                               color: colorScheme.surfaceContainerLow,
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(HrRadius.chip),
                               border: Border.all(
                                 color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                               ),
@@ -1451,7 +1452,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                                 Text(
                                                   'من تاريخ',
                                                   style: TextStyle(
-                                                    fontSize: 9.5,
+                                                    fontSize: HrFont.labelSmall,
                                                     fontWeight: FontWeight.w600,
                                                     color: colorScheme.onSurfaceVariant,
                                                   ),
@@ -1460,7 +1461,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                                 Text(
                                                   DateFormat('dd-MM-yyyy').format(startDate),
                                                   style: const TextStyle(
-                                                    fontSize: 12,
+                                                    fontSize: HrFont.labelMedium,
                                                     fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
@@ -1515,7 +1516,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                                 Text(
                                                   'إلى تاريخ',
                                                   style: TextStyle(
-                                                    fontSize: 9.5,
+                                                    fontSize: HrFont.labelSmall,
                                                     fontWeight: FontWeight.w600,
                                                     color: colorScheme.onSurfaceVariant,
                                                   ),
@@ -1524,7 +1525,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                                 Text(
                                                   DateFormat('dd-MM-yyyy').format(endDate),
                                                   style: const TextStyle(
-                                                    fontSize: 12,
+                                                    fontSize: HrFont.labelMedium,
                                                     fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
@@ -1543,7 +1544,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                           Text(
                             'سبب الطلب:',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: HrFont.labelMedium,
                               fontWeight: FontWeight.w600,
                               color: colorScheme.onSurface,
                             ),
@@ -1551,11 +1552,11 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                           const SizedBox(height: 6),
                           TextField(
                             controller: reasonCtrl,
-                            style: const TextStyle(fontSize: 12),
+                            style: const TextStyle(fontSize: HrFont.labelMedium),
                             decoration: InputDecoration(
                               hintText: 'اكتب السبب باختصار...',
                               hintStyle: TextStyle(
-                                fontSize: 11,
+                                fontSize: HrFont.labelSmall,
                                 color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                               ),
                               contentPadding: const EdgeInsets.symmetric(
@@ -1563,19 +1564,19 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                 vertical: 8,
                               ),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(HrRadius.chip),
                                 borderSide: BorderSide(
                                   color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                                 ),
                               ),
                               enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(HrRadius.chip),
                                 borderSide: BorderSide(
                                   color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                                 ),
                               ),
                               focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(HrRadius.chip),
                                 borderSide: BorderSide(
                                   color: colorScheme.primary,
                                   width: 1.5,
@@ -1607,7 +1608,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                             child: OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(HrRadius.chip),
                                 ),
                                 side: BorderSide(
                                   color: colorScheme.outlineVariant.withValues(alpha: 0.7),
@@ -1620,7 +1621,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                               label: const Text(
                                 'إلغاء',
                                 style: TextStyle(
-                                  fontSize: 12.5,
+                                  fontSize: HrFont.labelMedium,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -1636,13 +1637,14 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                             child: FilledButton.icon(
                               style: FilledButton.styleFrom(
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(HrRadius.chip),
                                 ),
                                 padding: EdgeInsets.zero,
                               ),
                               onPressed: () async {
                                 if (selectedDelegate == null) return;
                                 final messenger = ScaffoldMessenger.of(context);
+                                final successColor = HrStatusColors.of(context).success;
                                 final days = endDate.difference(startDate).inDays + 1;
                                 final docRef = FirebaseFirestore.instance
                                     .collection('leave_requests')
@@ -1670,9 +1672,9 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                 if (ctx.mounted) Navigator.pop(ctx);
                                 if (mounted) {
                                   messenger.showSnackBar(
-                                    const SnackBar(
+                                    SnackBar(
                                       content: Text('تم تسجيل واعتماد الإجازة بنجاح'),
-                                      backgroundColor: Color(0xFF2E7D32),
+                                      backgroundColor: successColor,
                                     ),
                                   );
                                 }
@@ -1681,7 +1683,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                               label: const Text(
                                 'حفظ واعتماد',
                                 style: TextStyle(
-                                  fontSize: 12.5,
+                                  fontSize: HrFont.labelMedium,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -1734,7 +1736,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('تم اعتماد طلب الإجازة لـ "$delegateName" بنجاح'),
-            backgroundColor: const Color(0xFF2E7D32),
+            backgroundColor: HrStatusColors.of(context).success,
           ),
         );
       }
@@ -1833,7 +1835,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1845,7 +1847,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                 children: [
                   const Text(
                     'مرفق الطلب',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.titleMedium),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close_rounded),
@@ -1856,8 +1858,8 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
             ),
             ClipRRect(
               borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(16),
+                bottomLeft: Radius.circular(HrRadius.card),
+                bottomRight: Radius.circular(HrRadius.card),
               ),
               child: InteractiveViewer(
                 maxScale: 4.0,
@@ -1897,7 +1899,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.35),
         ),
@@ -1914,7 +1916,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                 child: Text(
                   title,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: HrFont.labelMedium,
                     fontWeight: FontWeight.w600,
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -1927,7 +1929,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
                 child: Icon(icon, size: 16, color: color),
               ),
@@ -1937,7 +1939,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
           Text(
             value,
             style: TextStyle(
-              fontSize: 18,
+              fontSize: HrFont.titleMedium,
               fontWeight: FontWeight.bold,
               color: colorScheme.onSurface,
             ),
@@ -1946,7 +1948,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
           Text(
             subtitle,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: HrFont.labelSmall,
               color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
             ),
             maxLines: 1,

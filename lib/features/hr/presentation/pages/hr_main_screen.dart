@@ -13,6 +13,7 @@ import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_tab.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_desktop_sidebar.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_desktop_top_bar.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_inner_page.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_more_bottom_sheet.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_web_overflow_menu.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -22,6 +23,7 @@ import 'package:delegate_app/main.dart';
 import 'package:delegate_app/web/hr_system/hr_web_account_button.dart';
 import 'package:delegate_app/web/hr_system/hr_shell_link.dart';
 import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 class HRMainScreen extends StatefulWidget {
   final Delegate delegate;
@@ -46,6 +48,11 @@ class _HRMainScreenState extends State<HRMainScreen> {
   bool? _delegatesNavExpandedOverride;
   final int _homeIndex = hrShellHomeTab(isWeb: WebRuntimePolicy.isWeb);
   final HrWebHeaderBridge _headerBridge = HrWebHeaderBridge();
+
+  /// Web, wide windows: inner pages open in this navigator so the sidebar
+  /// and the top bar stay (TAS-136).
+  final GlobalKey<NavigatorState> _innerNavigator =
+      GlobalKey<NavigatorState>(debugLabel: 'hr_inner_navigator');
 
   @override
   void initState() {
@@ -80,6 +87,8 @@ class _HRMainScreenState extends State<HRMainScreen> {
   }
 
   void _onTabSelected(int index) {
+    // A sidebar click leaves any inner page of the previous tab.
+    _innerNavigator.currentState?.popUntil((route) => route.isFirst);
     setState(() {
       _currentIndex = index;
       _loadedTabs.add(index);
@@ -161,7 +170,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
         return Badge(
           label: Text(
             '$count',
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: HrFont.labelSmall, fontWeight: FontWeight.bold),
           ),
           backgroundColor: colorScheme.error,
           textColor: colorScheme.onError,
@@ -187,7 +196,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
         return Badge(
           label: Text(
             '$count',
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: HrFont.labelSmall, fontWeight: FontWeight.bold),
           ),
           backgroundColor: colorScheme.error,
           textColor: colorScheme.onError,
@@ -291,7 +300,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
               child: Text(
                 title,
                 style: TextStyle(
-                  fontSize: 13.5,
+                  fontSize: HrFont.body,
                   fontWeight: FontWeight.w500,
                   color: color,
                 ),
@@ -527,7 +536,11 @@ class _HRMainScreenState extends State<HRMainScreen> {
                                     )
                                   : null,
                             ),
-                            Expanded(child: _buildIndexedStack(delegate)),
+                            Expanded(
+                              child: web
+                                  ? _buildInnerNavigator(delegate)
+                                  : _buildIndexedStack(delegate),
+                            ),
                           ],
                         ),
                       ),
@@ -608,6 +621,28 @@ class _HRMainScreenState extends State<HRMainScreen> {
       icon: const Icon(Icons.refresh_rounded),
     ),
   ];
+
+  /// The content area of the wide web shell. Tabs are the first page; inner
+  /// pages from [pushHrInnerPage] go on top, inside the content area.
+  Widget _buildInnerNavigator(Delegate delegate) {
+    return NavigatorPopHandler(
+      onPopWithResult: (_) => _innerNavigator.currentState?.maybePop(),
+      child: HrInnerPageHost(
+        navigatorKey: _innerNavigator,
+        parentTitle: hrShellPageLabel(_currentIndex, isWeb: true),
+        child: Navigator(
+          key: _innerNavigator,
+          pages: [
+            MaterialPage<void>(
+              key: const ValueKey('hr_shell_tabs'),
+              child: _buildIndexedStack(delegate),
+            ),
+          ],
+          onDidRemovePage: (_) {},
+        ),
+      ),
+    );
+  }
 
   Widget _buildIndexedStack(Delegate delegate) {
     return IndexedStack(

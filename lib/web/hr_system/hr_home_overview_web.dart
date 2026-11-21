@@ -23,6 +23,7 @@ import 'package:delegate_app/web/hr_system/hr_home_side_cards_web.dart';
 import 'package:delegate_app/web/hr_system/hr_notifications_side_sheet.dart';
 import 'package:delegate_app/web/hr_system/hr_overlay_scrollbar.dart';
 import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// Width of the side column next to the attendance card.
 const double kHrOverviewSideColumnWidth = 352;
@@ -509,7 +510,7 @@ class _HrHomeOverviewViewState extends State<HrHomeOverviewView> {
         isScrollControlled: true,
         showDragHandle: false,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(HrRadius.pill)),
         ),
         builder: (sheetContext) => SizedBox(
           height: MediaQuery.sizeOf(sheetContext).height * 0.8,
@@ -541,7 +542,7 @@ class _HrHomeOverviewViewState extends State<HrHomeOverviewView> {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.pill)),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 540, maxHeight: 640),
           child: list,
@@ -598,7 +599,7 @@ class _AbsentList extends StatelessWidget {
                 title: Text(
                   r.delegate.fullName,
                   style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: HrFont.titleMedium,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -608,7 +609,7 @@ class _AbsentList extends StatelessWidget {
                       r.delegate.delegatePublicId.trim(),
                     if (chain.isNotEmpty) chain,
                   ].join(' · '),
-                  style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+                  style: TextStyle(fontSize: HrFont.body, color: cs.onSurfaceVariant),
                 ),
               );
             },
@@ -619,7 +620,7 @@ class _AbsentList extends StatelessWidget {
           child: Container(
             height: 48,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(HrRadius.pill),
               border: Border.all(color: cs.outlineVariant),
             ),
             clipBehavior: Clip.antiAlias,

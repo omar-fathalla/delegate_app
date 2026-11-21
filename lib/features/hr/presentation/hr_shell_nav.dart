@@ -319,6 +319,15 @@ String hrShellHeaderTitle(int index) {
   return 'بوابة الموارد البشرية';
 }
 
+/// Short page name of a shell tab: the sidebar label on web, the full title
+/// on mobile. Used as the first breadcrumb item of inner pages.
+String hrShellPageLabel(int index, {required bool isWeb}) {
+  for (final item in kHrShellCatalog) {
+    if (item.tabIndex == index) return item.menuLabel(isWeb: isWeb);
+  }
+  return 'الرئيسية';
+}
+
 IconData hrShellHeaderIcon(int index) {
   for (final item in kHrShellCatalog) {
     if (item.tabIndex == index) return item.selectedIcon;
