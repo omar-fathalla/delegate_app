@@ -1944,5 +1944,33 @@
   "chainPickerRequired": "يرجى اختيار سلسلة واحدة على الأقل.",
   "@chainPickerRequired": {
     "description": "Error when the supervisor submits without selecting a chain"
+  },
+  "updateRequiredTitle": "مطلوب تحديث التطبيق",
+  "@updateRequiredTitle": {
+    "description": "Title of the forced-update page shown when the installed build is below the minimum version (TAS-66)"
+  },
+  "updateRequiredBody": "هذه النسخة من تسهيل لم تعد مدعومة. يرجى تثبيت آخر تحديث للمتابعة.",
+  "@updateRequiredBody": {
+    "description": "Body of the forced-update page"
+  },
+  "updateRequiredVersions": "النسخة المثبتة {current} · الحد الأدنى {minimum}",
+  "@updateRequiredVersions": {
+    "description": "Small line showing the installed and the minimum version",
+    "placeholders": {
+      "current": {"type": "String"},
+      "minimum": {"type": "String"}
+    }
+  },
+  "updateRequiredButton": "تحديث الآن",
+  "@updateRequiredButton": {
+    "description": "Button that opens the app store page"
+  },
+  "updateRequiredNoStoreLink": "افتح App Store وحدّث تطبيق تسهيل، ثم افتح التطبيق مرة أخرى.",
+  "@updateRequiredNoStoreLink": {
+    "description": "Shown instead of the button when no store link is configured for this platform"
+  },
+  "updateRequiredOpenFailed": "تعذّر فتح المتجر. يرجى فتحه بنفسك وتحديث تطبيق تسهيل.",
+  "@updateRequiredOpenFailed": {
+    "description": "Snackbar when the store link could not be launched"
   }
 }

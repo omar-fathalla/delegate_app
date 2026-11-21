@@ -5171,6 +5171,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Please select at least one chain.'**
   String get chainPickerRequired;
+
+  /// Title of the forced-update page shown when the installed build is below the minimum version (TAS-66)
+  ///
+  /// In en, this message translates to:
+  /// **'Update required'**
+  String get updateRequiredTitle;
+
+  /// Body of the forced-update page
+  ///
+  /// In en, this message translates to:
+  /// **'This version of Tashil is no longer supported. Please install the latest update to continue.'**
+  String get updateRequiredBody;
+
+  /// Small line showing the installed and the minimum version
+  ///
+  /// In en, this message translates to:
+  /// **'Installed version {current} · minimum {minimum}'**
+  String updateRequiredVersions(String current, String minimum);
+
+  /// Button that opens the app store page
+  ///
+  /// In en, this message translates to:
+  /// **'Update now'**
+  String get updateRequiredButton;
+
+  /// Shown instead of the button when no store link is configured for this platform
+  ///
+  /// In en, this message translates to:
+  /// **'Open the App Store and update Tashil, then open the app again.'**
+  String get updateRequiredNoStoreLink;
+
+  /// Snackbar when the store link could not be launched
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the store. Please open it yourself and update Tashil.'**
+  String get updateRequiredOpenFailed;
 }
 
 class _AppLocalizationsDelegate

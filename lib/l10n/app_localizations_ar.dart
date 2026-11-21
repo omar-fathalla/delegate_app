@@ -2884,4 +2884,27 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get chainPickerRequired => 'يرجى اختيار سلسلة واحدة على الأقل.';
+
+  @override
+  String get updateRequiredTitle => 'مطلوب تحديث التطبيق';
+
+  @override
+  String get updateRequiredBody =>
+      'هذه النسخة من تسهيل لم تعد مدعومة. يرجى تثبيت آخر تحديث للمتابعة.';
+
+  @override
+  String updateRequiredVersions(String current, String minimum) {
+    return 'النسخة المثبتة $current · الحد الأدنى $minimum';
+  }
+
+  @override
+  String get updateRequiredButton => 'تحديث الآن';
+
+  @override
+  String get updateRequiredNoStoreLink =>
+      'افتح App Store وحدّث تطبيق تسهيل، ثم افتح التطبيق مرة أخرى.';
+
+  @override
+  String get updateRequiredOpenFailed =>
+      'تعذّر فتح المتجر. يرجى فتحه بنفسك وتحديث تطبيق تسهيل.';
 }

@@ -2409,5 +2409,33 @@
   "chainPickerRequired": "Please select at least one chain.",
   "@chainPickerRequired": {
     "description": "Error when the supervisor submits without selecting a chain"
+  },
+  "updateRequiredTitle": "Update required",
+  "@updateRequiredTitle": {
+    "description": "Title of the forced-update page shown when the installed build is below the minimum version (TAS-66)"
+  },
+  "updateRequiredBody": "This version of Tashil is no longer supported. Please install the latest update to continue.",
+  "@updateRequiredBody": {
+    "description": "Body of the forced-update page"
+  },
+  "updateRequiredVersions": "Installed version {current} · minimum {minimum}",
+  "@updateRequiredVersions": {
+    "description": "Small line showing the installed and the minimum version",
+    "placeholders": {
+      "current": {"type": "String"},
+      "minimum": {"type": "String"}
+    }
+  },
+  "updateRequiredButton": "Update now",
+  "@updateRequiredButton": {
+    "description": "Button that opens the app store page"
+  },
+  "updateRequiredNoStoreLink": "Open the App Store and update Tashil, then open the app again.",
+  "@updateRequiredNoStoreLink": {
+    "description": "Shown instead of the button when no store link is configured for this platform"
+  },
+  "updateRequiredOpenFailed": "Could not open the store. Please open it yourself and update Tashil.",
+  "@updateRequiredOpenFailed": {
+    "description": "Snackbar when the store link could not be launched"
   }
 }

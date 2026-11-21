@@ -29,6 +29,7 @@ import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
 import 'package:delegate_app/features/auth/domain/delegate_otp_config.dart';
+import 'package:delegate_app/core/services/app_version_gate.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/core/services/sync_manager.dart';
 
@@ -97,6 +98,8 @@ Future<void> bootstrapDelegateAppForPatrol() async {
   }
 
   unawaited(DelegateOtpConfig.refreshFromRemoteConfig());
+  // TAS-66: forced-update decision; the splash waits for it before login.
+  unawaited(AppVersionGate.refresh());
 
   try {
     if (!kIsWeb) {

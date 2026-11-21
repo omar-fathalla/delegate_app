@@ -2884,4 +2884,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chainPickerRequired => 'Please select at least one chain.';
+
+  @override
+  String get updateRequiredTitle => 'Update required';
+
+  @override
+  String get updateRequiredBody =>
+      'This version of Tashil is no longer supported. Please install the latest update to continue.';
+
+  @override
+  String updateRequiredVersions(String current, String minimum) {
+    return 'Installed version $current · minimum $minimum';
+  }
+
+  @override
+  String get updateRequiredButton => 'Update now';
+
+  @override
+  String get updateRequiredNoStoreLink =>
+      'Open the App Store and update Tashil, then open the app again.';
+
+  @override
+  String get updateRequiredOpenFailed =>
+      'Could not open the store. Please open it yourself and update Tashil.';
 }
