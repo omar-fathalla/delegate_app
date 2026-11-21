@@ -54,7 +54,9 @@ void main() {
       expect(s.icon, Icons.check_circle_rounded);
     });
 
-    test('departed is warning', () {
+    // Approved 21 Nov 2026 (TAS-174): a normal check-out and a leave are
+    // calm (info, blue); only an auto check-out is a warning.
+    test('departed is info', () {
       final s = hrAttendanceStatus(
         HRAttendanceRecord(
           delegate: d,
@@ -62,8 +64,27 @@ void main() {
           checkOutTime: DateTime(2026, 9, 27, 17),
         ),
       );
-      expect(s.tone, HrStatusTone.warning);
+      expect(s.tone, HrStatusTone.info);
       expect(s.label, 'انصرف اليوم');
+    });
+
+    test('auto check-out stays a warning', () {
+      final s = hrAttendanceStatus(
+        HRAttendanceRecord(
+          delegate: d,
+          checkInTime: DateTime(2026, 9, 27, 9),
+          isAutoCheckOut: true,
+        ),
+      );
+      expect(s.tone, HrStatusTone.warning);
+      expect(s.label, 'انصرف (تلقائي)');
+    });
+
+    test('approved leave is info', () {
+      final s = hrAttendanceStatus(
+        HRAttendanceRecord(delegate: d, isOnApprovedLeave: true),
+      );
+      expect(s.tone, HrStatusTone.info);
     });
 
     test('no check-in is neutral «لم يسجل»', () {
