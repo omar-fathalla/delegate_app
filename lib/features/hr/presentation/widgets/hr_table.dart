@@ -209,7 +209,10 @@ class HrTableDivider extends StatelessWidget {
 }
 
 /// Status tone for [HrStatusChip].
-enum HrStatusTone { success, warning, danger, neutral }
+///
+/// [info] is for calm, expected states such as a normal check-out or a leave
+/// (blue), so they don't read as warnings.
+enum HrStatusTone { success, warning, danger, info, neutral }
 
 /// Status chip: icon + label on the tone's container color, so the state
 /// never depends on color alone and text keeps M3 container contrast.
@@ -246,6 +249,11 @@ class HrStatusChip extends StatelessWidget {
           status.dangerContainer,
           status.onDangerContainer,
           Icons.error_rounded,
+        ),
+      HrStatusTone.info => (
+          status.infoContainer,
+          status.onInfoContainer,
+          Icons.info_outline_rounded,
         ),
       HrStatusTone.neutral => (
           colorScheme.surfaceContainerHighest,

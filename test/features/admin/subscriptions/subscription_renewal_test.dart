@@ -1039,6 +1039,12 @@ void main() {
       await pumpScreen(tester, FakeFirebaseFirestore());
       expect(find.byKey(const Key('renewal_empty_state')), findsOneWidget);
       expect(find.byType(HrEmptyState), findsOneWidget);
+      // Approved wording (TAS-174); which one depends on the advance window.
+      expect(
+        find.text('كل الاشتراكات سارية').evaluate().length +
+            find.text('لا يوجد مندوب موقوف').evaluate().length,
+        1,
+      );
     });
   });
 }

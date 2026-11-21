@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+
+import 'package:delegate_app/core/cubit/theme_cubit.dart';
 
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/app_logout_modal.dart';
@@ -257,6 +260,14 @@ class HrWebAccountButton extends StatelessWidget {
                     },
                     child: Text(l10n.changePassword),
                   ),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    child: HrThemeModeChooser(),
+                  ),
+                  Divider(
+                    height: 1,
+                    color: cs.outlineVariant.withValues(alpha: 0.5),
+                  ),
                   MenuItemButton(
                     key: const ValueKey('hr_web_profile_logout'),
                     leadingIcon: Icon(
@@ -346,6 +357,58 @@ class _ContactRow extends StatelessWidget {
             textDirection: textDirection,
             locale: ltr ? const Locale('en') : null,
             style: TextStyle(fontSize: HrFont.body, color: cs.onSurface),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// «المظهر» in the web account menu: system / light / dark (TAS-174).
+///
+/// Replaces the light/dark toggle the web top bar used to show. Settings
+/// keeps its own «المظهر» entry.
+class HrThemeModeChooser extends StatelessWidget {
+  const HrThemeModeChooser({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      key: const ValueKey('hr_web_profile_theme'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'المظهر',
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        BlocBuilder<ThemeCubit, ThemeState>(
+          builder: (context, state) => SegmentedButton<ThemeMode>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(
+                value: ThemeMode.system,
+                label: Text('تلقائي'),
+                icon: Icon(Icons.brightness_auto_outlined),
+              ),
+              ButtonSegment(
+                value: ThemeMode.light,
+                label: Text('فاتح'),
+                icon: Icon(Icons.light_mode_outlined),
+              ),
+              ButtonSegment(
+                value: ThemeMode.dark,
+                label: Text('داكن'),
+                icon: Icon(Icons.dark_mode_outlined),
+              ),
+            ],
+            selected: {state.themeMode},
+            onSelectionChanged: (modes) =>
+                context.read<ThemeCubit>().setThemeMode(modes.first),
           ),
         ),
       ],
