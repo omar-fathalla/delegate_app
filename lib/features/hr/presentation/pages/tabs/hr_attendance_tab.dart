@@ -217,6 +217,36 @@ class HRAttendanceViewData {
   });
 }
 
+/// Cards view grid (TAS-147). Above [kHrAttendanceCardsGridMinWidth] the
+/// cards sit in a grid with a fixed column count; below it they stack in a
+/// list (mobile keeps its list).
+const double kHrAttendanceCardsGridMinWidth = 750;
+
+/// Narrowest a card may get in the grid before a column is dropped.
+const double kHrAttendanceCardMinWidth = 360;
+
+/// Fixed card height in the grid.
+const double kHrAttendanceCardHeight = 235;
+
+/// Gap between grid cells, both ways.
+const double kHrAttendanceCardsGridSpacing = 12;
+
+/// Horizontal padding around the grid.
+const double kHrAttendanceCardsGridPadding = 16;
+
+/// Most columns the cards grid uses on very wide screens.
+const int kHrAttendanceCardsMaxColumns = 4;
+
+/// Column count for the cards grid in [contentWidth] (width inside the
+/// grid padding): as many columns of at least [kHrAttendanceCardMinWidth]
+/// as fit, between 1 and [kHrAttendanceCardsMaxColumns].
+int hrAttendanceCardColumns(double contentWidth) {
+  final fit = ((contentWidth + kHrAttendanceCardsGridSpacing) /
+          (kHrAttendanceCardMinWidth + kHrAttendanceCardsGridSpacing))
+      .floor();
+  return fit.clamp(1, kHrAttendanceCardsMaxColumns);
+}
+
 class HRAttendanceTab extends StatefulWidget {
   final Delegate hrDelegate;
   final ValueChanged<int>? onNavigateToTab;
@@ -2257,18 +2287,29 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
                             ? _buildTableView(filtered, theme, colorScheme)
                             : LayoutBuilder(
                                 builder: (context, constraints) {
-                                  if (constraints.maxWidth > 750) {
+                                  if (constraints.maxWidth >
+                                      kHrAttendanceCardsGridMinWidth) {
+                                    // Fixed column count from the width so
+                                    // every cell has the same width and the
+                                    // rows line up (TAS-147).
+                                    final columns = hrAttendanceCardColumns(
+                                      constraints.maxWidth -
+                                          2 * kHrAttendanceCardsGridPadding,
+                                    );
                                     return GridView.builder(
+                                      key: const Key('hr_attendance_cards_grid'),
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
+                                        horizontal: kHrAttendanceCardsGridPadding,
                                         vertical: 12,
                                       ),
                                       gridDelegate:
-                                          const SliverGridDelegateWithMaxCrossAxisExtent(
-                                        maxCrossAxisExtent: 600,
-                                        mainAxisExtent: 235,
-                                        crossAxisSpacing: 12,
-                                        mainAxisSpacing: 12,
+                                          SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: columns,
+                                        mainAxisExtent: kHrAttendanceCardHeight,
+                                        crossAxisSpacing:
+                                            kHrAttendanceCardsGridSpacing,
+                                        mainAxisSpacing:
+                                            kHrAttendanceCardsGridSpacing,
                                       ),
                                       itemCount: filtered.length,
                                       itemBuilder: (context, index) {
@@ -3287,7 +3328,7 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
         ),
         TashilConnectedButtonItem<bool>(
           value: false,
-          label: 'كروت',
+          label: 'بطاقات',
           icon: Icons.grid_view_rounded,
         ),
       ],
