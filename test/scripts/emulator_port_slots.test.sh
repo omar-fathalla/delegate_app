@@ -85,7 +85,15 @@ PY
 # JVM left behind by firebase.
 spawn_orphan() { ( python3 "$SCRATCH/fake-emulator.py" "$1" "$2" </dev/null >/dev/null 2>&1 & ); }
 wait_listen() { for _ in $(seq 1 40); do lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1 && return 0; sleep 0.25; done; return 1; }
-trap 'kill $holder 2>/dev/null || true; [[ -f $SCRATCH/pid ]] && kill -9 "$(cat "$SCRATCH/pid")" 2>/dev/null; rm -rf "$SCRATCH"' EXIT
+# Cleanup must never fail: under set -e a failing kill here (pid already gone)
+# would turn a passing run into exit 1.
+cleanup() {
+  kill "$holder" 2>/dev/null || true
+  if [[ -f "$SCRATCH/pid" ]]; then kill -9 "$(cat "$SCRATCH/pid")" 2>/dev/null || true; fi
+  rm -rf "$SCRATCH"
+  return 0
+}
+trap cleanup EXIT
 
 emulator_pick_local_slot || fail "no free local slot for the orphan test"
 port="$LOCAL_CI_FIRESTORE_HUB_PORT"
