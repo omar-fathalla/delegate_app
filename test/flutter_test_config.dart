@@ -1,15 +1,17 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Max share of differing pixels a golden may have and still pass (TAS-195).
 ///
-/// Goldens are recorded on a Mac but CI runs them on Linux (ubuntu-latest).
-/// Both use the bundled Cairo font (see `loadPromoTestFonts`), but text
-/// antialiasing can still differ by a few edge pixels between hosts and Flutter
-/// versions. 0.5% of a 780x1688 golden is ~6.5k pixels: enough for glyph-edge
-/// noise, far below a real change (e.g. one changed chip label was 1.09%).
+/// Mac and Linux render the same golden 0.5%-6.2% differently (measured on
+/// PR #427), far too much for one tolerance. So each host OS compares against
+/// its own images (see [TolerantGoldenFileComparator.getTestUri]) and this
+/// tolerance only absorbs small drift on the same OS (e.g. Flutter upgrades).
+/// 0.5% of a 780x1688 golden is ~6.5k pixels, below a real change (one
+/// changed chip label was 1.09%).
 const double kGoldenDiffTolerance = 0.005;
 
 /// Runs before every test file in `test/`. Only affects `matchesGoldenFile`,
@@ -26,12 +28,25 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   await testMain();
 }
 
-/// [LocalFileComparator] that accepts diffs up to [tolerance] (0..1).
+/// [LocalFileComparator] that accepts diffs up to [tolerance] (0..1) and keeps
+/// Linux goldens apart from the Mac ones.
 class TolerantGoldenFileComparator extends LocalFileComparator {
   TolerantGoldenFileComparator(super.testFile, {required this.tolerance})
     : assert(tolerance >= 0 && tolerance < 0.01);
 
   final double tolerance;
+
+  /// On Linux (CI), `dir/name.png` resolves to `dir/linux/name.png`; Macs use
+  /// `dir/name.png`. Applies to compare and `--update-goldens` alike, so
+  /// re-recording on Linux writes the Linux set.
+  @override
+  Uri getTestUri(Uri key, int? version) {
+    final uri = super.getTestUri(key, version);
+    if (!Platform.isLinux) return uri;
+    final segments = [...uri.pathSegments];
+    segments.insert(segments.length - 1, 'linux');
+    return uri.replace(pathSegments: segments);
+  }
 
   @override
   Future<bool> compare(Uint8List imageBytes, Uri golden) async {

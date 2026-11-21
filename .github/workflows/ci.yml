@@ -102,10 +102,10 @@ jobs:
         # run in the next step instead.
         run: flutter test --concurrency=4 --exclude-tags golden
       - name: Golden tests
-        # TAS-195: goldens back in CI. Images are recorded on a Mac; the
-        # comparator in test/flutter_test_config.dart accepts up to 0.5% pixel
-        # diff for host antialiasing. Re-record locally:
-        #   flutter test --tags golden --update-goldens
+        # TAS-195: goldens back in CI. Linux compares against the images in
+        # test/goldens/**/linux/ (Mac and Linux render 0.5-6% apart), see
+        # test/flutter_test_config.dart. To re-record the Linux set, take the
+        # *_testImage.png files from the "golden-failures" artifact below.
         run: flutter test --tags golden
       - name: Upload golden failures
         # Diff images (incl. *_testImage.png = this host's rendering) so a
