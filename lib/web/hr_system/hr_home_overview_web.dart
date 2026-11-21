@@ -24,6 +24,7 @@ import 'package:delegate_app/features/hr/presentation/widgets/hr_add_chains_shee
 import 'package:delegate_app/features/notifications/presentation/bloc/notification_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/web/hr_system/delegate_subscription_requests_web.dart';
 import 'package:delegate_app/web/hr_system/hr_home_attendance_card_web.dart';
 import 'package:delegate_app/web/hr_system/hr_home_side_cards_web.dart';
 import 'package:delegate_app/web/hr_system/hr_notifications_side_sheet.dart';
@@ -145,7 +146,7 @@ class HrHomeOverviewWeb extends StatelessWidget {
     onOpenDelegates: () => onNavigateToTab(kHrTabDelegates),
     onAddDelegate: () => openAdminHomeAddDelegate(context, delegate),
     onAddChain: () => _addChain(context),
-    onOpenChainRequests: () => onNavigateToTab(kHrTabSubscriptions),
+    onOpenChainRequests: () => openHrChainRequestsTab(onNavigateToTab),
     onHowToLink: () => showAdminHomeLinkingGuide(context, delegate),
     onOpenRecord: (record) => openHrDelegateAttendanceDetail(
       context,
@@ -218,6 +219,15 @@ class HrHomeOverviewWeb extends StatelessWidget {
       ),
     );
   }
+}
+
+/// «عرض الكل» in the chains card: opens «طلبات الاشتراك» straight on the
+/// «طلبات السلاسل» tab. The shell keeps that page alive, so the tab is asked
+/// for through [DelegateSubscriptionRequestsWeb.requestedTab] first.
+void openHrChainRequestsTab(ValueChanged<int> onNavigateToTab) {
+  DelegateSubscriptionRequestsWeb.requestedTab.value =
+      SubscriptionRequestsWebTab.chains;
+  onNavigateToTab(kHrTabSubscriptions);
 }
 
 /// Pending company «طلب ضم سلسلة» names for the chains card. One query when

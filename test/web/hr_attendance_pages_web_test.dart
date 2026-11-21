@@ -2,7 +2,9 @@
 // shell. The detail attendance log is an inner page with a breadcrumb, its
 // «سجل تعديلات الحضور» goes to the sidebar tab filtered to the delegate, the
 // reason filter is a normal dropdown, the attendance tab has no raw sizes,
-// and the status badge does not overflow. Fake data only.
+// and the status badge does not overflow. TAS-186: the adjustments log
+// shows an Arabic error state with retry. TAS-187: the detail log's status
+// filter wraps at 360 px. Fake data only.
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,6 +15,7 @@ import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_tab.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_delegate_attendance_detail_screen.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_empty_state.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_inner_page.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/web/hr_system/hr_shell_link.dart';
@@ -21,6 +24,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:mocktail/mocktail.dart';
 
 Delegate _person(
   String uid,
@@ -105,6 +109,45 @@ Future<FakeFirebaseFirestore> _adjustmentsStore() async {
   await logs.doc('a1').set(_adjustment('fake-d1', 'مندوب تجريبي أول', 'نسيان الانصراف'));
   await logs.doc('a2').set(_adjustment('fake-d2', 'مندوب تجريبي ثان', 'خطأ في الجهاز'));
   return fs;
+}
+
+class _MockFirestore extends Mock implements FirebaseFirestore {}
+
+class _MockCollection extends Mock
+    implements CollectionReference<Map<String, dynamic>> {}
+
+class _MockQuery extends Mock implements Query<Map<String, dynamic>> {}
+
+/// Adjustments log whose first listen fails with permission-denied; later
+/// listens read [data]. [listens] counts every listen.
+({FirebaseFirestore db, int Function() listens}) _failingAdjustmentsDb(
+  FakeFirebaseFirestore data,
+) {
+  final db = _MockFirestore();
+  final coll = _MockCollection();
+  final query = _MockQuery();
+  var listens = 0;
+  when(() => db.collection(kAttendanceAdjustmentLogsCollection)).thenReturn(coll);
+  when(
+    () => coll.where(any(), isEqualTo: any(named: 'isEqualTo')),
+  ).thenReturn(query);
+  when(() => query.snapshots()).thenAnswer((_) {
+    listens++;
+    if (listens == 1) {
+      return Stream.error(
+        FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'permission-denied',
+          message: 'Missing or insufficient permissions.',
+        ),
+      );
+    }
+    return data
+        .collection(kAttendanceAdjustmentLogsCollection)
+        .where('companyUID', isEqualTo: 'co-alpha')
+        .snapshots();
+  });
+  return (db: db, listens: () => listens);
 }
 
 /// The wide web shell's content area: a nested navigator with a host.
@@ -540,6 +583,99 @@ void main() {
           reason: '$signature has a raw radius',
         );
       }
+    });
+  });
+
+  group('TAS-186: adjustments log error state', () {
+    testWidgets('Arabic message and retry instead of the raw Firebase text', (
+      t,
+    ) async {
+      _webDesktop(t);
+      final fake = _failingAdjustmentsDb(await _adjustmentsStore());
+      HRAttendanceAdjustmentsScreen.debugFirestore = () => fake.db;
+
+      await t.pumpWidget(
+        MaterialApp(
+          home: Directionality(
+            textDirection: TextDirection.rtl,
+            child: HRAttendanceAdjustmentsScreen(
+              hrDelegate: _hr,
+              showAppBar: false,
+            ),
+          ),
+        ),
+      );
+      await t.pumpAndSettle();
+
+      final error = find.byKey(const Key('hr_adjustments_error'));
+      expect(error, findsOneWidget);
+      expect(t.widget(error), isA<HrEmptyState>());
+      expect(find.text('تعذر تحميل سجل التعديلات'), findsOneWidget);
+      expect(find.text('ليس لديك صلاحية لعرض سجل التعديلات.'), findsOneWidget);
+      expect(find.textContaining('permission'), findsNothing);
+      expect(find.textContaining('Missing or insufficient'), findsNothing);
+      expect(fake.listens(), 1);
+
+      await t.tap(find.text('إعادة المحاولة'));
+      await t.pumpAndSettle();
+      expect(fake.listens(), greaterThanOrEqualTo(2));
+      expect(error, findsNothing);
+      expect(find.text('مندوب تجريبي أول'), findsWidgets);
+      expect(t.takeException(), isNull);
+    });
+
+    test('messages never include the raw error', () {
+      final raw = FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'internal',
+        message: 'raw English text',
+      );
+      expect(hrAdjustmentsLoadErrorMessage(raw), isNot(contains('raw')));
+      expect(
+        hrAdjustmentsLoadErrorMessage(Exception('boom')),
+        'حدث خطأ أثناء تحميل سجل التعديلات. يرجى المحاولة مرة أخرى.',
+      );
+      expect(
+        hrAdjustmentsLoadErrorMessage(
+          FirebaseException(plugin: 'cloud_firestore', code: 'unavailable'),
+        ),
+        'تعذر الاتصال بالخادم. تحقق من الاتصال بالإنترنت ثم أعد المحاولة.',
+      );
+    });
+  });
+
+  group('TAS-187: status filter at 360 px', () {
+    testWidgets('the three chips wrap without overflow (default font)', (
+      t,
+    ) async {
+      // The default test font is much wider than Cairo, like a wider
+      // fallback font in a browser.
+      _webDesktop(t, size: const Size(360, 800));
+      final fs = await _attendanceStore();
+      HRDelegateAttendanceDetailScreen.debugFirestore = () => fs;
+
+      await t.pumpWidget(
+        MaterialApp(
+          home: Directionality(
+            textDirection: TextDirection.rtl,
+            child: HRDelegateAttendanceDetailScreen(
+              delegate: _subject,
+              hrDelegate: _hr,
+            ),
+          ),
+        ),
+      );
+      await t.pumpAndSettle();
+
+      final filter = find.byKey(const Key('hr_attendance_status_filter'));
+      expect(filter, findsOneWidget);
+      expect(t.widget(filter), isA<Wrap>());
+      expect(
+        find.descendant(of: filter, matching: find.byType(ChoiceChip)),
+        findsNWidgets(3),
+      );
+      expect(t.getRect(filter).width, lessThanOrEqualTo(360));
+      expect(t.takeException(), isNull);
     });
   });
 }
