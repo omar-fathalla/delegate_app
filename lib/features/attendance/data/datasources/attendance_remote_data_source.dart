@@ -7,6 +7,7 @@ import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:delegate_app/core/constants.dart';
@@ -115,7 +116,11 @@ abstract class AttendanceRemoteDataSource {
 class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
   final FirebaseFirestore firestore;
 
-  AttendanceRemoteDataSourceImpl({required this.firestore});
+  /// Signed-in user, for `createdBy` on supervisor alerts (TAS-71). Falls
+  /// back to the delegate's user id when no auth is available (tests).
+  final FirebaseAuth? auth;
+
+  AttendanceRemoteDataSourceImpl({required this.firestore, this.auth});
 
   /// Helper: Get the attendance_logs collection
   /// Path: /attendance_logs
@@ -1294,80 +1299,38 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           : 'قام المندوب $delegateName بتسجيل الانصراف بنجاح من فرع ($safeBranchName) الساعة $formattedTime.';
       final notifType = isCheckIn ? 'attendance_check_in' : 'attendance_check_out';
 
-      final notifiedSupervisorUids = <String>{};
-
-      // 2. Direct Supervisor Notifications from users collection
-      final supervisorQueries = [
-        firestore.collection('users').where('companyUID', isEqualTo: companyId),
-        firestore.collection('users').where('companyId', isEqualTo: companyId),
-      ];
-
-      for (final q in supervisorQueries) {
-        try {
-          final snap = await q.get();
-          for (final doc in snap.docs) {
-            if (notifiedSupervisorUids.contains(doc.id)) continue;
-            final uData = doc.data();
-            final role = uData['role']?.toString().toLowerCase() ?? '';
-            final pos = uData['position']?.toString().toLowerCase() ?? '';
-            if (role.contains('supervisor') ||
-                role.contains('admin') ||
-                role.contains('company') ||
-                pos.contains('supervisor') ||
-                role == 'admin') {
-              notifiedSupervisorUids.add(doc.id);
-              final phone =
-                  (uData['phoneNumber'] ?? uData['phone'] ?? uData['mobileNumber']) as String?;
-              await firestore.collection('notifications').add({
-                'title': title,
-                'body': body,
-                'type': notifType,
-                'attendanceType': type,
-                'companyId': companyId,
-                'organizationId': organizationId,
-                'branchName': safeBranchName,
-                'targetDelegateId': userId,
-                'targetDelegateName': delegateName,
-                'senderName': delegateName,
-                'senderRole': 'delegate',
-                'delegateUid': doc.id,
-                if (phone != null && phone.isNotEmpty) 'phoneNumber': phone,
-                'isRead': false,
-                'read': false,
-                'createdAt': Timestamp.fromDate(time),
-                'deletedBy': <String>[],
-              });
-            }
-          }
-        } catch (_) {}
-      }
-
-      // 3. Broadcast channels for company & supervisors
-      for (final targetKey in [
-        'supervisor_$companyId',
-        'company_$companyId',
-        'all_company_supervisors',
-      ]) {
-        await firestore.collection('notifications').add({
-          'title': title,
-          'body': body,
-          'type': notifType,
-          'attendanceType': type,
-          'companyId': companyId,
-          'organizationId': organizationId,
-          'branchName': safeBranchName,
-          'targetDelegateId': userId,
-          'targetDelegateName': delegateName,
-          'senderName': delegateName,
-          'senderRole': 'delegate',
-          'delegateUid': targetKey,
-          'isRead': false,
-          'read': false,
-          'createdAt': Timestamp.fromDate(time),
-          'deletedBy': <String>[],
-        });
-      }
-    } catch (_) {}
+      // TAS-71: one broadcast to the company's supervisors. A delegate cannot
+      // list `users` under the rules, and the per-supervisor fan-out needed
+      // that list. `supervisor_<companyUID>` is what the supervisor inbox
+      // already reads, and the create rule needs `createdBy` == auth uid plus
+      // the delegate's own company. The old `company_<id>` copy was readable
+      // by every delegate in the company and the `all_company_supervisors`
+      // copy was a duplicate, so neither is written any more.
+      await firestore.collection('notifications').add({
+        'title': title,
+        'body': body,
+        'type': notifType,
+        'attendanceType': type,
+        'companyId': companyId,
+        'companyUID': companyId,
+        'organizationId': organizationId,
+        'organizationUID': organizationId,
+        'branchName': safeBranchName,
+        'targetDelegateId': userId,
+        'targetDelegateName': delegateName,
+        'senderName': delegateName,
+        'senderRole': 'delegate',
+        'delegateUid': 'supervisor_$companyId',
+        'createdBy': auth?.currentUser?.uid ?? userId,
+        'isRead': false,
+        'read': false,
+        'createdAt': Timestamp.fromDate(time),
+        'deletedBy': <String>[],
+      });
+    } catch (e) {
+      // Not fatal for the check-in itself, but it must not vanish silently.
+      debugPrint('attendance supervisor alert failed ($type): $e');
+    }
   }
 
   Future<void> _syncDelegateTrackingCheckIn({
