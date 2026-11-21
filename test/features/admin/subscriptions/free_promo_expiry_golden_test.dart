@@ -1,3 +1,9 @@
+// Golden/screenshot tests (TAS-162): skipped in CI because pixels depend on
+// the host renderer. Run locally: flutter test --tags golden
+// Re-record: flutter test --tags golden --update-goldens
+@Tags(['golden'])
+library;
+
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/features/admin/data/repositories/subscription_renewal_repository.dart';
