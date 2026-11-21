@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:delegate_app/features/auth/presentation/pages/login_screen.dart';
 import 'package:delegate_app/features/auth/presentation/pages/splash_screen.dart';
+import 'package:delegate_app/core/services/app_version_gate.dart';
+import 'package:delegate_app/features/update/presentation/pages/update_required_screen.dart';
 import 'package:delegate_app/features/home/presentation/pages/main_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/profile/presentation/pages/user_profile_screen.dart';
@@ -48,12 +50,28 @@ import 'package:delegate_app/features/hr/presentation/pages/delegate_leaves_and_
 
 final appRouter = GoRouter(
   initialLocation: '/',
+  // Forced update (TAS-66): while the gate blocks, every location (deep links,
+  // notification taps, the logout redirect in main.dart) lands on the update
+  // page. Re-evaluated whenever the gate decision changes.
+  refreshListenable: AppVersionGate.decision,
+  redirect: (context, state) {
+    if (!AppVersionGate.isBlocked) return null;
+    if (state.matchedLocation == AppVersionGate.routePath) return null;
+    return AppVersionGate.routePath;
+  },
   routes: [
     GoRoute(
       path: '/',
       pageBuilder: (context, state) => AppMotionPage.fade(
         state: state,
         child: const SplashScreen(),
+      ),
+    ),
+    GoRoute(
+      path: AppVersionGate.routePath,
+      pageBuilder: (context, state) => AppMotionPage.fade(
+        state: state,
+        child: const UpdateRequiredScreen(),
       ),
     ),
     GoRoute(

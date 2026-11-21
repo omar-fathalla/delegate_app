@@ -14,6 +14,7 @@ import 'package:delegate_app/core/time/cairo_clock.dart';
 import 'package:delegate_app/core/services/app_bloc_observer.dart';
 import 'package:delegate_app/core/services/crashlytics_service.dart';
 import 'package:delegate_app/features/auth/domain/delegate_otp_config.dart';
+import 'package:delegate_app/core/services/app_version_gate.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/firebase_options.dart';
@@ -122,6 +123,7 @@ Future<void> main() async {
   print('[REAL_TEST] cachedDelegate written');
 
   unawaited(DelegateOtpConfig.refreshFromRemoteConfig());
+  unawaited(AppVersionGate.refresh()); // TAS-66
   try {
     if (!kIsWeb) {
       FirebaseFirestore.instance.settings = const Settings(

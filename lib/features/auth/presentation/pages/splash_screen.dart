@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:delegate_app/core/services/app_version_gate.dart';
 import 'package:delegate_app/core/widgets/device_lock_dialog.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
@@ -38,9 +39,23 @@ class _SplashScreenState extends State<SplashScreen>
     // Start animation after first frame renders (prevents jank)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _controller.forward();
-      // Trigger auto-login check using global AuthBloc
-      context.read<AuthBloc>().add(CheckAutoLoginRequested());
+      _continueAfterVersionGate();
     });
+  }
+
+  /// TAS-66: wait (briefly) for the forced-update decision before the
+  /// auto-login touches Firestore. A blocked build goes to the update page;
+  /// a slow or failed fetch lets the app continue as before (fail-open).
+  Future<void> _continueAfterVersionGate() async {
+    await AppVersionGate.ready
+        .timeout(AppVersionGate.splashWait, onTimeout: () {});
+    if (!mounted) return;
+    if (AppVersionGate.isBlocked) {
+      context.go(AppVersionGate.routePath);
+      return;
+    }
+    // Trigger auto-login check using global AuthBloc
+    context.read<AuthBloc>().add(CheckAutoLoginRequested());
   }
 
   @override
