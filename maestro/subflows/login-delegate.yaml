@@ -15,11 +15,21 @@ appId: com.tashil.delegate.dev
 
 - pressKey: Enter
 
+# Submit by id: the text "تسجيل الدخول" is also the form title, and the
+# button can sit under the keyboard. Enter alone does not submit the
+# delegate form. Skipped when Enter already logged in.
 - runFlow:
     when:
-      visible: "تسجيل الدخول"
+      visible: "رقم الجوال"
     commands:
-      - tapOn: "تسجيل الدخول"
+      - hideKeyboard
+      - scrollUntilVisible:
+          element:
+            id: "tashil_login_submit_button"
+          direction: DOWN
+          timeout: 15000
+      - tapOn:
+          id: "tashil_login_submit_button"
 
 - runFlow:
     file: ./dismiss-ios-save-password.yaml

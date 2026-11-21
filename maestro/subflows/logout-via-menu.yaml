@@ -1,15 +1,27 @@
 appId: com.tashil.delegate.dev
 ---
-# Opens header menu → logout → confirms M3 modal. Lands on login screen.
+# Logout → confirms M3 modal. Lands on login screen.
+# From a screen with the header menu (home): open the menu first.
+# From Settings: "تسجيل الخروج" is on the page itself and there is no menu
+# button (mac-gate a1d40efb failed tapping a menu that was not there).
+- runFlow:
+    when:
+      visible:
+        id: "tashil_main_menu_button"
+    commands:
+      - tapOn:
+          id: "tashil_main_menu_button"
+
+- tapOn: "تسجيل الخروج"
+
+# Confirm sheet: tap the button by id; the same text is also the sheet title.
+- extendedWaitUntil:
+    visible:
+      id: "tashil_logout_confirm_button"
+    timeout: 15000
 
 - tapOn:
-    id: "tashil_main_menu_button"
-
-- tapOn: "تسجيل الخروج"
-
-- assertVisible: "تسجيل الخروج"
-
-- tapOn: "تسجيل الخروج"
+    id: "tashil_logout_confirm_button"
 
 - extendedWaitUntil:
     visible: "رقم الجوال"
