@@ -21,8 +21,8 @@ permissions:
 # older CI run, so superseded commits stop holding runner slots. The group name
 # is different from PR User Test builds (user-test-…), so CI and User Test
 # never cancel each other. Pushes to dev and manual runs are never cancelled.
-# Heavy Mac jobs still queue one at a time via the job-level
-# delegate-mac-heavy-build group below.
+# Heavy Mac builds still run one at a time: they only run on the slot-3
+# runner (see build-web below).
 concurrency:
   group: ci-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -130,12 +130,13 @@ jobs:
   build-web:
     name: Build web (release)
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: [self-hosted, macOS, ARM64, delegate-app]
+    # One heavy delegate_app build at a time on the Mac (TAS-172): heavy builds
+    # run only on the runner labelled slot-3, so they wait in GitHub's normal
+    # job queue one behind the other. The old repo-wide concurrency group
+    # (delegate-mac-heavy-build) kept only ONE pending job, so each new PR
+    # cancelled the previous PR's waiting build.
+    runs-on: [self-hosted, macOS, ARM64, delegate-app, slot-3]
     timeout-minutes: 180
-    # One heavy delegate_app build at a time on the Mac (replaces ~/mac-resources lock).
-    concurrency:
-      group: delegate-mac-heavy-build
-      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - name: Sanitize PATH for delegate-ci
