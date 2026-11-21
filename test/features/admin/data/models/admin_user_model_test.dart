@@ -46,7 +46,30 @@ void main() {
       });
 
       final result = AdminUserModel.fromFirestore(mockDoc);
-      expect(result, tAdminUserModel);
+      // A stored password is never loaded back (TAS-100), so the fixture's
+      // temporaryPassword 'temp' must not match; compare the other fields.
+      expect(result.temporaryPassword, isEmpty);
+      expect(result.uid, tAdminUserModel.uid);
+      expect(result.email, tAdminUserModel.email);
+      expect(result.role, tAdminUserModel.role);
+      expect(result.organizationUID, tAdminUserModel.organizationUID);
+      expect(result.companyUID, tAdminUserModel.companyUID);
+      expect(result.createdBy, tAdminUserModel.createdBy);
+    });
+
+    test('ignores a password stored in the document (TAS-100)', () {
+      final mockDoc = MockDocumentSnapshot();
+      when(() => mockDoc.id).thenReturn('hr9');
+      when(() => mockDoc.data()).thenReturn({
+        'email': 'hr@test.com',
+        'role': 'hr',
+        'password': 'leaked-secret',
+        'temporaryPassword': 'leaked-secret-2',
+        'createdAt': tTimestamp,
+      });
+
+      final result = AdminUserModel.fromFirestore(mockDoc);
+      expect(result.temporaryPassword, isEmpty);
     });
 
     test('should parse delegate data with fullName, phone, and status fallback', () {
@@ -98,12 +121,18 @@ void main() {
         'role': 'company-admin',
         'organizationUID': 'org1',
         'companyUID': 'comp1',
-        'password': 'temp',
         'isActive': true,
         'createdAt': tTimestamp,
         'createdBy': 'admin1',
       };
       expect(result, expectedMap);
+    });
+
+    test('never writes the temporary password to Firestore (TAS-100)', () {
+      final result = tAdminUserModel.toMap();
+      expect(result.containsKey('password'), isFalse);
+      expect(result.containsKey('temporaryPassword'), isFalse);
+      expect(result.values, isNot(contains('temp')));
     });
 
     test('should include companyName and jobTitle when present', () {
