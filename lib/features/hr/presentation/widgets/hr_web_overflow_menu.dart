@@ -19,12 +19,17 @@ class HrWebOverflowMenu extends StatelessWidget {
   /// Wraps an icon when the item has a live count. Null leaves the icon as is.
   final Widget Function(HrShellItem item, Widget icon)? wrapIcon;
 
+  /// Trailing widget beside the label, such as a pending count (M3 menu
+  /// badge, TAS-154). Null shows nothing.
+  final Widget? Function(HrShellItem item)? trailingFor;
+
   const HrWebOverflowMenu({
     super.key,
     required this.delegate,
     required this.currentIndex,
     required this.onSelected,
     this.wrapIcon,
+    this.trailingFor,
   });
 
   @override
@@ -181,6 +186,7 @@ class HrWebOverflowMenu extends StatelessWidget {
         visualDensity: VisualDensity.standard,
       ),
       leadingIcon: wrapIcon?.call(item, icon) ?? icon,
+      trailingIcon: trailingFor?.call(item),
       onPressed: () => onSelected(item.id),
       child: Text(
         item.menuLabel(isWeb: true),
