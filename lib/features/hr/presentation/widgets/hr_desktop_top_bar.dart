@@ -8,6 +8,7 @@ import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/web/hr_system/hr_western_digits.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// هيدر مكتبي متطور للـ HR يستغل عرض الشاشات الكبيرة
 class HRDesktopTopBar extends StatelessWidget {
@@ -37,6 +38,8 @@ class HRDesktopTopBar extends StatelessWidget {
   });
 
   String _getTitle(int index) {
+    // Web: one name per page, the same as the sidebar (TAS-138).
+    if (WebRuntimePolicy.isWeb) return hrShellPageLabel(index, isWeb: true);
     switch (index) {
       case 0:
         return 'لوحة الحضور والانصراف';
@@ -169,7 +172,7 @@ class HRDesktopTopBar extends StatelessWidget {
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: colorScheme.primaryContainer.withValues(alpha: 0.7),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(HrRadius.chip),
             ),
             child: Icon(
               _getIcon(activeIndex),
@@ -189,14 +192,24 @@ class HRDesktopTopBar extends StatelessWidget {
                     Flexible(
                       child: Text(
                         _getTitle(activeIndex),
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
+                        key: const ValueKey('hr_top_bar_title'),
+                        // Web: M3 titleLarge now that page names are short
+                        // (TAS-114). Mobile keeps its 16.
+                        style: WebRuntimePolicy.isWeb
+                            ? Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              )
+                            : const TextStyle(
+                                fontSize: HrFont.titleMedium,
+                                fontWeight: FontWeight.w800,
+                              ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    // Narrow bars (no account name) drop the «مباشر» chip so
+                    // the title keeps its room (TAS-113: 12px minimum text).
+                    if (showName) ...[
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -204,10 +217,10 @@ class HRDesktopTopBar extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
+                        color: HrStatusColors.of(context).success.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(HrRadius.card),
                         border: Border.all(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                          color: HrStatusColors.of(context).success.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Row(
@@ -216,23 +229,24 @@ class HRDesktopTopBar extends StatelessWidget {
                           Container(
                             width: 6,
                             height: 6,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF10B981),
+                            decoration: BoxDecoration(
+                              color: HrStatusColors.of(context).success,
                               shape: BoxShape.circle,
                             ),
                           ),
                           const SizedBox(width: 5),
-                          const Text(
+                          Text(
                             'مباشر',
                             style: TextStyle(
-                              fontSize: 10.5,
+                              fontSize: HrFont.labelSmall,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF10B981),
+                              color: HrStatusColors.of(context).success,
                             ),
                           ),
                         ],
                       ),
                     ),
+                    ],
                   ],
                 ),
                 if (showSubtitle) ...[
@@ -240,7 +254,7 @@ class HRDesktopTopBar extends StatelessWidget {
                   Text(
                     _getSubtitle(activeIndex),
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: HrFont.labelSmall,
                       color: colorScheme.onSurfaceVariant,
                     ),
                     maxLines: 1,
@@ -258,7 +272,7 @@ class HRDesktopTopBar extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(HrRadius.button),
               border: Border.all(
                 color: colorScheme.outlineVariant.withValues(alpha: 0.35),
               ),
@@ -280,7 +294,7 @@ class HRDesktopTopBar extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     locale: WebRuntimePolicy.isWeb ? const Locale('en') : null,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: HrFont.labelMedium,
                       fontWeight: FontWeight.w600,
                       color: colorScheme.onSurface,
                     ),
@@ -303,7 +317,7 @@ class HRDesktopTopBar extends StatelessWidget {
                 alpha: 0.5,
               ),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(HrRadius.chip),
               ),
             ),
           ),
@@ -311,6 +325,8 @@ class HRDesktopTopBar extends StatelessWidget {
           const SizedBox(width: 10),
 
           // ── Theme Mode Toggle Button (Light/Dark Mode) ──
+          // Web moved it to the account menu (approved 21 Nov 2026, TAS-174).
+          if (webAccount == null)
           BlocBuilder<ThemeCubit, ThemeState>(
             builder: (context, themeState) {
               final isDark =
@@ -331,7 +347,7 @@ class HRDesktopTopBar extends StatelessWidget {
                     alpha: 0.5,
                   ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(HrRadius.chip),
                   ),
                 ),
               );
@@ -349,7 +365,7 @@ class HRDesktopTopBar extends StatelessWidget {
             PopupMenuButton<String>(
               tooltip: l10n.profile,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(HrRadius.card),
               ),
               offset: const Offset(0, 48),
               onSelected: onMenuSelected,

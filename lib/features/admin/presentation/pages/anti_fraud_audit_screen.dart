@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/core/services/device_binding_service.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/hr/presentation/device_unbind_labels.dart';
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_bloc.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/admin_create_penalty_page.dart';
 
@@ -35,11 +36,23 @@ class AntiFraudAuditScreen extends StatefulWidget {
   final bool showAppBar;
   final String initialTab;
 
+  /// HR web shell layout (TAS-153, TAS-154): the page shows the fraud log
+  /// only, because device unbind requests live on the «فك الأجهزة» page,
+  /// and the search filters as the user types without a separate button.
+  /// Admin roles and mobile keep the default layout.
+  final bool hrWebLayout;
+
+  /// Firestore for the audit log stream. Null uses the default instance;
+  /// tests pass a fake one.
+  final FirebaseFirestore? firestore;
+
   const AntiFraudAuditScreen({
     super.key,
     required this.delegate,
     this.showAppBar = false,
     this.initialTab = 'violations',
+    this.hrWebLayout = false,
+    this.firestore,
   });
 
   @override
@@ -66,6 +79,9 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
   bool _isExporting = false;
   List<Map<String, dynamic>> _currentFilteredLogs = [];
 
+  /// The audit log stream in the HR web layout, created once.
+  Stream<QuerySnapshot>? _hrAuditStream;
+
   bool get _isCompanyScoped =>
       widget.delegate.companyUID.isNotEmpty &&
       widget.delegate.role != UserRole.superAdmin &&
@@ -83,11 +99,15 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
   @override
   void initState() {
     super.initState();
-    _currentTab = widget.initialTab;
+    _currentTab = widget.hrWebLayout ? 'violations' : widget.initialTab;
     _loadBranches();
     _loadCompanies();
-    _loadCachedDeviceCounts();
-    _fetchDelegatesIfNeeded();
+    // The device binding section is hidden in the HR web layout, so its
+    // delegate list is not needed there.
+    if (!widget.hrWebLayout) {
+      _loadCachedDeviceCounts();
+      _fetchDelegatesIfNeeded();
+    }
   }
 
   Future<void> _loadCachedDeviceCounts() async {
@@ -1438,15 +1458,23 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     final colorScheme = theme.colorScheme;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
-    Query auditQuery = FirebaseFirestore.instance.collection('security_audit_logs');
+    Query auditQuery = (widget.firestore ?? FirebaseFirestore.instance)
+        .collection('security_audit_logs');
     if (_isCompanyScoped) {
       auditQuery = auditQuery.where('companyUID', isEqualTo: widget.delegate.companyUID);
     } else if (_isOrgScoped) {
       auditQuery = auditQuery.where('organizationUID', isEqualTo: widget.delegate.organizationUID);
     }
 
+    // HR web searches as the user types, so every keystroke rebuilds the
+    // page. Keep one stream there; a new one would drop back to the
+    // spinner and take the focus from the search field.
+    final Stream<QuerySnapshot> auditStream = widget.hrWebLayout
+        ? (_hrAuditStream ??= auditQuery.snapshots())
+        : auditQuery.snapshots();
+
     final body = StreamBuilder<QuerySnapshot>(
-      stream: auditQuery.snapshots(),
+      stream: auditStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -1683,6 +1711,10 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                             uniqueDevicesCount: uniqueDevices.length,
                             isArabic: isArabic,
                           );
+
+                          // HR web: no section switcher, the metrics take
+                          // the full width.
+                          if (widget.hrWebLayout) return metricsWidget;
 
                           if (isDesktop) {
                             return IntrinsicHeight(
@@ -3381,6 +3413,10 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
         controller: _searchController,
         style: TextStyle(fontSize: 13, color: colorScheme.onSurface),
         textInputAction: TextInputAction.search,
+        // HR web filters as the user types (TAS-154).
+        onChanged: widget.hrWebLayout
+            ? (val) => setState(() => _searchQuery = val.trim())
+            : null,
         onSubmitted: (val) {
           setState(() => _searchQuery = val.trim());
         },
@@ -3655,8 +3691,10 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
           return Row(
             children: [
               Expanded(child: searchField),
-              const SizedBox(width: 8),
-              searchButton,
+              if (!widget.hrWebLayout) ...[
+                const SizedBox(width: 8),
+                searchButton,
+              ],
               const SizedBox(width: 8),
               ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 180, maxWidth: 280),
@@ -3675,8 +3713,10 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
               Row(
                 children: [
                   Expanded(child: searchField),
-                  const SizedBox(width: 8),
-                  searchButton,
+                  if (!widget.hrWebLayout) ...[
+                    const SizedBox(width: 8),
+                    searchButton,
+                  ],
                 ],
               ),
               const SizedBox(height: 8),
@@ -4684,7 +4724,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                     ),
                     onPressed: () => _rejectUnbindRequest(req),
                     icon: const Icon(Icons.close_rounded, size: 18),
-                    label: const Text('رفض', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: const Text(DeviceUnbindLabels.reject, style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -4699,7 +4739,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                     ),
                     onPressed: () => _approveUnbindRequest(req),
                     icon: const Icon(Icons.check_circle_rounded, size: 18),
-                    label: const Text('موافقة وفك الارتباط', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: const Text(DeviceUnbindLabels.approve, style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -4727,7 +4767,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
           children: [
             Icon(Icons.check_circle_outline_rounded, color: Theme.of(ctx).colorScheme.primary),
             const SizedBox(width: 8),
-            const Text('تأكيد الموافقة وفك الارتباط', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text(DeviceUnbindLabels.approveTitle, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ],
         ),
         content: Text(
@@ -4744,7 +4784,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
               backgroundColor: Colors.green.shade700,
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('موافقة وفك الارتباط'),
+            child: const Text(DeviceUnbindLabels.approve),
           ),
         ],
       ),
@@ -4829,7 +4869,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
           children: [
             Icon(Icons.cancel_outlined, color: Theme.of(ctx).colorScheme.error),
             const SizedBox(width: 8),
-            const Text('رفض طلب فك الارتباط', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text(DeviceUnbindLabels.rejectTitle, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ],
         ),
         content: Column(
@@ -4860,7 +4900,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
               foregroundColor: Theme.of(ctx).colorScheme.onError,
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('تأكيد الرفض'),
+            child: const Text(DeviceUnbindLabels.confirmReject),
           ),
         ],
       ),

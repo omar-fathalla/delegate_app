@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
@@ -117,6 +118,47 @@ void main() {
         await tester.pumpAndSettle();
         expect(themeCubit.state.themeMode, m);
       }
+    });
+
+    group('appearance opens adaptively (TAS-158)', () {
+      tearDown(WebRuntimePolicy.debugReset);
+
+      Future<void> openAppearance(WidgetTester tester, {required bool web}) async {
+        WebRuntimePolicy.debugIsWebOverride = web;
+        tester.view.physicalSize =
+            web ? const Size(1440, 900) : const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(buildSettingsScreen());
+        await tester.pumpAndSettle();
+        final tile = find.byIcon(Symbols.dark_mode_rounded).first;
+        await tester.ensureVisible(tile);
+        await tester.tap(tile);
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('wide web opens a dialog, not a bottom sheet', (
+        tester,
+      ) async {
+        await openAppearance(tester, web: true);
+        expect(find.byType(Dialog), findsOneWidget);
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(find.byKey(const ValueKey('hr_sheet_close')), findsOneWidget);
+
+        final themeCubit = sl<ThemeCubit>();
+        await tester.tap(find.byKey(const ValueKey('theme_mode_dark')));
+        await tester.pumpAndSettle();
+        expect(themeCubit.state.themeMode, ThemeMode.dark);
+        expect(find.byType(Dialog), findsNothing);
+        themeCubit.setThemeMode(ThemeMode.system);
+      });
+
+      testWidgets('mobile still opens a bottom sheet', (tester) async {
+        await openAppearance(tester, web: false);
+        expect(find.byType(BottomSheet), findsOneWidget);
+        expect(find.byType(Dialog), findsNothing);
+        expect(find.byKey(const ValueKey('theme_mode_light')), findsOneWidget);
+      });
     });
 
     testWidgets('tapping logout shows confirmation dialog', (

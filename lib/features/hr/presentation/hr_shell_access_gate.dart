@@ -6,6 +6,7 @@ import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/auth/domain/role_home.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/auth/presentation/pages/splash_screen.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_delegate_attendance_detail_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_main_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -26,14 +27,65 @@ Delegate? hrShellSessionUser(BuildContext context) {
 /// `/hr/home`. A missing delegate still falls through to the splash, which
 /// restores the session. A role that does not own the shell is sent away
 /// before [HRMainScreen] is built.
-Widget hrHomeRouteChild(Delegate? actor) {
+///
+/// Web passes the tab and the inner-page count from the URL (TAS-139), and
+/// the address of an inner page that has one (TAS-190); mobile leaves them
+/// null and keeps its own tab state.
+Widget hrHomeRouteChild(
+  Delegate? actor, {
+  int? routeTab,
+  int routeInner = 0,
+  String? routeInnerUrl,
+}) {
   if (actor == null) return const SplashScreen();
   if (hrShellDeniedLocation(actor.role, isWeb: WebRuntimePolicy.isWeb) !=
       null) {
     return HrShellAccessGate(actor: actor);
   }
   return WebHrSystemRedirect.debugHrSystemBuilder?.call(actor) ??
-      HRMainScreen(delegate: actor);
+      HRMainScreen(
+        delegate: actor,
+        routeTab: routeTab,
+        routeInner: routeInner,
+        routeInnerUrl: routeInnerUrl,
+      );
+}
+
+/// Page key shared by every shell URL (`/hr/home`, `/hr/payroll`, ...).
+/// go_router then updates the one page in place when the URL changes, so
+/// [HRMainScreen] is never rebuilt and its tabs keep their state.
+const ValueKey<String> kHrShellPageKey = ValueKey<String>('hr-shell');
+
+/// The person a shell route is for: the route `extra`, or on the web the
+/// signed-in session (the browser back and forward buttons drop `extra`).
+Delegate? hrShellRouteActor(BuildContext context, Object? extra) {
+  if (extra is Delegate) return extra;
+  if (!WebRuntimePolicy.isWeb) return null;
+  return hrShellSessionUser(context);
+}
+
+/// Child of a shell route ([hrShellRoutePaths]). Same guard as `/hr/home`.
+Widget hrShellRouteChild(BuildContext context, GoRouterState state) {
+  final actor = hrShellRouteActor(context, state.extra);
+  if (!WebRuntimePolicy.isWeb) return hrHomeRouteChild(actor);
+  return hrHomeRouteChild(
+    actor,
+    routeTab: hrShellTabForPath(state.uri.path) ?? hrShellHomeTab(isWeb: true),
+    routeInner: hrShellInnerDepth(state.uri),
+    routeInnerUrl: hrShellInnerUrlForPath(state.uri.path),
+  );
+}
+
+/// Web: a shell URL whose tab the signed-in person may not open (renewal
+/// without the permission) goes to `/hr/home`. With no session yet the
+/// splash restores it first and the check runs on that navigation.
+String? hrShellRedirect(BuildContext context, GoRouterState state) {
+  if (!WebRuntimePolicy.isWeb) return null;
+  final tab = hrShellTabForPath(state.uri.path);
+  if (tab == null) return kWebHrSystemPath;
+  final actor = hrShellRouteActor(context, state.extra);
+  if (actor == null || !canOpenHrShell(actor.role)) return null;
+  return hrShellTabAllowed(actor, tab, isWeb: true) ? null : kWebHrSystemPath;
 }
 
 /// `/hr/delegate-attendance`. [subject] is the field delegate on the screen.

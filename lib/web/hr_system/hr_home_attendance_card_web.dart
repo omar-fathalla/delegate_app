@@ -9,6 +9,7 @@ import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import 'package:delegate_app/features/hr/presentation/pages/tabs/hr_attendance_tab.dart';
 import 'package:delegate_app/web/hr_system/hr_home_side_cards_web.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// M3 window size classes used by the overview.
 enum HrWindowClass { compact, medium, expanded }
@@ -211,7 +212,7 @@ class HrHomeAttendanceCard extends StatelessWidget {
         children: [
           HrCardTitle(
             icon: Icons.how_to_reg_rounded,
-            text: 'حضور النهاردة',
+            text: 'حضور اليوم',
             fontSize: _compact ? 19 : 22,
             trailing: TextButton.icon(
               key: const ValueKey('hr_home_attendance_log_link'),
@@ -224,7 +225,7 @@ class HrHomeAttendanceCard extends StatelessWidget {
               icon: forwardIcon,
               label: const Text(
                 'كل سجل الحضور',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: HrFont.body, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -359,7 +360,7 @@ class _StatsRow extends StatelessWidget {
                   Text(
                     known ? '${(ratio * 100).round()}%' : '—',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: HrFont.labelMedium,
                       fontWeight: FontWeight.w700,
                       color: Theme.of(context).colorScheme.primary,
                       fontFeatures: kHrTabularFigures,
@@ -378,8 +379,8 @@ class _StatsRow extends StatelessWidget {
                   ? Icons.hourglass_empty_rounded
                   : Icons.person_off_outlined,
               label: state == HrAttendanceCardState.empty
-                  ? 'لسه مسجلوش'
-                  : 'غايبين',
+                  ? 'لم يسجلوا بعد'
+                  : 'غائبون',
               value: known ? '${summary.absent.length}' : '—',
               onTap:
                   state == HrAttendanceCardState.data &&
@@ -486,7 +487,7 @@ class _StatTile extends StatelessWidget {
     );
     return Material(
       color: cs.surfaceContainerLowest,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(HrRadius.button),
       clipBehavior: Clip.antiAlias,
       child: onTap == null
           ? content
@@ -530,7 +531,7 @@ class _FilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final chips = <Widget>[
       _chip(context, HrPresenceFilter.all, 'الكل', summary.attended),
-      _chip(context, HrPresenceFilter.present, 'لسه موجود', summary.present),
+      _chip(context, HrPresenceFilter.present, 'لم ينصرف بعد', summary.present),
       _chip(context, HrPresenceFilter.departed, 'انصرف', summary.departed),
       _ChainFilterChip(
         enabled: enabled,
@@ -580,7 +581,7 @@ class _FilterBar extends StatelessWidget {
       key: ValueKey('hr_home_filter_${value.name}'),
       label: Text(enabled ? '$label  $count' : label),
       labelStyle: TextStyle(
-        fontSize: 13,
+        fontSize: HrFont.body,
         fontWeight: FontWeight.w600,
         fontFeatures: kHrTabularFigures,
         color: selected ? cs.onSecondaryContainer : cs.onSurfaceVariant,
@@ -593,7 +594,7 @@ class _FilterBar extends StatelessWidget {
       side: BorderSide(
         color: selected ? Colors.transparent : cs.outlineVariant,
       ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.chip)),
       materialTapTargetSize: MaterialTapTargetSize.padded,
       onSelected: enabled ? (_) => onPresenceChanged(value) : null,
     );
@@ -628,7 +629,7 @@ class _ChainFilterChip extends StatelessWidget {
       elevation: 3,
       position: PopupMenuPosition.under,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       onSelected: (v) => onChanged(v == _all ? null : v),
@@ -644,7 +645,7 @@ class _ChainFilterChip extends StatelessWidget {
           padding: const EdgeInsetsDirectional.only(start: 8, end: 6),
           decoration: BoxDecoration(
             color: active ? cs.secondaryContainer : cs.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(HrRadius.chip),
             border: active ? null : Border.all(color: cs.outlineVariant),
           ),
           child: Row(
@@ -658,7 +659,7 @@ class _ChainFilterChip extends StatelessWidget {
               Text(
                 selected ?? 'السلسلة',
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: HrFont.body,
                   fontWeight: FontWeight.w600,
                   color: enabled ? fg : fg.withValues(alpha: 0.38),
                 ),
@@ -694,7 +695,7 @@ class _ChainFilterChip extends StatelessWidget {
             child: Text(
               label,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: HrFont.body,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
@@ -732,7 +733,7 @@ class _SearchField extends StatelessWidget {
         controller: controller,
         enabled: enabled,
         onChanged: (_) => onChanged(),
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+        style: const TextStyle(fontSize: HrFont.body, fontWeight: FontWeight.normal),
         textAlignVertical: TextAlignVertical.center,
         decoration: InputDecoration(
           isDense: true,
@@ -740,7 +741,7 @@ class _SearchField extends StatelessWidget {
           fillColor: cs.surfaceContainerLowest,
           hintText: 'ابحث بالاسم أو الكود',
           hintStyle: TextStyle(
-            fontSize: 14,
+            fontSize: HrFont.body,
             fontWeight: FontWeight.normal,
             color: cs.onSurfaceVariant.withValues(alpha: 0.7),
           ),
@@ -786,7 +787,7 @@ class _TimeText extends StatelessWidget {
     text,
     maxLines: 1,
     style: TextStyle(
-      fontSize: 15,
+      fontSize: HrFont.titleMedium,
       fontWeight: weight,
       color: color ?? Theme.of(context).colorScheme.onSurface,
       fontFeatures: kHrTabularFigures,
@@ -811,11 +812,11 @@ class _StillHere extends StatelessWidget {
         const SizedBox(width: 6),
         Flexible(
           child: Text(
-            'لسه موجود',
+            'لم ينصرف بعد',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: HrFont.body,
               fontWeight: FontWeight.w700,
               color: cs.primary,
             ),
@@ -861,7 +862,7 @@ class _DelegateCell extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontSize: 13,
+                  fontSize: HrFont.body,
                   fontWeight: FontWeight.w600,
                   color: cs.onSurface,
                 ),
@@ -872,7 +873,7 @@ class _DelegateCell extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: HrFont.body,
                     color: cs.onSurfaceVariant,
                     fontFeatures: kHrTabularFigures,
                   ),
@@ -908,7 +909,7 @@ class _ChainCell extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: HrFont.body,
                   fontWeight: FontWeight.w700,
                   color: cs.onSurface,
                 ),
@@ -917,7 +918,7 @@ class _ChainCell extends StatelessWidget {
                 branch,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+                style: TextStyle(fontSize: HrFont.body, color: cs.onSurfaceVariant),
               ),
             ],
           ),
@@ -954,7 +955,7 @@ class _AttendanceTable extends StatelessWidget {
     final start = current * kHrTableRowsPerPage;
     final end = (start + kHrTableRowsPerPage).clamp(0, rows.length);
     final headerStyle = TextStyle(
-      fontSize: 13,
+      fontSize: HrFont.body,
       fontWeight: FontWeight.w700,
       color: cs.onSurfaceVariant,
     );
@@ -971,7 +972,7 @@ class _AttendanceTable extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: cs.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6)),
       ),
       child: Column(
@@ -1096,7 +1097,7 @@ class _Pagination extends StatelessWidget {
             '${start + 1}–$end من $total',
             key: const ValueKey('hr_home_page_label'),
             style: TextStyle(
-              fontSize: 13,
+              fontSize: HrFont.body,
               color: cs.onSurfaceVariant,
               fontFeatures: kHrTabularFigures,
             ),
@@ -1143,7 +1144,7 @@ class _AttendanceList extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: cs.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(HrRadius.card),
           ),
           child: Column(
             children: [
@@ -1178,7 +1179,7 @@ class _AttendanceList extends StatelessWidget {
               child: Text(
                 showAll ? 'عرض أقل' : 'عرض كل الحاضرين (${rows.length})',
                 style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: HrFont.body,
                   fontWeight: FontWeight.w600,
                   fontFeatures: kHrTabularFigures,
                 ),
@@ -1271,7 +1272,7 @@ class _SkeletonRows extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: cs.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
       ),
       child: Column(
         children: [
@@ -1322,7 +1323,7 @@ class _EmptyPanel extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
       ),
       child: Column(
         children: [
@@ -1337,10 +1338,10 @@ class _EmptyPanel extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'لسه محدش سجّل حضور النهاردة',
+            'لم يسجّل أحد حضوره اليوم بعد',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 17,
+              fontSize: HrFont.titleMedium,
               fontWeight: FontWeight.w700,
               color: cs.onSurface,
             ),
@@ -1377,17 +1378,17 @@ class _ErrorPanel extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
       decoration: BoxDecoration(
         color: cs.errorContainer,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
       ),
       child: Column(
         children: [
           Icon(Icons.cloud_off_rounded, size: 44, color: cs.onErrorContainer),
           const SizedBox(height: 12),
           Text(
-            'مقدرناش نحمّل حضور النهاردة',
+            'تعذر تحميل حضور اليوم',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 17,
+              fontSize: HrFont.titleMedium,
               fontWeight: FontWeight.w700,
               color: cs.onErrorContainer,
             ),
@@ -1411,7 +1412,7 @@ class _ErrorPanel extends StatelessWidget {
             'رمز الخطأ: ${hrAttendanceErrorCode(message)}',
             key: const ValueKey('hr_home_error_code'),
             style: TextStyle(
-              fontSize: 12,
+              fontSize: HrFont.labelMedium,
               color: cs.onErrorContainer.withValues(alpha: 0.8),
               fontFeatures: kHrTabularFigures,
             ),
@@ -1433,16 +1434,16 @@ class _NoMatches extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
       ),
       child: Column(
         children: [
           Icon(Icons.search_off_rounded, size: 36, color: cs.onSurfaceVariant),
           const SizedBox(height: 8),
           Text(
-            'مفيش نتايج مطابقة للفلتر أو البحث',
+            'لا توجد نتائج مطابقة للفلتر أو البحث',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 15, color: cs.onSurfaceVariant),
+            style: TextStyle(fontSize: HrFont.titleMedium, color: cs.onSurfaceVariant),
           ),
         ],
       ),

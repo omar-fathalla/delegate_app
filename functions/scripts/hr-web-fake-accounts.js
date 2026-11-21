@@ -13,6 +13,8 @@
  *   node scripts/hr-web-fake-accounts.js --project tashil-dev --apply
  *   node scripts/hr-web-fake-accounts.js --project tashil-dev --cleanup
  *   node scripts/hr-web-fake-accounts.js --project tashil-dev --cleanup --apply
+ *   node scripts/hr-web-fake-accounts.js --project tashil-dev --reset-device-bindings --apply
+ *     (clears the device lock of the fake delegates; local CI runs it before mac-gate)
  */
 
 const fs = require("fs");
@@ -92,6 +94,13 @@ async function main(argv, env = process.env, deps = {}) {
   lib.assertLocalCredentialSignals(env, readFile);
   const plan = lib.buildPlan();
 
+  if (args.resetDeviceBindings && !args.apply) {
+    const targets = lib.deviceResetTargets(plan);
+    console.log(`reset-device-bindings dry-run: ${targets.length} fake delegate(s)\n` +
+      targets.map((t) => `  ${t.uid} phone=${t.phone}`).join("\n"));
+    return {mode: "reset-device-bindings-dry-run", project};
+  }
+
   if (!args.apply) {
     const text = args.cleanup ? lib.formatCleanupDryRun(plan) : lib.formatDryRun(plan);
     console.log(text);
@@ -116,6 +125,11 @@ async function main(argv, env = process.env, deps = {}) {
   lib.assertCredentialProject(appProject);
 
   const io = adapters(admin);
+  if (args.resetDeviceBindings) {
+    const report = await lib.resetDeviceBindings({plan, db: io.db, apply: true});
+    console.log(JSON.stringify({mode: "reset-device-bindings", project, cleared: report.cleared.length}, null, 2));
+    return report;
+  }
   if (args.cleanup) {
     const report = await lib.cleanupSeed({plan, db: io.db, auth: io.auth});
     lib.assertNoSecretKeys(report);

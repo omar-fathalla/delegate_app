@@ -14,6 +14,11 @@ class HrShellLink {
   static ValueChanged<int>? _selectTab;
   static ValueChanged<String>? _selectMenu;
   static HrWebHeaderBridge? _bridge;
+  static void Function({
+    required String delegateUID,
+    required String delegateName,
+  })?
+  _openAdjustments;
   static Object? _owner;
 
   /// Header bridge of the mounted shell (unread count, notifications).
@@ -26,11 +31,14 @@ class HrShellLink {
     required ValueChanged<int> selectTab,
     required ValueChanged<String> selectMenu,
     required HrWebHeaderBridge bridge,
+    void Function({required String delegateUID, required String delegateName})?
+    openAdjustments,
   }) {
     _owner = owner;
     _selectTab = selectTab;
     _selectMenu = selectMenu;
     _bridge = bridge;
+    _openAdjustments = openAdjustments;
   }
 
   /// Only the shell that attached may detach, so a disposing old shell does
@@ -41,6 +49,7 @@ class HrShellLink {
     _selectTab = null;
     _selectMenu = null;
     _bridge = null;
+    _openAdjustments = null;
   }
 
   static void selectTab(int index) => _selectTab?.call(index);
@@ -49,11 +58,26 @@ class HrShellLink {
 
   static void openNotifications() => _bridge?.openNotifications?.call();
 
+  /// Whether the mounted shell can open «سجل تعديلات الحضور» filtered to one
+  /// delegate (TAS-146).
+  static bool get canOpenAdjustments => _openAdjustments != null;
+
+  /// Switches the shell to «سجل تعديلات الحضور» filtered to one delegate
+  /// (TAS-146), so the log lives in one place.
+  static void openAdjustmentsFor({
+    required String delegateUID,
+    required String delegateName,
+  }) => _openAdjustments?.call(
+    delegateUID: delegateUID,
+    delegateName: delegateName,
+  );
+
   @visibleForTesting
   static void debugReset() {
     _owner = null;
     _selectTab = null;
     _selectMenu = null;
     _bridge = null;
+    _openAdjustments = null;
   }
 }

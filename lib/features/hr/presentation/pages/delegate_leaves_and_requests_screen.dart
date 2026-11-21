@@ -10,6 +10,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/hr/domain/services/leave_notification_target.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_selected_card_colors.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 
 class DelegateLeavesAndRequestsScreen extends StatefulWidget {
   final Delegate delegate;
@@ -120,7 +123,7 @@ class _DelegateLeavesAndRequestsScreenState
                     AppLocalizations.of(context)!.reqTitle,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14.5,
+                      fontSize: HrFont.body,
                       letterSpacing: -0.2,
                     ),
                     maxLines: 1,
@@ -131,7 +134,7 @@ class _DelegateLeavesAndRequestsScreenState
                         ? widget.delegate.companyName
                         : widget.delegate.organizationName,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: HrFont.labelSmall,
                       color: colorScheme.onSurfaceVariant,
                     ),
                     maxLines: 1,
@@ -309,7 +312,7 @@ class _DelegateLeavesAndRequestsScreenState
                         Text(
                           AppLocalizations.of(context)!.reqEmptyHint,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: HrFont.labelMedium,
                             color: colorScheme.outline,
                           ),
                         ),
@@ -355,7 +358,7 @@ class _DelegateLeavesAndRequestsScreenState
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         boxShadow: [
           BoxShadow(
             color: colorScheme.shadow.withValues(alpha: 0.04),
@@ -373,7 +376,7 @@ class _DelegateLeavesAndRequestsScreenState
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: colorScheme.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
                 child: Icon(
                   Symbols.account_balance_wallet_rounded,
@@ -390,13 +393,13 @@ class _DelegateLeavesAndRequestsScreenState
                       AppLocalizations.of(context)!.annualLeaveBalance,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                        fontSize: HrFont.body,
                       ),
                     ),
                     Text(
                       AppLocalizations.of(context)!.forYear(DateTime.now().year),
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: HrFont.labelSmall,
                         color: colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -409,12 +412,12 @@ class _DelegateLeavesAndRequestsScreenState
                   color: remainingDays > 3
                       ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)
                       : colorScheme.error.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(HrRadius.card),
                 ),
                 child: Text(
                   AppLocalizations.of(context)!.remainingDays(remainingDays),
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: HrFont.labelMedium,
                     fontWeight: FontWeight.bold,
                     color: remainingDays > 3
                         ? Theme.of(context).colorScheme.primary
@@ -443,14 +446,14 @@ class _DelegateLeavesAndRequestsScreenState
               Text(
                 AppLocalizations.of(context)!.usedDays(usedDays),
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: HrFont.labelSmall,
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
               Text(
                 AppLocalizations.of(context)!.totalQuotaDays(totalQuota),
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: HrFont.labelSmall,
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
@@ -471,7 +474,7 @@ class _DelegateLeavesAndRequestsScreenState
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -482,7 +485,7 @@ class _DelegateLeavesAndRequestsScreenState
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.tertiaryContainer,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
                 child: Icon(
                   Symbols.event_repeat_rounded,
@@ -496,7 +499,7 @@ class _DelegateLeavesAndRequestsScreenState
                   AppLocalizations.of(context)!.weeklyOffPlan,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                    fontSize: HrFont.body,
                   ),
                 ),
               ),
@@ -504,12 +507,12 @@ class _DelegateLeavesAndRequestsScreenState
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.tertiaryContainer,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(HrRadius.card),
                 ),
                 child: Text(
                   AppLocalizations.of(context)!.daysOffPerMonth,
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: HrFont.labelSmall,
                     fontWeight: FontWeight.bold,
                     color: Theme.of(context).colorScheme.onTertiaryContainer,
                   ),
@@ -522,7 +525,7 @@ class _DelegateLeavesAndRequestsScreenState
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(HrRadius.chip),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -537,7 +540,7 @@ class _DelegateLeavesAndRequestsScreenState
                   child: Text(
                     AppLocalizations.of(context)!.weeklyPlanNote,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: HrFont.labelSmall,
                       color: colorScheme.onSurfaceVariant,
                       height: 1.4,
                     ),
@@ -596,7 +599,7 @@ class _DelegateLeavesAndRequestsScreenState
         color: isMuted
             ? colorScheme.surfaceContainer
             : colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(HrRadius.chip),
       ),
       child: Column(
         children: [
@@ -609,7 +612,7 @@ class _DelegateLeavesAndRequestsScreenState
           Text(
             label,
             style: TextStyle(
-              fontSize: 10,
+              fontSize: HrFont.labelSmall,
               fontWeight: FontWeight.bold,
               color: isMuted ? colorScheme.outline : colorScheme.onSurface,
             ),
@@ -619,7 +622,7 @@ class _DelegateLeavesAndRequestsScreenState
           Text(
             sublabel,
             style: TextStyle(
-              fontSize: 9,
+              fontSize: HrFont.labelSmall,
               color: isMuted ? colorScheme.outline : colorScheme.onSurfaceVariant,
             ),
             maxLines: 1,
@@ -641,7 +644,7 @@ class _DelegateLeavesAndRequestsScreenState
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         boxShadow: [
           BoxShadow(
             color: colorScheme.shadow.withValues(alpha: 0.03),
@@ -726,7 +729,7 @@ class _DelegateLeavesAndRequestsScreenState
                 child: Text(
                   title,
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: HrFont.labelSmall,
                     fontWeight: FontWeight.w600,
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -740,7 +743,7 @@ class _DelegateLeavesAndRequestsScreenState
           Text(
             value,
             style: TextStyle(
-              fontSize: 17,
+              fontSize: HrFont.titleMedium,
               fontWeight: FontWeight.bold,
               color: color,
             ),
@@ -762,7 +765,7 @@ class _DelegateLeavesAndRequestsScreenState
       height: 38,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(HrRadius.chip),
       ),
       padding: const EdgeInsets.all(2.5),
       child: Row(
@@ -807,16 +810,22 @@ class _DelegateLeavesAndRequestsScreenState
     required ColorScheme colorScheme,
   }) {
     final isSelected = _selectedStatusFilter == value;
+    // Web (TAS-185): the selected filter uses the primary container like
+    // every HR web page. Mobile keeps the secondary container.
+    final web =
+        WebRuntimePolicy.isWeb ? HrSelectedCardColors.of(colorScheme) : null;
+    final selectedBg = web?.background ?? colorScheme.secondaryContainer;
+    final selectedFg = web?.foreground ?? colorScheme.onSecondaryContainer;
 
     return Expanded(
       child: InkWell(
         onTap: () => setState(() => _selectedStatusFilter = value),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(HrRadius.chip),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           decoration: BoxDecoration(
-            color: isSelected ? colorScheme.secondaryContainer : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
+            color: isSelected ? selectedBg : Colors.transparent,
+            borderRadius: BorderRadius.circular(HrRadius.chip),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
@@ -836,10 +845,10 @@ class _DelegateLeavesAndRequestsScreenState
                 child: Text(
                   label,
                   style: TextStyle(
-                    fontSize: 10.5,
+                    fontSize: HrFont.labelSmall,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                     color: isSelected
-                        ? colorScheme.onSecondaryContainer
+                        ? selectedFg
                         : colorScheme.onSurfaceVariant,
                   ),
                   maxLines: 1,
@@ -851,17 +860,17 @@ class _DelegateLeavesAndRequestsScreenState
                 padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? colorScheme.onSecondaryContainer.withValues(alpha: 0.12)
+                      ? selectedFg.withValues(alpha: 0.12)
                       : colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
                 child: Text(
                   '$count',
                   style: TextStyle(
-                    fontSize: 9.5,
+                    fontSize: HrFont.labelSmall,
                     fontWeight: FontWeight.bold,
                     color: isSelected
-                        ? colorScheme.onSecondaryContainer
+                        ? selectedFg
                         : colorScheme.onSurfaceVariant,
                   ),
                 ),
@@ -987,7 +996,7 @@ class _DelegateLeavesAndRequestsScreenState
       elevation: 0,
       color: colorScheme.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(
           color: isExpanded
               ? colorScheme.primary.withValues(alpha: 0.5)
@@ -1030,7 +1039,7 @@ class _DelegateLeavesAndRequestsScreenState
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           color: colorScheme.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(HrRadius.chip),
                         ),
                         child: Icon(typeIcon, size: 16, color: colorScheme.primary),
                       ),
@@ -1045,7 +1054,7 @@ class _DelegateLeavesAndRequestsScreenState
                                 Text(
                                   typeLabel,
                                   style: const TextStyle(
-                                    fontSize: 13,
+                                    fontSize: HrFont.body,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -1062,7 +1071,7 @@ class _DelegateLeavesAndRequestsScreenState
                                   child: Text(
                                     durationText,
                                     style: TextStyle(
-                                      fontSize: 10.5,
+                                      fontSize: HrFont.labelSmall,
                                       fontWeight: FontWeight.bold,
                                       color: colorScheme.primary,
                                     ),
@@ -1083,7 +1092,7 @@ class _DelegateLeavesAndRequestsScreenState
                                   child: Text(
                                     periodStr,
                                     style: TextStyle(
-                                      fontSize: 11,
+                                      fontSize: HrFont.labelSmall,
                                       color: colorScheme.onSurfaceVariant,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -1101,7 +1110,7 @@ class _DelegateLeavesAndRequestsScreenState
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                         decoration: BoxDecoration(
                           color: statusColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(HrRadius.chip),
                           border: Border.all(
                             color: statusColor.withValues(alpha: 0.3),
                           ),
@@ -1114,7 +1123,7 @@ class _DelegateLeavesAndRequestsScreenState
                             Text(
                               statusLabel,
                               style: TextStyle(
-                                fontSize: 10,
+                                fontSize: HrFont.labelSmall,
                                 fontWeight: FontWeight.bold,
                                 color: statusColor,
                               ),
@@ -1153,12 +1162,12 @@ class _DelegateLeavesAndRequestsScreenState
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(HrRadius.chip),
                         ),
                         child: Text(
                           AppLocalizations.of(context)!.reasonLabel(reason),
                           style: TextStyle(
-                            fontSize: 11.5,
+                            fontSize: HrFont.labelSmall,
                             color: colorScheme.onSurfaceVariant,
                           ),
                         ),
@@ -1172,7 +1181,7 @@ class _DelegateLeavesAndRequestsScreenState
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: colorScheme.errorContainer.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(HrRadius.chip),
                           border: Border.all(
                             color: colorScheme.error.withValues(alpha: 0.35),
                           ),
@@ -1190,7 +1199,7 @@ class _DelegateLeavesAndRequestsScreenState
                               child: Text(
                                 AppLocalizations.of(context)!.rejectReasonLabel(rejectReason),
                                 style: TextStyle(
-                                  fontSize: 11.5,
+                                  fontSize: HrFont.labelSmall,
                                   color: colorScheme.error,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -1215,7 +1224,7 @@ class _DelegateLeavesAndRequestsScreenState
                           Text(
                             AppLocalizations.of(context)!.approvedBy(resolvedByName),
                             style: TextStyle(
-                              fontSize: 10.5,
+                              fontSize: HrFont.labelSmall,
                               fontWeight: FontWeight.w600,
                               color: Theme.of(context).colorScheme.primary,
                             ),
@@ -1225,7 +1234,7 @@ class _DelegateLeavesAndRequestsScreenState
                             Text(
                               '(${DateFormat('yyyy/MM/dd').format(resolvedAt)})',
                               style: TextStyle(
-                                fontSize: 10,
+                                fontSize: HrFont.labelSmall,
                                 color: colorScheme.onSurfaceVariant,
                               ),
                             ),
@@ -1246,13 +1255,13 @@ class _DelegateLeavesAndRequestsScreenState
                               style: OutlinedButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(HrRadius.chip),
                                 ),
                               ),
                               icon: const Icon(Symbols.attachment_rounded, size: 14),
                               label: Text(
                                 AppLocalizations.of(context)!.previewAttachment,
-                                style: TextStyle(fontSize: 11),
+                                style: TextStyle(fontSize: HrFont.labelSmall),
                               ),
                               onPressed: () => _viewAttachment(context, attachmentUrl),
                             ),
@@ -1271,7 +1280,7 @@ class _DelegateLeavesAndRequestsScreenState
                               icon: const Icon(Symbols.delete_outline_rounded, size: 15),
                               label: Text(
                                 AppLocalizations.of(context)!.cancelRequest,
-                                style: TextStyle(fontSize: 11),
+                                style: TextStyle(fontSize: HrFont.labelSmall),
                               ),
                               onPressed: () =>
                                   _cancelPendingRequest(context, req['docId']),
@@ -1337,7 +1346,7 @@ class _DelegateLeavesAndRequestsScreenState
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1349,7 +1358,7 @@ class _DelegateLeavesAndRequestsScreenState
                 children: [
                   Text(
                     AppLocalizations.of(context)!.requestAttachment,
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.titleMedium),
                   ),
                   IconButton(
                     icon: const Icon(Symbols.close_rounded),
@@ -1360,8 +1369,8 @@ class _DelegateLeavesAndRequestsScreenState
             ),
             ClipRRect(
               borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(16),
+                bottomLeft: Radius.circular(HrRadius.card),
+                bottomRight: Radius.circular(HrRadius.card),
               ),
               child: InteractiveViewer(
                 maxScale: 4.0,
@@ -1448,7 +1457,7 @@ class _DelegateLeavesAndRequestsScreenState
                           padding: const EdgeInsets.all(7),
                           decoration: BoxDecoration(
                             color: colorScheme.primary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(HrRadius.chip),
                           ),
                           child: Icon(
                             Symbols.edit_calendar_rounded,
@@ -1462,13 +1471,13 @@ class _DelegateLeavesAndRequestsScreenState
                             AppLocalizations.of(context)!.newRequest,
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: 15.5,
+                              fontSize: HrFont.titleMedium,
                             ),
                           ),
                         ),
                         InkWell(
                           onTap: isSubmitting ? null : () => Navigator.pop(ctx),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(HrRadius.button),
                           child: Padding(
                             padding: const EdgeInsets.all(4),
                             child: Icon(
@@ -1501,7 +1510,7 @@ class _DelegateLeavesAndRequestsScreenState
                               margin: const EdgeInsets.only(bottom: 12),
                               decoration: BoxDecoration(
                                 color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(HrRadius.chip),
                                 border: Border.all(
                                   color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.35),
                                 ),
@@ -1519,7 +1528,7 @@ class _DelegateLeavesAndRequestsScreenState
                                     child: Text(
                                       AppLocalizations.of(context)!.weeklyPlanAvailableInfo,
                                       style: TextStyle(
-                                        fontSize: 11,
+                                        fontSize: HrFont.labelSmall,
                                         color: Theme.of(context).colorScheme.onTertiaryContainer,
                                         fontWeight: FontWeight.w600,
                                         height: 1.35,
@@ -1536,7 +1545,7 @@ class _DelegateLeavesAndRequestsScreenState
                             AppLocalizations.of(context)!.requestType,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
-                              fontSize: 12,
+                              fontSize: HrFont.labelMedium,
                               color: colorScheme.onSurface,
                             ),
                           ),
@@ -1546,7 +1555,7 @@ class _DelegateLeavesAndRequestsScreenState
                             expandedInsets: EdgeInsets.zero,
                             requestFocusOnTap: false,
                             textStyle: TextStyle(
-                              fontSize: 14,
+                              fontSize: HrFont.body,
                               color: colorScheme.onSurface,
                             ),
                             dropdownMenuEntries: [
@@ -1593,7 +1602,7 @@ class _DelegateLeavesAndRequestsScreenState
                               AppLocalizations.of(context)!.dateField,
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
-                                fontSize: 12,
+                                fontSize: HrFont.labelMedium,
                                 color: colorScheme.onSurface,
                               ),
                             ),
@@ -1613,12 +1622,12 @@ class _DelegateLeavesAndRequestsScreenState
                                   });
                                 }
                               },
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(HrRadius.chip),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 decoration: BoxDecoration(
                                   color: colorScheme.surfaceContainer,
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(HrRadius.chip),
                                 ),
                                 child: Row(
                                   children: [
@@ -1631,7 +1640,7 @@ class _DelegateLeavesAndRequestsScreenState
                                     Text(
                                       DateFormat('yyyy-MM-dd (EEEE)', 'ar').format(startDate),
                                       style: const TextStyle(
-                                        fontSize: 12,
+                                        fontSize: HrFont.labelMedium,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -1651,7 +1660,7 @@ class _DelegateLeavesAndRequestsScreenState
                               AppLocalizations.of(context)!.timeField,
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
-                                fontSize: 12,
+                                fontSize: HrFont.labelMedium,
                                 color: colorScheme.onSurface,
                               ),
                             ),
@@ -1659,7 +1668,7 @@ class _DelegateLeavesAndRequestsScreenState
                             Container(
                               decoration: BoxDecoration(
                                 color: colorScheme.surfaceContainer,
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(HrRadius.chip),
                               ),
                               child: Row(
                                 children: [
@@ -1699,7 +1708,7 @@ class _DelegateLeavesAndRequestsScreenState
                                                   Text(
                                                     AppLocalizations.of(context)!.fromField,
                                                     style: TextStyle(
-                                                      fontSize: 9.5,
+                                                      fontSize: HrFont.labelSmall,
                                                       fontWeight: FontWeight.w600,
                                                       color: colorScheme.onSurfaceVariant,
                                                     ),
@@ -1708,7 +1717,7 @@ class _DelegateLeavesAndRequestsScreenState
                                                   Text(
                                                     fromTime.format(context),
                                                     style: const TextStyle(
-                                                      fontSize: 12,
+                                                      fontSize: HrFont.labelMedium,
                                                       fontWeight: FontWeight.bold,
                                                     ),
                                                   ),
@@ -1761,7 +1770,7 @@ class _DelegateLeavesAndRequestsScreenState
                                                   Text(
                                                     AppLocalizations.of(context)!.toField,
                                                     style: TextStyle(
-                                                      fontSize: 9.5,
+                                                      fontSize: HrFont.labelSmall,
                                                       fontWeight: FontWeight.w600,
                                                       color: colorScheme.onSurfaceVariant,
                                                     ),
@@ -1770,7 +1779,7 @@ class _DelegateLeavesAndRequestsScreenState
                                                   Text(
                                                     toTime.format(context),
                                                     style: const TextStyle(
-                                                      fontSize: 12,
+                                                      fontSize: HrFont.labelMedium,
                                                       fontWeight: FontWeight.bold,
                                                     ),
                                                   ),
@@ -1793,7 +1802,7 @@ class _DelegateLeavesAndRequestsScreenState
                                   AppLocalizations.of(context)!.periodField,
                                   style: TextStyle(
                                     fontWeight: FontWeight.w600,
-                                    fontSize: 12,
+                                    fontSize: HrFont.labelMedium,
                                     color: colorScheme.onSurface,
                                   ),
                                 ),
@@ -1810,7 +1819,7 @@ class _DelegateLeavesAndRequestsScreenState
                                   child: Text(
                                     AppLocalizations.of(context)!.durationLabel(AppLocalizations.of(context)!.daysCount(calculatedDays)),
                                     style: TextStyle(
-                                      fontSize: 11,
+                                      fontSize: HrFont.labelSmall,
                                       fontWeight: FontWeight.bold,
                                       color: colorScheme.primary,
                                     ),
@@ -1822,7 +1831,7 @@ class _DelegateLeavesAndRequestsScreenState
                             Container(
                               decoration: BoxDecoration(
                                 color: colorScheme.surfaceContainer,
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(HrRadius.chip),
                               ),
                               child: Row(
                                 children: [
@@ -1869,7 +1878,7 @@ class _DelegateLeavesAndRequestsScreenState
                                                   Text(
                                                     AppLocalizations.of(context)!.fromField,
                                                     style: TextStyle(
-                                                      fontSize: 9.5,
+                                                      fontSize: HrFont.labelSmall,
                                                       fontWeight: FontWeight.w600,
                                                       color: colorScheme.onSurfaceVariant,
                                                     ),
@@ -1878,7 +1887,7 @@ class _DelegateLeavesAndRequestsScreenState
                                                   Text(
                                                     DateFormat('dd-MM-yyyy').format(startDate),
                                                     style: const TextStyle(
-                                                      fontSize: 12,
+                                                      fontSize: HrFont.labelMedium,
                                                       fontWeight: FontWeight.bold,
                                                     ),
                                                   ),
@@ -1933,7 +1942,7 @@ class _DelegateLeavesAndRequestsScreenState
                                                   Text(
                                                     AppLocalizations.of(context)!.toField,
                                                     style: TextStyle(
-                                                      fontSize: 9.5,
+                                                      fontSize: HrFont.labelSmall,
                                                       fontWeight: FontWeight.w600,
                                                       color: colorScheme.onSurfaceVariant,
                                                     ),
@@ -1942,7 +1951,7 @@ class _DelegateLeavesAndRequestsScreenState
                                                   Text(
                                                     DateFormat('dd-MM-yyyy').format(endDate),
                                                     style: const TextStyle(
-                                                      fontSize: 12,
+                                                      fontSize: HrFont.labelMedium,
                                                       fontWeight: FontWeight.bold,
                                                     ),
                                                   ),
@@ -1963,7 +1972,7 @@ class _DelegateLeavesAndRequestsScreenState
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
                                   color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(HrRadius.chip),
                                   border: Border.all(color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.4)),
                                 ),
                                 child: Row(
@@ -1978,7 +1987,7 @@ class _DelegateLeavesAndRequestsScreenState
                                       child: Text(
                                         AppLocalizations.of(context)!.daysExceedBalance(calculatedDays, _currentRemainingBalance),
                                         style: TextStyle(
-                                          fontSize: 10.5,
+                                          fontSize: HrFont.labelSmall,
                                           color: Theme.of(context).colorScheme.onTertiaryContainer,
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -1997,18 +2006,18 @@ class _DelegateLeavesAndRequestsScreenState
                             AppLocalizations.of(context)!.reasonField,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
-                              fontSize: 12,
+                              fontSize: HrFont.labelMedium,
                               color: colorScheme.onSurface,
                             ),
                           ),
                           const SizedBox(height: 6),
                           TextField(
                             controller: reasonCtrl,
-                            style: const TextStyle(fontSize: 12),
+                            style: const TextStyle(fontSize: HrFont.labelMedium),
                             decoration: InputDecoration(
                               hintText: AppLocalizations.of(context)!.reasonHint,
                               hintStyle: TextStyle(
-                                fontSize: 11,
+                                fontSize: HrFont.labelSmall,
                                 color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                               ),
                               contentPadding: const EdgeInsets.symmetric(
@@ -2016,19 +2025,19 @@ class _DelegateLeavesAndRequestsScreenState
                                 vertical: 8,
                               ),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(HrRadius.chip),
                                 borderSide: BorderSide(
                                   color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                                 ),
                               ),
                               enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(HrRadius.chip),
                                 borderSide: BorderSide(
                                   color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                                 ),
                               ),
                               focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(HrRadius.chip),
                                 borderSide: BorderSide(
                                   color: colorScheme.primary,
                                   width: 1.5,
@@ -2045,7 +2054,7 @@ class _DelegateLeavesAndRequestsScreenState
                             AppLocalizations.of(context)!.attachmentOptional,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
-                              fontSize: 12,
+                              fontSize: HrFont.labelMedium,
                               color: colorScheme.onSurface,
                             ),
                           ),
@@ -2055,7 +2064,7 @@ class _DelegateLeavesAndRequestsScreenState
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
                                 color: colorScheme.surfaceContainer,
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(HrRadius.chip),
                                 border: Border.all(
                                   color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
                                 ),
@@ -2072,7 +2081,7 @@ class _DelegateLeavesAndRequestsScreenState
                                     child: Text(
                                       pickedAttachment!.name,
                                       style: const TextStyle(
-                                        fontSize: 11.5,
+                                        fontSize: HrFont.labelSmall,
                                         fontWeight: FontWeight.w600,
                                       ),
                                       overflow: TextOverflow.ellipsis,
@@ -2080,10 +2089,10 @@ class _DelegateLeavesAndRequestsScreenState
                                   ),
                                   InkWell(
                                     onTap: () => setDlgState(() => pickedAttachment = null),
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: const Padding(
+                                    borderRadius: BorderRadius.circular(HrRadius.button),
+                                    child: Padding(
                                       padding: EdgeInsets.all(4),
-                                      child: Icon(Symbols.close_rounded, size: 16, color: Colors.red),
+                                      child: Icon(Symbols.close_rounded, size: 16, color: HrStatusColors.of(context).danger),
                                     ),
                                   ),
                                 ],
@@ -2094,7 +2103,7 @@ class _DelegateLeavesAndRequestsScreenState
                               height: 38,
                               decoration: BoxDecoration(
                                 color: colorScheme.surfaceContainer,
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(HrRadius.chip),
                               ),
                               child: Row(
                                 children: [
@@ -2126,7 +2135,7 @@ class _DelegateLeavesAndRequestsScreenState
                                           Text(
                                             AppLocalizations.of(context)!.cameraLabel,
                                             style: TextStyle(
-                                              fontSize: 12,
+                                              fontSize: HrFont.labelMedium,
                                               fontWeight: FontWeight.w600,
                                             ),
                                           ),
@@ -2167,7 +2176,7 @@ class _DelegateLeavesAndRequestsScreenState
                                           Text(
                                             AppLocalizations.of(context)!.galleryLabel,
                                             style: TextStyle(
-                                              fontSize: 12,
+                                              fontSize: HrFont.labelMedium,
                                               fontWeight: FontWeight.w600,
                                             ),
                                           ),
@@ -2192,7 +2201,7 @@ class _DelegateLeavesAndRequestsScreenState
                                   SizedBox(height: 6),
                                   Text(
                                     AppLocalizations.of(context)!.sendingRequest,
-                                    style: TextStyle(fontSize: 11),
+                                    style: TextStyle(fontSize: HrFont.labelSmall),
                                   ),
                                 ],
                               ),
@@ -2221,7 +2230,7 @@ class _DelegateLeavesAndRequestsScreenState
                             child: OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(HrRadius.chip),
                                 ),
                                 foregroundColor: colorScheme.onSurfaceVariant,
                                 padding: EdgeInsets.zero,
@@ -2231,7 +2240,7 @@ class _DelegateLeavesAndRequestsScreenState
                               label: Text(
                                 AppLocalizations.of(context)!.cancel,
                                 style: TextStyle(
-                                  fontSize: 12.5,
+                                  fontSize: HrFont.labelMedium,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -2247,7 +2256,7 @@ class _DelegateLeavesAndRequestsScreenState
                             child: FilledButton.icon(
                               style: FilledButton.styleFrom(
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(HrRadius.chip),
                                 ),
                                 padding: EdgeInsets.zero,
                               ),
@@ -2425,7 +2434,7 @@ class _DelegateLeavesAndRequestsScreenState
                               label: Text(
                                 isSubmitting ? AppLocalizations.of(context)!.sendingEllipsis : AppLocalizations.of(context)!.sendAction,
                                 style: const TextStyle(
-                                  fontSize: 12.5,
+                                  fontSize: HrFont.labelMedium,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),

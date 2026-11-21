@@ -13,6 +13,45 @@ import '../../../../core/utils/google_maps_loader.dart';
 import '../../../../core/widgets/app_avatar.dart';
 import 'delegate_tracking_card.dart';
 
+/// A branch pin and geofence drawn on the live map even when no delegate
+/// is checked in there.
+@immutable
+class TrackingMapBranch {
+  final String branchName;
+  final double latitude;
+  final double longitude;
+  final double geofenceRadius;
+
+  const TrackingMapBranch({
+    required this.branchName,
+    required this.latitude,
+    required this.longitude,
+    required this.geofenceRadius,
+  });
+
+  /// Unique branches (by name) with coordinates from tracking sessions that
+  /// are already in the caller's company scope. No extra query.
+  static List<TrackingMapBranch> fromSessions(
+    Iterable<DelegateTrackingSession> sessions,
+  ) {
+    final byName = <String, TrackingMapBranch>{};
+    for (final s in sessions) {
+      final name = s.branchName.trim();
+      if (name.isEmpty || s.branchLat == 0 || s.branchLng == 0) continue;
+      byName.putIfAbsent(
+        name,
+        () => TrackingMapBranch(
+          branchName: s.branchName,
+          latitude: s.branchLat,
+          longitude: s.branchLng,
+          geofenceRadius: s.geofenceRadius,
+        ),
+      );
+    }
+    return byName.values.toList(growable: false);
+  }
+}
+
 class TrackingLiveMapView extends StatefulWidget {
   final List<DelegateTrackingSession> sessions;
   final ValueChanged<DelegateTrackingSession> onToggleTracking;
@@ -22,6 +61,18 @@ class TrackingLiveMapView extends StatefulWidget {
   /// Test seam; defaults to the real service.
   final DelegateTrackingService? trackingService;
 
+  /// False hides the map's own refresh buttons (the HR web shell has one in
+  /// its top bar). [onRefresh] still runs for a delegate card's ping.
+  final bool showRefreshControls;
+
+  /// Extra branches to draw and to fit the camera to. Empty keeps the old
+  /// behavior (branches come from [sessions] only).
+  final List<TrackingMapBranch> branches;
+
+  /// When set and [sessions] is empty, a message card is shown on the map.
+  final String? emptyMapTitle;
+  final String? emptyMapMessage;
+
   const TrackingLiveMapView({
     super.key,
     required this.sessions,
@@ -29,6 +80,10 @@ class TrackingLiveMapView extends StatefulWidget {
     this.onRefresh,
     this.initialSelectedDelegateId,
     this.trackingService,
+    this.showRefreshControls = true,
+    this.branches = const [],
+    this.emptyMapTitle,
+    this.emptyMapMessage,
   });
 
   @override
@@ -88,7 +143,16 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
         }
       }
     }
+    // Branches arrive after the map was created: fit to them once.
+    if (oldWidget.branches.isEmpty &&
+        widget.branches.isNotEmpty &&
+        _selectedSession == null) {
+      _fitMapBounds();
+    }
   }
+
+  bool get _showRefreshControls =>
+      widget.onRefresh != null && widget.showRefreshControls;
 
   void _checkMapsAvailability() {
     _mapsAvailabilityTimer?.cancel();
@@ -727,14 +791,24 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
         first.lastLatitude ?? first.branchLat,
         first.lastLongitude ?? first.branchLng,
       );
+    } else if (widget.branches.isNotEmpty) {
+      final first = widget.branches.first;
+      initialCenter = LatLng(first.latitude, first.longitude);
     }
 
     // 2. تجميع دوائر نطاق الفروع
     final Set<Circle> circles = {};
-    final Map<String, DelegateTrackingSession> uniqueBranches = {};
+    final Map<String, TrackingMapBranch> uniqueBranches = {
+      for (final b in widget.branches) b.branchName: b,
+    };
     for (final s in widget.sessions) {
       if (s.branchLat != 0 && s.branchLng != 0) {
-        uniqueBranches[s.branchName] = s;
+        uniqueBranches[s.branchName] = TrackingMapBranch(
+          branchName: s.branchName,
+          latitude: s.branchLat,
+          longitude: s.branchLng,
+          geofenceRadius: s.geofenceRadius,
+        );
       }
     }
 
@@ -743,7 +817,7 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
       circles.add(
         Circle(
           circleId: CircleId('geofence_${s.branchName}'),
-          center: LatLng(s.branchLat, s.branchLng),
+          center: LatLng(s.latitude, s.longitude),
           radius: s.geofenceRadius,
           fillColor: colorScheme.primary.withValues(alpha: 0.12),
           strokeColor: colorScheme.primary.withValues(alpha: 0.7),
@@ -780,7 +854,7 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
       markers.add(
         Marker(
           markerId: MarkerId('branch_${s.branchName}'),
-          position: LatLng(s.branchLat, s.branchLng),
+          position: LatLng(s.latitude, s.longitude),
           icon: _branchMarker ??
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
           infoWindow: InfoWindow(
@@ -917,7 +991,7 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
                 child: const Icon(Icons.crop_free_rounded),
               ),
               const SizedBox(height: 8),
-              if (widget.onRefresh != null)
+              if (_showRefreshControls)
                 FloatingActionButton.small(
                   heroTag: 'refresh_map_btn',
                   backgroundColor: colorScheme.surface,
@@ -929,6 +1003,13 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
             ],
           ),
         ),
+
+        if (widget.sessions.isEmpty && widget.emptyMapTitle != null)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Center(child: _buildEmptyMapCard(context)),
+            ),
+          ),
 
         // دليل ألوان الدبابيس الثلاثي (Legend)
         Positioned(
@@ -969,6 +1050,50 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
             ),
           ),
       ],
+    );
+  }
+
+  /// Message card on the map when nobody is checked in.
+  Widget _buildEmptyMapCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return ConstrainedBox(
+      key: const ValueKey('tracking_map_empty'),
+      constraints: const BoxConstraints(maxWidth: 400),
+      child: Card(
+        elevation: 2,
+        color: colorScheme.surfaceContainerLow,
+        margin: const EdgeInsets.all(24),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.person_pin_circle_outlined,
+                size: 40,
+                color: colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                widget.emptyMapTitle!,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleMedium,
+              ),
+              if (widget.emptyMapMessage != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  widget.emptyMapMessage!,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1037,7 +1162,7 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
                     ],
                   ),
                 ),
-                if (widget.onRefresh != null)
+                if (_showRefreshControls)
                   IconButton.filledTonal(
                     iconSize: 18,
                     visualDensity: VisualDensity.compact,
@@ -1146,7 +1271,7 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
                               color: colorScheme.onSurfaceVariant,
                             ),
                           ),
-                          if (widget.onRefresh != null) ...[
+                          if (_showRefreshControls) ...[
                             const SizedBox(height: 12),
                             TextButton.icon(
                               onPressed: widget.onRefresh,
@@ -1524,7 +1649,8 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
   }
 
   void _fitMapBounds({bool forceLocalScope = true}) {
-    if (!mounted || _mapController == null || widget.sessions.isEmpty) return;
+    if (!mounted || _mapController == null) return;
+    if (widget.sessions.isEmpty && widget.branches.isEmpty) return;
 
     // 1. إذا كان هناك مندوب محدد، نثبت النطاق عليه وعلى فرعه ومساره دون إبعاد الكاميرا
     if (_selectedSession != null) {
@@ -1544,6 +1670,9 @@ class _TrackingLiveMapViewState extends State<TrackingLiveMapView> {
       if (lat != 0 && lng != 0) {
         validPoints.add(LatLng(lat, lng));
       }
+    }
+    for (final b in widget.branches) {
+      validPoints.add(LatLng(b.latitude, b.longitude));
     }
 
     if (validPoints.isEmpty) return;

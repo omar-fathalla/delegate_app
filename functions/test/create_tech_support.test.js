@@ -258,10 +258,13 @@ test("assessExistingProfile allows technical_support refresh", () => {
 });
 
 test("shouldQueueSetupEmail respects cooldown unless forced", () => {
-  const recent = {lastPasswordSetupMailAt: {toMillis: () => Date.now()}};
+  // TAS-159: take "now" once. A toMillis() that calls Date.now() itself runs
+  // after the function's own Date.now(), so a 1 ms tick made "old" look recent.
+  const now = Date.now();
+  const recent = {lastPasswordSetupMailAt: {toMillis: () => now}};
   assert.equal(shouldQueueSetupEmail(recent, false), false);
   assert.equal(shouldQueueSetupEmail(recent, true), true);
-  const old = {lastPasswordSetupMailAt: {toMillis: () => Date.now() - SETUP_MAIL_COOLDOWN_MS - 1}};
+  const old = {lastPasswordSetupMailAt: {toMillis: () => now - SETUP_MAIL_COOLDOWN_MS - 1}};
   assert.equal(shouldQueueSetupEmail(old, false), true);
 });
 

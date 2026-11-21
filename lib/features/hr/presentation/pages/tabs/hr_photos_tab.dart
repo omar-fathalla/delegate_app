@@ -17,11 +17,48 @@ import 'package:delegate_app/features/photo_permission/presentation/pages/captur
 import 'package:delegate_app/features/photo_permission/presentation/pages/monthly_photo_report_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_adaptive_sheet.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_empty_state.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_inner_page.dart';
+
+/// The two views of the «الصور» page.
+enum HrPhotosView { photos, permissions }
+
+/// Lets the web HR shell switch an open «الصور» page to one of its views.
+///
+/// TAS-149: photo permissions live only inside «الصور». Old entry points of
+/// the retired «أذونات التصوير» page call [show] with
+/// [HrPhotosView.permissions]. Every call notifies, even when the same view
+/// is requested twice.
+class HrPhotosViewController extends ChangeNotifier {
+  HrPhotosView? _requested;
+
+  /// Last requested view, read by a page that mounts after the request.
+  HrPhotosView? get requested => _requested;
+
+  void show(HrPhotosView view) {
+    _requested = view;
+    notifyListeners();
+  }
+}
 
 class HRPhotosTab extends StatefulWidget {
   final Delegate hrDelegate;
 
-  const HRPhotosTab({super.key, required this.hrDelegate});
+  /// View shown first. A pending [viewController] request wins.
+  final HrPhotosView initialView;
+
+  /// Web shell only: switches the view while the page stays mounted.
+  final HrPhotosViewController? viewController;
+
+  const HRPhotosTab({
+    super.key,
+    required this.hrDelegate,
+    this.initialView = HrPhotosView.photos,
+    this.viewController,
+  });
 
   @override
   State<HRPhotosTab> createState() => HRPhotosTabState();
@@ -30,6 +67,9 @@ class HRPhotosTab extends StatefulWidget {
 class HRPhotosTabState extends State<HRPhotosTab> {
   int _selectedView = 0; // 0 = الصور الميدانية, 1 = أذونات التصوير
   final TextEditingController _searchController = TextEditingController();
+
+  /// Last loaded permissions, for the web toolbar filter counts.
+  List<PhotoPermission> _cachedPermissions = [];
 
   // Filters for View 0 (الصور الميدانية)
   String _selectedBranch = 'all';
@@ -45,11 +85,43 @@ class HRPhotosTabState extends State<HRPhotosTab> {
   void initState() {
     super.initState();
     _photoBloc = di.sl<PhotoPermissionBloc>();
+    final view = widget.viewController?.requested ?? widget.initialView;
+    _selectedView = view == HrPhotosView.permissions ? 1 : 0;
+    widget.viewController?.addListener(_onViewRequested);
+    _refreshData();
+  }
+
+  @override
+  void didUpdateWidget(covariant HRPhotosTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.viewController != widget.viewController) {
+      oldWidget.viewController?.removeListener(_onViewRequested);
+      widget.viewController?.addListener(_onViewRequested);
+    }
+  }
+
+  void _onViewRequested() {
+    final view = widget.viewController?.requested;
+    if (!mounted || view == null) return;
+    _selectView(view == HrPhotosView.permissions ? 1 : 0);
+  }
+
+  /// Switches between the photos and permissions views and reloads.
+  void _selectView(int view) {
+    if (view == _selectedView) return;
+    setState(() {
+      _selectedView = view;
+      _selectedBranch = 'all';
+      _selectedDelegate = 'all';
+      _selectedPermissionFilter = 'all';
+      _searchController.clear();
+    });
     _refreshData();
   }
 
   @override
   void dispose() {
+    widget.viewController?.removeListener(_onViewRequested);
     _searchController.dispose();
     _photoBloc.close();
     super.dispose();
@@ -91,16 +163,41 @@ class HRPhotosTabState extends State<HRPhotosTab> {
 
       if (hasActiveOrPending) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
               '⚠️ يوجد بالفعل إذن تصوير فعال أو معلق قيد المراجعة لهذه الشركة. لا يمكن تقديم طلب جديد حتى انتهاء الإذن الحالي.',
             ),
-            backgroundColor: Colors.orange,
+            backgroundColor: HrStatusColors.of(context).warning,
             behavior: SnackBarBehavior.floating,
           ),
         );
         return;
       }
+    }
+
+    // TAS-150: the web opens the request as a dialog (a bottom sheet on a
+    // narrow window). Mobile keeps its own bottom sheet below.
+    if (WebRuntimePolicy.isWeb) {
+      showHrAdaptiveSheet<void>(
+        context: context,
+        title: 'طلب إذن تصوير',
+        dialogWidth: 640,
+        scrollBody: false,
+        builder: (sheetContext) => MultiBlocProvider(
+          providers: [
+            BlocProvider(
+              create: (_) => di.sl<BranchBloc>()..add(BranchLoadRequested()),
+            ),
+            BlocProvider.value(value: _photoBloc),
+          ],
+          child: _HRCreatePhotoRequestBottomSheet(
+            hrDelegate: widget.hrDelegate,
+            photoBloc: _photoBloc,
+            framed: true,
+          ),
+        ),
+      );
+      return;
     }
 
     showModalBottomSheet(
@@ -126,15 +223,15 @@ class HRPhotosTabState extends State<HRPhotosTab> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
         title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 28),
+            Icon(Icons.warning_amber_rounded, color: HrStatusColors.of(context).danger, size: 28),
             const SizedBox(width: 8),
             const Expanded(
               child: Text(
                 'تأكيد حذف الصورة',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.titleMedium),
               ),
             ),
           ],
@@ -145,24 +242,24 @@ class HRPhotosTabState extends State<HRPhotosTab> {
           children: [
             Text(
               'هل أنت متأكد من حذف هذه الصورة المرسلة من المندوب "${photo.delegateName}" بفرع "${BranchDisplayCache.instance.displayName(photo.branchName)}"؟',
-              style: const TextStyle(fontSize: 14),
+              style: const TextStyle(fontSize: HrFont.body),
             ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: Colors.red.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(HrRadius.chip),
                 border: Border.all(color: Colors.red.shade200),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline_rounded, size: 18, color: Colors.red.shade700),
+                  Icon(Icons.info_outline_rounded, size: 18, color: HrStatusColors.of(context).danger),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'سيتم حذف الصورة بشكل نهائي من قاعدة البيانات ومساحة التخزين.',
-                      style: TextStyle(fontSize: 12, color: Colors.red),
+                      style: TextStyle(fontSize: HrFont.labelMedium, color: HrStatusColors.of(context).danger),
                     ),
                   ),
                 ],
@@ -177,9 +274,9 @@ class HRPhotosTabState extends State<HRPhotosTab> {
           ),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: HrStatusColors.of(context).danger,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.chip)),
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
             icon: const Icon(Icons.delete_forever_rounded, size: 18),
@@ -210,7 +307,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
         title: const Text('إلغاء طلب إذن التصوير'),
         content: const Text('هل أنت متأكد من رغبتك في إلغاء هذا الطلب المعلق؟'),
         actions: [
@@ -220,9 +317,9 @@ class HRPhotosTabState extends State<HRPhotosTab> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: HrStatusColors.of(context).danger,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.chip)),
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('تأكيد الإلغاء'),
@@ -271,7 +368,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                             : 'معاينة الصورة الميدانية',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 16,
+                          fontSize: HrFont.titleMedium,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -286,7 +383,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                   // Interactive Image Viewer
                   Flexible(
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                       child: InteractiveViewer(
                         panEnabled: true,
                         minScale: 0.5,
@@ -305,7 +402,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                       border: Border.all(color: Colors.white24),
                     ),
                     child: Column(
@@ -319,7 +416,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                               photo.branchName.isNotEmpty ? BranchDisplayCache.instance.displayName(photo.branchName) : 'الفرع غير محدد',
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 13,
+                                fontSize: HrFont.body,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -330,7 +427,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                               DateFormat('yyyy/MM/dd - hh:mm a', 'ar').format(photo.capturedAt),
                               style: const TextStyle(
                                 color: Colors.white70,
-                                fontSize: 12,
+                                fontSize: HrFont.labelMedium,
                               ),
                             ),
                           ],
@@ -341,7 +438,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                             'ملاحظات: ${photo.comment}',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 13,
+                              fontSize: HrFont.body,
                             ),
                           ),
                         ],
@@ -366,7 +463,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(color: colorScheme.error),
                           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -424,7 +521,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                           style: FilledButton.styleFrom(
                             backgroundColor: saveSuccess ? colorScheme.primary : null,
                             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
                           ),
                         ),
                       ),
@@ -436,13 +533,13 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: saveSuccess ? colorScheme.primaryContainer : colorScheme.errorContainer,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(HrRadius.chip),
                       ),
                       child: Text(
                         statusText!,
                         style: TextStyle(
                           color: saveSuccess ? colorScheme.onPrimaryContainer : colorScheme.onErrorContainer,
-                          fontSize: 12,
+                          fontSize: HrFont.labelMedium,
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
@@ -471,7 +568,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
-                backgroundColor: Colors.green,
+                backgroundColor: HrStatusColors.of(context).success,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -480,7 +577,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
-                backgroundColor: Colors.green,
+                backgroundColor: HrStatusColors.of(context).success,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -489,7 +586,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
-                backgroundColor: Colors.red,
+                backgroundColor: HrStatusColors.of(context).danger,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -498,6 +595,9 @@ class HRPhotosTabState extends State<HRPhotosTab> {
         builder: (context, state) {
           if (state is CapturedPhotosLoaded) {
             _cachedPhotos = state.photos;
+          }
+          if (state is PhotoPermissionsLoaded) {
+            _cachedPermissions = state.permissions;
           }
 
           final currentPhotos = (state is CapturedPhotosLoaded)
@@ -539,7 +639,16 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                     ),
                   ],
                 ),
-                child: LayoutBuilder(
+                child: WebRuntimePolicy.isWeb
+                    ? _buildWebToolbar(
+                        colorScheme: colorScheme,
+                        sortedBranches: sortedBranches,
+                        branchCounts: branchCounts,
+                        sortedDelegates: sortedDelegates,
+                        delegateCounts: delegateCounts,
+                        totalPhotos: currentPhotos.length,
+                      )
+                    : LayoutBuilder(
                   builder: (context, constraints) {
                     final isDesktop = constraints.maxWidth >= 768;
 
@@ -733,6 +842,29 @@ class HRPhotosTabState extends State<HRPhotosTab> {
       return true;
     }).toList();
 
+    if (filtered.isEmpty && WebRuntimePolicy.isWeb) {
+      final isFiltered = _selectedBranch != 'all' || _selectedDelegate != 'all';
+      return HrEmptyState(
+        key: const ValueKey('hr_photos_empty'),
+        icon: Icons.photo_library_outlined,
+        title: photos.isEmpty
+            ? 'لا توجد صور ميدانية'
+            : 'لا توجد صور مطابقة للفلتر',
+        message: photos.isEmpty
+            ? 'ستظهر هنا الصور التي يلتقطها المناديب أثناء الزيارات.'
+            : null,
+        action: isFiltered
+            ? TextButton(
+                onPressed: () => setState(() {
+                  _selectedBranch = 'all';
+                  _selectedDelegate = 'all';
+                }),
+                child: const Text('إظهار الكل'),
+              )
+            : null,
+      );
+    }
+
     if (filtered.isEmpty) {
       return Center(
         child: Column(
@@ -784,12 +916,12 @@ class HRPhotosTabState extends State<HRPhotosTab> {
           final photo = filtered[index];
           return InkWell(
             onTap: () => _openPhotoDetail(photo),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(HrRadius.card),
             child: Card(
               elevation: 0,
               clipBehavior: Clip.antiAlias,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(HrRadius.card),
                 side: BorderSide(
                   color: colorScheme.outlineVariant.withValues(alpha: 0.5),
                 ),
@@ -832,7 +964,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                           photo.delegateName.isNotEmpty ? photo.delegateName : 'مندوب',
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 13,
+                            fontSize: HrFont.body,
                             fontWeight: FontWeight.bold,
                           ),
                           maxLines: 1,
@@ -848,7 +980,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                                 branchName: photo.branchName,
                                 style: const TextStyle(
                                   color: Colors.white70,
-                                  fontSize: 11,
+                                  fontSize: HrFont.labelSmall,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -861,7 +993,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                           DateFormat('MM/dd - hh:mm a', 'ar').format(photo.capturedAt),
                           style: const TextStyle(
                             color: Colors.white54,
-                            fontSize: 10,
+                            fontSize: HrFont.labelSmall,
                           ),
                         ),
                       ],
@@ -913,7 +1045,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                     Text(
                       'طلب إذن تصوير',
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: HrFont.labelSmall,
                         fontWeight: FontWeight.w600,
                         color: colorScheme.onPrimary,
                       ),
@@ -932,20 +1064,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
           Material(
             color: colorScheme.surfaceContainerHigh,
             child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => BlocProvider(
-                      create: (_) => di.sl<PhotoPermissionBloc>(),
-                      child: MonthlyPhotoReportScreen(
-                        delegate: widget.hrDelegate,
-                        showAppBar: true,
-                      ),
-                    ),
-                  ),
-                );
-              },
+              onTap: _openMonthlyReport,
               hoverColor: colorScheme.primary.withValues(alpha: 0.08),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -961,7 +1080,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                     Text(
                       'التقرير الشهري',
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: HrFont.labelSmall,
                         fontWeight: FontWeight.w600,
                         color: colorScheme.onSurface,
                       ),
@@ -973,6 +1092,184 @@ class HRPhotosTabState extends State<HRPhotosTab> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Opens «التقرير الشهري».
+  ///
+  /// TAS-150: inside the wide web shell it is an inner page (breadcrumb,
+  /// sidebar kept, wide content width) without its own app bar. Without a
+  /// shell host (mobile, narrow web) [pushHrInnerPage] pushes it full screen
+  /// with its app bar, as before. In the shell an inline refresh button
+  /// replaces the app bar's refresh action.
+  void _openMonthlyReport() {
+    pushHrInnerPage<void>(
+      context,
+      title: 'التقرير الشهري',
+      maxWidth: HrInnerPageWidth.wide,
+      builder: (_, inShell) => BlocProvider(
+        create: (_) => di.sl<PhotoPermissionBloc>(),
+        child: MonthlyPhotoReportScreen(
+          delegate: widget.hrDelegate,
+          showAppBar: !inShell,
+          showInlineRefresh: inShell,
+        ),
+      ),
+    );
+  }
+
+  /// Active, pending and expired (or rejected) permissions.
+  ({
+    List<PhotoPermission> active,
+    List<PhotoPermission> pending,
+    List<PhotoPermission> expired,
+  })
+  _permissionBuckets(List<PhotoPermission> permissions) {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    return (
+      active: permissions.where((p) {
+        return p.status.toLowerCase() == 'approved' &&
+            !p.endDate.isBefore(todayStart);
+      }).toList(),
+      pending: permissions.where((p) {
+        return p.status.toLowerCase() == 'pending';
+      }).toList(),
+      expired: permissions.where((p) {
+        final isApproved = p.status.toLowerCase() == 'approved';
+        return (isApproved && p.endDate.isBefore(todayStart)) ||
+            p.status.toLowerCase() == 'rejected';
+      }).toList(),
+    );
+  }
+
+  /// Web toolbar (TAS-149, TAS-150): one line, same order on both views.
+  ///
+  /// View switch at the start, the filters of the current view in the
+  /// middle, and the two page actions («التقرير الشهري», then the one
+  /// «طلب إذن تصوير» button) pinned at the end so nothing moves when the
+  /// view changes.
+  Widget _buildWebToolbar({
+    required ColorScheme colorScheme,
+    required List<String> sortedBranches,
+    required Map<String, int> branchCounts,
+    required List<String> sortedDelegates,
+    required Map<String, int> delegateCounts,
+    required int totalPhotos,
+  }) {
+    const filterWidth = 220.0;
+    const controlHeight = 40.0;
+
+    final viewSwitch = TashilConnectedButtonGroup<int>(
+      key: const ValueKey('hr_photos_view_switch'),
+      isScrollable: false,
+      height: controlHeight,
+      itemPadding: const EdgeInsets.symmetric(horizontal: 12),
+      selectedValue: _selectedView,
+      items: const [
+        TashilConnectedButtonItem(
+          value: 0,
+          label: 'الصور الميدانية',
+          icon: Icons.photo_library_rounded,
+        ),
+        TashilConnectedButtonItem(
+          value: 1,
+          label: 'أذونات التصوير',
+          icon: Icons.verified_rounded,
+        ),
+      ],
+      onSelected: _selectView,
+    );
+
+    final List<Widget> filters;
+    if (_selectedView == 0) {
+      filters = [
+        SizedBox(
+          width: filterWidth,
+          child: _buildM3BranchDropdown(
+            sortedBranches: sortedBranches,
+            branchCounts: branchCounts,
+            colorScheme: colorScheme,
+            totalPhotos: totalPhotos,
+            height: controlHeight,
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: filterWidth,
+          child: _buildM3DelegateDropdown(
+            sortedDelegates: sortedDelegates,
+            delegateCounts: delegateCounts,
+            colorScheme: colorScheme,
+            totalPhotos: totalPhotos,
+            height: controlHeight,
+          ),
+        ),
+      ];
+    } else {
+      final buckets = _permissionBuckets(_cachedPermissions);
+      filters = [
+        TashilConnectedButtonGroup<String>(
+          key: const ValueKey('hr_photos_permission_filter'),
+          height: controlHeight,
+          isScrollable: false,
+          selectedValue: _selectedPermissionFilter,
+          items: [
+            TashilConnectedButtonItem(
+              value: 'all',
+              label: 'الكل (${_cachedPermissions.length})',
+              icon: Icons.filter_list_rounded,
+            ),
+            TashilConnectedButtonItem(
+              value: 'active',
+              label: 'النشطة (${buckets.active.length})',
+              icon: Icons.check_circle_outline_rounded,
+            ),
+            TashilConnectedButtonItem(
+              value: 'pending',
+              label: 'المعلقة (${buckets.pending.length})',
+              icon: Icons.hourglass_top_rounded,
+            ),
+            TashilConnectedButtonItem(
+              value: 'expired',
+              label: 'المنتهية (${buckets.expired.length})',
+              icon: Icons.event_busy_rounded,
+            ),
+          ],
+          onSelected: (val) => setState(() => _selectedPermissionFilter = val),
+        ),
+      ];
+    }
+
+    return Row(
+      key: const ValueKey('hr_photos_toolbar'),
+      children: [
+        viewSwitch,
+        const SizedBox(width: 12),
+        Expanded(
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(mainAxisSize: MainAxisSize.min, children: filters),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        OutlinedButton.icon(
+          key: const ValueKey('hr_photos_monthly_report'),
+          onPressed: _openMonthlyReport,
+          icon: const Icon(Icons.calendar_month_rounded, size: 18),
+          label: const Text('التقرير الشهري'),
+        ),
+        const SizedBox(width: 8),
+        FilledButton.icon(
+          key: const ValueKey('hr_photos_request_permission'),
+          onPressed: () => _showCreateRequestSheet(context),
+          icon: const Icon(Icons.add_a_photo_rounded, size: 18),
+          label: const Text('طلب إذن تصوير'),
+        ),
+      ],
     );
   }
 
@@ -1000,7 +1297,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
               maxWidth: 320,
             ),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(HrRadius.card),
               side: BorderSide(
                 color: colorScheme.outlineVariant.withValues(alpha: 0.4),
                 width: 1,
@@ -1060,7 +1357,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                     child: Text(
                       currentLabel,
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: HrFont.labelSmall,
                         fontWeight: FontWeight.w600,
                         color: isFiltered
                             ? colorScheme.primary
@@ -1108,7 +1405,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
               maxWidth: 320,
             ),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(HrRadius.card),
               side: BorderSide(
                 color: colorScheme.outlineVariant.withValues(alpha: 0.4),
                 width: 1,
@@ -1168,7 +1465,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                     child: Text(
                       currentLabel,
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: HrFont.labelSmall,
                         fontWeight: FontWeight.w600,
                         color: isFiltered
                             ? colorScheme.primary
@@ -1220,7 +1517,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
             child: Text(
               label,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: HrFont.body,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 color: isSelected ? colorScheme.primary : colorScheme.onSurface,
               ),
@@ -1235,12 +1532,12 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                 color: isSelected
                     ? colorScheme.primary.withValues(alpha: 0.15)
                     : colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(HrRadius.chip),
               ),
               child: Text(
                 '$count',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: HrFont.labelSmall,
                   fontWeight: FontWeight.bold,
                   color: isSelected
                       ? colorScheme.primary
@@ -1269,21 +1566,10 @@ class HRPhotosTabState extends State<HRPhotosTab> {
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
-    final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-
-    final activeList = permissions.where((p) {
-      return p.status.toLowerCase() == 'approved' && !p.endDate.isBefore(todayStart);
-    }).toList();
-
-    final pendingList = permissions.where((p) {
-      return p.status.toLowerCase() == 'pending';
-    }).toList();
-
-    final expiredList = permissions.where((p) {
-      final isApproved = p.status.toLowerCase() == 'approved';
-      return (isApproved && p.endDate.isBefore(todayStart)) || p.status.toLowerCase() == 'rejected';
-    }).toList();
+    final buckets = _permissionBuckets(permissions);
+    final activeList = buckets.active;
+    final pendingList = buckets.pending;
+    final expiredList = buckets.expired;
 
     // Filter by selected tab chip
     List<PhotoPermission> baseList = permissions;
@@ -1296,6 +1582,32 @@ class HRPhotosTabState extends State<HRPhotosTab> {
     }
 
     final filtered = baseList;
+
+    // TAS-149: on the web the status filter sits in the page toolbar, and
+    // the one request button is the toolbar's, so the empty state has no
+    // button of its own.
+    if (WebRuntimePolicy.isWeb) {
+      if (filtered.isEmpty) {
+        return HrEmptyState(
+          key: const ValueKey('hr_photos_permissions_empty'),
+          icon: Icons.assignment_outlined,
+          title: permissions.isEmpty
+              ? 'لا توجد أذونات تصوير'
+              : 'لا توجد أذونات مطابقة للفلتر',
+          message: permissions.isEmpty
+              ? 'لطلب إذن جديد استخدم زر «طلب إذن تصوير» في أعلى الصفحة.'
+              : null,
+          action: permissions.isEmpty
+              ? null
+              : TextButton(
+                  onPressed: () =>
+                      setState(() => _selectedPermissionFilter = 'all'),
+                  child: const Text('إظهار الكل'),
+                ),
+        );
+      }
+      return _buildPermissionsGrid(filtered, theme, colorScheme);
+    }
 
     return Column(
       children: [
@@ -1428,43 +1740,52 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                     ],
                   ),
                 )
-              : RefreshIndicator(
-                  onRefresh: () async => _refreshData(),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      if (constraints.maxWidth > 750) {
-                        return GridView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 550,
-                            childAspectRatio: 1.85,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                          ),
-                          itemCount: filtered.length,
-                          itemBuilder: (context, index) => _buildPermissionCard(
-                            filtered[index],
-                            theme,
-                            colorScheme,
-                          ),
-                        );
-                      }
-
-                      return ListView.separated(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        itemCount: filtered.length,
-                        separatorBuilder: (context, index) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) => _buildPermissionCard(
-                          filtered[index],
-                          theme,
-                          colorScheme,
-                        ),
-                      );
-                    },
-                  ),
-                ),
+              : _buildPermissionsGrid(filtered, theme, colorScheme),
         ),
       ],
+    );
+  }
+
+  /// Permission cards: a grid on wide layouts, a list on narrow ones.
+  Widget _buildPermissionsGrid(
+    List<PhotoPermission> filtered,
+    ThemeData theme,
+    ColorScheme colorScheme,
+  ) {
+    return RefreshIndicator(
+      onRefresh: () async => _refreshData(),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth > 750) {
+            return GridView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 550,
+                childAspectRatio: 1.85,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              itemCount: filtered.length,
+              itemBuilder: (context, index) => _buildPermissionCard(
+                filtered[index],
+                theme,
+                colorScheme,
+              ),
+            );
+          }
+
+          return ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            itemCount: filtered.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 10),
+            itemBuilder: (context, index) => _buildPermissionCard(
+              filtered[index],
+              theme,
+              colorScheme,
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -1486,10 +1807,10 @@ class HRPhotosTabState extends State<HRPhotosTab> {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(
           color: isActive
-              ? const Color(0xFF2E7D32).withValues(alpha: 0.4)
+              ? HrStatusColors.of(context).success.withValues(alpha: 0.4)
               : isPending
                   ? Colors.orange.withValues(alpha: 0.5)
                   : colorScheme.outlineVariant.withValues(alpha: 0.5),
@@ -1508,11 +1829,11 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: isActive
-                        ? const Color(0xFF2E7D32).withValues(alpha: 0.12)
+                        ? HrStatusColors.of(context).success.withValues(alpha: 0.12)
                         : isPending
                             ? Colors.orange.withValues(alpha: 0.12)
                             : colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(HrRadius.chip),
                   ),
                   child: Icon(
                     isActive
@@ -1521,9 +1842,9 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                             ? Icons.hourglass_top_rounded
                             : Icons.assignment_outlined,
                     color: isActive
-                        ? const Color(0xFF2E7D32)
+                        ? HrStatusColors.of(context).success
                         : isPending
-                            ? Colors.orange.shade800
+                            ? HrStatusColors.of(context).warning
                             : colorScheme.onSurfaceVariant,
                     size: 20,
                   ),
@@ -1555,14 +1876,14 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: (isActive
-                            ? const Color(0xFF2E7D32)
+                            ? HrStatusColors.of(context).success
                             : isPending
-                                ? Colors.orange
+                                ? HrStatusColors.of(context).warning
                                 : isExpired
-                                    ? Colors.red
+                                    ? HrStatusColors.of(context).danger
                                     : colorScheme.outline)
                         .withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(HrRadius.button),
                   ),
                   child: Text(
                     isActive
@@ -1574,13 +1895,13 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                                 : 'مرفوض',
                     style: TextStyle(
                       color: isActive
-                          ? const Color(0xFF2E7D32)
+                          ? HrStatusColors.of(context).success
                           : isPending
-                              ? Colors.orange.shade800
+                              ? HrStatusColors.of(context).warning
                               : isExpired
-                                  ? Colors.red.shade800
+                                  ? HrStatusColors.of(context).danger
                                   : colorScheme.outline,
-                      fontSize: 11,
+                      fontSize: HrFont.labelSmall,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -1595,7 +1916,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1605,7 +1926,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                     Text(
                       'القسم: ${perm.department}',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: HrFont.labelSmall,
                         fontWeight: FontWeight.bold,
                         color: colorScheme.primary,
                       ),
@@ -1640,7 +1961,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                     icon: Icon(Icons.cancel_outlined, size: 16, color: colorScheme.error),
                     label: Text(
                       'إلغاء الطلب',
-                      style: TextStyle(color: colorScheme.error, fontSize: 12, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: colorScheme.error, fontSize: HrFont.labelMedium, fontWeight: FontWeight.bold),
                     ),
                   )
                 else
@@ -1649,7 +1970,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                 FilledButton.tonalIcon(
                   style: FilledButton.styleFrom(
                     visualDensity: VisualDensity.compact,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
                   ),
                   onPressed: () {
                     Navigator.push(
@@ -1660,7 +1981,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
                     );
                   },
                   icon: const Icon(Icons.collections_rounded, size: 16),
-                  label: const Text('عرض صور هذا الإذن', style: TextStyle(fontSize: 12)),
+                  label: const Text('عرض صور هذا الإذن', style: TextStyle(fontSize: HrFont.labelMedium)),
                 ),
               ],
             ),
@@ -1704,7 +2025,7 @@ class _HRBranchNamesListState extends State<_HRBranchNamesList> {
         children: [
           Text(
             text,
-            style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+            style: theme.textTheme.bodySmall?.copyWith(fontSize: HrFont.labelMedium),
             maxLines: _isExpanded ? null : 2,
             overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
           ),
@@ -1715,7 +2036,7 @@ class _HRBranchNamesListState extends State<_HRBranchNamesList> {
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.primary,
                 fontWeight: FontWeight.bold,
-                fontSize: 11,
+                fontSize: HrFont.labelSmall,
               ),
             ),
           ],
@@ -1732,9 +2053,14 @@ class _HRCreatePhotoRequestBottomSheet extends StatefulWidget {
   final Delegate hrDelegate;
   final PhotoPermissionBloc photoBloc;
 
+  /// True inside [showHrAdaptiveSheet] on the web: no own title row,
+  /// background or padding.
+  final bool framed;
+
   const _HRCreatePhotoRequestBottomSheet({
     required this.hrDelegate,
     required this.photoBloc,
+    this.framed = false,
   });
 
   @override
@@ -1762,17 +2088,23 @@ class _HRCreatePhotoRequestBottomSheetState
     final colorScheme = theme.colorScheme;
     final media = MediaQuery.of(context);
 
+    // Web dialog: [HrSheetFrame] draws the title, close button and padding,
+    // so the sheet chrome below turns into a plain pass-through.
+    final framed = widget.framed;
     return Material(
-      color: colorScheme.surface,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      clipBehavior: Clip.antiAlias,
+      type: framed ? MaterialType.transparency : MaterialType.canvas,
+      color: framed ? null : colorScheme.surface,
+      borderRadius: framed ? null : const BorderRadius.vertical(top: Radius.circular(HrRadius.pill)),
+      clipBehavior: framed ? Clip.none : Clip.antiAlias,
       child: Padding(
-        padding: EdgeInsets.only(
-          top: 24,
-          left: 24,
-          right: 24,
-          bottom: media.viewInsets.bottom + 24,
-        ),
+        padding: framed
+            ? EdgeInsets.zero
+            : EdgeInsets.only(
+                top: 24,
+                left: 24,
+                right: 24,
+                bottom: media.viewInsets.bottom + 24,
+              ),
         child: BlocBuilder<BranchBloc, BranchState>(
           builder: (context, state) {
             List<Branch> branches = [];
@@ -1786,6 +2118,7 @@ class _HRCreatePhotoRequestBottomSheetState
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (!framed) ...[
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -1803,13 +2136,14 @@ class _HRCreatePhotoRequestBottomSheetState
                   ),
                   const Divider(),
                   const SizedBox(height: 12),
+                  ],
 
                   // القسم المطلوب للتصوير
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                       border: Border.all(
                         color: colorScheme.outlineVariant.withValues(alpha: 0.5),
                       ),
@@ -1835,7 +2169,7 @@ class _HRCreatePhotoRequestBottomSheetState
                           isExpanded: true,
                           decoration: InputDecoration(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
                             filled: true,
                             fillColor: colorScheme.surface,
                           ),
@@ -1844,7 +2178,7 @@ class _HRCreatePhotoRequestBottomSheetState
                               value: dept,
                               child: Text(
                                 dept,
-                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: HrFont.body),
                               ),
                             );
                           }).toList(),
@@ -1864,7 +2198,7 @@ class _HRCreatePhotoRequestBottomSheetState
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: colorScheme.primaryContainer.withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                       border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
                     ),
                     child: Column(
@@ -1889,14 +2223,14 @@ class _HRCreatePhotoRequestBottomSheetState
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
                                 color: colorScheme.primary,
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(HrRadius.button),
                               ),
                               child: const Text(
                                 'شهر واحد (30 يوم)',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 13,
+                                  fontSize: HrFont.body,
                                 ),
                               ),
                             ),
@@ -1934,7 +2268,7 @@ class _HRCreatePhotoRequestBottomSheetState
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: colorScheme.secondaryContainer.withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                       border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.3)),
                     ),
                     child: Column(
@@ -1966,14 +2300,14 @@ class _HRCreatePhotoRequestBottomSheetState
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
                                   color: colorScheme.secondary,
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(HrRadius.button),
                                 ),
                                 child: Text(
                                   'جميع الفروع (${branches.length})',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 13,
+                                    fontSize: HrFont.body,
                                   ),
                                 ),
                               ),
@@ -1995,7 +2329,7 @@ class _HRCreatePhotoRequestBottomSheetState
                   FilledButton.icon(
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
                     ),
                     onPressed: (isLoadingBranches || branches.isEmpty)
                         ? null
@@ -2019,7 +2353,7 @@ class _HRCreatePhotoRequestBottomSheetState
                     icon: const Icon(Icons.send_rounded, size: 18),
                     label: const Text(
                       'إرسال الطلب للاعتماد (شامل كل الفروع)',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.titleMedium),
                     ),
                   ),
                 ],

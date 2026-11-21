@@ -14,6 +14,7 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
 import 'package:delegate_app/core/widgets/device_lock_dialog.dart';
+import 'package:delegate_app/core/widgets/tashil_maestro_dev_semantics.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/semantics.dart';
@@ -156,11 +157,7 @@ class _LoginScreenState extends State<LoginScreen>
 
   /// Web form-level message. Credential failures use the approved copy.
   /// Every other failure keeps the message the app already produces.
-  String? _webFormMessage(
-    AuthState state,
-    AppLocalizations l10n,
-    bool arabic,
-  ) {
+  String? _webFormMessage(AuthState state, AppLocalizations l10n, bool arabic) {
     if (state is AuthError && state.code != 'device_mismatch') {
       if (state.code == 'invalid_credentials') {
         return arabic
@@ -170,11 +167,7 @@ class _LoginScreenState extends State<LoginScreen>
       if (_isDelegateWebBlock(state.code, state.message)) {
         return _delegateWebPolite(arabic);
       }
-      return localizedAuthError(
-        l10n,
-        message: state.message,
-        code: state.code,
-      );
+      return localizedAuthError(l10n, message: state.message, code: state.code);
     }
     if (_webDelegateNotice) return _delegateWebPolite(arabic);
     return null;
@@ -278,6 +271,7 @@ class _LoginScreenState extends State<LoginScreen>
               onSubmit: () => _submitLogin(context),
               onForgot: () => _forgotPassword(context, isArabic),
               onSupport: () => _launchPhoneDialer(l10n.contactNumber),
+              onSupportWhatsApp: () => _launchWhatsApp(l10n.contactNumber),
               onLanguage: () => localeProvider.toggleLocale(),
             );
           }
@@ -820,49 +814,57 @@ class _LoginScreenState extends State<LoginScreen>
         child: ConstrainedBox(
           // min 52dp; grows with large text scales instead of clipping.
           constraints: const BoxConstraints(minHeight: 52),
-          child: FilledButton(
-            key: const ValueKey('login_submit'),
-            // IgnorePointer keeps the primary colour while loading (spec §3).
-            onPressed: _isWebDelegate ? null : () => _submitLogin(context),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-              // The app theme's FilledButton padding is vertical 16, which in
-              // a 52dp box left only 20dp for Cairo's ~27dp line and clipped
-              // the label. Keep vertical padding small and centre the label.
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              alignment: Alignment.center,
-              foregroundColor: colorScheme.onPrimary,
-              backgroundColor: colorScheme.primary,
-              shape: const StadiumBorder(),
-              textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                height: 1.4,
+          // Maestro id: "تسجيل الدخول" is also the form title above.
+          child: tashilMaestroDevSemantics(
+            identifier: 'tashil_login_submit_button',
+            button: true,
+            child: FilledButton(
+              key: const ValueKey('login_submit'),
+              // IgnorePointer keeps the primary colour while loading (spec §3).
+              onPressed: _isWebDelegate ? null : () => _submitLogin(context),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+                // The app theme's FilledButton padding is vertical 16, which in
+                // a 52dp box left only 20dp for Cairo's ~27dp line and clipped
+                // the label. Keep vertical padding small and centre the label.
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 8,
+                ),
+                alignment: Alignment.center,
+                foregroundColor: colorScheme.onPrimary,
+                backgroundColor: colorScheme.primary,
+                shape: const StadiumBorder(),
+                textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                ),
               ),
-            ),
-            child: IgnorePointer(
-              ignoring: loading,
-              child: AnimatedSwitcher(
-                duration: reduce ? Duration.zero : M3Motion.short4,
-                switchInCurve: M3Motion.emphasizedDecel,
-                switchOutCurve: M3Motion.emphasizedAccel,
-                child: loading
-                    ? SizedBox.square(
-                        key: const ValueKey('login_loading'),
-                        dimension: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: colorScheme.onPrimary,
+              child: IgnorePointer(
+                ignoring: loading,
+                child: AnimatedSwitcher(
+                  duration: reduce ? Duration.zero : M3Motion.short4,
+                  switchInCurve: M3Motion.emphasizedDecel,
+                  switchOutCurve: M3Motion.emphasizedAccel,
+                  child: loading
+                      ? SizedBox.square(
+                          key: const ValueKey('login_loading'),
+                          dimension: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: colorScheme.onPrimary,
+                          ),
+                        )
+                      : Text(
+                          l10n.loginButton,
+                          key: const ValueKey('login_label'),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.visible,
+                          style: TextStyle(color: colorScheme.onPrimary),
                         ),
-                      )
-                    : Text(
-                        l10n.loginButton,
-                        key: const ValueKey('login_label'),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.visible,
-                        style: TextStyle(color: colorScheme.onPrimary),
-                      ),
+                ),
               ),
             ),
           ),
@@ -1133,6 +1135,16 @@ class _LoginScreenState extends State<LoginScreen>
         ],
       ),
     );
+  }
+
+  // ---- Helper: Open a WhatsApp chat with support (web login, TAS-188) ----
+  Future<void> _launchWhatsApp(String phoneNumber) async {
+    final e164 = egyptianPhoneToE164(phoneNumber);
+    if (e164 == null) return;
+    final uri = Uri.parse('https://wa.me/${e164.substring(1)}');
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
   }
 
   // ---- Helper: Launch Phone Dialer ----

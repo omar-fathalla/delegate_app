@@ -16,7 +16,9 @@ import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/admin/domain/entities/company.dart';
 import 'package:delegate_app/features/marketing/presentation/pages/marketing_main_screen.dart';
 import 'package:delegate_app/features/accountant/presentation/pages/accountant_main_screen.dart';
+import 'package:delegate_app/features/auth/domain/role_home.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_access_gate.dart';
+import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_login_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/privacy_policy_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
@@ -180,22 +182,24 @@ final appRouter = GoRouter(
         );
       },
     ),
-    GoRoute(
-      path: '/hr/home',
-      pageBuilder: (context, state) {
-        final delegate = state.extra is Delegate ? state.extra as Delegate : null;
-        if (delegate == null) {
-          return AppMotionPage.fadeThrough(
-            state: state,
-            child: const SplashScreen(),
-          );
-        }
-        return AppMotionPage.fadeThrough(
+    // HR shell: `/hr/home` and one URL per sidebar page (TAS-139). All of
+    // them share one page key, so a URL change updates the mounted shell
+    // (its tab follows the URL) instead of building a new one.
+    // TAS-190: `/hr/<slug>/delegate/<id>` is the delegate attendance detail
+    // page over that tab, on the same shell page.
+    for (final path in [
+      ...hrShellRoutePaths(),
+      ...hrShellDelegateDetailRoutePaths(),
+    ])
+      GoRoute(
+        path: path,
+        redirect: hrShellRedirect,
+        pageBuilder: (context, state) => AppMotionPage.fadeThrough(
           state: state,
-          child: hrHomeRouteChild(delegate),
-        );
-      },
-    ),
+          key: kHrShellPageKey,
+          child: hrShellRouteChild(context, state),
+        ),
+      ),
     GoRoute(
       path: '/hr/delegate-attendance',
       pageBuilder: (context, state) {
@@ -437,5 +441,9 @@ final appRouter = GoRouter(
         );
       },
     ),
+    // Unknown HR shell URLs fall back to the overview (TAS-139). Kept last
+    // so every known `/hr/...` route matches first.
+    GoRoute(path: '/hr/:slug', redirect: (_, _) => kWebHrSystemPath),
+    GoRoute(path: '/hr/:slug/:rest', redirect: (_, _) => kWebHrSystemPath),
   ],
 );

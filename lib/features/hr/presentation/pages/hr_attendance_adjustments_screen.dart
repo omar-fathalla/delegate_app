@@ -4,6 +4,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/core/widgets/tashil_button_group.dart';
@@ -11,6 +12,8 @@ import 'package:delegate_app/core/widgets/tashil_icon_button.dart';
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_empty_state.dart';
 
 /// نموذج سجل تعديل الحضور والانصراف الإداري
 class AttendanceAdjustmentRecord {
@@ -134,18 +137,52 @@ class AttendanceAdjustmentRecord {
   }
 }
 
+/// A request from the web shell to show «سجل تعديلات الحضور» for one
+/// delegate (TAS-146). Each request is a new object, so asking again for the
+/// same delegate after the user cleared the filter applies it again.
+class HrAdjustmentsDelegateFilter {
+  HrAdjustmentsDelegateFilter({required this.uid, required this.name});
+
+  final String uid;
+  final String name;
+}
+
 /// شاشة سجل تعديلات الحضور والانصراف الإدارية (Audit Trail)
+/// Arabic message for a failed adjustments-log load (TAS-186). Never shows
+/// the raw Firebase text.
+String hrAdjustmentsLoadErrorMessage(Object error) {
+  if (error is FirebaseException) {
+    switch (error.code) {
+      case 'permission-denied':
+        return 'ليس لديك صلاحية لعرض سجل التعديلات.';
+      case 'unavailable':
+      case 'deadline-exceeded':
+        return 'تعذر الاتصال بالخادم. تحقق من الاتصال بالإنترنت ثم أعد المحاولة.';
+    }
+  }
+  return 'حدث خطأ أثناء تحميل سجل التعديلات. يرجى المحاولة مرة أخرى.';
+}
+
 class HRAttendanceAdjustmentsScreen extends StatefulWidget {
   final Delegate hrDelegate;
   final bool showAppBar;
   final String? initialDelegateUID;
+
+  /// Web shell: delegate filter opened from «سجل الحضور والانصراف التفصيلي»
+  /// (TAS-146). Shown as a chip the user can clear.
+  final HrAdjustmentsDelegateFilter? delegateFilter;
 
   const HRAttendanceAdjustmentsScreen({
     super.key,
     required this.hrDelegate,
     this.showAppBar = true,
     this.initialDelegateUID,
+    this.delegateFilter,
   });
+
+  /// Tests swap in a fake Firestore for the reads.
+  @visibleForTesting
+  static FirebaseFirestore Function()? debugFirestore;
 
   @override
   State<HRAttendanceAdjustmentsScreen> createState() => _HRAttendanceAdjustmentsScreenState();
@@ -158,10 +195,15 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
   String _searchQuery = '';
   Map<String, Delegate> _delegatesByUid = {};
   int? _hoveredRowIndex;
+  HrAdjustmentsDelegateFilter? _delegateFilter;
+
+  /// Bumped by «إعادة المحاولة» to listen to the log again.
+  int _loadAttempt = 0;
 
   @override
   void initState() {
     super.initState();
+    _delegateFilter = widget.delegateFilter;
     _loadCompanyDelegates();
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.trim());
@@ -184,6 +226,14 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
         }
       });
     } catch (_) {}
+  }
+
+  @override
+  void didUpdateWidget(covariant HRAttendanceAdjustmentsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.delegateFilter, widget.delegateFilter)) {
+      _delegateFilter = widget.delegateFilter;
+    }
   }
 
   @override
@@ -222,6 +272,12 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
       if (widget.initialDelegateUID != null &&
           widget.initialDelegateUID!.isNotEmpty &&
           r.delegateUID != widget.initialDelegateUID) {
+        return false;
+      }
+
+      // 2b. Delegate filter from the web shell (TAS-146)
+      final delegateFilter = _delegateFilter;
+      if (delegateFilter != null && r.delegateUID != delegateFilter.uid) {
         return false;
       }
 
@@ -300,7 +356,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('تم تصدير $fileName بنجاح'),
-          backgroundColor: const Color(0xFF2E7D32),
+          backgroundColor: HrStatusColors.of(context).success,
         ),
       );
     }
@@ -313,8 +369,11 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
     final isWide = MediaQuery.of(context).size.width >= 900;
 
     // Strict multi-tenant query
-    Query<Map<String, dynamic>> query = FirebaseFirestore.instance
-        .collection(kAttendanceAdjustmentLogsCollection);
+    final db = HRAttendanceAdjustmentsScreen.debugFirestore?.call() ??
+        FirebaseFirestore.instance;
+    Query<Map<String, dynamic>> query = db.collection(
+      kAttendanceAdjustmentLogsCollection,
+    );
 
     if (widget.hrDelegate.companyUID.isNotEmpty) {
       query = query.where('companyUID', isEqualTo: widget.hrDelegate.companyUID);
@@ -333,7 +392,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                     'سجل تعديلات الحضور والانصراف',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14.5,
+                      fontSize: HrFont.body,
                       letterSpacing: -0.2,
                     ),
                     maxLines: 1,
@@ -344,7 +403,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                         ? widget.hrDelegate.companyName
                         : 'إدارة الرقابة الإدارية والامتثال',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: HrFont.labelSmall,
                       color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
                     ),
                     maxLines: 1,
@@ -357,20 +416,22 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
             )
           : null,
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        // A new key on retry drops the old error and listens again.
+        key: ValueKey(_loadAttempt),
         stream: query.snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
-                    const SizedBox(height: 12),
-                    Text('حدث خطأ أثناء تحميل السجلات: ${snapshot.error}', textAlign: TextAlign.center),
-                  ],
-                ),
+            // Same pattern as the detail log's error state (TAS-120): a
+            // readable Arabic message, never the raw Firebase text.
+            return HrEmptyState(
+              key: const Key('hr_adjustments_error'),
+              icon: Icons.error_outline_rounded,
+              title: 'تعذر تحميل سجل التعديلات',
+              message: hrAdjustmentsLoadErrorMessage(snapshot.error!),
+              action: FilledButton.tonal(
+                key: const Key('hr_adjustments_retry'),
+                onPressed: () => setState(() => _loadAttempt++),
+                child: const Text('إعادة المحاولة'),
               ),
             );
           }
@@ -534,7 +595,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.35),
         ),
@@ -551,7 +612,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                 child: Text(
                   kpi.title,
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: HrFont.labelSmall,
                     fontWeight: FontWeight.w600,
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -563,7 +624,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                 padding: const EdgeInsets.all(5),
                 decoration: BoxDecoration(
                   color: kpi.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
                 child: Icon(kpi.icon, size: 14, color: kpi.color),
               ),
@@ -573,7 +634,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
           Text(
             kpi.value,
             style: TextStyle(
-              fontSize: 14.5,
+              fontSize: HrFont.body,
               fontWeight: FontWeight.bold,
               color: colorScheme.onSurface,
             ),
@@ -584,7 +645,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
           Text(
             kpi.subtitle,
             style: TextStyle(
-              fontSize: 9.5,
+              fontSize: HrFont.labelSmall,
               color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
             ),
             maxLines: 1,
@@ -609,6 +670,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
         runSpacing: 10,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
+          if (_delegateFilter != null) _buildDelegateFilterChip(colorScheme),
           SizedBox(
             width: 260,
             height: 42,
@@ -625,7 +687,12 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
             ],
             onSelected: (val) => setState(() => _selectedPeriodFilter = val),
           ),
-          _buildReasonSelector(distinctReasons, colorScheme),
+          // Web: a normal dropdown sized to its content, not a bar across
+          // the whole page (TAS-146). Mobile keeps its selector.
+          if (WebRuntimePolicy.isWeb)
+            _buildReasonDropdown(distinctReasons, colorScheme)
+          else
+            _buildReasonSelector(distinctReasons, colorScheme),
           _buildCountAndExportGroup(recordCount, onExport, colorScheme),
         ],
       );
@@ -633,6 +700,13 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (_delegateFilter != null) ...[
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: _buildDelegateFilterChip(colorScheme),
+            ),
+            const SizedBox(height: 8),
+          ],
           SizedBox(
             height: 42,
             child: _buildSearchTextField(colorScheme),
@@ -668,12 +742,12 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
   Widget _buildSearchTextField(ColorScheme colorScheme) {
     return TextField(
       controller: _searchController,
-      style: TextStyle(fontSize: 13, color: colorScheme.onSurface),
+      style: TextStyle(fontSize: HrFont.body, color: colorScheme.onSurface),
       textAlignVertical: TextAlignVertical.center,
       decoration: InputDecoration(
         hintText: 'بحث باسم المندوب أو الهاتف...',
         hintStyle: TextStyle(
-          fontSize: 12,
+          fontSize: HrFont.labelMedium,
           color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
         ),
         prefixIcon: Icon(Icons.search_rounded, size: 19, color: colorScheme.primary),
@@ -689,22 +763,87 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
         filled: true,
         fillColor: colorScheme.surfaceContainerHigh,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(21),
+          borderRadius: BorderRadius.circular(HrRadius.pill),
           borderSide: BorderSide(
             color: colorScheme.outlineVariant.withValues(alpha: 0.35),
           ),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(21),
+          borderRadius: BorderRadius.circular(HrRadius.pill),
           borderSide: BorderSide(
             color: colorScheme.outlineVariant.withValues(alpha: 0.35),
           ),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(21),
+          borderRadius: BorderRadius.circular(HrRadius.pill),
           borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
         ),
       ),
+    );
+  }
+
+  /// Active delegate filter from the web shell; deleting it shows every
+  /// delegate again (TAS-146).
+  Widget _buildDelegateFilterChip(ColorScheme colorScheme) {
+    final filter = _delegateFilter!;
+    final name = filter.name.isNotEmpty
+        ? filter.name
+        : (_delegatesByUid[filter.uid]?.fullName ?? '');
+    return InputChip(
+      key: const Key('hr_adjustments_delegate_filter'),
+      avatar: Icon(Icons.person_rounded, size: 18, color: colorScheme.primary),
+      label: Text(
+        name.isNotEmpty ? 'المندوب: $name' : 'مندوب محدد',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      deleteButtonTooltipMessage: 'عرض كل المناديب',
+      onDeleted: () => setState(() => _delegateFilter = null),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(HrRadius.chip),
+      ),
+    );
+  }
+
+  /// Web reason filter: a standard M3 dropdown with a fixed width (TAS-146).
+  Widget _buildReasonDropdown(
+    Set<String> distinctReasons,
+    ColorScheme colorScheme,
+  ) {
+    final reasons = ['all', ...distinctReasons];
+    final selected = reasons.contains(_selectedReasonFilter)
+        ? _selectedReasonFilter
+        : 'all';
+    return DropdownMenu<String>(
+      key: const Key('hr_adjustments_reason_filter'),
+      width: 240,
+      initialSelection: selected,
+      leadingIcon: Icon(
+        Icons.tune_rounded,
+        size: 18,
+        color: selected != 'all'
+            ? colorScheme.primary
+            : colorScheme.onSurfaceVariant,
+      ),
+      textStyle: TextStyle(fontSize: HrFont.body, color: colorScheme.onSurface),
+      inputDecorationTheme: InputDecorationTheme(
+        isDense: true,
+        constraints: const BoxConstraints(maxHeight: 42),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(HrRadius.pill),
+        ),
+      ),
+      onSelected: (val) {
+        if (val != null) setState(() => _selectedReasonFilter = val);
+      },
+      dropdownMenuEntries: [
+        for (final r in reasons)
+          DropdownMenuEntry<String>(
+            value: r,
+            label: r == 'all' ? 'جميع الأسباب' : r,
+          ),
+      ],
     );
   }
 
@@ -713,7 +852,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
       height: 40,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(HrRadius.button),
         border: Border.all(
           color: _selectedReasonFilter != 'all'
               ? colorScheme.primary
@@ -726,7 +865,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
         color: colorScheme.surfaceContainerHigh,
         elevation: 3,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(HrRadius.card),
           side: BorderSide(
             color: colorScheme.outlineVariant.withValues(alpha: 0.4),
           ),
@@ -751,7 +890,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                     child: Text(
                       r == 'all' ? 'جميع الأسباب' : r,
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: HrFont.labelMedium,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                         color: isSelected ? colorScheme.primary : colorScheme.onSurface,
                       ),
@@ -783,7 +922,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                 child: Text(
                   _selectedReasonFilter == 'all' ? 'جميع الأسباب' : _selectedReasonFilter,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: HrFont.labelMedium,
                     fontWeight: FontWeight.w600,
                     color: _selectedReasonFilter != 'all'
                         ? colorScheme.primary
@@ -811,7 +950,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
       height: 40,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(HrRadius.button),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.35),
           width: 1.0,
@@ -832,7 +971,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                 Text(
                   'عدد: $recordCount',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: HrFont.labelMedium,
                     fontWeight: FontWeight.bold,
                     color: colorScheme.onSurface,
                   ),
@@ -873,7 +1012,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                       Text(
                         'CSV',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: HrFont.labelMedium,
                           fontWeight: FontWeight.bold,
                           color: colorScheme.primary,
                           letterSpacing: 0.5,
@@ -896,7 +1035,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
       elevation: 0,
       color: colorScheme.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
       ),
       clipBehavior: Clip.antiAlias,
@@ -989,7 +1128,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                                             r.delegateName,
                                             style: const TextStyle(
                                               fontWeight: FontWeight.bold,
-                                              fontSize: 13,
+                                              fontSize: HrFont.body,
                                               letterSpacing: 0.1,
                                             ),
                                             overflow: TextOverflow.ellipsis,
@@ -1007,7 +1146,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                                                 child: Text(
                                                   r.branchName,
                                                   style: TextStyle(
-                                                    fontSize: 11,
+                                                    fontSize: HrFont.labelSmall,
                                                     color: colorScheme.onSurfaceVariant,
                                                   ),
                                                   overflow: TextOverflow.ellipsis,
@@ -1037,7 +1176,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                                       DateFormat('EEEE', 'ar').format(r.sessionDate),
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 12.5,
+                                        fontSize: HrFont.labelMedium,
                                       ),
                                     ),
                                     const SizedBox(height: 3),
@@ -1053,7 +1192,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                                         Text(
                                           DateFormat('yyyy/MM/dd', 'en').format(r.sessionDate),
                                           style: TextStyle(
-                                            fontSize: 11,
+                                            fontSize: HrFont.labelSmall,
                                             color: colorScheme.onSurfaceVariant,
                                           ),
                                         ),
@@ -1073,7 +1212,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                                   orig: DateFormat('hh:mm a', 'ar').format(r.originalCheckInTime),
                                   updated: DateFormat('hh:mm a', 'ar').format(r.newCheckInTime),
                                   wasModified: r.wasCheckInModified,
-                                  activeColor: const Color(0xFF2E7D32),
+                                  activeColor: HrStatusColors.of(context).success,
                                   colorScheme: colorScheme,
                                 ),
                               ),
@@ -1113,7 +1252,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                                           : r.durationDiffMinutes < 0
                                               ? const Color(0xFFFFEBEE)
                                               : colorScheme.surfaceContainerHighest,
-                                      borderRadius: BorderRadius.circular(20),
+                                      borderRadius: BorderRadius.circular(HrRadius.button),
                                       border: Border.all(
                                         color: r.durationDiffMinutes > 0
                                             ? const Color(0xFFA5D6A7)
@@ -1134,21 +1273,21 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                                                   : Icons.horizontal_rule_rounded,
                                           size: 13,
                                           color: r.durationDiffMinutes > 0
-                                              ? const Color(0xFF1B5E20)
+                                              ? HrStatusColors.of(context).success
                                               : r.durationDiffMinutes < 0
-                                                  ? const Color(0xFFB71C1C)
+                                                  ? HrStatusColors.of(context).danger
                                                   : colorScheme.onSurfaceVariant,
                                         ),
                                         const SizedBox(width: 3),
                                         Text(
                                           r.formattedDurationDiff,
                                           style: TextStyle(
-                                            fontSize: 11.5,
+                                            fontSize: HrFont.labelSmall,
                                             fontWeight: FontWeight.bold,
                                             color: r.durationDiffMinutes > 0
-                                                ? const Color(0xFF1B5E20)
+                                                ? HrStatusColors.of(context).success
                                                 : r.durationDiffMinutes < 0
-                                                    ? const Color(0xFFB71C1C)
+                                                    ? HrStatusColors.of(context).danger
                                                     : colorScheme.onSurfaceVariant,
                                           ),
                                         ),
@@ -1180,7 +1319,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                                       child: Text(
                                         r.reason,
                                         style: TextStyle(
-                                          fontSize: 12,
+                                          fontSize: HrFont.labelMedium,
                                           fontWeight: FontWeight.w600,
                                           color: colorScheme.onSurface,
                                           height: 1.3,
@@ -1227,7 +1366,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                                             r.adjustedByName,
                                             style: const TextStyle(
                                               fontWeight: FontWeight.w600,
-                                              fontSize: 12,
+                                              fontSize: HrFont.labelMedium,
                                             ),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
@@ -1236,7 +1375,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                                           Text(
                                             DateFormat('yyyy/MM/dd • hh:mm a', 'ar').format(r.adjustedAt),
                                             style: TextStyle(
-                                              fontSize: 10.5,
+                                              fontSize: HrFont.labelSmall,
                                               color: colorScheme.onSurfaceVariant,
                                             ),
                                             maxLines: 1,
@@ -1307,7 +1446,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
           Text(
             updated,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: HrFont.labelMedium,
               fontWeight: FontWeight.w500,
               color: colorScheme.onSurfaceVariant,
             ),
@@ -1320,7 +1459,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: activeColor.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(HrRadius.chip),
         border: Border.all(
           color: activeColor.withValues(alpha: 0.22),
           width: 1,
@@ -1342,7 +1481,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
               Text(
                 orig,
                 style: TextStyle(
-                  fontSize: 10.5,
+                  fontSize: HrFont.labelSmall,
                   decoration: TextDecoration.lineThrough,
                   decorationColor: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
                   color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
@@ -1363,7 +1502,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
               Text(
                 updated,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: HrFont.labelMedium,
                   fontWeight: FontWeight.bold,
                   color: activeColor,
                 ),
@@ -1390,7 +1529,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
           child: Text(
             text,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: HrFont.labelMedium,
               fontWeight: FontWeight.bold,
               color: colorScheme.onSurfaceVariant,
             ),
@@ -1417,11 +1556,11 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
           elevation: 0,
           color: colorScheme.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(HrRadius.card),
             side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.35)),
           ),
           child: InkWell(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(HrRadius.card),
             onTap: () => _showRecordDetailsModal(r),
             child: Padding(
               padding: const EdgeInsets.all(14),
@@ -1440,8 +1579,8 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(r.delegateName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                            Text('${r.branchName} • $sessionDateStr', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
+                            Text(r.delegateName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.body)),
+                            Text('${r.branchName} • $sessionDateStr', style: TextStyle(fontSize: HrFont.labelSmall, color: colorScheme.onSurfaceVariant)),
                           ],
                         ),
                       ),
@@ -1453,7 +1592,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                               : r.durationDiffMinutes < 0
                                   ? const Color(0xFFFFEBEE)
                                   : colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(HrRadius.button),
                           border: Border.all(
                             color: r.durationDiffMinutes > 0
                                 ? const Color(0xFFA5D6A7)
@@ -1473,21 +1612,21 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                                       : Icons.horizontal_rule_rounded,
                               size: 12,
                               color: r.durationDiffMinutes > 0
-                                  ? const Color(0xFF1B5E20)
+                                  ? HrStatusColors.of(context).success
                                   : r.durationDiffMinutes < 0
-                                      ? const Color(0xFFB71C1C)
+                                      ? HrStatusColors.of(context).danger
                                       : colorScheme.onSurfaceVariant,
                             ),
                             const SizedBox(width: 3),
                             Text(
                               r.formattedDurationDiff,
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: HrFont.labelSmall,
                                 fontWeight: FontWeight.bold,
                                 color: r.durationDiffMinutes > 0
-                                    ? const Color(0xFF1B5E20)
+                                    ? HrStatusColors.of(context).success
                                     : r.durationDiffMinutes < 0
-                                        ? const Color(0xFFB71C1C)
+                                        ? HrStatusColors.of(context).danger
                                         : colorScheme.onSurfaceVariant,
                               ),
                             ),
@@ -1503,11 +1642,11 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('حضور معدل', style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant)),
+                            Text('حضور معدل', style: TextStyle(fontSize: HrFont.labelSmall, color: colorScheme.onSurfaceVariant)),
                             const SizedBox(height: 2),
                             Text(
                               DateFormat('hh:mm a', 'ar').format(r.newCheckInTime),
-                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
+                              style: TextStyle(fontSize: HrFont.labelMedium, fontWeight: FontWeight.bold, color: HrStatusColors.of(context).success),
                             ),
                           ],
                         ),
@@ -1516,12 +1655,12 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('انصراف معدل', style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant)),
+                            Text('انصراف معدل', style: TextStyle(fontSize: HrFont.labelSmall, color: colorScheme.onSurfaceVariant)),
                             const SizedBox(height: 2),
                             Text(
                               r.newCheckOutTime != null ? DateFormat('hh:mm a', 'ar').format(r.newCheckOutTime!) : 'لم يسجل',
                               style: TextStyle(
-                                fontSize: 12.5,
+                                fontSize: HrFont.labelMedium,
                                 fontWeight: FontWeight.bold,
                                 color: r.newCheckOutTime != null ? Colors.indigo.shade800 : colorScheme.error,
                               ),
@@ -1538,7 +1677,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                       Expanded(
                         child: Text(
                           'السبب: ${r.reason}',
-                          style: TextStyle(fontSize: 11, color: colorScheme.onSurface),
+                          style: TextStyle(fontSize: HrFont.labelSmall, color: colorScheme.onSurface),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -1551,7 +1690,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                           const SizedBox(width: 3),
                           Text(
                             r.adjustedByName,
-                            style: TextStyle(fontSize: 10.5, color: colorScheme.onSurfaceVariant),
+                            style: TextStyle(fontSize: HrFont.labelSmall, color: colorScheme.onSurfaceVariant),
                           ),
                         ],
                       ),
@@ -1572,7 +1711,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
       elevation: 0,
       color: colorScheme.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.35)),
       ),
       child: Padding(
@@ -1583,12 +1722,12 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
             const SizedBox(height: 16),
             Text(
               'لا توجد تعديلات إدارية مسجلة',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+              style: TextStyle(fontSize: HrFont.titleMedium, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
             ),
             const SizedBox(height: 8),
             Text(
               'جميع جلسات الحضور والانصراف مسجلة تلقائياً بدون تعديل يدوي، أو لا توجد نتائج تطابق الفلاتر المحددة.',
-              style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+              style: TextStyle(fontSize: HrFont.labelMedium, color: colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
           ],
@@ -1604,7 +1743,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.button)),
         title: Row(
           children: [
             AppAvatar(
@@ -1618,11 +1757,11 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('تفاصيل التعديل الإداري', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                  const Text('تفاصيل التعديل الإداري', style: TextStyle(fontSize: HrFont.titleMedium, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 2),
                   Text(
                     '${r.delegateName} • ${r.branchName}',
-                    style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                    style: TextStyle(fontSize: HrFont.labelMedium, color: colorScheme.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -1642,7 +1781,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                   Icons.login_rounded,
                   'وقت الحضور',
                   'الأصلي: ${DateFormat('hh:mm a', 'ar').format(r.originalCheckInTime)} ➔ الجديد: ${DateFormat('hh:mm a', 'ar').format(r.newCheckInTime)}',
-                  valueColor: Colors.green.shade800,
+                  valueColor: HrStatusColors.of(context).success,
                 ),
                 const SizedBox(height: 6),
                 _buildModalRow(
@@ -1656,7 +1795,7 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
                   Icons.timelapse_rounded,
                   'فارق مدة العمل',
                   r.formattedDurationDiff,
-                  valueColor: r.durationDiffMinutes >= 0 ? Colors.green.shade800 : Colors.red.shade800,
+                  valueColor: r.durationDiffMinutes >= 0 ? HrStatusColors.of(context).success : HrStatusColors.of(context).danger,
                 ),
                 const Divider(height: 16),
                 _buildModalRow(Icons.help_outline_rounded, 'سبب التعديل', r.reason),
@@ -1691,13 +1830,13 @@ class _HRAttendanceAdjustmentsScreenState extends State<HRAttendanceAdjustmentsS
         const SizedBox(width: 8),
         SizedBox(
           width: 130,
-          child: Text(label, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+          child: Text(label, style: TextStyle(fontSize: HrFont.labelMedium, color: colorScheme.onSurfaceVariant)),
         ),
         Expanded(
           child: Text(
             value,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: HrFont.labelMedium,
               fontWeight: FontWeight.w600,
               color: valueColor ?? colorScheme.onSurface,
             ),

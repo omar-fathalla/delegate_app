@@ -5,17 +5,24 @@
 # Does not talk to the runner service, release workflows, or tashil-ci / tashil-mac.
 #
 # Usage:
-#   bash scripts/local_ci.sh <git-sha>
+#   bash scripts/local_ci.sh [options] <git-sha>
+#     --jobs a,b,c        run only these jobs (see: bash scripts/ci/run_job.sh --list)
+#     --changed[=<base>]  run only jobs needed for files changed vs <base> (default origin/dev)
+#     --no-apk            skip the local-only android-dev-build job
+#     --post-status       publish each job result as a GitHub commit status
+#                         (context "local-ci/<job>"; costs no Actions minutes)
 #
-# Emulator port overrides (TA-39, e.g. parallel local runs):
-#   LOCAL_CI_FIRESTORE_PORT=18080 LOCAL_CI_FIRESTORE_HUB_PORT=14400 \
-#   LOCAL_CI_AUTH_PORT=19099 LOCAL_CI_STORAGE_PORT=19199 \
-#   LOCAL_CI_FUNCTIONS_PORT=15001 LOCAL_CI_LOGGING_PORT=14500 \
-#   LOCAL_CI_FIRESTORE_WEBSOCKET_PORT=19150 bash scripts/local_ci.sh <sha>
+# Job commands live in scripts/ci/jobs.sh (shared with ci.yml). Emulator jobs
+# lease a port slot (scripts/ci/lease.sh), so several local_ci.sh runs, GitHub
+# runners and agents can run at the same time on this Mac.
+#
+# Emulator ports (TAS-107): scripts/emulators_exec.sh picks a free local slot
+# (31xxx..39xxx) by itself, so parallel runs need no overrides. To pin ports,
+# set all seven LOCAL_CI_* vars (see scripts/emulator_ports.env.sh).
 #
 # Creates a fresh detached worktree at the SHA, runs every CI job plus an
 # Android dev debug APK build, and writes logs + SUMMARY.md to
-#   /tmp/local-ci/<sha>/
+#   /tmp/local-ci.noindex/<sha>/
 # Timestamps are Africa/Cairo.
 set -u
 set -o pipefail
@@ -41,7 +48,12 @@ if [[ ! -x "$NODE22_BIN/node" ]]; then
   exit 2
 fi
 
-export PATH="$FLUTTER_SDK/bin:$NODE22_BIN:$CLEAN_PATH"
+# Device tools for mac-gate (Maestro, Patrol, adb) when installed for this user.
+DEVICE_TOOLS=""
+for d in "$HOME/.maestro/bin" "$HOME/.pub-cache/bin" "$HOME/Library/Android/sdk/platform-tools"; do
+  [[ -d "$d" ]] && DEVICE_TOOLS="$DEVICE_TOOLS:$d"
+done
+export PATH="$FLUTTER_SDK/bin:$NODE22_BIN${DEVICE_TOOLS}:$CLEAN_PATH"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -49,10 +61,29 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # shellcheck source=emulator_ports.env.sh
 source "$SCRIPT_DIR/emulator_ports.env.sh"
 
-if [[ $# -lt 1 || -z "${1:-}" ]]; then
-  echo "Usage: bash scripts/local_ci.sh <git-sha>" >&2
+JOBS_ARG=""
+CHANGED_BASE=""
+NO_APK=0
+POST_STATUS=0
+TARGET=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --jobs) JOBS_ARG="${2:-}"; shift 2 ;;
+    --jobs=*) JOBS_ARG="${1#--jobs=}"; shift ;;
+    --changed) CHANGED_BASE="origin/dev"; shift ;;
+    --changed=*) CHANGED_BASE="${1#--changed=}"; shift ;;
+    --no-apk) NO_APK=1; shift ;;
+    --post-status) POST_STATUS=1; shift ;;
+    -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
+    -*) echo "local_ci: unknown option $1" >&2; exit 2 ;;
+    *) TARGET="$1"; shift ;;
+  esac
+done
+if [[ -z "$TARGET" ]]; then
+  echo "Usage: bash scripts/local_ci.sh [--jobs a,b] [--changed[=base]] [--no-apk] [--post-status] <git-sha>" >&2
   exit 2
 fi
+set -- "$TARGET"
 
 cd "$REPO_ROOT"
 git fetch origin --quiet || true
@@ -61,7 +92,7 @@ if ! SHA="$(git rev-parse --verify "${1}^{commit}" 2>/dev/null)"; then
   SHA="$(git rev-parse --verify "${1}^{commit}")"
 fi
 
-OUT="/tmp/local-ci/${SHA}"
+OUT="/tmp/local-ci.noindex/${SHA}"
 SRC="$OUT/src"
 LOGS="$OUT/logs"
 mkdir -p "$LOGS"
@@ -108,6 +139,22 @@ seed_local_properties() {
 
 seed_local_properties
 
+# Gitignored iOS dev Firebase config (tashil-dev), needed by iOS dev builds (mac-gate).
+seed_ios_dev_firebase() {
+  local rel="ios/config/dev/GoogleService-Info.plist" cand
+  for cand in "$REPO_ROOT/$rel" "${TASHIL_CI_IOS_DEV_PLIST:-}"; do
+    if [[ -n "$cand" && -f "$cand" ]]; then
+      mkdir -p "$SRC/$(dirname "$rel")"
+      cp "$cand" "$SRC/$rel"
+      echo "seeded $rel from a gitignored local file (values not logged)" >>"$OUT/full.log"
+      return 0
+    fi
+  done
+  echo "warning: no $rel found; iOS dev builds (mac-gate) will fail" >>"$OUT/full.log"
+}
+
+seed_ios_dev_firebase
+
 # Record a clean checkout at the exact SHA *before* jobs (gitignored
 # android/local.properties is not shown by status --porcelain).
 WORKTREE_HEAD="$(git -C "$SRC" rev-parse HEAD)"
@@ -122,9 +169,42 @@ WORKTREE_STATUS="$(git -C "$SRC" status --porcelain || true)"
   fi
 } | tee -a "$OUT/full.log"
 
-# Wait for emulator ports (firestore, hub, auth, storage, functions) to be free between jobs.
-wait_emulator_ports() {
-  wait_emulator_ports_free
+# Job selection (scripts/ci/jobs.sh is read from the SHA under test).
+# shellcheck source=ci/jobs.sh
+if [[ -f "$SRC/scripts/ci/jobs.sh" ]]; then
+  source "$SRC/scripts/ci/jobs.sh"
+else
+  echo "local_ci: $SHA predates scripts/ci; this script needs a SHA that has it" >&2
+  exit 2
+fi
+if [[ -n "$JOBS_ARG" ]]; then
+  JOBS="${JOBS_ARG//,/ }"
+elif [[ -n "$CHANGED_BASE" ]]; then
+  git fetch origin --quiet || true
+  JOBS="$(git diff --name-only "$(git merge-base "$CHANGED_BASE" "$SHA")" "$SHA" | ci_jobs_for_paths)"
+else
+  JOBS="$CI_JOBS_ALL"
+fi
+if [[ "$NO_APK" -eq 1 ]]; then
+  JOBS="$(echo " $JOBS " | sed 's/ android-dev-build / /; s/^ *//; s/ *$//')"
+fi
+for j in $JOBS; do
+  ci_job_exists "$j" || { echo "local_ci: unknown job '$j'" >&2; exit 2; }
+done
+echo "jobs: $JOBS" | tee -a "$OUT/full.log"
+export CI_SHA="$SHA"
+# Job artifacts (mac-gate screenshot, Maestro logs) outlive the temporary worktree.
+export CI_ARTIFACTS="$OUT/artifacts"
+
+REPO_SLUG="$(git remote get-url origin | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')"
+post_status() {
+  [[ "$POST_STATUS" -eq 1 ]] || return 0
+  local job="$1" result="$2" duration="$3" state
+  case "$result" in PASS) state=success ;; PENDING) state=pending ;; *) state=failure ;; esac
+  gh api "repos/${REPO_SLUG}/statuses/${SHA}" \
+    -f state="$state" -f context="local-ci/${job}" \
+    -f description="${result} in ${duration}s on $(hostname -s) (local_ci.sh)" >/dev/null 2>&1 \
+    || echo "warning: could not post status for ${job}" >>"$OUT/full.log"
 }
 
 run_job() {
@@ -136,6 +216,7 @@ run_job() {
   start_human="$(now)"
   start_e="$(date +%s)"
   echo "===== JOB ${slug} start ${start_human} (timeout ${minutes}m) =====" | tee -a "$log" "$OUT/full.log"
+  post_status "$slug" PENDING 0
   set +e
   (
     cd "$SRC" || exit 1
@@ -157,35 +238,14 @@ run_job() {
   fi
   echo "===== JOB ${slug} ${result} rc=${rc} duration=${duration}s end $(now) =====" | tee -a "$log" "$OUT/full.log"
   printf '%s\t%s\t%s\t%s\t%s\n' "$slug" "$result" "$rc" "$duration" "$start_human" >>"$OUT/results.tsv"
+  post_status "$slug" "$result" "$duration"
   return 0
 }
 
-# --- jobs, same commands and timeouts as .github/workflows/ci.yml ---
-
-run_job analyze 20 'flutter pub get --enforce-lockfile && flutter analyze --no-fatal-warnings --no-fatal-infos'
-
-run_job test 30 'flutter pub get --enforce-lockfile && flutter test --concurrency=1'
-
-wait_emulator_ports
-run_job emulator-ports 12 'npm install --no-audit --no-fund && npm run test:scripts:emulator-ports'
-
-wait_emulator_ports
-run_job p0-scripts 15 'cd functions && npm ci && bash ../scripts/emulators_exec.sh --only auth,firestore --project demo-p0-scripts "node --test scripts/p0-scripts.emulator.test.js"'
-
-run_job build-web 30 'flutter pub get --enforce-lockfile && flutter build web --release'
-
-run_job android-dev-config-check 5 'bash scripts/android_dev_config_check.sh && npm run test:scripts:android-dev-distribute-guard'
-
-run_job ios-dev-config-check 5 'bash scripts/ios_dev_config_check.sh && bash scripts/maestro_check_flow_headers.sh && bash scripts/patrol_check_integration_targets.sh && bash scripts/holds_authority_mode_trap_test.sh && python3 scripts/holds_authority_mode_payload_test.py'
-
-wait_emulator_ports
-run_job functions 15 'cd functions && npm ci && npm run lint && npm test --if-present && cd .. && npm install --no-audit --no-fund && npm run test:e2e:staff'
-
-wait_emulator_ports
-run_job rules 20 'npm install --no-audit --no-fund && npm --prefix functions ci && npm run test:rules && npm run test:rules:interim && npm run test:rules:p0 && npm run test:rules:adv && npm run test:rules:docs && npm run test:rules:subs && npm run test:rules:qa-hold && npm run test:rules:profile && npm run test:rules:m31 && npm run test:rules:source && npm run test:rules:gaps && npm run test:rules:status-guards && npm run test:rules:security && npm run test:rules:ut-nb && npm run test:rules:nationalid-scope && npm run test:rules:users-nationalid-lock && npm run test:rules:paymob-superseded && npm run test:rules:privileged-reupload && npm run test:rules:storage && npm run test:e2e:subscriptions && npm run test:e2e:delegate && npm run test:e2e:supervisor-reupload && npm run test:e2e:privileged-reupload'
-
-# Extra vs ci.yml: Android dev debug APK (requested for local machine CI).
-run_job android-dev-build 30 "flutter pub get --enforce-lockfile && flutter build apk --debug --flavor dev --dart-define=ENV=dev --dart-define=GIT_SHA=${SHA}"
+# --- jobs: commands and timeouts from scripts/ci/jobs.sh (same as ci.yml) ---
+for j in $JOBS; do
+  run_job "$j" "$(ci_job_timeout "$j")" "bash scripts/ci/run_job.sh $j"
+done
 
 END_TS="$(now)"
 END_EPOCH="$(date +%s)"
@@ -230,7 +290,7 @@ done <"$OUT/results.tsv"
   echo "- Java: \`$(java -version 2>&1 | head -1)\`"
   echo "- Overall: **${overall}** (${pass_count} passed, ${fail_count} failed)"
   echo
-  echo "Jobs follow \`.github/workflows/ci.yml\`. \`android-dev-build\` is extra (not in that workflow)."
+  echo "Jobs come from \`scripts/ci/jobs.sh\` (same commands as \`.github/workflows/ci.yml\`). \`android-dev-build\` is local-only."
   echo
   echo "| Job | Result | Exit | Duration | Started |"
   echo "| --- | --- | ---: | ---: | --- |"
@@ -239,6 +299,7 @@ done <"$OUT/results.tsv"
   done <"$OUT/results.tsv"
   echo
   echo "Logs: \`${LOGS}\`"
+  [[ -d "$OUT/artifacts" ]] && echo "Artifacts: \`$OUT/artifacts\`"
 } >"$OUT/SUMMARY.md"
 
 echo

@@ -88,7 +88,7 @@ void main() {
     expect(find.text('مندوب'), findsNothing);
     expect(find.text('موظف إداري'), findsNothing);
     expect(find.byKey(const ValueKey('login_mode_switch')), findsNothing);
-    expect(find.text('لحسابات الموظفين والإدارة'), findsOneWidget);
+    expect(find.text('تسجيل الدخول للموظفين الإداريين'), findsOneWidget);
   });
 
   testWidgets('web staff form submits LoginMode.staff', (tester) async {

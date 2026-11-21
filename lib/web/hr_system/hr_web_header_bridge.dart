@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// Web shell bridge between «الرئيسية» and the desktop header.
 ///
@@ -40,6 +41,22 @@ class HrWebHeaderBridge extends ChangeNotifier {
     sheetOpen = open;
     notifyListeners();
   }
+
+  /// Per-page reloads run by the shell's top-bar refresh, keyed by the
+  /// shell tab. A page with its own data (for example «الخريطة الحية»)
+  /// registers here instead of drawing its own refresh button (TAS-148).
+  final Map<Object, Future<void> Function()> _pageReloads = {};
+
+  void attachPageReload(Object page, Future<void> Function() reload) {
+    _pageReloads[page] = reload;
+  }
+
+  /// Removes [reload] only if it is still the one registered for [page].
+  void releasePageReload(Object page, Future<void> Function() reload) {
+    if (_pageReloads[page] == reload) _pageReloads.remove(page);
+  }
+
+  Future<void> Function()? pageReload(Object page) => _pageReloads[page];
 
   /// Drops the callbacks when the overview leaves the tree. The count stays
   /// so a disposing child does not rebuild the header mid-unmount.
@@ -137,7 +154,7 @@ class _HrWebHeaderBellState extends State<HrWebHeaderBell> {
                 foregroundColor: iconColor,
                 backgroundColor: cs.surfaceContainerHigh.withValues(alpha: 0.5),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
               )
             : IconButton.styleFrom(foregroundColor: iconColor),

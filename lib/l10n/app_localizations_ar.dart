@@ -494,6 +494,11 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String webVersion(String version) {
+    return 'الإصدار $version';
+  }
+
+  @override
   String get account => 'الحساب';
 
   @override
@@ -1622,7 +1627,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get roleCompanyAdmin2 => 'مشرف الشركة';
 
   @override
-  String get roleHrOfficer => 'مسؤول موارد بشرية';
+  String get roleHrOfficer => 'موارد بشرية (HR)';
 
   @override
   String get roleAccountant => 'إدارة الحسابات';
