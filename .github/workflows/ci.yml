@@ -99,9 +99,14 @@ jobs:
         # 25-30 min on the shared Mac and often hit timeout-minutes: 30; at 4 the
         # same suite ran in under 2 min locally on this Mac.
         # TAS-162: golden/screenshot tests (tag `golden`, see dart_test.yaml)
-        # depend on the host renderer, so they are skipped here. Run them
-        # locally: flutter test --tags golden [--update-goldens]
+        # run in the next step instead.
         run: flutter test --concurrency=4 --exclude-tags golden
+      - name: Golden tests
+        # TAS-195: goldens back in CI. Images are recorded on a Mac; the
+        # comparator in test/flutter_test_config.dart accepts up to 0.5% pixel
+        # diff for host antialiasing. Re-record locally:
+        #   flutter test --tags golden --update-goldens
+        run: flutter test --tags golden
 
   p0-scripts:
     name: P0 scripts (emulators)
