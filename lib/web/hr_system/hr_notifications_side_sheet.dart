@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// Pinned clock for screenshots and tests. Production leaves this null.
 @visibleForTesting
@@ -430,7 +431,7 @@ class _HrNotificationsSheetState extends State<_HrNotificationsSheet> {
                   foregroundColor: cs.onSurface,
                   textStyle: const TextStyle(
                     fontFamily: 'Cairo',
-                    fontSize: 13,
+                    fontSize: HrFont.body,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -490,7 +491,7 @@ class _Header extends StatelessWidget {
                             fontFamily: 'Cairo',
                             fontWeight: FontWeight.w700,
                             color: cs.onSurface,
-                            fontSize: 22,
+                            fontSize: HrFont.titleLarge,
                           ),
                         ),
                       ),
@@ -513,7 +514,7 @@ class _Header extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       textStyle: const TextStyle(
                         fontFamily: 'Cairo',
-                        fontSize: 13,
+                        fontSize: HrFont.body,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -567,13 +568,13 @@ class _UnreadCount extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: cs.primaryContainer,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(HrRadius.card),
       ),
       child: Text(
         label,
         style: TextStyle(
           fontFamily: 'Cairo',
-          fontSize: 12,
+          fontSize: HrFont.labelMedium,
           fontWeight: FontWeight.w700,
           color: cs.onPrimaryContainer,
         ),
@@ -606,7 +607,7 @@ class _FilterChip extends StatelessWidget {
       onSelected: (_) => onSelected(),
       labelStyle: TextStyle(
         fontFamily: 'Cairo',
-        fontSize: 13,
+        fontSize: HrFont.body,
         fontWeight: FontWeight.w600,
         color: selected ? cs.onSecondaryContainer : cs.onSurfaceVariant,
       ),
@@ -634,7 +635,7 @@ class _GroupLabel extends StatelessWidget {
         label,
         style: TextStyle(
           fontFamily: 'Cairo',
-          fontSize: 13,
+          fontSize: HrFont.body,
           fontWeight: FontWeight.w700,
           color: cs.onSurfaceVariant,
         ),
@@ -709,7 +710,7 @@ class _NotificationRowState extends State<_NotificationRow> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontFamily: 'Cairo',
-                            fontSize: 14,
+                            fontSize: HrFont.body,
                             height: 1.3,
                             fontWeight: unread
                                 ? FontWeight.w700
@@ -723,7 +724,7 @@ class _NotificationRowState extends State<_NotificationRow> {
                         _formatWhen(notification.createdAt, widget.now),
                         style: TextStyle(
                           fontFamily: 'Cairo',
-                          fontSize: 12,
+                          fontSize: HrFont.labelMedium,
                           color: cs.onSurfaceVariant,
                         ),
                       ),
@@ -740,7 +741,7 @@ class _NotificationRowState extends State<_NotificationRow> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontFamily: 'Cairo',
-                          fontSize: 13,
+                          fontSize: HrFont.body,
                           height: 1.35,
                           color: cs.onSurfaceVariant,
                         ),
@@ -805,7 +806,7 @@ class _OverflowMenuState extends State<_OverflowMenu> {
       color: cs.surfaceContainerHigh,
       elevation: 3,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       items: [
@@ -864,7 +865,7 @@ class _MenuRow extends StatelessWidget {
           label,
           style: TextStyle(
             fontFamily: 'Cairo',
-            fontSize: 13,
+            fontSize: HrFont.body,
             fontWeight: FontWeight.w600,
             color: ink,
           ),
@@ -936,7 +937,7 @@ class _Message extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Cairo',
-                fontSize: 14,
+                fontSize: HrFont.body,
                 color: cs.onSurfaceVariant,
               ),
             ),

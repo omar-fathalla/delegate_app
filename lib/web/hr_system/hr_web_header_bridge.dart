@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// Web shell bridge between «الرئيسية» and the desktop header.
 ///
@@ -137,7 +138,7 @@ class _HrWebHeaderBellState extends State<HrWebHeaderBell> {
                 foregroundColor: iconColor,
                 backgroundColor: cs.surfaceContainerHigh.withValues(alpha: 0.5),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
               )
             : IconButton.styleFrom(foregroundColor: iconColor),

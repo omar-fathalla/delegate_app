@@ -9,6 +9,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
 import 'package:delegate_app/web/hr_system/hr_overlay_scrollbar.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// عنصر في القائمة الجانبية المكتبية
 class HRSidebarItemData {
@@ -189,7 +190,7 @@ class HRDesktopSidebar extends StatelessWidget {
                   child: Text(
                     sections[i].sectionTitle,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: HrFont.labelSmall,
                       fontWeight: FontWeight.w700,
                       color: colorScheme.onSurfaceVariant.withValues(
                         alpha: 0.7,
@@ -235,7 +236,7 @@ class HRDesktopSidebar extends StatelessWidget {
   }
 
   /// Mobile HR sidebar. Titles and order are the ones the phone already ships.
-  List<HRSidebarSectionData> _mobileSections() => const [
+  List<HRSidebarSectionData> _mobileSections() => [
     HRSidebarSectionData(
       sectionTitle: 'العمليات والميدان',
       items: [
@@ -388,7 +389,7 @@ class HRDesktopSidebar extends StatelessWidget {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(HrRadius.card),
                       boxShadow: [
                         BoxShadow(
                           color: colorScheme.primary.withValues(alpha: 0.3),
@@ -412,7 +413,7 @@ class HRDesktopSidebar extends StatelessWidget {
                         const Text(
                           'تسهيل',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: HrFont.titleMedium,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 0.5,
                           ),
@@ -424,7 +425,7 @@ class HRDesktopSidebar extends StatelessWidget {
                               ? delegate.companyName
                               : 'بوابة الموارد البشرية',
                           style: TextStyle(
-                            fontSize: 11.5,
+                            fontSize: HrFont.labelSmall,
                             fontWeight: FontWeight.w600,
                             color: colorScheme.primary,
                           ),
@@ -447,7 +448,7 @@ class HRDesktopSidebar extends StatelessWidget {
               onPressed: onToggleExpanded,
               style: IconButton.styleFrom(
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
               ),
             ),
@@ -462,7 +463,7 @@ class HRDesktopSidebar extends StatelessWidget {
               onPressed: onToggleExpanded,
               style: IconButton.styleFrom(
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
               ),
             ),
@@ -527,7 +528,7 @@ class HRDesktopSidebar extends StatelessWidget {
               label: Text(
                 '$count',
                 style: const TextStyle(
-                  fontSize: 10,
+                  fontSize: HrFont.labelSmall,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -574,7 +575,7 @@ class HRDesktopSidebar extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: isSelected ? colorScheme.primaryContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(HrRadius.card),
       ),
       child: Row(
         mainAxisAlignment: showLabels
@@ -588,7 +589,7 @@ class HRDesktopSidebar extends StatelessWidget {
               child: Text(
                 item.title,
                 style: TextStyle(
-                  fontSize: 13.5,
+                  fontSize: HrFont.body,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   color: labelColor,
                 ),
@@ -605,7 +606,7 @@ class HRDesktopSidebar extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: open,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         hoverColor: colorScheme.onSurface.withValues(alpha: 0.06),
         child: showLabels
             ? content
@@ -649,7 +650,7 @@ class HRDesktopSidebar extends StatelessWidget {
                   child: Text(
                     item.title,
                     style: TextStyle(
-                      fontSize: 13.5,
+                      fontSize: HrFont.body,
                       fontWeight: isSelected
                           ? FontWeight.w700
                           : FontWeight.w500,
@@ -713,7 +714,7 @@ class HRDesktopSidebar extends StatelessWidget {
             if (showLabels)
               InkWell(
                 onTap: onOpenProfile,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(HrRadius.card),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 6,
@@ -738,7 +739,7 @@ class HRDesktopSidebar extends StatelessWidget {
                                   ? delegate.fullName
                                   : 'مسؤول الموارد البشرية',
                               style: const TextStyle(
-                                fontSize: 13,
+                                fontSize: HrFont.body,
                                 fontWeight: FontWeight.w700,
                               ),
                               maxLines: 1,
@@ -759,7 +760,7 @@ class HRDesktopSidebar extends StatelessWidget {
                                     ? 'مشرف الشركة'
                                     : 'موارد بشرية (HR)',
                                 style: TextStyle(
-                                  fontSize: 10,
+                                  fontSize: HrFont.labelSmall,
                                   fontWeight: FontWeight.w600,
                                   color: colorScheme.onPrimaryContainer,
                                 ),
@@ -791,7 +792,7 @@ class HRDesktopSidebar extends StatelessWidget {
           if (showLabels)
             InkWell(
               onTap: onOpenSettings,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(HrRadius.card),
               hoverColor: colorScheme.onSurface.withValues(alpha: 0.06),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -810,7 +811,7 @@ class HRDesktopSidebar extends StatelessWidget {
                       child: Text(
                         l10n.settings,
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: HrFont.body,
                           fontWeight: FontWeight.w600,
                           color: colorScheme.onSurface,
                         ),

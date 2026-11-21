@@ -6,6 +6,7 @@ import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/services/device_binding_service.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// شاشة إدارة واعتماد طلبات فك وربط أجهزة المناديب لمسؤولي الموارد البشرية (HR)
 class HRDeviceUnbindRequestsScreen extends StatefulWidget {
@@ -57,7 +58,7 @@ class _HRDeviceUnbindRequestsScreenState
                     'طلبات فك وربط الأجهزة',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14.5,
+                      fontSize: HrFont.body,
                       letterSpacing: -0.2,
                     ),
                     maxLines: 1,
@@ -66,7 +67,7 @@ class _HRDeviceUnbindRequestsScreenState
                   Text(
                     widget.hrDelegate.companyName,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: HrFont.labelSmall,
                       color: colorScheme.onSurfaceVariant,
                     ),
                     maxLines: 1,
@@ -173,7 +174,7 @@ class _HRDeviceUnbindRequestsScreenState
                           : 'لا توجد طلبات معلقة',
                       icon: Icons.hourglass_top_rounded,
                       color: pendingCount > 0
-                          ? const Color(0xFFD97706)
+                          ? HrStatusColors.of(context).warning
                           : colorScheme.outline,
                       colorScheme: colorScheme,
                       theme: theme,
@@ -185,7 +186,7 @@ class _HRDeviceUnbindRequestsScreenState
                       value: '$approvedCount',
                       subtitle: 'تمت الموافقة وفك الربط',
                       icon: Icons.check_circle_rounded,
-                      color: const Color(0xFF2E7D32),
+                      color: HrStatusColors.of(context).success,
                       colorScheme: colorScheme,
                       theme: theme,
                     );
@@ -197,7 +198,7 @@ class _HRDeviceUnbindRequestsScreenState
                       subtitle: 'تم رفض طلب الفك',
                       icon: Icons.cancel_outlined,
                       color: rejectedCount > 0
-                          ? const Color(0xFFC62828)
+                          ? HrStatusColors.of(context).danger
                           : colorScheme.outline,
                       colorScheme: colorScheme,
                       theme: theme,
@@ -267,13 +268,13 @@ class _HRDeviceUnbindRequestsScreenState
                         setState(() => _searchQuery = val.trim()),
                     textAlignVertical: TextAlignVertical.center,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: HrFont.body,
                       color: colorScheme.onSurface,
                     ),
                     decoration: InputDecoration(
                       hintText: 'بحث باسم المندوب أو الهاتف أو نوع الجهاز...',
                       hintStyle: TextStyle(
-                        fontSize: 12,
+                        fontSize: HrFont.labelMedium,
                         color: colorScheme.onSurfaceVariant
                             .withValues(alpha: 0.7),
                       ),
@@ -299,21 +300,21 @@ class _HRDeviceUnbindRequestsScreenState
                       ),
                       isDense: true,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(22),
+                        borderRadius: BorderRadius.circular(HrRadius.pill),
                         borderSide: BorderSide(
                           color:
                               colorScheme.outlineVariant.withValues(alpha: 0.35),
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(22),
+                        borderRadius: BorderRadius.circular(HrRadius.pill),
                         borderSide: BorderSide(
                           color:
                               colorScheme.outlineVariant.withValues(alpha: 0.35),
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(22),
+                        borderRadius: BorderRadius.circular(HrRadius.pill),
                         borderSide:
                             BorderSide(color: colorScheme.primary, width: 1.5),
                       ),
@@ -401,7 +402,7 @@ class _HRDeviceUnbindRequestsScreenState
     IconData statusIcon;
 
     if (status == 'approved') {
-      statusColor = const Color(0xFF2E7D32);
+      statusColor = HrStatusColors.of(context).success;
       statusLabel = 'معتمد';
       statusIcon = Icons.check_circle_rounded;
     } else if (status == 'rejected') {
@@ -413,7 +414,7 @@ class _HRDeviceUnbindRequestsScreenState
       statusLabel = 'تم الربط';
       statusIcon = Icons.phonelink_lock_rounded;
     } else {
-      statusColor = const Color(0xFFE65100);
+      statusColor = HrStatusColors.of(context).warning;
       statusLabel = 'قيد المراجعة';
       statusIcon = Icons.hourglass_top_rounded;
     }
@@ -422,7 +423,7 @@ class _HRDeviceUnbindRequestsScreenState
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(HrRadius.card),
         side: BorderSide(
           color: status == 'pending'
               ? statusColor.withValues(alpha: 0.4)
@@ -479,7 +480,7 @@ class _HRDeviceUnbindRequestsScreenState
                   ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(HrRadius.card),
                     border: Border.all(
                       color: statusColor.withValues(alpha: 0.3),
                     ),
@@ -493,7 +494,7 @@ class _HRDeviceUnbindRequestsScreenState
                         statusLabel,
                         style: TextStyle(
                           color: statusColor,
-                          fontSize: 11,
+                          fontSize: HrFont.labelSmall,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -513,7 +514,7 @@ class _HRDeviceUnbindRequestsScreenState
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHighest
                     .withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(HrRadius.card),
               ),
               child: Column(
                 children: [
@@ -528,7 +529,7 @@ class _HRDeviceUnbindRequestsScreenState
                       Text(
                         'الجهاز الحالي المقترن: ',
                         style: TextStyle(
-                          fontSize: 11.5,
+                          fontSize: HrFont.labelSmall,
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
@@ -536,7 +537,7 @@ class _HRDeviceUnbindRequestsScreenState
                         child: Text(
                           boundDevice,
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: HrFont.labelMedium,
                             fontWeight: FontWeight.bold,
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -556,7 +557,7 @@ class _HRDeviceUnbindRequestsScreenState
                       Text(
                         'الجهاز الجديد المطلوب: ',
                         style: TextStyle(
-                          fontSize: 11.5,
+                          fontSize: HrFont.labelSmall,
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
@@ -564,7 +565,7 @@ class _HRDeviceUnbindRequestsScreenState
                         child: Text(
                           reqDevice,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: HrFont.labelMedium,
                             fontWeight: FontWeight.bold,
                             color: colorScheme.primary,
                           ),
@@ -588,12 +589,12 @@ class _HRDeviceUnbindRequestsScreenState
                 decoration: BoxDecoration(
                   color: colorScheme.surfaceContainerHighest
                       .withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
                 child: Text(
                   'سبب الطلب: $reason',
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: HrFont.labelSmall,
                     color: colorScheme.onSurfaceVariant,
                   ),
                 ),
@@ -610,7 +611,7 @@ class _HRDeviceUnbindRequestsScreenState
                 ),
                 decoration: BoxDecoration(
                   color: colorScheme.errorContainer.withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                   border: Border.all(
                     color: colorScheme.error.withValues(alpha: 0.3),
                   ),
@@ -618,7 +619,7 @@ class _HRDeviceUnbindRequestsScreenState
                 child: Text(
                   'سبب الرفض: $rejectReason',
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: HrFont.labelSmall,
                     color: colorScheme.error,
                     fontWeight: FontWeight.w600,
                   ),
@@ -633,7 +634,7 @@ class _HRDeviceUnbindRequestsScreenState
                 child: Text(
                   'تاريخ الطلب: $reqDateStr',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: HrFont.labelSmall,
                     color: colorScheme.outline,
                   ),
                 ),
@@ -654,7 +655,7 @@ class _HRDeviceUnbindRequestsScreenState
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(HrRadius.chip),
                         ),
                       ),
                       onPressed: () => _rejectRequest(req),
@@ -670,11 +671,11 @@ class _HRDeviceUnbindRequestsScreenState
                     flex: 2,
                     child: FilledButton.icon(
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E7D32),
+                        backgroundColor: HrStatusColors.of(context).success,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(HrRadius.chip),
                         ),
                       ),
                       onPressed: () => _approveRequest(req),
@@ -731,12 +732,12 @@ class _HRDeviceUnbindRequestsScreenState
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  color: HrStatusColors.of(context).success.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.check_circle_outline_rounded,
-                  color: Color(0xFF2E7D32),
+                  color: HrStatusColors.of(context).success,
                   size: 22,
                 ),
               ),
@@ -765,7 +766,7 @@ class _HRDeviceUnbindRequestsScreenState
           Container(
             height: 48,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(HrRadius.pill),
               border: Border.all(
                 color: colorScheme.outlineVariant.withValues(alpha: 0.6),
               ),
@@ -784,7 +785,7 @@ class _HRDeviceUnbindRequestsScreenState
                           style: TextStyle(
                             color: colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                            fontSize: HrFont.body,
                           ),
                         ),
                       ),
@@ -799,7 +800,7 @@ class _HRDeviceUnbindRequestsScreenState
                 Expanded(
                   flex: 2,
                   child: Material(
-                    color: const Color(0xFF2E7D32),
+                    color: HrStatusColors.of(context).success,
                     child: InkWell(
                       onTap: () => Navigator.pop(ctx, true),
                       child: const Center(
@@ -813,7 +814,7 @@ class _HRDeviceUnbindRequestsScreenState
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 14,
+                                fontSize: HrFont.body,
                               ),
                             ),
                           ],
@@ -836,7 +837,7 @@ class _HRDeviceUnbindRequestsScreenState
         isScrollControlled: true,
         backgroundColor: Theme.of(context).colorScheme.surface,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(HrRadius.pill)),
         ),
         builder: (ctx) => Padding(
           padding: EdgeInsets.fromLTRB(
@@ -852,7 +853,7 @@ class _HRDeviceUnbindRequestsScreenState
       confirm = await showDialog<bool>(
         context: context,
         builder: (ctx) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.pill)),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 500),
             child: Padding(
@@ -882,7 +883,7 @@ class _HRDeviceUnbindRequestsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('تمت الموافقة وفك ارتباط جهاز "$delegateName" بنجاح'),
-            backgroundColor: const Color(0xFF2E7D32),
+            backgroundColor: HrStatusColors.of(context).success,
           ),
         );
       }
@@ -930,7 +931,7 @@ class _HRDeviceUnbindRequestsScreenState
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: colorScheme.error.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(HrRadius.chip),
                 ),
                 child: Icon(
                   Icons.cancel_outlined,
@@ -963,7 +964,7 @@ class _HRDeviceUnbindRequestsScreenState
               labelText: 'سبب الرفض (اختياري)',
               hintText: 'مثال: يرجى مراجعة إدارة الفرع أولاً...',
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(HrRadius.card),
               ),
               filled: true,
               fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
@@ -975,7 +976,7 @@ class _HRDeviceUnbindRequestsScreenState
           Container(
             height: 48,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(HrRadius.pill),
               border: Border.all(
                 color: colorScheme.outlineVariant.withValues(alpha: 0.6),
               ),
@@ -994,7 +995,7 @@ class _HRDeviceUnbindRequestsScreenState
                           style: TextStyle(
                             color: colorScheme.onSurfaceVariant,
                             fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                            fontSize: HrFont.body,
                           ),
                         ),
                       ),
@@ -1022,7 +1023,7 @@ class _HRDeviceUnbindRequestsScreenState
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 14,
+                                fontSize: HrFont.body,
                               ),
                             ),
                           ],
@@ -1045,7 +1046,7 @@ class _HRDeviceUnbindRequestsScreenState
         isScrollControlled: true,
         backgroundColor: Theme.of(context).colorScheme.surface,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(HrRadius.pill)),
         ),
         builder: (ctx) => Padding(
           padding: EdgeInsets.fromLTRB(
@@ -1061,7 +1062,7 @@ class _HRDeviceUnbindRequestsScreenState
       confirm = await showDialog<bool>(
         context: context,
         builder: (ctx) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.pill)),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 500),
             child: Padding(
@@ -1122,7 +1123,7 @@ class _HRDeviceUnbindRequestsScreenState
           _selectedStatusFilter = statusKey;
         });
       },
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(HrRadius.card),
       child: AnimatedContainer(
         duration: AppMotionDurations.short4,
         curve: AppMotionCurves.standardDefaultEffects,
@@ -1130,7 +1131,7 @@ class _HRDeviceUnbindRequestsScreenState
           color: isSelected
               ? color.withValues(alpha: 0.08)
               : colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(HrRadius.card),
           border: Border.all(
             color: isSelected
                 ? color
@@ -1159,7 +1160,7 @@ class _HRDeviceUnbindRequestsScreenState
                   child: Text(
                     title,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: HrFont.labelMedium,
                       fontWeight:
                           isSelected ? FontWeight.bold : FontWeight.w600,
                       color: isSelected ? color : colorScheme.onSurfaceVariant,
@@ -1172,7 +1173,7 @@ class _HRDeviceUnbindRequestsScreenState
                   padding: const EdgeInsets.all(5),
                   decoration: BoxDecoration(
                     color: isSelected ? color : color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(HrRadius.chip),
                   ),
                   child: Icon(
                     isSelected ? Icons.check_rounded : icon,
@@ -1186,7 +1187,7 @@ class _HRDeviceUnbindRequestsScreenState
             Text(
               value,
               style: TextStyle(
-                fontSize: 20,
+                fontSize: HrFont.titleLarge,
                 fontWeight: FontWeight.bold,
                 color: isSelected ? color : colorScheme.onSurface,
               ),
@@ -1195,7 +1196,7 @@ class _HRDeviceUnbindRequestsScreenState
             Text(
               subtitle,
               style: TextStyle(
-                fontSize: 10.5,
+                fontSize: HrFont.labelSmall,
                 color: isSelected
                     ? color.withValues(alpha: 0.85)
                     : colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
