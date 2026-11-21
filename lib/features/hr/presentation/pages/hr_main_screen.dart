@@ -9,6 +9,7 @@ import 'package:delegate_app/core/widgets/universal_app_header.dart';
 import 'package:delegate_app/core/widgets/app_logout_modal.dart';
 import 'package:delegate_app/features/admin/presentation/pages/subscription_renewal_screen.dart';
 import 'package:delegate_app/features/admin/domain/entities/subscription_renewal.dart';
+import 'package:delegate_app/features/hr/presentation/hr_account_pages.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_tab.dart';
 import 'package:delegate_app/features/hr/presentation/pages/tabs/hr_photos_tab.dart';
@@ -232,6 +233,11 @@ class _HRMainScreenState extends State<HRMainScreen> {
 
     switch (value) {
       case 'profile':
+        if (_openAccountPageInShell(
+          (inner) => HrAccountPages.openProfile(inner, delegate),
+        )) {
+          break;
+        }
         context.push('/user-profile', extra: delegate);
         break;
       case 'attendance':
@@ -288,6 +294,11 @@ class _HRMainScreenState extends State<HRMainScreen> {
         break;
       case 'settings':
         // Policy: Settings MUST always be the last item in the menu
+        if (_openAccountPageInShell(
+          (inner) => HrAccountPages.openSettings(inner, delegate),
+        )) {
+          break;
+        }
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) =>
@@ -296,6 +307,20 @@ class _HRMainScreenState extends State<HRMainScreen> {
         );
         break;
     }
+  }
+
+  /// Wide web: opens an account page (settings, profile) inside the content
+  /// area, on top of the shell tabs, so the sidebar and the top bar stay
+  /// (TAS-157). Returns false when there is no inner navigator (mobile,
+  /// narrow web); the caller then keeps the full-screen push.
+  bool _openAccountPageInShell(void Function(BuildContext inner) open) {
+    if (!WebRuntimePolicy.isWeb) return false;
+    final nav = _innerNavigator.currentState;
+    if (nav == null) return false;
+    // One account page at a time, opened from the current tab.
+    nav.popUntil((route) => route.isFirst);
+    open(nav.context);
+    return true;
   }
 
   void _showLogoutDialog(BuildContext context) {
@@ -556,6 +581,8 @@ class _HRMainScreenState extends State<HRMainScreen> {
                                   ? (showName) => HrWebAccountButton(
                                       delegate: delegate,
                                       showName: showName,
+                                      onOpenProfile: () =>
+                                          _onMenuSelected('profile'),
                                     )
                                   : null,
                             ),

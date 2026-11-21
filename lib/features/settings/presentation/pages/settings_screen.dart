@@ -14,6 +14,7 @@ import 'package:delegate_app/config/theme/color_schemes.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_adaptive_sheet.dart';
+import 'package:delegate_app/features/hr/presentation/hr_account_pages.dart';
 
 class SettingsScreen extends StatelessWidget {
   final Delegate delegate;
@@ -153,9 +154,10 @@ class SettingsScreen extends StatelessWidget {
                             context: context,
                             icon: Icons.feedback_rounded,
                             title: AppLocalizations.of(context)!.sendFeedback,
-                            onTap: () => context.push(
-                              '/submit-feedback',
-                              extra: delegate,
+                            // Inner page inside the web HR shell (TAS-157).
+                            onTap: () => HrAccountPages.openSendFeedback(
+                              context,
+                              delegate,
                             ),
                           ),
                           Divider(
