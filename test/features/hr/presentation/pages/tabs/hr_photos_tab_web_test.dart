@@ -272,6 +272,26 @@ void main() {
   });
 
   group('request and report (TAS-150)', () {
+    testWidgets('the report has no inline refresh outside the shell', (
+      tester,
+    ) async {
+      await pumpPage(tester, web: false);
+
+      await tester.tap(find.text('التقرير الشهري'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      final report = tester.widget<MonthlyPhotoReportScreen>(
+        find.byType(MonthlyPhotoReportScreen),
+      );
+      expect(report.showAppBar, isTrue);
+      expect(report.showInlineRefresh, isFalse);
+      expect(
+        find.byKey(const ValueKey('monthly_report_inline_refresh')),
+        findsNothing,
+      );
+    });
+
     testWidgets('«طلب إذن تصوير» opens a dialog on the web', (tester) async {
       await pumpPage(tester, initialView: HrPhotosView.permissions);
       await showPermissions(tester);
@@ -327,6 +347,19 @@ void main() {
         find.byType(MonthlyPhotoReportScreen),
       );
       expect(report.showAppBar, isFalse);
+      expect(report.showInlineRefresh, isTrue);
+
+      // The inline refresh reloads the company photos, like the old app
+      // bar action.
+      final refresh = find.byKey(
+        const ValueKey('monthly_report_inline_refresh'),
+      );
+      expect(refresh, findsOneWidget);
+      expect(tester.widget<IconButton>(refresh).tooltip, 'تحديث');
+      clearInteractions(photoBloc);
+      await tester.tap(refresh);
+      await tester.pump();
+      verify(() => photoBloc.add(any())).called(greaterThanOrEqualTo(1));
       expect(
         find.descendant(
           of: find.byType(MonthlyPhotoReportScreen),

@@ -1100,7 +1100,8 @@ class HRPhotosTabState extends State<HRPhotosTab> {
   /// TAS-150: inside the wide web shell it is an inner page (breadcrumb,
   /// sidebar kept, wide content width) without its own app bar. Without a
   /// shell host (mobile, narrow web) [pushHrInnerPage] pushes it full screen
-  /// with its app bar, as before.
+  /// with its app bar, as before. In the shell an inline refresh button
+  /// replaces the app bar's refresh action.
   void _openMonthlyReport() {
     pushHrInnerPage<void>(
       context,
@@ -1111,6 +1112,7 @@ class HRPhotosTabState extends State<HRPhotosTab> {
         child: MonthlyPhotoReportScreen(
           delegate: widget.hrDelegate,
           showAppBar: !inShell,
+          showInlineRefresh: inShell,
         ),
       ),
     );
