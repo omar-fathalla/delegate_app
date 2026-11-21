@@ -107,6 +107,15 @@ jobs:
         # diff for host antialiasing. Re-record locally:
         #   flutter test --tags golden --update-goldens
         run: flutter test --tags golden
+      - name: Upload golden failures
+        # Diff images (incl. *_testImage.png = this host's rendering) so a
+        # failing golden can be inspected or re-recorded for Linux.
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-failures
+          path: test/**/failures/
+          retention-days: 7
 
   p0-scripts:
     name: P0 scripts (emulators)
