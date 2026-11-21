@@ -425,6 +425,8 @@ void main() {
   });
 
   tearDown(() {
+    HRDelegatesTab.debugOpenAddDelegate = null;
+    HRDelegatesTab.debugOpenProfile = null;
     WebRuntimePolicy.debugReset();
     HrAddChainsSheet.debugReset();
     CompanyChainCatalog.clear();
@@ -448,10 +450,7 @@ void main() {
       find.byKey(const Key('hr_delegate_add_chains_fake-d0')),
       findsNothing,
     );
-    expect(
-      find.byKey(const Key('hr_delegate_attendance_fake-d0')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('hr_delegate_actions_fake-d0')), findsOneWidget);
     // «إضافة سلسلة» moved to the home chains card (TAS-117).
     expect(find.byKey(const Key('hr_add_company_chains')), findsNothing);
     expect(
@@ -462,6 +461,166 @@ void main() {
       findsOneWidget,
     );
     await _shot(t, 'hr-delegates-1440');
+  });
+
+  // ── TAS-116 / TAS-144: page layout and actions ──
+
+  testWidgets('TAS-116: primary button is «إضافة مندوب» and opens the form', (
+    t,
+  ) async {
+    WebRuntimePolicy.debugIsWebOverride = true;
+    final opened = <Delegate>[];
+    HRDelegatesTab.debugOpenAddDelegate = (_, supervisor) =>
+        opened.add(supervisor);
+    await _pump(t, const Size(1440, 900));
+    final add = find.byKey(HRDelegatesTab.addDelegateKey);
+    expect(add, findsOneWidget);
+    expect(
+      find.descendant(of: add, matching: find.text('إضافة مندوب')),
+      findsOneWidget,
+    );
+    // It is the only FilledButton on the page.
+    expect(
+      find.descendant(
+        of: find.byType(HRDelegatesTab),
+        matching: find.bySubtype<FilledButton>(),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('إضافة سلاسل للشركة'), findsNothing);
+    await t.tap(add);
+    await t.pump();
+    expect(opened.single.uid, _hr.uid);
+  });
+
+  testWidgets('TAS-116: search 56 high, status chips filter the table', (
+    t,
+  ) async {
+    WebRuntimePolicy.debugIsWebOverride = true;
+    await _pump(t, const Size(1440, 900));
+    expect(t.getSize(find.byKey(HRDelegatesTab.searchKey)).height, 56);
+    expect(find.byKey(HRDelegatesTab.filterKey(null)), findsOneWidget);
+    expect(find.text('الكل (16)'), findsOneWidget);
+    expect(find.text('نشط (14)'), findsOneWidget);
+    expect(find.text('متوقف (2)'), findsOneWidget);
+
+    await t.tap(find.byKey(HRDelegatesTab.filterKey(DelegateStatus.suspended)));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('hr_delegate_row_fake-d5')), findsOneWidget);
+    expect(find.byKey(const Key('hr_delegate_row_fake-d11')), findsOneWidget);
+    expect(find.byKey(const Key('hr_delegate_row_fake-d0')), findsNothing);
+
+    // No match → HrEmptyState with a clear action.
+    await t.enterText(find.byKey(HRDelegatesTab.searchKey), 'لا يوجد اسم كده');
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('hr_delegates_no_match')), findsOneWidget);
+    await t.tap(find.text('مسح البحث والفلتر'));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('hr_delegate_row_fake-d0')), findsOneWidget);
+  });
+
+  testWidgets('TAS-144: toolbar in two rows, toggle «بطاقات/جدول»', (t) async {
+    WebRuntimePolicy.debugIsWebOverride = true;
+    await _pump(t, const Size(1440, 900));
+    final search = t.getRect(find.byKey(HRDelegatesTab.searchKey));
+    final chips = t.getRect(find.byKey(HRDelegatesTab.filterKey(null)));
+    final toggle = t.getRect(find.byKey(HRDelegatesTab.viewToggleKey));
+    final add = t.getRect(find.byKey(HRDelegatesTab.addDelegateKey));
+    // Row 1: search + filters. Row 2: view toggle + primary button.
+    expect((chips.center.dy - search.center.dy).abs(), lessThan(4));
+    expect(toggle.top, greaterThanOrEqualTo(search.bottom));
+    expect((add.center.dy - toggle.center.dy).abs(), lessThan(4));
+    expect(
+      find.descendant(
+        of: find.byKey(HRDelegatesTab.viewToggleKey),
+        matching: find.text('بطاقات'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(HRDelegatesTab.viewToggleKey),
+        matching: find.text('جدول'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('TAS-144: «⋮» menu with labels, row tap opens the profile', (
+    t,
+  ) async {
+    WebRuntimePolicy.debugIsWebOverride = true;
+    final profiles = <String>[];
+    HRDelegatesTab.debugOpenProfile = (d) => profiles.add(d.uid);
+    await _pump(t, const Size(1440, 900));
+
+    await t.tap(find.byKey(const Key('hr_delegate_actions_fake-d0')));
+    await t.pumpAndSettle();
+    expect(find.text('عرض الملف'), findsOneWidget);
+    expect(find.text('سجل الحضور والانصراف'), findsOneWidget);
+    expect(find.text('نظام الإجازات: أسبوعية'), findsOneWidget);
+    await t.tap(find.text('عرض الملف'));
+    await t.pumpAndSettle();
+    expect(profiles, ['fake-d0']);
+
+    // Tap on the row itself (the city cell).
+    await t.tap(
+      find.descendant(
+        of: find.byKey(const Key('hr_delegate_row_fake-d1')),
+        matching: find.text(_cities[1]),
+      ),
+    );
+    await t.pumpAndSettle();
+    expect(profiles, ['fake-d0', 'fake-d1']);
+  });
+
+  testWidgets('TAS-144: chains cell is plain text, not a button', (t) async {
+    WebRuntimePolicy.debugIsWebOverride = true;
+    await _pump(t, const Size(1440, 900));
+    final chains = find.byKey(const Key('hr_delegate_chains_fake-d0'));
+    expect(chains, findsOneWidget);
+    expect(
+      find.descendant(of: chains, matching: find.byType(DecoratedBox)),
+      findsNothing,
+    );
+    expect(
+      find.ancestor(of: chains, matching: find.byType(Tooltip)),
+      findsWidgets,
+    );
+    final tooltip = t.widget<Tooltip>(
+      find.ancestor(of: chains, matching: find.byType(Tooltip)).first,
+    );
+    expect(tooltip.message, contains('كارفور'));
+  });
+
+  testWidgets('TAS-144: compact cards, chips not clipped', (t) async {
+    WebRuntimePolicy.debugIsWebOverride = true;
+    await _pump(t, const Size(1440, 900));
+    await t.tap(find.text('بطاقات'));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('hr_delegates_cards')), findsOneWidget);
+    final card = find.byKey(const Key('hr_delegate_card_fake-d0'));
+    expect(card, findsOneWidget);
+    expect(t.getSize(card).height, lessThan(140));
+    // The weekly chip shows its full label inside the card.
+    final leave = find.byKey(const Key('hr_delegate_leave_fake-d0'));
+    final label = find.descendant(of: leave, matching: find.text('أسبوعية فقط'));
+    expect(label, findsOneWidget);
+    final para = t.renderObject<RenderParagraph>(label);
+    expect(para.didExceedMaxLines, isFalse);
+    expect(t.getRect(card).contains(t.getRect(leave).center), isTrue);
+    await _shot(t, 'hr-delegates-cards-1440');
+  });
+
+  testWidgets('TAS-144: leave dialog note is at least 12', (t) async {
+    WebRuntimePolicy.debugIsWebOverride = true;
+    await _pump(t, const Size(1440, 900));
+    await t.tap(find.byKey(const Key('hr_delegate_actions_fake-d0')));
+    await t.pumpAndSettle();
+    await t.tap(find.text('نظام الإجازات: أسبوعية'));
+    await t.pumpAndSettle();
+    final note = t.widget<Text>(find.byKey(const Key('hr_leave_dialog_note')));
+    expect(note.style!.fontSize, greaterThanOrEqualTo(12));
   });
 
   testWidgets('sheet loading state: skeleton, no lone spinner', (t) async {
