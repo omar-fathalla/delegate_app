@@ -134,6 +134,9 @@ class _HRMainScreenState extends State<HRMainScreen> {
   /// change). Those closes must not step the browser history back.
   bool _shellPopping = false;
 
+  /// Layout of the last build: wide (sidebar + inner navigator) or narrow.
+  bool? _lastWide;
+
   /// Real web: an in-app close of an inner page stepped the history back
   /// and the URL update has not arrived yet. A URL write in that window
   /// waits for it, so the late back step cannot undo a newer page.
@@ -300,6 +303,21 @@ class _HRMainScreenState extends State<HRMainScreen> {
     } finally {
       _shellPopping = false;
     }
+  }
+
+  /// Wide to narrow drops the inner navigator, and its pages go with it
+  /// without a pop the observers hear. Forget them, so their address (a
+  /// delegate id, TAS-190) does not stick to the next inner page, and write
+  /// the URL of what is on screen now (TAS-199).
+  void _onLayoutChanged(bool wide) {
+    final was = _lastWide;
+    _lastWide = wide;
+    if (was != true || wide) return;
+    final lost = _innerDepth - _fullScreenInner.length;
+    if (lost <= 0) return;
+    _innerDepth = _fullScreenInner.length;
+    if (_innerDepth == 0) _innerUrl = null;
+    _scheduleUrlSync();
   }
 
   void _fullScreenInnerOpened(Route<dynamic> route) {
@@ -832,6 +850,7 @@ class _HRMainScreenState extends State<HRMainScreen> {
     final delegate = widget.delegate;
 
     final isWideScreen = MediaQuery.of(context).size.width > 768;
+    _onLayoutChanged(isWideScreen);
     final isArabic = localeProvider.isArabic;
     final web = WebRuntimePolicy.isWeb;
     final delegatesRail =
