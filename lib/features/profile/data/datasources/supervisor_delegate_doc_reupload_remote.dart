@@ -2,7 +2,27 @@ import 'dart:io';
 
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:delegate_app/features/admin/data/datasources/storage_upload_intent.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+
+/// Signed-in uid, or null when Firebase is not initialised (unit tests).
+String? _currentUid() {
+  try {
+    return FirebaseAuth.instance.currentUser?.uid;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// TAS-72: Storage already lets the signed-in user write its own
+/// `delegate_documents/<uid>/` folder (`request.auth.uid == folderId`).
+/// `ensureStorageUploadIntent` is staff-only and answers `caller_not_staff`
+/// for a delegate, so it is only called when the caller does not own the
+/// folder (a supervisor uploading for a delegate).
+bool callerOwnsDocumentFolder(String folderId, {String? callerUid}) {
+  final uid = (callerUid ?? _currentUid())?.trim() ?? '';
+  return uid.isNotEmpty && uid == folderId.trim();
+}
 
 class SupervisorDocReuploadException implements Exception {
   SupervisorDocReuploadException(this.message);
@@ -66,14 +86,17 @@ Future<String> uploadDelegateDocumentFile({
     required String companyUID,
     FirebaseFunctions? functions,
   })? ensureIntent,
+  String? callerUid,
 }) async {
-  final intentError = await (ensureIntent ?? _defaultEnsureIntent)(
-    folderId: folderId,
-    companyUID: companyUID,
-    functions: functions,
-  );
-  if (intentError != null) {
-    throw SupervisorDocReuploadException(intentError);
+  if (!callerOwnsDocumentFolder(folderId, callerUid: callerUid)) {
+    final intentError = await (ensureIntent ?? _defaultEnsureIntent)(
+      folderId: folderId,
+      companyUID: companyUID,
+      functions: functions,
+    );
+    if (intentError != null) {
+      throw SupervisorDocReuploadException(intentError);
+    }
   }
   try {
     final ref = (storage ?? FirebaseStorage.instance).ref(storagePath);

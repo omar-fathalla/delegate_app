@@ -1215,12 +1215,18 @@ class _ProfileBody extends StatelessWidget {
         }
       }
 
-      if (item.docType == 'personalPhoto') {
-        await firestore.collection('users').doc(delegate.uid).set({
-          'photoURL': newUrl,
-          'profileImageUrl': newUrl,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+      // TAS-72: update the users doc only when it is the caller's own and
+      // already exists; a merge-set used to create a role-less users doc.
+      if (item.docType == 'personalPhoto' &&
+          callerOwnsDocumentFolder(delegate.uid)) {
+        final usersRef = firestore.collection('users').doc(delegate.uid);
+        if ((await usersRef.get()).exists) {
+          await usersRef.update({
+            'photoURL': newUrl,
+            'profileImageUrl': newUrl,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
       }
 
       try {
