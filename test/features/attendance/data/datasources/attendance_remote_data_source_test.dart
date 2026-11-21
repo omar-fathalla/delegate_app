@@ -3,6 +3,7 @@ import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_remote_data_source.dart';
 import 'package:delegate_app/features/attendance/data/models/attendance_model.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -12,6 +13,72 @@ void main() {
   setUp(() {
     fakeFirestore = FakeFirebaseFirestore();
     dataSource = AttendanceRemoteDataSourceImpl(firestore: fakeFirestore);
+  });
+
+  group('supervisor attendance alerts (TAS-71)', () {
+    test('check-in writes one supervisor_<company> broadcast with createdBy, no users reads', () async {
+      dataSource = AttendanceRemoteDataSourceImpl(
+        firestore: fakeFirestore,
+        auth: MockFirebaseAuth(signedIn: true, mockUser: MockUser(uid: 'auth_user1')),
+      );
+      await dataSource.checkIn(
+        'user1',
+        10.0,
+        20.0,
+        companyId: 'company1',
+        organizationId: 'org1',
+        deviceInfo: 'device1',
+        branchName: 'branchA',
+      );
+      // The alert is fire-and-forget; let it finish.
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      final notifs = await fakeFirestore.collection('notifications').get();
+      expect(notifs.docs, hasLength(1));
+      final n = notifs.docs.single.data();
+      expect(n['delegateUid'], 'supervisor_company1');
+      expect(n['createdBy'], 'auth_user1');
+      expect(n['companyUID'], 'company1');
+      expect(n['companyId'], 'company1');
+      expect(n['organizationUID'], 'org1');
+      expect(n['type'], 'attendance_check_in');
+      expect(n['attendanceType'], 'check_in');
+      expect(n['targetDelegateId'], 'user1');
+      expect(n['senderRole'], 'delegate');
+    });
+
+    test('createdBy falls back to the delegate user id without auth', () async {
+      await dataSource.checkIn(
+        'user1',
+        10.0,
+        20.0,
+        companyId: 'company1',
+        organizationId: 'org1',
+        deviceInfo: 'device1',
+        branchName: 'branchA',
+      );
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      final n = (await fakeFirestore.collection('notifications').get()).docs.single.data();
+      expect(n['createdBy'], 'user1');
+    });
+
+    test('no company means no alert', () async {
+      await dataSource.checkIn(
+        'user1',
+        10.0,
+        20.0,
+        companyId: '',
+        organizationId: 'org1',
+        deviceInfo: 'device1',
+        branchName: 'branchA',
+      );
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      expect((await fakeFirestore.collection('notifications').get()).docs, isEmpty);
+    });
   });
 
   test('checkIn should create a document', () async {

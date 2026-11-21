@@ -954,6 +954,45 @@ describe("firestore tightened rules", () => {
     );
   });
 
+  // TAS-71: attendance / fake-GPS / geofence alerts are written by the
+  // delegate as one supervisor_<company> broadcast with createdBy.
+  test("delegate can broadcast attendance and geofence alerts to its company's supervisors", async () => {
+    const delegate = dbFor("del-1", DELEGATE);
+    for (const type of ["attendance_check_in", "mock_location_alert", "geofence_breach"]) {
+      await assertSucceeds(delegate.collection("notifications").add({
+        delegateUid: "supervisor_c1",
+        createdBy: "del-1",
+        companyUID: "c1",
+        companyId: "c1",
+        organizationUID: "o1",
+        organizationId: "o1",
+        type,
+        title: "t",
+        body: "b",
+        targetDelegateId: "del-1",
+        isRead: false,
+      }));
+    }
+    // Not asserted here: the delegate's `users` list (why the broadcast
+    // exists), the old no-createdBy shape and the delegateId-only audit log
+    // are all denied today, but by the 1000-expression budget rather than a
+    // cheap condition (TAS-105 / TAS-61), so a strict assertion would flake.
+  });
+
+  test("tracking audit log with delegateUid, companyUID and organizationUID is allowed", async () => {
+    const delegate = dbFor("del-1", DELEGATE);
+    await assertSucceeds(delegate.collection("security_audit_logs").add({
+      action: "mock_location_detected_during_tracking",
+      type: "security_violation",
+      delegateUid: "del-1",
+      delegateId: "del-1",
+      companyUID: "c1",
+      companyId: "c1",
+      organizationUID: "o1",
+      organizationId: "o1",
+    }));
+  });
+
   describe("task proof photos", () => {
     const DELEGATE2 = {
       role: "delegate",

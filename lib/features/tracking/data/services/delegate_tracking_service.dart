@@ -3,6 +3,7 @@ import 'package:delegate_app/features/attendance/domain/attendance_auto_close.da
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
@@ -16,8 +17,46 @@ import '../models/tracking_breadcrumb_model.dart';
 class DelegateTrackingService {
   final FirebaseFirestore _firestore;
 
-  DelegateTrackingService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  /// Signed-in user, for `createdBy` / `delegateUid` on alerts and audit
+  /// logs (TAS-71). Null only in tests without Firebase; the session's
+  /// delegate id is used then.
+  final FirebaseAuth? _auth;
+
+  DelegateTrackingService({FirebaseFirestore? firestore, FirebaseAuth? auth})
+      : _firestore = firestore ?? FirebaseFirestore.instance,
+        _auth = auth;
+
+  String _writerUid(DelegateTrackingSession session) {
+    try {
+      return (_auth ?? FirebaseAuth.instance).currentUser?.uid ??
+          session.delegateId;
+    } catch (_) {
+      // No Firebase app (unit tests).
+      return session.delegateId;
+    }
+  }
+
+  /// Audit log write that can never abort the location update around it.
+  /// The rules need `delegateUid` (== auth uid) and company/org ids so the
+  /// company's supervisors can read it (TAS-71).
+  Future<void> _addAuditLog(
+    DelegateTrackingSession session,
+    Map<String, dynamic> fields,
+  ) async {
+    try {
+      await _auditLogsCollection.add({
+        ...fields,
+        'delegateUid': _writerUid(session),
+        'delegateId': session.delegateId,
+        'companyUID': session.companyId,
+        'companyId': session.companyId,
+        'organizationUID': session.organizationId,
+        'organizationId': session.organizationId,
+      });
+    } catch (e) {
+      debugPrint('security audit log failed (${fields['action']}): $e');
+    }
+  }
 
   CollectionReference<Map<String, dynamic>> get _trackingCollection =>
       _firestore.collection('delegate_tracking');
@@ -259,13 +298,11 @@ class DelegateTrackingService {
           breachDistance: 0,
         );
 
-        await _auditLogsCollection.add({
+        await _addAuditLog(session, {
           'action': 'mock_location_detected_during_tracking',
           'type': 'security_violation',
-          'delegateId': session.delegateId,
           'delegateName': session.delegateName,
           'delegatePhone': session.delegatePhone,
-          'companyId': session.companyId,
           'branchName': session.branchName,
           'latitude': currentLat,
           'longitude': currentLng,
@@ -340,14 +377,11 @@ class DelegateTrackingService {
             breachDistance: breachMeters,
           );
 
-          await _auditLogsCollection.add({
+          await _addAuditLog(session, {
             'action': 'confirmed_geofence_breach_after_grace',
             'type': 'geofence_violation',
-            'delegateId': session.delegateId,
             'delegateName': session.delegateName,
             'delegatePhone': session.delegatePhone,
-            'companyId': session.companyId,
-            'organizationId': session.organizationId,
             'branchName': session.branchName,
             'geofenceRadius': session.geofenceRadius,
             'breachDistanceMeters': breachMeters,
@@ -642,51 +676,25 @@ class DelegateTrackingService {
   }) async {
     try {
       final now = DateTime.now();
-
-      // 1. إرسال للمشرفين المباشرين لشركة المندوب
-      if (session.companyId.isNotEmpty) {
-        final supervisorSnap = await _firestore
-            .collection('users')
-            .where('companyUID', isEqualTo: session.companyId)
-            .get();
-
-        for (final doc in supervisorSnap.docs) {
-          final data = doc.data();
-          final role = (data['role'] ?? '').toString().toLowerCase();
-          final pos = (data['position'] ?? '').toString().toLowerCase();
-
-          if (role.contains('admin') ||
-              role.contains('supervisor') ||
-              pos.contains('supervisor')) {
-            await _notificationsCollection.add({
-              'title': title,
-              'body': body,
-              'type': type,
-              'delegateUid': doc.id,
-              'companyId': session.companyId,
-              'organizationId': session.organizationId,
-              'targetDelegateId': session.delegateId,
-              'targetDelegateName': session.delegateName,
-              'targetDelegatePhone': session.delegatePhone,
-              'branchName': session.branchName,
-              'breachDistanceMeters': breachDistance,
-              'isRead': false,
-              'read': false,
-              'createdAt': Timestamp.fromDate(now),
-              'deletedBy': <String>[],
-            });
-          }
-        }
+      // TAS-71: a delegate cannot list `users` under the rules, so the
+      // per-supervisor fan-out is gone. One `supervisor_<companyUID>`
+      // broadcast is what the supervisor inbox reads; the create rule needs
+      // `createdBy` == auth uid and the delegate's own company.
+      if (session.companyId.isEmpty) {
+        debugPrint('geofence alert skipped ($type): session has no company');
+        return;
       }
 
-      // 2. إرسال لبث المشرفين العام للشركة
       await _notificationsCollection.add({
         'title': title,
         'body': body,
         'type': type,
         'delegateUid': 'supervisor_${session.companyId}',
+        'createdBy': _writerUid(session),
         'companyId': session.companyId,
+        'companyUID': session.companyId,
         'organizationId': session.organizationId,
+        'organizationUID': session.organizationId,
         'targetDelegateId': session.delegateId,
         'targetDelegateName': session.delegateName,
         'targetDelegatePhone': session.delegatePhone,
