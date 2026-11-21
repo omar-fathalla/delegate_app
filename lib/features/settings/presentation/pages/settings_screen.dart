@@ -12,6 +12,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
 import 'package:delegate_app/config/theme/color_schemes.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_adaptive_sheet.dart';
 
 class SettingsScreen extends StatelessWidget {
   final Delegate delegate;
@@ -161,17 +163,22 @@ class SettingsScreen extends StatelessWidget {
                             color: Theme.of(context).colorScheme.outlineVariant,
                             indent: 64,
                           ),
-                          _buildSettingsTile(
-                            context: context,
-                            icon: Icons.star_rate_rounded,
-                            title: AppLocalizations.of(context)!.rateTheApp,
-                            onTap: () => sl<ReviewService>().requestManualReview(),
-                          ),
-                          Divider(
-                            height: 1,
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                            indent: 64,
-                          ),
+                          // Store rating has no meaning in a browser (TAS-158).
+                          if (!WebRuntimePolicy.isWeb) ...[
+                            _buildSettingsTile(
+                              context: context,
+                              icon: Icons.star_rate_rounded,
+                              title: AppLocalizations.of(context)!.rateTheApp,
+                              onTap: () =>
+                                  sl<ReviewService>().requestManualReview(),
+                            ),
+                            Divider(
+                              height: 1,
+                              color:
+                                  Theme.of(context).colorScheme.outlineVariant,
+                              indent: 64,
+                            ),
+                          ],
                           _buildSettingsTile(
                             context: context,
                             icon: Icons.history_rounded,
@@ -266,7 +273,10 @@ class SettingsScreen extends StatelessWidget {
                             snapshot.hasData ? snapshot.data!.version : '...';
                         return Center(
                           child: Text(
-                            l10n.version(version),
+                            // The web isn't the «مندوب تسهيل» app (TAS-158).
+                            WebRuntimePolicy.isWeb
+                                ? l10n.webVersion(version)
+                                : l10n.version(version),
                             style: TextStyle(
                               color: Theme.of(
                                 context,
@@ -312,47 +322,70 @@ class SettingsScreen extends StatelessWidget {
   Future<void> _showThemeModeSheet(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cubit = context.read<ThemeCubit>();
+    // Wide web windows get a dialog (TAS-158). Mobile and narrow windows keep
+    // the original bottom sheet unchanged.
+    if (HrSheet.useDesktop(context)) {
+      return showHrAdaptiveSheet<void>(
+        context: context,
+        title: l10n.themeModeTitle,
+        dialogWidth: 440,
+        builder: (sheetContext) =>
+            _themeModeOptions(sheetContext, cubit, l10n, showTitle: false),
+      );
+    }
     return showModalBottomSheet<void>(
       context: context,
       builder: (sheetContext) => SafeArea(
-        child: BlocBuilder<ThemeCubit, ThemeState>(
-          bloc: cubit,
-          builder: (_, state) => RadioGroup<ThemeMode>(
-            groupValue: state.themeMode,
-            onChanged: (m) {
-              if (m == null) return;
-              cubit.setThemeMode(m);
-              Navigator.of(sheetContext).pop();
-            },
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-                  child: Text(
-                    l10n.themeModeTitle,
-                    style: Theme.of(sheetContext).textTheme.titleLarge,
-                  ),
+        child: _themeModeOptions(sheetContext, cubit, l10n, showTitle: true),
+      ),
+    );
+  }
+
+  /// Radio list of theme modes. Picking one applies it and closes the sheet
+  /// or dialog that hosts it.
+  Widget _themeModeOptions(
+    BuildContext sheetContext,
+    ThemeCubit cubit,
+    AppLocalizations l10n, {
+    required bool showTitle,
+  }) {
+    return BlocBuilder<ThemeCubit, ThemeState>(
+      bloc: cubit,
+      builder: (_, state) => RadioGroup<ThemeMode>(
+        groupValue: state.themeMode,
+        onChanged: (m) {
+          if (m == null) return;
+          cubit.setThemeMode(m);
+          Navigator.of(sheetContext).pop();
+        },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (showTitle)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                child: Text(
+                  l10n.themeModeTitle,
+                  style: Theme.of(sheetContext).textTheme.titleLarge,
                 ),
-                for (final (m, icon) in [
-                  (ThemeMode.system, Symbols.brightness_auto_rounded),
-                  (ThemeMode.light, Symbols.light_mode_rounded),
-                  (ThemeMode.dark, Symbols.dark_mode_rounded),
-                ])
-                  RadioListTile<ThemeMode>(
-                    key: ValueKey('theme_mode_${m.name}'),
-                    value: m,
-                    secondary: Icon(icon, fill: state.themeMode == m ? 1 : 0),
-                    title: Text(_themeModeLabel(l10n, m)),
-                    subtitle: m == ThemeMode.system
-                        ? Text(l10n.themeModeSystemHint)
-                        : null,
-                  ),
-                const SizedBox(height: 8),
-              ],
-            ),
-          ),
+              ),
+            for (final (m, icon) in [
+              (ThemeMode.system, Symbols.brightness_auto_rounded),
+              (ThemeMode.light, Symbols.light_mode_rounded),
+              (ThemeMode.dark, Symbols.dark_mode_rounded),
+            ])
+              RadioListTile<ThemeMode>(
+                key: ValueKey('theme_mode_${m.name}'),
+                value: m,
+                secondary: Icon(icon, fill: state.themeMode == m ? 1 : 0),
+                title: Text(_themeModeLabel(l10n, m)),
+                subtitle: m == ThemeMode.system
+                    ? Text(l10n.themeModeSystemHint)
+                    : null,
+              ),
+            if (showTitle) const SizedBox(height: 8),
+          ],
         ),
       ),
     );

@@ -209,7 +209,7 @@ abstract class AppLocalizations {
   /// Pending or blocked delegate login error
   ///
   /// In en, this message translates to:
-  /// **'This account is pending or suspended. Contact your company admin.'**
+  /// **'This account is pending or suspended. Please contact Tashil management.'**
   String get delegateAccountInactive;
 
   /// Delegate login lockout message
@@ -997,6 +997,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tashil Representative - Version {version}'**
   String version(String version);
+
+  /// Version label in web settings (no mobile app name)
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String webVersion(String version);
 
   /// Account section header
   ///
