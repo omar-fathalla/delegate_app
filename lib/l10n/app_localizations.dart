@@ -5207,6 +5207,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not open the store. Please open it yourself and update Tashil.'**
   String get updateRequiredOpenFailed;
+
+  /// Hint under the delegate's personal info: delegates cannot edit identity fields themselves (TAS-72)
+  ///
+  /// In en, this message translates to:
+  /// **'To change your name, email or phone number, please contact your supervisor.'**
+  String get profileIdentityEditViaSupervisor;
 }
 
 class _AppLocalizationsDelegate

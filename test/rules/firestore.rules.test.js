@@ -607,6 +607,18 @@ describe("firestore tightened rules", () => {
     await assertSucceeds(db.collection("attendance_logs").where("companyId", "==", "c1").get());
   });
 
+  // TAS-72: the delegate home screen reads its supervisor from the company's
+  // admins subcollection instead of users/{supervisorUid} (denied).
+  test("delegate can read its own company's admins entry for the supervisor card", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("organizations/o1/companies/c1/admins/sup-1").set({
+        uid: "sup-1", name: "مشرف", phone: "01000000001", role: "company-admin",
+      });
+    });
+    const delegate = dbFor("del-1", DELEGATE);
+    await assertSucceeds(delegate.doc("organizations/o1/companies/c1/admins/sup-1").get());
+  });
+
   test("signed-in clients can read only config/subscriptions", async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();

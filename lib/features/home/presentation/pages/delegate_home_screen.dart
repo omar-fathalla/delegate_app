@@ -163,18 +163,34 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       String companySupervisorName = widget.delegate.supervisorName ?? '';
       String companyName = widget.delegate.companyName;
 
+      // TAS-72: a delegate may only read its own users doc and list users
+      // with its own phone/email, so every users get/query below is denied
+      // for it (and was swallowed). Delegates read the company's `admins`
+      // subcollection instead, which the rules open to the same org.
+      final isDelegateViewer = widget.delegate.role == UserRole.delegate;
+
       // 0. Direct lookup by delegate's assigned supervisor UID if present
       final directSupervisorUid = widget.delegate.supervisorUid;
       if (directSupervisorUid != null && directSupervisorUid.isNotEmpty) {
         try {
-          final supDoc = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(directSupervisorUid)
-              .getResilient(forceServer: forceRefresh);
+          final supRef = isDelegateViewer
+              ? FirebaseFirestore.instance
+                  .collection('organizations')
+                  .doc(orgId)
+                  .collection('companies')
+                  .doc(compId)
+                  .collection('admins')
+                  .doc(directSupervisorUid)
+              : FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(directSupervisorUid);
+          final supDoc = await supRef.getResilient(forceServer: forceRefresh);
           if (supDoc.exists) {
             final sData = supDoc.data()!;
             final name = _extractPersonName(sData, companyName);
+            // `admins/{uid}` stores the number as `phone`.
             final phone = (sData['phoneNumber'] as String?)?.trim() ??
+                (sData['phone'] as String?)?.trim() ??
                 (widget.delegate.supervisorPhone ?? '');
             fetchedSupervisors.add({
               ...sData,
@@ -192,7 +208,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       }
 
       // Also check supervisor from delegate's supervisorPhone if UID lookup didn't yield a supervisor
-      if (fetchedSupervisors.isEmpty &&
+      if (!isDelegateViewer &&
+          fetchedSupervisors.isEmpty &&
           widget.delegate.supervisorPhone != null &&
           widget.delegate.supervisorPhone!.trim().isNotEmpty) {
         try {
@@ -355,7 +372,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       }
 
       // 4. If companyPhone exists, also try lookup in users collection by phoneNumber
-      if (companyPhone.isNotEmpty &&
+      if (!isDelegateViewer &&
+          companyPhone.isNotEmpty &&
           (fetchedSupervisors.isEmpty ||
               fetchedSupervisors.every(
                 (s) => (s['displayName'] as String? ?? '').isEmpty,

@@ -176,6 +176,55 @@ void main() {
     verify(() => privilegedCallable.call(any())).called(1);
   });
 
+  group('callerOwnsDocumentFolder (TAS-72)', () {
+    test('true only when the signed-in uid is the folder id', () {
+      expect(callerOwnsDocumentFolder('del_1', callerUid: 'del_1'), isTrue);
+      expect(callerOwnsDocumentFolder(' del_1 ', callerUid: 'del_1'), isTrue);
+      expect(callerOwnsDocumentFolder('del_1', callerUid: 'sup_9'), isFalse);
+      expect(callerOwnsDocumentFolder('del_1', callerUid: ''), isFalse);
+    });
+
+    test('a delegate uploading to its own folder skips the staff-only intent', () async {
+      var intentCalls = 0;
+      // Storage is not reachable in unit tests; the point is that the
+      // staff-only intent (which answers caller_not_staff) is never called.
+      await expectLater(
+        uploadDelegateDocumentFile(
+          folderId: 'del_1',
+          companyUID: 'comp_1',
+          storagePath: 'delegate_documents/del_1/x.jpg',
+          file: File('missing.jpg'),
+          callerUid: 'del_1',
+          ensureIntent: ({required folderId, required companyUID, functions}) async {
+            intentCalls++;
+            return 'caller_not_staff';
+          },
+        ),
+        throwsA(anything),
+      );
+      expect(intentCalls, 0);
+    });
+
+    test('a supervisor uploading for a delegate still asks for the intent', () async {
+      var intentCalls = 0;
+      await expectLater(
+        uploadDelegateDocumentFile(
+          folderId: 'del_1',
+          companyUID: 'comp_1',
+          storagePath: 'delegate_documents/del_1/x.jpg',
+          file: File('missing.jpg'),
+          callerUid: 'sup_9',
+          ensureIntent: ({required folderId, required companyUID, functions}) async {
+            intentCalls++;
+            return 'تعذر تجهيز المجلد';
+          },
+        ),
+        throwsA(isA<SupervisorDocReuploadException>()),
+      );
+      expect(intentCalls, 1);
+    });
+  });
+
   test('supervisorDocReplaceErrorMessage maps storage unauthorized', () {
     expect(
       supervisorDocReplaceErrorMessage(

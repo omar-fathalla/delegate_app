@@ -2437,5 +2437,9 @@
   "updateRequiredOpenFailed": "Could not open the store. Please open it yourself and update Tashil.",
   "@updateRequiredOpenFailed": {
     "description": "Snackbar when the store link could not be launched"
+  },
+  "profileIdentityEditViaSupervisor": "To change your name, email or phone number, please contact your supervisor.",
+  "@profileIdentityEditViaSupervisor": {
+    "description": "Hint under the delegate's personal info: delegates cannot edit identity fields themselves (TAS-72)"
   }
 }

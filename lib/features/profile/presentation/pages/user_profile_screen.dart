@@ -20,6 +20,11 @@ import '../../../../l10n/app_localizations.dart';
 
 /// صفحة الملف الشخصي للمستخدم
 /// User Profile Screen with ability to change password and photo
+/// TAS-72: whether the profile screen offers the name / email / phone edit.
+/// Delegates cannot change these on their delegate documents (only the
+/// staff-only `editDelegateProfile` callable may), so they ask a supervisor.
+bool profileIdentityEditable(UserRole? role) => role != UserRole.delegate;
+
 class UserProfileScreen extends StatefulWidget {
   final Delegate? delegate;
 
@@ -319,29 +324,45 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       }
 
       // 1b. users doc is written after the delegate doc so a denied write
-      // does not leave the two out of sync.
+      // does not leave the two out of sync. TAS-72: only update an existing
+      // doc, and only the signed-in user's own one; a merge-set here used to
+      // create a role-less users doc (or be denied for a secondary profile).
       try {
-        await firestore.collection('users').doc(effectiveUid).set({
-          'photoURL': downloadUrl,
-          'profileImageUrl': downloadUrl,
-          'personalPhotoURL': downloadUrl,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+        final usersRef = firestore.collection('users').doc(effectiveUid);
+        if (_currentUser?.uid == effectiveUid &&
+            (await usersRef.get()).exists) {
+          await usersRef.update({
+            'photoURL': downloadUrl,
+            'profileImageUrl': downloadUrl,
+            'personalPhotoURL': downloadUrl,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
       } on FirebaseException catch (e) {
         throw Exception(e.message ?? 'فشل تحديث ملف المستخدم');
       }
 
-      // 3. تحديث delegate_requests إن وجد
+      // 3. تحديث delegate_requests إن وجد. TAS-72: the rule only accepts a
+      // new photo URL when the request's `documents` list carries a matching
+      // pending entry, so send the merged list with it.
       try {
         final reqRef = firestore.collection('delegate_requests').doc(effectiveUid);
         final reqSnap = await reqRef.get();
         if (reqSnap.exists) {
           await reqRef.set({
             'profileImageUrl': downloadUrl,
+            'personalPhotoURL': downloadUrl,
+            'documents': mergeReuploadedDocument(
+              reqSnap.data()?['documents'],
+              docType: 'personalPhoto',
+              newUrl: downloadUrl,
+            ),
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('delegate_requests photo sync failed: $e');
+      }
 
       // 4. تحديث حساب Firebase Auth (فقط إذا كان نفس المستخدم صاحب الجلسة)
       try {
@@ -397,13 +418,17 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       final effectiveUid = uid;
 
       final firestore = FirebaseFirestore.instance;
-      // 1. حذف الصورة من وثيقة المستخدم المحددة فقط في users
-      await firestore.collection('users').doc(effectiveUid).set({
-        'photoURL': FieldValue.delete(),
-        'profileImageUrl': FieldValue.delete(),
-        'personalPhotoURL': FieldValue.delete(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      // 1. حذف الصورة من وثيقة المستخدم المحددة فقط في users. TAS-72: only
+      // the signed-in user's own existing doc (no role-less create).
+      final usersRef = firestore.collection('users').doc(effectiveUid);
+      if (_currentUser?.uid == effectiveUid && (await usersRef.get()).exists) {
+        await usersRef.update({
+          'photoURL': FieldValue.delete(),
+          'profileImageUrl': FieldValue.delete(),
+          'personalPhotoURL': FieldValue.delete(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
 
       if (delegate != null && delegate.companyUID.isNotEmpty) {
         final orgsSnap = await firestore.collection('organizations').get();
@@ -790,6 +815,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         '';
     final phone = rawPhone;
 
+    // TAS-72: a delegate cannot change its own name, email or phone on the
+    // delegate documents (the rules only let `editDelegateProfile` do that,
+    // and that callable is staff-only). The users doc alone would succeed and
+    // leave the two out of sync, so the edit buttons are hidden for
+    // delegates and they are told to ask their supervisor. Phone/ID changes
+    // with OTP come with TAS-112.
+    final canEditIdentity = profileIdentityEditable(delegate?.role);
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -836,12 +869,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               value: displayName,
               colorScheme: colorScheme,
               theme: theme,
-              onEdit: () => _showEditInfoSheet(
-                context,
-                fieldType: 'name',
-                initialValue: displayName,
-                delegate: delegate,
-              ),
+              onEdit: !canEditIdentity
+                  ? null
+                  : () => _showEditInfoSheet(
+                        context,
+                        fieldType: 'name',
+                        initialValue: displayName,
+                        delegate: delegate,
+                      ),
             ),
 
             // Email
@@ -851,12 +886,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               value: email,
               colorScheme: colorScheme,
               theme: theme,
-              onEdit: () => _showEditInfoSheet(
-                context,
-                fieldType: 'email',
-                initialValue: email,
-                delegate: delegate,
-              ),
+              onEdit: !canEditIdentity
+                  ? null
+                  : () => _showEditInfoSheet(
+                        context,
+                        fieldType: 'email',
+                        initialValue: email,
+                        delegate: delegate,
+                      ),
             ),
 
             // Phone Number
@@ -867,14 +904,35 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               colorScheme: colorScheme,
               theme: theme,
               maestroValueIdentifier: 'tashil_profile_phone_value',
-              onEdit: () => _showEditInfoSheet(
-                context,
-                fieldType: 'phone',
-                initialValue: phone,
-                delegate: delegate,
-              ),
+              onEdit: !canEditIdentity
+                  ? null
+                  : () => _showEditInfoSheet(
+                        context,
+                        fieldType: 'phone',
+                        initialValue: phone,
+                        delegate: delegate,
+                      ),
               showDivider: false,
             ),
+            if (!canEditIdentity) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(Icons.info_outline_rounded,
+                      size: 18, color: colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      AppLocalizations.of(context)!.profileIdentityEditViaSupervisor,
+                      key: const Key('profile_identity_locked_hint'),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

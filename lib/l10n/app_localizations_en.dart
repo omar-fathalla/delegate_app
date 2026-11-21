@@ -2907,4 +2907,8 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get updateRequiredOpenFailed =>
       'Could not open the store. Please open it yourself and update Tashil.';
+
+  @override
+  String get profileIdentityEditViaSupervisor =>
+      'To change your name, email or phone number, please contact your supervisor.';
 }

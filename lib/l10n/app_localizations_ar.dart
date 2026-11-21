@@ -2907,4 +2907,8 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get updateRequiredOpenFailed =>
       'تعذّر فتح المتجر. يرجى فتحه بنفسك وتحديث تطبيق تسهيل.';
+
+  @override
+  String get profileIdentityEditViaSupervisor =>
+      'لتغيير الاسم أو البريد الإلكتروني أو رقم الموبايل، يرجى التواصل مع المشرف.';
 }

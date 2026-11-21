@@ -1972,5 +1972,9 @@
   "updateRequiredOpenFailed": "تعذّر فتح المتجر. يرجى فتحه بنفسك وتحديث تطبيق تسهيل.",
   "@updateRequiredOpenFailed": {
     "description": "Snackbar when the store link could not be launched"
+  },
+  "profileIdentityEditViaSupervisor": "لتغيير الاسم أو البريد الإلكتروني أو رقم الموبايل، يرجى التواصل مع المشرف.",
+  "@profileIdentityEditViaSupervisor": {
+    "description": "Hint under the delegate's personal info: delegates cannot edit identity fields themselves (TAS-72)"
   }
 }
