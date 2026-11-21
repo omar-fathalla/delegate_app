@@ -70,7 +70,9 @@ class CompanyChainCatalog {
   }) {
     final co = companyUID.trim();
     final hit = _cache[co];
-    if (!forceRefresh && hit != null && DateTime.now().difference(hit.at) < ttl) {
+    if (!forceRefresh &&
+        hit != null &&
+        DateTime.now().difference(hit.at) < ttl) {
       return hit.future;
     }
     final future = _load(firestore, co);
@@ -91,19 +93,26 @@ class CompanyChainCatalog {
     final docs = snap.docs;
     final joined = co.isEmpty
         ? List<bool>.filled(docs.length, false)
-        : await Future.wait(docs.map((d) async {
-            try {
-              return (await d.reference.collection('companies').doc(co).get()).exists;
-            } catch (_) {
-              return false;
-            }
-          }));
+        : await Future.wait(
+            docs.map((d) async {
+              try {
+                return (await d.reference.collection('companies').doc(co).get())
+                    .exists;
+              } catch (_) {
+                return false;
+              }
+            }),
+          );
     final out = <CompanyChainOption>[];
     for (var i = 0; i < docs.length; i++) {
       final data = docs[i].data();
-      final name = (data['name'] ?? data['title'] ?? docs[i].id).toString().trim();
+      final name = (data['name'] ?? data['title'] ?? docs[i].id)
+          .toString()
+          .trim();
       if (isHiddenChain(uid: docs[i].id, name: name) && !joined[i]) continue;
-      out.add(CompanyChainOption(uid: docs[i].id, name: name, joined: joined[i]));
+      out.add(
+        CompanyChainOption(uid: docs[i].id, name: name, joined: joined[i]),
+      );
     }
     out.sort(compareChainNames);
     return out;
@@ -135,6 +144,24 @@ Future<Set<String>> fetchPendingCompanyChainUids({
   };
 }
 
+/// Pending «طلب ضم سلسلة» rows for [companyUID], by chain name. Same query
+/// as [fetchPendingCompanyChainUids]; used by the HR home chains card.
+Future<List<CompanyChainRequest>> fetchPendingCompanyChainRequests({
+  required FirebaseFirestore firestore,
+  required String companyUID,
+}) async {
+  final co = companyUID.trim();
+  if (co.isEmpty) return const [];
+  final snap = await firestore
+      .collection(kCompanyChainRequestsCollection)
+      .where('companyUID', isEqualTo: co)
+      .where('status', isEqualTo: 'pending')
+      .get();
+  final list = snap.docs.map(CompanyChainRequest.fromDoc).toList()
+    ..sort((a, b) => a.organizationName.compareTo(b.organizationName));
+  return list;
+}
+
 /// Writes one pending request per chain in one batch. Returns the batch id.
 Future<String> submitCompanyChainRequests({
   required FirebaseFirestore firestore,
@@ -164,7 +191,16 @@ Future<String> submitCompanyChainRequests({
           ? picked.length
           : i + kCompanyChainRequestsPerCommit,
     );
-    await _commitRequests(firestore, col, part, picked.length, batchId, co, companyName, supervisor);
+    await _commitRequests(
+      firestore,
+      col,
+      part,
+      picked.length,
+      batchId,
+      co,
+      companyName,
+      supervisor,
+    );
   }
   CompanyChainCatalog.clear(co);
   return batchId;
@@ -234,7 +270,9 @@ class CompanyChainRequest {
 
   bool get isPending => status == 'pending';
 
-  factory CompanyChainRequest.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+  factory CompanyChainRequest.fromDoc(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
     final d = doc.data() ?? const <String, dynamic>{};
     String s(String k) => (d[k] ?? '').toString();
     final created = d['createdAt'];
@@ -302,8 +340,12 @@ Future<void> approveCompanyChainRequest({
   if (bad != null) throw StateError(kCompanyChainUnavailableMessage);
   String supervisorPhone = '';
   try {
-    final sup = await firestore.collection('users').doc(request.supervisorUid).get();
-    supervisorPhone = (sup.data()?['phoneNumber'] ?? sup.data()?['phone'] ?? '').toString();
+    final sup = await firestore
+        .collection('users')
+        .doc(request.supervisorUid)
+        .get();
+    supervisorPhone = (sup.data()?['phoneNumber'] ?? sup.data()?['phone'] ?? '')
+        .toString();
   } catch (_) {}
   await ensureCompanyInChains(
     firestore: firestore,
@@ -315,12 +357,15 @@ Future<void> approveCompanyChainRequest({
     supervisorPhone: supervisorPhone,
     requestId: request.id,
   );
-  await firestore.collection(kCompanyChainRequestsCollection).doc(request.id).update({
-    'status': 'approved',
-    'reviewedBy': reviewer.fullName,
-    'reviewedByUid': reviewer.uid,
-    'reviewedAt': FieldValue.serverTimestamp(),
-  });
+  await firestore
+      .collection(kCompanyChainRequestsCollection)
+      .doc(request.id)
+      .update({
+        'status': 'approved',
+        'reviewedBy': reviewer.fullName,
+        'reviewedByUid': reviewer.uid,
+        'reviewedAt': FieldValue.serverTimestamp(),
+      });
   CompanyChainCatalog.clear(request.companyUID);
 }
 
@@ -330,12 +375,15 @@ Future<void> rejectCompanyChainRequest({
   required Delegate reviewer,
   String reason = '',
 }) async {
-  await firestore.collection(kCompanyChainRequestsCollection).doc(request.id).update({
-    'status': 'rejected',
-    'reviewedBy': reviewer.fullName,
-    'reviewedByUid': reviewer.uid,
-    'reviewedAt': FieldValue.serverTimestamp(),
-    'rejectionReason': reason,
-  });
+  await firestore
+      .collection(kCompanyChainRequestsCollection)
+      .doc(request.id)
+      .update({
+        'status': 'rejected',
+        'reviewedBy': reviewer.fullName,
+        'reviewedByUid': reviewer.uid,
+        'reviewedAt': FieldValue.serverTimestamp(),
+        'rejectionReason': reason,
+      });
   CompanyChainCatalog.clear(request.companyUID);
 }
