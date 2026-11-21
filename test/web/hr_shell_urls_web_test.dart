@@ -693,6 +693,27 @@ void main() {
         expect(shownTab(t), kHrTabDelegates);
       });
 
+      testWidgets('TAS-199: narrowing the window forgets the detail address', (
+        t,
+      ) async {
+        final r = await pumpShell(t, initial: path);
+        expect(find.text('detail seed-fake-delegate-1'), findsOneWidget);
+        expect(location(r), path);
+
+        // Wide to narrow drops the inner navigator and the detail page.
+        t.view.physicalSize = const Size(412, 900);
+        await settleLong(t);
+        expect(location(r), '/hr/attendance');
+
+        // The next inner page must not carry the old delegate id.
+        r.go('/hr/delegates');
+        await settleLong(t);
+        await t.tap(find.byKey(const ValueKey('inner_$kHrTabDelegates')));
+        await settleLong(t);
+        expect(find.text('inner body'), findsOneWidget);
+        expect(location(r), '/hr/delegates?inner=1');
+      });
+
       testWidgets('narrow web: a direct visit opens it full screen', (t) async {
         final r = await pumpShell(t, initial: path, size: const Size(412, 900));
         expect(find.text('detail seed-fake-delegate-1'), findsOneWidget);
