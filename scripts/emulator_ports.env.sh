@@ -163,7 +163,7 @@ emulator_ports_busy_report() {
 # parent is gone (ppid 1): leftovers of a cancelled or crashed run. Never
 # touches a process whose parent is alive, or another user's process.
 emulator_kill_orphans_on_ports() {
-  local p pid killed=0 me
+  local p pid me victims=""
   me="$(id -un)"
   while IFS= read -r p; do
     for pid in $(lsof -nP -iTCP:"${p}" -sTCP:LISTEN -t 2>/dev/null | sort -u); do
@@ -172,11 +172,33 @@ emulator_kill_orphans_on_ports() {
       user="$(ps -o user= -p "${pid}" 2>/dev/null | tr -d ' ')"
       cmd="$(ps -o command= -p "${pid}" 2>/dev/null)"
       if [[ "${ppid}" == 1 && "${user}" == "${me}" && "${cmd}" == *emulator* ]]; then
+        case " ${victims} " in *" ${pid} "*) continue ;; esac
         echo "emulator ports: killing orphaned emulator pid ${pid} on port ${p}" >&2
-        kill "${pid}" 2>/dev/null && killed=1
+        kill "${pid}" 2>/dev/null || true
+        victims="${victims} ${pid}"
       fi
     done
   done < <(emulator_ports_all)
-  [[ "${killed}" -eq 1 ]] && sleep 3
+  # TAS-111: a JVM that failed to stop can ignore SIGTERM for a long time
+  # under load and keep answering on the old port. Wait for it to really
+  # exit, then SIGKILL whatever is left.
+  for pid in ${victims}; do
+    emulator_wait_pid_gone "${pid}" "${EMULATOR_KILL_GRACE_SECONDS:-10}" && continue
+    echo "emulator ports: pid ${pid} ignored SIGTERM, sending SIGKILL" >&2
+    kill -9 "${pid}" 2>/dev/null || true
+    emulator_wait_pid_gone "${pid}" 5 ||
+      echo "emulator ports: pid ${pid} is still alive after SIGKILL" >&2
+  done
+  return 0
+}
+
+# 0 once pid has exited, 1 if it is still alive after ~seconds.
+emulator_wait_pid_gone() {
+  local pid="$1" seconds="$2" i
+  for ((i = 0; i < seconds * 4; i++)); do
+    kill -0 "${pid}" 2>/dev/null || return 0
+    sleep 0.25
+  done
+  kill -0 "${pid}" 2>/dev/null && return 1
   return 0
 }
