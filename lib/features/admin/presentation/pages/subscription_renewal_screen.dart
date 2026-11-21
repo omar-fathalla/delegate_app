@@ -30,12 +30,18 @@ class SubscriptionRenewalScreen extends StatefulWidget {
   final SubscriptionPaymentGateway? paymentGateway;
   final DateTime Function()? clock;
 
+  /// Inside the HR web shell the top bar already shows the title, so the
+  /// screen swaps its AppBar for a slim toolbar with the same actions
+  /// (TAS-143).
+  final bool showAppBar;
+
   const SubscriptionRenewalScreen({
     super.key,
     required this.supervisor,
     this.repository,
     this.paymentGateway,
     this.clock,
+    this.showAppBar = true,
   });
 
   static const String title = 'تجديد المناديب';
@@ -341,7 +347,7 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen>
     if (!mounted) return;
     result.fold((f) => AppSnackBar.showError(context, f.message), (list) {
       if (list.isEmpty) {
-        AppSnackBar.showError(context, 'لا توجد إيصالات تجديد مدفوعة بعد.');
+        AppSnackBar.showInfo(context, 'لا توجد إيصالات تجديد مدفوعة بعد.');
         return;
       }
       showModalBottomSheet<void>(
@@ -439,24 +445,47 @@ class _SubscriptionRenewalScreenState extends State<SubscriptionRenewalScreen>
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text(SubscriptionRenewalScreen.title),
-          actions: [
-            IconButton(
-              tooltip: 'إيصالات التجديد',
-              key: const Key('renewal_receipts_button'),
-              icon: const Icon(Icons.receipt_long_rounded),
-              onPressed: _loading ? null : _openPaidReceipts,
-            ),
-            IconButton(
-              tooltip: 'تحديث',
-              icon: const Icon(Icons.refresh_rounded),
-              onPressed: _loading ? null : _load,
-            ),
-          ],
-        ),
+        appBar: widget.showAppBar
+            ? AppBar(
+                title: const Text(SubscriptionRenewalScreen.title),
+                actions: [
+                  IconButton(
+                    tooltip: 'إيصالات التجديد',
+                    key: const Key('renewal_receipts_button'),
+                    icon: const Icon(Icons.receipt_long_rounded),
+                    onPressed: _loading ? null : _openPaidReceipts,
+                  ),
+                  IconButton(
+                    tooltip: 'تحديث',
+                    icon: const Icon(Icons.refresh_rounded),
+                    onPressed: _loading ? null : _load,
+                  ),
+                ],
+              )
+            : null,
         body: Column(
           children: [
+            if (!widget.showAppBar)
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 16, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton.icon(
+                      key: const Key('renewal_receipts_button'),
+                      icon: const Icon(Icons.receipt_long_rounded, size: 18),
+                      label: const Text('إيصالات التجديد'),
+                      onPressed: _loading ? null : _openPaidReceipts,
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: 'تحديث',
+                      icon: const Icon(Icons.refresh_rounded),
+                      onPressed: _loading ? null : _load,
+                    ),
+                  ],
+                ),
+              ),
             _PeriodBanner(
               now: now,
               isFree: isFree,
