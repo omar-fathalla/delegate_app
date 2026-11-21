@@ -684,6 +684,15 @@
       }
     }
   },
+  "webVersion": "الإصدار {version}",
+  "@webVersion": {
+    "description": "Version label in web settings (no mobile app name)",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "account": "الحساب",
   "@account": {
     "description": "Account section header"

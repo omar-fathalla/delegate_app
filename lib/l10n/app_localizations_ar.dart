@@ -494,6 +494,11 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String webVersion(String version) {
+    return 'الإصدار $version';
+  }
+
+  @override
   String get account => 'الحساب';
 
   @override

@@ -12,6 +12,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
 import 'package:delegate_app/config/theme/color_schemes.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 
 class SettingsScreen extends StatelessWidget {
   final Delegate delegate;
@@ -161,17 +162,22 @@ class SettingsScreen extends StatelessWidget {
                             color: Theme.of(context).colorScheme.outlineVariant,
                             indent: 64,
                           ),
-                          _buildSettingsTile(
-                            context: context,
-                            icon: Icons.star_rate_rounded,
-                            title: AppLocalizations.of(context)!.rateTheApp,
-                            onTap: () => sl<ReviewService>().requestManualReview(),
-                          ),
-                          Divider(
-                            height: 1,
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                            indent: 64,
-                          ),
+                          // Store rating has no meaning in a browser (TAS-158).
+                          if (!WebRuntimePolicy.isWeb) ...[
+                            _buildSettingsTile(
+                              context: context,
+                              icon: Icons.star_rate_rounded,
+                              title: AppLocalizations.of(context)!.rateTheApp,
+                              onTap: () =>
+                                  sl<ReviewService>().requestManualReview(),
+                            ),
+                            Divider(
+                              height: 1,
+                              color:
+                                  Theme.of(context).colorScheme.outlineVariant,
+                              indent: 64,
+                            ),
+                          ],
                           _buildSettingsTile(
                             context: context,
                             icon: Icons.history_rounded,
@@ -266,7 +272,10 @@ class SettingsScreen extends StatelessWidget {
                             snapshot.hasData ? snapshot.data!.version : '...';
                         return Center(
                           child: Text(
-                            l10n.version(version),
+                            // The web isn't the «مندوب تسهيل» app (TAS-158).
+                            WebRuntimePolicy.isWeb
+                                ? l10n.webVersion(version)
+                                : l10n.version(version),
                             style: TextStyle(
                               color: Theme.of(
                                 context,
