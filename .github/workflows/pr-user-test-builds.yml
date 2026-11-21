@@ -19,11 +19,13 @@ on:
 permissions:
   contents: read
 
-# Shared with the CI workflow so heavy Mac jobs do not interleave on
-# the single tashil-delegate-mac runner. See ci.yml.
+# One group per workflow per PR (TAS-172): a new push to a PR cancels that PR's
+# older User Test build. Separate from CI's group (ci-…), so CI and User Test
+# never cancel each other. Heavy Mac jobs still queue one at a time via the
+# job-level delegate-mac-heavy-build group. See ci.yml.
 concurrency:
-  group: tashil-delegate-mac-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  group: user-test-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Listener inherited fathalla's PATH (unreadable Android platform-tools).
 # Set a clean base PATH so checkout/git do not EACCES that directory.

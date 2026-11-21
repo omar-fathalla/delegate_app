@@ -17,12 +17,15 @@ on:
 permissions:
   contents: read
 
-# Shared with PR User Test builds so both workflows take the single
-# tashil-delegate-mac runner one at a time instead of interleaving jobs.
-# cancel-in-progress is false so CI and User Test do not cancel each other.
+# One group per workflow per PR (TAS-172): a new push to a PR cancels that PR's
+# older CI run, so superseded commits stop holding runner slots. The group name
+# is different from PR User Test builds (user-test-…), so CI and User Test
+# never cancel each other. Pushes to dev and manual runs are never cancelled.
+# Heavy Mac jobs still queue one at a time via the job-level
+# delegate-mac-heavy-build group below.
 concurrency:
-  group: tashil-delegate-mac-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  group: ci-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   PATH: /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
