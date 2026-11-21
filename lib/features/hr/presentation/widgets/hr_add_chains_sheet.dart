@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import 'package:delegate_app/features/admin/data/company_chains.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_adaptive_sheet.dart';
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 
 /// Kept for the delegates table: suspended delegates never get chains
@@ -39,7 +40,7 @@ class HrAddChainsSheet extends StatefulWidget {
   final bool fullScreen;
 
   static const double fullScreenBelow = 840;
-  static const double sheetWidth = 480;
+  static const double sheetWidth = HrSheet.sideWidth;
 
   static const titleKey = Key('hr_add_chains_title');
   static const counterKey = Key('hr_add_chains_counter');
@@ -78,7 +79,7 @@ class HrAddChainsSheet extends StatefulWidget {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'إغلاق',
-      barrierColor: Colors.black.withValues(alpha: 0.32),
+      barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.32),
       transitionDuration: const Duration(milliseconds: 250),
       pageBuilder: (_, _, _) => HrAddChainsSheet(
         supervisor: supervisor,
@@ -87,11 +88,13 @@ class HrAddChainsSheet extends StatefulWidget {
         fullScreen: fullScreen,
       ),
       transitionBuilder: (ctx, anim, _, child) {
-        final rtl = Directionality.of(ctx) == TextDirection.rtl;
+        if (!fullScreen) {
+          return HrSideSheetTransition(animation: anim, child: child);
+        }
         final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
         return SlideTransition(
           position: Tween<Offset>(
-            begin: fullScreen ? const Offset(0, 0.05) : Offset(rtl ? -1 : 1, 0),
+            begin: const Offset(0, 0.05),
             end: Offset.zero,
           ).animate(curved),
           child: FadeTransition(opacity: curved, child: child),
