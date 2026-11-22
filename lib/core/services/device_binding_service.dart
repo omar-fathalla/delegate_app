@@ -228,13 +228,10 @@ class DeviceBindingService {
       return;
     }
 
-    final snap = await _firestore.collectionGroup('delegates').get();
-    for (final doc in snap.docs) {
-      if (doc.id == delegateUid) {
-        await doc.reference.update(resetData);
-        return;
-      }
-    }
+    // TAS-75: no unscoped collection-group scan to find the doc. The rules
+    // deny that list, and the approved device_unbind_requests doc already
+    // tells the server to replace the binding.
+    debugPrint('Device binding mirror skipped for $delegateUid: no org/company.');
   }
   static Future<void> _logUnauthorizedDeviceAttempt({
     required Delegate delegate,

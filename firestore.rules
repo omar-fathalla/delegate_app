@@ -2974,6 +2974,14 @@ service cloud.firestore {
     // Public subscription flags (advance renewal, etc.). Clients may read
     // only this doc; every other config/* stays deny-all. Do not put secrets
     // or bypass lists here.
+    // TAS-75: emergency session reset (session_management_service). Every
+    // signed-in app reads it at start; only a super admin writes it from
+    // «إدارة جلسات المناديب».
+    match /system_config/session_control {
+      allow read: if signedIn();
+      allow write: if isSuperAdmin();
+    }
+
     match /config/subscriptions {
       allow read: if signedIn();
       allow write: if false;
