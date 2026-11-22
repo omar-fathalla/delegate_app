@@ -2,6 +2,7 @@
 // supervisors and HR. Data comes from HRAttendanceTab's existing,
 // company-scoped loads through its viewBuilder hook; nothing here queries
 // Firestore directly.
+import 'package:delegate_app/features/hr/domain/hr_add_delegate_policy.dart';
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -76,7 +77,8 @@ class HrHomeOverviewActions {
   final VoidCallback onOpenProfile;
   final VoidCallback onOpenAttendanceLog;
   final VoidCallback onOpenDelegates;
-  final VoidCallback onAddDelegate;
+  /// Null hides «إضافة مندوب» (HR users, TAS-74).
+  final VoidCallback? onAddDelegate;
   final VoidCallback onHowToLink;
   final ValueChanged<HRAttendanceRecord> onOpenRecord;
 
@@ -92,7 +94,7 @@ class HrHomeOverviewActions {
     required this.onOpenProfile,
     required this.onOpenAttendanceLog,
     required this.onOpenDelegates,
-    required this.onAddDelegate,
+    this.onAddDelegate,
     required this.onHowToLink,
     required this.onOpenRecord,
     this.onAddChain,
@@ -144,7 +146,9 @@ class HrHomeOverviewWeb extends StatelessWidget {
     onOpenProfile: () => HrAccountPages.openProfile(context, delegate),
     onOpenAttendanceLog: () => onNavigateToTab(kHrTabAttendance),
     onOpenDelegates: () => onNavigateToTab(kHrTabDelegates),
-    onAddDelegate: () => openAdminHomeAddDelegate(context, delegate),
+    onAddDelegate: hrUserCanAddDelegate(delegate)
+        ? () => openAdminHomeAddDelegate(context, delegate)
+        : null,
     onAddChain: () => _addChain(context),
     onOpenChainRequests: () => openHrChainRequestsTab(onNavigateToTab),
     onHowToLink: () => showAdminHomeLinkingGuide(context, delegate),
