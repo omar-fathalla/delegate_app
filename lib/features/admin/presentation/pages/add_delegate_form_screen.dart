@@ -14,9 +14,9 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:delegate_app/features/admin/data/base_chain.dart';
 import 'package:delegate_app/features/admin/data/chain_duplicate_lookup.dart';
 import 'package:delegate_app/features/admin/domain/entities/chain_selection.dart';
-import 'package:delegate_app/features/admin/presentation/widgets/chain_multi_select.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/add_delegate_subscription_section.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 
@@ -107,89 +107,31 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
     super.dispose();
   }
 
+  /// TAS-254: no chain picker. Every new delegate is registered under the
+  /// base (free) chain of the company; the autoLink functions link the
+  /// delegate to every other chain the company has joined.
   Future<void> _fetchOrganizations() async {
     final debugLoader = widget.debugOrganizationsLoader;
-    if (debugLoader != null) {
-      final orgs = await debugLoader();
-      if (mounted) {
-        setState(() {
-          _organizations = orgs;
-          _isLoadingOrgs = false;
-        });
-      }
-      return;
-    }
+    List<Map<String, dynamic>> orgs = const [];
     try {
-      final snap = await FirebaseFirestore.instance.collection('organizations').get();
-      final companyUID = widget.supervisor.companyUID;
-      final candidates = snap.docs.where((doc) {
-        final data = doc.data();
-        final name = (data['name'] ?? data['title'] ?? doc.id).toString().toLowerCase();
-        final uid = doc.id.toLowerCase();
-        // استبعاد أسواق فتح الله لأن لها آلية تسجيل خاصة عبر الموقع الإلكتروني
-        final isFathalla = name.contains('fathalla') ||
-            name.contains('فتح الله') ||
-            name.contains('فتح_الله') ||
-            uid.contains('fathalla') ||
-            uid.contains('فتح_الله');
-        return !isFathalla;
-      }).toList();
-
-      final List<Map<String, dynamic>> orgs = [];
-      final role = widget.supervisor.role;
-      final isGlobal = role == UserRole.superAdmin;
-      if (companyUID.isEmpty && !isGlobal) {
-        // Company staff and org-admin fail closed without a companyUID.
-      } else if (companyUID.isEmpty && isGlobal) {
-        orgs.addAll(candidates.map((doc) {
-          final data = doc.data();
-          return {
-            'uid': doc.id,
-            'name': data['name'] ?? data['title'] ?? doc.id,
-          };
-        }));
+      if (debugLoader != null) {
+        final all = await debugLoader();
+        orgs = all.isEmpty ? const [] : [all.first];
       } else {
-        final checks = await Future.wait(candidates.map((doc) async {
-          try {
-            final cDoc = await FirebaseFirestore.instance
-                .collection('organizations')
-                .doc(doc.id)
-                .collection('companies')
-                .doc(companyUID)
-                .get();
-            // Any company may request any chain (2026-11-17); approval
-            // registers the company in chains it is not in yet.
-            final data = doc.data();
-            return {
-              'uid': doc.id,
-              'name': data['name'] ?? data['title'] ?? doc.id,
-              'companyRegistered': cDoc.exists,
-            };
-          } catch (_) {
-            final data = doc.data();
-            return {
-              'uid': doc.id,
-              'name': data['name'] ?? data['title'] ?? doc.id,
-              'companyRegistered': false,
-            };
-          }
-        }));
-        orgs.addAll(checks.whereType<Map<String, dynamic>>());
-      }
-      if (role == UserRole.organizationAdmin) {
-        final ownOrg = widget.supervisor.organizationUID.trim();
-        orgs.removeWhere((o) => (o['uid'] as String).trim() != ownOrg);
-      }
-
-      if (mounted) {
-        setState(() {
-          _organizations = orgs;
-          _isLoadingOrgs = false;
-        });
+        final base = await loadBaseChain(FirebaseFirestore.instance);
+        if (base != null) orgs = [{'uid': base.uid, 'name': base.name}];
       }
     } catch (_) {
-      if (mounted) setState(() => _isLoadingOrgs = false);
+      orgs = const [];
     }
+    if (!mounted) return;
+    setState(() {
+      _organizations = orgs;
+      _selectedOrgUIDs
+        ..clear()
+        ..addAll(orgs.map((o) => o['uid'] as String));
+      _isLoadingOrgs = false;
+    });
   }
 
   Future<void> _pickImage(void Function(File file) onSelected) async {
@@ -213,7 +155,9 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
     _phoneController.clear();
     _nationalIdController.clear();
     _receiptCodeController.clear();
-    _selectedOrgUIDs.clear();
+    _selectedOrgUIDs
+      ..clear()
+      ..addAll(_organizations.map((o) => o['uid'] as String));
     _duplicateOrgUIDs = {};
     _profileImage = null;
     _nationalIdFront = null;
@@ -248,12 +192,11 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
       return;
     }
 
-    final l10n = AppLocalizations.of(context);
     final chainOptions = _organizations
         .map((o) => ChainOption(uid: o['uid'] as String, name: o['name'] as String))
         .toList();
     if (_selectedOrgUIDs.isEmpty) {
-      AppSnackBar.showError(context, l10n?.chainPickerRequired ?? 'يرجى اختيار سلسلة واحدة على الأقل.');
+      AppSnackBar.showError(context, _baseChainMissingMessage);
       return;
     }
 
@@ -288,7 +231,7 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
       AppSnackBar.showInfo(context, selection.warningAr!);
     }
     if (!selection.canSubmit) {
-      AppSnackBar.showError(context, l10n?.chainPickerRequired ?? 'يرجى اختيار سلسلة واحدة على الأقل.');
+      AppSnackBar.showError(context, 'المندوب ده متسجل بالفعل في الشركة.');
       return;
     }
     final selectedOrgUID = selection.primaryUid!;
@@ -711,23 +654,48 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
   }
 
 
+  String get _baseChainMissingMessage =>
+      'تعذر تحديد السلسلة الأساسية للمندوب. حاول مرة تانية أو كلم الدعم الفني.';
+
+  /// TAS-254: replaces the chain picker. The delegate is registered under the
+  /// base chain and linked to every company chain automatically.
   Widget _buildOrganizationSelector(ColorScheme colorScheme) {
-    final chains = _organizations
-        .map((o) => ChainOption(uid: o['uid'] as String, name: o['name'] as String))
-        .toList();
-    return ChainMultiSelect(
-      chains: chains,
-      selectedUids: _selectedOrgUIDs,
-      duplicateUids: _duplicateOrgUIDs,
-      onChanged: (next) => setState(() {
-        _selectedOrgUIDs
-          ..clear()
-          ..addAll(next);
-        _duplicateOrgUIDs = {};
-      }),
+    final base = _organizations.isEmpty ? null : _organizations.first['name']?.toString();
+    final missing = !_isLoadingOrgs && base == null;
+    return Container(
+      key: const ValueKey('add_delegate_base_chain_note'),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: missing ? colorScheme.errorContainer : colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            missing ? Icons.error_outline_rounded : Icons.hub_rounded,
+            color: missing ? colorScheme.onErrorContainer : colorScheme.primary,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _isLoadingOrgs
+                  ? 'جاري تحميل بيانات الشركة...'
+                  : missing
+                      ? _baseChainMissingMessage
+                      : 'المندوب هيتسجل في الشركة على $base، وبعد الاعتماد بيتربط تلقائياً بكل السلاسل المضافة للشركة. لإضافة سلسلة جديدة استخدم «إضافة سلاسل للشركة».',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.5,
+                color: missing ? colorScheme.onErrorContainer : colorScheme.onSurface,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
-
   Widget _buildSectionHeader(String title, IconData icon) {
     return Row(
       children: [
@@ -1048,15 +1016,6 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
       .map((o) => ChainOption(uid: o['uid'] as String, name: o['name'] as String))
       .toList();
 
-  void _setSelectedChains(Set<String> next) {
-    setState(() {
-      _selectedOrgUIDs
-        ..clear()
-        ..addAll(next);
-      _duplicateOrgUIDs = {};
-    });
-  }
-
   ImageProvider? _previewOf(File? file) {
     if (file == null) return null;
     // image_picker hands back a blob: URL on the web.
@@ -1206,12 +1165,7 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
   /// Form sections as stacked cards (chains, personal data, images, plan).
   List<Widget> _buildDesktopFormCards(ColorScheme colorScheme) {
     return [
-      AddDelegateChainGrid(
-        chains: _chainOptions,
-        selectedUids: _selectedOrgUIDs,
-        duplicateUids: _duplicateOrgUIDs,
-        onChanged: _setSelectedChains,
-      ),
+      _buildOrganizationSelector(colorScheme),
       const SizedBox(height: 16),
       AddDelegateSectionCard(
         icon: Icons.badge_rounded,
@@ -1337,11 +1291,6 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
   }
 
   Widget _buildSingleColumnBody(ColorScheme colorScheme) {
-    final kept = partitionSelectedChains(
-      all: _chainOptions,
-      selectedUids: _selectedOrgUIDs,
-      duplicateUids: _duplicateOrgUIDs,
-    ).kept.length;
     return Column(
       children: [
         Expanded(
@@ -1374,7 +1323,6 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               child: Row(
                 children: [
-                  AddDelegateChainCounter(count: kept),
                   const Spacer(),
                   SizedBox(
                     width: 340,
@@ -1437,28 +1385,14 @@ class _AddDelegateFormScreenState extends State<AddDelegateFormScreen> with Widg
                 ),
                 const SizedBox(height: 12),
                 AddDelegateSummaryLine(
-                  label: 'السلاسل المختارة',
-                  value: '${selection.kept.length}',
+                  label: 'السلسلة الأساسية',
+                  value: selection.kept.isEmpty ? '—' : selection.kept.first.name,
                 ),
-                if (selection.kept.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final chain in selection.kept)
-                        InputChip(
-                          key: ValueKey('add_delegate_summary_chip_${chain.uid}'),
-                          label: Text(chain.name, style: const TextStyle(fontSize: 13)),
-                          onDeleted: () => _setSelectedChains(
-                            {..._selectedOrgUIDs}..remove(chain.uid),
-                          ),
-                          deleteIcon: const Icon(Symbols.close_rounded, size: 18),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                ],
+                const SizedBox(height: 4),
+                const Text(
+                  'بعد الاعتماد يتربط المندوب تلقائياً بكل سلاسل الشركة.',
+                  style: TextStyle(fontSize: 12),
+                ),
                 const Divider(height: 20),
                 AddDelegateSummaryLine(
                   label: 'المندوب',
