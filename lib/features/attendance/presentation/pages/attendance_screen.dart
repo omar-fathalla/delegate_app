@@ -498,6 +498,16 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   @override
   void didUpdateWidget(covariant AttendanceScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.delegate.organizationUID == widget.delegate.organizationUID &&
+        oldWidget.memberships.length != widget.memberships.length &&
+        !_autoLocateDone &&
+        !_isLoadingBranches &&
+        (_orgBranches.isNotEmpty || !_isGeofenceMode)) {
+      // Memberships arrived after the first scan (TAS-245).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _autoLocateAcrossChains(null);
+      });
+    }
     if (oldWidget.delegate.organizationUID != widget.delegate.organizationUID) {
       _otherChainBranches = null;
       _otherGeofenceOrgIds.clear();
