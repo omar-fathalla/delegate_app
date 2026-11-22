@@ -254,8 +254,12 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       final gender = _extractGenderFromNationalId(cleanNationalId);
       String? existingPid;
       try {
+        // TAS-75: company-scoped so the rules can prove the list (an
+        // unscoped one was denied and silently returned nothing). Other
+        // companies are covered by checkDelegateDuplicate above.
         final existingByNat = await _firestore
             .collectionGroup('delegates')
+            .where('companyUID', isEqualTo: companyUID)
             .where('nationalId', isEqualTo: cleanNationalId)
             .limit(1)
             .get();

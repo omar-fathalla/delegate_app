@@ -28,6 +28,7 @@
     "test:rules:status-guards": "bash scripts/emulators_exec.sh --only firestore --project demo-status-guards \"node --test test/rules/delegate-status-guards.test.js\"",
     "test:rules:security": "bash scripts/emulators_exec.sh --only firestore --project demo-suspend-login-penalties \"node --test test/rules/suspend-login-penalties.test.js\"",
     "test:rules:hr-web": "bash scripts/emulators_exec.sh --only firestore --project demo-hr-web-reads \"node --test test/rules/hr-web-company-reads.test.js\"",
+    "test:rules:tas75": "bash scripts/emulators_exec.sh --only firestore --project demo-tas75 \"node --test test/rules/tas75-app-writes.test.js\"",
     "test:rules:tas74-hr": "bash scripts/emulators_exec.sh --only firestore --project demo-tas74-hr \"node --test test/rules/tas74-hr-writes.test.js\"",
     "test:rules:tas73-penalties": "bash scripts/emulators_exec.sh --only firestore --project demo-tas73-penalties \"node --test test/rules/tas73-penalty-scoped-queries.test.js\"",
     "test:rules:tas73-tracking": "bash scripts/emulators_exec.sh --only storage,firestore --project demo-tas73-tracking \"node --test test/rules/tas73-tracking-evidence.test.js\"",
