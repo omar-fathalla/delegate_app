@@ -83,4 +83,33 @@ void main() {
     expect(await r.runIfPending(), isFalse);
     expect(calls, isEmpty);
   });
+
+  group('TAS-244: cache left by an older build', () {
+    test('first start of this build drops the cache once', () async {
+      await reset().markLegacyCacheOnce();
+      expect(await reset().runIfPending(), isTrue);
+      expect(calls, ['wait', 'terminate', 'clear']);
+
+      calls.clear();
+      await reset().markLegacyCacheOnce();
+      expect(await reset().runIfPending(), isFalse);
+      expect(calls, isEmpty);
+    });
+
+    test('unsent writes postpone it to the next start, then it runs', () async {
+      await reset().markLegacyCacheOnce();
+      final pending = Completer<void>();
+      expect(await reset(wait: () => pending.future).runIfPending(), isFalse);
+      expect(reset().isPending, isTrue);
+
+      await reset().markLegacyCacheOnce();
+      expect(await reset().runIfPending(), isTrue);
+    });
+
+    test('web: no mark', () async {
+      await reset(isWeb: true).markLegacyCacheOnce();
+      expect(prefs.getBool(FirestoreCacheReset.pendingKey), isNull);
+      expect(prefs.getBool(FirestoreCacheReset.legacyDoneKey), isNull);
+    });
+  });
 }

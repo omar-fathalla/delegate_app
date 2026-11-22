@@ -108,9 +108,12 @@ Future<void> bootstrapDelegateAppForPatrol() async {
 
   // TAS-76: a logout on this device asked to drop the previous user's
   // cache; do it before anything reads Firestore in this run.
+  // TAS-244: once per device, also drop a cache left by an older build.
   if (!kIsWeb) {
-    await FirestoreCacheReset(prefs: results[1] as SharedPreferences)
-        .runIfPending();
+    final cacheReset =
+        FirestoreCacheReset(prefs: results[1] as SharedPreferences);
+    await cacheReset.markLegacyCacheOnce();
+    await cacheReset.runIfPending();
   }
 
   try {

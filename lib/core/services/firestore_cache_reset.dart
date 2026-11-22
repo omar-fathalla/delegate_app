@@ -52,6 +52,19 @@ class FirestoreCacheReset {
     await prefs.setBool(pendingKey, true);
   }
 
+  /// TAS-244: set once this build has dropped a cache from older builds.
+  static const legacyDoneKey = 'firestore_cache_legacy_reset_v1';
+
+  /// TAS-244: a logout done by an older build (before TAS-76) never marked
+  /// the reset, so earlier users' documents stay in the cache. On the first
+  /// start of this build, mark it once; [runIfPending] then drops it before
+  /// anything reads Firestore. Unsent writes still postpone it, as usual.
+  Future<void> markLegacyCacheOnce() async {
+    if (_isWeb || (prefs.getBool(legacyDoneKey) ?? false)) return;
+    await prefs.setBool(pendingKey, true);
+    await prefs.setBool(legacyDoneKey, true);
+  }
+
   /// Clears the cache when a logout asked for it. Returns whether it did.
   /// Concurrent callers share one run.
   Future<bool> runIfPending() {
