@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/widgets/app_snack_bar.dart';
+import 'package:delegate_app/features/hr/presentation/widgets/hr_add_chains_sheet.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
@@ -687,9 +689,37 @@ mixin _AdminHomeHelpers {
                 ),
               ],
             ),
+            const SizedBox(height: 10),
+            // TAS-254: chains are added to the company, same sheet as the HR web.
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.tonalIcon(
+                key: const ValueKey('admin_home_add_company_chains'),
+                onPressed: () => _addCompanyChains(context),
+                icon: const Icon(Icons.add_business_rounded, size: 18),
+                label: Text(
+                  isArabic ? 'إضافة سلاسل للشركة' : 'Add chains to the company',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                style: FilledButton.styleFrom(
+                  shape: const StadiumBorder(),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  /// TAS-254: company-level «طلب ضم سلسلة», like the HR web home.
+  Future<void> _addCompanyChains(BuildContext context) async {
+    final names = await HrAddChainsSheet.show(context, supervisor: adminDelegate);
+    if (!context.mounted || names == null || names.isEmpty) return;
+    AppSnackBar.showSuccess(
+      context,
+      'تم إرسال طلب ضم ${names.length} سلسلة للشركة. بعد الموافقة تظهر فروعها لكل المناديب النشطين المدفوع اشتراكهم.',
     );
   }
 
@@ -780,28 +810,28 @@ mixin _AdminHomeHelpers {
                 _buildStepItem(
                   colorScheme,
                   '1',
-                  isArabic ? 'الضغط على زر إضافة مندوب' : 'Tap Add Delegate',
+                  isArabic ? 'إضافة سلاسل للشركة' : 'Add chains to the company',
                   isArabic
-                      ? 'افتح نموذج إضافة المندوب من هذا الكارت أو من تبويب المناديب.'
-                      : 'Open the delegate form from this card or the delegates tab.',
+                      ? 'اطلب ضم السلاسل اللي شركتك شغالة فيها (مثل: زهران، جملة ماركت، كارفور). بعد الموافقة تظهر فروعها لكل مناديب الشركة.'
+                      : 'Request the chains your company works in (e.g. Zahran, Gomla, Carrefour). Once approved, every delegate of the company sees their branches.',
                 ),
                 const SizedBox(height: 10),
                 _buildStepItem(
                   colorScheme,
                   '2',
-                  isArabic ? 'اختيار المنظمة أو السلسلة' : 'Select Chain / Organization',
+                  isArabic ? 'الضغط على زر إضافة مندوب' : 'Tap Add Delegate',
                   isArabic
-                      ? 'اختر السلسلة التي يعمل بها المندوب (مثل: زهران، جملة ماركت، كارفور، بيت الجملة).'
-                      : 'Pick the retail chain where the delegate works (e.g. Zahran, Gomla, Carrefour, Beit El-Gomla).',
+                      ? 'أدخل بيانات المندوب وصوره فقط، من غير اختيار سلاسل.'
+                      : 'Enter the delegate details and photos only; no chain to pick.',
                 ),
                 const SizedBox(height: 10),
                 _buildStepItem(
                   colorScheme,
                   '3',
-                  isArabic ? 'تحديد الفرع والبيانات' : 'Set Branch & Details',
+                  isArabic ? 'اعتماد الإدارة والربط التلقائي' : 'Approval and automatic linking',
                   isArabic
-                      ? 'حدد اسم الفرع ورقم هاتف المندوب وبياناته الشخصية لإتمام التسجيل.'
-                      : 'Specify the branch name and delegate contact info.',
+                      ? 'بعد اعتماد الإدارة يتربط المندوب تلقائياً بكل سلاسل الشركة.'
+                      : 'Once approved, the delegate is linked to every chain of the company automatically.',
                 ),
                 const SizedBox(height: 10),
                 _buildStepItem(
