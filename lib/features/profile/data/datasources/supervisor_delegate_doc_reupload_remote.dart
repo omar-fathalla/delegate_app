@@ -24,6 +24,51 @@ bool callerOwnsDocumentFolder(String folderId, {String? callerUid}) {
   return uid.isNotEmpty && uid == folderId.trim();
 }
 
+/// TAS-72 (a), decided by the user 2026-11-22: which `delegate_documents/`
+/// folder a document re-upload for [profileUid] goes to.
+///
+/// A delegate signs in once (one auth uid) but can hold profiles in several
+/// companies; its token lists them in `delegateIds`. Storage only lets the
+/// caller write `delegate_documents/<auth.uid>/`, so when a delegate edits a
+/// *secondary* profile the file goes to the caller's own folder: it is the
+/// same person and the same ID card. The Firestore rules only check that the
+/// stored URL matches the pending `documents` entry, not the folder.
+/// Anyone else (staff uploading for a delegate) keeps [profileUid].
+String chooseDelegateDocumentFolder({
+  required String profileUid,
+  required String callerUid,
+  required String callerRole,
+  required List<String> callerDelegateIds,
+}) {
+  final caller = callerUid.trim();
+  final profile = profileUid.trim();
+  if (caller.isEmpty || caller == profile) return profile;
+  if (callerRole.trim().toLowerCase() == 'delegate' &&
+      callerDelegateIds.map((e) => e.trim()).contains(profile)) {
+    return caller;
+  }
+  return profile;
+}
+
+/// Reads the signed-in user's uid and token claims and applies
+/// [chooseDelegateDocumentFolder]. Falls back to [profileUid] on any error.
+Future<String> resolveDelegateDocumentFolder(String profileUid) async {
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.uid == profileUid) return profileUid;
+    final claims = (await user.getIdTokenResult()).claims ?? const {};
+    final ids = claims['delegateIds'];
+    return chooseDelegateDocumentFolder(
+      profileUid: profileUid,
+      callerUid: user.uid,
+      callerRole: (claims['role'] ?? '').toString(),
+      callerDelegateIds: ids is List ? ids.map((e) => e.toString()).toList() : const [],
+    );
+  } catch (_) {
+    return profileUid;
+  }
+}
+
 class SupervisorDocReuploadException implements Exception {
   SupervisorDocReuploadException(this.message);
   final String message;
