@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/services/firestore_cache_reset.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/admin/data/repositories/subscription_renewal_repository.dart';
 import 'package:delegate_app/features/admin/domain/services/subscription_payment_gateway.dart';
@@ -208,6 +209,8 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
           await sl<PushNotificationService>().clearToken(userId);
         }
       },
+      markFirestoreCacheReset: () =>
+          FirestoreCacheReset(prefs: sl<SharedPreferences>()).markPending(),
     ),
   );
 

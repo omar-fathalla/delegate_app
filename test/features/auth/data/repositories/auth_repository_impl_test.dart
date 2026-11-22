@@ -278,5 +278,30 @@ void main() {
       expect(mockLocalDataSource.clearCallCount, 1);
       expect(mockLocalDataSource.cachedDelegate, isNull);
     });
+
+    test('marks the Firestore cache reset after wiping prefs (TAS-76)', () async {
+      final order = <String>[];
+      final loggingOut = AuthRepositoryImpl(
+        remoteDataSource: mockRemoteDataSource,
+        localDataSource: mockLocalDataSource,
+        markFirestoreCacheReset: () async {
+          order.add('mark:clear=${mockLocalDataSource.clearCallCount}');
+        },
+      );
+
+      await loggingOut.logout(userId: 'delegate-1');
+
+      expect(order, ['mark:clear=1']);
+    });
+
+    test('a failing reset mark does not fail the logout (TAS-76)', () async {
+      final loggingOut = AuthRepositoryImpl(
+        remoteDataSource: mockRemoteDataSource,
+        localDataSource: mockLocalDataSource,
+        markFirestoreCacheReset: () async => throw Exception('prefs'),
+      );
+
+      expect(await loggingOut.logout(userId: 'delegate-1'), const Right(null));
+    });
   });
 }
