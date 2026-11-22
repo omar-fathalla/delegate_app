@@ -17,7 +17,7 @@ import 'package:delegate_app/features/auth/domain/delegate_otp_config.dart';
 import 'package:delegate_app/core/services/app_version_gate.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
-import 'package:delegate_app/firebase_options.dart';
+import 'package:delegate_app/core/config/app_env.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/main.dart' show MyApp, localeProvider;
 import 'package:firebase_auth/firebase_auth.dart';
@@ -31,11 +31,20 @@ import 'package:delegate_app/features/marketing/data/services/real_test_metrics.
 import 'package:delegate_app/features/marketing/data/services/delegate_profile_cache.dart';
 import 'package:delegate_app/features/marketing/presentation/bloc/marketing_bloc.dart';
 
+// TAS-78: no account data in lib/. Everything about the probe account comes
+// from dart-defines, and ENV must be passed explicitly (the app default is
+// prod, so a bare `flutter run -t lib/main_real_test.dart` used to sign in
+// to production). Example (tashil-dev):
+//   flutter run -t lib/main_real_test.dart --flavor dev --dart-define=ENV=dev \
+//     --dart-define=REAL_TEST_CUSTOM_TOKEN=... --dart-define=REAL_TEST_UID=... \
+//     --dart-define=REAL_TEST_EMAIL=... --dart-define=REAL_TEST_ORG=... \
+//     --dart-define=REAL_TEST_PHONE=...
+const _envGiven = bool.hasEnvironment('ENV');
 const _token = String.fromEnvironment('REAL_TEST_CUSTOM_TOKEN');
-const _uid = 'O0LHjrZU7TXG5LHi9QcqavE4i1q1';
-const _email = 'probe.tashil.test1@gmail.com';
-const _org = 'PiioBFgxaHAeuRdjlDgj';
-const _phone = '01555550001';
+const _uid = String.fromEnvironment('REAL_TEST_UID');
+const _email = String.fromEnvironment('REAL_TEST_EMAIL');
+const _org = String.fromEnvironment('REAL_TEST_ORG');
+const _phone = String.fromEnvironment('REAL_TEST_PHONE');
 const _favorites = <String>[
   'Smoha',
   'al-rehab',
@@ -51,12 +60,25 @@ Future<void> main() async {
   CairoClock.ensureInitialized();
   GoogleFonts.config.allowRuntimeFetching = false;
 
-  if (_token.isEmpty) {
-    throw StateError('REAL_TEST_CUSTOM_TOKEN dart-define is required');
+  if (!_envGiven) {
+    throw StateError(
+      'Pass --dart-define=ENV=dev (or ENV=prod on purpose); the real-test '
+      'entrypoint no longer defaults to production (TAS-78).',
+    );
+  }
+  for (final entry in const {
+    'REAL_TEST_CUSTOM_TOKEN': _token,
+    'REAL_TEST_UID': _uid,
+    'REAL_TEST_EMAIL': _email,
+    'REAL_TEST_ORG': _org,
+  }.entries) {
+    if (entry.value.isEmpty) {
+      throw StateError('${entry.key} dart-define is required');
+    }
   }
 
   final results = await Future.wait([
-    Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
+    Firebase.initializeApp(options: AppEnv.firebaseOptions),
     SharedPreferences.getInstance(),
   ]);
   final prefs = results[1] as SharedPreferences;
