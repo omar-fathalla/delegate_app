@@ -10,6 +10,7 @@ const common = require("./p0-common");
 const {purge} = require("./purge-password-fields");
 const {run} = require("./revoke-and-force-reset");
 const {counts} = require("./role-counts");
+const penaltyOrg = require("./backfill-penalty-organization-id");
 
 const live = !!process.env.FIRESTORE_EMULATOR_HOST && !!process.env.FIREBASE_AUTH_EMULATOR_HOST;
 
@@ -58,4 +59,46 @@ test("purge, revoke+reset and role counts on emulators", {skip: !live}, async ()
 
   assert.deepEqual(await counts(db), {total: 3, byRole: {"super-admin": 1, "hr": 1, "delegate": 1}});
   await Promise.all(admin.apps.map((a) => a && a.delete()));
+});
+
+// TAS-224: penalty organizationId backfill.
+test("penalty org resolution: branch first, unique company, never a guess", () => {
+  const {resolvePenaltyOrg: r} = penaltyOrg;
+  const branchOrg = new Map([["b1", "oA"], ["bX", "oX"]]);
+  const companyOrgs = new Map([["c1", new Set(["oA"])], ["cMulti", new Set(["oA", "oB"])]]);
+  assert.deepEqual(r({organizationId: "oZ"}, branchOrg, companyOrgs), {org: "", how: "hasOrg"});
+  assert.deepEqual(r({branchId: "b1", companyId: "cMulti"}, branchOrg, companyOrgs), {org: "oA", how: "byBranch"});
+  assert.deepEqual(r({companyId: "c1"}, branchOrg, companyOrgs), {org: "oA", how: "byUniqueCompany"});
+  assert.deepEqual(r({companyId: "cMulti"}, branchOrg, companyOrgs), {org: "", how: "ambiguousCompany"});
+  assert.deepEqual(r({branchId: "bX", companyId: "c1"}, branchOrg, companyOrgs), {org: "", how: "branchCompanyMismatch"});
+  assert.deepEqual(r({companyId: "nowhere"}, branchOrg, companyOrgs), {org: "", how: "unresolved"});
+});
+
+test("penalty org backfill on the emulator: dry run writes nothing, apply fills only the gap", {skip: !live}, async () => {
+  if (!admin.apps.length) admin.initializeApp({projectId: process.env.GCLOUD_PROJECT || "demo-p0-scripts"});
+  const db = admin.firestore();
+  await db.doc("organizations/oA/companies/c1").set({name: "fake"});
+  await db.doc("organizations/oA/companies/cM").set({name: "fake"});
+  await db.doc("organizations/oB/companies/cM").set({name: "fake"});
+  await db.doc("branches/b1").set({organizationUID: "oB", companyUID: "cM"});
+  await db.doc("penalties/p-unique").set({companyId: "c1", title: "fake"});
+  await db.doc("penalties/p-branch").set({companyId: "cM", branchId: "b1", title: "fake"});
+  await db.doc("penalties/p-ambig").set({companyId: "cM", title: "fake"});
+  await db.doc("penalties/p-has").set({companyId: "c1", organizationId: "oKeep", title: "fake"});
+
+  const dry = await penaltyOrg.backfill(db, false);
+  assert.equal(dry.updated, 0);
+  assert.equal((await db.doc("penalties/p-unique").get()).get("organizationId"), undefined);
+
+  const run = await penaltyOrg.backfill(db, true);
+  assert.equal(run.updated, 2);
+  assert.equal(run.ambiguousCompany, 1);
+  assert.equal((await db.doc("penalties/p-unique").get()).get("organizationId"), "oA");
+  assert.equal((await db.doc("penalties/p-branch").get()).get("organizationId"), "oB");
+  assert.equal((await db.doc("penalties/p-ambig").get()).get("organizationId"), undefined);
+  assert.equal((await db.doc("penalties/p-has").get()).get("organizationId"), "oKeep");
+  assert.equal((await db.doc("penalties/p-unique").get()).get("title"), "fake");
+
+  const again = await penaltyOrg.backfill(db, true);
+  assert.equal(again.updated, 0, "second run is a no-op");
 });
