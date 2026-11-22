@@ -5213,6 +5213,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'To change your name, email or phone number, please contact your supervisor.'**
   String get profileIdentityEditViaSupervisor;
+
+  /// No description provided for @attYouAreAtChainBranch.
+  ///
+  /// In en, this message translates to:
+  /// **'You are at {chain} - {branch}'**
+  String attYouAreAtChainBranch(String chain, String branch);
+
+  /// No description provided for @autoSwitchedToChainBranch.
+  ///
+  /// In en, this message translates to:
+  /// **'You are at {branch} — switched to {chain} automatically'**
+  String autoSwitchedToChainBranch(String branch, String chain);
+
+  /// No description provided for @autoSwitchUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get autoSwitchUndo;
+
+  /// No description provided for @autoSwitchPickCompany.
+  ///
+  /// In en, this message translates to:
+  /// **'You are at {branch} ({chain}). Choose the company'**
+  String autoSwitchPickCompany(String branch, String chain);
+
+  /// No description provided for @autoSwitchBlockedActiveSession.
+  ///
+  /// In en, this message translates to:
+  /// **'You are at {branch} ({chain}), but you have an open check-in. Check out first.'**
+  String autoSwitchBlockedActiveSession(String branch, String chain);
 }
 
 class _AppLocalizationsDelegate

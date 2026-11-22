@@ -18,6 +18,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/attendance/domain/geofence_helpers.dart';
+import 'package:delegate_app/features/attendance/domain/branch_auto_locator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
@@ -40,10 +41,21 @@ class AttendanceScreen extends StatefulWidget {
   final Delegate delegate;
   final bool viewOnly;
 
+  /// Every chain/company membership of the delegate (TAS-245). Used to find
+  /// the branch they stand in across all their chains.
+  final List<Delegate> memberships;
+
+  /// Called when the delegate stands in a branch of another chain. The
+  /// owner switches to [target]; null turns automatic switching off.
+  final Future<void> Function(Delegate target, String branchLabel)?
+      onAutoSwitchChain;
+
   const AttendanceScreen({
     super.key,
     required this.delegate,
     this.viewOnly = false,
+    this.memberships = const [],
+    this.onAutoSwitchChain,
   });
 
   @override
@@ -334,16 +346,29 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   final AttendanceActionLock _actionLock = AttendanceActionLock();
   String? _locationStatusMessage;
 
-  bool get _isGeofenceMode {
-    if (_orgAttendanceMode != null) {
-      return _orgAttendanceMode == 'geofence' || _orgAttendanceMode == 'gps';
-    }
-    final orgName = widget.delegate.organizationName.toLowerCase();
-    if (orgName.contains('فتح الله') || orgName.contains('fathalla')) {
-      return false;
-    }
-    return true; // Default for Gomla Market and all other retail chains
-  }
+  bool get _isGeofenceMode => isGeofenceAttendanceMode(
+        _orgAttendanceMode,
+        widget.delegate.organizationName,
+      );
+
+  // --- Automatic chain + branch detection (TAS-245) ---
+  /// Branches of the delegate's OTHER chains (null until loaded).
+  List<Branch>? _otherChainBranches;
+  final Set<String> _otherGeofenceOrgIds = {};
+  bool _autoLocateDone = false;
+  bool _autoLocateRunning = false;
+
+  Set<String> get _otherChainOrgIds => widget.memberships
+      .map((m) => m.organizationUID.trim())
+      .where((o) => o.isNotEmpty && o != widget.delegate.organizationUID)
+      .toSet();
+
+  bool get _canAutoSwitchChain =>
+      !widget.viewOnly &&
+      widget.onAutoSwitchChain != null &&
+      _otherChainOrgIds.isNotEmpty;
+
+  bool get _hasSeveralChains => _otherChainOrgIds.isNotEmpty;
 
   @override
   bool get wantKeepAlive => true;
@@ -413,8 +438,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _fetchOrganizationSettings().then((_) {
-            if (mounted && _isGeofenceMode) {
+            if (!mounted) return;
+            if (_isGeofenceMode) {
               _loadBranches();
+            } else {
+              _autoLocateAcrossChains(null);
             }
           });
         }
@@ -470,7 +498,20 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   @override
   void didUpdateWidget(covariant AttendanceScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.delegate.organizationUID == widget.delegate.organizationUID &&
+        oldWidget.memberships.length != widget.memberships.length &&
+        !_autoLocateDone &&
+        !_isLoadingBranches &&
+        (_orgBranches.isNotEmpty || !_isGeofenceMode)) {
+      // Memberships arrived after the first scan (TAS-245).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _autoLocateAcrossChains(null);
+      });
+    }
     if (oldWidget.delegate.organizationUID != widget.delegate.organizationUID) {
+      _otherChainBranches = null;
+      _otherGeofenceOrgIds.clear();
+      _autoLocateDone = false;
       setState(() {
         _orgBranches.clear();
         _matchedBranch = null;
@@ -481,8 +522,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       });
       if (!widget.viewOnly) {
         _fetchOrganizationSettings().then((_) {
-          if (mounted && _isGeofenceMode) {
+          if (!mounted) return;
+          if (_isGeofenceMode) {
             _loadBranches();
+          } else {
+            _autoLocateAcrossChains(null);
           }
         });
       }
@@ -2179,9 +2223,16 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           }
         });
 
-        // Only scan GPS if branches exist
+        // Only scan GPS if branches exist; otherwise look in the other
+        // chains straight away (TAS-245).
         if (branchesList.isNotEmpty) {
-          _detectNearestBranch(showSnackBar: false, silent: true);
+          _detectNearestBranch(
+            showSnackBar: false,
+            silent: true,
+            allowChainSwitch: true,
+          );
+        } else {
+          _autoLocateAcrossChains(null);
         }
       }
     } catch (e, st) {
@@ -2193,6 +2244,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   Future<void> _detectNearestBranch({
     bool showSnackBar = false,
     bool silent = false,
+    bool allowChainSwitch = false,
   }) async {
     if (!mounted || _isCheckingLocation) return;
     if (_orgBranches.isEmpty) {
@@ -2200,6 +2252,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         _isCheckingLocation = false;
         _locationStatusMessage = AppLocalizations.of(context)!.noBranchesForOrg;
       });
+      if (allowChainSwitch) {
+        _autoLocateAcrossChains(null, force: true);
+      }
       return;
     }
 
@@ -2246,11 +2301,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         closest = branch;
       }
 
-      final allowedRadius = branch.geofenceRadius > 0
-          ? (branch.geofenceRadius + 50.0)
-          : 150.0;
-
-      if (dist <= allowedRadius) {
+      if (dist <= allowedGeofenceRadius(branch)) {
         matched = branch;
       }
     }
@@ -2264,13 +2315,27 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       _isInsideGeofence = matched != null;
 
       if (matched != null) {
-        _locationStatusMessage = AppLocalizations.of(context)!.attYouAreWithinBranch(BranchDisplayCache.instance.displayName(matched.branchName));
+        final branchLabel =
+            BranchDisplayCache.instance.displayName(matched.branchName);
+        _locationStatusMessage = _hasSeveralChains &&
+                widget.delegate.organizationName.trim().isNotEmpty
+            ? AppLocalizations.of(context)!.attYouAreAtChainBranch(
+                widget.delegate.organizationName.trim(),
+                branchLabel,
+              )
+            : AppLocalizations.of(context)!.attYouAreWithinBranch(branchLabel);
       } else if (closest != null && minDistance.isFinite) {
         _locationStatusMessage = AppLocalizations.of(context)!.attMoveCloser;
       } else {
         _locationStatusMessage = AppLocalizations.of(context)!.attOutsideApprovedBranches;
       }
     });
+
+    if (matched == null && (allowChainSwitch || showSnackBar)) {
+      // Outside every branch of this chain: maybe inside another chain's
+      // branch. The refresh button (showSnackBar) always re-checks.
+      _autoLocateAcrossChains(position, force: showSnackBar);
+    }
 
     if (showSnackBar && mounted) {
       if (_isInsideGeofence && matched != null) {
@@ -2285,6 +2350,186 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         );
       }
     }
+  }
+
+  /// Loads branches and attendance mode of the delegate's other chains,
+  /// once per open chain (TAS-245).
+  Future<void> _loadOtherChainBranches() async {
+    if (_otherChainBranches != null) return;
+    final db = FirebaseFirestore.instance;
+    final orgIds = _otherChainOrgIds.toList();
+    final geofenced = <String>{};
+    final byOrg = <String, List<Branch>>{};
+
+    for (final org in orgIds) {
+      try {
+        final doc = await db.collection('organizations').doc(org).get();
+        final data = doc.data() ?? const <String, dynamic>{};
+        final name = (data['name'] ?? '').toString().trim();
+        final fallbackName = widget.memberships
+            .firstWhere((m) => m.organizationUID == org)
+            .organizationName;
+        if (isGeofenceAttendanceMode(
+          data['attendanceMode'] as String?,
+          name.isNotEmpty ? name : fallbackName,
+        )) {
+          geofenced.add(org);
+        }
+      } catch (e, st) {
+        debugPrint('Attendance: org settings for $org failed: $e\n$st');
+      }
+    }
+
+    // Root `branches` hold the coordinates; whereIn takes up to 10 values.
+    for (var i = 0; i < orgIds.length; i += 10) {
+      final chunk = orgIds.sublist(i, (i + 10).clamp(0, orgIds.length));
+      try {
+        final snap = await db
+            .collection('branches')
+            .where('organizationUID', whereIn: chunk)
+            .get();
+        for (final d in snap.docs) {
+          final b = BranchModel.fromMap(d.data(), id: d.id);
+          final org = (b.organizationUID ?? '').trim();
+          if (org.isEmpty) continue;
+          (byOrg[org] ??= []).add(b);
+        }
+      } catch (e, st) {
+        debugPrint('Attendance: other-chain branches fetch failed: $e\n$st');
+      }
+    }
+
+    final all = <Branch>[];
+    for (final org in orgIds) {
+      all.addAll(mergeOrgBranches(const [], byOrg[org] ?? const []));
+    }
+    _otherGeofenceOrgIds
+      ..clear()
+      ..addAll(geofenced);
+    _otherChainBranches = all;
+  }
+
+  /// True when the delegate has an open check-in in any chain, or when that
+  /// cannot be known yet (then we do not switch).
+  Future<bool> _hasOpenSession() async {
+    AttendanceState s = _attendanceBloc.state;
+    if (s is! AttendanceHistoryLoaded) {
+      try {
+        s = await _attendanceBloc.stream
+            .firstWhere((e) => e is AttendanceHistoryLoaded)
+            .timeout(const Duration(seconds: 10));
+      } catch (_) {
+        return true;
+      }
+    }
+    return (s as AttendanceHistoryLoaded).activeAttendance != null;
+  }
+
+  /// Looks for the branch the delegate stands in across all their chains
+  /// and switches chain when it belongs to another one (TAS-245).
+  /// Runs once per open chain unless [force] (the refresh button).
+  Future<void> _autoLocateAcrossChains(
+    Position? position, {
+    bool force = false,
+  }) async {
+    if (!_canAutoSwitchChain || _autoLocateRunning) return;
+    if (_autoLocateDone && !force) return;
+    _autoLocateDone = true;
+    _autoLocateRunning = true;
+    try {
+      position ??= await _getCurrentLocation(
+        context,
+        actionType: 'تحديد الفرع تلقائياً',
+        silent: true,
+      );
+      if (position == null || !mounted) return;
+      await _loadOtherChainBranches();
+      if (!mounted) return;
+
+      final result = locateBranchAcrossChains<Delegate>(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        branches: [..._orgBranches, ...?_otherChainBranches],
+        currentOrgId: widget.delegate.organizationUID,
+        memberships: widget.memberships,
+        orgIdOf: (d) => d.organizationUID,
+        geofenceOrgIds: _otherGeofenceOrgIds,
+      );
+      if (result.outcome == AutoBranchOutcome.currentChain ||
+          result.outcome == AutoBranchOutcome.none) {
+        return;
+      }
+
+      final branch = result.branch!;
+      final branchLabel =
+          BranchDisplayCache.instance.displayName(branch.branchName);
+      final chainLabel = result.memberships.first.organizationName.trim();
+      final l10n = AppLocalizations.of(context)!;
+
+      if (await _hasOpenSession()) {
+        if (mounted) {
+          AppSnackBar.showInfo(
+            context,
+            l10n.autoSwitchBlockedActiveSession(branchLabel, chainLabel),
+          );
+        }
+        return;
+      }
+      if (!mounted) return;
+
+      Delegate? target;
+      if (result.outcome == AutoBranchOutcome.switchChain) {
+        target = result.memberships.first;
+      } else {
+        target = await _pickCompany(
+          result.memberships,
+          l10n.autoSwitchPickCompany(branchLabel, chainLabel),
+        );
+      }
+      if (target == null || !mounted) return;
+      await widget.onAutoSwitchChain?.call(target, branchLabel);
+    } catch (e, st) {
+      debugPrint('Attendance: auto chain locate failed: $e\n$st');
+    } finally {
+      _autoLocateRunning = false;
+    }
+  }
+
+  /// Lets the delegate pick the company when they have several in the
+  /// chain of the branch they stand in (branches carry no company).
+  Future<Delegate?> _pickCompany(List<Delegate> options, String title) {
+    final cs = Theme.of(context).colorScheme;
+    return showModalBottomSheet<Delegate>(
+      context: context,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+              child: Text(
+                title,
+                style: Theme.of(sheetContext).textTheme.titleMedium,
+              ),
+            ),
+            for (final d in options)
+              ListTile(
+                leading: Icon(Symbols.business_rounded, color: cs.primary),
+                title: Text(
+                  d.companyName.isNotEmpty ? d.companyName : d.organizationName,
+                ),
+                onTap: () => Navigator.of(sheetContext).pop(d),
+              ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _handleGeofenceAction({

@@ -50,3 +50,13 @@ List<Branch> mergeOrgBranches(List<Branch> nested, List<Branch> root) {
   }
   return out;
 }
+
+/// Whether a chain checks in by location. `attendanceMode` wins when set;
+/// otherwise every chain is geofenced except فتح الله (the old default).
+bool isGeofenceAttendanceMode(String? attendanceMode, String organizationName) {
+  if (attendanceMode != null) {
+    return attendanceMode == 'geofence' || attendanceMode == 'gps';
+  }
+  final orgName = organizationName.toLowerCase();
+  return !(orgName.contains('فتح الله') || orgName.contains('fathalla'));
+}

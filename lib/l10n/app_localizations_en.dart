@@ -2911,4 +2911,27 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get profileIdentityEditViaSupervisor =>
       'To change your name, email or phone number, please contact your supervisor.';
+
+  @override
+  String attYouAreAtChainBranch(String chain, String branch) {
+    return 'You are at $chain - $branch';
+  }
+
+  @override
+  String autoSwitchedToChainBranch(String branch, String chain) {
+    return 'You are at $branch — switched to $chain automatically';
+  }
+
+  @override
+  String get autoSwitchUndo => 'Undo';
+
+  @override
+  String autoSwitchPickCompany(String branch, String chain) {
+    return 'You are at $branch ($chain). Choose the company';
+  }
+
+  @override
+  String autoSwitchBlockedActiveSession(String branch, String chain) {
+    return 'You are at $branch ($chain), but you have an open check-in. Check out first.';
+  }
 }

@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/home/presentation/pages/delegate_home_screen.dart';
+import 'package:delegate_app/features/home/presentation/chain_auto_switch_session.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/features/photo_permission/presentation/pages/monthly_photo_report_screen.dart';
@@ -47,9 +48,21 @@ class _MainScreenState extends State<MainScreen> {
   final Set<int> _initializedTabs = {0}; // Tab 0 (Attendance) loads first
 
   List<Delegate> _allDelegates = [];
+
+  /// Paused after an undo or a manual chain pick, for this login (TAS-245).
+  bool get _autoSwitchPaused =>
+      ChainAutoSwitchSession.isPaused(widget.delegate.uid);
+
   @override
   void initState() {
     super.initState();
+    // An automatic chain switch rebuilds MainScreen (keyed by org): reopen
+    // the tab the delegate was on (TAS-245).
+    final tab = ChainAutoSwitchSession.takePendingTab();
+    if (tab != null) {
+      _currentIndex = tab;
+      _initializedTabs.add(tab);
+    }
     _loadAllDelegates();
   }
 
@@ -59,10 +72,12 @@ class _MainScreenState extends State<MainScreen> {
     if (oldWidget.delegate.organizationUID != widget.delegate.organizationUID ||
         oldWidget.delegate.companyUID != widget.delegate.companyUID ||
         oldWidget.delegate.uid != widget.delegate.uid) {
+      final keep = ChainAutoSwitchSession.takePendingTab();
       setState(() {
-        _currentIndex = 0;
+        _currentIndex = keep ?? 0;
         _initializedTabs.clear();
         _initializedTabs.add(0);
+        if (keep != null) _initializedTabs.add(keep);
       });
       _loadAllDelegates();
     }
@@ -284,7 +299,11 @@ class _MainScreenState extends State<MainScreen> {
 
         // Tab 1: Attendance
         if (_initializedTabs.contains(1))
-          AttendanceScreen(delegate: delegate)
+          AttendanceScreen(
+            delegate: delegate,
+            memberships: _allDelegates,
+            onAutoSwitchChain: _autoSwitchPaused ? null : _autoSwitchToChain,
+          )
         else
           const SizedBox.shrink(),
 
@@ -313,7 +332,67 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  /// Switches chain because the delegate is standing in a branch of
+  /// [target]'s chain (TAS-245). Stays on the attendance tab and offers
+  /// an undo that also pauses auto switching for this session.
+  Future<void> _autoSwitchToChain(Delegate target, String branchLabel) async {
+    final previous = widget.delegate;
+    if (target.organizationUID == previous.organizationUID &&
+        target.companyUID == previous.companyUID) {
+      return;
+    }
+    final cacheDelegate = di.sl<CacheDelegate>();
+    await cacheDelegate(target);
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final chainLabel = target.companyName.isNotEmpty
+        ? '${target.organizationName} - ${target.companyName}'
+        : target.organizationName;
+    ChainAutoSwitchSession.openTabAfterSwitch(1);
+    context.go(homePathForRole(target.role), extra: target);
+    // A MaterialBanner, not a SnackBar: the attendance tab shows sync
+    // SnackBars right after the switch and AppSnackBar hides the current
+    // one, which took the undo away (seen on the M31).
+    Timer? autoHide;
+    void hideBanner() {
+      autoHide?.cancel();
+      messenger.hideCurrentMaterialBanner();
+    }
+
+    messenger
+      ..clearMaterialBanners()
+      ..showMaterialBanner(
+        MaterialBanner(
+          leading: const Icon(Symbols.swap_horiz_rounded),
+          content: Text(l10n.autoSwitchedToChainBranch(branchLabel, chainLabel)),
+          actions: [
+            TextButton(
+              onPressed: hideBanner,
+              child: Text(l10n.okAction),
+            ),
+            TextButton(
+              onPressed: () async {
+                hideBanner();
+                // This MainScreen is already gone (keyed by org): use the
+                // router captured before the switch.
+                ChainAutoSwitchSession.pause(previous.uid);
+                await cacheDelegate(previous);
+                ChainAutoSwitchSession.openTabAfterSwitch(1);
+                router.go(homePathForRole(previous.role), extra: previous);
+              },
+              child: Text(l10n.autoSwitchUndo),
+            ),
+          ],
+        ),
+      );
+    autoHide = Timer(const Duration(seconds: 15), hideBanner);
+  }
+
   Future<void> _switchToOrganization(Delegate delegate) async {
+    // A chain picked by hand wins over location for this login (TAS-245).
+    ChainAutoSwitchSession.pause(delegate.uid);
     final cacheDelegate = di.sl<CacheDelegate>();
     await cacheDelegate(delegate);
     if (mounted) {

@@ -2911,4 +2911,27 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get profileIdentityEditViaSupervisor =>
       'لتغيير الاسم أو البريد الإلكتروني أو رقم الموبايل، يرجى التواصل مع المشرف.';
+
+  @override
+  String attYouAreAtChainBranch(String chain, String branch) {
+    return 'أنت في $chain - $branch';
+  }
+
+  @override
+  String autoSwitchedToChainBranch(String branch, String chain) {
+    return 'أنت في $branch — تم التبديل تلقائياً إلى $chain';
+  }
+
+  @override
+  String get autoSwitchUndo => 'تراجع';
+
+  @override
+  String autoSwitchPickCompany(String branch, String chain) {
+    return 'أنت في $branch التابع لـ $chain. اختر الشركة';
+  }
+
+  @override
+  String autoSwitchBlockedActiveSession(String branch, String chain) {
+    return 'أنت في $branch التابع لـ $chain، لكن لديك حضور مفتوح. سجّل الانصراف أولاً.';
+  }
 }
