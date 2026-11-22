@@ -352,24 +352,42 @@ class _MainScreenState extends State<MainScreen> {
         : target.organizationName;
     ChainAutoSwitchSession.openTabAfterSwitch(1);
     context.go(homePathForRole(target.role), extra: target);
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(l10n.autoSwitchedToChainBranch(branchLabel, chainLabel)),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 8),
-        action: SnackBarAction(
-          label: l10n.autoSwitchUndo,
-          onPressed: () async {
-            // This MainScreen is already gone (keyed by org): use the
-            // router captured before the switch.
-            ChainAutoSwitchSession.pause(previous.uid);
-            await cacheDelegate(previous);
-            ChainAutoSwitchSession.openTabAfterSwitch(1);
-            router.go(homePathForRole(previous.role), extra: previous);
-          },
+    // A MaterialBanner, not a SnackBar: the attendance tab shows sync
+    // SnackBars right after the switch and AppSnackBar hides the current
+    // one, which took the undo away (seen on the M31).
+    Timer? autoHide;
+    void hideBanner() {
+      autoHide?.cancel();
+      messenger.hideCurrentMaterialBanner();
+    }
+
+    messenger
+      ..clearMaterialBanners()
+      ..showMaterialBanner(
+        MaterialBanner(
+          leading: const Icon(Symbols.swap_horiz_rounded),
+          content: Text(l10n.autoSwitchedToChainBranch(branchLabel, chainLabel)),
+          actions: [
+            TextButton(
+              onPressed: hideBanner,
+              child: Text(l10n.okAction),
+            ),
+            TextButton(
+              onPressed: () async {
+                hideBanner();
+                // This MainScreen is already gone (keyed by org): use the
+                // router captured before the switch.
+                ChainAutoSwitchSession.pause(previous.uid);
+                await cacheDelegate(previous);
+                ChainAutoSwitchSession.openTabAfterSwitch(1);
+                router.go(homePathForRole(previous.role), extra: previous);
+              },
+              child: Text(l10n.autoSwitchUndo),
+            ),
+          ],
         ),
-      ),
-    );
+      );
+    autoHide = Timer(const Duration(seconds: 15), hideBanner);
   }
 
   Future<void> _switchToOrganization(Delegate delegate) async {
