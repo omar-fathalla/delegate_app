@@ -190,8 +190,20 @@ void main() {
     expect(d['uid'], 'r1');
     expect(d['registeredVia'], 'mobile_app');
     expect(d['approvedRequestId'], 'r1');
+    // TAS-230: server time, not the approving device's clock.
+    expect(d['createdAt'], isA<Timestamp>());
     // Same-batch write: a trigger running after commit sees the approved
     // app request and cannot stamp the new doc as web.
+  });
+
+  test('newDelegateDocData adds a server createdAt only when missing (TAS-230)', () {
+    final added = newDelegateDocData({'fullName': 'F'});
+    expect(added['createdAt'], isA<FieldValue>());
+    expect(added['fullName'], 'F');
+    final kept = Timestamp.fromDate(DateTime(2025, 1, 1));
+    expect(newDelegateDocData({'createdAt': kept})['createdAt'], same(kept));
+    // The merge path for an existing doc never carries it.
+    expect(profileMergeFields({'fullName': 'F'}).containsKey('createdAt'), isFalse);
   });
 
   test('new_delegate with two organizationUIDs writes both chain docs in the same batch, one fee', () async {

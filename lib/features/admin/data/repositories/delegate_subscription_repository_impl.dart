@@ -1342,7 +1342,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         final (ref, fullData) = activations[i];
         final snap = snaps[i];
         if (!snap.exists) {
-          pendingWrites.add((b) => b.set(ref, fullData));
+          pendingWrites.add((b) => b.set(ref, newDelegateDocData(fullData)));
           continue;
         }
         final existing = snap.data() ?? const <String, dynamic>{};
@@ -1886,6 +1886,17 @@ Map<String, dynamic> buildStatusOnlyActivation({
   }
   return out;
 }
+
+/// TAS-230: a delegate doc created by the approval gets the server's
+/// `createdAt`. Without it the model fell back to the first document's
+/// `uploadedAt`, which is the approving device's clock, and that date
+/// decides which days count as absences and whether a global force-logout
+/// applies. Only on create: an existing doc keeps its own date.
+@visibleForTesting
+Map<String, dynamic> newDelegateDocData(Map<String, dynamic> full) =>
+    full.containsKey('createdAt')
+        ? full
+        : {...full, 'createdAt': FieldValue.serverTimestamp()};
 
 /// Profile / subscription fields written after the approval batch commits.
 /// Never status, documents, the request binding, or document URLs.
