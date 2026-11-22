@@ -63,3 +63,26 @@ Auth test phone numbers +201500000003 / +971500000001 use a fixed code.
 Passwords and codes are **not** in the repo; they are kept in the operator's
 creds file (`/workspace/tashil-dev-test-accounts.txt`, chmod 600, on the
 agent box). Log in at most once per account per smoke run (lockout).
+
+### Delegates and device binding (TAS-228)
+A delegate is bound to the first device that logs in. Any other device then
+stops at «الحساب مقترن بجهاز آخر». So each device type gets its own account:
+
+| Use | Account | Phone | Fake national ID |
+|---|---|---|---|
+| Real Android device (M31) | shared dev delegate | 01500000003 | 29901015740919 |
+| Local Mac gate (Maestro, Patrol) | seed `alpha` delegates | set in `~/.tashil-ci.env` | — |
+| Manual emulator / simulator, delegate | seed `beta-1` (Promoter) | 01000000018 | 00000000000201 |
+| Manual emulator / simulator, supervisor | seed `beta-4` (Supervisor) | 01000000021 | 00000000000204 |
+
+- Seed delegates come from `functions/scripts/hr-web-fake-accounts.js`. In
+  each fake company, delegates 1-3 are Promoters, 4 is a Supervisor and 5 is
+  suspended. The national ID is `0000000000` + company code (`01` alpha,
+  `02` beta) + the two-digit index (`fakeNationalId`).
+- Free every seed delegate's device binding (tashil-dev only). The Mac gate
+  runs this before each device step:
+  ```bash
+  cd functions && node scripts/hr-web-fake-accounts.js --project tashil-dev --reset-device-bindings --apply
+  ```
+- Keep 01500000003 for the M31. If you log it in somewhere else, the M31
+  needs its binding cleared before it can log in again.
