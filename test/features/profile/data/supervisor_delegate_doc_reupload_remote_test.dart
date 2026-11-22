@@ -225,6 +225,58 @@ void main() {
     });
   });
 
+  group('chooseDelegateDocumentFolder (TAS-72 a)', () {
+    test('own profile keeps its folder', () {
+      expect(
+        chooseDelegateDocumentFolder(
+          profileUid: 'dlg_1', callerUid: 'dlg_1', callerRole: 'delegate',
+          callerDelegateIds: const ['dlg_1', 'dlg_2'],
+        ),
+        'dlg_1',
+      );
+    });
+
+    test('a delegate editing its secondary profile uploads to its own folder', () {
+      expect(
+        chooseDelegateDocumentFolder(
+          profileUid: 'dlg_2', callerUid: 'dlg_1', callerRole: 'delegate',
+          callerDelegateIds: const ['dlg_1', 'dlg_2'],
+        ),
+        'dlg_1',
+      );
+    });
+
+    test('a profile that is not in the token stays on the profile folder', () {
+      expect(
+        chooseDelegateDocumentFolder(
+          profileUid: 'dlg_9', callerUid: 'dlg_1', callerRole: 'delegate',
+          callerDelegateIds: const ['dlg_1', 'dlg_2'],
+        ),
+        'dlg_9',
+      );
+    });
+
+    test('staff uploading for a delegate keep the profile folder', () {
+      expect(
+        chooseDelegateDocumentFolder(
+          profileUid: 'dlg_2', callerUid: 'sup_1', callerRole: 'supervisor',
+          callerDelegateIds: const ['dlg_2'],
+        ),
+        'dlg_2',
+      );
+    });
+
+    test('no signed-in user keeps the profile folder', () {
+      expect(
+        chooseDelegateDocumentFolder(
+          profileUid: 'dlg_2', callerUid: '', callerRole: '',
+          callerDelegateIds: const [],
+        ),
+        'dlg_2',
+      );
+    });
+  });
+
   test('supervisorDocReplaceErrorMessage maps storage unauthorized', () {
     expect(
       supervisorDocReplaceErrorMessage(

@@ -1160,12 +1160,16 @@ class _ProfileBody extends StatelessWidget {
         return;
       }
 
+      // TAS-72 (a): a delegate in several companies viewing a secondary
+      // profile uploads into its own sign-in folder (Storage only lets the
+      // caller write delegate_documents/<auth.uid>/). Same person, same ID.
+      final folderUid = await resolveDelegateDocumentFolder(delegate.uid);
       final storagePath = delegateDocumentStoragePath(
-        delegateUid: delegate.uid,
+        delegateUid: folderUid,
         docType: item.docType,
       );
       final newUrl = await uploadDelegateDocumentFile(
-        folderId: delegate.uid,
+        folderId: folderUid,
         companyUID: delegate.companyUID,
         storagePath: storagePath,
         file: file,
