@@ -285,12 +285,19 @@ void main() {
         ),
         isFalse,
       );
-      // Widget/unit tests run without ENV=dev, so the live helper stays free in 2026
-      // even when the test company id is passed.
+      // Tests run with the default ENV (dev, TAS-78): the bypass applies to the
+      // dev test company only; every other company stays free in 2026.
       expect(
         SubscriptionCycleHelper.isFreePromotionActive(
           DateTime(2026, 6, 15),
           company,
+        ),
+        isFalse,
+      );
+      expect(
+        SubscriptionCycleHelper.isFreePromotionActive(
+          DateTime(2026, 6, 15),
+          'co_other',
         ),
         isTrue,
       );

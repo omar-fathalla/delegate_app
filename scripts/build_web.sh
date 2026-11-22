@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build Flutter web for an environment: scripts/build_web.sh [prod|dev]
-# prod: plain `flutter build web --release` (output unchanged).
+# prod: `flutter build web --release --dart-define=ENV=prod` (TAS-78: the
+#       app defaults to dev, so prod must be asked for explicitly).
 # dev:  ENV=dev build, then swaps the Maps JS key in build/web/index.html
 #       for the tashil-dev key from lib/core/config/maps_keys.dart.
 set -euo pipefail
@@ -9,7 +10,7 @@ cd "$(dirname "$0")/.."
 key_of() { grep -A1 "static const String $1" lib/core/config/maps_keys.dart | grep -o "'[^']*'" | tr -d "'"; }
 case "$ENV_NAME" in
   prod)
-    flutter build web --release
+    flutter build web --release --dart-define=ENV=prod
     ;;
   dev)
     flutter build web --release --dart-define=ENV=dev

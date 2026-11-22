@@ -7,7 +7,9 @@ import 'package:delegate_app/firebase_options_dev.dart' as dev;
 
 /// Build environment, chosen at compile time with `--dart-define=ENV=dev`.
 ///
-/// Defaults to `prod`, so builds without the define are unchanged.
+/// Defaults to `dev` (TAS-78): a build or run without the define talks to
+/// tashil-dev, never to production. Store builds must pass
+/// `--dart-define=ENV=prod` (android-release.yml and deploy-ios.yml do).
 /// `ENV=dev` always uses the tashil-dev Firebase project and never falls back
 /// to production. Any other value fails at startup.
 ///
@@ -22,7 +24,7 @@ class AppEnv {
 
   static const String name = String.fromEnvironment(
     'ENV',
-    defaultValue: 'prod',
+    defaultValue: 'dev',
   );
 
   static const bool isDev = name == 'dev';

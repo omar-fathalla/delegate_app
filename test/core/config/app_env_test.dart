@@ -6,9 +6,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('ENV defaults to prod', () {
-    expect(AppEnv.name, 'prod');
-    expect(AppEnv.isDev, isFalse);
+  test('ENV defaults to dev, so a build without the define never hits prod (TAS-78)', () {
+    expect(AppEnv.name, 'dev');
+    expect(AppEnv.isDev, isTrue);
+    expect(AppEnv.expectedProjectId, 'tashil-dev');
   });
 
   test('GIT_SHA is a compile-time fromEnvironment string', () {
@@ -56,12 +57,15 @@ void main() {
       () => AppEnv.verifyFirebaseProjectFor('prod', 'tashil-dev'),
       throwsStateError,
     );
-    expect(AppEnv.expectedProjectId, 'practice-firebase-72df1');
+    expect(
+      () => AppEnv.verifyFirebaseProjectFor('prod', 'practice-firebase-72df1'),
+      returnsNormally,
+    );
   });
 
-  test('Crashlytics is enabled only for prod builds', () {
-    // Tests run with the default ENV (prod).
-    expect(CrashlyticsService.enabledForEnv, isTrue);
+  test('Crashlytics is off in the default (dev) build', () {
+    // Tests run with the default ENV (dev); only ENV=prod builds report.
+    expect(CrashlyticsService.enabledForEnv, isFalse);
   });
 
   test('unknown ENV fails instead of falling back', () {

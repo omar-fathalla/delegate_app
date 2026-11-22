@@ -778,6 +778,8 @@ void main() {
       final repo = SubscriptionRenewalRepository(
         firestore: await seed(),
         clock: () => nov2026,
+        // Prod behaviour: no advance window (the dev default turns it on).
+        advanceRenewalEnabled: false,
       );
       await tester.pumpWidget(
         MaterialApp(
