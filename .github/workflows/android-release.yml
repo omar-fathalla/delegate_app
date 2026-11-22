@@ -107,7 +107,7 @@ jobs:
 
       # 7. بناء نسخة الـ App Bundle الموقعة
       - name: Build AAB
-        run: flutter build appbundle --release --flavor prod
+        run: flutter build appbundle --release --flavor prod --dart-define=ENV=prod
 
       # 8. رفع الملف الناتج كـ Artifact (لتتمكن من تحميله)
       - name: Upload Artifact

@@ -3,9 +3,14 @@ import 'package:delegate_app/core/config/maps_keys.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('default ENV uses the production Maps and Places keys', () {
-    expect(AppEnv.mapsJsApiKey, MapsKeys.prodMapsJs);
-    expect(AppEnv.placesApiKey, MapsKeys.prodPlaces);
+  test('default ENV (dev) uses the tashil-dev key, never production', () {
+    expect(AppEnv.mapsJsApiKey, MapsKeys.devMapsPlaces);
+    expect(AppEnv.placesApiKey, MapsKeys.devMapsPlaces);
+  });
+
+  test('prod uses the production Maps and Places keys', () {
+    expect(AppEnv.mapsJsApiKeyFor('prod'), MapsKeys.prodMapsJs);
+    expect(AppEnv.placesApiKeyFor('prod'), MapsKeys.prodPlaces);
   });
 
   test('dev uses the tashil-dev key, never a production key', () {

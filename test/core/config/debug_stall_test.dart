@@ -13,8 +13,8 @@ void main() {
     }
   });
 
-  test('default build (no ENV define = prod) is off', () {
-    expect(AppEnv.isDev, isFalse);
+  test('default build (no ENV define = dev) is off outside web', () {
+    expect(AppEnv.isDev, isTrue);
     expect(debugStallActive, isFalse);
   });
 

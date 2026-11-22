@@ -85,7 +85,7 @@ jobs:
 
       - name: 🔨 Build iOS
         run: |
-          flutter build ios --release --no-codesign
+          flutter build ios --release --no-codesign --dart-define=ENV=prod
           
           cd ios
           xcodebuild -workspace Runner.xcworkspace \
