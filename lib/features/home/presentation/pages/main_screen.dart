@@ -47,6 +47,15 @@ class _MainScreenState extends State<MainScreen> {
   final Set<int> _initializedTabs = {0}; // Tab 0 (Attendance) loads first
 
   List<Delegate> _allDelegates = [];
+
+  /// Tab to stay on after the next delegate change (auto chain switch from
+  /// the attendance tab keeps the delegate on attendance). TAS-245.
+  int? _keepTabOnUpdate;
+
+  /// Set when the delegate undoes an automatic chain switch, so the
+  /// attendance tab does not switch them back again in this session.
+  bool _autoSwitchPaused = false;
+
   @override
   void initState() {
     super.initState();
@@ -59,10 +68,13 @@ class _MainScreenState extends State<MainScreen> {
     if (oldWidget.delegate.organizationUID != widget.delegate.organizationUID ||
         oldWidget.delegate.companyUID != widget.delegate.companyUID ||
         oldWidget.delegate.uid != widget.delegate.uid) {
+      final keep = _keepTabOnUpdate;
+      _keepTabOnUpdate = null;
       setState(() {
-        _currentIndex = 0;
+        _currentIndex = keep ?? 0;
         _initializedTabs.clear();
         _initializedTabs.add(0);
+        if (keep != null) _initializedTabs.add(keep);
       });
       _loadAllDelegates();
     }
@@ -284,7 +296,11 @@ class _MainScreenState extends State<MainScreen> {
 
         // Tab 1: Attendance
         if (_initializedTabs.contains(1))
-          AttendanceScreen(delegate: delegate)
+          AttendanceScreen(
+            delegate: delegate,
+            memberships: _allDelegates,
+            onAutoSwitchChain: _autoSwitchPaused ? null : _autoSwitchToChain,
+          )
         else
           const SizedBox.shrink(),
 
@@ -313,7 +329,47 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  /// Switches chain because the delegate is standing in a branch of
+  /// [target]'s chain (TAS-245). Stays on the attendance tab and offers
+  /// an undo that also pauses auto switching for this session.
+  Future<void> _autoSwitchToChain(Delegate target, String branchLabel) async {
+    final previous = widget.delegate;
+    if (target.organizationUID == previous.organizationUID &&
+        target.companyUID == previous.companyUID) {
+      return;
+    }
+    final cacheDelegate = di.sl<CacheDelegate>();
+    await cacheDelegate(target);
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final chainLabel = target.companyName.isNotEmpty
+        ? '${target.organizationName} - ${target.companyName}'
+        : target.organizationName;
+    _keepTabOnUpdate = 1;
+    context.go(homePathForRole(target.role), extra: target);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(l10n.autoSwitchedToChainBranch(branchLabel, chainLabel)),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 8),
+        action: SnackBarAction(
+          label: l10n.autoSwitchUndo,
+          onPressed: () async {
+            await cacheDelegate(previous);
+            if (!mounted) return;
+            setState(() => _autoSwitchPaused = true);
+            _keepTabOnUpdate = 1;
+            context.go(homePathForRole(previous.role), extra: previous);
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _switchToOrganization(Delegate delegate) async {
+    // A chain picked by hand wins over location for this session (TAS-245).
+    _autoSwitchPaused = true;
     final cacheDelegate = di.sl<CacheDelegate>();
     await cacheDelegate(delegate);
     if (mounted) {

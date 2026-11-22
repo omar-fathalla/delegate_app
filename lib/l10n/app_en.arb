@@ -2441,5 +2441,50 @@
   "profileIdentityEditViaSupervisor": "To change your name, email or phone number, please contact your supervisor.",
   "@profileIdentityEditViaSupervisor": {
     "description": "Hint under the delegate's personal info: delegates cannot edit identity fields themselves (TAS-72)"
+  },
+  "attYouAreAtChainBranch": "You are at {chain} - {branch}",
+  "@attYouAreAtChainBranch": {
+    "placeholders": {
+      "chain": {
+        "type": "String"
+      },
+      "branch": {
+        "type": "String"
+      }
+    }
+  },
+  "autoSwitchedToChainBranch": "You are at {branch} — switched to {chain} automatically",
+  "@autoSwitchedToChainBranch": {
+    "placeholders": {
+      "branch": {
+        "type": "String"
+      },
+      "chain": {
+        "type": "String"
+      }
+    }
+  },
+  "autoSwitchUndo": "Undo",
+  "autoSwitchPickCompany": "You are at {branch} ({chain}). Choose the company",
+  "@autoSwitchPickCompany": {
+    "placeholders": {
+      "branch": {
+        "type": "String"
+      },
+      "chain": {
+        "type": "String"
+      }
+    }
+  },
+  "autoSwitchBlockedActiveSession": "You are at {branch} ({chain}), but you have an open check-in. Check out first.",
+  "@autoSwitchBlockedActiveSession": {
+    "placeholders": {
+      "branch": {
+        "type": "String"
+      },
+      "chain": {
+        "type": "String"
+      }
+    }
   }
 }

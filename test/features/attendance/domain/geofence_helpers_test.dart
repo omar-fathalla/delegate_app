@@ -72,4 +72,18 @@ void main() {
       expect(merged.single.latitude, 30.05);
     });
   });
+
+  group('isGeofenceAttendanceMode (TAS-245)', () {
+    test('attendanceMode wins when set', () {
+      expect(isGeofenceAttendanceMode('geofence', 'فتح الله'), isTrue);
+      expect(isGeofenceAttendanceMode('gps', 'x'), isTrue);
+      expect(isGeofenceAttendanceMode('qr', 'زهران'), isFalse);
+    });
+
+    test('without a mode, every chain except فتح الله is geofenced', () {
+      expect(isGeofenceAttendanceMode(null, 'زهران'), isTrue);
+      expect(isGeofenceAttendanceMode(null, 'شركة فتح الله'), isFalse);
+      expect(isGeofenceAttendanceMode(null, 'Fathalla Market'), isFalse);
+    });
+  });
 }

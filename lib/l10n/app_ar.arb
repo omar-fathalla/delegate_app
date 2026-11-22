@@ -1976,5 +1976,10 @@
   "profileIdentityEditViaSupervisor": "لتغيير الاسم أو البريد الإلكتروني أو رقم الموبايل، يرجى التواصل مع المشرف.",
   "@profileIdentityEditViaSupervisor": {
     "description": "Hint under the delegate's personal info: delegates cannot edit identity fields themselves (TAS-72)"
-  }
+  },
+  "attYouAreAtChainBranch": "أنت في {chain} - {branch}",
+  "autoSwitchedToChainBranch": "أنت في فرع {branch} — تم التبديل تلقائياً إلى {chain}",
+  "autoSwitchUndo": "تراجع",
+  "autoSwitchPickCompany": "أنت في فرع {branch} التابع لـ {chain}. اختر الشركة",
+  "autoSwitchBlockedActiveSession": "أنت في فرع {branch} التابع لـ {chain}، لكن لديك حضور مفتوح. سجّل الانصراف أولاً."
 }
