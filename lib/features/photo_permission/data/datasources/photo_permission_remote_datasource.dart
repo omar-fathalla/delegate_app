@@ -449,7 +449,10 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
         capturedAt: DateTime.now(),
       );
 
-      await docRef.set(model.toFirestore());
+      // TAS-77: the stored capture time is the server's (a device clock is
+      // easy to change and the photo is proof of a visit). The device time
+      // is kept beside it for reference only.
+      await docRef.set(capturedPhotoWriteData(model));
       return model;
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في رفع الصورة وتسجيلها في النظام.');
@@ -889,4 +892,13 @@ String photoListOrgScope(UserRole role, String organizationUID) {
     return '';
   }
   return organizationUID;
+}
+
+/// TAS-77: what [PhotoPermissionRemoteDataSourceImpl.uploadPhoto] stores:
+/// `capturedAt` is the server time, `deviceCapturedAt` the device's.
+Map<String, dynamic> capturedPhotoWriteData(CapturedPhotoModel model) {
+  final data = model.toFirestore();
+  data['deviceCapturedAt'] = data['capturedAt'];
+  data['capturedAt'] = FieldValue.serverTimestamp();
+  return data;
 }

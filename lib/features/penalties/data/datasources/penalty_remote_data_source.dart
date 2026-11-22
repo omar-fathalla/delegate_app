@@ -159,7 +159,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
             if (delPhone != null && delPhone.isNotEmpty) 'phoneNumber': delPhone,
             'isRead': false,
             'read': false,
-            'createdAt': Timestamp.now(),
+            'createdAt': FieldValue.serverTimestamp(),
             'deletedBy': <String>[],
           });
         }
@@ -208,7 +208,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
                 if (phone != null && phone.isNotEmpty) 'phoneNumber': phone,
                 'isRead': false,
                 'read': false,
-                'createdAt': Timestamp.now(),
+                'createdAt': FieldValue.serverTimestamp(),
                 'deletedBy': <String>[],
               });
             }
@@ -248,7 +248,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
                 if (phone != null && phone.isNotEmpty) 'phoneNumber': phone,
                 'isRead': false,
                 'read': false,
-                'createdAt': Timestamp.now(),
+                'createdAt': FieldValue.serverTimestamp(),
                 'deletedBy': <String>[],
               });
             }
@@ -289,7 +289,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
             'delegateUid': targetKey,
             'isRead': false,
             'read': false,
-            'createdAt': Timestamp.now(),
+            'createdAt': FieldValue.serverTimestamp(),
             'deletedBy': <String>[],
           });
         }
@@ -326,7 +326,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
               'delegateUid': roleKey,
               'isRead': false,
               'read': false,
-              'createdAt': Timestamp.now(),
+              'createdAt': FieldValue.serverTimestamp(),
               'deletedBy': <String>[],
             });
           }
@@ -368,7 +368,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
             'delegateUid': roleKey,
             'isRead': false,
             'read': false,
-            'createdAt': Timestamp.now(),
+            'createdAt': FieldValue.serverTimestamp(),
             'deletedBy': <String>[],
           });
         }
@@ -426,7 +426,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
             if (phone != null && phone.isNotEmpty) 'phoneNumber': phone,
             'isRead': false,
             'read': false,
-            'createdAt': Timestamp.now(),
+            'createdAt': FieldValue.serverTimestamp(),
             'deletedBy': <String>[],
           });
         }
@@ -715,7 +715,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
     try {
       final updateData = <String, dynamic>{
         'status': status.toFirestoreString(),
-        'updatedAt': Timestamp.fromDate(DateTime.now()),
+        'updatedAt': FieldValue.serverTimestamp(),
       };
 
       if (rejectionReason != null && rejectionReason.isNotEmpty) {
@@ -724,10 +724,10 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
 
       if (status == PenaltyStatus.pendingGeneralManager && reviewerName != null) {
         updateData['branchesMarketingApprovedBy'] = reviewerName;
-        updateData['branchesMarketingApprovedAt'] = Timestamp.fromDate(DateTime.now());
+        updateData['branchesMarketingApprovedAt'] = FieldValue.serverTimestamp();
       } else if (status == PenaltyStatus.issued && reviewerName != null) {
         updateData['generalManagerApprovedBy'] = reviewerName;
-        updateData['generalManagerApprovedAt'] = Timestamp.fromDate(DateTime.now());
+        updateData['generalManagerApprovedAt'] = FieldValue.serverTimestamp();
       }
 
       await _penaltiesRef.doc(penaltyId).update(updateData);
@@ -774,7 +774,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
                 'delegateUid': r,
                 'isRead': false,
                 'read': false,
-                'createdAt': Timestamp.now(),
+                'createdAt': FieldValue.serverTimestamp(),
                 'deletedBy': <String>[],
               });
             }
@@ -805,7 +805,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
                 'delegateUid': r,
                 'isRead': false,
                 'read': false,
-                'createdAt': Timestamp.now(),
+                'createdAt': FieldValue.serverTimestamp(),
                 'deletedBy': <String>[],
               });
             }
@@ -837,7 +837,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
               'delegateUid': pen.targetDelegateId,
               'isRead': false,
               'read': false,
-              'createdAt': Timestamp.now(),
+              'createdAt': FieldValue.serverTimestamp(),
               'deletedBy': <String>[],
             });
           }
@@ -860,7 +860,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
             'delegateUid': 'company_${pen.companyId}',
             'isRead': false,
             'read': false,
-            'createdAt': Timestamp.now(),
+            'createdAt': FieldValue.serverTimestamp(),
             'deletedBy': <String>[],
           });
         }
@@ -1019,7 +1019,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
 
       await _penaltyRulesRef.doc(ruleId).update({
         'isConfidential': isConfidential,
-        'updatedAt': Timestamp.now(),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
       _lastConfidentialRulesFetch = null;
 
@@ -1033,7 +1033,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
           for (final doc in penaltiesSnap.docs) {
             batch.update(doc.reference, {
               'isConfidential': isConfidential,
-              'updatedAt': Timestamp.now(),
+              'updatedAt': FieldValue.serverTimestamp(),
             });
           }
           await batch.commit();
