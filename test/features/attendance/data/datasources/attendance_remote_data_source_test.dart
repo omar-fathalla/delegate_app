@@ -283,4 +283,42 @@ void main() {
       expect(active, isNull);
     },
   );
+
+  group('cross-chain history keeps the branch reference (TAS-248)', () {
+    Future<AttendanceModel> checkInAtBranch() => dataSource.checkIn(
+          'user1',
+          10.0,
+          20.0,
+          companyId: 'company1',
+          organizationId: 'org_b',
+          deviceInfo: 'device1',
+          branchName: 'فرع تجريبي DEV',
+          branchId: 'br_1',
+          branchOrganizationUID: 'org_b',
+        );
+
+    test('open session loaded with organizationId "" keeps org and branch',
+        () async {
+      await checkInAtBranch();
+
+      // The attendance tab loads history for all chains with org ''.
+      final history = await dataSource.getHistory('user1', '');
+      final active = history.singleWhere((a) => a.checkOutTime == null);
+
+      expect(active.organizationId, 'org_b');
+      expect(active.branchId, 'br_1');
+      expect(active.branchOrganizationUID, 'org_b');
+      expect(active.branchName, 'فرع تجريبي DEV');
+    });
+
+    test('closed session loaded with organizationId "" keeps branch', () async {
+      final checkIn = await checkInAtBranch();
+      await dataSource.checkOut(checkIn.id, 'org_b', 11.0, 21.0);
+
+      final history = await dataSource.getHistory('user1', '');
+      expect(history.single.organizationId, 'org_b');
+      expect(history.single.branchId, 'br_1');
+      expect(history.single.branchOrganizationUID, 'org_b');
+    });
+  });
 }

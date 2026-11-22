@@ -735,6 +735,12 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       final lng = (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0;
       final branchName = data['branchName'];
       final targetOrgId = docOrg.isNotEmpty ? docOrg : organizationId;
+      // Keep the branch reference: the attendance tab loads history for
+      // all chains (organizationId ''), and check-out compares the open
+      // session's branch with the current one (TAS-248).
+      final branchId = data['branchId'] as String?;
+      final branchOrganizationUID =
+          (data['branchOrganizationUID'] as String?) ?? targetOrgId;
 
       // Prefer denormalized checkOutTime on the check-in doc (fix2),
       // fall back to paired check_out log for older records.
@@ -763,6 +769,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             latitude: lat,
             longitude: lng,
             branchName: branchName,
+            branchId: branchId,
+            branchOrganizationUID: branchOrganizationUID,
             isAutoCheckOut: isAuto,
             autoCheckOutReason: autoReason,
           ),
@@ -781,6 +789,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
               latitude: lat,
               longitude: lng,
               branchName: branchName,
+              branchId: branchId,
+              branchOrganizationUID: branchOrganizationUID,
               isAutoCheckOut: true,
               autoCheckOutReason: kAttendanceAutoCloseReasonAr,
             ),
@@ -790,11 +800,13 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             AttendanceModel(
               id: checkInId,
               userId: userId,
-              organizationId: organizationId,
+              organizationId: targetOrgId,
               checkInTime: checkInTime,
               latitude: lat,
               longitude: lng,
               branchName: branchName,
+              branchId: branchId,
+              branchOrganizationUID: branchOrganizationUID,
             ),
           );
         }
