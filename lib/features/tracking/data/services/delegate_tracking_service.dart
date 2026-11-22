@@ -14,6 +14,13 @@ import '../../domain/entities/delegate_tracking_session.dart';
 import '../../domain/entities/tracking_breadcrumb.dart';
 import '../models/tracking_breadcrumb_model.dart';
 
+/// TAS-82: breadcrumbs are fetched newest-first (so `limit` keeps the most
+/// recent points) and drawn oldest-first; this flips a newest-first page.
+List<TrackingBreadcrumb> latestBreadcrumbsInOrder(
+  List<TrackingBreadcrumb> newestFirst,
+) =>
+    newestFirst.reversed.toList(growable: false);
+
 class DelegateTrackingService {
   final FirebaseFirestore _firestore;
 
@@ -464,15 +471,18 @@ class DelegateTrackingService {
     required String delegateId,
     int limit = 200,
   }) {
+    // TAS-82: newest [limit] points, returned oldest→newest for drawing the
+    // trail. Ascending + limit returned the *first* points of the day, so the
+    // map showed where the delegate started, not where they are now.
     return _trackingCollection
         .doc(delegateId)
         .collection('breadcrumbs')
-        .orderBy('timestamp', descending: false)
+        .orderBy('timestamp', descending: true)
         .limit(limit)
         .snapshots()
-        .map((snap) => snap.docs
+        .map((snap) => latestBreadcrumbsInOrder(snap.docs
             .map((doc) => TrackingBreadcrumbModel.fromFirestore(doc))
-            .toList());
+            .toList()));
   }
 
   /// 4.2 جلب مسار تحرك المندوب لليوم
@@ -481,16 +491,17 @@ class DelegateTrackingService {
     int limit = 300,
   }) async {
     try {
+      // TAS-82: newest [limit] points, oldest→newest (see streamBreadcrumbs).
       final snap = await _trackingCollection
           .doc(delegateId)
           .collection('breadcrumbs')
-          .orderBy('timestamp', descending: false)
+          .orderBy('timestamp', descending: true)
           .limit(limit)
           .get();
 
-      return snap.docs
+      return latestBreadcrumbsInOrder(snap.docs
           .map((doc) => TrackingBreadcrumbModel.fromFirestore(doc))
-          .toList();
+          .toList());
     } catch (e) {
       debugPrint('Error fetching breadcrumbs: $e');
       return [];
