@@ -13,6 +13,7 @@ import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_state.dart';
 import 'package:delegate_app/features/penalties/presentation/widgets/penalty_evidence_viewer.dart';
 import 'package:delegate_app/features/penalties/presentation/utils/penalty_creator_helper.dart';
+import 'package:delegate_app/features/penalties/presentation/utils/penalty_list_scope.dart';
 import 'admin_create_penalty_page.dart';
 import 'penalty_rules_settings_page.dart';
 import 'package:delegate_app/features/penalties/domain/entities/standard_violation.dart';
@@ -73,11 +74,11 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
   void _loadData() {
     if (widget.ownPenaltiesOnly) {
       context.read<PenaltyBloc>().add(LoadOwnPenaltiesEvent(widget.adminDelegate));
-    } else if (widget.companyViewOnly ||
-        widget.adminDelegate.role == UserRole.admin) {
-      context.read<PenaltyBloc>().add(LoadCompanyPenaltiesEvent(widget.adminDelegate.companyUID));
     } else {
-      context.read<PenaltyBloc>().add(const LoadAllPenaltiesEvent());
+      context.read<PenaltyBloc>().add(penaltyListEventFor(
+        widget.adminDelegate,
+        companyViewOnly: widget.companyViewOnly,
+      ));
     }
   }
 
@@ -1899,11 +1900,7 @@ class _AdminPenaltyCardState extends State<_AdminPenaltyCard> {
     );
     if (res == true) {
       if (context.mounted) {
-        if (widget.currentDelegate.role == UserRole.admin) {
-          context.read<PenaltyBloc>().add(LoadCompanyPenaltiesEvent(widget.currentDelegate.companyUID));
-        } else {
-          context.read<PenaltyBloc>().add(const LoadAllPenaltiesEvent());
-        }
+        context.read<PenaltyBloc>().add(penaltyListEventFor(widget.currentDelegate));
       }
     }
   }

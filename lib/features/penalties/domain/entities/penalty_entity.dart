@@ -170,6 +170,10 @@ class PenaltyEntity extends Equatable {
   final String penaltyId;
   final String companyId;
   final String companyName;
+
+  /// TAS-73: the company's organization, so org-admin and org-level
+  /// marketing can list penalties by `organizationId`. Null on old docs.
+  final String? organizationId;
   final String? branchId;
   final String? branchName;
   final String createdById;
@@ -198,6 +202,7 @@ class PenaltyEntity extends Equatable {
     required this.penaltyId,
     required this.companyId,
     required this.companyName,
+    this.organizationId,
     this.branchId,
     this.branchName,
     required this.createdById,
@@ -228,6 +233,7 @@ class PenaltyEntity extends Equatable {
         penaltyId,
         companyId,
         companyName,
+        organizationId,
         branchId,
         branchName,
         createdById,

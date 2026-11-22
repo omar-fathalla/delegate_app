@@ -81,6 +81,21 @@ service firebase.storage {
       );
     }
 
+    // TAS-73: organization admin / org-level marketing (no companyUID) reach
+    // a company's files only when that company sits under their organization.
+    function orgStaffOwnsCompany(compId) {
+      let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      let role = u.get('role', '');
+      let org = u.get('organizationUID', '');
+      return isNonAnonymous()
+        && role in [
+          'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
+          'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion'
+        ]
+        && org != ''
+        && firestore.exists(/databases/(default)/documents/organizations/$(org)/companies/$(compId));
+    }
+
     // Delegate tokens always have role=delegate and companyId (singular).
     // companyIds is present only when the delegate is in more than one company.
     function isDelegateToken() {
@@ -359,7 +374,7 @@ service firebase.storage {
     // clients that only GET remain usable; new writes on the legacy
     // path are denied.
     match /penalties/{compId}/evidence/{penaltyId}/{allPaths=**} {
-      allow read, write: if canAccessCompanyFiles(compId);
+      allow read, write: if canAccessCompanyFiles(compId) || orgStaffOwnsCompany(compId);
     }
     match /penalties/evidence/{allPaths=**} {
       allow read: if isStorageStaff();

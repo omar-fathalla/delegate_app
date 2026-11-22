@@ -12,6 +12,7 @@ import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_state.dart';
 import 'package:delegate_app/features/penalties/presentation/widgets/penalty_evidence_viewer.dart';
 import 'package:delegate_app/features/penalties/presentation/utils/penalty_creator_helper.dart';
+import 'package:delegate_app/features/penalties/presentation/utils/penalty_list_scope.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/admin_create_penalty_page.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/penalty_rules_settings_page.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/penalty_rules_catalog_page.dart';
@@ -510,17 +511,9 @@ class _CompanyPenaltiesSettingsPageState
       ));
       return;
     }
-    final canViewAll = widget.delegate.role == UserRole.superAdmin ||
-        widget.delegate.role == UserRole.technicalSupport;
-    if (canViewAll) {
-      context.read<PenaltyBloc>().add(const LoadAllPenaltiesEvent());
-    } else {
-      final companyId = widget.delegate.companyUID.isNotEmpty
-          ? widget.delegate.companyUID
-          : widget.delegate.organizationUID;
-      // Company-scoped roles: rules prove companyId lists only (not organizationId).
-      context.read<PenaltyBloc>().add(LoadCompanyPenaltiesEvent(companyId));
-    }
+    // TAS-73: global staff list everything; company staff their company;
+    // org-scoped staff their organization (an org id is never a company id).
+    context.read<PenaltyBloc>().add(penaltyListEventFor(widget.delegate));
   }
 
   @override

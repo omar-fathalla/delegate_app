@@ -491,12 +491,9 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
             .collection('users')
             .where('companyUID', isEqualTo: compId)
             .get();
-      } else if (compName.isNotEmpty) {
-        usersSnap = await firestore
-            .collection('users')
-            .where('companyName', isEqualTo: compName)
-            .get();
       }
+      // TAS-73: no users-by-companyName fallback (a name is not a tenant,
+      // and the rules deny that list).
 
       if (usersSnap != null && usersSnap.docs.isNotEmpty) {
         for (final doc in usersSnap.docs) {
