@@ -225,15 +225,8 @@ class _AdminHomeBodyState extends State<_AdminHomeBody>
                 .get(),
           );
         }
-        if (widget.adminDelegate.role != UserRole.organizationAdmin &&
-            widget.adminDelegate.companyName.isNotEmpty) {
-          queries.add(
-            FirebaseFirestore.instance
-                .collection('users')
-                .where('companyName', isEqualTo: widget.adminDelegate.companyName)
-                .get(),
-          );
-        }
+        // TAS-73: no users-by-companyName list. A name is not a tenant and
+        // the rules deny it; the companyUID list above covers the company.
         final snapshots = await Future.wait(queries);
         for (final snap in snapshots) {
           for (final doc in snap.docs) {

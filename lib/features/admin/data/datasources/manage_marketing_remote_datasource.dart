@@ -3,7 +3,9 @@ import 'package:delegate_app/core/error/firestore_error_handler.dart';
 import 'package:delegate_app/features/admin/data/models/admin_user_model.dart';
 
 abstract class ManageMarketingRemoteDataSource {
-  Future<List<AdminUserModel>> getMarketingEmployees();
+  /// TAS-73: company staff see their company, org-scoped staff their
+  /// organization; only global staff (both empty) read every user.
+  Future<List<AdminUserModel>> getMarketingEmployees({String companyUID = '', String organizationUID = ''});
   Future<void> updateMarketingEmployee(AdminUserModel employee);
   Future<void> deleteMarketingEmployee(String employeeId);
   Future<void> suspendMarketingEmployee(String employeeId, bool suspend);
@@ -16,7 +18,7 @@ class ManageMarketingRemoteDataSourceImpl
   ManageMarketingRemoteDataSourceImpl({required this.firestore});
 
   @override
-  Future<List<AdminUserModel>> getMarketingEmployees() async {
+  Future<List<AdminUserModel>> getMarketingEmployees({String companyUID = '', String organizationUID = ''}) async {
     try {
       // 1. Fetch organizations to resolve organization names dynamically
       final orgMap = <String, String>{};
@@ -41,7 +43,14 @@ class ManageMarketingRemoteDataSourceImpl
         // Fallback gracefully if organizations fetch fails
       }
 
-      final snapshot = await firestore.collection('users').get();
+      Query<Map<String, dynamic>> usersQuery = firestore.collection('users');
+      if (companyUID.trim().isNotEmpty) {
+        usersQuery = usersQuery.where('companyUID', isEqualTo: companyUID.trim());
+      } else if (organizationUID.trim().isNotEmpty) {
+        usersQuery =
+            usersQuery.where('organizationUID', isEqualTo: organizationUID.trim());
+      }
+      final snapshot = await usersQuery.get();
       final list = <AdminUserModel>[];
       for (final doc in snapshot.docs) {
         try {

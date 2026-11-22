@@ -2291,6 +2291,54 @@ service cloud.firestore {
         || penaltyMarketingReadOk();
     }
 
+    // TAS-73: penalty create in one pass. The caller's users doc is read
+    // once (let) and the role lists are literal, so an org-admin create
+    // stays under the 1000-expression budget (the role helpers each repeat
+    // the users get). Same roles as isGlobalStaff / isCompanyScopedStaff /
+    // isOrgScopedStaff; only the incoming tenant is checked (no stored doc).
+    function penaltyCreateOk() {
+      let d = request.resource.data;
+      let co = callerCompany();
+      let org = callerOrg();
+      return penaltyRoleTenantOk(userRole(), co, org,
+        co != '' && (d.get('companyUID', '') == co || d.get('companyId', '') == co),
+        org != '' && (d.get('organizationUID', '') == org || d.get('organizationId', '') == org));
+    }
+
+    // Update: the stored doc or the incoming one must be in the caller's
+    // tenant (same as before TAS-73), evaluated once.
+    function penaltyUpdateOk() {
+      let d = request.resource.data;
+      let old = resource.data;
+      let co = callerCompany();
+      let org = callerOrg();
+      return penaltyRoleTenantOk(userRole(), co, org,
+        co != '' && (old.get('companyUID', '') == co || old.get('companyId', '') == co
+          || d.get('companyUID', '') == co || d.get('companyId', '') == co),
+        org != '' && (old.get('organizationUID', '') == org || old.get('organizationId', '') == org
+          || d.get('organizationUID', '') == org || d.get('organizationId', '') == org));
+    }
+
+    function penaltyRoleTenantOk(r, co, org, inCo, inOrg) {
+      return r in superAdminRoleList()
+        || r in techRoleList()
+        || (inCo && r in [
+          'company-admin', 'company_admin', 'companyadmin', 'admin',
+          'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'human_resources',
+          'accountant', 'accounting', 'account_admin',
+          'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+          'branches-marketing-manager', 'branchesmarketingmanager',
+          'branchesMarketingManager'
+        ])
+        || (inOrg && r in [
+          'organization-admin', 'organization_admin', 'organizationadmin',
+          'organizationAdmin',
+          'marketing', 'marketing_promotion', 'marketingpromotion',
+          'marketingPromotion'
+        ]);
+    }
+
     match /penalties/{penaltyId} {
       // List/get: delegate vs staff split (1k expr cap — avoid evaluating both paths).
       allow list: if signedIn() && (
@@ -2299,9 +2347,10 @@ service cloud.firestore {
       allow get: if signedIn() && (
         claimString('role') == 'delegate' ? delegatePenaltySelfReadOk() : penaltyStaffGetOk()
       );
-      allow create, update: if isGlobalStaff()
-        || (isCompanyScopedStaff() && (companyScoped() || incomingCompanyScoped()))
-        || (isOrgScopedStaff() && (orgScoped() || incomingOrgScoped()));
+      // TAS-73: create checks only the incoming tenant (there is no stored
+      // doc), which keeps an org-admin create under the 1000-expression budget.
+      allow create: if signedIn() && penaltyCreateOk();
+      allow update: if signedIn() && penaltyUpdateOk();
       allow delete: if isGlobalStaff() || (isCompanyAdmin() && companyScoped()) || (isOrgAdmin() && orgScoped());
     }
 
@@ -2822,6 +2871,34 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // TAS-73: breadcrumbs for staff in one pass (users doc and the parent
+    // tracking doc read once, literal role lists) so an organization admin
+    // without a companyUID can follow a delegate of its organization under
+    // the 1000-expression budget. Company staff match the parent's company,
+    // org-scoped staff its company or its organization.
+    function breadcrumbStaffOk(delegateId) {
+      let r = userRole();
+      let co = callerCompany();
+      let org = callerOrg();
+      let t = get(/databases/$(database)/documents/delegate_tracking/$(delegateId)).data;
+      let orgRoles = [
+        'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
+        'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion'
+      ];
+      return r in superAdminRoleList()
+        || r in techRoleList()
+        || (co != '' && t.get('companyUID', '') == co && (r in orgRoles || r in [
+          'company-admin', 'company_admin', 'companyadmin', 'admin',
+          'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'human_resources',
+          'accountant', 'accounting', 'account_admin',
+          'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+          'branches-marketing-manager', 'branchesmarketingmanager',
+          'branchesMarketingManager'
+        ]))
+        || (org != '' && t.get('organizationUID', '') == org && r in orgRoles);
+    }
+
     match /delegate_tracking/{delegateId} {
       allow read: if signedIn() && (
         delegateOwns(delegateId) || isGlobalStaff()
@@ -2835,12 +2912,7 @@ service cloud.firestore {
 
       match /breadcrumbs/{breadcrumbId} {
         allow read, create: if signedIn() && (
-          delegateOwns(delegateId)
-          || isGlobalStaff()
-          || (
-            (isCompanyScopedStaff() || isOrgScopedStaff())
-            && get(/databases/$(database)/documents/delegate_tracking/$(delegateId)).data.companyUID == callerCompany()
-          )
+          delegateOwns(delegateId) || breadcrumbStaffOk(delegateId)
         );
         allow update, delete: if isGlobalStaff();
       }

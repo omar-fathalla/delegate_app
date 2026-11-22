@@ -6,6 +6,7 @@ class PenaltyModel extends PenaltyEntity {
     required super.penaltyId,
     required super.companyId,
     required super.companyName,
+    super.organizationId,
     super.branchId,
     super.branchName,
     required super.createdById,
@@ -56,6 +57,7 @@ class PenaltyModel extends PenaltyEntity {
       penaltyId: data['penaltyId'] ?? doc.id,
       companyId: data['companyId'] ?? '',
       companyName: data['companyName'] ?? '',
+      organizationId: _nonEmpty(data['organizationId']),
       branchId: data['branchId'],
       branchName: data['branchName'],
       createdById: data['createdById'] ?? '',
@@ -89,6 +91,8 @@ class PenaltyModel extends PenaltyEntity {
       'penaltyId': penaltyId,
       'companyId': companyId,
       'companyName': companyName,
+      if (organizationId != null && organizationId!.isNotEmpty)
+        'organizationId': organizationId,
       if (branchId != null) 'branchId': branchId,
       if (branchName != null) 'branchName': branchName,
       'createdById': createdById,
@@ -124,6 +128,7 @@ class PenaltyModel extends PenaltyEntity {
       penaltyId: entity.penaltyId,
       companyId: entity.companyId,
       companyName: entity.companyName,
+      organizationId: entity.organizationId,
       branchId: entity.branchId,
       branchName: entity.branchName,
       createdById: entity.createdById,
@@ -149,4 +154,9 @@ class PenaltyModel extends PenaltyEntity {
       updatedAt: entity.updatedAt,
     );
   }
+}
+
+String? _nonEmpty(Object? v) {
+  final s = v?.toString().trim() ?? '';
+  return s.isEmpty ? null : s;
 }

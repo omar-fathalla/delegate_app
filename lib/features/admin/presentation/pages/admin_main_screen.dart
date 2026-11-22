@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/admin/domain/usecases/get_marketing_employees.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -419,7 +420,17 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       case 'manage_marketing':
         Navigator.of(
           context,
-        ).push(MaterialPageRoute(builder: (_) => const ManageMarketingScreen()));
+        ).push(MaterialPageRoute(
+          builder: (_) => ManageMarketingScreen(
+            // TAS-73: non-global staff list only their company / organization.
+            scope: MarketingEmployeesScope.forUser(
+              isGlobalStaff: widget.delegate.role == UserRole.superAdmin ||
+                  widget.delegate.role == UserRole.technicalSupport,
+              companyUID: widget.delegate.companyUID,
+              organizationUID: widget.delegate.organizationUID,
+            ),
+          ),
+        ));
         break;
       case 'manage_feedbacks':
         Navigator.of(context).push(

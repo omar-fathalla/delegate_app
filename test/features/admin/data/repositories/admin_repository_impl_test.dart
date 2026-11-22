@@ -115,7 +115,10 @@ class MockAdminRemoteDataSource implements AdminRemoteDataSource {
 class MockManageMarketingRemoteDataSource
     implements ManageMarketingRemoteDataSource {
   @override
-  Future<List<AdminUserModel>> getMarketingEmployees() {
+  Future<List<AdminUserModel>> getMarketingEmployees({
+    String companyUID = '',
+    String organizationUID = '',
+  }) {
     throw UnimplementedError();
   }
 

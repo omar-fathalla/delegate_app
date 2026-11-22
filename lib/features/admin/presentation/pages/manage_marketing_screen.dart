@@ -6,17 +6,24 @@ import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
 import 'package:delegate_app/features/admin/domain/entities/admin_user.dart';
+import 'package:delegate_app/features/admin/domain/usecases/get_marketing_employees.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/manage_marketing_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/admin_header.dart';
 
 class ManageMarketingScreen extends StatelessWidget {
-  const ManageMarketingScreen({super.key});
+  /// TAS-73: whose users to list (empty for global staff).
+  final MarketingEmployeesScope scope;
+
+  const ManageMarketingScreen({
+    super.key,
+    this.scope = const MarketingEmployeesScope(),
+  });
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => di.sl<ManageMarketingBloc>()
-        ..add(LoadMarketingEmployeesRequested()),
+        ..add(LoadMarketingEmployeesRequested(scope: scope)),
       child: const _ManageMarketingView(),
     );
   }
@@ -164,7 +171,7 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
             onPressed: () {
               context
                   .read<ManageMarketingBloc>()
-                  .add(LoadMarketingEmployeesRequested());
+                  .add(const LoadMarketingEmployeesRequested());
             },
           ),
         ],
@@ -257,7 +264,7 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
                     onRefresh: () async {
                       context
                           .read<ManageMarketingBloc>()
-                          .add(LoadMarketingEmployeesRequested());
+                          .add(const LoadMarketingEmployeesRequested());
                     },
                     child: filteredEmployees.isEmpty
                         ? LayoutBuilder(
@@ -277,7 +284,7 @@ class _ManageMarketingViewState extends State<_ManageMarketingView> {
                                   onRefresh: () {
                                     context
                                         .read<ManageMarketingBloc>()
-                                        .add(LoadMarketingEmployeesRequested());
+                                        .add(const LoadMarketingEmployeesRequested());
                                   },
                                 ),
                               ),

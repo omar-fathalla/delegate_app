@@ -329,6 +329,13 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
 
   String _effectiveOrgUid = '';
 
+  /// TAS-73: the organization the selected company was loaded from, saved
+  /// on the penalty so org-admin can create and list it. Null when unknown.
+  String? _penaltyOrgId() {
+    final org = _effectiveOrgUid.trim();
+    return org.isEmpty ? null : org;
+  }
+
   Future<String> _getEffectiveOrgUid() async {
     if (_effectiveOrgUid.isNotEmpty) return _effectiveOrgUid;
     if (widget.adminDelegate.organizationUID.isNotEmpty &&
@@ -540,35 +547,8 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
         }
       } catch (_) {}
 
-      // Strategy 3: Also query users matching companyName
-      if (_selectedCompanyName != null && _selectedCompanyName!.isNotEmpty) {
-        try {
-          final nameSnapshot = await firestore
-              .collection('users')
-              .where('companyName', isEqualTo: _selectedCompanyName)
-              .get();
-
-          for (var doc in nameSnapshot.docs) {
-            final data = doc.data();
-            final role = data['role']?.toString().toLowerCase() ?? '';
-            if (role.contains('admin') || role.contains('supervisor') || role.contains('manager')) {
-              continue;
-            }
-
-            final name = data['displayName']?.toString() ??
-                data['fullName']?.toString() ??
-                data['name']?.toString() ??
-                doc.id;
-            final phone = data['phoneNumber']?.toString() ?? data['phone']?.toString() ?? '';
-
-            delegatesMap[doc.id] = {
-              'id': doc.id,
-              'name': name,
-              'phone': phone,
-            };
-          }
-        } catch (_) {}
-      }
+      // TAS-73: no users-by-companyName lookup. A name is not a tenant (two
+      // companies can share it) and the rules deny that unscoped list.
 
       final list = delegatesMap.values.toList();
       list.sort((a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''));
@@ -793,6 +773,7 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
         penaltyId: old.penaltyId,
         companyId: _selectedCompanyId!,
         companyName: _selectedCompanyName ?? _selectedCompanyId!,
+        organizationId: old.organizationId ?? _penaltyOrgId(),
         branchId: _selectedBranchId,
         branchName: _selectedBranchName,
         createdById: old.createdById,
@@ -830,6 +811,7 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
         penaltyId: '',
         companyId: _selectedCompanyId!,
         companyName: _selectedCompanyName ?? _selectedCompanyId!,
+        organizationId: _penaltyOrgId(),
         branchId: _selectedBranchId,
         branchName: _selectedBranchName,
         createdById: widget.adminDelegate.uid,
