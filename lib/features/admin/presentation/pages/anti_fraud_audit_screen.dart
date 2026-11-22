@@ -5,11 +5,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/features/admin/presentation/utils/anti_fraud_audit_display.dart';
 import 'package:delegate_app/core/services/device_binding_service.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/hr/presentation/device_unbind_labels.dart';
@@ -278,63 +278,12 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     }
   }
 
-  String _resolveBranchName(Map<String, dynamic> item) {
-    final directBranch = (item['branchName'] as String?)?.trim() ?? '';
-    if (directBranch.isNotEmpty && directBranch != 'غير محدد') {
-      return directBranch;
-    }
-
-    final branchUid = (item['branchUID'] as String?)?.trim() ?? '';
-    if (branchUid.isNotEmpty) {
-      final match = _branchesList.firstWhere(
-        (b) => b['id'] == branchUid,
-        orElse: () => {'name': ''},
-      );
-      if ((match['name'] as String?)?.isNotEmpty == true) {
-        return match['name'] as String;
-      }
-    }
-
-    // Match closest branch from mock coordinates
-    final lat = (item['latitude'] as num?)?.toDouble();
-    final lng = (item['longitude'] as num?)?.toDouble();
-    if (lat != null && lng != null && _branchesList.isNotEmpty) {
-      double minDistance = double.infinity;
-      String bestName = '';
-      String bestId = '';
-
-      for (final b in _branchesList) {
-        final bLat = b['latitude'] as double?;
-        final bLng = b['longitude'] as double?;
-        if (bLat != null && bLng != null) {
-          final dist = Geolocator.distanceBetween(lat, lng, bLat, bLng);
-          if (dist < minDistance) {
-            minDistance = dist;
-            bestName = b['name'] as String;
-            bestId = b['id'] as String;
-          }
-        }
-      }
-
-      if (bestName.isNotEmpty) {
-        final docId = item['docId']?.toString();
-        if (docId != null && docId.isNotEmpty && item['_isUpdated'] != true) {
-          item['_isUpdated'] = true;
-          FirebaseFirestore.instance
-              .collection('security_audit_logs')
-              .doc(docId)
-              .update({
-                'branchName': bestName,
-                'branchUID': bestId,
-              })
-              .catchError((_) {});
-        }
-        return bestName;
-      }
-    }
-
-    return 'غير محدد';
-  }
+  // TAS-79: display-only. This used to write the guessed branch back to the
+  // security_audit_logs doc the moment the row was shown (no click), so just
+  // opening the screen rewrote evidence in production, with whatever the
+  // viewer's permissions allowed. The name is now only resolved for display.
+  String _resolveBranchName(Map<String, dynamic> item) =>
+      resolveAuditBranchName(item, _branchesList);
 
   Future<void> _loadCompanies() async {
     try {
@@ -357,26 +306,9 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     } catch (_) {}
   }
 
-  String _resolveCompanyName(Map<String, dynamic> item) {
-    final compUid = (item['companyUID'] as String?)?.trim() ?? '';
-    if (compUid.isNotEmpty && _companiesMap.containsKey(compUid)) {
-      final officialName = _companiesMap[compUid]!;
-      final currentName = (item['companyName'] as String?)?.trim() ?? '';
-      if (currentName != officialName && item['_isCompUpdated'] != true) {
-        item['_isCompUpdated'] = true;
-        final docId = item['docId']?.toString();
-        if (docId != null && docId.isNotEmpty) {
-          FirebaseFirestore.instance
-              .collection('security_audit_logs')
-              .doc(docId)
-              .update({'companyName': officialName})
-              .catchError((_) {});
-        }
-      }
-      return officialName;
-    }
-    return (item['companyName'] as String?)?.trim() ?? '';
-  }
+  // TAS-79: display-only (it used to rewrite companyName on open).
+  String _resolveCompanyName(Map<String, dynamic> item) =>
+      resolveAuditCompanyName(item, _companiesMap);
 
   @override
   void dispose() {
