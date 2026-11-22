@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:delegate_app/core/services/firestore_cache_reset.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -87,6 +88,16 @@ void main() {
       await dataSource.clearCachedData();
 
       expect(sharedPreferences.getString(cachedDelegateKey), isNull);
+    });
+
+    // TAS-241: logout now sets the Firestore cache reset mark before this
+    // wipe, so the wipe must keep it.
+    test('keeps the Firestore cache reset mark', () async {
+      await sharedPreferences.setBool(FirestoreCacheReset.pendingKey, true);
+
+      await dataSource.clearCachedData();
+
+      expect(sharedPreferences.getBool(FirestoreCacheReset.pendingKey), isTrue);
     });
   });
 }

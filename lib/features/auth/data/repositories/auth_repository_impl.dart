@@ -20,11 +20,16 @@ class AuthRepositoryImpl implements AuthRepository {
   /// session (FirestoreCacheReset.markPending). Must not throw.
   final Future<void> Function()? markFirestoreCacheReset;
 
+  /// TAS-240: drops the cache now if it was marked
+  /// (FirestoreCacheReset.runIfPending). Must not throw.
+  final Future<void> Function()? runFirestoreCacheReset;
+
   AuthRepositoryImpl({
     required this.remoteDataSource,
     required this.localDataSource,
     this.clearPushRegistration,
     this.markFirestoreCacheReset,
+    this.runFirestoreCacheReset,
   });
 
   @override
@@ -159,6 +164,15 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<Either<Failure, void>> logout({String? userId}) async {
     final uid = userId?.trim() ?? '';
+    // TAS-241: mark first. Offline, the push cleanup and sign-out below can
+    // take ~17s; if the app is closed before a later mark, the old user's
+    // cache stayed for good. clearCachedData keeps this key.
+    final markReset = markFirestoreCacheReset;
+    if (markReset != null) {
+      try {
+        await markReset();
+      } catch (_) {}
+    }
     try {
       await FirestoreSessionSubscriptions.instance.cancelAll();
     } catch (_) {}
@@ -179,11 +193,14 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       await localDataSource.clearCachedData();
     } catch (_) {}
-    // TAS-76: after the prefs wipe, so the mark survives it.
-    final markReset = markFirestoreCacheReset;
-    if (markReset != null) {
+    // TAS-240: the login screen is already up (AuthBloc emits before this
+    // runs), so its own runIfPending saw no mark. Drop the cache here, after
+    // sign-out, with the session's listeners gone. Unsent writes keep the
+    // mark for the next start (FirestoreCacheReset waits for them).
+    final runReset = runFirestoreCacheReset;
+    if (runReset != null) {
       try {
-        await markReset();
+        await runReset();
       } catch (_) {}
     }
     return const Right(null);

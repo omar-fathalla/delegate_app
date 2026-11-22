@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dartz/dartz.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
@@ -279,19 +281,52 @@ void main() {
       expect(mockLocalDataSource.cachedDelegate, isNull);
     });
 
-    test('marks the Firestore cache reset after wiping prefs (TAS-76)', () async {
+    test('marks the cache reset first and runs it last (TAS-240, TAS-241)', () async {
       final order = <String>[];
       final loggingOut = AuthRepositoryImpl(
         remoteDataSource: mockRemoteDataSource,
         localDataSource: mockLocalDataSource,
-        markFirestoreCacheReset: () async {
-          order.add('mark:clear=${mockLocalDataSource.clearCallCount}');
-        },
+        clearPushRegistration: (_) async => order.add('push'),
+        markFirestoreCacheReset: () async => order.add(
+          'mark:signOut=${mockRemoteDataSource.signOutCount}'
+          ',clear=${mockLocalDataSource.clearCallCount}',
+        ),
+        runFirestoreCacheReset: () async => order.add(
+          'run:signOut=${mockRemoteDataSource.signOutCount}'
+          ',clear=${mockLocalDataSource.clearCallCount}',
+        ),
       );
 
       await loggingOut.logout(userId: 'delegate-1');
 
-      expect(order, ['mark:clear=1']);
+      // Mark before the slow offline steps, so closing the app mid-logout
+      // keeps it; run after sign-out, when the login screen is already up.
+      expect(order, ['mark:signOut=0,clear=0', 'push', 'run:signOut=1,clear=1']);
+    });
+
+    test('marks the reset even when push cleanup never finishes (TAS-241)', () async {
+      var marked = false;
+      final loggingOut = AuthRepositoryImpl(
+        remoteDataSource: mockRemoteDataSource,
+        localDataSource: mockLocalDataSource,
+        clearPushRegistration: (_) => Completer<void>().future,
+        markFirestoreCacheReset: () async => marked = true,
+      );
+
+      unawaited(loggingOut.logout(userId: 'delegate-1'));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(marked, isTrue);
+    });
+
+    test('a failing cache reset run does not fail the logout (TAS-240)', () async {
+      final loggingOut = AuthRepositoryImpl(
+        remoteDataSource: mockRemoteDataSource,
+        localDataSource: mockLocalDataSource,
+        runFirestoreCacheReset: () async => throw Exception('terminate'),
+      );
+
+      expect(await loggingOut.logout(userId: 'delegate-1'), const Right(null));
     });
 
     test('a failing reset mark does not fail the logout (TAS-76)', () async {
