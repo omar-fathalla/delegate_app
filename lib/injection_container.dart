@@ -211,6 +211,8 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       },
       markFirestoreCacheReset: () =>
           FirestoreCacheReset(prefs: sl<SharedPreferences>()).markPending(),
+      runFirestoreCacheReset: () =>
+          FirestoreCacheReset(prefs: sl<SharedPreferences>()).runIfPending(),
     ),
   );
 
