@@ -97,8 +97,15 @@ describe("payroll: user_wallets company list", () => {
       await assertFails(getDocs(collection(as(uid), "user_wallets")));
     });
 
-    test(`${uid} still cannot write a wallet`, async () => {
-      await assertFails(updateDoc(doc(as(uid), `user_wallets/wallet-${companyOf(uid)}`), {baseSalary: 1}));
+    // TAS-74: payroll saves salary settings (own company only); balance
+    // and other fields stay out of reach (see tas74-hr-writes.test.js).
+    test(`${uid} may save salary fields but not the balance`, async () => {
+      await assertSucceeds(updateDoc(doc(as(uid), `user_wallets/wallet-${companyOf(uid)}`), {baseSalary: 1}));
+      await assertFails(updateDoc(doc(as(uid), `user_wallets/wallet-${companyOf(uid)}`), {balance: 1}));
+    });
+
+    test(`${uid} cannot write another company's wallet`, async () => {
+      await assertFails(updateDoc(doc(as(uid), `user_wallets/wallet-${otherCompany(uid)}`), {baseSalary: 1}));
     });
   }
 

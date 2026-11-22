@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/hr/data/hr_leave_settings_writer.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -309,27 +310,14 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                                                 ? del.companyUID
                                                 : widget.hrDelegate.companyUID;
 
-                                            // 1. Update in company delegates subcollection if scoped
-                                            if (orgUid.isNotEmpty && compUid.isNotEmpty) {
-                                              await FirebaseFirestore.instance
-                                                  .collection('organizations')
-                                                  .doc(orgUid)
-                                                  .collection('companies')
-                                                  .doc(compUid)
-                                                  .collection('delegates')
-                                                  .doc(del.uid)
-                                                  // update(): never create a stub doc.
-                                                  .update(payload);
-                                            }
-
-                                            // 2. Safely update in users document if it exists
-                                            final userRef = FirebaseFirestore.instance
-                                                .collection('users')
-                                                .doc(del.uid);
-                                            final userDoc = await userRef.get();
-                                            if (userDoc.exists) {
-                                              await userRef.set(payload, SetOptions(merge: true));
-                                            }
+                                            // TAS-74: delegate doc required, users copy best effort.
+                                            await saveDelegateLeaveSettings(
+                                              firestore: FirebaseFirestore.instance,
+                                              organizationUID: orgUid,
+                                              companyUID: compUid,
+                                              delegateUid: del.uid,
+                                              payload: payload,
+                                            );
                                           } catch (e) {
                                             messenger.showSnackBar(
                                               SnackBar(content: Text('فشل حفظ التعديل: $e')),

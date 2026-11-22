@@ -2748,6 +2748,33 @@ service cloud.firestore {
         ];
     }
 
+    // TAS-74: HR / company supervisors save a delegate's salary settings
+    // (hr_monthly_payroll_screen _saveDelegateSalary). Only the payroll
+    // fields, never balance or transactions, and only inside their own
+    // company: the wallet stays (or starts) on the caller's companyUID.
+    function walletPayrollKeys() {
+      return ['monthlyAllocation', 'baseSalary', 'dailyShiftHours', 'customHourlyRate',
+        'payrollCalculationMode', 'companyUID', 'companyName', 'userName', 'userPhone',
+        'updatedAt', 'updatedBy'];
+    }
+
+    function walletPayrollWriteOk(isCreate) {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let co = u.get('companyUID', '');
+      let d = request.resource.data;
+      return co is string && co != ''
+        && u.get('role', '') in [
+          'company-admin', 'company_admin', 'companyadmin', 'admin',
+          'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'human_resources'
+        ]
+        && d.get('companyUID', '') == co
+        && (isCreate
+          ? d.keys().hasOnly(walletPayrollKeys())
+          : resource.data.get('companyUID', '') == co
+            && d.diff(resource.data).affectedKeys().hasOnly(walletPayrollKeys()));
+    }
+
     match /user_wallets/{walletId} {
       allow read: if signedIn() && (
         walletId == request.auth.uid || delegateOwns(walletId) || isGlobalStaff() || isAccountant() || isOrgAdmin()
@@ -2758,6 +2785,8 @@ service cloud.firestore {
       allow create, update: if signedIn() && (
         walletId == request.auth.uid || delegateOwns(walletId) || isGlobalStaff() || isAccountant() || isOrgAdmin()
       );
+      allow create: if signedIn() && walletPayrollWriteOk(true);
+      allow update: if signedIn() && walletPayrollWriteOk(false);
       allow delete: if isGlobalStaff() || isAccountant();
       match /transactions/{transactionId} {
         allow read, write: if signedIn() && (

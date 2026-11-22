@@ -1,3 +1,5 @@
+import 'package:delegate_app/features/hr/domain/hr_add_delegate_policy.dart';
+import 'package:delegate_app/features/hr/data/hr_leave_settings_writer.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -528,36 +530,20 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                             'updatedAt': FieldValue.serverTimestamp(),
                           };
 
-                          // 1. Update in company delegates subcollection if scoped
                           final orgUid = delegate.organizationUID.isNotEmpty
                               ? delegate.organizationUID
                               : widget.hrDelegate.organizationUID;
                           final compUid = delegate.companyUID.isNotEmpty
                               ? delegate.companyUID
                               : widget.hrDelegate.companyUID;
-                          if (orgUid.isNotEmpty && compUid.isNotEmpty) {
-                            await FirebaseFirestore.instance
-                                .collection('organizations')
-                                .doc(orgUid)
-                                .collection('companies')
-                                .doc(compUid)
-                                .collection('delegates')
-                                .doc(delegate.uid)
-                                // update(): never create a stub doc.
-                                .update(updatePayload);
-                          }
-
-                          // 2. Safely update in users collection if document exists
-                          final userRef = FirebaseFirestore.instance
-                              .collection('users')
-                              .doc(delegate.uid);
-                          final userDoc = await userRef.get();
-                          if (userDoc.exists) {
-                            await userRef.set(
-                              updatePayload,
-                              SetOptions(merge: true),
-                            );
-                          }
+                          // TAS-74: delegate doc required, users copy best effort.
+                          await saveDelegateLeaveSettings(
+                            firestore: FirebaseFirestore.instance,
+                            organizationUID: orgUid,
+                            companyUID: compUid,
+                            delegateUid: delegate.uid,
+                            payload: updatePayload,
+                          );
 
                           if (dialogContext.mounted) {
                             Navigator.pop(dialogContext);
@@ -1028,7 +1014,8 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                   icon: const Icon(Icons.refresh_rounded),
                 ),
                 const Spacer(),
-                addButton,
+                // TAS-74: HR users cannot submit the add request (rules).
+                if (hrUserCanAddDelegate(widget.hrDelegate)) addButton,
               ],
             ),
           ],
@@ -1045,11 +1032,13 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
         icon: Icons.group_off_rounded,
         title: 'لا يوجد مناديب',
         message: 'سيظهر المناديب هنا عند إضافتهم.',
-        action: FilledButton.icon(
-          onPressed: _openAddDelegate,
-          icon: const Icon(Icons.person_add_alt_1_rounded),
-          label: const Text('إضافة مندوب'),
-        ),
+        action: hrUserCanAddDelegate(widget.hrDelegate)
+            ? FilledButton.icon(
+                onPressed: _openAddDelegate,
+                icon: const Icon(Icons.person_add_alt_1_rounded),
+                label: const Text('إضافة مندوب'),
+              )
+            : null,
       );
     }
     return HrEmptyState(
