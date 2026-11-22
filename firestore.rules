@@ -204,6 +204,11 @@ service cloud.firestore {
       return isDelegate() && (claimString('companyId') == compId || claimListHas('companyIds', compId));
     }
 
+    // Signed in with a staff token (not a delegate custom token).
+    function staffToken() {
+      return request.auth != null && request.auth.token.get('role', '') != 'delegate';
+    }
+
     function delegateOwns(id) {
       return isDelegate() && (
         id == request.auth.uid ||
@@ -2924,10 +2929,14 @@ service cloud.firestore {
       // Split allow rules so a company+status list is provable for HR
       // (a single OR with unconstrained own-id branches made that query
       // PERMISSION_DENIED). Own-id stays a separate rule for delegates.
-      allow read: if canReadOrgAdminRequestInOwnOrg();
-      allow read: if signedIn() && isGlobalStaff();
-      allow read: if signedIn() && isCompanyScopedStaff() && companyScoped();
-      allow read: if signedIn() && isOrgScopedStaff() && orgScoped();
+      // Staff branches check the token role first: a delegate token stops
+      // here instead of walking users/{uid} three times, which pushed the
+      // delegate's own-list query (home screen) over the 1000-expression
+      // budget and denied it.
+      allow read: if staffToken() && canReadOrgAdminRequestInOwnOrg();
+      allow read: if staffToken() && isGlobalStaff();
+      allow read: if staffToken() && isCompanyScopedStaff() && companyScoped();
+      allow read: if staffToken() && isOrgScopedStaff() && orgScoped();
       allow read: if signedIn() && (
         ownsDelegateId(resource.data.delegateUid)
         || delegateOwns(resource.data.delegateUid)

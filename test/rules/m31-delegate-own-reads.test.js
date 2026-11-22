@@ -125,6 +125,25 @@ describe("m31 delegate own-data queries", () => {
       where("delegateUid", "==", "del-2"),
     ))));
 
+  // Delegate home screen listener. With a users/{uid} doc present the staff
+  // read branches used to walk it three times and the query went over the
+  // 1000-expression budget (permission-denied on tashil-dev, Patrol gate).
+  test("delegate home leave listener (company + own uid) with users doc", async () => {
+    await env.withSecurityRulesDisabled((ctx) => ctx.firestore().doc("users/del-1").set({
+      uid: "del-1", role: "delegate", organizationUID: "o1", companyUID: "c1",
+    }));
+    await assertSucceeds(getDocs(query(
+      collection(as("del-1", DELEGATE), "leave_requests"),
+      where("companyUID", "==", "c1"),
+      where("delegateUid", "==", "del-1"),
+    )));
+    await assertFails(getDocs(query(
+      collection(as("del-1", DELEGATE), "leave_requests"),
+      where("companyUID", "==", "c1"),
+      where("delegateUid", "==", "del-2"),
+    )));
+  });
+
   test("delegate can query own notifications by uid and by phone claim", async () => {
     await assertSucceeds(getDocs(query(
       collection(as("del-1", DELEGATE), "notifications"),
