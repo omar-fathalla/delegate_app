@@ -276,7 +276,12 @@ void main() {
     final theme = await promoTestTheme();
     final db = await renewal.seed();
     final clock = () => renewal.nov2026;
-    final repo = SubscriptionRenewalRepository(firestore: db, clock: clock);
+    // Prod behaviour (TAS-78: the dev default turns the advance window on).
+    final repo = SubscriptionRenewalRepository(
+      firestore: db,
+      clock: clock,
+      advanceRenewalEnabled: false,
+    );
     await tester.pumpWidget(
       promoTestApp(
         theme: theme,
@@ -298,7 +303,12 @@ void main() {
     final theme = await promoTestTheme();
     final db = await renewal.seed();
     final clock = () => renewal.feb2027;
-    final repo = SubscriptionRenewalRepository(firestore: db, clock: clock);
+    // Prod behaviour (TAS-78: the dev default turns the advance window on).
+    final repo = SubscriptionRenewalRepository(
+      firestore: db,
+      clock: clock,
+      advanceRenewalEnabled: false,
+    );
     await tester.pumpWidget(
       promoTestApp(
         theme: theme,
