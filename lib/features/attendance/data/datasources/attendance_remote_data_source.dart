@@ -1324,7 +1324,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'createdBy': auth?.currentUser?.uid ?? userId,
         'isRead': false,
         'read': false,
-        'createdAt': Timestamp.fromDate(time),
+        'createdAt': FieldValue.serverTimestamp(),
         'deletedBy': <String>[],
       });
     } catch (e) {

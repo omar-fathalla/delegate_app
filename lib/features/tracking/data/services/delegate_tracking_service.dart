@@ -713,7 +713,7 @@ class DelegateTrackingService {
         'breachDistanceMeters': breachDistance,
         'isRead': false,
         'read': false,
-        'createdAt': Timestamp.fromDate(now),
+        'createdAt': FieldValue.serverTimestamp(),
         'deletedBy': <String>[],
       });
     } catch (e) {
