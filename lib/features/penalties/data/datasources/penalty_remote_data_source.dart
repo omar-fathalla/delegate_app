@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:delegate_app/core/error/exceptions.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
@@ -373,63 +372,9 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
           });
         }
 
-        // Direct manager user accounts in Firestore
-        final queryRoles = finalPenalty.isConfidential
-            ? ['organizationAdmin', 'superAdmin', 'super-admin', 'super_admin', 'technicalSupport', 'technical_support']
-            : ['branchesMarketingManager', 'organizationAdmin', 'superAdmin', 'super-admin', 'super_admin', 'branches_marketing'];
-
-        // TAS-73: managers of this penalty's organization only. An unscoped
-        // users list is denied by the rules (and would notify every
-        // organization); a failure here must not skip anything else.
-        final managerDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-        final penaltyOrg = (finalPenalty.organizationId ?? '').trim();
-        if (penaltyOrg.isNotEmpty) {
-          try {
-            final usersSnap = await firestore
-                .collection('users')
-                .where('organizationUID', isEqualTo: penaltyOrg)
-                .where('role', whereIn: queryRoles)
-                .get();
-            managerDocs.addAll(usersSnap.docs);
-          } on FirebaseException catch (e) {
-            debugPrint('penalty manager lookup skipped: ${e.code}');
-          }
-        }
-
-        for (final userDoc in managerDocs) {
-          final uid = userDoc.id;
-          final phone = userDoc.data()['phoneNumber']?.toString();
-          final userRole = userDoc.data()['role']?.toString().toLowerCase() ?? '';
-          final isBmm = userRole.contains('marketing') || userRole.contains('branches');
-
-          if (finalPenalty.isConfidential && isBmm) continue;
-
-          await firestore.collection('notifications').add({
-            'title': isBmm ? bmmTitle : gmTitle,
-            'body': isBmm ? bmmBody : gmBody,
-            'type': 'penalty',
-            'penaltyId': docRef.id,
-            'companyId': finalPenalty.companyId,
-            'companyName': finalPenalty.companyName,
-            'branchId': finalPenalty.branchId,
-            'branchName': finalPenalty.branchName,
-            'targetDelegateId': finalPenalty.targetDelegateId,
-            'targetDelegateName': finalPenalty.targetDelegateName,
-            'fineAmount': finalPenalty.fineAmount,
-            'category': finalPenalty.category,
-            'incidentDescription': finalPenalty.incidentDescription,
-            'createdById': finalPenalty.createdById,
-            'createdByName': finalPenalty.createdByName,
-            'senderName': finalPenalty.createdByName,
-            'senderRole': 'supervisor',
-            'delegateUid': uid,
-            if (phone != null && phone.isNotEmpty) 'phoneNumber': phone,
-            'isRead': false,
-            'read': false,
-            'createdAt': FieldValue.serverTimestamp(),
-            'deletedBy': <String>[],
-          });
-        }
+        // TAS-229: the managers of this penalty's organization are notified
+        // by name on the server (onPenaltyCreated). Company staff cannot
+        // read those users here, and a second copy would duplicate them.
       } catch (_) {
         // Notification failure should not block penalty creation
       }

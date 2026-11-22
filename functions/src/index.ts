@@ -5,6 +5,7 @@ import {photoPermissionNotifyUserIds} from "./photo_permission_notify_logic";
 admin.initializeApp();
 
 export {onTaskCreated, onTaskUpdated} from "./task_notify";
+export {onPenaltyCreated} from "./penalty_notify";
 export {getTaskImage, onTaskImageFinalize} from "./task_image_access";
 export {getTaskProofImage, onTaskDeleted, onTaskProofWritten} from "./task_proof_access";
 
