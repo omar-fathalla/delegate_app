@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/photo_permission/data/datasources/photo_permission_remote_datasource.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -482,11 +483,13 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
     bool isArabic,
   ) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: (widget.firestore ?? FirebaseFirestore.instance)
-          .collectionGroup('photo_permissions')
-          .orderBy('createdAt', descending: true)
-          .limit(100)
-          .streamResilient(includeMetadataChanges: true),
+      // TAS-73: scoped to the user's company, or its organization when it
+      // has none, so the rules can prove the list. Counted on the client.
+      stream: photoPermissionsTenantQuery(
+        widget.firestore ?? FirebaseFirestore.instance,
+        companyUID: widget.delegate.companyUID,
+        organizationUID: widget.delegate.organizationUID,
+      ).streamResilient(includeMetadataChanges: true),
       builder: (context, permissionsSnapshot) {
         int pendingCount = _cachedPendingCount;
         int activeCount = _cachedActiveCount;

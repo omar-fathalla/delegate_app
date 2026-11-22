@@ -30,6 +30,7 @@
     "test:rules:hr-web": "bash scripts/emulators_exec.sh --only firestore --project demo-hr-web-reads \"node --test test/rules/hr-web-company-reads.test.js\"",
     "test:rules:tas73-penalties": "bash scripts/emulators_exec.sh --only firestore --project demo-tas73-penalties \"node --test test/rules/tas73-penalty-scoped-queries.test.js\"",
     "test:rules:tas73-tracking": "bash scripts/emulators_exec.sh --only storage,firestore --project demo-tas73-tracking \"node --test test/rules/tas73-tracking-evidence.test.js\"",
+    "test:rules:tas73-photos": "bash scripts/emulators_exec.sh --only firestore --project demo-tas73-photos \"node --test test/rules/tas73-photo-scoped-queries.test.js\"",
     "test:rules:storage": "bash scripts/emulators_exec.sh --only storage,firestore --project demo-tashil-storage \"node --test test/rules/storage.rules.test.js\"",
     "test:scripts:ipa-entitlements": "bash test/scripts/check_ipa_entitlements.test.sh"
   },

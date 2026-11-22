@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/photo_permission/data/datasources/photo_permission_remote_datasource.dart';
 import 'package:flutter/material.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -354,11 +355,13 @@ class _BranchesMarketingHomeScreenState
     bool isArabic,
   ) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collectionGroup('photo_permissions')
-          .where('status', isEqualTo: 'pending')
-          .limit(100)
-          .streamResilient(includeMetadataChanges: true),
+      // TAS-73: scoped to the user's company (or organization) so the rules
+      // can prove the list; pending is counted on the client.
+      stream: photoPermissionsTenantQuery(
+        FirebaseFirestore.instance,
+        companyUID: widget.delegate.companyUID,
+        organizationUID: widget.delegate.organizationUID,
+      ).streamResilient(includeMetadataChanges: true),
       builder: (context, snapshot) {
         int pendingCount = _cachedPendingCount;
         if (snapshot.hasData) {
@@ -369,6 +372,9 @@ class _BranchesMarketingHomeScreenState
             final data = doc.data();
             final docOrg = (data['organizationUID'] ?? '').toString();
             if (orgUID.isNotEmpty && docOrg.isNotEmpty && docOrg != orgUID) {
+              continue;
+            }
+            if ((data['status'] ?? '').toString().toLowerCase() != 'pending') {
               continue;
             }
             final compId = (data['companyUID'] ?? '').toString();
