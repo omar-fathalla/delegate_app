@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/photo_permission/data/datasources/photo_permission_remote_datasource.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -154,6 +155,10 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
       context.read<PhotoPermissionBloc>().add(
             LoadCompanyCapturedPhotosRequested(
               companyUID: widget.delegate.companyUID,
+              organizationUID: photoListOrgScope(
+                widget.delegate.role,
+                widget.delegate.organizationUID,
+              ),
               limit: widget.delegate.companyUID.isEmpty ? 200 : null,
             ),
           );
