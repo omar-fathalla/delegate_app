@@ -2459,8 +2459,8 @@ service cloud.firestore {
     // every company and only super admins / tech support review them. The
     // base chain's org admin must not read, edit or delete those requests.
     function isBaseChainOrg(org) {
-      return org in get(/databases/$(database)/documents/config/subscriptions)
-        .data.get('freeChainOrgUids', []);
+      let cfg = /databases/$(database)/documents/config/subscriptions;
+      return exists(cfg) && org in get(cfg).data.get('freeChainOrgUids', []);
     }
     function delegateRequestReadOk() {
       let d = resource.data;
