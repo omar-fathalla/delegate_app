@@ -145,31 +145,16 @@ export function eligibility(
   return r.paid ? {ok: true} : {ok: false, reason: r.reason || "not_paid"};
 }
 
-/** Port of DelegateSubscriptionRepositoryImpl.formatSmartPosition. */
-export function smartPosition(
-  allOrgs: string[],
-  currentOrgName: string,
-  originOrgName: string,
-  base = "Promoter",
-): string {
-  const unique = [...new Set(allOrgs.map((o) => o.trim()).filter((o) => o !== ""))];
-  if (unique.length === 0) return base;
-  const cur = currentOrgName.trim().toLowerCase();
-  const origin = originOrgName.trim() !== "" ? originOrgName.trim() : unique[0];
-  if (unique.length === 1) {
-    return cur !== "" && unique[0].toLowerCase() !== cur ? `${base} (${unique[0]})` : base;
-  }
-  if (unique.length === 2) {
-    if (cur !== "") {
-      const other = unique.find((o) => o.toLowerCase() !== cur) ?? unique[0];
-      return `${base} (${other})`;
-    }
-    return `${base} (${unique[0]}، ${unique[1]})`;
-  }
-  if (cur !== "" && cur === origin.toLowerCase()) {
-    return `${base} (مشترك - ${unique.length} سلاسل)`;
-  }
-  return `${base} (${origin} + ${unique.length - 1} سلاسل)`;
+/**
+ * The `position` to store: only the role ("Promoter" / "Supervisor"), never
+ * chain names (TAS-232 / TAS-234). Chains live in `allOrganizationNames`,
+ * `originOrganizationName` and `isExternal`. A legacy value such as
+ * "Promoter (جملة ماركت + 9 سلاسل)" is cleaned back to "Promoter", and an
+ * existing "Supervisor" stays "Supervisor".
+ */
+export function plainPosition(raw: unknown): string {
+  const s = str(raw).replace(/\s*\(.*\)\s*$/s, "").trim();
+  return s !== "" ? s : "Promoter";
 }
 
 /** The copy to clone: an active, non-auto-linked copy, newest first. */
@@ -234,7 +219,7 @@ export function buildAutoLinkedCopy(opts: {
   out.organizationName = opts.chain.name;
   out.originOrganizationName = origin;
   out.isExternal = origin.toLowerCase() !== opts.chain.name.toLowerCase();
-  out.position = smartPosition(opts.allNames, opts.chain.name, origin);
+  out.position = plainPosition(src.position);
   if (opts.allNames.length > 1) out.allOrganizationNames = opts.allNames;
   out.autoLinked = true;
   out.autoLinkedFromOrganizationUID = opts.source.orgId;
