@@ -12,6 +12,7 @@ const {run} = require("./revoke-and-force-reset");
 const {counts} = require("./role-counts");
 const usersCompany = require("./backfill-delegate-users-company");
 const penaltyOrg = require("./backfill-penalty-organization-id");
+const delegateCreatedAt = require("./backfill-delegate-created-at");
 
 const live = !!process.env.FIRESTORE_EMULATOR_HOST && !!process.env.FIREBASE_AUTH_EMULATOR_HOST;
 
@@ -147,4 +148,46 @@ test("users company backfill on the emulator: dry run writes nothing, apply fill
   assert.equal((await db.doc("users/u-keep").get()).get("companyUID"), "cKeep");
   assert.equal((await db.doc("users/u-staff").get()).get("companyUID"), undefined);
   assert.equal((await usersCompany.backfill(db, true)).updated, 0, "second run is a no-op");
+});
+
+// TAS-230: server createdAt for nested delegates with no start date.
+test("delegate date classification: only docs with no date get createdAt", () => {
+  const {classifyDelegateDate: c, needsCreatedAt: n} = delegateCreatedAt;
+  assert.equal(c({createdAt: "x"}), "hasCreatedAt");
+  assert.equal(c({hiredAt: "x"}), "hasOtherDate");
+  assert.equal(c({subscription: {startDate: "x"}}), "hasOtherDate");
+  assert.equal(c({documents: [{uploadedAt: "2026-01-02"}]}), "fromUploadedAt");
+  assert.equal(c({documents: []}), "noDate");
+  assert.equal(c({}), "noDate");
+  assert.deepEqual(["hasCreatedAt", "hasOtherDate", "fromUploadedAt", "noDate"].map(n), [false, false, true, true]);
+});
+
+test("delegate createdAt backfill on the emulator: dry run writes nothing, apply uses createTime", {skip: !live}, async () => {
+  if (!admin.apps.length) admin.initializeApp({projectId: process.env.GCLOUD_PROJECT || "demo-p0-scripts"});
+  const db = admin.firestore();
+  const base = "organizations/oD/companies/cD/delegates";
+  await db.doc(`${base}/d-none`).set({fullName: "fake"});
+  await db.doc(`${base}/d-upload`).set({fullName: "fake", documents: [{uploadedAt: "2020-01-01T00:00:00.000"}]});
+  const keep = admin.firestore.Timestamp.fromDate(new Date("2024-05-05T00:00:00Z"));
+  await db.doc(`${base}/d-keep`).set({fullName: "fake", createdAt: keep});
+  await db.doc(`${base}/d-hired`).set({fullName: "fake", hiredAt: "2024-01-01"});
+  await db.doc("delegates/top-level").set({fullName: "fake"});
+
+  const dry = await delegateCreatedAt.backfill(db, false);
+  assert.equal(dry.updated, 0);
+  assert.equal((await db.doc(`${base}/d-none`).get()).get("createdAt"), undefined);
+
+  const run = await delegateCreatedAt.backfill(db, true);
+  // Earlier tests leave undated delegate docs in the same emulator: the
+  // apply writes exactly what the dry run counted.
+  assert.ok(dry.noDate >= 1 && dry.fromUploadedAt >= 1);
+  assert.equal(run.updated, dry.noDate + dry.fromUploadedAt);
+  const none = await db.doc(`${base}/d-none`).get();
+  assert.ok(none.get("createdAt") instanceof admin.firestore.Timestamp);
+  assert.equal(none.get("createdAt").toMillis(), none.createTime.toMillis());
+  assert.ok((await db.doc(`${base}/d-upload`).get()).get("createdAt") instanceof admin.firestore.Timestamp);
+  assert.equal((await db.doc(`${base}/d-keep`).get()).get("createdAt").toMillis(), keep.toMillis());
+  assert.equal((await db.doc(`${base}/d-hired`).get()).get("createdAt"), undefined);
+  assert.equal((await db.doc("delegates/top-level").get()).get("createdAt"), undefined);
+  assert.equal((await delegateCreatedAt.backfill(db, true)).updated, 0, "second run is a no-op");
 });
