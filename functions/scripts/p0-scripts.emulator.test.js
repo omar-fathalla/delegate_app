@@ -12,6 +12,7 @@ const {run} = require("./revoke-and-force-reset");
 const {counts} = require("./role-counts");
 const usersCompany = require("./backfill-delegate-users-company");
 const penaltyOrg = require("./backfill-penalty-organization-id");
+const ghostCleanup = require("./cleanup-ghost-delegate-docs");
 const delegateCreatedAt = require("./backfill-delegate-created-at");
 
 const live = !!process.env.FIRESTORE_EMULATOR_HOST && !!process.env.FIREBASE_AUTH_EMULATOR_HOST;
@@ -190,4 +191,54 @@ test("delegate createdAt backfill on the emulator: dry run writes nothing, apply
   assert.equal((await db.doc(`${base}/d-hired`).get()).get("createdAt"), undefined);
   assert.equal((await db.doc("delegates/top-level").get()).get("createdAt"), undefined);
   assert.equal((await delegateCreatedAt.backfill(db, true)).updated, 0, "second run is a no-op");
+});
+
+// TAS-251: ghost delegate link docs cleanup.
+test("ghost classification: identity, then state, else ghost; field lists match delegate_identity.ts", () => {
+  const {classifyDelegateDoc: c} = ghostCleanup;
+  assert.equal(c({fullName: "x"}), "real");
+  assert.equal(c({phone: "010"}), "real");
+  assert.equal(c({idNumber: "123"}), "real");
+  assert.equal(c({status: "active", boundDeviceId: "d"}), "hasState");
+  assert.equal(c({approvedRequestId: "r"}), "hasState");
+  assert.equal(c({subscription: {periodCode: "x"}}), "hasState");
+  assert.equal(c({boundDeviceId: "d", createdAt: "x", fullName: "  "}), "ghost");
+  assert.equal(c({}), "ghost");
+  const src = require("fs").readFileSync(require("path").join(__dirname, "../src/delegate_identity.ts"), "utf8");
+  const list = (name) => JSON.parse(src.match(new RegExp(`${name} = (\\[[^\\]]*\\])`))[1].replace(/\s+/g, " ").replace(/,\s*]/, "]"));
+  assert.deepEqual(ghostCleanup.NAME_FIELDS, list("DELEGATE_NAME_FIELDS"));
+  assert.deepEqual(ghostCleanup.NATIONAL_ID_FIELDS, list("DELEGATE_NATIONAL_ID_FIELDS"));
+  assert.deepEqual(ghostCleanup.PHONE_FIELDS, list("DELEGATE_PHONE_FIELDS"));
+});
+
+test("ghost cleanup on the emulator: dry run deletes nothing, apply backs up then deletes ghosts only", {skip: !live}, async () => {
+  if (!admin.apps.length) admin.initializeApp({projectId: process.env.GCLOUD_PROJECT || "demo-p0-scripts"});
+  const db = admin.firestore();
+  const base = "organizations/oG/companies/cG/delegates";
+  await db.doc(`${base}/g-1`).set({boundDeviceId: "dev1", createdAt: admin.firestore.Timestamp.now()});
+  await db.doc(`${base}/g-2`).set({deviceModel: "M31"});
+  await db.doc(`${base}/real`).set({fullName: "Fake", status: "active"});
+  await db.doc(`${base}/state`).set({status: "pending", boundDeviceId: "d"});
+  await db.doc("delegates/top-ghost").set({boundDeviceId: "d"});
+
+  const dry = await ghostCleanup.cleanup(db, {apply: false});
+  assert.ok(dry.ghost >= 2);
+  assert.equal(dry.deleted, 0);
+  assert.ok((await db.doc(`${base}/g-1`).get()).exists);
+  await assert.rejects(ghostCleanup.cleanup(db, {apply: true}), /backup/);
+  assert.ok((await db.doc(`${base}/g-1`).get()).exists, "no delete without a backup");
+
+  const file = require("path").join(require("os").tmpdir(), `ghost-backup-${Date.now()}.json`);
+  const run = await ghostCleanup.cleanup(db, {apply: true, backup: file, project: "demo"});
+  assert.equal(run.deleted, dry.ghost);
+  const saved = JSON.parse(require("fs").readFileSync(file, "utf8"));
+  assert.equal(saved.docs.length, run.deleted);
+  assert.ok(saved.docs.some((d) => d.path === `${base}/g-1` && d.data.boundDeviceId === "dev1"));
+  assert.equal((await db.doc(`${base}/g-1`).get()).exists, false);
+  assert.equal((await db.doc(`${base}/g-2`).get()).exists, false);
+  assert.ok((await db.doc(`${base}/real`).get()).exists);
+  assert.ok((await db.doc(`${base}/state`).get()).exists);
+  assert.ok((await db.doc("delegates/top-ghost").get()).exists);
+  assert.equal((await ghostCleanup.cleanup(db, {apply: false})).ghost, 0, "nothing left");
+  require("fs").unlinkSync(file);
 });
