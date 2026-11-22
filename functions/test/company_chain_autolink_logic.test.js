@@ -68,7 +68,7 @@ test("free chains come from config and org flags", () => {
   assert.deepEqual([...s].sort(), ["x", "y"]);
 });
 
-test("built copy: chain fields, smart position, autoLinked, no device binding", () => {
+test("built copy: chain fields, plain position, autoLinked, no device binding", () => {
   const src = copy("A", {status: "active", fullName: "مندوب تجريبي", deviceBinding: {id: "d"}, originOrganizationName: "سلسلة أ"});
   const d = L.buildAutoLinkedCopy({source: src, chain: chains[1], allNames: ["سلسلة أ", "سلسلة ب", "فتح الله"]});
   assert.equal(d.organizationUID, "B");
@@ -76,7 +76,19 @@ test("built copy: chain fields, smart position, autoLinked, no device binding", 
   assert.equal(d.autoLinked, true);
   assert.equal(d.isExternal, true);
   assert.equal(d.deviceBinding, undefined);
-  assert.equal(d.position, "Promoter (سلسلة أ + 2 سلاسل)");
+  assert.equal(d.position, "Promoter");
+});
+
+test("plain position (TAS-234): role only, legacy chain suffix stripped, Supervisor kept", () => {
+  assert.equal(L.plainPosition("Promoter"), "Promoter");
+  assert.equal(L.plainPosition("Promoter (جملة ماركت + 9 سلاسل)"), "Promoter");
+  assert.equal(L.plainPosition("Promoter (مشترك - 10 سلاسل)"), "Promoter");
+  assert.equal(L.plainPosition("Supervisor (كارفور)"), "Supervisor");
+  assert.equal(L.plainPosition("Supervisor"), "Supervisor");
+  assert.equal(L.plainPosition(undefined), "Promoter");
+  assert.equal(L.plainPosition(""), "Promoter");
+  const sup = copy("A", {status: "active", position: "Supervisor (سلسلة أ)", originOrganizationName: "سلسلة أ"});
+  assert.equal(L.buildAutoLinkedCopy({source: sup, chain: chains[1], allNames: ["سلسلة أ", "سلسلة ب"]}).position, "Supervisor");
 });
 
 test("delegate write filter: skips our own creates and plain field edits", () => {

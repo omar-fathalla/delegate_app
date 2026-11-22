@@ -34,7 +34,7 @@ import {
   freeChainIds,
   pickSource,
   planDelegate,
-  smartPosition,
+  plainPosition,
   str,
 } from "./company_chain_autolink_logic";
 import {
@@ -216,12 +216,10 @@ export async function reconcileCompanyChainLinks(
     }
     // Keep the existing copies' chain list and position in step (only
     // when they changed, so the daily run does not rewrite every doc).
-    const origin = str(source.data.originOrganizationName) || str(source.data.organizationName);
     const sameList = (v: unknown) => Array.isArray(v) &&
       v.length === plan.allNames.length && plan.allNames.every((n) => v.includes(n));
     for (const c of copies) {
-      const name = str(c.data.organizationName) || chains.find((x) => x.id === c.orgId)?.name || "";
-      const position = smartPosition(plan.allNames, name, origin);
+      const position = plainPosition(c.data.position);
       if (sameList(c.data.allOrganizationNames) && str(c.data.position) === position) continue;
       batch.set(db.doc(`organizations/${c.orgId}/companies/${co}/delegates/${uid}`), {
         allOrganizationNames: plan.allNames,
