@@ -1,4 +1,5 @@
 import * as crypto from "crypto";
+import {isDeletedDelegateStatus} from "./delegate_identity";
 
 /**
  * Pure helpers for delegateLoginV2.
@@ -67,13 +68,19 @@ export interface DelegateCandidate {
   boundDeviceId?: string;
   boundDeviceModel?: string;
   fullName?: string;
+  /** False for a ghost doc (no name, national ID or phone). Missing = true. */
+  hasIdentity?: boolean;
 }
 
 export type CandidateDecision =
   | { outcome: "ok"; primary: DelegateCandidate; ids: string[] }
   | { outcome: "not_found" }
   | { outcome: "bad_credentials" }
-  | { outcome: "inactive" };
+  | { outcome: "inactive" }
+  /** Only ghost docs matched: the profile no longer exists. */
+  | { outcome: "profile_missing" }
+  /** Every real match has a deleted status. */
+  | { outcome: "deleted" };
 
 function swapDigits(value: string): string {
   let normalized = value;
@@ -278,10 +285,16 @@ export function evaluateCandidates(candidates: DelegateCandidate[]): CandidateDe
     }
     return { outcome: "not_found" };
   }
-  if (matched.some((candidate) => isGlobalLoginBlockedProfile(candidate))) {
+  // A ghost doc (device fields only, re-created by an old app after the
+  // delegate was deleted) is never a sign-in profile.
+  const real = matched.filter((candidate) => candidate.hasIdentity !== false);
+  if (real.length === 0) return { outcome: "profile_missing" };
+  if (real.some((candidate) => isGlobalLoginBlockedProfile(candidate))) {
     return { outcome: "inactive" };
   }
-  const allowed = matched.filter(
+  const live = real.filter((candidate) => !isDeletedDelegateStatus(candidate.status));
+  if (live.length === 0) return { outcome: "deleted" };
+  const allowed = live.filter(
     (candidate) => candidate.phoneMatchesLogin !== false && !isLoginDenied(candidate.status),
   );
   if (allowed.length === 0) return { outcome: "inactive" };

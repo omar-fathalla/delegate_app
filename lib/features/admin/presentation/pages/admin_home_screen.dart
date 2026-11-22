@@ -6,6 +6,7 @@ import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_dashboard_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_dashboard_event.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_dashboard_state.dart';
+import 'package:delegate_app/features/profile/data/models/delegate_identity.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
@@ -2228,6 +2229,10 @@ class _AttendanceDetailsBottomSheetState
               .collection('delegates')
               .getResilient(timeout: const Duration(seconds: 4), forceServer: false);
           for (final doc in res.docs) {
+            if (!delegateDocHasIdentity(doc.data())) {
+              logSkippedGhostDelegate(doc.reference.path);
+              continue;
+            }
             try {
               final rawMap = Map<String, dynamic>.from(doc.data());
               if ((rawMap['organizationUID'] as String?)?.isEmpty ?? true) {
@@ -2281,6 +2286,10 @@ class _AttendanceDetailsBottomSheetState
             discoveredOrgs[orgId] = orgName;
           }
           for (final doc in res.docs) {
+            if (!delegateDocHasIdentity(doc.data())) {
+              logSkippedGhostDelegate(doc.reference.path);
+              continue;
+            }
             try {
               final rawMap = Map<String, dynamic>.from(doc.data());
               if ((rawMap['organizationUID'] as String?)?.isEmpty ?? true) {
@@ -2323,6 +2332,10 @@ class _AttendanceDetailsBottomSheetState
             .collection('delegates')
             .getResilient(timeout: const Duration(seconds: 4), forceServer: false);
         for (final doc in delegatesSnapshot.docs) {
+          if (!delegateDocHasIdentity(doc.data())) {
+            logSkippedGhostDelegate(doc.reference.path);
+            continue;
+          }
           try {
             final model = DelegateModel.fromJson(doc.data(), doc.id);
             delegates.add(model.copyWith(

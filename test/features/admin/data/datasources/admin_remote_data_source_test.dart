@@ -203,6 +203,56 @@ void main() {
       expect(result.first.email, 'admin@test.com');
     });
   });
+  group('getCompanyDelegates skips ghost docs (no name, phone or national ID)', () {
+    const ghost = {
+      'boundDeviceId': 'RP1A.200720.011',
+      'boundDeviceModel': 'OPPO CPH1989',
+      'boundDeviceBrand': 'OPPO',
+      'boundDeviceOs': 'Android 11 (SDK 30)',
+      'isDeviceLocked': true,
+      'position': 'Promoter',
+      'delegatePublicId': 'DEL-6179',
+    };
+
+    Future<void> seed() async {
+      await fakeFirestore.collection('organizations').doc('o1').set({'name': 'fathalla market'});
+      final del = fakeFirestore
+          .collection('organizations').doc('o1')
+          .collection('companies').doc('c1').collection('delegates');
+      await del.doc('real1').set({
+        'uid': 'real1', 'fullName': 'Salma saber Abdelsalam', 'phoneNumber': '01227420366',
+        'companyUID': 'c1', 'organizationUID': 'o1', 'status': 'active',
+      });
+      await del.doc('nameOnlyPhone').set({
+        'uid': 'nameOnlyPhone', 'phoneNumber': '01091737301', 'companyUID': 'c1', 'status': 'active',
+      });
+      await del.doc('ghost1').set(ghost);
+      await del.doc('ghost2').set({...ghost, 'forceLogoutAt': 1, 'requireReLogin': false});
+    }
+
+    test('direct org path (payroll / attendance / dashboard)', () async {
+      await seed();
+      final list = await dataSource.getCompanyDelegates('o1', 'c1');
+      expect(list.map((d) => d.uid).toSet(), {'real1', 'nameOnlyPhone'});
+      expect(list.every((d) => d.fullName.isNotEmpty || d.phoneNumber.isNotEmpty), isTrue);
+    });
+
+    test('all-organizations path', () async {
+      await seed();
+      final list = await dataSource.getCompanyDelegates('all', 'c1');
+      expect(list.map((d) => d.uid).toSet(), {'real1', 'nameOnlyPhone'});
+    });
+
+    test('org-wide path (no company)', () async {
+      await seed();
+      await fakeFirestore.collection('organizations').doc('o1')
+          .collection('companies').doc('c1').set({'name': 'new start'});
+      final list = await dataSource.getCompanyDelegates('o1', '');
+      expect(list.map((d) => d.uid), isNot(contains('ghost1')));
+      expect(list.map((d) => d.uid), isNot(contains('ghost2')));
+      expect(list.map((d) => d.uid), contains('real1'));
+    });
+  });
 }
 
 class _MockFunctions extends Mock implements FirebaseFunctions {}
