@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/home/presentation/pages/delegate_home_screen.dart';
+import 'package:delegate_app/features/home/presentation/chain_auto_switch_session.dart';
 import 'package:delegate_app/features/attendance/presentation/pages/attendance_screen.dart';
 import 'package:delegate_app/features/settings/presentation/pages/settings_screen.dart';
 import 'package:delegate_app/features/photo_permission/presentation/pages/monthly_photo_report_screen.dart';
@@ -48,17 +49,20 @@ class _MainScreenState extends State<MainScreen> {
 
   List<Delegate> _allDelegates = [];
 
-  /// Tab to stay on after the next delegate change (auto chain switch from
-  /// the attendance tab keeps the delegate on attendance). TAS-245.
-  int? _keepTabOnUpdate;
-
-  /// Set when the delegate undoes an automatic chain switch, so the
-  /// attendance tab does not switch them back again in this session.
-  bool _autoSwitchPaused = false;
+  /// Paused after an undo or a manual chain pick, for this login (TAS-245).
+  bool get _autoSwitchPaused =>
+      ChainAutoSwitchSession.isPaused(widget.delegate.uid);
 
   @override
   void initState() {
     super.initState();
+    // An automatic chain switch rebuilds MainScreen (keyed by org): reopen
+    // the tab the delegate was on (TAS-245).
+    final tab = ChainAutoSwitchSession.takePendingTab();
+    if (tab != null) {
+      _currentIndex = tab;
+      _initializedTabs.add(tab);
+    }
     _loadAllDelegates();
   }
 
@@ -68,8 +72,7 @@ class _MainScreenState extends State<MainScreen> {
     if (oldWidget.delegate.organizationUID != widget.delegate.organizationUID ||
         oldWidget.delegate.companyUID != widget.delegate.companyUID ||
         oldWidget.delegate.uid != widget.delegate.uid) {
-      final keep = _keepTabOnUpdate;
-      _keepTabOnUpdate = null;
+      final keep = ChainAutoSwitchSession.takePendingTab();
       setState(() {
         _currentIndex = keep ?? 0;
         _initializedTabs.clear();
@@ -342,11 +345,12 @@ class _MainScreenState extends State<MainScreen> {
     await cacheDelegate(target);
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
     final l10n = AppLocalizations.of(context)!;
     final chainLabel = target.companyName.isNotEmpty
         ? '${target.organizationName} - ${target.companyName}'
         : target.organizationName;
-    _keepTabOnUpdate = 1;
+    ChainAutoSwitchSession.openTabAfterSwitch(1);
     context.go(homePathForRole(target.role), extra: target);
     messenger.showSnackBar(
       SnackBar(
@@ -356,11 +360,12 @@ class _MainScreenState extends State<MainScreen> {
         action: SnackBarAction(
           label: l10n.autoSwitchUndo,
           onPressed: () async {
+            // This MainScreen is already gone (keyed by org): use the
+            // router captured before the switch.
+            ChainAutoSwitchSession.pause(previous.uid);
             await cacheDelegate(previous);
-            if (!mounted) return;
-            setState(() => _autoSwitchPaused = true);
-            _keepTabOnUpdate = 1;
-            context.go(homePathForRole(previous.role), extra: previous);
+            ChainAutoSwitchSession.openTabAfterSwitch(1);
+            router.go(homePathForRole(previous.role), extra: previous);
           },
         ),
       ),
@@ -368,8 +373,8 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _switchToOrganization(Delegate delegate) async {
-    // A chain picked by hand wins over location for this session (TAS-245).
-    _autoSwitchPaused = true;
+    // A chain picked by hand wins over location for this login (TAS-245).
+    ChainAutoSwitchSession.pause(delegate.uid);
     final cacheDelegate = di.sl<CacheDelegate>();
     await cacheDelegate(delegate);
     if (mounted) {
