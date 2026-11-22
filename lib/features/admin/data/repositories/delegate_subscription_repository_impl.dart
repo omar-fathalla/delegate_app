@@ -1771,57 +1771,23 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
     return null;
   }
 
-  /// Generates a clean, concise, single-line position label for web and mobile tables
-  /// dynamically indicating secondary chains or count of other chains without cluttering
+  /// The `position` to store on a delegate copy: only the base role
+  /// (`Promoter` / `Supervisor`), never the chain names (TAS-232).
+  ///
+  /// Chains live in `organizationName`, `originOrganizationName`,
+  /// `allOrganizationNames` and `isExternal`. A legacy value such as
+  /// `Promoter (جملة ماركت + 9 سلاسل)` is cleaned back to `Promoter`.
+  /// The chain arguments are kept so existing call sites stay unchanged.
   static String formatSmartPosition({
     required List<String> allOrgs,
     String? currentOrgName,
     String? originOrgName,
     String basePosition = 'Promoter',
   }) {
-    if (allOrgs.isEmpty) return basePosition;
-
-    final uniqueOrgs = allOrgs
-        .map((o) => o.trim())
-        .where((o) => o.isNotEmpty)
-        .toSet()
-        .toList();
-
-    if (uniqueOrgs.isEmpty) return basePosition;
-
-    final cur = currentOrgName?.trim().toLowerCase();
-    final origin = (originOrgName != null && originOrgName.trim().isNotEmpty)
-        ? originOrgName.trim()
-        : uniqueOrgs.first;
-    final originLower = origin.toLowerCase();
-
-    // 1. Only 1 organization
-    if (uniqueOrgs.length == 1) {
-      if (cur != null && cur.isNotEmpty && uniqueOrgs.first.toLowerCase() != cur) {
-        return '$basePosition (${uniqueOrgs.first})';
-      }
-      return basePosition;
-    }
-
-    // 2. Exactly 2 organizations
-    if (uniqueOrgs.length == 2) {
-      if (cur != null && cur.isNotEmpty) {
-        final otherOrg = uniqueOrgs.firstWhere(
-          (o) => o.toLowerCase() != cur,
-          orElse: () => uniqueOrgs.first,
-        );
-        return '$basePosition ($otherOrg)';
-      }
-      return '$basePosition (${uniqueOrgs[0]}، ${uniqueOrgs[1]})';
-    }
-
-    // 3. 3 or more organizations (e.g. 5 or 6 chains)
-    if (cur != null && cur.isNotEmpty && cur == originLower) {
-      return '$basePosition (مشترك - ${uniqueOrgs.length} سلاسل)';
-    } else {
-      final otherCount = uniqueOrgs.length - 1;
-      return '$basePosition ($origin + $otherCount سلاسل)';
-    }
+    final paren = basePosition.indexOf('(');
+    final base =
+        (paren >= 0 ? basePosition.substring(0, paren) : basePosition).trim();
+    return base.isEmpty ? 'Promoter' : base;
   }
 
   /// A same-company chain doc with a real paid (or waived) subscription
