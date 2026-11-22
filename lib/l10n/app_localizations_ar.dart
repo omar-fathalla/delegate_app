@@ -2919,7 +2919,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String autoSwitchedToChainBranch(String branch, String chain) {
-    return 'أنت في فرع $branch — تم التبديل تلقائياً إلى $chain';
+    return 'أنت في $branch — تم التبديل تلقائياً إلى $chain';
   }
 
   @override
@@ -2927,11 +2927,11 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String autoSwitchPickCompany(String branch, String chain) {
-    return 'أنت في فرع $branch التابع لـ $chain. اختر الشركة';
+    return 'أنت في $branch التابع لـ $chain. اختر الشركة';
   }
 
   @override
   String autoSwitchBlockedActiveSession(String branch, String chain) {
-    return 'أنت في فرع $branch التابع لـ $chain، لكن لديك حضور مفتوح. سجّل الانصراف أولاً.';
+    return 'أنت في $branch التابع لـ $chain، لكن لديك حضور مفتوح. سجّل الانصراف أولاً.';
   }
 }
