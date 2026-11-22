@@ -97,6 +97,15 @@ final _hr = _person(
   position: DelegatePosition.supervisor,
 );
 
+/// A company supervisor (stored role `supervisor` → UserRole.admin).
+final _supervisor = _person(
+  uid: 'seed-fake-supervisor',
+  fullName: 'مشرف شركة تجريبي',
+  phone: '01000000001',
+  role: UserRole.admin,
+  position: DelegatePosition.supervisor,
+);
+
 const _names = [
   'أحمد سمير حسن',
   'منى خالد إبراهيم',
@@ -256,13 +265,18 @@ void _openSheet(WidgetTester t) {
   );
 }
 
-Future<void> _pump(WidgetTester t, Size size, {bool web = true}) async {
+Future<void> _pump(
+  WidgetTester t,
+  Size size, {
+  bool web = true,
+  Delegate? user,
+}) async {
   t.view.physicalSize = size;
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.resetPhysicalSize);
   addTearDown(t.view.resetDevicePixelRatio);
   final theme = AppTheme.lightTheme(const Color(0xFF6750A4));
-  final tab = HRDelegatesTab(hrDelegate: _hr);
+  final tab = HRDelegatesTab(hrDelegate: user ?? _hr);
   final wide = size.width > 768;
   await t.pumpWidget(
     RepaintBoundary(
@@ -472,7 +486,7 @@ void main() {
     final opened = <Delegate>[];
     HRDelegatesTab.debugOpenAddDelegate = (_, supervisor) =>
         opened.add(supervisor);
-    await _pump(t, const Size(1440, 900));
+    await _pump(t, const Size(1440, 900), user: _supervisor);
     final add = find.byKey(HRDelegatesTab.addDelegateKey);
     expect(add, findsOneWidget);
     expect(
@@ -490,7 +504,16 @@ void main() {
     expect(find.text('إضافة سلاسل للشركة'), findsNothing);
     await t.tap(add);
     await t.pump();
-    expect(opened.single.uid, _hr.uid);
+    expect(opened.single.uid, _supervisor.uid);
+  });
+
+  testWidgets('TAS-74: HR users do not get «إضافة مندوب» (rules deny their request)', (
+    t,
+  ) async {
+    WebRuntimePolicy.debugIsWebOverride = true;
+    await _pump(t, const Size(1440, 900));
+    expect(find.byKey(HRDelegatesTab.addDelegateKey), findsNothing);
+    expect(find.text('إضافة مندوب'), findsNothing);
   });
 
   testWidgets('TAS-116: search 56 high, status chips filter the table', (
@@ -521,7 +544,7 @@ void main() {
 
   testWidgets('TAS-144: toolbar in two rows, toggle «بطاقات/جدول»', (t) async {
     WebRuntimePolicy.debugIsWebOverride = true;
-    await _pump(t, const Size(1440, 900));
+    await _pump(t, const Size(1440, 900), user: _supervisor);
     final search = t.getRect(find.byKey(HRDelegatesTab.searchKey));
     final chips = t.getRect(find.byKey(HRDelegatesTab.filterKey(null)));
     final toggle = t.getRect(find.byKey(HRDelegatesTab.viewToggleKey));

@@ -595,13 +595,14 @@ class _ChainGridChip extends StatelessWidget {
 /// (TAS-141), with the free-offer chip, the pitch and the two actions.
 class HrHomeFeatureCard extends StatelessWidget {
   final bool isFreePromotion;
-  final VoidCallback onAddDelegate;
+  /// Null hides «إضافة مندوب» (HR users, TAS-74).
+  final VoidCallback? onAddDelegate;
   final VoidCallback onHowToLink;
 
   const HrHomeFeatureCard({
     super.key,
     required this.isFreePromotion,
-    required this.onAddDelegate,
+    this.onAddDelegate,
     required this.onHowToLink,
   });
 
@@ -676,6 +677,7 @@ class HrHomeFeatureCard extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
+              if (onAddDelegate != null)
               FilledButton.icon(
                 key: const ValueKey('hr_home_add_delegate'),
                 onPressed: onAddDelegate,
