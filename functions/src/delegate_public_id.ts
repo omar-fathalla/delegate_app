@@ -9,7 +9,8 @@
  * Writes only delegatePublicId (Admin SDK). Its own writes trigger it again,
  * find every doc equal and stop.
  *
- * Deploy: functions:tashil-mobile-notifications:enforceSingleDelegatePublicId
+ * Deploy: functions:tashil-mobile-notifications:enforceSingleDelegatePublicId,
+ *   functions:tashil-mobile-notifications:enforceSingleDelegatePublicIdOnUser
  */
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
@@ -18,6 +19,7 @@ import {
   formatPublicId,
   planPublicId,
   publicIdCheckNeeded,
+  userPublicIdCheckNeeded,
 } from "./delegate_public_id_logic";
 
 if (admin.apps.length === 0) admin.initializeApp();
@@ -65,5 +67,20 @@ export const enforceSingleDelegatePublicId = functions
     const uid = (typeof after?.uid === "string" && after.uid.trim()) || String(context.params.uid);
     const res = await enforceSinglePublicId(admin.firestore(), uid);
     if (res.written) functions.logger.info("enforceSingleDelegatePublicId", {uid, ...res});
+    return null;
+  });
+
+/** Same rule when users/{uid} gets a code (written after the copies). */
+export const enforceSingleDelegatePublicIdOnUser = functions
+  .region("us-central1")
+  .runWith({timeoutSeconds: 60, memory: "256MB"})
+  .firestore.document("users/{uid}")
+  .onWrite(async (change, context) => {
+    const before = change.before.exists ? (change.before.data() as Data) : null;
+    const after = change.after.exists ? (change.after.data() as Data) : null;
+    if (!userPublicIdCheckNeeded(before, after)) return null;
+    const uid = String(context.params.uid);
+    const res = await enforceSinglePublicId(admin.firestore(), uid);
+    if (res.written) functions.logger.info("enforceSingleDelegatePublicIdOnUser", {uid, ...res});
     return null;
   });

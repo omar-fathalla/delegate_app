@@ -44,11 +44,11 @@ export function isRealDelegateDoc(d: Data | null): boolean {
 
 /** True when a delegate copy write should check the code. */
 export function publicIdCheckNeeded(before: Data | null, after: Data | null): boolean {
-  if (!isRealDelegateDoc(after)) return false;
+  if (!after || !isRealDelegateDoc(after)) return false;
   if (!before) return true;
   const st = (d: Data) => str(d.status).toLowerCase();
-  return str(before.delegatePublicId) !== str(after!.delegatePublicId) ||
-    (st(before) !== st(after!) && ACTIVE.has(st(after!)));
+  return str(before.delegatePublicId) !== str(after.delegatePublicId) ||
+    (st(before) !== st(after) && ACTIVE.has(st(after)));
 }
 
 export interface PublicIdPlan {
@@ -80,4 +80,15 @@ export function planPublicId(
     allocate: false,
     paths: all.filter((d) => str(d.data.delegatePublicId) !== canonical).map((d) => d.path),
   };
+}
+
+/**
+ * True when a users/{uid} write should check the code. The app writes the
+ * users doc after the copies, so an old app build can put a fresh code there.
+ */
+export function userPublicIdCheckNeeded(before: Data | null, after: Data | null): boolean {
+  if (!after) return false;
+  const code = str(after.delegatePublicId);
+  if (!code) return false;
+  return !before || str(before.delegatePublicId) !== code;
 }

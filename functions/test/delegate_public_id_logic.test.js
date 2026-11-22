@@ -59,3 +59,11 @@ test("format keeps 4 digits minimum", () => {
   assert.equal(L.formatPublicId(7), "DEL-0007");
   assert.equal(L.formatPublicId(6898), "DEL-6898");
 });
+
+test("users doc: check when a code appears or changes only", () => {
+  assert.equal(L.userPublicIdCheckNeeded(null, {delegatePublicId: "DEL-5"}), true);
+  assert.equal(L.userPublicIdCheckNeeded({delegatePublicId: "DEL-4"}, {delegatePublicId: "DEL-5"}), true);
+  assert.equal(L.userPublicIdCheckNeeded({delegatePublicId: "DEL-5"}, {delegatePublicId: "DEL-5", fullName: "x"}), false);
+  assert.equal(L.userPublicIdCheckNeeded(null, {role: "admin"}), false);
+  assert.equal(L.userPublicIdCheckNeeded({delegatePublicId: "DEL-5"}, null), false);
+});
