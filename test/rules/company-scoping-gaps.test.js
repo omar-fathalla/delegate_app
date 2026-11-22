@@ -6,7 +6,7 @@ const {describe, test, before, after, beforeEach} = require("node:test");
 const {readFileSync} = require("fs");
 const {resolve} = require("path");
 const {initializeTestEnvironment, assertFails, assertSucceeds} = require("./_rules_testing");
-const {doc, updateDoc, setDoc, deleteDoc} = require("firebase/firestore");
+const {doc, updateDoc, setDoc, deleteDoc, writeBatch} = require("firebase/firestore");
 
 /** Mirrors `pendingDelegateDataFor` in delegate_subscription_repository_impl.dart */
 function pendingDelegatePlaceholderPayload(requestId) {
@@ -283,10 +283,30 @@ describe("TA-8 security rules gaps", () => {
       ],
     })));
 
-  test("DENY HR cannot create pending delegate placeholder", () =>
-    assertFails(setDoc(
+  // TAS-220 (user decision 22 Nov): HR adds delegates like a supervisor.
+  test("ALLOW HR creates a pending delegate placeholder in its company", () =>
+    assertSucceeds(setDoc(
       doc(as("hr"), "organizations/o1/companies/c1/delegates/hr-ph"),
       pendingDelegatePlaceholderPayload("hr-ph"),
+    )));
+
+  // The app's submit: request + pending placeholder in one batch (TAS-220).
+  test("ALLOW HR submits the add-delegate batch (request + placeholder)", () => {
+    const db = as("hr");
+    const b = writeBatch(db);
+    b.set(doc(db, "delegate_requests/hr-req-1"), {
+      requestType: "new_delegate", status: "pending", organizationUID: "o1", companyUID: "c1",
+      supervisorUid: "hr", createdBy: "hr", paymentStatus: "pending", nationalId: "29001011234567",
+      phoneNumber: "01077777777", fullName: "Ali Hassan Omar",
+    });
+    b.set(doc(db, "organizations/o1/companies/c1/delegates/hr-req-1"), pendingDelegatePlaceholderPayload("hr-req-1"));
+    return assertSucceeds(b.commit());
+  });
+
+  test("DENY HR placeholder in another company", () =>
+    assertFails(setDoc(
+      doc(as("hr"), "organizations/o1/companies/c2/delegates/hr-ph-c2"),
+      {...pendingDelegatePlaceholderPayload("hr-ph-c2"), companyUID: "c2"},
     )));
 
   test("DENY placeholder create when documents is a map not a list", () =>

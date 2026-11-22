@@ -1175,8 +1175,10 @@ service cloud.firestore {
     }
 
     // Multi-chain placeholder create: same companyUID, any org in the company.
+    // TAS-220 (user decision 22 Nov): HR adds delegates too, pending only.
     function companyPlaceholderCreateRoleList() {
-      return ['company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor'];
+      return ['company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
+        'hr', 'company-hr', 'company_hr', 'human_resources'];
     }
 
     // H1: roles company staff may grant. Supervisor/HR: field roles only.

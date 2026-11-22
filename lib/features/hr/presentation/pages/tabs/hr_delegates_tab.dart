@@ -1,4 +1,3 @@
-import 'package:delegate_app/features/hr/domain/hr_add_delegate_policy.dart';
 import 'package:delegate_app/features/hr/data/hr_leave_settings_writer.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -1014,8 +1013,7 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
                   icon: const Icon(Icons.refresh_rounded),
                 ),
                 const Spacer(),
-                // TAS-74: HR users cannot submit the add request (rules).
-                if (hrUserCanAddDelegate(widget.hrDelegate)) addButton,
+                addButton,
               ],
             ),
           ],
@@ -1032,13 +1030,11 @@ class _HRDelegatesTabState extends State<HRDelegatesTab> {
         icon: Icons.group_off_rounded,
         title: 'لا يوجد مناديب',
         message: 'سيظهر المناديب هنا عند إضافتهم.',
-        action: hrUserCanAddDelegate(widget.hrDelegate)
-            ? FilledButton.icon(
-                onPressed: _openAddDelegate,
-                icon: const Icon(Icons.person_add_alt_1_rounded),
-                label: const Text('إضافة مندوب'),
-              )
-            : null,
+        action: FilledButton.icon(
+          onPressed: _openAddDelegate,
+          icon: const Icon(Icons.person_add_alt_1_rounded),
+          label: const Text('إضافة مندوب'),
+        ),
       );
     }
     return HrEmptyState(
