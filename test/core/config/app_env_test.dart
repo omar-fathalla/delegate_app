@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show appFlavor;
 import 'package:delegate_app/core/config/app_env.dart';
 import 'package:delegate_app/core/services/crashlytics_service.dart';
 import 'package:delegate_app/firebase_options.dart' as prod;
@@ -136,6 +137,30 @@ void main() {
     test('optionsFor prod on Android still works', () {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       expect(AppEnv.optionsFor('prod').projectId, 'practice-firebase-72df1');
+    });
+  });
+
+  group('verifyFlavorFor (TAS-221)', () {
+    test('matching flavor and ENV start', () {
+      expect(() => AppEnv.verifyFlavorFor('prod', 'prod'), returnsNormally);
+      expect(() => AppEnv.verifyFlavorFor('dev', 'dev'), returnsNormally);
+    });
+
+    test('a store build that forgot ENV=prod stops', () {
+      expect(() => AppEnv.verifyFlavorFor('prod', 'dev'), throwsStateError);
+    });
+
+    test('a dev-flavor app with ENV=prod stops', () {
+      expect(() => AppEnv.verifyFlavorFor('dev', 'prod'), throwsStateError);
+    });
+
+    test('no flavor (web, tests, build without --flavor) is not checked', () {
+      expect(() => AppEnv.verifyFlavorFor(null, 'dev'), returnsNormally);
+      expect(() => AppEnv.verifyFlavorFor('', 'prod'), returnsNormally);
+    });
+
+    test('the running tests have no flavor', () {
+      expect(() => AppEnv.verifyFlavor(appFlavor), returnsNormally);
     });
   });
 }

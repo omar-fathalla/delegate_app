@@ -2,7 +2,6 @@
 // supervisors and HR. Data comes from HRAttendanceTab's existing,
 // company-scoped loads through its viewBuilder hook; nothing here queries
 // Firestore directly.
-import 'package:delegate_app/features/hr/domain/hr_add_delegate_policy.dart';
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -146,9 +145,7 @@ class HrHomeOverviewWeb extends StatelessWidget {
     onOpenProfile: () => HrAccountPages.openProfile(context, delegate),
     onOpenAttendanceLog: () => onNavigateToTab(kHrTabAttendance),
     onOpenDelegates: () => onNavigateToTab(kHrTabDelegates),
-    onAddDelegate: hrUserCanAddDelegate(delegate)
-        ? () => openAdminHomeAddDelegate(context, delegate)
-        : null,
+    onAddDelegate: () => openAdminHomeAddDelegate(context, delegate),
     onAddChain: () => _addChain(context),
     onOpenChainRequests: () => openHrChainRequestsTab(onNavigateToTab),
     onHowToLink: () => showAdminHomeLinkingGuide(context, delegate),

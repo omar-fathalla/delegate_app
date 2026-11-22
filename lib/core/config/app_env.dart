@@ -47,6 +47,26 @@ class AppEnv {
   static void verifyFirebaseProject(String actualProjectId) =>
       verifyFirebaseProjectFor(name, actualProjectId);
 
+  /// TAS-221: the native flavor and the Dart ENV must agree. ENV now
+  /// defaults to dev, so a store build (`--flavor prod`) that forgot
+  /// `--dart-define=ENV=prod` would talk to tashil-dev; a dev-flavor app with
+  /// ENV=prod would talk to production. Both stop at startup. Unknown flavor
+  /// (web, tests, a build without --flavor) is not checked here.
+  static void verifyFlavor(String? flavor) => verifyFlavorFor(flavor, name);
+
+  @visibleForTesting
+  static void verifyFlavorFor(String? flavor, String env) {
+    final f = flavor?.trim().toLowerCase() ?? '';
+    if (f.isEmpty) return;
+    if ((f == 'prod' || f == 'dev') && f != env) {
+      throw StateError(
+        'Build flavor "$f" but ENV=$env. Store builds need '
+        '--flavor prod --dart-define=ENV=prod; dev builds --flavor dev '
+        '--dart-define=ENV=dev. Refusing to start.',
+      );
+    }
+  }
+
   @visibleForTesting
   static void verifyFirebaseProjectFor(String env, String actualProjectId) {
     final expected = env == 'dev' ? devProjectId : prodProjectId;

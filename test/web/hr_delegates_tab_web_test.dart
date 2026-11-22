@@ -507,13 +507,14 @@ void main() {
     expect(opened.single.uid, _supervisor.uid);
   });
 
-  testWidgets('TAS-74: HR users do not get «إضافة مندوب» (rules deny their request)', (
-    t,
-  ) async {
+  testWidgets('TAS-220: HR users get «إضافة مندوب» too', (t) async {
     WebRuntimePolicy.debugIsWebOverride = true;
+    final opened = <Delegate>[];
+    HRDelegatesTab.debugOpenAddDelegate = (_, user) => opened.add(user);
     await _pump(t, const Size(1440, 900));
-    expect(find.byKey(HRDelegatesTab.addDelegateKey), findsNothing);
-    expect(find.text('إضافة مندوب'), findsNothing);
+    await t.tap(find.byKey(HRDelegatesTab.addDelegateKey));
+    await t.pump();
+    expect(opened.single.uid, _hr.uid);
   });
 
   testWidgets('TAS-116: search 56 high, status chips filter the table', (

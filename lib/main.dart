@@ -18,6 +18,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show appFlavor;
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -87,6 +88,9 @@ Future<void> bootstrapDelegateAppForPatrol() async {
   GoogleFonts.config.allowRuntimeFetching = false;
   // M3 design system: Latin digits in Arabic locales (dates, numbers).
   DateFormat.useNativeDigitsByDefaultFor('ar', false);
+
+  // TAS-221: flavor and ENV must match before anything talks to Firebase.
+  AppEnv.verifyFlavor(appFlavor);
 
   final results = await Future.wait([
     Firebase.initializeApp(options: AppEnv.firebaseOptions),
