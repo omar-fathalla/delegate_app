@@ -10,6 +10,7 @@ const common = require("./p0-common");
 const {purge} = require("./purge-password-fields");
 const {run} = require("./revoke-and-force-reset");
 const {counts} = require("./role-counts");
+const usersCompany = require("./backfill-delegate-users-company");
 const penaltyOrg = require("./backfill-penalty-organization-id");
 
 const live = !!process.env.FIRESTORE_EMULATOR_HOST && !!process.env.FIREBASE_AUTH_EMULATOR_HOST;
@@ -101,4 +102,49 @@ test("penalty org backfill on the emulator: dry run writes nothing, apply fills 
 
   const again = await penaltyOrg.backfill(db, true);
   assert.equal(again.updated, 0, "second run is a no-op");
+});
+
+// TAS-225: companyUID backfill on delegate users docs.
+test("users company resolution: one company only, field roles only", () => {
+  const {resolveUserCompany: r} = usersCompany;
+  const one = {companies: new Set(["c1"]), orgs: new Set(["oA"])};
+  const twoOrgs = {companies: new Set(["c1"]), orgs: new Set(["oA", "oB"])};
+  const twoCos = {companies: new Set(["c1", "c2"]), orgs: new Set(["oA"])};
+  assert.deepEqual(r({role: "hr"}, one), {how: "notDelegate", patch: {}});
+  assert.deepEqual(r({role: "delegate", companyUID: "cX"}, one), {how: "hasCompany", patch: {}});
+  assert.deepEqual(r({role: "delegate"}, one), {how: "filled", patch: {companyUID: "c1", organizationUID: "oA"}});
+  assert.deepEqual(r({role: "Promoter", organizationUID: "oZ"}, one), {how: "filled", patch: {companyUID: "c1"}});
+  assert.deepEqual(r({role: "delegate"}, twoOrgs), {how: "filled", patch: {companyUID: "c1"}});
+  assert.deepEqual(r({role: "delegate"}, twoCos), {how: "severalCompanies", patch: {}});
+  assert.deepEqual(r({role: "delegate"}, undefined), {how: "noDelegateDoc", patch: {}});
+});
+
+test("users company backfill on the emulator: dry run writes nothing, apply fills only the gap", {skip: !live}, async () => {
+  if (!admin.apps.length) admin.initializeApp({projectId: process.env.GCLOUD_PROJECT || "demo-p0-scripts"});
+  const db = admin.firestore();
+  await db.doc("organizations/oA/companies/c1/delegates/u-fill").set({fullName: "fake"});
+  await db.doc("organizations/oA/companies/c1/delegates/u-multi").set({fullName: "fake"});
+  await db.doc("organizations/oA/companies/c2/delegates/u-multi").set({fullName: "fake"});
+  await db.doc("users/u-fill").set({role: "delegate", phoneNumber: "0100000000x"});
+  await db.doc("users/u-multi").set({role: "delegate"});
+  await db.doc("users/u-keep").set({role: "delegate", companyUID: "cKeep"});
+  await db.doc("users/u-orphan").set({role: "promoter"});
+  await db.doc("users/u-staff").set({role: "hr"});
+
+  const dry = await usersCompany.backfill(db, false);
+  assert.equal(dry.updated, 0);
+  assert.equal((await db.doc("users/u-fill").get()).get("companyUID"), undefined);
+
+  const run = await usersCompany.backfill(db, true);
+  assert.equal(run.updated, 1);
+  assert.equal(run.severalCompanies, 1);
+  assert.ok(run.noDelegateDoc >= 1, "u-orphan (and earlier tests' users) have no delegate doc");
+  const filled = (await db.doc("users/u-fill").get()).data();
+  assert.equal(filled.companyUID, "c1");
+  assert.equal(filled.organizationUID, "oA");
+  assert.equal(filled.phoneNumber, "0100000000x");
+  assert.equal((await db.doc("users/u-multi").get()).get("companyUID"), undefined);
+  assert.equal((await db.doc("users/u-keep").get()).get("companyUID"), "cKeep");
+  assert.equal((await db.doc("users/u-staff").get()).get("companyUID"), undefined);
+  assert.equal((await usersCompany.backfill(db, true)).updated, 0, "second run is a no-op");
 });
