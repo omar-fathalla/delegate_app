@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/features/profile/domain/entities/delegate.dart' show UserRole;
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:delegate_app/core/error/failures.dart';
@@ -470,12 +471,20 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
           .collection('photo_permissions')
           .doc(permissionId)
           .collection('captured_photos')
-          .orderBy('capturedAt', descending: true)
+          // TAS-73: the rules decide a captured_photos list only through the
+          // collection-group rule, which must prove the tenant from the
+          // query. Company + organization equality covers company staff,
+          // org-scoped staff and delegates; sort on the client so no
+          // composite index is needed.
+          .where('companyUID', isEqualTo: companyUID)
+          .where('organizationUID', isEqualTo: organizationUID)
           .getResilient(timeout: const Duration(seconds: 6));
 
-      return snapshot.docs
+      final photos = snapshot.docs
           .map((doc) => CapturedPhotoModel.fromFirestore(doc))
           .toList();
+      photos.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+      return photos;
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في جلب الصور المسجلة للإذن.');
     } catch (e) {
@@ -489,34 +498,19 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
     required String delegateUID,
   }) async {
     try {
-      try {
-        final snapshot = await firestore
-            .collectionGroup('captured_photos')
-            .where('delegateUID', isEqualTo: delegateUID)
-            .getResilient();
+      // TAS-73: no unfiltered collection-group fallback; the rules deny it.
+      // delegateUID equality has its own collection-group single-field index.
+      final snapshot = await firestore
+          .collectionGroup('captured_photos')
+          .where('delegateUID', isEqualTo: delegateUID)
+          .getResilient();
 
-        final docs = snapshot.docs
-            .map((doc) => CapturedPhotoModel.fromFirestore(doc))
-            .toList();
+      final docs = snapshot.docs
+          .map((doc) => CapturedPhotoModel.fromFirestore(doc))
+          .toList();
 
-        docs.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
-        return docs;
-      } on FirebaseException catch (e) {
-        if (e.code == 'failed-precondition') {
-          debugPrint(
-            'Delegate captured photos index missing/building, fetching collectionGroup and filtering locally in Dart',
-          );
-          final snapshot =
-              await firestore.collectionGroup('captured_photos').get();
-          final docs = snapshot.docs
-              .map((doc) => CapturedPhotoModel.fromFirestore(doc))
-              .where((photo) => photo.delegateUID == delegateUID)
-              .toList();
-          docs.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
-          return docs;
-        }
-        rethrow;
-      }
+      docs.sort((a, b) => b.capturedAt.compareTo(a.capturedAt));
+      return docs;
     } on FirebaseException catch (e) {
       debugPrint('Firestore Error in getDelegateCapturedPhotos: $e');
       throw ServerFailure('فشل في جلب تقرير صور المندوب: [${e.code}] ${e.message}');
@@ -535,16 +529,19 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
   }) async {
     try {
       try {
-        Query query = firestore.collectionGroup('captured_photos');
-        if (companyUID.isNotEmpty) {
-          query = query.where('companyUID', isEqualTo: companyUID);
-        }
+        // TAS-73: company staff by company, org-scoped staff by organization,
+        // global staff unfiltered (latest 200).
+        Query query = capturedPhotosTenantQuery(
+          firestore,
+          companyUID: companyUID,
+          organizationUID: organizationUID ?? '',
+        );
         if (branchName != null && branchName.trim().isNotEmpty && branchName != 'all') {
           query = query.where('branchName', isEqualTo: branchName.trim());
         }
         final effectiveLimit = (limit != null && limit > 0)
             ? limit
-            : (companyUID.isEmpty ? 200 : null);
+            : (companyUID.isEmpty && (organizationUID ?? '').isEmpty ? 200 : null);
         if (effectiveLimit != null) {
           query = query.limit(effectiveLimit);
         }
@@ -561,7 +558,13 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
           debugPrint(
             'Company captured photos index missing/building, fetching collectionGroup with limit and filtering locally in Dart',
           );
-          Query fallbackQuery = firestore.collectionGroup('captured_photos');
+          // Same tenant filter as above (an unfiltered list is denied);
+          // only the branch filter moves to the client.
+          Query fallbackQuery = capturedPhotosTenantQuery(
+            firestore,
+            companyUID: companyUID,
+            organizationUID: organizationUID ?? '',
+          );
           if (limit != null && limit > 0) {
             fallbackQuery = fallbackQuery.limit(limit * 3);
           }
@@ -835,4 +838,55 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
       throw ServerFailure('حدث خطأ غير متوقع أثناء تعديل التاريخ: $e');
     }
   }
+}
+
+/// TAS-73: the tenant filter a `captured_photos` collection-group list needs
+/// so the rules can prove access from the query. Company staff filter by
+/// company, org-scoped staff (no companyUID) by organization; only global
+/// staff (neither) list unfiltered.
+Query capturedPhotosTenantQuery(
+  FirebaseFirestore firestore, {
+  required String companyUID,
+  required String organizationUID,
+}) {
+  return _tenantQuery(
+    firestore.collectionGroup('captured_photos'),
+    companyUID: companyUID,
+    organizationUID: organizationUID,
+  );
+}
+
+/// TAS-73: same as [capturedPhotosTenantQuery] for `photo_permissions`.
+Query<Map<String, dynamic>> photoPermissionsTenantQuery(
+  FirebaseFirestore firestore, {
+  required String companyUID,
+  required String organizationUID,
+}) {
+  return _tenantQuery(
+    firestore.collectionGroup('photo_permissions'),
+    companyUID: companyUID,
+    organizationUID: organizationUID,
+  );
+}
+
+Query<Map<String, dynamic>> _tenantQuery(
+  Query<Map<String, dynamic>> query, {
+  required String companyUID,
+  required String organizationUID,
+}) {
+  final company = companyUID.trim();
+  final org = organizationUID.trim();
+  if (company.isNotEmpty) return query.where('companyUID', isEqualTo: company);
+  if (org.isNotEmpty) return query.where('organizationUID', isEqualTo: org);
+  return query;
+}
+
+/// TAS-73: the organization to filter photo lists by. Global staff (super
+/// admin, technical support) list across organizations; everyone else is
+/// held to their own organization.
+String photoListOrgScope(UserRole role, String organizationUID) {
+  if (role == UserRole.superAdmin || role == UserRole.technicalSupport) {
+    return '';
+  }
+  return organizationUID;
 }

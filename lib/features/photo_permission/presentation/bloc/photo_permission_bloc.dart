@@ -803,6 +803,7 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
     final result = await getCompanyCapturedPhotos(
       GetCompanyCapturedPhotosParams(
         companyUID: event.companyUID,
+        organizationUID: event.organizationUID,
         branchName: event.branchName,
         limit: event.limit,
       ),
