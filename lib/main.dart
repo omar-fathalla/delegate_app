@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/services/firestore_cache_reset.dart';
 import 'dart:async';
 
 import 'package:delegate_app/core/providers/locale_provider.dart';
@@ -101,11 +102,19 @@ Future<void> bootstrapDelegateAppForPatrol() async {
   // TAS-66: forced-update decision; the splash waits for it before login.
   unawaited(AppVersionGate.refresh());
 
+  // TAS-76: a logout on this device asked to drop the previous user's
+  // cache; do it before anything reads Firestore in this run.
+  if (!kIsWeb) {
+    await FirestoreCacheReset(prefs: results[1] as SharedPreferences)
+        .runIfPending();
+  }
+
   try {
     if (!kIsWeb) {
+      // TAS-76: bounded disk cache (was unlimited) on shared devices.
       FirebaseFirestore.instance.settings = const Settings(
         persistenceEnabled: true,
-        cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+        cacheSizeBytes: 100 * 1024 * 1024,
       );
     }
   } catch (e) {

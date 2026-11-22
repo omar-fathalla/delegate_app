@@ -1,3 +1,6 @@
+import 'package:delegate_app/core/services/firestore_cache_reset.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:async';
 import 'package:delegate_app/core/config/app_env.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/auth/domain/role_home.dart';
@@ -72,6 +75,11 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void initState() {
     super.initState();
+    // TAS-76: drop the previous session's Firestore cache (marked at logout)
+    // before this login reads anything.
+    if (!kIsWeb && sl.isRegistered<SharedPreferences>()) {
+      unawaited(FirestoreCacheReset(prefs: sl<SharedPreferences>()).runIfPending());
+    }
     // Entrance: sheet slides up 500ms emphasizedDecel (starts +100ms),
     // rows stagger 50ms each (fade + 16px rise, 200ms).
     _animationController = AnimationController(

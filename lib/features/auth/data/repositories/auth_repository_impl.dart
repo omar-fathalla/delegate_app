@@ -16,10 +16,15 @@ class AuthRepositoryImpl implements AuthRepository {
   /// Best-effort FCM token and topic cleanup. Must not throw.
   final Future<void> Function(String userId)? clearPushRegistration;
 
+  /// TAS-76: asks for the Firestore disk cache to be dropped before the next
+  /// session (FirestoreCacheReset.markPending). Must not throw.
+  final Future<void> Function()? markFirestoreCacheReset;
+
   AuthRepositoryImpl({
     required this.remoteDataSource,
     required this.localDataSource,
     this.clearPushRegistration,
+    this.markFirestoreCacheReset,
   });
 
   @override
@@ -174,6 +179,13 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       await localDataSource.clearCachedData();
     } catch (_) {}
+    // TAS-76: after the prefs wipe, so the mark survives it.
+    final markReset = markFirestoreCacheReset;
+    if (markReset != null) {
+      try {
+        await markReset();
+      } catch (_) {}
+    }
     return const Right(null);
   }
 

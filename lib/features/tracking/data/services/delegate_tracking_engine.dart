@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/services/firestore_session_subscriptions.dart';
 import 'dart:async';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
@@ -116,6 +117,12 @@ class DelegateTrackingEngine {
         debugPrint(
             '⚠️ [DelegateTrackingEngine] Remote config subscription error: $err');
       });
+      // TAS-76: logout cancels it with the other session listeners.
+      final sub = _remoteConfigSubscription;
+      if (sub != null) {
+        FirestoreSessionSubscriptions.instance
+            .register('tracking_remote_config', sub);
+      }
     } catch (e) {
       debugPrint('⚠️ [DelegateTrackingEngine] Failed to listen to remote config: $e');
     }
