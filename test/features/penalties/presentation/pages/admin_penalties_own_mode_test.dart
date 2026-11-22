@@ -124,13 +124,17 @@ void main() {
     expect(find.text('مخالفة وهمية سرية'), findsWidgets);
   });
 
-  testWidgets('without own mode an HR user still gets the old behaviour', (
+  testWidgets('without own mode an HR user loads its company list (TAS-73)', (
     tester,
   ) async {
     final bloc = await pump(tester, own: false);
     final events = verify(() => bloc.add(captureAny())).captured;
     expect(events.whereType<LoadOwnPenaltiesEvent>(), isEmpty);
-    expect(events.whereType<LoadAllPenaltiesEvent>(), hasLength(1));
+    // The rules deny an unscoped penalties list for company staff.
+    expect(events.whereType<LoadAllPenaltiesEvent>(), isEmpty);
+    final company = events.whereType<LoadCompanyPenaltiesEvent>().toList();
+    expect(company, hasLength(1));
+    expect(company.single.companyId, 'seed-fake-co-alpha');
     expect(find.text('سجل المخالفات والغرامات'), findsOneWidget);
     expect(find.text('مخالفة وهمية سرية'), findsNothing);
   });

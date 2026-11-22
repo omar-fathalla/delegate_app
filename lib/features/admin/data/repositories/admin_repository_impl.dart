@@ -273,9 +273,12 @@ class AdminRepositoryImpl implements AdminRepository {
   }
 
   @override
-  Future<Either<Failure, List<AdminUser>>> getMarketingEmployees() async {
+  Future<Either<Failure, List<AdminUser>>> getMarketingEmployees({String companyUID = '', String organizationUID = ''}) async {
     try {
-      final employees = await marketingDataSource.getMarketingEmployees();
+      final employees = await marketingDataSource.getMarketingEmployees(
+        companyUID: companyUID,
+        organizationUID: organizationUID,
+      );
       return Right(employees);
     } on Failure catch (f) {
       return Left(f);

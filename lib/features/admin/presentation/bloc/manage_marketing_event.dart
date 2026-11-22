@@ -7,7 +7,14 @@ abstract class ManageMarketingEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class LoadMarketingEmployeesRequested extends ManageMarketingEvent {}
+class LoadMarketingEmployeesRequested extends ManageMarketingEvent {
+  /// Null keeps the scope of the previous load (reloads after edits).
+  final MarketingEmployeesScope? scope;
+  const LoadMarketingEmployeesRequested({this.scope});
+
+  @override
+  List<Object?> get props => [scope];
+}
 
 class DeleteMarketingEmployeeRequested extends ManageMarketingEvent {
   final String employeeId;

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:delegate_app/core/error/exceptions.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
@@ -86,6 +87,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
         penaltyId: docRef.id,
         companyId: penalty.companyId,
         companyName: penalty.companyName,
+        organizationId: penalty.organizationId,
         branchId: penalty.branchId,
         branchName: penalty.branchName,
         createdById: penalty.createdById,
@@ -376,12 +378,25 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
             ? ['organizationAdmin', 'superAdmin', 'super-admin', 'super_admin', 'technicalSupport', 'technical_support']
             : ['branchesMarketingManager', 'organizationAdmin', 'superAdmin', 'super-admin', 'super_admin', 'branches_marketing'];
 
-        final usersSnap = await firestore
-            .collection('users')
-            .where('role', whereIn: queryRoles)
-            .get();
+        // TAS-73: managers of this penalty's organization only. An unscoped
+        // users list is denied by the rules (and would notify every
+        // organization); a failure here must not skip anything else.
+        final managerDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+        final penaltyOrg = (finalPenalty.organizationId ?? '').trim();
+        if (penaltyOrg.isNotEmpty) {
+          try {
+            final usersSnap = await firestore
+                .collection('users')
+                .where('organizationUID', isEqualTo: penaltyOrg)
+                .where('role', whereIn: queryRoles)
+                .get();
+            managerDocs.addAll(usersSnap.docs);
+          } on FirebaseException catch (e) {
+            debugPrint('penalty manager lookup skipped: ${e.code}');
+          }
+        }
 
-        for (final userDoc in usersSnap.docs) {
+        for (final userDoc in managerDocs) {
           final uid = userDoc.id;
           final phone = userDoc.data()['phoneNumber']?.toString();
           final userRole = userDoc.data()['role']?.toString().toLowerCase() ?? '';
@@ -471,6 +486,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
           penaltyId: p.penaltyId,
           companyId: p.companyId,
           companyName: p.companyName,
+          organizationId: p.organizationId,
           branchId: p.branchId,
           branchName: p.branchName,
           createdById: p.createdById,

@@ -11,6 +11,7 @@ part 'manage_marketing_state.dart';
 class ManageMarketingBloc
     extends Bloc<ManageMarketingEvent, ManageMarketingState> {
   final GetMarketingEmployees getMarketingEmployees;
+  MarketingEmployeesScope _scope = const MarketingEmployeesScope();
   final AdminRepository adminRepository;
 
   ManageMarketingBloc({
@@ -28,7 +29,8 @@ class ManageMarketingBloc
     Emitter<ManageMarketingState> emit,
   ) async {
     emit(ManageMarketingLoading());
-    final result = await getMarketingEmployees(NoParams());
+    _scope = event.scope ?? _scope;
+    final result = await getMarketingEmployees(_scope);
     result.fold(
       (failure) => emit(ManageMarketingError(message: failure.message)),
       (employees) => emit(ManageMarketingLoaded(employees: employees)),
@@ -45,7 +47,7 @@ class ManageMarketingBloc
     );
     result.fold(
       (failure) => emit(ManageMarketingError(message: failure.message)),
-      (_) => add(LoadMarketingEmployeesRequested()),
+      (_) => add(const LoadMarketingEmployeesRequested()),
     );
   }
 
@@ -60,7 +62,7 @@ class ManageMarketingBloc
     );
     result.fold(
       (failure) => emit(ManageMarketingError(message: failure.message)),
-      (_) => add(LoadMarketingEmployeesRequested()),
+      (_) => add(const LoadMarketingEmployeesRequested()),
     );
   }
 
@@ -74,7 +76,7 @@ class ManageMarketingBloc
     );
     result.fold(
       (failure) => emit(ManageMarketingError(message: failure.message)),
-      (_) => add(LoadMarketingEmployeesRequested()),
+      (_) => add(const LoadMarketingEmployeesRequested()),
     );
   }
 }
