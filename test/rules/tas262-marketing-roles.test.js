@@ -8,6 +8,8 @@
  *    (penalties, tasks, delegates, photo permissions); with a companyUID it
  *    stays on its company.
  *  - TAS-269: role broadcast notifications for each role.
+ *  - TAS-291: every deny here comes from a rule, not from the
+ *    1000-expression budget (baseline 0; run with RULES_BUDGET_MODE=strict).
  * Fake data only.
  *
  * npm run test:rules:tas262
@@ -15,7 +17,7 @@
 const {describe, test, before, after} = require("node:test");
 const {readFileSync} = require("fs");
 const {resolve} = require("path");
-const {initializeTestEnvironment, assertSucceeds, assertFails} = require("./_rules_testing");
+const {initializeTestEnvironment, assertSucceeds, assertFails, assertDeniedByRule} = require("./_rules_testing");
 const {collection, collectionGroup, doc, getDoc, getDocs, query, setDoc, Timestamp, updateDoc, where} =
   require("firebase/firestore");
 
@@ -147,8 +149,6 @@ describe("TAS-269 role broadcast notifications", () => {
     await assertSucceeds(q(as("bmm"), "branchesMarketingManager"));
     await assertSucceeds(q(as("bmmc"), "branchesMarketingManager"));
   });
-  // Still denied by canReadNotification's 1000-expression budget, not by a
-  // rule (pre-existing; baseline 2). Follow-up sub-issue under TAS-269.
   test("roles do not read each other's broadcast", async () => {
     await assertFails(q(as("mk"), "branchesMarketingManager"));
     await assertFails(q(as("bmm"), "marketing"));
@@ -171,7 +171,6 @@ describe("TAS-266 follow-up notifications after a penalty decision", () => {
   test("org-wide manager sends them stamped with its uid", async () => {
     await assertSucceeds(setDoc(doc(as("bmm"), "notifications/n-dec-1"), payload("bmm")));
   });
-  // Denied, but by canCreateNotification's budget (baseline +2), TAS-291.
   test("not without createdBy, and not as someone else", async () => {
     await assertFails(setDoc(doc(as("bmm"), "notifications/n-dec-2"), payload(null)));
     await assertFails(setDoc(doc(as("bmm"), "notifications/n-dec-3"), payload("someone-else")));
@@ -188,7 +187,6 @@ describe("TAS-268 manager sends by role / by phone inside its org", () => {
     await assertSucceeds(getDocs(query(collectionGroup(db, "delegates"),
       where("phoneNumber", "==", "0100000000a"), where("organizationUID", "==", ORG))));
   });
-  // These two are denied by the old users list rule's budget (TAS-291).
   test("not another org's users, and not an unscoped list", async () => {
     const db = as("bmm");
     await assertFails(getDocs(query(collection(db, "users"),
@@ -198,5 +196,21 @@ describe("TAS-268 manager sends by role / by phone inside its org", () => {
   test("a company-scoped manager does not get the org-wide list", async () => {
     await assertFails(getDocs(query(collection(as("bmmc"), "users"),
       where("role", "==", "marketing"), where("organizationUID", "==", ORG))));
+  });
+});
+
+describe("TAS-291 denies come from a rule, not the budget", () => {
+  test("a self-made delegate doc with someone's phone cannot list that person", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "users/atk"), {role: "delegate", phoneNumber: "01000000901"});
+    });
+    await assertDeniedByRule(getDocs(query(collection(as("atk"), "users"),
+      where("phoneNumber", "==", "01000000901"))));
+  });
+  test("cross-role broadcast and tenant-less notification are denied by a rule", async () => {
+    await assertDeniedByRule(getDocs(query(collection(as("mk"), "notifications"),
+      where("delegateUid", "==", "branchesMarketingManager"))));
+    await assertDeniedByRule(setDoc(doc(as("bmm"), "notifications/n-291"),
+      {title: "fake", delegateUid: "company_" + CO_A}));
   });
 });

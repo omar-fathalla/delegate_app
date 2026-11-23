@@ -933,22 +933,45 @@ service cloud.firestore {
 
     // ==================== SHARED: USERS ====================
 
-    // TAS-268: the org-wide branches-marketing manager (no companyUID) lists
-    // users of its own organization (send by role / by phone). One users
-    // read; the query must constrain organizationUID.
-    function canListUsersAsOrgBranchesMarketing() {
+    // TAS-268 / TAS-291: users list for staff tokens in one pass over the
+    // caller's users doc. The isGlobalStaff / isOrgScopedStaff /
+    // isCompanyScopedStaff chain re-read users/{uid} per helper, so lists the
+    // rule should refuse were refused by the 1000-expression budget. Same
+    // principals as that chain, plus the org-wide branches-marketing manager
+    // (no companyUID) on its organization. Own record by phone / email kept.
+    function staffUsersListOk() {
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      return u.get('role', '') in ['branches_marketing', 'branches-marketing',
-          'branches_marketing_manager', 'branches-marketing-manager',
-          'branchesmarketingmanager', 'branchesMarketingManager']
-        && u.get('companyUID', '') == ''
-        && u.get('organizationUID', '') is string
-        && u.get('organizationUID', '') != ''
-        && resource.data.get('organizationUID', '') == u.get('organizationUID', '');
+      let r = u.get('role', '');
+      let org = u.get('organizationUID', '') is string && u.get('organizationUID', '') != ''
+        ? u.get('organizationUID', '') : claimString('orgId');
+      let co = u.get('companyUID', '') is string && u.get('companyUID', '') != ''
+        ? u.get('companyUID', '') : claimString('companyId');
+      let d = resource.data;
+      return r in superAdminRoleList()
+        || r in techRoleList()
+        || (org != '' && (d.get('organizationUID', '') == org || d.get('organizationId', '') == org)
+          && (r in ['organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
+              'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion']
+            || (co == '' && r in ['branches_marketing', 'branches-marketing',
+              'branches_marketing_manager', 'branches-marketing-manager',
+              'branchesmarketingmanager', 'branchesMarketingManager'])))
+        || (co != '' && (d.get('companyUID', '') == co || d.get('companyId', '') == co)
+          && r in ['company-admin', 'company_admin', 'companyadmin', 'admin',
+            'supervisor', 'company_supervisor',
+            'hr', 'company-hr', 'company_hr', 'human_resources',
+            'accountant', 'accounting', 'account_admin',
+            'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+            'branches-marketing-manager', 'branchesmarketingmanager', 'branchesMarketingManager'])
+        // Own record by phone / email, staff roles only: a self-created
+        // delegate doc carrying someone else's phone or email must not list
+        // that person (adversarial S2). The old chain only refused that on
+        // the 1000-expression budget (TAS-291).
+        || (!(r in ['', 'delegate'])
+          && ((u.get('phoneNumber', '') != '' && d.get('phoneNumber', '') == u.get('phoneNumber', ''))
+            || (u.get('email', '') != '' && d.get('email', '') == u.get('email', ''))));
     }
 
     match /users/{userId} {
-      allow list: if staffToken() && canListUsersAsOrgBranchesMarketing();
       allow get: if signedIn() && (
         request.auth.uid == userId ||
         ownsDelegateId(userId) ||
@@ -959,7 +982,9 @@ service cloud.firestore {
 
       // Phone/email lookups after sign-in, and the admin directory for
       // global staff. Unauthenticated list is denied (staffPhoneLookup).
-      allow list: if signedIn() && (
+      allow list: if signedIn() && (staffToken()
+        ? staffUsersListOk()
+        : (
         isGlobalStaff() ||
         (isOrgScopedStaff() && orgScoped()) ||
         (isCompanyScopedStaff() && companyScoped()) ||
@@ -969,7 +994,7 @@ service cloud.firestore {
         (userExists()
           && userDoc().keys().hasAll(['email'])
           && resource.data.email == userDoc().email)
-      );
+      ));
 
       // New staff accounts come from the createStaffUser function (Admin SDK).
       // Client creates stay for delegate approval (M6) and legacy screens.
@@ -2218,7 +2243,51 @@ service cloud.firestore {
       );
     }
 
+    // TAS-291: role broadcasts (delegateUid is a role name) are decided here
+    // with one users read: the caller's role must match the target role
+    // (global staff read all). Before, a role reading another role's
+    // broadcast ran the whole helper chain below and was refused by the
+    // 1000-expression budget, not by a rule.
+    function roleBroadcastTargets() {
+      return ['super-admin', 'super_admin', 'superAdmin', 'role_super_admin',
+        'technicalSupport', 'technical-support', 'technical_support', 'role_technical_support',
+        'organizationAdmin', 'organization-admin', 'organization_admin',
+        'hr', 'company-hr', 'company_hr',
+        'marketing', 'marketing_promotion', 'marketingPromotion',
+        'branchesMarketingManager', 'branches_marketing', 'branches-marketing',
+        'company-admin', 'admin', 'supervisor', 'company_admin'];
+    }
+
+    function canReadRoleBroadcastNotification(du) {
+      let r = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '');
+      return r in superAdminRoleList()
+        || r in techRoleList()
+        || (!isPrivilegedStaffAlert() && (
+          (r in ['organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin']
+            && du in ['organizationAdmin', 'organization-admin', 'organization_admin'])
+          || (r in ['hr', 'company-hr', 'company_hr', 'human_resources']
+            && du in ['hr', 'company-hr', 'company_hr'])
+          || (r in ['marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion']
+            && du in ['marketing', 'marketing_promotion', 'marketingPromotion'])
+          || (r in ['branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+              'branches-marketing-manager', 'branchesmarketingmanager', 'branchesMarketingManager']
+            && du in ['branchesMarketingManager', 'branches_marketing', 'branches-marketing'])
+          || (r in ['company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor',
+              'company_supervisor']
+            && du in ['company-admin', 'admin', 'supervisor', 'company_admin'])));
+    }
+
     function canReadNotification() {
+      return signedIn() && (resource.data.get('delegateUid', '') in ['all', 'delegates']
+        // App-wide broadcasts: anyone signed in, except privileged alert types
+        // (global staff read those through the general branch).
+        ? (!isPrivilegedStaffAlert() || canReadNotificationGeneral())
+        : resource.data.get('delegateUid', '') in roleBroadcastTargets()
+          ? canReadRoleBroadcastNotification(resource.data.get('delegateUid', ''))
+          : canReadNotificationGeneral());
+    }
+
+    function canReadNotificationGeneral() {
       return signedIn() && (
         isGlobalStaff()
         || (
@@ -2266,12 +2335,41 @@ service cloud.firestore {
         );
     }
 
+    // TAS-291: staff tokens in one pass over the caller's users doc. The
+    // isGlobalStaff / isOrgScopedStaff / isCompanyScopedStaff chain re-read
+    // users/{uid} per helper, so a create the rule should refuse (no tenant,
+    // no createdBy) was refused by the 1000-expression budget instead.
+    // Same principals: global staff; org- or company-scoped staff when the
+    // payload is in their org or company or they are the stated sender.
+    function staffCreateNotificationOk() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let org = u.get('organizationUID', '') is string && u.get('organizationUID', '') != ''
+        ? u.get('organizationUID', '') : claimString('orgId');
+      let co = u.get('companyUID', '') is string && u.get('companyUID', '') != ''
+        ? u.get('companyUID', '') : claimString('companyId');
+      let d = request.resource.data;
+      return r in superAdminRoleList()
+        || r in techRoleList()
+        || (r in [
+            'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
+            'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion',
+            'company-admin', 'company_admin', 'companyadmin', 'admin',
+            'supervisor', 'company_supervisor',
+            'hr', 'company-hr', 'company_hr', 'human_resources',
+            'accountant', 'accounting', 'account_admin',
+            'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+            'branches-marketing-manager', 'branchesmarketingmanager', 'branchesMarketingManager'
+          ]
+          && ((org != '' && (d.get('organizationUID', '') == org || d.get('organizationId', '') == org))
+            || (co != '' && (d.get('companyUID', '') == co || d.get('companyId', '') == co))
+            || d.get('createdBy', '') == request.auth.uid));
+    }
+
     function canCreateNotification() {
-      return signedIn() && (
-        isGlobalStaff()
-        || ((isOrgScopedStaff() || isCompanyScopedStaff()) && (incomingOrgScoped() || incomingCompanyScoped() || request.resource.data.createdBy == request.auth.uid))
-        || canDelegateCreateNotification()
-      );
+      return signedIn() && (staffToken()
+        ? staffCreateNotificationOk()
+        : canDelegateCreateNotification());
     }
 
     // Cheap, org-admin-only allow so a list query on
@@ -2279,72 +2377,28 @@ service cloud.firestore {
     // folding isPrivilegedStaffAlert into the query, and without
     // adding every staff roleIs() to the get() budget (M-7).
     function canReadOrgAdminRoleBroadcast() {
-      return isOrgAdmin() && resource.data.get('delegateUid', '') in [
+      // delegateUid first (TAS-291): other targets stop before any users read.
+      return resource.data.get('delegateUid', '') in [
         'organizationAdmin', 'organization-admin', 'organization_admin'
-      ];
-    }
-
-    // TAS-269: cheap allow for marketing / branches-marketing role broadcasts
-    // (delegateUid == 'marketing', 'branchesMarketingManager', ...). Inside
-    // canReadNotification those list queries were denied on the budget.
-    // 'all' is the app-wide broadcast (never a privileged staff alert type).
-    function canReadMarketingRoleBroadcast() {
-      // delegateUid first: any other target (supervisor_<co>, a uid, ...)
-      // stops here without a users/{uid} read, so other roles' list
-      // queries keep their budget.
-      let du = resource.data.get('delegateUid', '');
-      return du in ['all', 'marketing', 'marketing_promotion', 'marketingPromotion',
-          'branchesMarketingManager', 'branches_marketing', 'branches-marketing']
-        && !isPrivilegedStaffAlert()
-        && staffToken()
-        && marketingBroadcastRoleOk(du,
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', ''));
-    }
-
-    function marketingBroadcastRoleOk(du, role) {
-      return (role in ['marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion']
-          && du in ['all', 'marketing', 'marketing_promotion', 'marketingPromotion'])
-        || (role in ['branches_marketing', 'branches-marketing', 'branches_marketing_manager',
-            'branches-marketing-manager', 'branchesmarketingmanager', 'branchesMarketingManager']
-          && du in ['all', 'branchesMarketingManager', 'branches_marketing', 'branches-marketing']);
+      ] && isOrgAdmin();
     }
 
     // Cheap allow so a list query on delegateUid == 'supervisor_' +
     // company is provable for company admins and supervisors (I2 leave
     // fallback). Folding this into canReadNotification hits the cap.
     function canReadCompanySupervisorBroadcast() {
-      return isCompanyAdmin()
+      // delegateUid first (TAS-291): other targets stop before any users read.
+      return resource.data.get('delegateUid', '') is string
+        && resource.data.get('delegateUid', '').matches('supervisor_.+')
+        && isCompanyAdmin()
         && callerCompany() != ''
         && resource.data.delegateUid == 'supervisor_' + callerCompany();
     }
 
-    // TAS-266: same principals as the createdBy branch of
-    // canCreateNotification (org- or company-scoped staff sending as
-    // themselves), with one users/{uid} read. The full helper ran out of the
-    // 1000-expression budget for the branches-marketing manager's penalty
-    // decision notifications.
-    function canCreateOwnStaffNotification() {
-      return request.auth != null
-        && request.resource.data.get('createdBy', '') == request.auth.uid
-        && staffToken()
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in [
-          'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
-          'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion',
-          'company-admin', 'company_admin', 'companyadmin', 'admin',
-          'supervisor', 'company_supervisor',
-          'hr', 'company-hr', 'company_hr', 'human_resources',
-          'accountant', 'accounting', 'account_admin',
-          'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
-          'branches-marketing-manager', 'branchesmarketingmanager', 'branchesMarketingManager'
-        ];
-    }
-
     match /notifications/{notificationId} {
-      allow create: if canCreateOwnStaffNotification();
       allow read: if canReadOwnNotification();
       allow read: if canReadOrgAdminRoleBroadcast();
       allow read: if canReadCompanySupervisorBroadcast();
-      allow read: if canReadMarketingRoleBroadcast();
       allow read: if canReadNotification();
       allow create: if canCreateNotification();
       allow update: if (canReadOwnNotification() || canReadNotification()) && (
