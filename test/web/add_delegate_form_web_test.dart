@@ -21,7 +21,6 @@ import 'package:delegate_app/main.dart';
 import 'package:delegate_app/web/hr_system/hr_shell_link.dart';
 import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
 import 'package:flutter/material.dart';
-import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -130,10 +129,6 @@ Future<void> _pump(WidgetTester t, Size size) async {
 }
 
 Future<void> _fill(WidgetTester t) async {
-  for (final i in [1, 0, 3]) {
-    await t.tap(find.byKey(AddDelegateChainGrid.optionKey('fake-org-$i')));
-    await t.pump();
-  }
   final fields = find.byType(TextFormField);
   await t.enterText(fields.at(0), 'أحمد');
   await t.enterText(fields.at(1), 'محمود');
@@ -214,19 +209,13 @@ void main() {
     expect(find.text('ملخص الطلب'), findsOneWidget);
     expect(find.byType(AppBar), findsNothing);
     await _fill(t);
-    expect(find.text('3 مختارة'), findsOneWidget);
     expect(find.text('أحمد محمود السيد'), findsOneWidget);
-    expect(find.byKey(const ValueKey('add_delegate_summary_chip_fake-org-3')), findsOneWidget);
+    // TAS-254: no chain picker; the base chain is chosen automatically.
+    expect(find.byKey(const ValueKey('add_delegate_base_chain_note')), findsOneWidget);
+    expect(find.byKey(AddDelegateChainGrid.optionKey('fake-org-0')), findsNothing);
+    expect(find.text('السلسلة الأساسية'), findsOneWidget);
+    expect(find.text(_fakeChains[0]), findsWidgets);
     await _shot(t, 'add-delegate-1440');
-
-    // Removing a chip unticks the chain.
-    await t.tap(find.descendant(
-      of: find.byKey(const ValueKey('add_delegate_summary_chip_fake-org-3')),
-      matching: find.byIcon(Symbols.close_rounded),
-    ));
-    await t.pumpAndSettle();
-    expect(find.byKey(const ValueKey('add_delegate_summary_chip_fake-org-3')), findsNothing);
-    expect(find.text('2 مختارة'), findsOneWidget);
   });
 
   testWidgets('1024: rail navigation, still two columns', (t) async {
@@ -246,7 +235,7 @@ void main() {
     expect(find.byKey(const ValueKey('add_delegate_summary')), findsNothing);
     expect(find.byKey(const ValueKey('add_delegate_bottom_bar')), findsOneWidget);
     await _fill(t);
-    expect(find.text('3 مختارة'), findsWidgets);
+    expect(find.byKey(const ValueKey('add_delegate_base_chain_note')), findsOneWidget);
     await _shot(t, 'add-delegate-800');
   });
 

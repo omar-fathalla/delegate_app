@@ -1016,6 +1016,7 @@ service cloud.firestore {
             'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin']
           ? (u.get('organizationUID', '') != ''
             && u.get('organizationUID', '') == resource.data.get('organizationUID', '')
+            && !isBaseChainOrg(u.get('organizationUID', ''))
             && staffDelegateRequestMetaOnly(u))
         : false;
     }
@@ -2454,6 +2455,13 @@ service cloud.firestore {
         || pay == 'waived'
         || pay == 'not_required';
     }
+    // TAS-254: new delegates are registered under the base (free) chain from
+    // every company and only super admins / tech support review them. The
+    // base chain's org admin must not read, edit or delete those requests.
+    function isBaseChainOrg(org) {
+      let cfg = /databases/$(database)/documents/config/subscriptions;
+      return exists(cfg) && org in get(cfg).data.get('freeChainOrgUids', []);
+    }
     function delegateRequestReadOk() {
       let d = resource.data;
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
@@ -2468,7 +2476,7 @@ service cloud.firestore {
           'tech_support', 'techsupport']
         || (r in [
           'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin']
-          && org != '' && docOrg == org)
+          && org != '' && docOrg == org && !isBaseChainOrg(org))
         || (r in [
           'company-admin', 'company_admin', 'companyadmin', 'admin',
           'supervisor', 'company_supervisor', 'hr', 'company-hr', 'company_hr', 'human_resources']
@@ -2731,7 +2739,8 @@ service cloud.firestore {
       allow delete: if isSuperAdmin()
         || (isOrgAdmin()
           && (resource.data.get('organizationUID', '') == callerOrg()
-            || resource.data.get('organizationId', '') == callerOrg()));
+            || resource.data.get('organizationId', '') == callerOrg())
+          && !isBaseChainOrg(callerOrg()));
 
       match /paymob_checkout_attempts/{attemptId} {
         allow read, write: if false;

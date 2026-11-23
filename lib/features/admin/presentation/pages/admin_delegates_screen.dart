@@ -18,7 +18,6 @@ import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/features/admin/data/datasources/delegate_hold_remote.dart';
 import 'package:delegate_app/core/security/delegate_status_policy.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_hold_access.dart';
-import 'package:delegate_app/features/admin/presentation/widgets/link_delegate_to_org_sheet.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/delete_delegate_request_sheet.dart';
 import 'package:delegate_app/features/admin/presentation/pages/edit_delegate_profile_screen.dart';
 
@@ -1332,28 +1331,6 @@ class _CompactDelegateTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // Action to link another organization (if supervisor)
-                if (adminDelegate != null) ...[
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    onPressed: () async {
-                      Navigator.of(ctx).pop();
-                      final result = await LinkDelegateToOrgSheet.show(
-                        context,
-                        delegate: delegate,
-                        supervisor: adminDelegate!,
-                      );
-                      if (result == true) {
-                        onRefresh?.call();
-                      }
-                    },
-                    icon: const Icon(Icons.add_business_rounded, size: 18),
-                    label: const Text('ربط بسلسلة / منظمة إضافية'),
-                  ),
-                ],
               ],
             ),
           ),
@@ -1514,35 +1491,9 @@ class _CompactDelegateTile extends StatelessWidget {
         );
 
     final isDark = theme.brightness == Brightness.dark;
-    final goldBg = const Color(0xFFB8860B).withValues(alpha: isDark ? 0.28 : 0.12);
-    final goldBorder = const Color(0xFFD4AF37).withValues(alpha: isDark ? 0.6 : 0.45);
-    final goldFg = isDark ? const Color(0xFFFFE082) : const Color(0xFF8D6200);
 
-    // 1. Link Org Button
-    final linkOrgBtn = _buildActionPill(
-      context: context,
-      icon: const Icon(Icons.add_business_rounded),
-      label: canRequestDelete ? 'ربط بسلسلة' : 'ربط بسلاسل إضافية',
-      backgroundColor: goldBg,
-      borderColor: goldBorder,
-      foregroundColor: goldFg,
-      tooltip: 'ربط بسلسلة إضافية وسداد الاشتراك',
-      height: canRequestDelete ? 30 : 40,
-      width: canRequestDelete ? 104 : null,
-      fontSize: canRequestDelete ? 10.5 : 11.5,
-      onPressed: adminDelegate != null
-          ? () async {
-              final result = await LinkDelegateToOrgSheet.show(
-                context,
-                delegate: delegate,
-                supervisor: adminDelegate!,
-              );
-              if (result == true) {
-                onRefresh?.call();
-              }
-            }
-          : null,
-    );
+    // TAS-254: no per-delegate chain link. Chains are added to the company
+    // («إضافة سلاسل للشركة») and every delegate is linked automatically.
 
     // 2. Delete Request Button (Supervisor only, non-Fathalla delegates)
     final deleteRequestBtn = canRequestDelete
@@ -1654,15 +1605,14 @@ class _CompactDelegateTile extends StatelessWidget {
       if (isSuperAdmin) ?logoutBtn,
       if (_showHoldControl) ?holdBtn,
     ];
-    if (extras.isEmpty) return linkOrgBtn;
+    if (extras.isEmpty) return const SizedBox.shrink();
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        linkOrgBtn,
-        for (final extra in extras) ...[
-          const SizedBox(height: 5),
-          extra,
+        for (var i = 0; i < extras.length; i++) ...[
+          if (i > 0) const SizedBox(height: 5),
+          extras[i],
         ],
       ],
     );

@@ -909,6 +909,34 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
     }
 
     final tenantCompany = companyUID?.trim() ?? '';
+    final org = organizationUID?.trim() ?? '';
+    if (org.isNotEmpty && tenantCompany.isEmpty) {
+      // TAS-254: requests on the base (free) chain come from every company and
+      // only super admins / tech support review them. The rules deny that
+      // chain's org admin, so show an empty list instead of an error.
+      return Stream.fromFuture(_isBaseChainOrg(org)).asyncExpand(
+        (isBase) => isBase
+            ? Stream.value(const <DelegateSubscriptionRequest>[])
+            : _requestsFromQuery(query, tenantCompany),
+      );
+    }
+    return _requestsFromQuery(query, tenantCompany);
+  }
+
+  Future<bool> _isBaseChainOrg(String org) async {
+    try {
+      final cfg = await _firestore.doc('config/subscriptions').get();
+      final raw = cfg.data()?['freeChainOrgUids'];
+      return raw is List && raw.map((e) => e.toString().trim()).contains(org);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Stream<List<DelegateSubscriptionRequest>> _requestsFromQuery(
+    Query query,
+    String tenantCompany,
+  ) {
     return query.snapshots().map((snapshot) {
       var list = snapshot.docs.map((doc) {
         return DelegateSubscriptionRequest.fromMap(
