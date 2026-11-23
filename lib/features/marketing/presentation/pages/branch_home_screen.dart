@@ -21,6 +21,7 @@ import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/marketing/data/models/floor_verification_model.dart';
 import 'package:delegate_app/features/marketing/data/services/floor_verification_service.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/features/marketing/data/datasources/marketing_remote_data_source.dart';
 import 'package:delegate_app/features/marketing/data/services/real_test_metrics.dart';
 
 /// الشاشة الرئيسية للفروع - تعرض جميع الفروع المفضلة في نفس الصفحة
@@ -90,7 +91,12 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   final Map<String, String> _branchFilter = {};
 
   /// Periodic timer for auto-refresh heartbeat (every 30s)
-  Timer? _autoRefreshTimer;
+  /// Live updates (TAS-260): a Firestore listener on today's attendance for
+  /// the favorite branches replaces the old 30-second polling timer. It only
+  /// costs reads when a record changes, and it is stopped while the app is in
+  /// the background.
+  StreamSubscription<void>? _liveSub;
+  Timer? _liveDebounce;
 
   /// App lifecycle listener to sync immediately upon app resume
   AppLifecycleListener? _lifecycleListener;
@@ -111,24 +117,17 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       _floorVerifications = _floorService.getLocalVerifications(_selectedDate);
       _syncFloorVerificationsFromCloud();
 
-      // Auto-refresh heartbeat every 30 seconds for live zero-drop data delivery
-      // Disabled during REAL_TEST_METRICS so cold/warm measurements are not polluted.
-      if (!RealTestMetrics.enabled) {
-        _autoRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-          if (mounted && _favoriteBranches.isNotEmpty) {
-            _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
-            _syncFloorVerificationsFromCloud();
-          }
-        });
-      }
+      _watchLive();
 
-      // Revalidate immediately when app resumes from background
+      // Stop listening in the background; revalidate and listen again on resume.
       _lifecycleListener = AppLifecycleListener(
+        onHide: _stopLive,
         onResume: () {
           if (mounted && _favoriteBranches.isNotEmpty) {
             _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
             _syncFloorVerificationsFromCloud();
           }
+          _watchLive();
         },
       );
     } catch (e, st) {
@@ -138,10 +137,40 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
 
   @override
   void dispose() {
-    _autoRefreshTimer?.cancel();
+    _stopLive();
     _lifecycleListener?.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _stopLive() {
+    _liveDebounce?.cancel();
+    _liveDebounce = null;
+    _liveSub?.cancel();
+    _liveSub = null;
+  }
+
+  /// (Re)starts the attendance listener for the current favorites and date.
+  /// Disabled during REAL_TEST_METRICS so cold/warm measurements stay clean.
+  void _watchLive() {
+    _stopLive();
+    if (RealTestMetrics.enabled || _favoriteBranches.isEmpty) return;
+    if (!di.sl.isRegistered<MarketingRemoteDataSource>()) return;
+    _liveSub = di.sl<MarketingRemoteDataSource>()
+        .watchTodayAttendanceChanges(
+          branchNames: _favoriteBranches,
+          organizationId: widget.marketingUser.organizationUID,
+          date: _selectedDate,
+        )
+        .listen((_) {
+      // Several check-ins in a burst become one reload.
+      _liveDebounce?.cancel();
+      _liveDebounce = Timer(const Duration(seconds: 3), () {
+        if (!mounted || _favoriteBranches.isEmpty) return;
+        _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
+        _syncFloorVerificationsFromCloud();
+      });
+    });
   }
 
   Future<void> _syncFloorVerificationsFromCloud() async {
@@ -487,6 +516,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       });
       _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
       _syncFloorVerificationsFromCloud();
+      _watchLive();
     }
   }
 
@@ -520,6 +550,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
             // حمّل بيانات كل الفروع دفعة واحدة
             _loadAllBranches(context, favorites);
           }
+          _watchLive();
         }
       },
       buildWhen: (prev, curr) =>
