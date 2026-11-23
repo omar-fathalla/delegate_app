@@ -116,4 +116,11 @@ PY
 [[ -f "$ROOT/scripts/android_dev_distribute.sh" ]] || fail "missing scripts/android_dev_distribute.sh"
 [[ -f "$ROOT/android/README_DEV_FLAVOR.md" ]] || fail "missing android/README_DEV_FLAVOR.md"
 
+# TAS-288: app data must not be backed up or moved to a new phone.
+MANIFEST="$ROOT/android/app/src/main/AndroidManifest.xml"
+grep -q 'android:allowBackup="false"' "$MANIFEST" || fail "AndroidManifest must set android:allowBackup=\"false\" (TAS-288)"
+grep -q 'android:dataExtractionRules="@xml/data_extraction_rules"' "$MANIFEST" || fail "AndroidManifest must set android:dataExtractionRules (TAS-288)"
+[[ -f "$ROOT/android/app/src/main/res/xml/data_extraction_rules.xml" ]] || fail "missing res/xml/data_extraction_rules.xml (TAS-288)"
+grep -q '<device-transfer>' "$ROOT/android/app/src/main/res/xml/data_extraction_rules.xml" || fail "data_extraction_rules.xml must exclude device-transfer (TAS-288)"
+
 echo "android-dev-config-check: OK"
