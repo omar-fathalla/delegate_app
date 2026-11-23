@@ -32,6 +32,8 @@ const users = {
   pr: {role: "marketing_promotion", organizationUID: ORG},
   bmm: {role: "branches_marketing", organizationUID: ORG},
   bmmc: {role: "branches_marketing", organizationUID: ORG, companyUID: CO_A},
+  ca: {role: "company-admin", organizationUID: ORG, companyUID: CO_A},
+  hr: {role: "hr", organizationUID: ORG, companyUID: CO_A},
 };
 
 let env;
@@ -166,14 +168,34 @@ describe("TAS-268 sent notifications log for branches marketing", () => {
 });
 
 describe("TAS-266 follow-up notifications after a penalty decision", () => {
-  const payload = (by) => ({title: "fake", type: "penalty", penaltyId: "pen-a", companyId: CO_A,
-    delegateUid: "company_" + CO_A, isRead: false, ...(by ? {createdBy: by} : {})});
-  test("org-wide manager sends them stamped with its uid", async () => {
+  // TAS-51: the app stamps the sender's own org (users/{uid}) next to createdBy.
+  const payload = (by, org = ORG) => ({title: "fake", type: "penalty", penaltyId: "pen-a", companyId: CO_A,
+    delegateUid: "company_" + CO_A, isRead: false, ...(org ? {organizationUID: org} : {}),
+    ...(by ? {createdBy: by} : {})});
+  test("org-wide manager sends them with its own org", async () => {
     await assertSucceeds(setDoc(doc(as("bmm"), "notifications/n-dec-1"), payload("bmm")));
   });
-  test("not without createdBy, and not as someone else", async () => {
-    await assertFails(setDoc(doc(as("bmm"), "notifications/n-dec-2"), payload(null)));
-    await assertFails(setDoc(doc(as("bmm"), "notifications/n-dec-3"), payload("someone-else")));
+  test("not without its own org (createdBy alone is not enough, TAS-51)", async () => {
+    await assertDeniedByRule(setDoc(doc(as("bmm"), "notifications/n-dec-2"), payload("bmm", null)));
+    await assertFails(setDoc(doc(as("bmm"), "notifications/n-dec-3"), payload("bmm", OTHER)));
+  });
+});
+
+describe("TAS-51 staff notifications must name the sender's own tenant", () => {
+  const n = (extra) => ({title: "fake", delegateUid: "victim-delegate-uid", isRead: false, ...extra});
+  test("createdBy alone to any delegate is denied by a rule", async () => {
+    for (const uid of ["mk", "pr", "bmm", "bmmc", "ca", "hr"]) {
+      await assertDeniedByRule(setDoc(doc(as(uid), `notifications/n51-${uid}`), n({createdBy: uid})));
+    }
+  });
+  test("another org or company in the payload is denied", async () => {
+    await assertFails(setDoc(doc(as("mk"), "notifications/n51-o"), n({createdBy: "mk", organizationUID: OTHER})));
+    await assertFails(setDoc(doc(as("ca"), "notifications/n51-c"), n({createdBy: "ca", companyUID: CO_B})));
+  });
+  test("own org or own company is accepted", async () => {
+    await assertSucceeds(setDoc(doc(as("mk"), "notifications/n51-ok1"), n({createdBy: "mk", organizationUID: ORG})));
+    await assertSucceeds(setDoc(doc(as("ca"), "notifications/n51-ok2"), n({createdBy: "ca", companyUID: CO_A})));
+    await assertSucceeds(setDoc(doc(as("hr"), "notifications/n51-ok3"), n({createdBy: "hr", companyId: CO_A})));
   });
 });
 
