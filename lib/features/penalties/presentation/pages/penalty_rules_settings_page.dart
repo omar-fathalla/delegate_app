@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/firestore/chunked_batch.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -114,20 +115,18 @@ class _PenaltyRulesSettingsPageState extends State<PenaltyRulesSettingsPage> {
 
       // Synchronize all existing penalties in Firestore matching this rule's title
       try {
-        final penaltiesSnap = await FirebaseFirestore.instance
-            .collection('penalties')
-            .where('title', isEqualTo: rule.title.trim())
-            .get();
-        if (penaltiesSnap.docs.isNotEmpty) {
-          final batch = FirebaseFirestore.instance.batch();
-          for (final doc in penaltiesSnap.docs) {
-            batch.update(doc.reference, {
-              'isConfidential': newValue,
-              'updatedAt': Timestamp.now(),
-            });
-          }
-          await batch.commit();
-        }
+        final fs = FirebaseFirestore.instance;
+        final penaltiesSnap = await penaltiesWithTitle(
+          fs,
+          rule.title,
+          companyUID: widget.adminDelegate.companyUID,
+        ).get();
+        await commitInChunks(fs, penaltiesSnap.docs, (b, doc) {
+          b.update(doc.reference, {
+            'isConfidential': newValue,
+            'updatedAt': Timestamp.now(),
+          });
+        });
       } catch (err) {
         debugPrint('Error syncing penalties on confidentiality toggle: $err');
       }
@@ -395,21 +394,19 @@ class _PenaltyRulesSettingsPageState extends State<PenaltyRulesSettingsPage> {
 
                         // Synchronize penalties matching old or new title
                         try {
-                          final penaltiesSnap = await FirebaseFirestore.instance
-                              .collection('penalties')
-                              .where('title', isEqualTo: ruleToEdit.title.trim())
-                              .get();
-                          if (penaltiesSnap.docs.isNotEmpty) {
-                            final batch = FirebaseFirestore.instance.batch();
-                            for (final doc in penaltiesSnap.docs) {
-                              batch.update(doc.reference, {
-                                'isConfidential': isConfidential,
-                                if (title != ruleToEdit.title) 'title': title,
-                                'updatedAt': Timestamp.now(),
-                              });
-                            }
-                            await batch.commit();
-                          }
+                          final fs = FirebaseFirestore.instance;
+                          final penaltiesSnap = await penaltiesWithTitle(
+                            fs,
+                            ruleToEdit.title,
+                            companyUID: widget.adminDelegate.companyUID,
+                          ).get();
+                          await commitInChunks(fs, penaltiesSnap.docs, (b, doc) {
+                            b.update(doc.reference, {
+                              'isConfidential': isConfidential,
+                              if (title != ruleToEdit.title) 'title': title,
+                              'updatedAt': Timestamp.now(),
+                            });
+                          });
                         } catch (err) {
                           debugPrint('Error syncing penalties on rule edit: $err');
                         }

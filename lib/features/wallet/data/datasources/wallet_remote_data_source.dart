@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/firestore/chunked_batch.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
@@ -129,12 +130,9 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
   @override
   Future<void> deleteWallet({required String userId}) async {
     final transSnap = await _walletsRef.doc(userId).collection('transactions').get();
-    final batch = _firestore.batch();
-    for (var doc in transSnap.docs) {
-      batch.delete(doc.reference);
-    }
-    batch.delete(_walletsRef.doc(userId));
-    await batch.commit();
+    // TAS-81: more than 500 transactions used to fail the whole delete.
+    await commitInChunks(_firestore, transSnap.docs, (b, doc) => b.delete(doc.reference));
+    await _walletsRef.doc(userId).delete();
   }
 
   @override
