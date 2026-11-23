@@ -2340,7 +2340,7 @@ service cloud.firestore {
     // users/{uid} per helper, so a create the rule should refuse (no tenant,
     // no createdBy) was refused by the 1000-expression budget instead.
     // Same principals: global staff; org- or company-scoped staff when the
-    // payload is in their org or company or they are the stated sender.
+    // payload is in their own org or company (TAS-51).
     function staffCreateNotificationOk() {
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
       let r = u.get('role', '');
@@ -2361,9 +2361,12 @@ service cloud.firestore {
             'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
             'branches-marketing-manager', 'branchesmarketingmanager', 'branchesMarketingManager'
           ]
+          // TAS-51: the payload must name the caller's own organization or
+          // company. `createdBy == auth.uid` alone let any staff notify any
+          // delegateUid; staff-to-anyone sends go through the
+          // sendStaffNotification callable (TAS-216).
           && ((org != '' && (d.get('organizationUID', '') == org || d.get('organizationId', '') == org))
-            || (co != '' && (d.get('companyUID', '') == co || d.get('companyId', '') == co))
-            || d.get('createdBy', '') == request.auth.uid));
+            || (co != '' && (d.get('companyUID', '') == co || d.get('companyId', '') == co))));
     }
 
     function canCreateNotification() {

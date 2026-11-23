@@ -687,6 +687,9 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
           'body': notifBody,
           'type': 'delegate_subscription_request',
           'requestId': requestId,
+          // TAS-51: sender and own company so the rules accept the alert.
+          'createdBy': supervisorUid,
+          'companyUID': companyUID,
           'senderName': supervisorName,
           'senderRole': 'supervisor',
           'createdAt': FieldValue.serverTimestamp(),
@@ -810,6 +813,10 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
           'body': notifBody,
           'type': 'delegate_delete_request',
           'requestId': requestId,
+          // TAS-51: sender and own company so the rules accept the alert.
+          'createdBy': supervisorUid,
+          'companyUID': delegate.companyUID,
+          'organizationUID': delegate.organizationUID,
           'senderName': supervisorName,
           'senderRole': 'supervisor',
           'createdAt': FieldValue.serverTimestamp(),
