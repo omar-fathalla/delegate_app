@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
+import 'package:delegate_app/core/widgets/keyed_stream_builder.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
@@ -343,20 +344,18 @@ class HRMoreBottomSheet extends StatelessWidget {
       size: 22,
     );
 
-    if (item.badgeCollection != null) {
-      Stream<QuerySnapshot>? pending;
-      try {
-        pending = FirebaseFirestore.instance
-            .collection(item.badgeCollection!)
-            .where('companyUID', isEqualTo: hrDelegate.companyUID)
+    final badgeCollection = item.badgeCollection;
+    if (badgeCollection != null) {
+      final companyUID = hrDelegate.companyUID;
+      // Created once per (collection, company), not on every build (TAS-90).
+      // If Firebase isn't ready the error leaves the count at zero.
+      icon = KeyedStreamBuilder<QuerySnapshot>(
+        streamKey: (badgeCollection, companyUID),
+        create: () => FirebaseFirestore.instance
+            .collection(badgeCollection)
+            .where('companyUID', isEqualTo: companyUID)
             .where('status', isEqualTo: 'pending')
-            .snapshots();
-      } catch (_) {
-        pending = null;
-      }
-      if (pending == null) return icon;
-      icon = StreamBuilder<QuerySnapshot>(
-        stream: pending,
+            .snapshots(),
         builder: (context, snapshot) {
           final count = snapshot.data?.docs.length ?? 0;
           return Badge(

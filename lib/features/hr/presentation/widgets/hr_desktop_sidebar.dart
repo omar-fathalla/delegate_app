@@ -4,6 +4,7 @@ import 'package:flutter/rendering.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
+import 'package:delegate_app/core/widgets/keyed_stream_builder.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -503,30 +504,30 @@ class HRDesktopSidebar extends StatelessWidget {
     );
 
     // إضافة شارة العداد الحي إذا كان العنصر مرتبطاً بطلبات معلقة
-    Stream<int>? pendingCount;
-    if (item.badgeCollection != null) {
-      try {
-        pendingCount = FirebaseFirestore.instance
-            .collection(item.badgeCollection!)
-            .where('companyUID', isEqualTo: delegate.companyUID)
-            .where('status', isEqualTo: 'pending')
-            .snapshots()
-            .map((s) => s.docs.length);
-      } catch (_) {
-        // Firebase isn't ready (tests, or a build without a default app).
-        pendingCount = null;
-      }
-    }
+    // Created once per (collection, company) by [KeyedStreamBuilder], not
+    // on every build (TAS-90). If Firebase isn't ready (tests, or a build
+    // without a default app) the error leaves the count at zero.
+    final badgeCollection = item.badgeCollection;
+    final companyUID = delegate.companyUID;
+    Widget pendingCount(AsyncWidgetBuilder<int> builder) =>
+        KeyedStreamBuilder<int>(
+          streamKey: (badgeCollection, companyUID),
+          create: () => FirebaseFirestore.instance
+              .collection(badgeCollection!)
+              .where('companyUID', isEqualTo: companyUID)
+              .where('status', isEqualTo: 'pending')
+              .snapshots()
+              .map((s) => s.docs.length),
+          builder: builder,
+        );
 
     // Web drawer rows show the count as trailing text beside the label
     // (M3 navigation drawer badge). The collapsed rail and mobile keep a
     // Badge on the icon, toned danger or warning from the theme.
     final trailingBadge = web && showLabels;
     Widget? trailing;
-    if (pendingCount != null && trailingBadge) {
-      trailing = StreamBuilder<int>(
-        stream: pendingCount,
-        builder: (context, snapshot) {
+    if (badgeCollection != null && trailingBadge) {
+      trailing = pendingCount((context, snapshot) {
           final count = snapshot.data ?? 0;
           if (count == 0) return const SizedBox.shrink();
           return Text(
@@ -539,11 +540,9 @@ class HRDesktopSidebar extends StatelessWidget {
           );
         },
       );
-    } else if (pendingCount != null) {
+    } else if (badgeCollection != null) {
       final status = HrStatusColors.of(context);
-      iconWidget = StreamBuilder<int>(
-        stream: pendingCount,
-        builder: (context, snapshot) {
+      iconWidget = pendingCount((context, snapshot) {
           final count = snapshot.data ?? 0;
           return Badge(
             isLabelVisible: count > 0,

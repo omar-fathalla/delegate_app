@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/widgets/keyed_stream_builder.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -1526,11 +1527,19 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
   // ----------------------------------------------------
   // Sent History / Outbox Tab with Realtime Read Status
   // ----------------------------------------------------
+  /// The outbox lists the most recent sent notifications only (TAS-90).
+  static const int _sentHistoryLimit = 50;
+
   Widget _buildSentHistoryTab() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
+    // Subscribed once, not on every build: the compose form calls setState
+    // on every keystroke (TAS-90). Shows the latest
+    // [_sentHistoryLimit] notifications, newest first.
+    return KeyedStreamBuilder<QuerySnapshot>(
+      streamKey: 'sent_notifications',
+      create: () => FirebaseFirestore.instance
           .collection('sent_notifications')
           .orderBy('createdAt', descending: true)
+          .limit(_sentHistoryLimit)
           .snapshots(),
       builder: (context, snapshot) {
         final colorScheme = Theme.of(context).colorScheme;
