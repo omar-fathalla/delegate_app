@@ -16,6 +16,7 @@ import 'delegate_subscription_requests_page.dart';
 import 'super_admin_payment_receipts_report_screen.dart';
 import 'super_admin_subscription_financial_report_screen.dart';
 import 'super_admin_session_control_screen.dart';
+import '../../data/super_admin_dashboard_stats.dart';
 import '../../../photo_permission/presentation/pages/super_admin_photos_and_permissions_screen.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -65,8 +66,10 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
   int _deductedFromCompanyCount = 0;
   int _totalDelegatesCount = 0;
 
-  StreamSubscription<QuerySnapshot>? _delegatesSubscription;
-  StreamSubscription<QuerySnapshot>? _delegateRequestsSubscription;
+  // TAS-89: counts are read on open / pull-to-refresh instead of through
+  // realtime listeners that re-read a document on every change.
+  Timer? _pendingRequestsTimer;
+  static const _pendingRequestsRefreshInterval = Duration(minutes: 2);
   int _pendingDelegateRequestsCount = 0;
 
   // Technical Support Suggestions / Feedbacks Stats
@@ -81,122 +84,69 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
     super.initState();
     _applyCachedDataIfAvailable();
     _loadStats();
-    _startRealtimeDelegatesListener();
-    _startRealtimeDelegateRequestsListener();
+    _refreshDelegateStatsOnOpen();
+    _refreshPendingDelegateRequestsCount();
+    // The tab stays alive in an IndexedStack, so keep the badge fresh with a
+    // cheap count() (1 read) instead of a listener on every pending doc.
+    _pendingRequestsTimer = Timer.periodic(
+      _pendingRequestsRefreshInterval,
+      (_) => _refreshPendingDelegateRequestsCount(),
+    );
   }
 
   @override
   void dispose() {
-    _delegatesSubscription?.cancel();
-    _delegateRequestsSubscription?.cancel();
+    _pendingRequestsTimer?.cancel();
     super.dispose();
   }
 
-  void _startRealtimeDelegateRequestsListener() {
-    _delegateRequestsSubscription?.cancel();
-    _delegateRequestsSubscription = FirebaseFirestore.instance
-        .collection('delegate_requests')
-        .where('status', isEqualTo: 'pending')
-        .snapshots()
-        .listen((snapshot) {
+  Future<void> _refreshPendingDelegateRequestsCount() async {
+    try {
+      final count = await countPendingDelegateRequests(FirebaseFirestore.instance);
       if (mounted) {
         setState(() {
-          _pendingDelegateRequestsCount = snapshot.docs.length;
+          _pendingDelegateRequestsCount = count;
         });
       }
-    }, onError: (e) {
-      debugPrint('Error in delegate requests realtime stream: $e');
-    });
+    } catch (e) {
+      debugPrint('Error counting pending delegate requests: $e');
+    }
   }
 
-  void _startRealtimeDelegatesListener() {
+  void _refreshDelegateStatsOnOpen() {
     if (widget.delegate.role != UserRole.superAdmin) return;
-    _delegatesSubscription?.cancel();
-
-    Query delegatesQuery = FirebaseFirestore.instance.collectionGroup('delegates');
-    if (widget.delegate.organizationUID.isNotEmpty) {
-      delegatesQuery = delegatesQuery.where('organizationUID', isEqualTo: widget.delegate.organizationUID);
-    }
-
-    _delegatesSubscription = delegatesQuery.snapshots().listen((snapshot) {
-      _processDelegatesSnapshot(snapshot.docs);
-    }, onError: (e) {
-      debugPrint('Error in delegates realtime stream: $e');
+    _refreshDelegateStats().catchError((Object e) {
+      debugPrint('Error loading delegate stats: $e');
     });
   }
 
-  void _processDelegatesSnapshot(List<QueryDocumentSnapshot> docs) {
-    int withImage = 0;
-    int emptyOrMissing = 0;
-    int approved = 0;
-    int deducted = 0;
-    int total = 0;
+  Future<void> _refreshDelegateStats() async {
+    final stats = await loadSuperAdminDelegateStats(
+      FirebaseFirestore.instance,
+      widget.delegate.organizationUID,
+    );
+    _applyDelegateStats(stats);
+  }
 
-    for (final doc in docs) {
-      final pathParts = doc.reference.path.split('/');
-      final orgUid = pathParts.length > 1 ? pathParts[1] : '';
-      if (widget.delegate.organizationUID.isNotEmpty && orgUid != widget.delegate.organizationUID) {
-        continue;
-      }
-
-      total++;
-      final data = doc.data() as Map<String, dynamic>? ?? {};
-      if (data['isDeductedFromCompany'] == true) {
-        deducted++;
-      }
-
-      final documentsList = data['documents'] as List? ?? [];
-      Map<String, dynamic>? electronicDoc;
-
-      for (final docItem in documentsList) {
-        if (docItem is Map<String, dynamic>) {
-          final key = docItem['documentKey']?.toString().toLowerCase() ?? '';
-          if (key == 'electronicpaymentreceipt' ||
-              key == 'electronic_payment_receipt' ||
-              key == 'electronicreceipt' ||
-              key == 'electronic_receipt') {
-            electronicDoc = docItem;
-            break;
-          }
-        }
-      }
-
-      if (electronicDoc != null) {
-        final url = (electronicDoc['documentURL']?.toString() ??
-                     electronicDoc['secondaryURL']?.toString() ?? '').trim();
-        final status = electronicDoc['documentStatus']?.toString().toLowerCase() ?? '';
-
-        if (url.isNotEmpty) {
-          withImage++;
-          if (status == 'approved') {
-            approved++;
-          }
-        } else {
-          emptyOrMissing++;
-        }
-      } else {
-        emptyOrMissing++;
-      }
-    }
-
+  void _applyDelegateStats(SuperAdminDelegateStats stats) {
     _cachedAdminStats = {
       ...?_cachedAdminStats,
-      'electronicWithImageCount': withImage,
-      'electronicEmptyCount': emptyOrMissing,
-      'electronicApprovedCount': approved,
-      'deductedFromCompanyCount': deducted,
-      'totalDelegatesCount': total,
-      'delegatesCount': total,
+      'electronicWithImageCount': stats.withImage,
+      'electronicEmptyCount': stats.emptyOrMissing,
+      'electronicApprovedCount': stats.approved,
+      'deductedFromCompanyCount': stats.deducted,
+      'totalDelegatesCount': stats.total,
+      'delegatesCount': stats.total,
     };
     _cachedAdminStatsTime = DateTime.now();
 
     if (mounted) {
       setState(() {
-        _electronicWithImageCount = withImage;
-        _electronicEmptyCount = emptyOrMissing;
-        _electronicApprovedCount = approved;
-        _deductedFromCompanyCount = deducted;
-        _totalDelegatesCount = total;
+        _electronicWithImageCount = stats.withImage;
+        _electronicEmptyCount = stats.emptyOrMissing;
+        _electronicApprovedCount = stats.approved;
+        _deductedFromCompanyCount = stats.deducted;
+        _totalDelegatesCount = stats.total;
         _isLoading = false;
       });
     }
@@ -231,6 +181,9 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
 
   Future<void> _loadStats({bool isPullToRefresh = false}) async {
     final isSupport = widget.delegate.role == UserRole.technicalSupport;
+    if (isPullToRefresh) {
+      unawaited(_refreshPendingDelegateRequestsCount());
+    }
 
     // If we already have fresh cached data and it's not a manual pull-to-refresh, don't show loading spinner
     final cacheTime = isSupport ? _cachedSupportStatsTime : _cachedAdminStatsTime;
@@ -352,12 +305,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
 
       // 2. If pull to refresh, refresh delegates explicitly
       if (isPullToRefresh) {
-        Query delegatesBaseQuery = firestore.collectionGroup('delegates');
-        if (orgUID.isNotEmpty) {
-          delegatesBaseQuery = delegatesBaseQuery.where('organizationUID', isEqualTo: orgUID);
-        }
-        final snap = await delegatesBaseQuery.get();
-        _processDelegatesSnapshot(snap.docs);
+        _applyDelegateStats(await loadSuperAdminDelegateStats(firestore, orgUID));
       }
 
       _cachedAdminStats = {
@@ -669,7 +617,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                         currentAdmin: widget.delegate,
                       ),
                     ),
-                  );
+                  ).then((_) => _refreshPendingDelegateRequestsCount());
                 },
               ),
               _buildActionButton(
@@ -947,7 +895,7 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                         currentAdmin: widget.delegate,
                       ),
                     ),
-                  );
+                  ).then((_) => _refreshPendingDelegateRequestsCount());
                 },
               ),
               _buildActionButton(
