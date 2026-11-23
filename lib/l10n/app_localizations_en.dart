@@ -1567,7 +1567,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get locationTimeout =>
-      'Timed out getting your location. Make sure GPS is on and you\'re in an open area.';
+      'We couldn\'t get your location. Stand in an open area, open Google Maps until the blue dot settles, turn on Google Location Accuracy, then try again.';
 
   @override
   String get locationError => 'Couldn\'t get your location. Try again.';
