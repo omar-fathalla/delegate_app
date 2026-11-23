@@ -38,7 +38,7 @@ test("isDeletedDelegateStatus", () => {
 
 test("planDeletedLinkCleanup: still linked elsewhere -> nothing", () => {
   const plan = identity.planDeletedLinkCleanup({ remainingLiveLinks: 1, usersRole: null });
-  assert.deepEqual(plan, { clearDeviceBinding: false, cancelUnbindRequests: false, revokeSessions: false, reason: "still_linked" });
+  assert.deepEqual(plan, { clearDeviceBinding: false, cancelUnbindRequests: false, revokeSessions: false, deleteUsersDoc: false, reason: "still_linked" });
 });
 
 test("planDeletedLinkCleanup: staff uid with a ghost doc is never revoked", () => {
@@ -47,14 +47,25 @@ test("planDeletedLinkCleanup: staff uid with a ghost doc is never revoked", () =
     assert.equal(plan.reason, "staff_account", role);
     assert.equal(plan.revokeSessions, false);
     assert.equal(plan.clearDeviceBinding, false);
+    assert.equal(plan.deleteUsersDoc, false, role);
   }
 });
 
 test("planDeletedLinkCleanup: last link gone -> clear binding, unbind requests, sessions", () => {
   for (const role of [null, "", "delegate", "Promoter"]) {
     const plan = identity.planDeletedLinkCleanup({ remainingLiveLinks: 0, usersRole: role });
-    assert.deepEqual(plan, { clearDeviceBinding: true, cancelUnbindRequests: true, revokeSessions: true, reason: "no_links_left" }, String(role));
+    assert.deepEqual(plan, {
+      clearDeviceBinding: true, cancelUnbindRequests: true, revokeSessions: true,
+      deleteUsersDoc: role !== null, reason: "no_links_left",
+    }, String(role));
   }
+});
+
+test("TAS-217: users/{id} is deleted only when it exists with a delegate role", () => {
+  assert.equal(identity.planDeletedLinkCleanup({ remainingLiveLinks: 0, usersRole: "delegate" }).deleteUsersDoc, true);
+  assert.equal(identity.planDeletedLinkCleanup({ remainingLiveLinks: 0, usersRole: null }).deleteUsersDoc, false);
+  assert.equal(identity.planDeletedLinkCleanup({ remainingLiveLinks: 1, usersRole: "delegate" }).deleteUsersDoc, false);
+  assert.equal(identity.planDeletedLinkCleanup({ remainingLiveLinks: 0, usersRole: "hr" }).deleteUsersDoc, false);
 });
 
 const REAL = {
