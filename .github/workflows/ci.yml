@@ -278,7 +278,8 @@ jobs:
     # CLI boot, rules load, test bodies; no download or install step stood
     # out), then both e2e suites ~2 min each, so 35 min cut off the last
     # one. Mac: 50 min (~36 min measured + headroom); hosted: 20 min.
-    timeout-minutes: ${{ github.event.repository.private && 50 || 20 }}
+    # TAS-255: every test:rules* suite now runs (8 more), so Mac 90 / hosted 30.
+    timeout-minutes: ${{ github.event.repository.private && 90 || 30 }}
     steps:
       - uses: actions/checkout@v4
       - name: Sanitize PATH for delegate-ci
@@ -302,7 +303,16 @@ jobs:
       - name: Install functions deps
         run: npm --prefix functions ci
       - name: Rules tests
-        run: npm run test:rules && npm run test:rules:interim && npm run test:rules:p0 && npm run test:rules:adv && npm run test:rules:docs && npm run test:rules:subs && npm run test:rules:budget && npm run test:rules:qa-hold && npm run test:rules:profile && npm run test:rules:m31 && npm run test:rules:source && npm run test:rules:gaps && npm run test:rules:security && npm run test:rules:ut-nb && npm run test:rules:nationalid-scope && npm run test:rules:users-nationalid-lock && npm run test:rules:paymob-superseded && npm run test:rules:privileged-reupload && npm run test:rules:ghost && npm run test:rules:tas254
+        # TAS-255: every test:rules* script in package.json, the same list
+        # scripts/ci/jobs.sh (ci_rules_scripts) runs locally. A hand-written
+        # list here had drifted: 8 suites ran locally only.
+        run: |
+          set -e
+          for s in $(node -e 'const s=require("./package.json").scripts||{};console.log(Object.keys(s).filter(k=>/^test:rules(:|$)/.test(k)).join("\n"))'); do
+            echo "::group::npm run $s"
+            npm run "$s"
+            echo "::endgroup::"
+          done
       - name: Subscriptions e2e (suspension job + Paymob hook on emulator)
         run: npm run test:e2e:subscriptions
       - name: Delegate login e2e (delegateLoginV2 -> custom token -> 1.14.3 query)
