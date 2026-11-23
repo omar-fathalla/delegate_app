@@ -476,9 +476,7 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
                   ? 'صفحة الكتالوج وإضافة وتعديل المنتجات'
                   : 'صفحة الكتالوج وعرض المنتجات والأسعار المعتمدة',
               statusPillText: canOpenCatalog
-                  ? (canEdit
-                      ? (isArabic ? 'الكتالوج' : 'Catalog')
-                      : 'Catalog')
+                  ? (isArabic ? 'الكتالوج' : 'Catalog')
                   : (isArabic ? 'يتطلب صلاحية' : 'Restricted'),
               isPermitted: canOpenCatalog,
               onTap: () {

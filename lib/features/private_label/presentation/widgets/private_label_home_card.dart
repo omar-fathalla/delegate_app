@@ -94,7 +94,7 @@ class _HomeCardView extends StatelessWidget {
           pendingCount: state.pendingDrafts.length,
           onOpen: () => _open(context),
           onOpenCatalog: () => _openCatalog(context),
-          catalogButtonLabel: 'Catalog',
+          catalogButtonLabel: 'الكتالوج',
           onRegisterRestToday: canEditRest && kpi.remainingRestDays > 0
               ? () => _rest(context, cancel: false)
               : null,

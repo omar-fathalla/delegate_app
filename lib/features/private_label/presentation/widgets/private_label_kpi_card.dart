@@ -65,7 +65,7 @@ class PrivateLabelKpiCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Private Label',
+                      'العلامة الخاصة',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: cs.onSurface,
@@ -145,7 +145,7 @@ class PrivateLabelKpiCard extends StatelessWidget {
               child: FilledButton.tonalIcon(
                 onPressed: onOpenCatalog,
                 icon: const Icon(Icons.inventory_2_rounded, size: 18),
-                label: Text(catalogButtonLabel ?? 'Catalog'),
+                label: Text(catalogButtonLabel ?? 'الكتالوج'),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(0, 44),
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -165,7 +165,7 @@ class PrivateLabelKpiCard extends StatelessWidget {
                   OutlinedButton.icon(
                     onPressed: onOpenCatalog,
                     icon: const Icon(Icons.inventory_2_rounded, size: 18),
-                    label: Text(catalogButtonLabel ?? 'Catalog'),
+                    label: Text(catalogButtonLabel ?? 'الكتالوج'),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(0, 44),
                       padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -180,7 +180,7 @@ class PrivateLabelKpiCard extends StatelessWidget {
                       size: 18,
                       textDirection: TextDirection.ltr,
                     ),
-                    label: const Text('Open Private Label'),
+                    label: const Text('فتح العلامة الخاصة'),
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(0, 44),
                       padding: const EdgeInsets.symmetric(horizontal: 16),
