@@ -17,6 +17,8 @@ const {
   doc,
   getDoc,
   getDocs,
+  limit,
+  orderBy,
   query,
   setDoc,
   where,
@@ -149,6 +151,34 @@ describe("m31 delegate own-data queries", () => {
       where("companyUID", "==", "c1"),
       where("delegateUid", "==", "del-2"),
     )));
+  });
+
+  // TAS-212 (2026-11-23): attendance history + recent sessions use
+  // delegateId whereIn [uid] + orderBy timestamp. With a users/{uid} doc the
+  // staff branches went over the 1000-expression budget and the delegate's
+  // own history came back permission-denied on tashil-dev.
+  test("delegate attendance history queries with users doc", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.doc("users/del-1").set({
+        uid: "del-1", role: "delegate", position: "Supervisor",
+        organizationUID: "o1", companyUID: "c1",
+      });
+      await db.doc("attendance_logs/a1").set({
+        delegateId: "del-1", organizationId: "o1", organizationUID: "o1",
+        companyUID: "c1", type: "check_in", timestamp: new Date(),
+      });
+    });
+    const logs = collection(as("del-1", DELEGATE), "attendance_logs");
+    await assertSucceeds(getDocs(query(logs,
+      where("organizationId", "==", "o1"),
+      where("delegateId", "in", ["del-1"]),
+      orderBy("timestamp", "desc"), limit(40))));
+    await assertSucceeds(getDocs(query(logs,
+      where("delegateId", "in", ["del-1"]),
+      orderBy("timestamp", "desc"), limit(18))));
+    // Another delegate's history stays denied: covered by "delegate cannot
+    // list another delegate's attendance" (budget-baselined, TAS-105).
   });
 
   test("delegate can query own notifications by uid and by phone claim", async () => {

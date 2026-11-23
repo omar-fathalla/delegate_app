@@ -2003,15 +2003,22 @@ service cloud.firestore {
     // ==================== MOBILE: ATTENDANCE ====================
 
     function canReadAttendance() {
-      return signedIn() && (
-        isGlobalStaff()
-        || (isCompanyScopedStaff() && companyScoped())
-        || (isOrgScopedStaff() && orgScoped())
-        || ownsDelegateId(resource.data.delegateId)
-        || ownsDelegateId(resource.data.userId)
-        || delegateOwns(resource.data.delegateId)
-        || delegateOwns(resource.data.userId)
-      );
+      // Delegate tokens are decided by claims only: the staff branches read
+      // users/{uid} and pushed delegate history queries (delegateId whereIn
+      // [uid] + orderBy timestamp) over the 1000-expression budget (TAS-212).
+      // Staff tokens keep the original order and checks.
+      return signedIn() && (staffToken()
+        ? (isGlobalStaff()
+          || (isCompanyScopedStaff() && companyScoped())
+          || (isOrgScopedStaff() && orgScoped())
+          || ownsDelegateId(resource.data.delegateId)
+          || ownsDelegateId(resource.data.userId)
+          || delegateOwns(resource.data.delegateId)
+          || delegateOwns(resource.data.userId))
+        : (ownsDelegateId(resource.data.delegateId)
+          || ownsDelegateId(resource.data.userId)
+          || delegateOwns(resource.data.delegateId)
+          || delegateOwns(resource.data.userId)));
     }
 
     // Minimal expressions (raw get, no callerOrg/isOrgAdmin) so this
@@ -2074,7 +2081,7 @@ service cloud.firestore {
     }
 
     match /attendance_logs/{logId} {
-      allow read: if canReadOrgAdminAttendanceByOrgId();
+      allow read: if staffToken() && canReadOrgAdminAttendanceByOrgId();
       allow read: if canReadAttendance();
       allow create: if canCreateAttendance();
       allow update: if canUpdateAttendance();
