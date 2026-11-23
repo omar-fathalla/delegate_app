@@ -57,6 +57,19 @@ void main() {
     expect(await firstInvalidRequestChain(firestore: db, companyUID: 'c1', orgIds: ['of']), isNull);
   });
 
+  test('TAS-256: the base chain is available even when the company is not in it', () async {
+    final db = FakeFirebaseFirestore();
+    await db.doc('organizations/of').set({'name': 'فتح الله (تجريبي)'});
+    await db.doc('organizations/oh').set({'name': 'fathalla other'});
+    await db.doc('config/subscriptions').set({'freeChainOrgUids': ['of']});
+    expect(await firstInvalidRequestChain(firestore: db, companyUID: 'c-new', orgIds: ['of']), isNull);
+    // Another hidden chain that is not the base chain stays blocked.
+    expect(await firstInvalidRequestChain(firestore: db, companyUID: 'c-new', orgIds: ['of', 'oh']), 'oh');
+    // A base chain id that does not exist is still refused.
+    await db.doc('config/subscriptions').set({'freeChainOrgUids': ['gone']});
+    expect(await firstInvalidRequestChain(firestore: db, companyUID: 'c-new', orgIds: ['gone']), 'gone');
+  });
+
   test('approvalStampBlocks only on a real failure', () {
     expect(approvalStampBlocks(null), isFalse);
     expect(approvalStampBlocks({'orgCompanyCheck': 'ok'}), isFalse);

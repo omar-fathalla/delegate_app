@@ -236,10 +236,28 @@ Future<String?> _freeCompanyCode(
   }
 }
 
+/// Ids in `config/subscriptions.freeChainOrgUids` (the base chain). Empty when
+/// the config is missing or unreadable.
+Future<Set<String>> loadFreeChainIds(FirebaseFirestore firestore) async {
+  try {
+    final cfg = await firestore.doc('config/subscriptions').get();
+    final raw = cfg.data()?['freeChainOrgUids'];
+    if (raw is! List) return const {};
+    return {
+      for (final v in raw)
+        if ((v?.toString().trim() ?? '').isNotEmpty) v.toString().trim(),
+    };
+  } catch (_) {
+    return const {};
+  }
+}
+
 /// Client re-check used when the server stamp is missing (or is the old
 /// "org_not_in_company" failure): every chain must exist, and a hidden chain
-/// is allowed only when the company is already in it. Returns the first bad
-/// chain id, or null.
+/// is allowed only when the company is already in it, or when it is the base
+/// chain (TAS-254 / TAS-256: every new delegate is registered there and
+/// approval registers the company in it). Returns the first bad chain id, or
+/// null.
 Future<String?> firstInvalidRequestChain({
   required FirebaseFirestore firestore,
   required String companyUID,
@@ -250,9 +268,11 @@ Future<String?> firstInvalidRequestChain({
     for (final raw in orgIds)
       if (raw.trim().isNotEmpty) raw.trim(),
   ];
+  final freeChains = await loadFreeChainIds(firestore);
   final bad = await Future.wait(ids.map((orgId) async {
     final org = await firestore.collection('organizations').doc(orgId).get();
     if (!org.exists) return true;
+    if (freeChains.contains(orgId)) return false;
     final data = org.data() ?? const <String, dynamic>{};
     final name = (data['name'] ?? data['title'] ?? orgId).toString();
     if (isHiddenChain(uid: orgId, name: name)) {

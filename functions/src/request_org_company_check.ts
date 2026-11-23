@@ -20,6 +20,14 @@ import {
 
 if (admin.apps.length === 0) admin.initializeApp();
 
+/** Ids in config/subscriptions.freeChainOrgUids (the base chain). */
+export async function freeChainIds(db: FirebaseFirestore.Firestore): Promise<Set<string>> {
+  const cfg = await db.doc("config/subscriptions").get();
+  const raw = cfg.exists ? cfg.get("freeChainOrgUids") : undefined;
+  if (!Array.isArray(raw)) return new Set();
+  return new Set(raw.map((v) => String(v ?? "").trim()).filter((v) => v.length > 0));
+}
+
 export async function unavailableOrgsForRequest(
   db: FirebaseFirestore.Firestore,
   companyUID: string,
@@ -30,11 +38,13 @@ export async function unavailableOrgsForRequest(
   // Two batched reads instead of 2 sequential reads per chain.
   const orgs = await db.getAll(...orgIds.map((id) => db.doc(`organizations/${id}`)));
   const cos = await db.getAll(...orgIds.map((id) => db.doc(`organizations/${id}/companies/${companyUID}`)));
+  const freeChains = await freeChainIds(db);
   orgIds.forEach((orgId, i) => {
     const org = orgs[i];
     const name = org.exists ? (org.get("name") ?? org.get("title") ?? orgId) : orgId;
     const companyInChain = org.exists && cos[i].exists;
-    if (!chainAvailableForRequest({orgExists: org.exists, orgId, orgName: name, companyInChain})) {
+    const isBaseChain = freeChains.has(orgId);
+    if (!chainAvailableForRequest({orgExists: org.exists, orgId, orgName: name, companyInChain, isBaseChain})) {
       missing.push(orgId);
     }
   });

@@ -41,6 +41,12 @@ test("delegateCreateCompanyMissing is true when the parent company doc is absent
   assert.equal(L.delegateCreateCompanyMissing({orgId: "", companyId: "c1", companyExists: true}), true);
 });
 
+test("TAS-256: the base chain is available for a company not in it yet", () => {
+  assert.equal(L.chainAvailableForRequest({orgExists: true, orgId: "o1", orgName: "fathalla market", companyInChain: false, isBaseChain: true}), true);
+  assert.equal(L.chainAvailableForRequest({orgExists: false, orgId: "o1", orgName: "", companyInChain: false, isBaseChain: true}), false);
+  assert.equal(L.chainAvailableForRequest({orgExists: true, orgId: "o2", orgName: "fathalla other", companyInChain: false, isBaseChain: false}), false);
+});
+
 test("chainAvailableForRequest: any existing chain, hidden only when already registered (2026-11-17)", () => {
   assert.equal(L.chainAvailableForRequest({orgExists: true, orgId: "o-carrefour", orgName: "كارفور", companyInChain: false}), true);
   assert.equal(L.chainAvailableForRequest({orgExists: false, orgId: "o-gone", orgName: "", companyInChain: false}), false);

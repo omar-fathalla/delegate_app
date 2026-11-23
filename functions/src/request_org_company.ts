@@ -70,14 +70,17 @@ export function isHiddenChain(uid: unknown, name: unknown): boolean {
 }
 
 /** A requested chain is available when it exists and is not hidden, or is
- * hidden but the company is already in it. */
+ * hidden but the company is already in it, or is the base (free) chain
+ * (TAS-256: every new delegate goes there; approval registers the company). */
 export function chainAvailableForRequest(opts: {
   orgExists: boolean;
   orgId: string;
   orgName: unknown;
   companyInChain: boolean;
+  isBaseChain?: boolean;
 }): boolean {
   if (!opts.orgExists) return false;
+  if (opts.isBaseChain === true) return true;
   if (!isHiddenChain(opts.orgId, opts.orgName)) return true;
   return opts.companyInChain;
 }
