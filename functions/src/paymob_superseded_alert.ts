@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+import {sendToUserToken} from "./fcm_token_cleanup";
 import {
   PRIVILEGED_ALERT_ROLE_VALUES,
   privilegedAlertDoc,
@@ -47,7 +48,7 @@ async function sendFcmTokenPush(
   const tokenDoc = await db.collection("fcm_tokens").doc(recipientUid).get();
   const token = str(tokenDoc.get("token"));
   if (!token) return false;
-  await messaging.send({
+  return sendToUserToken(db, messaging, recipientUid, {
     token,
     notification: {title: payload.title, body: payload.body},
     android: {
@@ -70,7 +71,6 @@ async function sendFcmTokenPush(
       paymobTransactionId: payload.txId,
     },
   });
-  return true;
 }
 
 export interface PaymobSupersededAlertResult {

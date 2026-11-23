@@ -1,6 +1,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import {photoPermissionNotifyUserIds} from "./photo_permission_notify_logic";
+import {pruneDeadFromMulticast, sendToUserToken} from "./fcm_token_cleanup";
 
 admin.initializeApp();
 
@@ -72,6 +73,7 @@ export const onPhotoPermissionCreated = functions.firestore
 
       const batch = admin.firestore().batch();
       const fcmTokens: string[] = [];
+      const fcmRecipients: Array<{uid: string; token: string}> = [];
 
       for (const userId of targetUserIds) {
         const notificationRef = admin.firestore().collection("notifications").doc();
@@ -90,13 +92,14 @@ export const onPhotoPermissionCreated = functions.firestore
         const tokenDoc = await admin.firestore().collection("fcm_tokens").doc(userId).get();
         if (tokenDoc.exists && tokenDoc.data()?.token) {
           fcmTokens.push(tokenDoc.data()!.token);
+          fcmRecipients.push({uid: userId, token: tokenDoc.data()!.token});
         }
       }
 
       await batch.commit();
 
       if (fcmTokens.length > 0) {
-        await admin.messaging().sendEachForMulticast({
+        const multicast = await admin.messaging().sendEachForMulticast({
           notification: {
             title: notificationTitle,
             body: notificationBody,
@@ -109,6 +112,7 @@ export const onPhotoPermissionCreated = functions.firestore
           },
           tokens: fcmTokens,
         });
+        await pruneDeadFromMulticast(admin.firestore(), fcmRecipients, multicast);
       }
       return null;
     } catch (error) {
@@ -167,7 +171,7 @@ export const onPhotoPermissionUpdated = functions.firestore
 
       const tokenDoc = await admin.firestore().collection("fcm_tokens").doc(requestedBy).get();
       if (tokenDoc.exists && tokenDoc.data()?.token) {
-        await admin.messaging().send({
+        await sendToUserToken(admin.firestore(), admin.messaging(), requestedBy, {
           notification: {
             title: notificationTitle,
             body: notificationBody,
@@ -276,7 +280,7 @@ export const onNotificationCreated = functions.firestore
 
         if (tokenDoc.exists && tokenDoc.data()?.token) {
           const fcmToken = tokenDoc.data()!.token;
-          await admin.messaging().send({
+          const delivered = await sendToUserToken(admin.firestore(), admin.messaging(), recipientUid, {
             notification: { title, body },
             android: {
               priority: "high",
@@ -302,7 +306,7 @@ export const onNotificationCreated = functions.firestore
             },
             token: fcmToken,
           });
-          console.log(`Successfully sent FCM push notification to delegate ${recipientUid}`);
+          if (delivered) console.log(`Successfully sent FCM push notification to delegate ${recipientUid}`);
         } else {
           console.log(`No active FCM token found for recipient ${recipientUid}`);
         }
