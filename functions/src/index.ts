@@ -372,6 +372,10 @@ export {
   autoLinkOnUserStatus,
   reconcileCompanyChainLinksDaily,
 } from "./company_chain_autolink";
+export {
+  enforceSingleDelegatePublicId,
+  enforceSingleDelegatePublicIdOnUser,
+} from "./delegate_public_id";
 export {suspendExpiredSubscriptions} from "./subscription_schedule";
 export {
   expireAbandonedSubscriptionRenewals,
