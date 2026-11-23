@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/firestore/chunked_batch.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -970,19 +971,13 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
 
       // Synchronize all existing penalties matching this rule's title
       if (ruleTitle != null && ruleTitle.trim().isNotEmpty) {
-        final penaltiesSnap = await _penaltiesRef
-            .where('title', isEqualTo: ruleTitle.trim())
-            .get();
-        if (penaltiesSnap.docs.isNotEmpty) {
-          final batch = firestore.batch();
-          for (final doc in penaltiesSnap.docs) {
-            batch.update(doc.reference, {
-              'isConfidential': isConfidential,
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-          }
-          await batch.commit();
-        }
+        final penaltiesSnap = await penaltiesWithTitle(firestore, ruleTitle).get();
+        await commitInChunks(firestore, penaltiesSnap.docs, (b, doc) {
+          b.update(doc.reference, {
+            'isConfidential': isConfidential,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        });
       }
     } catch (e) {
       throw ServerException('فشل في تعديل حالة سرية الغرامة: $e');
