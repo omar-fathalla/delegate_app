@@ -2,4 +2,5 @@
 abstract final class CloudCallableNames {
   static const listGlobalNotifyStaff = 'listGlobalNotifyStaff';
   static const checkDelegateDuplicate = 'checkDelegateDuplicate';
+  static const sendStaffNotification = 'sendStaffNotification';
 }

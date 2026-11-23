@@ -323,6 +323,7 @@ export {onDelegateLinkDeleted} from "./delegate_link_deleted";
 export {confirmDelegateOtp} from "./confirm_delegate_otp";
 export {staffPhoneLookup} from "./staff_phone_lookup";
 export {listGlobalNotifyStaff} from "./list_global_notify_staff";
+export {sendStaffNotification} from "./send_staff_notification";
 
 export {createStaffUser, resendStaffSetupLink, claimInvite} from "./staff_accounts";
 export {

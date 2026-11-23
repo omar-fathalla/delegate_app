@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
+import 'package:delegate_app/core/constants/cloud_functions.dart';
+import 'package:delegate_app/features/notifications/data/send_staff_notification_request.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 /// مركز بث وإرسال الإشعارات السحابية الشامل
@@ -109,295 +112,45 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
     );
   }
 
-  String _formatUserNameAndRole(Map<String, dynamic> data) {
-    final role = (data['role'] ?? '').toString();
-    final displayName = (data['displayName'] ?? '').toString().trim();
-    final fullName = (data['fullName'] ?? data['name'] ?? '').toString().trim();
-
-    final normRole = role.toLowerCase().replaceAll('-', '_');
-    if (normRole == 'super_admin' || normRole == 'superadmin') {
-      return 'Super Admin';
-    }
-    if (role == 'technicalSupport' || role == 'technical-support') {
-      return 'Technical Support';
-    }
-    if (role == 'organization-admin' || role == 'organizationAdmin') {
-      return fullName.isNotEmpty && fullName != 'admin' ? 'مدير عام ($fullName)' : 'مدير عام';
-    }
-    if (role == 'company-admin' || role == 'admin') {
-      return fullName.isNotEmpty && fullName != 'admin' ? 'مشرف شركة ($fullName)' : 'مشرف شركة';
-    }
-    if (role == 'marketing') {
-      return fullName.isNotEmpty ? 'تسويق الفروع ($fullName)' : 'تسويق الفروع';
-    }
-    if (role == 'marketing_promotion' || role == 'marketingPromotion') {
-      return fullName.isNotEmpty ? 'تسويق العروض ($fullName)' : 'تسويق العروض';
-    }
-
-    if (displayName.isNotEmpty && displayName != 'admin' && displayName != 'user') {
-      return displayName;
-    }
-    if (fullName.isNotEmpty && fullName != 'admin' && fullName != 'user') {
-      return fullName;
-    }
-    return 'مستخدم';
-  }
-
-  Future<Map<String, dynamic>?> _findUserByPhone(String rawPhone) async {
-    final cleanPhone = rawPhone.replaceAll(RegExp(r'\s+'), '').trim();
-    if (cleanPhone.isEmpty) return null;
-
-    final variations = <String>{
-      cleanPhone,
-      cleanPhone.startsWith('0') ? cleanPhone.substring(1) : '0$cleanPhone',
-      if (!cleanPhone.startsWith('+')) '+20$cleanPhone',
-      if (!cleanPhone.startsWith('+') && cleanPhone.startsWith('0'))
-        '+20${cleanPhone.substring(1)}',
-      if (!cleanPhone.startsWith('+')) '+971$cleanPhone',
-    };
-
-    final firestore = FirebaseFirestore.instance;
-
-    for (final phoneVar in variations) {
-      for (final field in ['phoneNumber', 'phone', 'mobile', 'mobileNumber']) {
-        final query =
-            await firestore
-                .collection('users')
-                .where(field, isEqualTo: phoneVar)
-                .limit(1)
-                .get();
-        if (query.docs.isNotEmpty) {
-          final doc = query.docs.first;
-          final data = doc.data();
-          return {
-            'uid': data['uid'] ?? doc.id,
-            'name': _formatUserNameAndRole(data),
-            'phone': phoneVar,
-            'organizationUID': data['organizationUID'] ?? '',
-            'companyUID': data['companyUID'] ?? '',
-            'role': data['role'] ?? 'user',
-          };
-        }
-      }
-    }
-
-    for (final phoneVar in variations) {
-      for (final field in ['phoneNumber', 'phone', 'mobile', 'mobileNumber']) {
-        final query =
-            await firestore
-                .collectionGroup('delegates')
-                .where(field, isEqualTo: phoneVar)
-                .limit(1)
-                .get();
-        if (query.docs.isNotEmpty) {
-          final doc = query.docs.first;
-          final data = doc.data();
-          return {
-            'uid': data['uid'] ?? doc.id,
-            'name': _formatUserNameAndRole(data),
-            'phone': phoneVar,
-            'organizationUID': data['organizationUID'] ?? '',
-            'companyUID': data['companyUID'] ?? '',
-            'role': data['role'] ?? 'delegate',
-          };
-        }
-      }
-    }
-
-    return null;
-  }
-
   Future<void> _sendNotification() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSending = true);
 
     final title = _titleController.text.trim();
     final body = _bodyController.text.trim();
-    final firestore = FirebaseFirestore.instance;
 
     try {
-      int sentCount = 0;
-      String targetName = 'جميع مستخدمي التطبيق (الكل)';
-      String targetDetails = '';
-      String? targetUid;
+      // TAS-216: targeting and writes run in the scoped callable. The
+      // server reads the sender's role and scope from users/{uid}.
+      final payload = buildSendStaffNotificationPayload(
+        title: title,
+        body: body,
+        type: _selectedType,
+        audience: _targetAudience,
+        role: _selectedRole,
+        organizationUid: _selectedOrgUID,
+        phone: _phoneController.text,
+      );
+      final result = await FirebaseFunctions.instanceFor(region: 'us-central1')
+          .httpsCallable(CloudCallableNames.sendStaffNotification)
+          .call<dynamic>(payload);
+      final data = result.data is Map
+          ? Map<String, dynamic>.from(result.data as Map)
+          : const <String, dynamic>{};
+      final sentCount = (data['sent'] as num?)?.toInt() ?? 0;
+      final targetName = (data['targetName'] as String?) ?? '';
 
-      final sentLogRef = firestore.collection('sent_notifications').doc();
-      final String broadcastId = sentLogRef.id;
-
-      if (_targetAudience == 'all') {
-        targetName = 'جميع مستخدمي التطبيق (بث عام)';
-        targetDetails = 'بث مباشر عبر FCM Topic (app_updates) لجميع هواتف Android و iOS';
-
-        // 1. Write single global broadcast document
-        // This triggers Cloud Function `onNotificationCreated` which broadcasts to topic 'app_updates'
-        await firestore.collection('notifications').add({
-          'delegateUid': 'all',
-          'organizationId': '',
-          'companyId': '',
-          'title': title,
-          'body': body,
-          'type': _selectedType,
-          'isRead': false,
-          'createdAt': FieldValue.serverTimestamp(),
-          'senderName': widget.senderDelegate.fullName,
-          'senderRole': widget.senderDelegate.role.name,
-          'senderUid': widget.senderDelegate.uid,
-          'broadcastId': broadcastId,
-        });
-
-        sentCount = 1;
-      } else if (_targetAudience == 'org' && _selectedOrgUID != null) {
-        final org = _organizations.firstWhere(
-          (o) => o['uid'] == _selectedOrgUID,
-          orElse: () => {'name': _selectedOrgUID},
-        );
-        targetName = 'منظمة: ${org['name']}';
-        targetDetails = 'جميع أعضاء ومناديب ${org['name']}';
-
-        final snap = await firestore.collectionGroup('delegates').get();
-        final batch = firestore.batch();
-        int count = 0;
-
-        for (final doc in snap.docs) {
-          final data = doc.data();
-          final pathParts = doc.reference.path.split('/');
-          final docOrgUid =
-              data['organizationUID'] ??
-              (pathParts.length > 1 ? pathParts[1] : '');
-
-          if (docOrgUid == _selectedOrgUID) {
-            final uid = data['uid'] ?? doc.id;
-            final compId = data['companyUID'] ?? '';
-            final newRef = firestore.collection('notifications').doc();
-            batch.set(newRef, {
-              'delegateUid': uid,
-              'organizationId': _selectedOrgUID,
-              'companyId': compId,
-              'title': title,
-              'body': body,
-              'type': _selectedType,
-              'isRead': false,
-              'createdAt': FieldValue.serverTimestamp(),
-              'senderName': widget.senderDelegate.fullName,
-              'senderRole': widget.senderDelegate.role.name,
-              'senderUid': widget.senderDelegate.uid,
-              'broadcastId': broadcastId,
-            });
-            count++;
-            if (count % 450 == 0) {
-              await batch.commit();
-            }
-          }
+      if (sentCount == 0) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('لم يتم العثور على مستلمين لهذا الاختيار داخل نطاقك.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
         }
-        await batch.commit();
-        sentCount = count;
-      } else if (_targetAudience == 'role') {
-        final roleLabel = _getRoleLabel(_selectedRole);
-        targetName = 'فئة: $roleLabel';
-        targetDetails = 'جميع المستخدمين الحاملين لرتبة $roleLabel';
-
-        final usersSnap = await firestore
-            .collection('users')
-            .where('role', isEqualTo: _selectedRole)
-            .get();
-        final batch = firestore.batch();
-        int count = 0;
-
-        for (final doc in usersSnap.docs) {
-          final data = doc.data();
-          final uid = data['uid'] ?? doc.id;
-          final newRef = firestore.collection('notifications').doc();
-          batch.set(newRef, {
-            'delegateUid': uid,
-            'organizationId': data['organizationUID'] ?? '',
-            'companyId': data['companyUID'] ?? '',
-            'title': title,
-            'body': body,
-            'type': _selectedType,
-            'isRead': false,
-            'createdAt': FieldValue.serverTimestamp(),
-            'senderName': widget.senderDelegate.fullName,
-            'senderRole': widget.senderDelegate.role.name,
-            'senderUid': widget.senderDelegate.uid,
-            'broadcastId': broadcastId,
-          });
-          count++;
-          if (count % 450 == 0) {
-            await batch.commit();
-          }
-        }
-        await batch.commit();
-        sentCount = count;
-      } else if (_targetAudience == 'user') {
-        final phoneInput = _phoneController.text.trim();
-        final matchedUser = await _findUserByPhone(phoneInput);
-
-        if (matchedUser != null) {
-          targetUid = matchedUser['uid'];
-          final uName = matchedUser['name'] ?? 'مستخدم';
-          final uPhone = matchedUser['phone'] ?? phoneInput;
-          targetName = uName;
-          targetDetails = 'مستخدم محدد: $uName';
-
-          await firestore.collection('notifications').add({
-            'delegateUid': targetUid,
-            'phoneNumber': uPhone,
-            'organizationId': matchedUser['organizationUID'] ?? '',
-            'companyId': matchedUser['companyUID'] ?? '',
-            'title': title,
-            'body': body,
-            'type': _selectedType,
-            'isRead': false,
-            'createdAt': FieldValue.serverTimestamp(),
-            'senderName': widget.senderDelegate.fullName,
-            'senderRole': widget.senderDelegate.role.name,
-            'senderUid': widget.senderDelegate.uid,
-            'broadcastId': broadcastId,
-          });
-          sentCount = 1;
-        } else {
-          targetUid = 'phone_$phoneInput';
-          targetName = 'رقم الهاتف: $phoneInput';
-          targetDetails = 'مستخدم برقم الهاتف: $phoneInput';
-
-          await firestore.collection('notifications').add({
-            'delegateUid': targetUid,
-            'phoneNumber': phoneInput,
-            'organizationId': '',
-            'companyId': '',
-            'title': title,
-            'body': body,
-            'type': _selectedType,
-            'isRead': false,
-            'createdAt': FieldValue.serverTimestamp(),
-            'senderName': widget.senderDelegate.fullName,
-            'senderRole': widget.senderDelegate.role.name,
-            'senderUid': widget.senderDelegate.uid,
-            'broadcastId': broadcastId,
-          });
-          sentCount = 1;
-        }
+        return;
       }
-
-      // Record Sent Log Entry in sent_notifications
-      await sentLogRef.set({
-        'broadcastId': broadcastId,
-        'title': title,
-        'body': body,
-        'type': _selectedType,
-        'senderUid': widget.senderDelegate.uid,
-        'senderName': widget.senderDelegate.fullName,
-        'senderRole': widget.senderDelegate.role.name,
-        'targetAudience': _targetAudience,
-        'targetName': targetName,
-        'targetDetails': targetDetails,
-        'targetUid': targetUid,
-        'targetRole': _targetAudience == 'role' ? _selectedRole : null,
-        'targetPhone': _targetAudience == 'user' ? _phoneController.text.trim() : null,
-        'targetOrgId': _targetAudience == 'org' ? _selectedOrgUID : null,
-        'sentCount': sentCount,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
 
       // Optional local test chime on sender device
       try {
@@ -441,6 +194,19 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
 
         _tabController.animateTo(1);
       }
+    } on FirebaseFunctionsException catch (e) {
+      final details = e.details;
+      final reason =
+          details is Map ? details['reason']?.toString() : null;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(sendStaffNotificationErrorMessage(e.code, reason)),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -453,25 +219,6 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
       }
     } finally {
       if (mounted) setState(() => _isSending = false);
-    }
-  }
-
-  String _getRoleLabel(String role) {
-    switch (role) {
-      case 'delegate':
-        return 'المناديب';
-      case 'supervisor':
-        return 'المشرفين';
-      case 'marketing':
-        return 'مسؤولي تسويق الفروع';
-      case 'marketing_promotion':
-        return 'مسؤولي العروض الترويجية';
-      case 'admin':
-        return 'مشرفي الشركات';
-      case 'organizationAdmin':
-        return 'مدراء المنظمات';
-      default:
-        return role;
     }
   }
 
