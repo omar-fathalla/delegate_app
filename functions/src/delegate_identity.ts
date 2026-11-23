@@ -56,6 +56,8 @@ export interface DeletedLinkCleanupPlan {
   clearDeviceBinding: boolean;
   cancelUnbindRequests: boolean;
   revokeSessions: boolean;
+  /** TAS-217: delete users/{id} (only when it exists with a delegate role). */
+  deleteUsersDoc: boolean;
   reason: "still_linked" | "staff_account" | "no_links_left";
 }
 
@@ -65,16 +67,21 @@ export interface DeletedLinkCleanupPlan {
  * - The id is a staff account (company-admin etc. whose uid got a ghost doc
  *   from the old app): never revoke, that would sign the staff member out of
  *   the HR web.
- * - Otherwise: drop the server device binding, close open unbind requests and
- *   revoke the delegate's Firebase sessions so the next call needs a new login.
+ * - Otherwise: drop the server device binding, close open unbind requests,
+ *   revoke the delegate's Firebase sessions so the next call needs a new login,
+ *   and delete users/{id} when it is a delegate doc (TAS-217: the app could
+ *   not delete it for tech support, so it stayed orphaned).
  */
 export function planDeletedLinkCleanup(input: DeletedLinkCleanupInput): DeletedLinkCleanupPlan {
   if (input.remainingLiveLinks > 0) {
-    return {clearDeviceBinding: false, cancelUnbindRequests: false, revokeSessions: false, reason: "still_linked"};
+    return {clearDeviceBinding: false, cancelUnbindRequests: false, revokeSessions: false, deleteUsersDoc: false, reason: "still_linked"};
   }
   const role = (input.usersRole ?? "").trim().toLowerCase();
   if (input.usersRole !== null && !DELEGATE_USER_ROLES.has(role)) {
-    return {clearDeviceBinding: false, cancelUnbindRequests: false, revokeSessions: false, reason: "staff_account"};
+    return {clearDeviceBinding: false, cancelUnbindRequests: false, revokeSessions: false, deleteUsersDoc: false, reason: "staff_account"};
   }
-  return {clearDeviceBinding: true, cancelUnbindRequests: true, revokeSessions: true, reason: "no_links_left"};
+  return {
+    clearDeviceBinding: true, cancelUnbindRequests: true, revokeSessions: true,
+    deleteUsersDoc: input.usersRole !== null, reason: "no_links_left",
+  };
 }
