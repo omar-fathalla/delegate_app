@@ -104,14 +104,13 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         .collection('leave_requests')
         .where('companyUID', isEqualTo: widget.delegate.companyUID)
         .where('delegateUid', isEqualTo: widget.delegate.uid)
+        // TAS-90: only pending requests are counted, so only they are
+        // streamed (was every leave request of the delegate, ever).
+        .where('status', isEqualTo: 'pending')
         .snapshots()
         .listen((snap) {
       if (!mounted) return;
-      var pending = 0;
-      for (final doc in snap.docs) {
-        if (doc.data()['status'] == 'pending') pending++;
-      }
-      setState(() => _pendingLeaveCount = pending);
+      setState(() => _pendingLeaveCount = snap.docs.length);
     });
     FirestoreSessionSubscriptions.instance.register(_leaveSubKey, _leaveSub!);
   }

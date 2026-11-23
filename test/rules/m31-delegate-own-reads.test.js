@@ -137,6 +137,13 @@ describe("m31 delegate own-data queries", () => {
       where("companyUID", "==", "c1"),
       where("delegateUid", "==", "del-1"),
     )));
+    // TAS-90: the home badge now streams pending requests only.
+    await assertSucceeds(getDocs(query(
+      collection(as("del-1", DELEGATE), "leave_requests"),
+      where("companyUID", "==", "c1"),
+      where("delegateUid", "==", "del-1"),
+      where("status", "==", "pending"),
+    )));
     await assertFails(getDocs(query(
       collection(as("del-1", DELEGATE), "leave_requests"),
       where("companyUID", "==", "c1"),
