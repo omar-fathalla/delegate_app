@@ -55,6 +55,23 @@ Future<List<QuerySnapshot<T>>> queryAllSettled<T>(
   return results.whereType<QuerySnapshot<T>>().toList();
 }
 
+/// TAS-269: broadcast `delegateUid` values a marketing-family role reads
+/// (matches `canReadMarketingRoleBroadcast` in firestore.rules), or null for
+/// any other role. Branches marketing is checked first: its role name
+/// (`branchesMarketingManager`, `branches_marketing`) also contains
+/// "marketing".
+@visibleForTesting
+List<String>? marketingBroadcastTargets(String role) {
+  final r = role.toLowerCase();
+  if (r.contains('branches')) {
+    return const ['all', 'branchesMarketingManager', 'branches_marketing', 'branches-marketing'];
+  }
+  if (r.contains('marketing')) {
+    return const ['all', 'marketing', 'marketing_promotion', 'marketingPromotion'];
+  }
+  return null;
+}
+
 class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
   final FirebaseFirestore firestore;
 
@@ -101,7 +118,23 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
       final bool orgAdminOnly = normalizedRole.contains('organization') &&
           normalizedRole.contains('admin');
 
-      if (delegateOnly) {
+      final marketingTargets = marketingBroadcastTargets(normalizedRole);
+
+      if (marketingTargets != null) {
+        // TAS-269: marketing / promotion / branches-marketing staff read
+        // their own uid and their role's broadcast only. The generic staff
+        // path below also sent phone-format and other roles' queries that
+        // the rules deny (13+ PERMISSION_DENIED per login on the M31).
+        final queries = <Future<QuerySnapshot>>[
+          _collection.where('delegateUid', isEqualTo: delegateUid).limit(50).get(),
+          for (final r in marketingTargets)
+            _collection.where('delegateUid', isEqualTo: r).limit(30).get(),
+        ];
+        final snaps = await queryAllSettled(queries);
+        for (final snap in snaps) {
+          addDocs(snap.docs);
+        }
+      } else if (delegateOnly) {
         final queries = <Future<QuerySnapshot>>[
           _collection.where('delegateUid', isEqualTo: delegateUid).limit(50).get(),
         ];

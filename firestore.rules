@@ -126,8 +126,12 @@ service cloud.firestore {
       return isSuperAdmin() || isTechnicalSupport();
     }
 
+    // TAS-266: a branches-marketing manager with no companyUID follows every
+    // company of its organization (like marketing). With a companyUID it
+    // stays company-scoped through isCompanyScopedStaff().
     function isOrgScopedStaff() {
-      return isOrgAdmin() || isMarketing();
+      return isOrgAdmin() || isMarketing()
+        || (isBranchesMarketing() && callerCompany() == '');
     }
 
     function isCompanyScopedStaff() {
@@ -787,6 +791,10 @@ service cloud.firestore {
             'organization-admin', 'organization_admin', 'organizationAdmin',
             'marketing', 'marketing_promotion'
           ] && resource.data.organizationUID == callerOrg())
+          // TAS-266: org-wide branches-marketing manager (no companyUID).
+          || (staffRole() in [
+            'branches_marketing', 'branches_marketing_manager', 'branchesMarketingManager'
+          ] && callerCompany() == '' && resource.data.organizationUID == callerOrg())
           || (staffRole() in [
             'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
             'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
@@ -1501,6 +1509,12 @@ service cloud.firestore {
               'branches-marketing-manager', 'branchesmarketingmanager'] ? 3
             : 0;
         }
+        // TAS-266: a branches-marketing manager with no company is org-scoped.
+        function taskEffectiveLevel(level, role, comp) {
+          return level == 3 && comp == '' && role in ['branches_marketing',
+              'branches-marketing', 'branches_marketing_manager',
+              'branches-marketing-manager', 'branchesmarketingmanager'] ? 2 : level;
+        }
         function taskUserData() {
           return signedIn()
             && exists(/databases/$(database)/documents/users/$(request.auth.uid))
@@ -1519,9 +1533,9 @@ service cloud.firestore {
         function taskStaffScope(taskCompany) {
           let ud = taskUserData();
           let role = ud.get('role', '') is string ? ud.get('role', '') : '';
-          let level = taskStaffLevel(role);
-          let org = taskOrgOf(ud);
           let comp = taskCompanyOf(ud);
+          let level = taskEffectiveLevel(taskStaffLevel(role), role, comp);
+          let org = taskOrgOf(ud);
           return level == 1 ? 1
             : level == 2 && org == orgId ? 2
             : level == 3 && org == orgId && comp != '' && comp == taskCompany ? 3
@@ -1543,9 +1557,9 @@ service cloud.firestore {
         function taskAssignerScope(taskCompany) {
           let ud = taskUserData();
           let role = ud.get('role', '') is string ? ud.get('role', '') : '';
-          let level = taskAssignerLevel(role);
-          let org = taskOrgOf(ud);
           let comp = taskCompanyOf(ud);
+          let level = taskEffectiveLevel(taskAssignerLevel(role), role, comp);
+          let org = taskOrgOf(ud);
           return level == 1 ? 1
             : level == 2 && org == orgId ? 2
             : level == 3 && org == orgId && comp != '' && comp == taskCompany ? 3
@@ -2002,19 +2016,58 @@ service cloud.firestore {
 
     // ==================== MOBILE: ATTENDANCE ====================
 
+    // TAS-265: the staff tenant check of canReadAttendance in one pass over
+    // the caller's users doc (let). The isGlobalStaff / isCompanyScopedStaff /
+    // isOrgScopedStaff chain re-read users/{uid} per role helper and ran out of
+    // the 1000-expression budget, so other-tenant reads were denied by the
+    // budget instead of by a rule. Same principals as those helpers.
+    function staffAttendanceTenantOk() {
+      let d = resource.data;
+      let r = userRole();
+      let co = callerCompany();
+      let org = callerOrg();
+      let inCo = co != '' && (d.get('companyUID', '') == co || d.get('companyId', '') == co);
+      let inOrg = org != '' && (d.get('organizationUID', '') == org || d.get('organizationId', '') == org);
+      return r in superAdminRoleList()
+        || r in techRoleList()
+        || (inCo && r in [
+          'company-admin', 'company_admin', 'companyadmin', 'admin',
+          'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'human_resources',
+          'accountant', 'accounting', 'account_admin',
+          'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+          'branches-marketing-manager', 'branchesmarketingmanager',
+          'branchesMarketingManager'
+        ])
+        || (inOrg && r in [
+          'organization-admin', 'organization_admin', 'organizationadmin',
+          'organizationAdmin',
+          'marketing', 'marketing_promotion', 'marketingpromotion',
+          'marketingPromotion'
+        ])
+        || (inOrg && co == '' && r in [
+          'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+          'branches-marketing-manager', 'branchesmarketingmanager',
+          'branchesMarketingManager'
+        ]);
+    }
+
     function canReadAttendance() {
       // Delegate tokens are decided by claims only: the staff branches read
       // users/{uid} and pushed delegate history queries (delegateId whereIn
       // [uid] + orderBy timestamp) over the 1000-expression budget (TAS-212).
       // Staff tokens keep the original order and checks.
       return signedIn() && (staffToken()
-        ? (isGlobalStaff()
-          || (isCompanyScopedStaff() && companyScoped())
-          || (isOrgScopedStaff() && orgScoped())
-          || ownsDelegateId(resource.data.delegateId)
-          || ownsDelegateId(resource.data.userId)
-          || delegateOwns(resource.data.delegateId)
-          || delegateOwns(resource.data.userId))
+        // TAS-265: delegateOwns() needs a delegate token, never true here.
+        // Own-id first by uid; the claim-based ownsDelegateId only runs for a
+        // staff token that carries delegate claims, so an other-tenant read
+        // is denied by a rule and not by the 1000-expression budget.
+        ? (staffAttendanceTenantOk()
+          || (delegateOtpOk() && (resource.data.get('delegateId', '') == request.auth.uid
+            || resource.data.get('userId', '') == request.auth.uid))
+          || (request.auth.token.keys().hasAny(['delegateId', 'delegateIds'])
+            && (ownsDelegateId(resource.data.delegateId)
+              || ownsDelegateId(resource.data.userId))))
         : (ownsDelegateId(resource.data.delegateId)
           || ownsDelegateId(resource.data.userId)
           || delegateOwns(resource.data.delegateId)
@@ -2215,6 +2268,20 @@ service cloud.firestore {
       ];
     }
 
+    // TAS-269: cheap allow for marketing / branches-marketing role broadcasts
+    // (delegateUid == 'marketing', 'branchesMarketingManager', ...). Inside
+    // canReadNotification those list queries were denied on the budget.
+    // 'all' is the app-wide broadcast (never a privileged staff alert type).
+    function canReadMarketingRoleBroadcast() {
+      return !isPrivilegedStaffAlert() && (
+        (isMarketing() && resource.data.get('delegateUid', '') in [
+          'all', 'marketing', 'marketing_promotion', 'marketingPromotion'
+        ])
+        || (isBranchesMarketing() && resource.data.get('delegateUid', '') in [
+          'all', 'branchesMarketingManager', 'branches_marketing', 'branches-marketing'
+        ]));
+    }
+
     // Cheap allow so a list query on delegateUid == 'supervisor_' +
     // company is provable for company admins and supervisors (I2 leave
     // fallback). Folding this into canReadNotification hits the cap.
@@ -2227,6 +2294,7 @@ service cloud.firestore {
     match /notifications/{notificationId} {
       allow read: if canReadOwnNotification();
       allow read: if canReadOrgAdminRoleBroadcast();
+      allow read: if canReadMarketingRoleBroadcast();
       allow read: if canReadCompanySupervisorBroadcast();
       allow read: if canReadNotification();
       allow create: if canCreateNotification();
@@ -2304,32 +2372,6 @@ service cloud.firestore {
         && resource.data.organizationId == callerOrg();
     }
 
-    // One roleIs list so company staff list queries stay under the 1k expr cap.
-    function penaltyCompanyStaffReadOk() {
-      return callerCompany() != '' && companyScoped()
-        && roleIs([
-          'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor',
-          'company_supervisor',
-          'hr', 'company-hr', 'company_hr', 'human_resources',
-          'accountant', 'accounting', 'account_admin',
-          'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
-          'branches-marketing-manager', 'branchesmarketingmanager',
-          'branchesMarketingManager',
-          'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion'
-        ]);
-    }
-
-    function penaltyMarketingOrgListOk() {
-      return callerCompany() == '' && orgScoped()
-        && roleIs([
-          'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion'
-        ]);
-    }
-
-    function penaltyMarketingReadOk() {
-      return penaltyCompanyStaffReadOk() || penaltyMarketingOrgListOk();
-    }
-
     function delegatePenaltyTargetOk(targetId) {
       return targetId is string && targetId != '' && (
         targetId == request.auth.uid
@@ -2352,20 +2394,50 @@ service cloud.firestore {
           || claimListHas('delegateIds', resource.data.get('targetDelegateId', '')));
     }
 
+    // TAS-266: one pass over the caller's users doc (let), like
+    // penaltyCreateOk. The old chain of roleIs() helpers re-read users/{uid}
+    // per helper and a branches-marketing get ran out of the 1000-expression
+    // budget. Same principals as before:
+    //   global staff; company staff (incl. marketing / branches marketing
+    //   with a companyUID) on their company; org admin on their org;
+    //   marketing / branches marketing with no companyUID on their org.
+    function penaltyStaffReadOk() {
+      let d = resource.data;
+      let r = userRole();
+      let co = callerCompany();
+      let org = callerOrg();
+      let inCo = co != '' && (d.get('companyUID', '') == co || d.get('companyId', '') == co);
+      let inOrg = org != '' && (d.get('organizationUID', '') == org || d.get('organizationId', '') == org);
+      return r in superAdminRoleList()
+        || r in techRoleList()
+        || (inCo && r in [
+          'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor',
+          'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'human_resources',
+          'accountant', 'accounting', 'account_admin',
+          'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+          'branches-marketing-manager', 'branchesmarketingmanager',
+          'branchesMarketingManager',
+          'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion'
+        ])
+        || (inOrg && r in [
+          'organization-admin', 'organization_admin', 'organizationadmin',
+          'organizationAdmin'
+        ])
+        || (inOrg && co == '' && r in [
+          'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion',
+          'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+          'branches-marketing-manager', 'branchesmarketingmanager',
+          'branchesMarketingManager'
+        ]);
+    }
+
     function penaltyStaffListOk() {
-      return canReadOrgAdminPenaltyByOrgId()
-        || penaltyCompanyStaffReadOk()
-        || penaltyMarketingOrgListOk()
-        || isGlobalStaff()
-        || (isOrgAdmin() && orgScoped());
+      return canReadOrgAdminPenaltyByOrgId() || penaltyStaffReadOk();
     }
 
     function penaltyStaffGetOk() {
-      return canReadOrgAdminPenaltyByOrgId()
-        || isGlobalStaff()
-        || penaltyCompanyStaffReadOk()
-        || (isOrgAdmin() && orgScoped())
-        || penaltyMarketingReadOk();
+      return canReadOrgAdminPenaltyByOrgId() || penaltyStaffReadOk();
     }
 
     // TAS-73: penalty create in one pass. The caller's users doc is read
@@ -2413,6 +2485,12 @@ service cloud.firestore {
           'organizationAdmin',
           'marketing', 'marketing_promotion', 'marketingpromotion',
           'marketingPromotion'
+        ])
+        // TAS-266: org-wide branches-marketing manager (no companyUID).
+        || (inOrg && co == '' && r in [
+          'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+          'branches-marketing-manager', 'branchesmarketingmanager',
+          'branchesMarketingManager'
         ]);
     }
 
