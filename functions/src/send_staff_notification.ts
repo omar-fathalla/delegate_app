@@ -49,7 +49,7 @@ function tooMany(): never {
  */
 export const sendStaffNotification = functions
   .region("us-central1")
-  .runWith({timeoutSeconds: 120, memory: "512MB"})
+  .runWith({timeoutSeconds: 300, memory: "1GB"})
   .https.onCall(async (data: unknown, context) => {
     if (!context.auth) {
       throw new functions.https.HttpsError("unauthenticated", "Sign in required.", {reason: "unauthenticated"});

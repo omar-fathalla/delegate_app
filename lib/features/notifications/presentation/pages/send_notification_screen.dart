@@ -54,6 +54,14 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
     if (mounted) setState(() {});
   }
 
+  // Decision 2026-11-23 (TAS-216): only super admin / technical support
+  // broadcast to the whole app; "all" from anyone else is their own scope.
+  bool get _isGlobalSender =>
+      widget.senderDelegate.role == UserRole.superAdmin ||
+      widget.senderDelegate.role == UserRole.technicalSupport;
+  bool get _isCompanySender =>
+      widget.senderDelegate.companyUID.trim().isNotEmpty;
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -132,7 +140,11 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
         phone: _phoneController.text,
       );
       final result = await FirebaseFunctions.instanceFor(region: 'us-central1')
-          .httpsCallable(CloudCallableNames.sendStaffNotification)
+          .httpsCallable(
+            CloudCallableNames.sendStaffNotification,
+            // Up to 10000 recipients: the server may take minutes.
+            options: HttpsCallableOptions(timeout: const Duration(minutes: 5)),
+          )
           .call<dynamic>(payload);
       final data = result.data is Map
           ? Map<String, dynamic>.from(result.data as Map)
@@ -600,8 +612,12 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
             child: Column(
               children: [
                 _buildAudienceOptionTile(
-                  title: 'جميع مستخدمي التطبيق (بث شامل)',
-                  subtitle: 'يصل فورياً لجميع هواتف Android و iOS عبر موضوع app_updates',
+                  title: _isGlobalSender
+                      ? 'جميع مستخدمي التطبيق (بث شامل)'
+                      : (_isCompanySender ? 'جميع مستخدمي شركتك' : 'جميع مستخدمي منظمتك'),
+                  subtitle: _isGlobalSender
+                      ? 'يصل فورياً لجميع هواتف Android و iOS عبر موضوع app_updates'
+                      : 'الإرسال داخل نطاقك فقط',
                   value: 'all',
                   icon: Icons.public_rounded,
                   badge: 'الأشمل',

@@ -115,10 +115,11 @@ describe("authorizeTarget", () => {
   const org = {kind: "org", org: ORG};
   const global = {kind: "global"};
 
-  test("'all' is for global staff only", () => {
-    assert.equal(authorizeTarget(global, {kind: "all"}).ok, true);
-    assert.equal(authorizeTarget(org, {kind: "all"}).reason, "broadcast_global_only");
-    assert.equal(authorizeTarget(company, {kind: "all"}).reason, "broadcast_global_only");
+  test("'all' is a global broadcast only for global staff; scoped senders get their own scope", () => {
+    assert.deepEqual(authorizeTarget(global, {kind: "all"}), {ok: true, target: {kind: "all"}});
+    assert.deepEqual(authorizeTarget(org, {kind: "all"}), {ok: true, target: {kind: "org", org: ORG}});
+    assert.deepEqual(authorizeTarget(company, {kind: "all"}),
+      {ok: true, target: {kind: "company", org: ORG, company: CO}});
   });
 
   test("company staff cannot reach another company or the whole org", () => {

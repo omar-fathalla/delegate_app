@@ -10,8 +10,8 @@
 import {normalizePhone, phoneQueryVariants} from "./delegate_login_logic";
 import {normalizeRoleKey} from "./staff_phone_lookup_logic";
 
-/** Hard cap on notification docs one call may write. */
-export const MAX_RECIPIENTS = 2000;
+/** Hard cap on notification docs one call may write (decision 2026-11-23: raised from 2000). */
+export const MAX_RECIPIENTS = 10000;
 /** Firestore allows 500 writes per batch; stay well under it. */
 export const BATCH_SIZE = 450;
 export const MAX_TITLE_LENGTH = 200;
@@ -195,7 +195,11 @@ export function authorizeTarget(
   const outOfScope = deny("permission-denied", "out_of_scope", "Target is outside your scope.");
   switch (target.kind) {
   case "all":
-    return deny("permission-denied", "broadcast_global_only", "Only global staff can send to everyone.");
+    // Decision 2026-11-23: "all" from a scoped sender means everyone in the
+    // sender's own scope (their company, or their organization).
+    return scope.kind === "company" ?
+      {ok: true, target: {kind: "company", org: scope.org, company: scope.company}} :
+      {ok: true, target: {kind: "org", org: scope.org}};
   case "org": {
     if (scope.kind !== "org") return outOfScope;
     const org = target.org || scope.org;
