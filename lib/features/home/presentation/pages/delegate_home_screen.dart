@@ -1494,23 +1494,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       return AppLocalizations.of(context)!.chainZahranMarket;
     }
 
-    final rClean = raw.trim();
-    final lower = rClean.toLowerCase();
-    if (lower.contains('fathalla') ||
-        rClean.contains('فتح الله') ||
-        rClean.contains('فتح_الله')) {
-      return AppLocalizations.of(context)!.chainFathallaMarket;
-    }
-    if (lower.contains('gomla') ||
-        lower.contains('jomla') ||
-        rClean.contains('جملة') ||
-        rClean.contains('جمله')) {
-      return AppLocalizations.of(context)!.chainGomlaMarket;
-    }
-    if (lower.contains('zahran') || rClean.contains('زهران')) {
-      return AppLocalizations.of(context)!.chainZahranMarket;
-    }
-    return rClean;
+    return localizeChainName(raw, AppLocalizations.of(context));
   }
 
   String _cleanBranchName(String rawBranchName) {

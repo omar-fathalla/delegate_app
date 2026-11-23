@@ -166,31 +166,7 @@ class UniversalAppHeader extends StatelessWidget
         'مستخدم';
   }
 
-  String _formatOrgLabel(String raw) {
-    final clean = raw.trim();
-    final lower = clean.toLowerCase();
-    if (lower.contains('fathalla') ||
-        clean.contains('فتح الله') ||
-        clean.contains('فتح_الله')) {
-      return 'فتح الله ماركت';
-    }
-    if (lower.contains('gomla') ||
-        lower.contains('jomla') ||
-        clean.contains('جملة') ||
-        clean.contains('جمله')) {
-      return 'جملة ماركت';
-    }
-    if (lower.contains('zahran') || clean.contains('زهران')) {
-      return 'زهران ماركت';
-    }
-    if (lower.contains('carrefour') || clean.contains('كارفور')) {
-      return 'كارفور';
-    }
-    if (lower.contains('beit') || clean.contains('بيت الجملة')) {
-      return 'بيت الجملة';
-    }
-    return clean;
-  }
+  String _formatOrgLabel(String raw) => chainDisplayName(raw);
 
   String _getActiveOrganizationLabel(
     Delegate del,
