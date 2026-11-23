@@ -143,6 +143,36 @@ service cloud.firestore {
       return isGlobalStaff() || isOrgScopedStaff() || isCompanyScopedStaff();
     }
 
+    // TAS-5: one users/{uid} read for the write paths whose deny must come
+    // from a rule and not from the 1000-expression budget (TAS-105).
+    // Same roles as isGlobalStaff / isOrgScopedStaff / isCompanyScopedStaff.
+    // tOrg / tCo: the target's chain and company ('' when not known).
+    function staffRoleListGlobal() {
+      return ['super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
+        'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport',
+        'tech_support', 'techsupport'];
+    }
+    function staffRoleListOrg() {
+      return ['organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
+        'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion'];
+    }
+    function staffRoleListCompany() {
+      return ['company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
+        'hr', 'company-hr', 'company_hr', 'human_resources',
+        'accountant', 'accounting', 'account_admin',
+        'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+        'branches-marketing-manager', 'branchesmarketingmanager', 'branchesMarketingManager'];
+    }
+    function staffTargetOk(tOrg, tCo, allowOrgScoped) {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let org = u.get('organizationUID', '');
+      let co = u.get('companyUID', '');
+      return r in staffRoleListGlobal()
+        || (allowOrgScoped && org is string && org != '' && org == tOrg && r in staffRoleListOrg())
+        || (co is string && co != '' && co == tCo && r in staffRoleListCompany());
+    }
+
     function claimString(key) {
       return signedIn() && request.auth.token.keys().hasAll([key]) && request.auth.token[key] is string
         ? request.auth.token[key]
@@ -811,6 +841,15 @@ service cloud.firestore {
         || (isCompanyScopedStaff() && companyScoped());
     }
 
+    function companyDocWriteOk(orgId, compId) {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let org = u.get('organizationUID', '');
+      return r in staffRoleListGlobal()
+        || (org == orgId && r in ['organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin'])
+        || (org == orgId && u.get('companyUID', '') == compId && r in staffRoleListCompany());
+    }
+
     function canManageNestedDelegate(orgId, compId) {
       return isGlobalStaff()
         || (isOrgScopedStaff() && callerOrg() == orgId)
@@ -1279,8 +1318,20 @@ service cloud.firestore {
           && nr in ['supervisor', 'company_supervisor', 'hr', 'company-hr', 'company_hr', 'human_resources']);
     }
 
+    // TAS-43: a role compared letters only, lower-case ("Super_Admin " ->
+    // "superadmin"), the way the functions normalise it. Exact-list checks
+    // let "SUPER-ADMIN" or "Super_Admin " through as an ordinary role.
+    function normRoleStr(r) {
+      return r is string ? r.lower().replace('[^a-z]', '') : '';
+    }
+
+    function isPrivilegedRoleStr(r) {
+      return normRoleStr(r) in ['superadmin', 'technicalsupport', 'techsupport',
+        'organizationadmin', 'orgadmin'];
+    }
+
     function newRoleOk(r) {
-      return r == 'super-admin' || !(r in superAdminRoleList());
+      return r == 'super-admin' || normRoleStr(r) != 'superadmin';
     }
 
     function companyStaffUsersCreateFieldOk(d) {
@@ -1309,11 +1360,11 @@ service cloud.firestore {
         && d.get('uid', request.auth.uid) == request.auth.uid
         && !d.keys().hasAny(['status', 'organizationUID', 'companyUID', 'organizationId', 'companyId', 'isActive'])
         && !d.keys().hasAny(privilegeKeys())
-        && !(nr in privilegedRoleList());
+        && !isPrivilegedRoleStr(nr);
       return usersIdentityClientLocked(d.keys())
         && newRoleOk(nr) && (isSA || selfCreate || (
         !d.keys().hasAny(privilegeKeys())
-        && !(nr in privilegedRoleList())
+        && !isPrivilegedRoleStr(nr)
         && companyPinned(d)
         && (
           (r in techRoleList()) ||
@@ -1375,7 +1426,7 @@ service cloud.firestore {
           (request.auth.uid == userId
             && !changed.hasAny(escalationKeys().concat(['isActive']))) ||
           (request.auth.uid != userId
-            && !(or in privilegedRoleList()) && !(nr in privilegedRoleList())
+            && !isPrivilegedRoleStr(or) && !isPrivilegedRoleStr(nr)
             && (
               (r in techRoleList()) ||
               (r in orgAdminRoleList() && org != ''
@@ -1436,9 +1487,9 @@ service cloud.firestore {
 
       match /companies/{compId} {
         allow read: if signedIn();
-        allow create, update, delete: if isGlobalStaff()
-          || (isOrgAdmin() && callerOrg() == orgId)
-          || (isCompanyScopedStaff() && callerOrg() == orgId && callerCompany() == compId);
+        // Org admin of this chain, or company staff of this company in this
+        // chain (TAS-44: one users read, so a cross-chain deny is a rule).
+        allow create, update, delete: if staffToken() && companyDocWriteOk(orgId, compId);
 
         match /admins/{adminId} {
           allow read: if signedIn() && (
@@ -1479,7 +1530,8 @@ service cloud.firestore {
           allow read: if signedIn() && (
             isGlobalStaff() || canManageNestedDelegate(orgId, compId) || delegateInCompany(compId)
           );
-          allow create, update, delete: if canManageNestedDelegate(orgId, compId);
+          // Same principals as canManageNestedDelegate, one users read (TAS-45).
+          allow create, update, delete: if staffToken() && staffTargetOk(orgId, compId, true);
         }
 
         match /notifications/{notificationId} {
@@ -1650,27 +1702,46 @@ service cloud.firestore {
               .hasAny(['imagePath', 'imagePaths'])
             || incomingTaskImageOk();
         }
+        // TAS-52: the task must also be in one of the delegate's companies,
+        // not just the chain.
         function taskDelegateTarget() {
           return delegateInOrg(orgId) && (
             ownsDelegateId(resource.data.assignedTo)
-            || resource.data.assignedTo == 'all'
-            || resource.data.assignedTo == 'all_marketing_promotion'
-            || resource.data.assignedTo == 'all_branch_marketing'
+            || ((resource.data.get('companyId', '') == claimString('companyId')
+                || claimListHas('companyIds', resource.data.get('companyId', '')))
+              && resource.data.assignedTo in ['all', 'all_marketing_promotion', 'all_branch_marketing'])
             || ownsDelegateId(resource.data.createdBy)
           );
         }
-        function taskCanUpdate() {
+        // TAS-52: createdBy never changes (except global staff), so nobody
+        // can make themselves the sender of someone else's task. A delegate
+        // only moves the task along: status, notes and completion. The token
+        // split keeps the staff lookups off the delegate path (budget).
+        function taskKeepsSender() {
+          return !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['createdBy', 'createdByName']);
+        }
+        function taskDelegateCanUpdate() {
+          return taskDelegateTarget()
+            && taskKeepsSender()
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['status', 'notes', 'completedAt', 'completedBy']);
+        }
+        function taskStaffCanUpdate() {
           let scope = taskStaffScope(resource.data.get('companyId', ''));
           let isSender = resource.data.get('createdBy', '') == request.auth.uid;
           let canAssign = !taskTouchesAssignmentKeys()
             || taskAssignerScope(resource.data.get('companyId', '')) > 0;
-          return (scope > 0
-              && (scope == 1 || isSender || !taskTouchesSenderKeys())
-              && taskImageChangeOk()
-              && canAssign)
-            || (taskDelegateTarget()
-              && (ownsDelegateId(resource.data.createdBy) || !taskTouchesSenderKeys())
-              && !taskTouchesAssignmentKeys());
+          return scope > 0
+            && (scope == 1 || (taskKeepsSender()
+              && (isSender || !taskTouchesSenderKeys())))
+            && taskImageChangeOk()
+            && canAssign;
+        }
+        function taskCanUpdate() {
+          return claimString('role') == 'delegate'
+            ? taskDelegateCanUpdate()
+            : taskStaffCanUpdate();
         }
         function taskCanDelete() {
           let scope = taskStaffScope(resource.data.get('companyId', ''));
@@ -1895,7 +1966,10 @@ service cloud.firestore {
 
     match /{path=**}/companies/{companyId} {
       allow read: if signedIn();
-      allow write: if isGlobalStaff() || isOrgAdmin() || (isCompanyScopedStaff() && callerCompany() == companyId);
+      // TAS-44: no write here. A recursive match also covers direct writes to
+      // organizations/{org}/companies/{co}, so a write on it OR-ed past the
+      // nested rule's org/company check (org admin of chain A writing chain B).
+      // Every client writes through the nested path (web and app).
     }
 
     // Nested photo_permissions / captured_photos have no allow-read of their
@@ -1968,7 +2042,9 @@ service cloud.firestore {
 
     match /{path=**}/requests/{requestId} {
       allow read: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped()));
-      allow write: if isGlobalStaff() || (isOrgScopedStaff() && incomingOrgScoped()) || (isCompanyScopedStaff() && incomingCompanyScoped());
+      // TAS-45: no write here. It checked only the incoming data, so staff
+      // could overwrite another company's request by putting their own
+      // companyUID in it. Writes go through the nested requests rule.
     }
 
     // ==================== WEB DASHBOARD ====================
@@ -2150,28 +2226,71 @@ service cloud.firestore {
         && (co == '' || docCo == co);
     }
 
-    function canCreateAttendance() {
-      return signedIn() && (
-        isGlobalStaff()
-        || (isCompanyScopedStaff() && incomingCompanyScoped())
-        || (isOrgScopedStaff() && incomingOrgScoped())
-        || (
-          (ownsDelegateId(request.resource.data.delegateId)
-            || ownsDelegateId(request.resource.data.userId)
-            || delegateOwns(request.resource.data.delegateId)
-            || delegateOwns(request.resource.data.userId))
-          && (delegateInOrg(request.resource.data.organizationId)
-            || delegateInOrg(request.resource.data.organizationUID)
-            || incomingOrgScoped())
-        )
-      );
+    // TAS-48: a person writing their own attendance cannot pick the time.
+    // Live check-in / check-out use the server time; the only past time
+    // allowed is the app's auto check-out of an expired session.
+    function attendanceOwnTimeOk(d) {
+      return d.get('timestamp', null) == request.time
+        || (d.get('isAutoCheckOut', false) == true
+          && d.get('type', '') == 'check_out'
+          && d.get('timestamp', null) is timestamp
+          && d.timestamp < request.time);
     }
 
+    function attendanceOwnCreateOk() {
+      let d = request.resource.data;
+      return attendanceOwnTimeOk(d)
+        && !d.keys().hasAny(['checkOutTime', 'isManuallyAdjusted', 'lastAdjustedBy',
+          'lastAdjustedAt', 'adjustmentReason', 'adjustmentNotes']);
+    }
+
+    // Own record update = closing the session only (check-out fields).
+    function attendanceOwnUpdateOk() {
+      let d = request.resource.data;
+      let ch = d.diff(resource.data).affectedKeys();
+      return ch.hasOnly(['checkOutTime', 'checkOutLocation', 'checkOutDocId',
+          'autoClosedDuplicate', 'isAutoCheckOut', 'autoCheckOutReason'])
+        && (!ch.hasAny(['checkOutTime'])
+          || d.checkOutTime == request.time
+          || (d.get('isAutoCheckOut', false) == true
+            && d.checkOutTime is timestamp
+            && d.checkOutTime < request.time));
+    }
+
+    // ownsDelegateId covers delegateOwns (same id / claim checks).
+    function attendanceOwns(d) {
+      return ownsDelegateId(d.get('delegateId', '')) || ownsDelegateId(d.get('userId', ''));
+    }
+
+    function attendanceOrgOf(d) {
+      return d.get('organizationId', '') != '' ? d.get('organizationId', '') : d.get('organizationUID', '');
+    }
+
+    function attendanceCoOf(d) {
+      return d.get('companyId', '') != '' ? d.get('companyId', '') : d.get('companyUID', '');
+    }
+
+    function canCreateAttendance() {
+      let d = request.resource.data;
+      return signedIn() && (attendanceOwns(d)
+        ? attendanceOwnCreateOk()
+          && (staffToken()
+            ? staffTargetOk(attendanceOrgOf(d), attendanceCoOf(d), true)
+            : delegateInOrg(attendanceOrgOf(d)))
+        : staffToken() && staffTargetOk(attendanceOrgOf(d), attendanceCoOf(d), true));
+    }
+
+    // Staff may not move a record to another company or chain (stored and
+    // incoming in the same scope). Owners only close their session.
     function canUpdateAttendance() {
-      // Same principals as read. Avoid nesting an extra AND of staff/owner
-      // checks (duplicate of canReadAttendance) so checkout denormalize updates
-      // stay under the Firestore rules expression budget.
-      return canReadAttendance();
+      let d = request.resource.data;
+      let old = resource.data;
+      return signedIn() && (attendanceOwns(old)
+        ? attendanceOwnUpdateOk()
+        : (staffToken()
+          && attendanceOrgOf(d) == attendanceOrgOf(old)
+          && attendanceCoOf(d) == attendanceCoOf(old)
+          && staffTargetOk(attendanceOrgOf(old), attendanceCoOf(old), true)));
     }
 
     match /attendance_logs/{logId} {
@@ -2215,8 +2334,17 @@ service cloud.firestore {
       allow create, update, delete: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isBranchesMarketing();
     }
 
+    // TAS-43 (from the 20 Nov prod hotfix): the delegate-id counter only
+    // ever goes up by one; nobody can reset it or jump it.
     match /counters/{counterId} {
-      allow read, write: if isStaffWriter();
+      allow read: if isStaffWriter();
+      allow create: if isStaffWriter()
+        && request.resource.data.keys().hasOnly(['count'])
+        && request.resource.data.count is int;
+      allow update: if isStaffWriter()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count'])
+        && request.resource.data.count == resource.data.get('count', 6232) + 1;
+      allow delete: if false;
     }
 
     // SA/tech profile-edit and national-ID request alerts are not readable
@@ -2561,18 +2689,19 @@ service cloud.firestore {
         org != '' && (d.get('organizationUID', '') == org || d.get('organizationId', '') == org));
     }
 
-    // Update: the stored doc or the incoming one must be in the caller's
-    // tenant (same as before TAS-73), evaluated once.
+    // Update: the stored doc AND the incoming one must both be in the
+    // caller's tenant (TAS-50), so a penalty cannot be pulled in from, or
+    // moved out to, another company or chain. Evaluated once.
     function penaltyUpdateOk() {
       let d = request.resource.data;
       let old = resource.data;
       let co = callerCompany();
       let org = callerOrg();
       return penaltyRoleTenantOk(userRole(), co, org,
-        co != '' && (old.get('companyUID', '') == co || old.get('companyId', '') == co
-          || d.get('companyUID', '') == co || d.get('companyId', '') == co),
-        org != '' && (old.get('organizationUID', '') == org || old.get('organizationId', '') == org
-          || d.get('organizationUID', '') == org || d.get('organizationId', '') == org));
+        co != '' && (old.get('companyUID', '') == co || old.get('companyId', '') == co)
+          && (d.get('companyUID', '') == co || d.get('companyId', '') == co),
+        org != '' && (old.get('organizationUID', '') == org || old.get('organizationId', '') == org)
+          && (d.get('organizationUID', '') == org || d.get('organizationId', '') == org));
     }
 
     function penaltyRoleTenantOk(r, co, org, inCo, inOrg) {
@@ -3052,16 +3181,19 @@ service cloud.firestore {
       // HR payroll: HR and company supervisors read wallets of their own
       // company only (companyUID == users/{uid}.companyUID). Read only.
       allow read: if signedIn() && walletCompanyStaffReadOk();
+      // TAS-47: the wallet owner reads only. Balances, companyUID and the
+      // ledger are written by staff (the delegate app never writes them).
       allow create, update: if signedIn() && (
-        walletId == request.auth.uid || delegateOwns(walletId) || isGlobalStaff() || isAccountant() || isOrgAdmin()
+        isGlobalStaff() || isAccountant() || isOrgAdmin()
       );
       allow create: if signedIn() && walletPayrollWriteOk(true);
       allow update: if signedIn() && walletPayrollWriteOk(false);
       allow delete: if isGlobalStaff() || isAccountant();
       match /transactions/{transactionId} {
-        allow read, write: if signedIn() && (
+        allow read: if signedIn() && (
           walletId == request.auth.uid || delegateOwns(walletId) || isGlobalStaff() || isAccountant() || isOrgAdmin()
         );
+        allow write: if signedIn() && (isGlobalStaff() || isAccountant() || isOrgAdmin());
       }
     }
 
@@ -3188,6 +3320,13 @@ service cloud.firestore {
       }
     }
 
+    function leaveOwnerCreateOk() {
+      let d = request.resource.data;
+      return d.get('status', '') == 'pending'
+        && d.get('resolvedBy', null) == null
+        && d.get('resolvedAt', null) == null;
+    }
+
     match /leave_requests/{requestId} {
       // Split allow rules so a company+status list is provable for HR
       // (a single OR with unconstrained own-id branches made that query
@@ -3204,16 +3343,17 @@ service cloud.firestore {
         ownsDelegateId(resource.data.delegateUid)
         || delegateOwns(resource.data.delegateUid)
       );
+      // TAS-46: the owner files the request as pending only, with nothing
+      // already resolved; approval and rejection are staff updates. The
+      // delegate app never updates its own request (create or cancel only).
       allow create: if signedIn() && (
-        ownsDelegateId(request.resource.data.delegateUid)
-        || delegateOwns(request.resource.data.delegateUid)
-        || (isCompanyScopedStaff() && incomingCompanyScoped())
-        || isGlobalStaff()
+        (ownsDelegateId(request.resource.data.get('delegateUid', '')) && leaveOwnerCreateOk())
+        || (staffToken()
+          && staffTargetOk('', request.resource.data.get('companyUID', ''), false))
       );
-      allow update: if isGlobalStaff()
-        || (isCompanyScopedStaff() && companyScoped())
-        || (ownsDelegateId(resource.data.delegateUid) && resource.data.status == 'pending')
-        || (delegateOwns(resource.data.delegateUid) && resource.data.status == 'pending');
+      allow update: if staffToken()
+        && resource.data.get('companyUID', '') == request.resource.data.get('companyUID', '')
+        && staffTargetOk('', resource.data.get('companyUID', ''), false);
       allow delete: if isGlobalStaff()
         || (isCompanyScopedStaff() && companyScoped())
         || (ownsDelegateId(resource.data.delegateUid) && resource.data.status == 'pending')
@@ -3287,7 +3427,8 @@ service cloud.firestore {
       allow get: if signedIn() && docId == 'time_probe';
       allow create, update: if signedIn()
         && docId == 'time_probe'
-        && request.resource.data.keys().hasOnly(['probe']);
+        && request.resource.data.keys().hasOnly(['probe'])
+        && request.resource.data.probe == request.time;
       allow delete: if false;
     }
 

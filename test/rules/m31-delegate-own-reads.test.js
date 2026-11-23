@@ -20,6 +20,7 @@ const {
   limit,
   orderBy,
   query,
+  serverTimestamp,
   setDoc,
   where,
 } = require("firebase/firestore");
@@ -224,7 +225,9 @@ describe("m31 delegate own-data queries", () => {
 
   test("signed-in delegate can write the time_probe field only", async () => {
     const ref = doc(as("del-1", DELEGATE), "_system_metadata/time_probe");
-    await assertSucceeds(setDoc(ref, {probe: new Date()}));
+    await assertSucceeds(setDoc(ref, {probe: serverTimestamp()}));
+    // TAS-48: a client-chosen time is refused.
+    await assertFails(setDoc(ref, {probe: new Date("2030-01-01T00:00:00Z")}));
     await assertFails(setDoc(ref, {probe: new Date(), extra: true}));
     await assertFails(setDoc(doc(as("del-1", DELEGATE), "_system_metadata/other"), {probe: new Date()}));
   });

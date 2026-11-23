@@ -12,6 +12,9 @@
 const {test, describe, before, after, beforeEach} = require("node:test");
 const {readFileSync} = require("fs");
 const {resolve} = require("path");
+const firebase = require("firebase/compat/app");
+require("firebase/compat/firestore");
+const serverTimestamp = () => firebase.firestore.FieldValue.serverTimestamp();
 const {
   initializeTestEnvironment, assertSucceeds, assertDeniedByRule, assertBudgetHeadroom,
 } = require("./_rules_testing");
@@ -162,6 +165,7 @@ describe("expression budget headroom (TAS-105)", () => {
       request: (e) => e.authenticatedContext("del-1", {...DELEGATE_TOKEN, otp_required: true, otp_verified: true})
         .firestore().collection("attendance_logs").add({
           delegateId: "del-1", userId: "del-1", organizationId: "o1", companyId: "c1",
+          timestamp: serverTimestamp(),
         }),
     });
   });
