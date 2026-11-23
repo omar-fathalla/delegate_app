@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
+import 'branches_session_cache.dart';
+
 /// Display-only info for a branch (Arabic display name + short address).
 ///
 /// `branchName` remains the matching key everywhere (attendance logs,
@@ -32,6 +34,18 @@ class BranchDisplayCache {
 
   static String _key(String name) => name.trim().toLowerCase();
 
+  /// Test hook for the branches load in [ensureLoaded].
+  @visibleForTesting
+  static FirebaseFirestore Function()? debugFirestore;
+
+  /// Clears loaded branch display data (tests).
+  @visibleForTesting
+  void debugReset() {
+    _byName.clear();
+    _loaded = false;
+    _loading = null;
+  }
+
   /// Registers display info from a raw `branches` document map.
   void registerFromMap(Map<String, dynamic> data, {String? docId}) {
     final info = BranchDisplayInfo(
@@ -45,26 +59,35 @@ class BranchDisplayCache {
     if (docId != null && docId.trim().isNotEmpty) _byName[_key(docId)] = info;
   }
 
-  void registerSnapshot(QuerySnapshot<Map<String, dynamic>> snap) {
-    for (final d in snap.docs) {
+  void registerSnapshot(QuerySnapshot<Map<String, dynamic>> snap) =>
+      registerDocs(snap.docs);
+
+  /// Registers the full `branches` list (e.g. from [BranchesSessionCache]).
+  void registerDocs(Iterable<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+    for (final d in docs) {
       registerFromMap(d.data(), docId: d.id);
     }
     _loaded = true;
     version.value++;
   }
 
-  /// Loads all branches once (cheap: ~170 docs). Safe to call repeatedly.
+  /// Loads all branches once per session (TAS-259: shared with every other
+  /// full-list reader through [BranchesSessionCache]). Safe to call
+  /// repeatedly: an in-flight load is reused instead of starting another
+  /// full-collection read for every row that asks for a display name.
   Future<void> ensureLoaded() {
     if (_loaded) return Future.value();
+    final pending = _loading;
+    if (pending != null) return pending;
     final FirebaseFirestore db;
     try {
-      db = FirebaseFirestore.instance;
+      db = debugFirestore?.call() ?? FirebaseFirestore.instance;
     } catch (e, st) {
       // Firebase not initialised (e.g. widget tests): show raw names.
       debugPrint('BranchDisplayCache: Firestore unavailable: $e\n$st');
       return Future.value();
     }
-    final future = db.collection('branches').get().then(registerSnapshot);
+    final future = BranchesSessionCache.load(db).then(registerDocs);
     late final Future<void> guarded;
     guarded = future.catchError((Object e, StackTrace st) {
       debugPrint('BranchDisplayCache: ensureLoaded failed: $e\n$st');
