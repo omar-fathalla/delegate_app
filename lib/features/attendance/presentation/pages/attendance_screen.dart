@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/l10n/display_names.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'dart:async';
@@ -118,29 +119,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       return isArabic ? 'بيت الجملة' : 'Beit El Gomla';
     }
 
-    final clean = rawOrgName.trim();
-    final lower = clean.toLowerCase();
-    if (lower.contains('fathalla') ||
-        clean.contains('فتح الله') ||
-        clean.contains('فتح_الله')) {
-      return isArabic ? 'فتح الله ماركت' : 'Fathalla Market';
-    }
-    if (lower.contains('gomla') ||
-        lower.contains('jomla') ||
-        clean.contains('جملة') ||
-        clean.contains('جمله')) {
-      return isArabic ? 'جملة ماركت' : 'Gomla Market';
-    }
-    if (lower.contains('zahran') || clean.contains('زهران')) {
-      return isArabic ? 'زهران ماركت' : 'Zahran Market';
-    }
-    if (lower.contains('carrefour') || clean.contains('كارفور')) {
-      return isArabic ? 'كارفور' : 'Carrefour';
-    }
-    if (lower.contains('beit') || clean.contains('بيت الجملة')) {
-      return isArabic ? 'بيت الجملة' : 'Beit El Gomla';
-    }
-    return clean;
+    return chainDisplayName(rawOrgName, isArabic: isArabic);
   }
 
   static String _cleanBranchName(String rawBranchName) {

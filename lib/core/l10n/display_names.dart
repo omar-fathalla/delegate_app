@@ -1,32 +1,76 @@
 import 'package:delegate_app/l10n/app_localizations.dart';
 
-/// Maps a raw chain/organization name (data, any casing or script) to its
-/// localized display name. Unknown names are returned trimmed, unchanged.
-String localizeChainName(String raw, AppLocalizations? l10n) {
+/// Known retail chains. TAS-214: «بيت الجملة» contains the word «جملة», so it
+/// must be matched before Gomla Market; every chain-name helper goes through
+/// [chainKeyOf] so the order lives in one place.
+enum ChainKey { fathalla, beitElGomla, gomla, zahran, carrefour, other }
+
+ChainKey chainKeyOf(String raw) {
   final clean = raw.trim();
-  if (l10n == null || clean.isEmpty) return clean;
   final lower = clean.toLowerCase();
   if (lower.contains('fathalla') ||
       clean.contains('فتح الله') ||
       clean.contains('فتح_الله')) {
-    return l10n.chainFathallaMarket;
+    return ChainKey.fathalla;
   }
-  if (lower.contains('beit') || clean.contains('بيت الجملة')) {
-    return l10n.chainBeitElGomla;
+  if (lower.contains('beit') ||
+      clean.contains('بيت الجملة') ||
+      clean.contains('بيت الجمله')) {
+    return ChainKey.beitElGomla;
   }
   if (lower.contains('gomla') ||
       lower.contains('jomla') ||
       clean.contains('جملة') ||
       clean.contains('جمله')) {
-    return l10n.chainGomlaMarket;
+    return ChainKey.gomla;
   }
   if (lower.contains('zahran') || clean.contains('زهران')) {
-    return l10n.chainZahranMarket;
+    return ChainKey.zahran;
   }
   if (lower.contains('carrefour') || clean.contains('كارفور')) {
-    return l10n.chainCarrefour;
+    return ChainKey.carrefour;
   }
-  return clean;
+  return ChainKey.other;
+}
+
+/// Fixed Arabic/English display name for a raw chain name (no l10n needed).
+/// Unknown names are returned trimmed, unchanged.
+String chainDisplayName(String raw, {bool isArabic = true}) {
+  switch (chainKeyOf(raw)) {
+    case ChainKey.fathalla:
+      return isArabic ? 'فتح الله ماركت' : 'Fathalla Market';
+    case ChainKey.beitElGomla:
+      return isArabic ? 'بيت الجملة' : 'Beit El Gomla';
+    case ChainKey.gomla:
+      return isArabic ? 'جملة ماركت' : 'Gomla Market';
+    case ChainKey.zahran:
+      return isArabic ? 'زهران ماركت' : 'Zahran Market';
+    case ChainKey.carrefour:
+      return isArabic ? 'كارفور' : 'Carrefour';
+    case ChainKey.other:
+      return raw.trim();
+  }
+}
+
+/// Maps a raw chain/organization name (data, any casing or script) to its
+/// localized display name. Unknown names are returned trimmed, unchanged.
+String localizeChainName(String raw, AppLocalizations? l10n) {
+  final clean = raw.trim();
+  if (l10n == null || clean.isEmpty) return clean;
+  switch (chainKeyOf(clean)) {
+    case ChainKey.fathalla:
+      return l10n.chainFathallaMarket;
+    case ChainKey.beitElGomla:
+      return l10n.chainBeitElGomla;
+    case ChainKey.gomla:
+      return l10n.chainGomlaMarket;
+    case ChainKey.zahran:
+      return l10n.chainZahranMarket;
+    case ChainKey.carrefour:
+      return l10n.chainCarrefour;
+    case ChainKey.other:
+      return clean;
+  }
 }
 
 final _arabicChars = RegExp(r'[\u0600-\u06FF]');

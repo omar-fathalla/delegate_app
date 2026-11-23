@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/l10n/display_names.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_add_chains_sheet.dart';
@@ -290,26 +291,8 @@ class _AdminHomeBodyState extends State<_AdminHomeBody>
     } catch (_) {}
   }
 
-  String _normalizeOrgName(String raw, bool isArabic) {
-    final clean = raw.trim();
-    final lower = clean.toLowerCase();
-    if (lower.contains('fathalla') || clean.contains('فتح الله') || clean.contains('فتح_الله')) {
-      return isArabic ? 'فتح الله ماركت' : 'Fathalla Market';
-    }
-    if (lower.contains('gomla') || clean.contains('جملة')) {
-      return isArabic ? 'جملة ماركت' : 'Gomla Market';
-    }
-    if (lower.contains('zahran') || clean.contains('زهران')) {
-      return isArabic ? 'زهران ماركت' : 'Zahran Market';
-    }
-    if (lower.contains('carrefour') || clean.contains('كارفور')) {
-      return isArabic ? 'كارفور' : 'Carrefour';
-    }
-    if (lower.contains('beit') || clean.contains('بيت الجملة')) {
-      return isArabic ? 'بيت الجملة' : 'Beit El Gomla';
-    }
-    return clean;
-  }
+  String _normalizeOrgName(String raw, bool isArabic) =>
+      chainDisplayName(raw, isArabic: isArabic);
 
 
   Future<void> _refresh() async {
@@ -374,21 +357,19 @@ mixin _AdminHomeHelpers {
   Delegate get adminDelegate;
 
   Color _getOrgAccentColor(String orgName) {
-    final lower = orgName.toLowerCase();
-    if (lower.contains('fathalla') || orgName.contains('فتح الله') || orgName.contains('فتح_الله')) {
-      return const Color(0xFFEF4444); // Crimson red
-    }
-    if (lower.contains('gomla') || orgName.contains('جملة')) {
-      return const Color(0xFFF59E0B); // Warm amber/gold
-    }
-    if (lower.contains('zahran') || orgName.contains('زهران')) {
-      return const Color(0xFF10B981); // Emerald green
-    }
-    if (lower.contains('carrefour') || orgName.contains('كارفور')) {
-      return const Color(0xFF0EA5E9); // Sky blue
-    }
-    if (lower.contains('beit') || orgName.contains('بيت الجملة')) {
-      return const Color(0xFF8B5CF6); // Purple
+    switch (chainKeyOf(orgName)) {
+      case ChainKey.fathalla:
+        return const Color(0xFFEF4444); // Crimson red
+      case ChainKey.beitElGomla:
+        return const Color(0xFF8B5CF6); // Purple
+      case ChainKey.gomla:
+        return const Color(0xFFF59E0B); // Warm amber/gold
+      case ChainKey.zahran:
+        return const Color(0xFF10B981); // Emerald green
+      case ChainKey.carrefour:
+        return const Color(0xFF0EA5E9); // Sky blue
+      case ChainKey.other:
+        break;
     }
     return const Color(0xFF14B8A6); // Teal fallback
   }
@@ -2189,29 +2170,7 @@ class _AttendanceDetailsBottomSheetState
       return 'بيت الجملة';
     }
 
-    final clean = raw.trim();
-    final lower = clean.toLowerCase();
-    if (lower.contains('fathalla') ||
-        clean.contains('فتح الله') ||
-        clean.contains('فتح_الله')) {
-      return 'فتح الله ماركت';
-    }
-    if (lower.contains('gomla') ||
-        lower.contains('jomla') ||
-        clean.contains('جملة') ||
-        clean.contains('جمله')) {
-      return 'جملة ماركت';
-    }
-    if (lower.contains('zahran') || clean.contains('زهران')) {
-      return 'زهران ماركت';
-    }
-    if (lower.contains('carrefour') || clean.contains('كارفور')) {
-      return 'كارفور';
-    }
-    if (lower.contains('beit') || clean.contains('بيت الجملة')) {
-      return 'بيت الجملة';
-    }
-    return clean;
+    return chainDisplayName(raw);
   }
 
   String _cleanBranchName(String rawBranchName) {

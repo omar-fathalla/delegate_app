@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/l10n/display_names.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_bloc.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_delegates_event.dart';
@@ -731,31 +732,7 @@ class _NoResultsView extends StatelessWidget {
 }
 
 /// Normalizes raw organization / retail chain names into clean Arabic display names.
-String formatChainDisplayName(String raw) {
-  final clean = raw.trim();
-  final lower = clean.toLowerCase();
-  if (lower.contains('fathalla') ||
-      clean.contains('فتح الله') ||
-      clean.contains('فتح_الله')) {
-    return 'فتح الله ماركت';
-  }
-  if (lower.contains('gomla') ||
-      lower.contains('jomla') ||
-      clean.contains('جملة') ||
-      clean.contains('جمله')) {
-    return 'جملة ماركت';
-  }
-  if (lower.contains('zahran') || clean.contains('زهران')) {
-    return 'زهران ماركت';
-  }
-  if (lower.contains('carrefour') || clean.contains('كارفور')) {
-    return 'كارفور';
-  }
-  if (lower.contains('beit') || clean.contains('بيت الجملة')) {
-    return 'بيت الجملة';
-  }
-  return clean;
-}
+String formatChainDisplayName(String raw) => chainDisplayName(raw);
 
 /// Returns a tuple of (backgroundColor, foregroundColor, borderColor) for an organization
 /// with distinct, recognizable colors for quick visual differentiation.
