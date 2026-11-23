@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/logging/release_log_guard.dart';
 import 'package:delegate_app/core/services/firestore_cache_reset.dart';
 import 'dart:async';
 
@@ -138,6 +139,9 @@ Future<void> bootstrapDelegateAppForPatrol() async {
 }
 
 void main() async {
+  // TAS-83: no debugPrint output (phones, uids) in release builds.
+  silenceDebugPrintInRelease();
+
   // TAS-197: `/hr/home` → `/#/hr/home` before the router reads the address.
   normalizeWebPathToHash();
 
