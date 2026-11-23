@@ -51,7 +51,7 @@ class PrivateLabelScreen extends StatelessWidget {
           return _buildContent(context);
         }
         return const PrivateLabelAccessDeniedView(
-          title: 'Private Label',
+          title: 'العلامة الخاصة',
           screenName: 'التوثيق الميداني للبرايفت ليبل',
         );
       },
@@ -196,7 +196,7 @@ class _PrivateLabelView extends StatelessWidget {
       child: Scaffold(
         backgroundColor: cs.surface,
         appBar: AppBar(
-          title: const Text('Private Label'),
+          title: const Text('العلامة الخاصة'),
           centerTitle: false,
           actions: [
             BlocBuilder<PrivateLabelBloc, PrivateLabelState>(
@@ -222,7 +222,7 @@ class _PrivateLabelView extends StatelessWidget {
             IconButton(
               tooltip: PrivateLabelCatalogScreen.canEditCatalog(delegate)
                   ? 'الكتالوج (منتجات البرايفت ليبل)'
-                  : 'Catalog',
+                  : 'الكتالوج',
               icon: const Icon(Icons.inventory_2_rounded),
               onPressed: () async {
                 final bloc = context.read<PrivateLabelBloc>();
@@ -345,7 +345,7 @@ class _PrivateLabelView extends StatelessWidget {
         }
       },
       catalogButtonLabel: isReadOnlyCatalog
-          ? 'Catalog'
+          ? 'الكتالوج'
           : 'الكتالوج (منتجات البرايفت ليبل)',
       onRegisterRestToday: isCurrentMonth && !state.isUpdatingRest ? () => _registerRest(context, today) : null,
       onCancelRestToday: isCurrentMonth && !state.isUpdatingRest ? () => _cancelRest(context, today) : null,

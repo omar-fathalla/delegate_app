@@ -76,6 +76,7 @@ test("delete of the last link clears binding, unbind requests and sessions", asy
     uid: id, fullName: "Gone Fake", phoneNumber: "01077778888", organizationUID: "o1", companyUID: "c1", status: "active",
   });
   await fs.doc(`deviceBindings/${id}`).set({deviceId: "dev-x", delegateId: id});
+  await fs.doc(`users/${id}`).set({role: "delegate", fullName: "Gone Fake"});
   await fs.doc("device_unbind_requests/r-pending").set({delegateUid: id, status: "pending"});
   await fs.doc("device_unbind_requests/r-done").set({delegateUid: id, status: "completed"});
   await ensureAuthUser(id);
@@ -84,6 +85,8 @@ test("delete of the last link clears binding, unbind requests and sessions", asy
   await deleteAndTrigger(`organizations/o1/companies/c1/delegates/${id}`);
 
   assert.equal((await fs.doc(`deviceBindings/${id}`).get()).exists, false);
+  // TAS-217: the orphaned delegate users doc goes too.
+  assert.equal((await fs.doc(`users/${id}`).get()).exists, false);
   assert.equal((await fs.doc("device_unbind_requests/r-pending").get()).data().status, "cancelled");
   assert.equal((await fs.doc("device_unbind_requests/r-done").get()).data().status, "completed");
   const after = await admin.auth().getUser(id);
@@ -117,6 +120,7 @@ test("deleting a ghost under a staff uid never revokes the staff account", async
   await admin.auth().setCustomUserClaims(id, {role: "company-admin"});
   await deleteAndTrigger(`organizations/o1/companies/c1/delegates/${id}`);
   assert.equal((await fs.doc(`deviceBindings/${id}`).get()).exists, true);
+  assert.equal((await fs.doc(`users/${id}`).get()).exists, true);
   assert.deepEqual((await admin.auth().getUser(id)).customClaims, {role: "company-admin"});
 });
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:delegate_app/core/l10n/display_names.dart';
 import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'package:delegate_app/core/services/firestore_client_health.dart';
 import 'package:flutter/material.dart';
@@ -21,6 +22,7 @@ import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/marketing/data/models/floor_verification_model.dart';
 import 'package:delegate_app/features/marketing/data/services/floor_verification_service.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/features/marketing/data/datasources/marketing_remote_data_source.dart';
 import 'package:delegate_app/features/marketing/data/services/real_test_metrics.dart';
 
 /// الشاشة الرئيسية للفروع - تعرض جميع الفروع المفضلة في نفس الصفحة
@@ -90,7 +92,12 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   final Map<String, String> _branchFilter = {};
 
   /// Periodic timer for auto-refresh heartbeat (every 30s)
-  Timer? _autoRefreshTimer;
+  /// Live updates (TAS-260): a Firestore listener on today's attendance for
+  /// the favorite branches replaces the old 30-second polling timer. It only
+  /// costs reads when a record changes, and it is stopped while the app is in
+  /// the background.
+  StreamSubscription<void>? _liveSub;
+  Timer? _liveDebounce;
 
   /// App lifecycle listener to sync immediately upon app resume
   AppLifecycleListener? _lifecycleListener;
@@ -111,24 +118,17 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       _floorVerifications = _floorService.getLocalVerifications(_selectedDate);
       _syncFloorVerificationsFromCloud();
 
-      // Auto-refresh heartbeat every 30 seconds for live zero-drop data delivery
-      // Disabled during REAL_TEST_METRICS so cold/warm measurements are not polluted.
-      if (!RealTestMetrics.enabled) {
-        _autoRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-          if (mounted && _favoriteBranches.isNotEmpty) {
-            _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
-            _syncFloorVerificationsFromCloud();
-          }
-        });
-      }
+      _watchLive();
 
-      // Revalidate immediately when app resumes from background
+      // Stop listening in the background; revalidate and listen again on resume.
       _lifecycleListener = AppLifecycleListener(
+        onHide: _stopLive,
         onResume: () {
           if (mounted && _favoriteBranches.isNotEmpty) {
             _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
             _syncFloorVerificationsFromCloud();
           }
+          _watchLive();
         },
       );
     } catch (e, st) {
@@ -138,10 +138,40 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
 
   @override
   void dispose() {
-    _autoRefreshTimer?.cancel();
+    _stopLive();
     _lifecycleListener?.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _stopLive() {
+    _liveDebounce?.cancel();
+    _liveDebounce = null;
+    _liveSub?.cancel();
+    _liveSub = null;
+  }
+
+  /// (Re)starts the attendance listener for the current favorites and date.
+  /// Disabled during REAL_TEST_METRICS so cold/warm measurements stay clean.
+  void _watchLive() {
+    _stopLive();
+    if (RealTestMetrics.enabled || _favoriteBranches.isEmpty) return;
+    if (!di.sl.isRegistered<MarketingRemoteDataSource>()) return;
+    _liveSub = di.sl<MarketingRemoteDataSource>()
+        .watchTodayAttendanceChanges(
+          branchNames: _favoriteBranches,
+          organizationId: widget.marketingUser.organizationUID,
+          date: _selectedDate,
+        )
+        .listen((_) {
+      // Several check-ins in a burst become one reload.
+      _liveDebounce?.cancel();
+      _liveDebounce = Timer(const Duration(seconds: 3), () {
+        if (!mounted || _favoriteBranches.isEmpty) return;
+        _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
+        _syncFloorVerificationsFromCloud();
+      });
+    });
   }
 
   Future<void> _syncFloorVerificationsFromCloud() async {
@@ -487,6 +517,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       });
       _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
       _syncFloorVerificationsFromCloud();
+      _watchLive();
     }
   }
 
@@ -520,6 +551,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
             // حمّل بيانات كل الفروع دفعة واحدة
             _loadAllBranches(context, favorites);
           }
+          _watchLive();
         }
       },
       buildWhen: (prev, curr) =>
@@ -3139,6 +3171,26 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
         r.name.toLowerCase().contains('technical');
   }
 
+  /// TAS-270: regular users are locked to their own organization (legacy
+  /// fallback to Fathalla Market only when the user has none).
+  String get _lockedOrgUID {
+    final org = widget.organizationId.trim();
+    return (org.isEmpty || org == 'all') ? 'PiioBFgxaHAeuRdjlDgj' : org;
+  }
+
+  /// Arabic display name of the locked organization.
+  String get _lockedOrgName {
+    final found = _organizations.firstWhere(
+      (o) => o['uid'] == _lockedOrgUID,
+      orElse: () => {'name': _fallbackOrgName(_lockedOrgUID)},
+    );
+    final name = chainDisplayName(found['name'] ?? '');
+    return name.isNotEmpty ? name : 'السلسلة';
+  }
+
+  static String _fallbackOrgName(String orgUID) =>
+      orgUID == 'PiioBFgxaHAeuRdjlDgj' ? 'fathalla market' : '';
+
   @override
   void initState() {
     super.initState();
@@ -3155,17 +3207,29 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
     try {
       final firestore = di.sl<FirebaseFirestore>();
 
-      // 1. Fetch organizations if Super Admin or Tech Support
+      // 1. Fetch organizations (all for Super Admin / Tech Support, only the
+      // user's own one otherwise).
       final List<Map<String, String>> orgs = [];
+      void addOrg(String docId, Map<String, dynamic> d) {
+        final name =
+            (d['name'] ?? d['organizationName'] ?? d['title'] ?? '').toString().trim();
+        final uid = (d['uid'] ?? d['organizationUID'] ?? docId).toString().trim();
+        if (name.isNotEmpty) {
+          orgs.add({'uid': uid.isNotEmpty ? uid : docId, 'name': name});
+        }
+      }
       try {
-        final orgSnapshot = await firestore.collection('organizations').get();
-        for (final doc in orgSnapshot.docs) {
-          final d = doc.data();
-          final name = (d['name'] ?? d['title'] ?? '').toString().trim();
-          final uid = (d['uid'] ?? d['organizationUID'] ?? doc.id).toString().trim();
-          if (name.isNotEmpty) {
-            orgs.add({'uid': uid.isNotEmpty ? uid : doc.id, 'name': name});
+        if (isSuperAdminOrTechSupport) {
+          final orgSnapshot = await firestore.collection('organizations').get();
+          for (final doc in orgSnapshot.docs) {
+            addOrg(doc.id, doc.data());
           }
+        } else {
+          final doc = await firestore
+              .collection('organizations')
+              .doc(_lockedOrgUID)
+              .get();
+          addOrg(doc.id, doc.data() ?? const <String, dynamic>{});
         }
       } catch (e, st) {
         debugPrint('BranchPicker: organizations fetch failed: $e\n$st');
@@ -3311,9 +3375,13 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
         targetOrgName = found['name'] ?? 'fathalla market';
       }
     } else {
-      // For all regular users: strictly locked to fathalla market
-      targetOrgName = 'fathalla market';
-      targetOrgUID = 'PiioBFgxaHAeuRdjlDgj';
+      // For all regular users: strictly locked to their own organization.
+      targetOrgUID = _lockedOrgUID;
+      targetOrgName = _organizations.firstWhere(
+            (o) => o['uid'] == targetOrgUID,
+            orElse: () => {'name': _fallbackOrgName(targetOrgUID)},
+          )['name'] ??
+          '';
     }
 
     final orgBranches = _allBranches.where((b) {
@@ -3385,7 +3453,7 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'fathalla market',
+                          _lockedOrgName,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -3459,7 +3527,7 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          org['name']!,
+                          chainDisplayName(org['name']!),
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,

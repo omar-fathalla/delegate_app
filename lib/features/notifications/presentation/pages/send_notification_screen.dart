@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:delegate_app/core/widgets/keyed_stream_builder.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:intl/intl.dart';
+import 'package:delegate_app/core/org/org_scope.dart';
 import 'package:delegate_app/core/constants/cloud_functions.dart';
 import 'package:delegate_app/features/notifications/data/send_staff_notification_request.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -10,6 +12,14 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 /// مركز بث وإرسال الإشعارات السحابية الشامل
 /// يتيح للسوبر أدمن والدعم الفني إرسال إشعارات فورية لجميع الأجهزة (Android & iOS)
 /// مع محاكي حي لشكل الإشعار وقوالب جاهزة للتحديثات والصيانة.
+/// Sent-log time for newest-first sorting; pending server timestamps first.
+@visibleForTesting
+DateTime sentAtOf(QueryDocumentSnapshot doc) {
+  final data = doc.data() as Map<String, dynamic>?;
+  final t = data?['createdAt'];
+  return t is Timestamp ? t.toDate() : DateTime(9999);
+}
+
 class SendNotificationScreen extends StatefulWidget {
   final Delegate senderDelegate;
   final bool showAppBar;
@@ -44,6 +54,8 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
   @override
   void initState() {
     super.initState();
+    // App update notices are for global staff only (TAS-268).
+    if (!_isGlobalSender) _selectedType = 'announcement';
     _tabController = TabController(length: 2, vsync: this);
     _titleController.addListener(_onTextChanged);
     _bodyController.addListener(_onTextChanged);
@@ -54,11 +66,14 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
     if (mounted) setState(() {});
   }
 
+  /// TAS-268: null for global staff (super admin / technical support);
+  /// otherwise the only organization this sender may target.
+  late final String? _orgScope = orgScopeFor(widget.senderDelegate);
+
   // Decision 2026-11-23 (TAS-216): only super admin / technical support
-  // broadcast to the whole app; "all" from anyone else is their own scope.
-  bool get _isGlobalSender =>
-      widget.senderDelegate.role == UserRole.superAdmin ||
-      widget.senderDelegate.role == UserRole.technicalSupport;
+  // broadcast to the whole app; "all" from anyone else is their own scope
+  // (the callable resolves it to their company or organization).
+  bool get _isGlobalSender => _orgScope == null;
   bool get _isCompanySender =>
       widget.senderDelegate.companyUID.trim().isNotEmpty;
 
@@ -75,15 +90,39 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
 
   Future<void> _fetchOrganizations() async {
     try {
-      final snap =
-          await FirebaseFirestore.instance.collection('organizations').get();
-      final orgs = snap.docs.map((doc) {
-        final data = doc.data();
-        return {
-          'uid': doc.id,
-          'name': data['name'] ?? data['title'] ?? doc.id,
-        };
-      }).toList();
+      final List<Map<String, dynamic>> orgs;
+      final scope = _orgScope;
+      if (scope != null) {
+        // TAS-268: non-global staff only see their own organization.
+        if (scope.isEmpty) {
+          orgs = [];
+        } else {
+          final doc = await FirebaseFirestore.instance
+              .collection('organizations')
+              .doc(scope)
+              .get();
+          final data = doc.data() ?? const <String, dynamic>{};
+          orgs = [
+            {
+              'uid': scope,
+              'name': data['name'] ??
+                  data['organizationName'] ??
+                  data['title'] ??
+                  widget.senderDelegate.organizationName,
+            },
+          ];
+        }
+      } else {
+        final snap =
+            await FirebaseFirestore.instance.collection('organizations').get();
+        orgs = snap.docs.map((doc) {
+          final data = doc.data();
+          return {
+            'uid': doc.id,
+            'name': data['name'] ?? data['title'] ?? doc.id,
+          };
+        }).toList();
+      }
 
       if (mounted) {
         setState(() {
@@ -94,8 +133,26 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
           _isLoadingOrgs = false;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingOrgs = false);
+    } catch (e) {
+      debugPrint('SendNotificationScreen: load organizations failed: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingOrgs = false;
+          final scope = _orgScope;
+          if (scope != null && scope.isNotEmpty) {
+            // Still let the sender target their own org by id.
+            _organizations = [
+              {
+                'uid': scope,
+                'name': widget.senderDelegate.organizationName.isNotEmpty
+                    ? widget.senderDelegate.organizationName
+                    : scope,
+              },
+            ];
+            _selectedOrgUID = scope;
+          }
+        });
+      }
     }
   }
 
@@ -108,7 +165,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
     setState(() {
       _titleController.text = title;
       _bodyController.text = body;
-      _selectedType = type;
+      _selectedType = (!_isGlobalSender && type == 'update') ? 'announcement' : type;
       _targetAudience = audience;
     });
     ScaffoldMessenger.of(context).showSnackBar(
@@ -219,11 +276,12 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
           ),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('SendNotificationScreen: send failed: $e\n$st');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('حدث خطأ أثناء إرسال الإشعار: $e'),
+            content: Text(sendNotificationErrorMessage(e)),
             backgroundColor: Theme.of(context).colorScheme.error,
             behavior: SnackBarBehavior.floating,
           ),
@@ -391,6 +449,8 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
+              // TAS-268: app update templates are for global staff only.
+              if (_isGlobalSender) ...[
               _buildPresetChip(
                 label: '🚀 تحديث إلزامي فوري',
                 colorScheme: colorScheme,
@@ -413,6 +473,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
                 ),
               ),
               const SizedBox(width: 8),
+              ],
               _buildPresetChip(
                 label: '⚙️ صيانة مجدولة',
                 colorScheme: colorScheme,
@@ -489,16 +550,18 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
           const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(
-                child: _buildTypeSelectTile(
-                  title: 'تحديث تطبيق',
-                  subtitle: 'مع زر للمتجر',
-                  value: 'update',
-                  icon: Icons.system_update_rounded,
-                  colorScheme: colorScheme,
+              if (_isGlobalSender) ...[
+                Expanded(
+                  child: _buildTypeSelectTile(
+                    title: 'تحديث تطبيق',
+                    subtitle: 'مع زر للمتجر',
+                    value: 'update',
+                    icon: Icons.system_update_rounded,
+                    colorScheme: colorScheme,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
+                const SizedBox(width: 8),
+              ],
               Expanded(
                 child: _buildTypeSelectTile(
                   title: 'إعلان عام',
@@ -1289,12 +1352,28 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
   // ----------------------------------------------------
   // Sent History / Outbox Tab with Realtime Read Status
   // ----------------------------------------------------
+  /// The outbox lists the most recent sent notifications only (TAS-90).
+  static const int _sentHistoryLimit = 50;
+
   Widget _buildSentHistoryTab() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('sent_notifications')
-          .orderBy('createdAt', descending: true)
-          .snapshots(),
+    // Subscribed once, not on every build: the compose form calls setState
+    // on every keystroke (TAS-90).
+    return KeyedStreamBuilder<QuerySnapshot>(
+      streamKey: 'sent_notifications',
+      // TAS-268: non-global senders see only what they sent (the rules allow
+      // reading own entries only). Sorted on the client so no
+      // senderUid+createdAt index is needed.
+      create: () => _isGlobalSender
+          ? FirebaseFirestore.instance
+              .collection('sent_notifications')
+              .orderBy('createdAt', descending: true)
+              .limit(_sentHistoryLimit)
+              .snapshots()
+          : FirebaseFirestore.instance
+              .collection('sent_notifications')
+              .where('senderUid', isEqualTo: widget.senderDelegate.uid)
+              .limit(_sentHistoryLimit)
+              .snapshots(),
       builder: (context, snapshot) {
         final colorScheme = Theme.of(context).colorScheme;
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -1310,7 +1389,8 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
           );
         }
 
-        final docs = snapshot.data?.docs ?? [];
+        final docs = [...?snapshot.data?.docs]
+          ..sort((a, b) => sentAtOf(b).compareTo(sentAtOf(a)));
         if (docs.isEmpty) {
           return Center(
             child: Column(
@@ -1349,7 +1429,8 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
               onResend: (t, b, type, aud, ph) {
                 _titleController.text = t;
                 _bodyController.text = b;
-                _selectedType = type;
+                _selectedType =
+                    (!_isGlobalSender && type == 'update') ? 'announcement' : type;
                 _targetAudience = aud;
                 _phoneController.text = ph;
                 _tabController.animateTo(0);
@@ -1664,4 +1745,19 @@ class _SentNotificationCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// TAS-268: a clear Arabic message for a failed send (never the raw error).
+@visibleForTesting
+String sendNotificationErrorMessage(Object error) {
+  if (error is FirebaseException) {
+    switch (error.code) {
+      case 'permission-denied':
+        return 'ليس لديك صلاحية لإرسال هذا الإشعار لهذه الفئة. تواصل مع الإدارة.';
+      case 'unavailable':
+      case 'deadline-exceeded':
+        return 'تعذّر الاتصال بالخادم. تحقق من الإنترنت وحاول مرة أخرى.';
+    }
+  }
+  return 'تعذّر إرسال الإشعار. حاول مرة أخرى.';
 }

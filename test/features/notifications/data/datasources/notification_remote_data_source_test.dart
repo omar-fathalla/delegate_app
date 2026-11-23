@@ -72,6 +72,43 @@ void main() {
     });
   });
 
+  group('marketing roles (TAS-269)', () {
+    test('broadcast targets per role', () {
+      expect(marketingBroadcastTargets('marketing'),
+          ['all', 'marketing', 'marketing_promotion', 'marketingPromotion']);
+      expect(marketingBroadcastTargets('marketingPromotion'),
+          ['all', 'marketing', 'marketing_promotion', 'marketingPromotion']);
+      expect(marketingBroadcastTargets('branchesMarketingManager'),
+          ['all', 'branchesMarketingManager', 'branches_marketing', 'branches-marketing']);
+      expect(marketingBroadcastTargets('branches_marketing'),
+          ['all', 'branchesMarketingManager', 'branches_marketing', 'branches-marketing']);
+      expect(marketingBroadcastTargets('organizationAdmin'), isNull);
+      expect(marketingBroadcastTargets('delegate'), isNull);
+    });
+
+    test('sends only uid + role broadcast queries, no phone variants', () async {
+      final asked = <String>[];
+      when(() => mockCollection.where('delegateUid', isEqualTo: any(named: 'isEqualTo')))
+          .thenAnswer((inv) {
+        asked.add(inv.namedArguments[#isEqualTo] as String);
+        return mockQuery;
+      });
+      when(() => mockCollection.where('phoneNumber', isEqualTo: any(named: 'isEqualTo')))
+          .thenAnswer((inv) {
+        asked.add('phoneNumber=${inv.namedArguments[#isEqualTo]}');
+        return mockQuery;
+      });
+      when(() => mockQuery.limit(any())).thenReturn(mockQuery);
+      when(() => mockQuery.get()).thenAnswer((_) async => mockQuerySnapshot);
+      when(() => mockQuerySnapshot.docs).thenReturn([]);
+
+      await dataSource.getNotifications('mk-uid', 'org-1',
+          phoneNumber: '01000000901', userRole: 'marketing');
+
+      expect(asked, ['mk-uid', 'all', 'marketing', 'marketing_promotion', 'marketingPromotion']);
+    });
+  });
+
   group('getUnreadCount', () {
     test('should return stream of int representing unread notifications', () {
       when(() => mockCollection.where('delegateUid', isEqualTo: any(named: 'isEqualTo'))).thenReturn(mockQuery);

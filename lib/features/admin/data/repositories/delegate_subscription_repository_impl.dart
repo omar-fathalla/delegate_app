@@ -895,6 +895,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
     SubscriptionRequestStatus? statusFilter,
     String? organizationUID,
     String? companyUID,
+    int? limit,
   }) {
     Query query = _firestore.collection('delegate_requests');
 
@@ -906,6 +907,10 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
     }
     if (companyUID != null && companyUID.isNotEmpty) {
       query = query.where('companyUID', isEqualTo: companyUID);
+    }
+    if (limit != null && limit > 0) {
+      // TAS-260: no orderBy, so no composite index; the caller only counts.
+      query = query.limit(limit);
     }
 
     final tenantCompany = companyUID?.trim() ?? '';
@@ -1679,24 +1684,25 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
   }) async {
     final cleanNat = nationalId.trim();
     final cleanUid = delegateUid.trim();
+    final found = <String?>[];
+    var lookupFailed = false;
 
-    // 1. Check if delegate already has a delegatePublicId in any organization by UID
+    // 1. Codes the delegate already holds in any chain (by UID).
+    // A chain admin may read only its own chain's copies, so this query can be
+    // denied; that must never lead to a second code (TAS-246).
     if (cleanUid.isNotEmpty) {
       try {
         final uidSnap = await _firestore
             .collectionGroup('delegates')
             .where('uid', isEqualTo: cleanUid)
             .get();
-        for (final doc in uidSnap.docs) {
-          final pid = doc.data()['delegatePublicId']?.toString().trim();
-          if (pid != null && pid.isNotEmpty) {
-            return pid;
-          }
-        }
-      } catch (_) {}
+        found.addAll(uidSnap.docs.map((d) => d.data()['delegatePublicId']?.toString()));
+      } catch (_) {
+        lookupFailed = true;
+      }
     }
 
-    // 2. Check if delegate already has a delegatePublicId by national ID
+    // 2. By national ID.
     if (cleanNat.isNotEmpty) {
       try {
         final natSnap = await _firestore
@@ -1704,14 +1710,17 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
             .where('nationalId', isEqualTo: cleanNat)
             .limit(5)
             .get();
-        for (final doc in natSnap.docs) {
-          final pid = doc.data()['delegatePublicId']?.toString().trim();
-          if (pid != null && pid.isNotEmpty) {
-            return pid;
-          }
-        }
-      } catch (_) {}
+        found.addAll(natSnap.docs.map((d) => d.data()['delegatePublicId']?.toString()));
+      } catch (_) {
+        lookupFailed = true;
+      }
     }
+
+    final existing = oldestDelegatePublicId(found);
+    if (existing != null) return existing;
+    // Could not see the other chains: leave the code empty. The server
+    // (enforceSingleDelegatePublicId) gives the delegate its one code.
+    if (lookupFailed) return '';
 
     // 3. Atomically allocate next counter from /counters/delegates
     try {
@@ -1806,6 +1815,24 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
   /// `allOrganizationNames` and `isExternal`. A legacy value such as
   /// `Promoter (جملة ماركت + 9 سلاسل)` is cleaned back to `Promoter`.
   /// The chain arguments are kept so existing call sites stay unchanged.
+  /// The oldest (lowest number) "DEL-n" code in [codes], or null.
+  /// One code per delegate, whatever the number of chains (TAS-246).
+  static String? oldestDelegatePublicId(Iterable<String?> codes) {
+    String? best;
+    int? bestN;
+    for (final raw in codes) {
+      final c = (raw ?? '').trim();
+      final m = RegExp(r'^DEL-(\d+)$', caseSensitive: false).firstMatch(c);
+      if (m == null) continue;
+      final n = int.parse(m.group(1)!);
+      if (bestN == null || n < bestN) {
+        bestN = n;
+        best = c;
+      }
+    }
+    return best;
+  }
+
   static String formatSmartPosition({
     required List<String> allOrgs,
     String? currentOrgName,

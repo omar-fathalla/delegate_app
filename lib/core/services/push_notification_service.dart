@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
+import 'package:delegate_app/core/services/fcm_device_token_store.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -19,9 +20,11 @@ const AndroidNotificationChannel taskNotificationChannel =
 /// Handles Firebase Cloud Messaging setup, token management, and local
 /// notification display.
 class PushNotificationService {
-  final FirebaseFirestore _firestore;
   final FirebaseMessaging _messaging;
   final FlutterLocalNotificationsPlugin _localNotifications;
+
+  /// TAS-258: legacy `fcm_tokens/{uid}` + per-device `devices/{deviceId}`.
+  final FcmDeviceTokenStore _tokens;
 
   StreamSubscription<String>? _tokenRefreshSub;
   String? _initializedUid;
@@ -38,10 +41,16 @@ class PushNotificationService {
     required FirebaseFirestore firestore,
     required FirebaseMessaging messaging,
     FlutterLocalNotificationsPlugin? localNotifications,
-  })  : _firestore = firestore,
-        _messaging = messaging,
+    FcmDeviceTokenStore? deviceTokens,
+  })  : _messaging = messaging,
         _localNotifications =
-            localNotifications ?? FlutterLocalNotificationsPlugin();
+            localNotifications ?? FlutterLocalNotificationsPlugin(),
+        _tokens = deviceTokens ??
+            FcmDeviceTokenStore(
+              firestore: firestore,
+              deviceId: FcmInstallId.load,
+              platform: kIsWeb ? 'web' : (Platform.isIOS ? 'ios' : 'android'),
+            );
 
   /// Initializes FCM: requests permissions, saves token, subscribes to topics,
   /// and sets up foreground/tap handlers.
@@ -147,19 +156,10 @@ class PushNotificationService {
     } catch (e) {
       debugPrint('FCM: token refresh cancel error: $e');
     }
-    // Delete the Firestore token doc first, while still signed in. A 2s
-    // timeout on this write (or on the whole cleanup) left a stale doc
-    // (M31 f7dbcf37 TimeoutException).
-    try {
-      await _firestore
-          .collection('fcm_tokens')
-          .doc(delegateUid)
-          .delete()
-          .timeout(const Duration(seconds: 10));
-      debugPrint('FCM: Token cleared for $delegateUid');
-    } catch (e) {
-      debugPrint('FCM: Error clearing token: $e');
-    }
+    // Delete the Firestore token docs first, while still signed in (M31
+    // f7dbcf37). TAS-258: only this device's doc, and the legacy doc only
+    // when it still holds this device's token.
+    await _tokens.clear(delegateUid);
     try {
       await _messaging
           .unsubscribeFromTopic('app_updates')
@@ -175,20 +175,8 @@ class PushNotificationService {
   }
 
   Future<void> _saveToken(String delegateUid, String token) async {
-    try {
-      await _firestore
-          .collection('fcm_tokens')
-          .doc(delegateUid)
-          .set({
-            'token': token,
-            'updatedAt': FieldValue.serverTimestamp(),
-            'platform': Platform.isIOS ? 'ios' : 'android',
-          })
-          .timeout(const Duration(seconds: 4));
-      debugPrint('FCM: Token saved for $delegateUid');
-    } catch (e) {
-      debugPrint('FCM: Error saving token: $e');
-    }
+    await _tokens.save(delegateUid, token);
+    debugPrint('FCM: Token saved for $delegateUid');
   }
 
   Future<void> _initLocalNotifications() async {

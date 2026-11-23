@@ -11,7 +11,7 @@ const {describe, test, before, after} = require("node:test");
 const {readFileSync} = require("fs");
 const {resolve} = require("path");
 const {initializeTestEnvironment, assertSucceeds, assertFails} = require("./_rules_testing");
-const {collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where} = require("firebase/firestore");
+const {collection, deleteDoc, doc, getDoc, getDocs, limit, query, setDoc, updateDoc, where} = require("firebase/firestore");
 
 const BASE = "seed-fake-base-chain";
 const PAID = "seed-fake-paid-chain";
@@ -80,4 +80,22 @@ describe("everyone else keeps their access", () => {
     assertSucceeds(getDoc(doc(as("sup-a"), "delegate_requests/req-base"))));
   test("super admin deletes a base-chain request", () =>
     assertSucceeds(deleteDoc(doc(as("sa"), "delegate_requests/req-base-del"))));
+});
+
+// TAS-260: the admin home pending badge lists pending requests with a limit
+// (no orderBy). The limit must not change who may list.
+describe("pending badge query (status + scope + limit)", () => {
+  const pending = (uid, field, value) => query(collection(as(uid), "delegate_requests"),
+    where("status", "==", "pending"), where(field, "==", value), limit(100));
+  test("company supervisor lists its company's pending requests", () =>
+    assertSucceeds(getDocs(pending("sup-a", "companyUID", CO_A))));
+  test("company supervisor cannot list another company's pending requests", () =>
+    assertFails(getDocs(pending("sup-a", "companyUID", "seed-fake-tas254-co-b"))));
+  test("another chain's org admin lists its pending requests", () =>
+    assertSucceeds(getDocs(pending("paid-oa", "organizationUID", PAID))));
+  test("base chain org admin still cannot list base-chain pending requests", () =>
+    assertFails(getDocs(pending("base-oa", "organizationUID", BASE))));
+  test("super admin lists pending requests with a limit", () =>
+    assertSucceeds(getDocs(query(collection(as("sa"), "delegate_requests"),
+      where("status", "==", "pending"), limit(100)))));
 });

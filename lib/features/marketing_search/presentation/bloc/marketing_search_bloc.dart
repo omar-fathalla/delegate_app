@@ -113,32 +113,42 @@ class MarketingSearchBloc
     SearchDelegateRequested event,
     Emitter<MarketingSearchState> emit,
   ) async {
+    // TAS-270: a phone number typed in the name field is a phone search.
+    var name = event.name;
+    var phone = event.phoneNumber;
+    if (name != null &&
+        looksLikePhoneNumber(name) &&
+        (phone == null || phone.trim().isEmpty)) {
+      phone = name.trim();
+      name = null;
+    }
+
     // Store search parameters for pagination
     _currentOrganizationUID = event.organizationUID;
-    _currentPhoneNumber = event.phoneNumber;
-    _currentDelegateName = event.name;
+    _currentPhoneNumber = phone;
+    _currentDelegateName = name;
 
     emit(const MarketingSearchLoading(searchType: 'delegate'));
 
     final searchLabel = [
-      if (event.name != null && event.name!.isNotEmpty) event.name!,
-      if (event.phoneNumber != null && event.phoneNumber!.isNotEmpty) event.phoneNumber!,
+      if (name != null && name.isNotEmpty) name,
+      if (phone != null && phone.isNotEmpty) phone,
     ].join(' - ');
 
     final dynamic result;
-    if (event.name != null && event.name!.trim().isNotEmpty) {
+    if (name != null && name.trim().isNotEmpty) {
       result = await searchDelegateByName(
         SearchDelegateByNameParams(
           organizationUID: event.organizationUID,
-          name: event.name!.trim(),
-          phoneNumber: event.phoneNumber,
+          name: name.trim(),
+          phoneNumber: phone,
         ),
       );
     } else {
       result = await searchDelegateByPhone(
         SearchDelegateByPhoneParams(
           organizationUID: event.organizationUID,
-          phoneNumber: event.phoneNumber ?? '',
+          phoneNumber: phone ?? '',
         ),
       );
     }
@@ -227,4 +237,12 @@ class MarketingSearchBloc
 
     emit(const MarketingSearchInitial());
   }
+}
+
+/// TAS-270: true when [input] is a phone number (digits, spaces, dashes and
+/// an optional leading +, at least 6 digits).
+bool looksLikePhoneNumber(String input) {
+  final t = input.trim();
+  if (!RegExp(r'^\+?[0-9\s\-]+$').hasMatch(t)) return false;
+  return RegExp(r'[0-9]').allMatches(t).length >= 6;
 }

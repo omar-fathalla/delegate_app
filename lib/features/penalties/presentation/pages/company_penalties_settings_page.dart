@@ -644,7 +644,23 @@ class _CompanyPenaltiesSettingsPageState
               label: Text(AppLocalizations.of(context)!.recordViolation),
             )
           : null,
-      body: BlocBuilder<PenaltyBloc, PenaltyState>(
+      // TAS-266: approve / reject emit PenaltyActionSuccessState. The page
+      // had no case for it and went blank without reloading. Keep the list
+      // on screen, confirm, and reload.
+      body: BlocConsumer<PenaltyBloc, PenaltyState>(
+        listenWhen: (_, state) => state is PenaltyActionSuccessState,
+        listener: (context, state) {
+          if (state is PenaltyActionSuccessState) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            _loadData();
+          }
+        },
+        buildWhen: (_, state) => state is! PenaltyActionSuccessState,
         builder: (context, state) {
           if (state is PenaltyLoadingState) {
             return const Center(child: CircularProgressIndicator());

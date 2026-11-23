@@ -14,6 +14,7 @@ import 'package:delegate_app/features/attendance/domain/monthly_attendance_stats
 import 'package:delegate_app/features/attendance/domain/usecases/get_history_for_month.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/features/attendance/presentation/attendance_action_lock.dart';
+import 'package:delegate_app/features/attendance/presentation/attendance_location_fetcher.dart';
 import 'package:delegate_app/features/attendance/presentation/widgets/early_checkout_confirm_sheet.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
@@ -323,6 +324,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   bool _isInsideGeofence = false;
   bool _isCheckingLocation = false;
   final AttendanceActionLock _actionLock = AttendanceActionLock();
+  final AttendanceLocationFetcher _locationFetcher =
+      AttendanceLocationFetcher();
   String? _locationStatusMessage;
 
   bool get _isGeofenceMode => isGeofenceAttendanceMode(
@@ -2826,12 +2829,19 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     }
 
     try {
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 6),
-        ),
-      );
+      // High then medium accuracy, then a recent last known position only
+      // (TAS-278, TAS-279, TAS-280).
+      final fix = await _locationFetcher.fetch();
+      if (fix == null) {
+        if (context.mounted && !silent) {
+          AppSnackBar.showError(
+            context,
+            AppLocalizations.of(context)!.locationTimeout,
+          );
+        }
+        return null;
+      }
+      final position = fix.position;
 
       // --- Anti-Fraud: Fake GPS / Mock Location Detection ---
       if (position.isMocked) {
@@ -2850,32 +2860,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       }
 
       return position;
-    } on TimeoutException catch (_) {
-      final lastPosition = await Geolocator.getLastKnownPosition();
-      if (lastPosition != null) {
-        if (lastPosition.isMocked) {
-          _logMockViolation(
-            lastPosition,
-            branchName: branchName,
-            actionType: actionType,
-          );
-          if (context.mounted && !silent) {
-            AppSnackBar.showError(
-              context,
-              AppLocalizations.of(context)!.fakeGpsDetected,
-            );
-          }
-          return null;
-        }
-        return lastPosition;
-      }
-      if (context.mounted && !silent) {
-        AppSnackBar.showError(
-          context,
-          AppLocalizations.of(context)!.locationTimeout,
-        );
-      }
-      return null;
     } catch (e) {
       if (context.mounted && !silent) {
         AppSnackBar.showError(context, AppLocalizations.of(context)!.locationError);

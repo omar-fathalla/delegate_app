@@ -49,12 +49,15 @@ const GLOBAL_ROLES = new Set([
   "technical_support", "technicalsupport", "tech_support", "techsupport",
 ]);
 const ORG_ROLES = new Set(["organization_admin", "organizationadmin"]);
-const MARKETING_ROLES = new Set(["marketing", "marketing_promotion", "marketingpromotion"]);
+// TAS-268: branches marketing without a company works for its whole organization.
+const MARKETING_ROLES = new Set([
+  "marketing", "marketing_promotion", "marketingpromotion",
+  "branches_marketing", "branches_marketing_manager", "branchesmarketingmanager",
+]);
 const COMPANY_ROLES = new Set([
   "company_admin", "companyadmin", "admin", "supervisor", "company_supervisor",
   "hr", "company_hr", "human_resources",
   "accountant", "accounting", "account_admin",
-  "branches_marketing", "branches_marketing_manager", "branchesmarketingmanager",
 ]);
 
 /** camelCase role keys ("superAdmin") become "superadmin" after normalizeRoleKey. */
@@ -93,6 +96,14 @@ export function callerScopeFrom(
       deny("permission-denied", "no_scope", "Company is missing.");
   }
   return deny("permission-denied", "role_not_allowed", "This role cannot send notifications.");
+}
+
+/** App update notices (store button) are for global staff only (TAS-268). */
+export function typeAllowedFor(scope: CallerScope, type: string): Denial | null {
+  if (type === "update" && scope.kind !== "global") {
+    return deny("permission-denied", "type_not_allowed", "Only global staff send app update notices.");
+  }
+  return null;
 }
 
 /** Roles the screen may target, with the spellings stored in users.role. */
@@ -320,10 +331,10 @@ export function senderRoleName(role: unknown): string {
   if (GLOBAL_ROLES.has(k)) return "technicalSupport";
   if (ORG_ROLES.has(k)) return "organizationAdmin";
   if (k === "marketing") return "marketing";
+  if (k.startsWith("branches")) return "branchesMarketingManager";
   if (MARKETING_ROLES.has(k)) return "marketingPromotion";
   if (["hr", "company_hr", "human_resources"].includes(k)) return "hr";
   if (["accountant", "accounting", "account_admin"].includes(k)) return "accountant";
-  if (k.startsWith("branches")) return "branchesMarketingManager";
   if (COMPANY_ROLES.has(k)) return "admin";
   return k || "admin";
 }

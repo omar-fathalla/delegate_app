@@ -2,6 +2,7 @@ const {describe, test} = require("node:test");
 const assert = require("node:assert/strict");
 const {
   callerScopeFrom,
+  typeAllowedFor,
   parseRequest,
   authorizeTarget,
   candidateFrom,
@@ -77,6 +78,25 @@ describe("callerScopeFrom", () => {
       {kind: "company", org: ORG, company: CO},
     );
     assert.deepEqual(callerScopeFrom({role: "marketing", organizationUID: ORG}), {kind: "org", org: ORG});
+  });
+
+  test("branches marketing manager: company-scoped with a company, org-scoped without (TAS-268)", () => {
+    assert.deepEqual(
+      callerScopeFrom({role: "branchesMarketingManager", organizationUID: ORG, companyUID: CO}),
+      {kind: "company", org: ORG, company: CO},
+    );
+    assert.deepEqual(
+      callerScopeFrom({role: "branches_marketing_manager", organizationUID: ORG}),
+      {kind: "org", org: ORG},
+    );
+    assert.equal(callerScopeFrom({role: "branches_marketing_manager"}).reason, "no_scope");
+  });
+
+  test("app update notices are for global staff only (TAS-268)", () => {
+    assert.equal(typeAllowedFor({kind: "global"}, "update"), null);
+    assert.equal(typeAllowedFor({kind: "org", org: ORG}, "update").reason, "type_not_allowed");
+    assert.equal(typeAllowedFor({kind: "company", org: ORG, company: CO}, "update").reason, "type_not_allowed");
+    assert.equal(typeAllowedFor({kind: "org", org: ORG}, "announcement"), null);
   });
 
   test("unknown role is rejected", () => {

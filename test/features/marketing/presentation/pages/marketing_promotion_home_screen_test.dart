@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +13,19 @@ import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/injection_container.dart' as di;
+
+/// Counts how often the live pulse query is built (TAS-90).
+class _CountingFirestore extends FakeFirebaseFirestore {
+  int photoPermissionQueries = 0;
+
+  @override
+  CollectionReference<Map<String, dynamic>> collectionGroup(
+    String collectionPath,
+  ) {
+    if (collectionPath == 'photo_permissions') photoPermissionQueries++;
+    return super.collectionGroup(collectionPath);
+  }
+}
 
 class MockPermissionsDataSource extends Mock
     implements PrivateLabelPermissionsRemoteDataSource {}
@@ -144,5 +158,40 @@ void main() {
 
     // Verify onNavigateTab was called with 3 (the Private Label tab index)
     expect(navigatedTab, equals(3));
+  });
+
+  testWidgets('TAS-90: live pulse query is built once across rebuilds', (
+    tester,
+  ) async {
+    final countingFirestore = _CountingFirestore();
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        MarketingPromotionHomeScreen(
+          delegate: _createPromoDelegate(),
+          firestore: countingFirestore,
+          onNavigateTab: (_) {},
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(countingFirestore.photoPermissionQueries, 1);
+
+    // Each permissions event calls setState on the screen and rebuilds it.
+    for (var i = 0; i < 3; i++) {
+      streamController.add(PrivateLabelPermissions(
+        userId: 'promo123',
+        canCapture: i.isEven,
+        canReviewAudit: true,
+      ));
+      await tester.pump(Duration.zero);
+      await tester.pump();
+    }
+
+    expect(
+      countingFirestore.photoPermissionQueries,
+      1,
+      reason: 'rebuilds must reuse the subscribed stream',
+    );
   });
 }

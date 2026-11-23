@@ -61,6 +61,8 @@ void main() {
           contains('البث العام'));
       expect(sendStaffNotificationErrorMessage('permission-denied', 'out_of_scope'),
           contains('نطاق'));
+      expect(sendStaffNotificationErrorMessage('permission-denied', 'type_not_allowed'),
+          contains('تحديث التطبيق'));
       expect(sendStaffNotificationErrorMessage('internal', null), isNotEmpty);
     });
   });

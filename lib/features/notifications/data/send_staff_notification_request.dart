@@ -40,6 +40,8 @@ String sendStaffNotificationErrorMessage(String code, String? reason) {
   switch (reason) {
     case 'broadcast_global_only':
       return 'البث العام لجميع المستخدمين متاح للإدارة العليا والدعم الفني فقط.';
+    case 'type_not_allowed':
+      return 'إشعارات تحديث التطبيق متاحة للإدارة العليا والدعم الفني فقط.';
     case 'out_of_scope':
       return 'لا يمكنك الإرسال خارج نطاق شركتك أو منظمتك.';
     case 'delegate_not_allowed':

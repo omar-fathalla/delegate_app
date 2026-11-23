@@ -2901,7 +2901,7 @@ abstract class AppLocalizations {
   /// No description provided for @locationTimeout.
   ///
   /// In en, this message translates to:
-  /// **'Timed out getting your location. Make sure GPS is on and you\'re in an open area.'**
+  /// **'We couldn\'t get your location. Stand in an open area, open Google Maps until the blue dot settles, turn on Google Location Accuracy, then try again.'**
   String get locationTimeout;
 
   /// No description provided for @locationError.

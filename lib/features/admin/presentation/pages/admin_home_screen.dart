@@ -4,6 +4,7 @@ import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_add_chains_sheet.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/widgets/branch_name_label.dart';
+import 'package:delegate_app/core/widgets/keyed_stream_builder.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/features/admin/presentation/bloc/admin_dashboard_bloc.dart';
@@ -49,6 +50,14 @@ String _dashboardOrganizationUID(Delegate d) {
   if (d.role == UserRole.organizationAdmin) return d.organizationUID;
   return d.companyUID.isNotEmpty ? '' : d.organizationUID;
 }
+
+/// TAS-260: the pending-requests badge reads at most this many documents.
+const int pendingRequestsBadgeCap = 100;
+
+/// Badge text for [count] pending requests read with [pendingRequestsBadgeCap]:
+/// a full page means there may be more, so it shows "100+".
+String pendingRequestsBadgeLabel(int count) =>
+    count >= pendingRequestsBadgeCap ? '$pendingRequestsBadgeCap+' : '$count';
 
 class AdminHomeScreen extends StatelessWidget {
   final Delegate adminDelegate;
@@ -1642,6 +1651,15 @@ class AdminHomeQuickActions extends StatelessWidget with _AdminHomeHelpers {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Scope of the pending subscription requests badge (unchanged).
+    final String? pendingCompanyUID = (adminDelegate.role == UserRole.superAdmin ||
+            adminDelegate.role == UserRole.technicalSupport ||
+            adminDelegate.role == UserRole.organizationAdmin)
+        ? null
+        : (adminDelegate.companyUID.isNotEmpty ? adminDelegate.companyUID : null);
+    final String? pendingOrganizationUID = adminDelegate.role == UserRole.organizationAdmin
+        ? (adminDelegate.organizationUID.isNotEmpty ? adminDelegate.organizationUID : null)
+        : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -1738,21 +1756,17 @@ class AdminHomeQuickActions extends StatelessWidget with _AdminHomeHelpers {
                                   ),
                                 ),
                                 const SizedBox(width: 6),
-                                StreamBuilder<List<DelegateSubscriptionRequest>>(
-                                  stream: sl<DelegateSubscriptionRepository>().getSubscriptionRequestsStream(
+                                KeyedStreamBuilder<List<DelegateSubscriptionRequest>>(
+                                  // Subscribed once per scope, not on every
+                                  // build (TAS-90).
+                                  streamKey: ('pending_subscription_requests', pendingCompanyUID, pendingOrganizationUID),
+                                  create: () => sl<DelegateSubscriptionRepository>().getSubscriptionRequestsStream(
                                     statusFilter: SubscriptionRequestStatus.pending,
-                                    companyUID: (adminDelegate.role == UserRole.superAdmin ||
-                                            adminDelegate.role == UserRole.technicalSupport ||
-                                            adminDelegate.role == UserRole.organizationAdmin)
-                                        ? null
-                                        : (adminDelegate.companyUID.isNotEmpty
-                                            ? adminDelegate.companyUID
-                                            : null),
-                                    organizationUID: adminDelegate.role == UserRole.organizationAdmin
-                                        ? (adminDelegate.organizationUID.isNotEmpty
-                                            ? adminDelegate.organizationUID
-                                            : null)
-                                        : null,
+                                    companyUID: pendingCompanyUID,
+                                    organizationUID: pendingOrganizationUID,
+                                    // TAS-260: the badge only counts, so read at
+                                    // most this many pending documents.
+                                    limit: pendingRequestsBadgeCap,
                                   ),
                                   builder: (context, snapshot) {
                                     final count = snapshot.data?.length ?? 0;
@@ -1764,7 +1778,7 @@ class AdminHomeQuickActions extends StatelessWidget with _AdminHomeHelpers {
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Text(
-                                        '$count معلقة',
+                                        '${pendingRequestsBadgeLabel(count)} معلقة',
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 11,

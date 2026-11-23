@@ -1,5 +1,6 @@
 import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
+import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'package:flutter/material.dart';
@@ -418,9 +419,11 @@ class _HRDelegateAttendanceDetailScreenState
     try {
       // 1. Load branches if not provided
       if (_branchesByName.isEmpty) {
-        final branchesSnap = await _db.collection('branches').get();
+        // TAS-259: shared once-per-session list (the HR tab usually
+        // loaded it already), not a fresh full-collection read per open.
+        final branchDocs = await BranchesSessionCache.load(_db);
         final Map<String, Branch> bMap = {};
-        for (final doc in branchesSnap.docs) {
+        for (final doc in branchDocs) {
           final b = BranchModel.fromFirestore(doc);
           registerBranchInLookupMap(bMap, b);
         }

@@ -29,6 +29,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       'انتهت جلسة الدخول السابقة. يرجى تسجيل الدخول من جديد.\n'
       'Your previous session has ended. Please sign in again.';
 
+  /// Shown when a cached delegate has no Firebase sign-in on this phone,
+  /// e.g. after Android restored the app data on a new phone (TAS-287).
+  static const sessionLostMessage =
+      'انتهت جلستك على هذا الجهاز. سجّل الدخول برقم الموبايل والرقم القومي.\n'
+      'Your session on this phone has ended. Please sign in again.';
+
   final Login loginUseCase;
   final CheckAutoLogin checkAutoLoginUseCase;
   final Logout logoutUseCase;
@@ -37,6 +43,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final bool Function()? isAnonymousSession;
   final Future<void> Function()? signOutAuth;
   final Stream<bool>? anonymousSessionRestored;
+
+  /// Resolves whether Firebase Auth has a signed-in user on this device.
+  /// Null skips the check (older tests). Wired to FirebaseAuth in DI.
+  final Future<bool> Function()? hasAuthUser;
 
   /// Test seams; default to the real services.
   final Future<SessionVerificationResult> Function(Delegate delegate)
@@ -64,6 +74,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     this.isAnonymousSession,
     this.signOutAuth,
     this.anonymousSessionRestored,
+    this.hasAuthUser,
     Future<SessionVerificationResult> Function(Delegate delegate)?
         sessionCheck,
     Future<DeviceVerificationResult> Function(Delegate delegate)? deviceCheck,
@@ -450,6 +461,18 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
     }
     onCached(delegate);
+
+    // 0. A cached delegate with no Firebase user can read nothing and every
+    // write is permission-denied (TAS-286). Send them to sign in again.
+    if (delegate.role == UserRole.delegate) {
+      final check = hasAuthUser;
+      if (check != null && !await check()) {
+        return const _AutoLoginDecision(
+          AuthUnauthenticated(message: sessionLostMessage),
+          logout: true,
+        );
+      }
+    }
 
     // 1. فحص إبطال الجلسة أو الخروج الإجباري من الإدارة
     final session = await sessionCheck(delegate);

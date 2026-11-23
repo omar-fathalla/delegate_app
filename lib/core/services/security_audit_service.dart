@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 /// خدمة تدقيق الأمان ومكافحة التلاعب ورصد أجهزة الـ Fake Location
@@ -91,12 +92,15 @@ class SecurityAuditService {
       // If branchName is empty, determine the nearest branch from mock coordinates
       if (resolvedBranchName.isEmpty) {
         try {
-          final branchesSnap = await _firestore.collection('branches').get();
+          // TAS-259: reuse the once-per-session branches list (already
+          // loaded by the attendance screen's display cache) instead of a
+          // full-collection read on every fake-GPS attempt.
+          final branchDocs = await BranchesSessionCache.load(_firestore);
           double minDistance = double.infinity;
           String bestName = '';
           String bestId = '';
 
-          for (final doc in branchesSnap.docs) {
+          for (final doc in branchDocs) {
             final bData = doc.data();
             final bName = (bData['branchName'] as String?) ??
                 (bData['name'] as String?) ??

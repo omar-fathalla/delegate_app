@@ -16,6 +16,7 @@ import {
   filterRecipients,
   notificationDoc,
   parseRequest,
+  typeAllowedFor,
   phoneVariants,
   recipientOrgCompany,
   senderRoleName,
@@ -70,6 +71,8 @@ async function handle(db: Db, uid: string, tokenRole: unknown, data: unknown) {
   if ("ok" in scope) fail(scope);
   const req = parseRequest(data);
   if (!req.ok) fail(req);
+  const typeDenied = typeAllowedFor(scope, req.type);
+  if (typeDenied) fail(typeDenied);
   const auth = authorizeTarget(scope, req.target);
   if (!auth.ok) fail(auth);
   const target = auth.target;

@@ -2,7 +2,8 @@
  * Recipients for a new pending photo-permission request.
  * Company admin / supervisor of the delegate's company (one role),
  * org-admins of the delegate's organization, marketing-promotion of
- * the same company, and global approvers (super-admin, technical support).
+ * the same company (or of the organization when it has no company), and
+ * global approvers (super-admin, technical support).
  */
 const COMPANY_ADMIN_ROLES = new Set([
   "admin",
@@ -99,7 +100,15 @@ export function shouldNotifyPhotoPermissionUser(
   const org = String(opts.organizationId || "").trim();
   if (!u || !u.id) return false;
   if (isGlobalApproverNotifyRole(u.role)) return true;
-  if (isCompanyAdminNotifyRole(u.role) || isMarketingPromotionNotifyRole(u.role)) {
+  if (isMarketingPromotionNotifyRole(u.role)) {
+    // TAS-270 #8: marketing promotion approves photo requests. With a
+    // companyUID it follows that company; with none (org-wide, e.g.
+    // Fathalla Market's promotion team) every request of its organization.
+    const ownCo = String(u.companyUID || "").trim();
+    if (ownCo !== "") return co !== "" && ownCo === co;
+    return org !== "" && orgIdsOf(u).includes(org);
+  }
+  if (isCompanyAdminNotifyRole(u.role)) {
     return co !== "" && String(u.companyUID || "").trim() === co;
   }
   if (isOrgAdminNotifyRole(u.role)) {

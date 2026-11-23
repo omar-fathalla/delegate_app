@@ -9,6 +9,7 @@ import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
+import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'package:delegate_app/core/utils/file_download_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
@@ -379,12 +380,15 @@ class _HRAttendanceTabState extends State<HRAttendanceTab> {
     });
 
     try {
-      // 1. Load branches to calculate geofence distances accurately
-      final branchesSnap =
-          await FirebaseFirestore.instance.collection('branches').get();
-      BranchDisplayCache.instance.registerSnapshot(branchesSnap);
+      // 1. Load branches to calculate geofence distances accurately.
+      // TAS-259: the full list is needed (name/substring/nearest-500m
+      // matching), but it is read once per session and shared with the
+      // display cache and the detail screen instead of on every open.
+      final branchDocs =
+          await BranchesSessionCache.load(FirebaseFirestore.instance);
+      BranchDisplayCache.instance.registerDocs(branchDocs);
       final Map<String, Branch> branchesMap = {};
-      for (final doc in branchesSnap.docs) {
+      for (final doc in branchDocs) {
         final b = BranchModel.fromFirestore(doc);
         registerBranchInLookupMap(branchesMap, b);
       }

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
+import 'package:delegate_app/core/widgets/keyed_stream_builder.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/create_task_screen.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/admin_tasks_screen.dart';
@@ -354,14 +355,22 @@ class _BranchesMarketingHomeScreenState
     ColorScheme colorScheme,
     bool isArabic,
   ) {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    final companyUID = widget.delegate.companyUID;
+    final organizationUID = widget.delegate.organizationUID;
+    return KeyedStreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       // TAS-73: scoped to the user's company (or organization) so the rules
       // can prove the list; pending is counted on the client.
-      stream: photoPermissionsTenantQuery(
+      // TAS-90: subscribed once per scope, not on every build.
+      streamKey: (companyUID, organizationUID),
+      create: () => photoPermissionsTenantQuery(
         FirebaseFirestore.instance,
-        companyUID: widget.delegate.companyUID,
-        organizationUID: widget.delegate.organizationUID,
-      ).streamResilient(includeMetadataChanges: true),
+        companyUID: companyUID,
+        organizationUID: organizationUID,
+      ).streamResilient(
+        // TAS-260: the builder only counts docs; cache/server metadata-only
+        // events would just rebuild with the same counts.
+        includeMetadataChanges: false,
+      ),
       builder: (context, snapshot) {
         int pendingCount = _cachedPendingCount;
         if (snapshot.hasData) {

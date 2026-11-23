@@ -2,6 +2,7 @@ import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/error/firestore_error_handler.dart';
 import 'package:delegate_app/core/error/failures.dart';
@@ -11,6 +12,15 @@ import 'package:delegate_app/features/marketing/data/services/real_test_metrics.
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 
 abstract class MarketingRemoteDataSource {
+  /// Emits once each time today's attendance for [branchNames] changes on the
+  /// server (TAS-260). The first snapshot of each query is skipped: it is the
+  /// data the screen already loaded. Replaces the 30-second polling timer.
+  Stream<void> watchTodayAttendanceChanges({
+    required List<String> branchNames,
+    required String organizationId,
+    DateTime? date,
+  });
+
   Future<List<Map<String, dynamic>>> getCompanies(String organizationUID);
 
   /// Get companies with pagination
@@ -337,6 +347,53 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
   }
 
   @override
+  Stream<void> watchTodayAttendanceChanges({
+    required List<String> branchNames,
+    required String organizationId,
+    DateTime? date,
+  }) {
+    if (branchNames.isEmpty) return const Stream<void>.empty();
+    final target = date ?? DateTime.now();
+    final start = DateTime(target.year, target.month, target.day);
+    final end = start.add(const Duration(days: 1));
+    final orgId = attendanceQueryOrgId(organizationId);
+    final chunks = branchQueryChunks(branchQueryTerms(branchNames).toList());
+    final controller = StreamController<void>();
+    final subs = <StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>[];
+    controller.onListen = () {
+      for (final chunk in chunks) {
+        var first = true;
+        subs.add(firestore
+            .collection(kAttendanceCollection)
+            .where('organizationId', isEqualTo: orgId)
+            .where('branchName', whereIn: chunk)
+            .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+            .where('timestamp', isLessThan: Timestamp.fromDate(end))
+            .limit(2000)
+            .snapshots()
+            .listen((snap) {
+          if (first) {
+            first = false;
+            return;
+          }
+          if (snap.metadata.hasPendingWrites) return;
+          if (snap.docChanges.isEmpty) return;
+          if (!controller.isClosed) controller.add(null);
+        }, onError: (Object e) {
+          debugPrint('watchTodayAttendanceChanges: $e');
+        }));
+      }
+    };
+    controller.onCancel = () async {
+      for (final s in subs) {
+        await s.cancel();
+      }
+      subs.clear();
+    };
+    return controller.stream;
+  }
+
+  @override
   Future<Map<String, List<Map<String, dynamic>>>> getTodayAttendanceForBranches({
     required List<String> branchNames,
     required String organizationId,
@@ -351,52 +408,19 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       final todayEnd = todayStart.add(const Duration(days: 1));
 
       // ── Step 1: جلب سجلات الحضور مع تطبيع أسماء الفروع والاستعلام الموثوق ──
-      final Set<String> queryBranchTerms = {};
-      final Map<String, String> normalizedToBranch = {};
-
-      for (final b in branchNames) {
-        final trimmed = b.trim();
-        if (trimmed.isEmpty) continue;
-        normalizedToBranch[normalizeBranchName(trimmed)] = b;
-        queryBranchTerms.add(trimmed);
-
-        // إضافة أشكال الحروف المختلفة (الهمزات، التاء المربوطة، الياء/الألف المقصورة) لضمان عدم سقوط أي سجل في whereIn
-        final withoutHamza = trimmed.replaceAll(RegExp(r'[أإآ]'), 'ا');
-        queryBranchTerms.add(withoutHamza);
-        final withAlifHamza = trimmed.replaceAll('ا', 'أ');
-        queryBranchTerms.add(withAlifHamza);
-        final withTa = trimmed.replaceAll('ه', 'ة');
-        queryBranchTerms.add(withTa);
-        final withHa = trimmed.replaceAll('ة', 'ه');
-        queryBranchTerms.add(withHa);
-        final withYa = trimmed.replaceAll('ى', 'ي');
-        queryBranchTerms.add(withYa);
-      }
-
+      final Map<String, String> normalizedToBranch = {
+        for (final b in branchNames)
+          if (b.trim().isNotEmpty) normalizeBranchName(b.trim()): b,
+      };
+      final queryBranchTerms = branchQueryTerms(branchNames);
       final queryBranchList = queryBranchTerms.toList();
-      // Firestore caps (filter clauses * whereIn size) at 100. With
-      // organizationId + branchName + timestamp>= + timestamp< (=4), max whereIn is 25.
-      const branchWhereInChunkSize = 20;
-      final branchChunks = <List<String>>[];
-      for (var i = 0; i < queryBranchList.length; i += branchWhereInChunkSize) {
-        branchChunks.add(
-          queryBranchList.sublist(
-            i,
-            (i + branchWhereInChunkSize > queryBranchList.length)
-                ? queryBranchList.length
-                : i + branchWhereInChunkSize,
-          ),
-        );
-      }
+      final branchChunks = branchQueryChunks(queryBranchList);
 
       // attendance_logs writes use `organizationId` (see AttendanceRemoteDataSource).
       // Bound the query by org + branchName variants + today's local calendar day
       // (device TZ; production users are Africa/Cairo) + a hard limit so we never
       // download the full historical collection.
-      String queryOrgId = organizationId.trim();
-      if (queryOrgId.isEmpty) {
-        queryOrgId = 'PiioBFgxaHAeuRdjlDgj'; // Fathalla Market default
-      }
+      final queryOrgId = attendanceQueryOrgId(organizationId);
       final todayStartTs = Timestamp.fromDate(todayStart);
       final todayEndTs = Timestamp.fromDate(todayEnd);
       // Favorites UIs are typically << this; guards runaway orgs / bad data.
@@ -1166,3 +1190,38 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
 
 
 
+
+
+/// Fathalla Market default when the marketing user has no organization.
+String attendanceQueryOrgId(String organizationId) {
+  final id = organizationId.trim();
+  return id.isEmpty ? 'PiioBFgxaHAeuRdjlDgj' : id;
+}
+
+/// Branch name spellings sent to `whereIn` (hamza, taa marbuta, alef maqsura
+/// variants), so no attendance record is missed.
+Set<String> branchQueryTerms(List<String> branchNames) {
+  final terms = <String>{};
+  for (final b in branchNames) {
+    final trimmed = b.trim();
+    if (trimmed.isEmpty) continue;
+    terms
+      ..add(trimmed)
+      ..add(trimmed.replaceAll(RegExp(r'[أإآ]'), 'ا'))
+      ..add(trimmed.replaceAll('ا', 'أ'))
+      ..add(trimmed.replaceAll('ه', 'ة'))
+      ..add(trimmed.replaceAll('ة', 'ه'))
+      ..add(trimmed.replaceAll('ى', 'ي'));
+  }
+  return terms;
+}
+
+/// Firestore caps (filter clauses * whereIn size) at 100. With
+/// organizationId + branchName + timestamp>= + timestamp< (=4), max whereIn
+/// is 25; chunks of 20 keep a margin.
+List<List<String>> branchQueryChunks(List<String> terms, {int size = 20}) {
+  return [
+    for (var i = 0; i < terms.length; i += size)
+      terms.sublist(i, i + size > terms.length ? terms.length : i + size),
+  ];
+}

@@ -55,6 +55,17 @@ export const onDelegateLinkDeleted = functions.firestore
         }
         if (n > 0) await batch.commit();
       }
+      if (plan.deleteUsersDoc) {
+        // Re-read inside a transaction: delete only if it is still a
+        // delegate-role doc (a staff role written meanwhile is kept).
+        await db.runTransaction(async (tx) => {
+          const ref = db.collection("users").doc(delegateId);
+          const cur = await tx.get(ref);
+          if (!cur.exists) return;
+          const again = planDeletedLinkCleanup({remainingLiveLinks: 0, usersRole: String(cur.get("role") ?? "")});
+          if (again.deleteUsersDoc) tx.delete(ref);
+        });
+      }
       if (plan.revokeSessions) {
         try {
           // Only undo what delegateLoginV2 set: never touch an auth user

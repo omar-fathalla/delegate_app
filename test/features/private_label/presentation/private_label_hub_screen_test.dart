@@ -368,7 +368,8 @@ void main() {
     di.sl.registerFactory<PrivateLabelReviewBloc>(() => mockReviewBloc);
 
     try {
-      // 1) UserRole.marketing sees 'Catalog' and can open catalog in read-only mode
+      // 1) UserRole.marketing sees 'الكتالوج' (TAS-270: Arabic, not 'Catalog')
+      // and can open catalog in read-only mode
       await tester.pumpWidget(_buildTestApp(PrivateLabelHubScreen(delegate: branchMarketing)));
       await tester.pump();
       streamController.add(const PrivateLabelPermissions(
@@ -380,7 +381,7 @@ void main() {
       await tester.pump(Duration.zero);
       await tester.pump();
 
-      expect(find.text('Catalog'), findsOneWidget);
+      expect(find.text('الكتالوج'), findsOneWidget);
       expect(
         find.text('صفحة الكتالوج وعرض المنتجات والأسعار المعتمدة'),
         findsOneWidget,

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
+import 'package:delegate_app/core/widgets/keyed_stream_builder.dart';
 
 class ManageOrganizationsPage extends StatefulWidget {
   const ManageOrganizationsPage({super.key});
@@ -188,8 +189,10 @@ class _ManageOrganizationsPageState extends State<ManageOrganizationsPage> {
 
           // Organizations Stream
           Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('organizations').snapshots(),
+            // Subscribed once, not on every search keystroke (TAS-90).
+            child: KeyedStreamBuilder<QuerySnapshot>(
+              streamKey: 'organizations',
+              create: () => FirebaseFirestore.instance.collection('organizations').snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
