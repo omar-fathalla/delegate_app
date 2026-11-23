@@ -366,7 +366,11 @@ class _BranchesMarketingHomeScreenState
         FirebaseFirestore.instance,
         companyUID: companyUID,
         organizationUID: organizationUID,
-      ).streamResilient(includeMetadataChanges: true),
+      ).streamResilient(
+        // TAS-260: the builder only counts docs; cache/server metadata-only
+        // events would just rebuild with the same counts.
+        includeMetadataChanges: false,
+      ),
       builder: (context, snapshot) {
         int pendingCount = _cachedPendingCount;
         if (snapshot.hasData) {

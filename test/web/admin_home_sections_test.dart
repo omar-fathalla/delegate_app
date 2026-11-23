@@ -103,6 +103,7 @@ void main() {
           statusFilter: any(named: 'statusFilter'),
           organizationUID: any(named: 'organizationUID'),
           companyUID: any(named: 'companyUID'),
+          limit: any(named: 'limit'),
         )).thenAnswer((_) => Stream.value(<DelegateSubscriptionRequest>[]));
     if (!sl.isRegistered<DelegateSubscriptionRepository>()) {
       sl.registerSingleton<DelegateSubscriptionRepository>(repo);

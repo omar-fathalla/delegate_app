@@ -75,11 +75,16 @@ abstract class DelegateSubscriptionRepository {
     required String companyUID,
   });
 
-  /// Streams subscription requests filtered by status or organization/company
+  /// Streams subscription requests filtered by status or organization/company.
+  ///
+  /// [limit] caps how many documents the listener reads (TAS-260). Only pass
+  /// it where the caller shows a bounded view (e.g. a pending-count badge);
+  /// screens that list or total every request must leave it null.
   Stream<List<DelegateSubscriptionRequest>> getSubscriptionRequestsStream({
     SubscriptionRequestStatus? statusFilter,
     String? organizationUID,
     String? companyUID,
+    int? limit,
   });
 
   /// Approves a subscription request, creating/activating the delegate

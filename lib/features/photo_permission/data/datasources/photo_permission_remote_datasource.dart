@@ -263,7 +263,7 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
           .collectionGroup('photo_permissions')
           .orderBy('createdAt', descending: true)
           .limit(100)
-          .snapshots(includeMetadataChanges: true)
+          .snapshots()
           .map((snapshot) {
         final docs = snapshot.docs
             .map((doc) => PhotoPermissionModel.fromFirestore(doc))
@@ -275,7 +275,7 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
       return firestore
           .collectionGroup('photo_permissions')
           .where('organizationUID', isEqualTo: organizationUID)
-          .snapshots(includeMetadataChanges: true)
+          .snapshots()
           .handleError((Object e, StackTrace st) {
             Error.throwWithStackTrace(e, st);
           })
@@ -292,7 +292,7 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
       return firestore
           .collectionGroup('photo_permissions')
           .where('companyUID', isEqualTo: companyUID)
-          .snapshots(includeMetadataChanges: true)
+          .snapshots()
           .handleError((Object e, StackTrace st) {
             Error.throwWithStackTrace(e, st);
           })
