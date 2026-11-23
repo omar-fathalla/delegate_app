@@ -11,7 +11,7 @@ const {describe, test, before, after} = require("node:test");
 const assert = require("node:assert");
 const {readFileSync} = require("fs");
 const {resolve} = require("path");
-const {initializeTestEnvironment, assertSucceeds} = require("./_rules_testing");
+const {initializeTestEnvironment, assertSucceeds, assertFails} = require("./_rules_testing");
 const {
   doc, setDoc, getDocs, collection, collectionGroup, query, where,
 } = require("firebase/firestore");
@@ -110,6 +110,18 @@ describe("photo_permissions ongoing list for delegates (getOngoingPermissions)",
     const snap = await assertSucceeds(ongoing(delegateDb("del-1", ORG_A, CO_A1), ORG_A));
     assert.strictEqual(snap.size, 2);
   });
+
+  // TAS-215: a delegate in two chains gets orgIds/companyIds claims from
+  // delegateLoginV2 (buildCustomClaimsForProfiles). Its second chain's ongoing
+  // permissions must list; a chain outside orgIds stays denied.
+  test("a multi-chain delegate lists its second chain (orgIds claim)", async () => {
+    const db = delegateDb("del-multi", ORG_A, CO_A1, {orgIds: [ORG_A, ORG_B], companyIds: [CO_A1, CO_B1]});
+    const snap = await assertSucceeds(ongoing(db, ORG_B));
+    assert.strictEqual(snap.size, 1);
+  });
+
+  test("a single-chain delegate cannot list another chain", () =>
+    assertFails(ongoing(delegateDb("del-1", ORG_A, CO_A1), ORG_B)));
 
   // Supervisors sign in through delegateLoginV2, so their token says
   // role "delegate"; the company list must still pass through companyScoped().

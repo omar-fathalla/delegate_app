@@ -1850,11 +1850,20 @@ service cloud.firestore {
       // companyUID / organizationUID equality first so a constrained
       // collection-group query stays well under the 1000-expression budget.
       // Use get() so an unfiltered list does not evaluation-error on missing fields.
+      // TAS-215: a delegate token (supervisors sign in through
+      // delegateLoginV2 too) is decided by its claims: primary orgId/companyId
+      // or any chain in orgIds/companyIds (multi-chain delegates). Staff
+      // helpers (users/{uid} reads) only run for staff tokens, so a delegate's
+      // deny comes from a rule and not from the 1000-expression budget.
       allow read: if signedIn() && (
-        companyScoped()
-        || orgScoped()
-        || isGlobalStaff()
-        || (isDelegate() && resource.data.get('organizationUID', '') == claimString('orgId'))
+        request.auth.token.get('role', '') == 'delegate'
+          // Claims only (no users/{uid} read): primary org/company, or any
+          // chain/company in orgIds/companyIds.
+          ? (claimString('orgId') == resource.data.get('organizationUID', '')
+            || claimListHas('orgIds', resource.data.get('organizationUID', ''))
+            || claimString('companyId') == resource.data.get('companyUID', '')
+            || claimListHas('companyIds', resource.data.get('companyUID', '')))
+          : (companyScoped() || orgScoped() || isGlobalStaff())
       );
       allow create: if signedIn() && (
         isGlobalStaff()
