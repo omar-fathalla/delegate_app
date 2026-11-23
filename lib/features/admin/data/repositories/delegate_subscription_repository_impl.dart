@@ -895,6 +895,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
     SubscriptionRequestStatus? statusFilter,
     String? organizationUID,
     String? companyUID,
+    int? limit,
   }) {
     Query query = _firestore.collection('delegate_requests');
 
@@ -906,6 +907,10 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
     }
     if (companyUID != null && companyUID.isNotEmpty) {
       query = query.where('companyUID', isEqualTo: companyUID);
+    }
+    if (limit != null && limit > 0) {
+      // TAS-260: no orderBy, so no composite index; the caller only counts.
+      query = query.limit(limit);
     }
 
     final tenantCompany = companyUID?.trim() ?? '';

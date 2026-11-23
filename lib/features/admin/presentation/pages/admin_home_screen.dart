@@ -51,6 +51,14 @@ String _dashboardOrganizationUID(Delegate d) {
   return d.companyUID.isNotEmpty ? '' : d.organizationUID;
 }
 
+/// TAS-260: the pending-requests badge reads at most this many documents.
+const int pendingRequestsBadgeCap = 100;
+
+/// Badge text for [count] pending requests read with [pendingRequestsBadgeCap]:
+/// a full page means there may be more, so it shows "100+".
+String pendingRequestsBadgeLabel(int count) =>
+    count >= pendingRequestsBadgeCap ? '$pendingRequestsBadgeCap+' : '$count';
+
 class AdminHomeScreen extends StatelessWidget {
   final Delegate adminDelegate;
 
@@ -1756,6 +1764,9 @@ class AdminHomeQuickActions extends StatelessWidget with _AdminHomeHelpers {
                                     statusFilter: SubscriptionRequestStatus.pending,
                                     companyUID: pendingCompanyUID,
                                     organizationUID: pendingOrganizationUID,
+                                    // TAS-260: the badge only counts, so read at
+                                    // most this many pending documents.
+                                    limit: pendingRequestsBadgeCap,
                                   ),
                                   builder: (context, snapshot) {
                                     final count = snapshot.data?.length ?? 0;
@@ -1767,7 +1778,7 @@ class AdminHomeQuickActions extends StatelessWidget with _AdminHomeHelpers {
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Text(
-                                        '$count معلقة',
+                                        '${pendingRequestsBadgeLabel(count)} معلقة',
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 11,
