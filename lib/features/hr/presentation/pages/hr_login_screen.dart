@@ -7,6 +7,7 @@ import 'package:delegate_app/features/auth/presentation/auth_error_message.dart'
 import 'package:delegate_app/features/auth/domain/role_home.dart';
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:delegate_app/features/auth/presentation/widgets/totp_code_form.dart';
 import 'package:delegate_app/features/auth/presentation/pages/delegate_phone_otp_view.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
@@ -137,6 +138,14 @@ class _HrLoginScreenState extends State<HrLoginScreen>
           }
         },
         builder: (context, state) {
+          if (state is AuthMfaRequired) {
+            final bloc = context.read<AuthBloc>();
+            return TotpLoginView(
+              onSubmit: state.challenge.resolve,
+              onVerified: () => bloc.add(const MfaVerified()),
+              onCancel: () => bloc.add(const MfaCancelled()),
+            );
+          }
           if (state is AuthPhoneOtpRequired) {
             return DelegatePhoneOtpView(phoneE164: state.e164Phone);
           }

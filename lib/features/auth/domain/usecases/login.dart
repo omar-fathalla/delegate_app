@@ -2,6 +2,7 @@ import 'package:dartz/dartz.dart';
 import 'package:equatable/equatable.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/usecases/usecase.dart';
+import 'package:delegate_app/features/auth/domain/mfa_required_failure.dart';
 import 'package:delegate_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
@@ -54,6 +55,8 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
             phone,
             params.password,
           );
+          final mfa = _twoStepFailure(isValid, delegate);
+          if (mfa != null) return Left(mfa);
           final valid = isValid.fold((_) => false, (v) => v);
           if (valid) matched.add(delegate);
         } else if (delegate.nationalityID.startsWith('__firebase_auth__:')) {
@@ -65,6 +68,8 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
             email,
             params.password,
           );
+          final mfa = _twoStepFailure(verifyResult, delegate);
+          if (mfa != null) return Left(mfa);
           final isValid = verifyResult.fold((_) => false, (valid) => valid);
           if (isValid) matched.add(delegate);
         }
@@ -83,6 +88,21 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
 
       return _finish(matched, params);
     });
+  }
+
+  /// TAS-207: a right password on an account with two-step verification.
+  /// The login stops here and carries [delegate] so it can continue once the
+  /// TOTP code is confirmed. Other failures keep counting as a wrong password.
+  Failure? _twoStepFailure(Either<Failure, bool> result, Delegate delegate) {
+    return result.fold((failure) {
+      if (failure is MfaRequiredFailure) {
+        return failure.withPendingDelegates([delegate]);
+      }
+      if (failure is AuthFailure && failure.code == 'mfa_unsupported') {
+        return failure;
+      }
+      return null;
+    }, (_) => null);
   }
 
   Future<Either<Failure, List<Delegate>>> _finish(

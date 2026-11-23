@@ -53,6 +53,16 @@ class PhoneOtpCancelled extends AuthEvent {
   const PhoneOtpCancelled();
 }
 
+/// The TOTP code of [AuthMfaRequired] was accepted (TAS-207).
+class MfaVerified extends AuthEvent {
+  const MfaVerified();
+}
+
+/// The user left the TOTP step; back to the password form (TAS-207).
+class MfaCancelled extends AuthEvent {
+  const MfaCancelled();
+}
+
 class OrganizationSelected extends AuthEvent {
   final Delegate delegate;
   final bool rememberMe;
