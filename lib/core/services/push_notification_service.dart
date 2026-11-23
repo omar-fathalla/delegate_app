@@ -26,6 +26,10 @@ class PushNotificationService {
   StreamSubscription<String>? _tokenRefreshSub;
   String? _initializedUid;
 
+  /// TAS-80: foreground/tap listeners are registered once per service, not
+  /// once per login, so a logout + login no longer shows every push twice.
+  final FcmListenerRegistry _listeners = FcmListenerRegistry();
+
   /// Callback invoked when a notification is tapped.
   /// Receives the notification data payload.
   static void Function(Map<String, dynamic> data)? onNotificationTap;
@@ -58,8 +62,12 @@ class PushNotificationService {
 
     // 2. Set up foreground/background message stream listeners
     try {
-      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-      FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
+      _listeners.listenOnce(
+        onMessage: FirebaseMessaging.onMessage,
+        onMessageOpenedApp: FirebaseMessaging.onMessageOpenedApp,
+        onForeground: _handleForegroundMessage,
+        onTap: _handleNotificationTap,
+      );
     } catch (e) {
       debugPrint('FCM: Message listener setup error: $e');
     }
@@ -256,5 +264,31 @@ class PushNotificationService {
   void _handleNotificationTap(RemoteMessage message) {
     debugPrint('FCM notification tapped: ${message.data}');
     onNotificationTap?.call(message.data);
+  }
+}
+
+/// Holds the FCM foreground/tap subscriptions so they are created only once
+/// for the lifetime of a [PushNotificationService] (TAS-80).
+class FcmListenerRegistry {
+  StreamSubscription<RemoteMessage>? _onMessageSub;
+  StreamSubscription<RemoteMessage>? _onOpenedSub;
+
+  bool get isListening => _onMessageSub != null;
+
+  void listenOnce({
+    required Stream<RemoteMessage> onMessage,
+    required Stream<RemoteMessage> onMessageOpenedApp,
+    required void Function(RemoteMessage) onForeground,
+    required void Function(RemoteMessage) onTap,
+  }) {
+    _onMessageSub ??= onMessage.listen(onForeground);
+    _onOpenedSub ??= onMessageOpenedApp.listen(onTap);
+  }
+
+  Future<void> cancel() async {
+    await _onMessageSub?.cancel();
+    await _onOpenedSub?.cancel();
+    _onMessageSub = null;
+    _onOpenedSub = null;
   }
 }
