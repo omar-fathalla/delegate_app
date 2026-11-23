@@ -89,6 +89,9 @@ class MemRef {
   async set(data, _options) {
     this._db._store.set(this.path, applySentinels(data, this._db.now()));
   }
+  async delete() {
+    this._db._store.delete(this.path);
+  }
   async create(data) {
     if (this._db._store.has(this.path)) {
       const err = new Error(`Document already exists: ${this.path}`);
@@ -179,6 +182,9 @@ class MemTx {
   update(ref, data) {
     return ref.update(data);
   }
+  delete(ref) {
+    return ref.delete();
+  }
 }
 
 class MemoryFirestore {
@@ -212,6 +218,9 @@ class MemoryFirestore {
       },
       update(ref, data) {
         ops.push(() => ref.update(data));
+      },
+      delete(ref) {
+        ops.push(() => ref.delete());
       },
       async commit() {
         for (const op of ops) await op();
