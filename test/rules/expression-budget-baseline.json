@@ -6,7 +6,7 @@
   "docs-pending.test.js": 230,
   "firestore.rules.test.js": 48,
   "hr-web-company-reads.test.js": 12,
-  "m31-delegate-own-reads.test.js": 6,
+  "m31-delegate-own-reads.test.js": 5,
   "qa-hold-reads.test.js": 22,
   "staff-privileged-doc-reupload.test.js": 4,
   "suspend-login-penalties.test.js": 10,
