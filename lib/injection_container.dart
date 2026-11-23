@@ -186,6 +186,16 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
       isAnonymousSession: () =>
           sl<FirebaseAuth>().currentUser?.isAnonymous == true,
       signOutAuth: () => sl<FirebaseAuth>().signOut(),
+      // TAS-287: wait for Firebase to restore its saved user before deciding.
+      hasAuthUser: () async {
+        final auth = sl<FirebaseAuth>();
+        if (auth.currentUser != null) return true;
+        final user = await auth
+            .authStateChanges()
+            .first
+            .timeout(const Duration(seconds: 3), onTimeout: () => null);
+        return user != null;
+      },
       anonymousSessionRestored: sl<FirebaseAuth>().authStateChanges().map(
         (user) => user?.isAnonymous == true,
       ),
