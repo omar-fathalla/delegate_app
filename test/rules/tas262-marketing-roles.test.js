@@ -177,3 +177,26 @@ describe("TAS-266 follow-up notifications after a penalty decision", () => {
     await assertFails(setDoc(doc(as("bmm"), "notifications/n-dec-3"), payload("someone-else")));
   });
 });
+
+describe("TAS-268 manager sends by role / by phone inside its org", () => {
+  test("lists users of its org by role and by phone", async () => {
+    const db = as("bmm");
+    await assertSucceeds(getDocs(query(collection(db, "users"),
+      where("role", "==", "marketing"), where("organizationUID", "==", ORG))));
+    await assertSucceeds(getDocs(query(collection(db, "users"),
+      where("phoneNumber", "==", "01000000901"), where("organizationUID", "==", ORG))));
+    await assertSucceeds(getDocs(query(collectionGroup(db, "delegates"),
+      where("phoneNumber", "==", "0100000000a"), where("organizationUID", "==", ORG))));
+  });
+  // These two are denied by the old users list rule's budget (TAS-291).
+  test("not another org's users, and not an unscoped list", async () => {
+    const db = as("bmm");
+    await assertFails(getDocs(query(collection(db, "users"),
+      where("role", "==", "marketing"), where("organizationUID", "==", OTHER))));
+    await assertFails(getDocs(query(collection(db, "users"), where("role", "==", "marketing"))));
+  });
+  test("a company-scoped manager does not get the org-wide list", async () => {
+    await assertFails(getDocs(query(collection(as("bmmc"), "users"),
+      where("role", "==", "marketing"), where("organizationUID", "==", ORG))));
+  });
+});

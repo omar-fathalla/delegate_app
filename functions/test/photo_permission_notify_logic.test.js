@@ -35,6 +35,19 @@ test("notifies marketing-promotion of the same company and global approvers", ()
   );
 });
 
+test("org-wide marketing-promotion (no companyUID) is notified for its org only (TAS-270)", () => {
+  const users = [
+    {id: "mpOrg", role: "marketing_promotion", organizationUID: "o1"},
+    {id: "mpOrgCompanyEmpty", role: "marketingPromotion", companyUID: "", organizationUID: "o1"},
+    {id: "mpOtherOrg", role: "marketing_promotion", organizationUID: "o2"},
+    {id: "mpOtherCo", role: "marketing_promotion", companyUID: "coB", organizationUID: "o1"},
+  ];
+  assert.deepEqual(
+    L.photoPermissionNotifyUserIds(users, "coA", "o1").sort(),
+    ["mpOrg", "mpOrgCompanyEmpty"],
+  );
+});
+
 test("empty company yields no company-scoped recipients; global approvers still notify", () => {
   const users = [
     {id: "supA", role: "admin", companyUID: "coA"},

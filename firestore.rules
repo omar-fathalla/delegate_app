@@ -933,7 +933,22 @@ service cloud.firestore {
 
     // ==================== SHARED: USERS ====================
 
+    // TAS-268: the org-wide branches-marketing manager (no companyUID) lists
+    // users of its own organization (send by role / by phone). One users
+    // read; the query must constrain organizationUID.
+    function canListUsersAsOrgBranchesMarketing() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return u.get('role', '') in ['branches_marketing', 'branches-marketing',
+          'branches_marketing_manager', 'branches-marketing-manager',
+          'branchesmarketingmanager', 'branchesMarketingManager']
+        && u.get('companyUID', '') == ''
+        && u.get('organizationUID', '') is string
+        && u.get('organizationUID', '') != ''
+        && resource.data.get('organizationUID', '') == u.get('organizationUID', '');
+    }
+
     match /users/{userId} {
+      allow list: if staffToken() && canListUsersAsOrgBranchesMarketing();
       allow get: if signedIn() && (
         request.auth.uid == userId ||
         ownsDelegateId(userId) ||

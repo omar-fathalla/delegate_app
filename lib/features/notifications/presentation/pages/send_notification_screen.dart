@@ -53,6 +53,11 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
   late final String? _orgScope = orgScopeFor(widget.senderDelegate);
   bool get _isGlobalSender => _orgScope == null;
 
+  /// TAS-268: a non-global sender only finds people of its organization
+  /// (single-user send by phone, role send).
+  Query<Map<String, dynamic>> _scopedToOrg(Query<Map<String, dynamic>> q) =>
+      _isGlobalSender ? q : q.where('organizationUID', isEqualTo: _orgScope);
+
   /// Non-global senders cannot broadcast to the whole app.
   String _allowedAudience(String audience) =>
       (!_isGlobalSender && audience == 'all') ? 'org' : audience;
@@ -225,12 +230,9 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
 
     for (final phoneVar in variations) {
       for (final field in ['phoneNumber', 'phone', 'mobile', 'mobileNumber']) {
-        final query =
-            await firestore
-                .collection('users')
-                .where(field, isEqualTo: phoneVar)
-                .limit(1)
-                .get();
+        final query = await _scopedToOrg(
+          firestore.collection('users').where(field, isEqualTo: phoneVar),
+        ).limit(1).get();
         if (query.docs.isNotEmpty) {
           final doc = query.docs.first;
           final data = doc.data();
@@ -248,12 +250,9 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
 
     for (final phoneVar in variations) {
       for (final field in ['phoneNumber', 'phone', 'mobile', 'mobileNumber']) {
-        final query =
-            await firestore
-                .collectionGroup('delegates')
-                .where(field, isEqualTo: phoneVar)
-                .limit(1)
-                .get();
+        final query = await _scopedToOrg(
+          firestore.collectionGroup('delegates').where(field, isEqualTo: phoneVar),
+        ).limit(1).get();
         if (query.docs.isNotEmpty) {
           final doc = query.docs.first;
           final data = doc.data();
@@ -379,12 +378,9 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
         targetName = 'فئة: $roleLabel';
         targetDetails = 'جميع المستخدمين الحاملين لرتبة $roleLabel';
 
-        final usersQuery = _isGlobalSender
-            ? firestore.collection('users').where('role', isEqualTo: _selectedRole)
-            : firestore
-                .collection('users')
-                .where('role', isEqualTo: _selectedRole)
-                .where('organizationUID', isEqualTo: _orgScope);
+        final usersQuery = _scopedToOrg(
+          firestore.collection('users').where('role', isEqualTo: _selectedRole),
+        );
         final usersSnap = await usersQuery.get();
         var batch = firestore.batch();
         int count = 0;
