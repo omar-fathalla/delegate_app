@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:delegate_app/core/l10n/display_names.dart';
 import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'package:delegate_app/core/services/firestore_client_health.dart';
 import 'package:flutter/material.dart';
@@ -3170,6 +3171,26 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
         r.name.toLowerCase().contains('technical');
   }
 
+  /// TAS-270: regular users are locked to their own organization (legacy
+  /// fallback to Fathalla Market only when the user has none).
+  String get _lockedOrgUID {
+    final org = widget.organizationId.trim();
+    return (org.isEmpty || org == 'all') ? 'PiioBFgxaHAeuRdjlDgj' : org;
+  }
+
+  /// Arabic display name of the locked organization.
+  String get _lockedOrgName {
+    final found = _organizations.firstWhere(
+      (o) => o['uid'] == _lockedOrgUID,
+      orElse: () => {'name': _fallbackOrgName(_lockedOrgUID)},
+    );
+    final name = chainDisplayName(found['name'] ?? '');
+    return name.isNotEmpty ? name : 'السلسلة';
+  }
+
+  static String _fallbackOrgName(String orgUID) =>
+      orgUID == 'PiioBFgxaHAeuRdjlDgj' ? 'fathalla market' : '';
+
   @override
   void initState() {
     super.initState();
@@ -3186,17 +3207,29 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
     try {
       final firestore = di.sl<FirebaseFirestore>();
 
-      // 1. Fetch organizations if Super Admin or Tech Support
+      // 1. Fetch organizations (all for Super Admin / Tech Support, only the
+      // user's own one otherwise).
       final List<Map<String, String>> orgs = [];
+      void addOrg(String docId, Map<String, dynamic> d) {
+        final name =
+            (d['name'] ?? d['organizationName'] ?? d['title'] ?? '').toString().trim();
+        final uid = (d['uid'] ?? d['organizationUID'] ?? docId).toString().trim();
+        if (name.isNotEmpty) {
+          orgs.add({'uid': uid.isNotEmpty ? uid : docId, 'name': name});
+        }
+      }
       try {
-        final orgSnapshot = await firestore.collection('organizations').get();
-        for (final doc in orgSnapshot.docs) {
-          final d = doc.data();
-          final name = (d['name'] ?? d['title'] ?? '').toString().trim();
-          final uid = (d['uid'] ?? d['organizationUID'] ?? doc.id).toString().trim();
-          if (name.isNotEmpty) {
-            orgs.add({'uid': uid.isNotEmpty ? uid : doc.id, 'name': name});
+        if (isSuperAdminOrTechSupport) {
+          final orgSnapshot = await firestore.collection('organizations').get();
+          for (final doc in orgSnapshot.docs) {
+            addOrg(doc.id, doc.data());
           }
+        } else {
+          final doc = await firestore
+              .collection('organizations')
+              .doc(_lockedOrgUID)
+              .get();
+          addOrg(doc.id, doc.data() ?? const <String, dynamic>{});
         }
       } catch (e, st) {
         debugPrint('BranchPicker: organizations fetch failed: $e\n$st');
@@ -3342,9 +3375,13 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
         targetOrgName = found['name'] ?? 'fathalla market';
       }
     } else {
-      // For all regular users: strictly locked to fathalla market
-      targetOrgName = 'fathalla market';
-      targetOrgUID = 'PiioBFgxaHAeuRdjlDgj';
+      // For all regular users: strictly locked to their own organization.
+      targetOrgUID = _lockedOrgUID;
+      targetOrgName = _organizations.firstWhere(
+            (o) => o['uid'] == targetOrgUID,
+            orElse: () => {'name': _fallbackOrgName(targetOrgUID)},
+          )['name'] ??
+          '';
     }
 
     final orgBranches = _allBranches.where((b) {
@@ -3416,7 +3453,7 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'fathalla market',
+                          _lockedOrgName,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -3490,7 +3527,7 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          org['name']!,
+                          chainDisplayName(org['name']!),
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,

@@ -272,7 +272,7 @@ class _ReviewView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Private Label Audit'),
+                  const Text('تدقيق العلامة الخاصة'),
                   Text(
                     subtitle,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(

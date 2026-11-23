@@ -8,6 +8,20 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import '../bloc/photo_permission_bloc.dart';
 import '../../domain/entities/photo_permission.dart';
 
+bool _isGlobalReportViewer(Delegate d) =>
+    d.role == UserRole.superAdmin || d.role == UserRole.technicalSupport;
+
+/// TAS-266: only super admin / technical support may load the unfiltered
+/// report. Everyone else (branches marketing manager, marketing, org admin)
+/// is scoped to their own organization, or their company when they have one.
+@visibleForTesting
+String reportOrgScope(Delegate d) =>
+    _isGlobalReportViewer(d) ? '' : d.organizationUID;
+
+@visibleForTesting
+String reportCompanyScope(Delegate d) =>
+    _isGlobalReportViewer(d) ? '' : d.companyUID;
+
 class SuperAdminPermissionsReportScreen extends StatefulWidget {
   final Delegate delegate;
 
@@ -31,9 +45,9 @@ class _SuperAdminPermissionsReportScreenState
 
   void _loadData() {
     context.read<PhotoPermissionBloc>().add(
-          const LoadPermissionsRequested(
-            organizationUID: '',
-            companyUID: '',
+          LoadPermissionsRequested(
+            organizationUID: reportOrgScope(widget.delegate),
+            companyUID: reportCompanyScope(widget.delegate),
           ),
         );
   }

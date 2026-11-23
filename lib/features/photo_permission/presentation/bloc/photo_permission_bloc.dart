@@ -476,9 +476,10 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
         emit(
           PermissionActionSuccess(
             permission: permission,
-            message: event.status == 'approved'
-                ? 'تمت الموافقة على إذن التصوير وتفعيله بنجاح.'
-                : 'تم رفض طلب إذن التصوير.',
+            message: approvePermissionMessage(
+              status: event.status,
+              isSupervisorEnabled: permission.isSupervisorEnabled,
+            ),
           ),
         );
       },
@@ -912,3 +913,15 @@ class PhotoPermissionBloc extends Bloc<PhotoPermissionEvent, PhotoPermissionStat
   }
 }
 
+
+/// TAS-270: the approval message must not claim the permission is active
+/// while the supervisor still has it switched off.
+String approvePermissionMessage({
+  required String status,
+  required bool isSupervisorEnabled,
+}) {
+  if (status != 'approved') return 'تم رفض طلب إذن التصوير.';
+  return isSupervisorEnabled
+      ? 'تمت الموافقة على إذن التصوير وتفعيله بنجاح.'
+      : 'تمت الموافقة على إذن التصوير، وفي انتظار تفعيله من المشرف.';
+}

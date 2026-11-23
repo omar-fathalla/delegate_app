@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:delegate_app/core/org/org_scope.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/penalties/domain/entities/penalty_entity.dart';
 import 'package:delegate_app/features/penalties/data/models/penalty_rule_model.dart';
@@ -231,7 +232,14 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
     try {
       final snapshot = await FirebaseFirestore.instance.collection('branches').get();
       if (!mounted) return;
-      final list = snapshot.docs.map((doc) {
+      // TAS-267: non-global staff only see their own organization's branches.
+      final orgScope = orgScopeFor(widget.adminDelegate);
+      final scopedDocs = orgScope == null
+          ? snapshot.docs
+          : snapshot.docs
+              .where((d) => branchBelongsToOrg(d.data(), orgScope))
+              .toList();
+      final list = scopedDocs.map((doc) {
         final data = doc.data();
         final name = (data['branchName'] as String?) ??
             (data['name'] as String?) ??
@@ -307,10 +315,8 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
         initialSelectedId = pinnedIds.first;
         final match = list.firstWhere((b) => b['id'] == pinnedIds.first);
         initialSelectedName = match['name'];
-      } else if (list.isNotEmpty) {
-        initialSelectedId = list.first['id'];
-        initialSelectedName = list.first['name'];
       }
+      // TAS-267: no silent default to the first branch; the user must choose.
 
       setState(() {
         _branches = list;

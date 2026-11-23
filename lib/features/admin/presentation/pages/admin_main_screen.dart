@@ -995,6 +995,15 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
             ),
           ],
 
+          // TAS-270: مدير تسويق الفروع يسجّل الخروج من القائمة زي باقي أدوار التسويق
+          if (isBranchesMarketingManager)
+            buildPopupItem(
+              value: 'logout',
+              icon: Icons.logout_rounded,
+              title: l10n.logout,
+              color: Theme.of(context).colorScheme.error,
+            ),
+
           const PopupMenuDivider(),
           // الإعدادات دائماً في أسفل القائمة
           buildPopupItem(
