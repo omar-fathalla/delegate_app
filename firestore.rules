@@ -776,19 +776,23 @@ service cloud.firestore {
         // Field uid (not document id) so a collection-group query
         // where uid==auth.uid / delegateId is provable. Own data only.
         || ownsDelegateId(resource.data.get('uid', ''))
-        || staffRole() in [
-          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-          'technical_support', 'technical-support', 'technicalSupport'
-        ]
-        || (staffRole() in [
-          'organization-admin', 'organization_admin', 'organizationAdmin',
-          'marketing', 'marketing_promotion'
-        ] && resource.data.organizationUID == callerOrg())
-        || (staffRole() in [
-          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
-          'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
-          'branches_marketing_manager', 'branchesMarketingManager'
-        ] && resource.data.companyUID == callerCompany())
+        // TAS-242: staff branches (users/{uid} reads) only for staff tokens,
+        // so a delegate's deny is decided by a rule, not the budget.
+        || (staffToken() && (
+          staffRole() in [
+            'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+            'technical_support', 'technical-support', 'technicalSupport'
+          ]
+          || (staffRole() in [
+            'organization-admin', 'organization_admin', 'organizationAdmin',
+            'marketing', 'marketing_promotion'
+          ] && resource.data.organizationUID == callerOrg())
+          || (staffRole() in [
+            'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+            'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
+            'branches_marketing_manager', 'branchesMarketingManager'
+          ] && resource.data.companyUID == callerCompany())
+        ))
       );
     }
 
@@ -815,18 +819,33 @@ service cloud.firestore {
           && request.auth.token.orgId == orgId
           && request.auth.token.keys().hasAll(['companyId'])
           && request.auth.token.companyId == compId)
-        || staffRole() in [
-          'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-          'technical_support', 'technical-support', 'technicalSupport'
-        ]
-        || (callerCompany() != '' && callerCompany() == compId && staffRole() in [
-          'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
-          'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
-          'branches_marketing_manager', 'branchesMarketingManager'
-        ])
-        || (callerOrg() == orgId && staffRole() in [
-          'organization-admin', 'organization_admin', 'marketing', 'marketing_promotion'
-        ])
+        // TAS-242: a delegate in several chains/companies (orgIds/companyIds
+        // claims) reads the delegates of a company it also belongs to there,
+        // e.g. the supervisor card after switching organization. Its own
+        // copy must exist in that org/company, so orgIds x companyIds pairs
+        // the delegate is not in stay closed.
+        || (request.auth.token.get('role', '') == 'delegate'
+          && delegateOtpOk()
+          && delegateInOrg(orgId)
+          && delegateInCompany(compId)
+          && exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId)/delegates/$(request.auth.uid)))
+        // Staff branches read users/{uid}; a delegate token never walks them,
+        // so a delegate's deny comes from a rule, not the 1000-expression
+        // budget (TAS-242 / TAS-105).
+        || (staffToken() && (
+          staffRole() in [
+            'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+            'technical_support', 'technical-support', 'technicalSupport'
+          ]
+          || (callerCompany() != '' && callerCompany() == compId && staffRole() in [
+            'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
+            'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
+            'branches_marketing_manager', 'branchesMarketingManager'
+          ])
+          || (callerOrg() == orgId && staffRole() in [
+            'organization-admin', 'organization_admin', 'marketing', 'marketing_promotion'
+          ])
+        ))
       );
     }
 
