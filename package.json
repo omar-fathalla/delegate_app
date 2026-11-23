@@ -41,7 +41,8 @@
     "test:e2e:ghost": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only auth,firestore --project demo-tashil-ghost \"node --test --test-concurrency=1 test/e2e/ghost-delegate.e2e.test.js\"",
     "test:rules:tas262": "bash scripts/emulators_exec.sh --only firestore --project demo-tas262 \"node --test test/rules/tas262-marketing-roles.test.js\"",
     "test:rules:tas242": "bash scripts/emulators_exec.sh --only firestore --project demo-tas242 \"node --test test/rules/tas242-multi-org-delegate-reads.test.js\"",
-    "test:rules:tas5-high": "bash scripts/emulators_exec.sh --only firestore --project demo-tas5-high \"node --test test/rules/tas5-high-gaps.test.js\""
+    "test:rules:tas5-high": "bash scripts/emulators_exec.sh --only firestore --project demo-tas5-high \"node --test test/rules/tas5-high-gaps.test.js\"",
+    "test:rules:tas51-rest": "bash scripts/emulators_exec.sh --only firestore --project demo-tas51-rest \"node --test test/rules/tas51-notifications-rest.test.js\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",

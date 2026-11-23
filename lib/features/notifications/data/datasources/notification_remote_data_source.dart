@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:delegate_app/features/notifications/data/models/notification_model.dart';
 import 'package:delegate_app/features/notifications/domain/notification_account_cutoff.dart';
@@ -75,7 +76,28 @@ List<String>? marketingBroadcastTargets(String role) {
 class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
   final FirebaseFirestore firestore;
 
-  NotificationRemoteDataSourceImpl({required this.firestore});
+  /// Signed-in auth uid. Injectable for tests; defaults to FirebaseAuth.
+  final String? Function() currentAuthUid;
+
+  NotificationRemoteDataSourceImpl({
+    required this.firestore,
+    String? Function()? currentAuthUid,
+  }) : currentAuthUid = currentAuthUid ?? _firebaseAuthUid;
+
+  static String? _firebaseAuthUid() {
+    try {
+      return FirebaseAuth.instance.currentUser?.uid;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// TAS-51: ids this user writes into readBy / deletedBy of a shared
+  /// notification. The rules accept only the caller's own ids.
+  Set<String> _selfIds(String userUid) => {
+        if (userUid.trim().isNotEmpty) userUid.trim(),
+        if ((currentAuthUid() ?? '').isNotEmpty) currentAuthUid()!,
+      };
 
   CollectionReference get _collection => firestore.collection('notifications');
 
@@ -346,6 +368,8 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
       } // staff/admin query path
     } catch (_) {}
 
+    final self = _selfIds(delegateUid);
+
     // Filter out notifications deleted by this user (Soft Delete) and role-restricted notifications
     final filteredDocs = docs.where((doc) {
       final data = doc.data() as Map<String, dynamic>?;
@@ -353,7 +377,8 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
 
       final deletedBy = data['deletedBy'];
       if (deletedBy is List) {
-        if (deletedBy.contains(delegateUid)) return false;
+        if (self.any(deletedBy.contains)) return false;
+        // Legacy soft deletes were stored by phone number.
         if (phoneNumber != null && deletedBy.contains(phoneNumber)) return false;
       }
 
@@ -431,7 +456,14 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
       );
     }
 
-    return activeDocs.map((doc) => NotificationModel.fromFirestore(doc)).toList();
+    // TAS-51: a shared notification is read per user (readBy), not by the
+    // doc-wide isRead flag.
+    return activeDocs.map((doc) {
+      final model = NotificationModel.fromFirestore(doc);
+      final readBy = (doc.data() as Map<String, dynamic>?)?['readBy'];
+      final readByMe = readBy is List && self.any(readBy.contains);
+      return readByMe && !model.isRead ? model.copyWith(isRead: true) : model;
+    }).toList();
   }
 
   Future<void> _pruneOlderNotificationsInBackground(
@@ -469,6 +501,16 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
 
   @override
   Future<void> markAsRead(String notificationId) async {
+    // TAS-51: readBy works on own and shared notifications; the doc-wide
+    // isRead flag is only allowed on the user's own notification.
+    final me = currentAuthUid() ?? '';
+    if (me.isNotEmpty) {
+      try {
+        await _collection.doc(notificationId).update({
+          'readBy': FieldValue.arrayUnion([me]),
+        });
+      } catch (_) {}
+    }
     try {
       await _collection.doc(notificationId).update({
         'isRead': true,
@@ -504,7 +546,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
   ) async {
     try {
       await _collection.doc(notificationId).set({
-        'deletedBy': FieldValue.arrayUnion([userUid]),
+        'deletedBy': FieldValue.arrayUnion(_selfIds(userUid).toList()),
       }, SetOptions(merge: true));
     } catch (_) {}
   }
@@ -517,10 +559,10 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
   }) async {
     if (notificationIds.isEmpty) return;
 
-    final identifiers = <String>{
-      userUid,
-      if (phoneNumber != null && phoneNumber.isNotEmpty) phoneNumber,
-    }.toList();
+    // TAS-51: own ids only (the rules refuse anything else, so a phone
+    // number would fail the whole batch). Legacy phone entries still hide.
+    final identifiers = _selfIds(userUid).toList();
+    if (identifiers.isEmpty) return;
 
     const int chunkSize = 100;
     for (var i = 0; i < notificationIds.length; i += chunkSize) {
