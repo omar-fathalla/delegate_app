@@ -1566,7 +1566,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get locationTimeout =>
-      'انتهى الوقت ولم نتمكن من تحديد موقعك. تأكد من تفعيل GPS وأنك في مكان مفتوح.';
+      'لم نتمكن من تحديد موقعك. قف في مكان مفتوح، وافتح خرائط Google حتى تثبت النقطة الزرقاء، وشغّل «دقة الموقع من Google»، ثم حاول مرة أخرى.';
 
   @override
   String get locationError => 'تعذّر تحديد موقعك. حاول مرة أخرى.';

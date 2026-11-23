@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:delegate_app/features/attendance/presentation/attendance_location_fetcher.dart';
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/features/attendance/presentation/widgets/attendance_action_button.dart';
@@ -250,9 +251,18 @@ class _HomeScreenState extends State<HomeScreen> {
       return null;
     }
 
-    final position = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-    );
+    // Same fallback chain as the attendance screen (TAS-278).
+    final fix = await AttendanceLocationFetcher().fetch();
+    if (fix == null) {
+      if (context.mounted) {
+        AppSnackBar.showError(
+          context,
+          AppLocalizations.of(context)!.locationTimeout,
+        );
+      }
+      return null;
+    }
+    final position = fix.position;
 
     if (position.isMocked) {
       final device = await _getDeviceInfo();

@@ -1656,7 +1656,7 @@
   "locationPermissionDenied2": "Location permission denied",
   "locationPermissionDeniedForever": "Location access is off. Turn it on in Settings.",
   "fakeGpsDetected": "A fake GPS app was detected. Turn it off to check in or out.",
-  "locationTimeout": "Timed out getting your location. Make sure GPS is on and you're in an open area.",
+  "locationTimeout": "We couldn't get your location. Stand in an open area, open Google Maps until the blue dot settles, turn on Google Location Accuracy, then try again.",
   "locationError": "Couldn't get your location. Try again.",
   "trustedTime": "Trusted time",
   "attActionCheckIn": "check in",
