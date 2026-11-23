@@ -9,6 +9,14 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 /// مركز بث وإرسال الإشعارات السحابية الشامل
 /// يتيح للسوبر أدمن والدعم الفني إرسال إشعارات فورية لجميع الأجهزة (Android & iOS)
 /// مع محاكي حي لشكل الإشعار وقوالب جاهزة للتحديثات والصيانة.
+/// Sent-log time for newest-first sorting; pending server timestamps first.
+@visibleForTesting
+DateTime sentAtOf(QueryDocumentSnapshot doc) {
+  final data = doc.data() as Map<String, dynamic>?;
+  final t = data?['createdAt'];
+  return t is Timestamp ? t.toDate() : DateTime(9999);
+}
+
 class SendNotificationScreen extends StatefulWidget {
   final Delegate senderDelegate;
   final bool showAppBar;
@@ -1623,11 +1631,20 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
     // [_sentHistoryLimit] notifications, newest first.
     return KeyedStreamBuilder<QuerySnapshot>(
       streamKey: 'sent_notifications',
-      create: () => FirebaseFirestore.instance
-          .collection('sent_notifications')
-          .orderBy('createdAt', descending: true)
-          .limit(_sentHistoryLimit)
-          .snapshots(),
+      // TAS-268: non-global senders see only what they sent (the rules
+      // allow branches marketing to read its own entries only). Sorted on
+      // the client so no senderUid+createdAt index is needed.
+      create: () => _isGlobalSender
+          ? FirebaseFirestore.instance
+              .collection('sent_notifications')
+              .orderBy('createdAt', descending: true)
+              .limit(_sentHistoryLimit)
+              .snapshots()
+          : FirebaseFirestore.instance
+              .collection('sent_notifications')
+              .where('senderUid', isEqualTo: widget.senderDelegate.uid)
+              .limit(_sentHistoryLimit)
+              .snapshots(),
       builder: (context, snapshot) {
         final colorScheme = Theme.of(context).colorScheme;
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -1643,7 +1660,8 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
           );
         }
 
-        final docs = snapshot.data?.docs ?? [];
+        final docs = [...?snapshot.data?.docs]
+          ..sort((a, b) => sentAtOf(b).compareTo(sentAtOf(a)));
         if (docs.isEmpty) {
           return Center(
             child: Column(

@@ -854,10 +854,12 @@ describe("docs-pending round 2", () => {
   describe("r5 sent_notifications log (app payload: senderUid, no supervisorUid)", () => {
     const SN = (w) => ({title: "t", body: "b", senderUid: w, senderName: "S", targetType: "company",
       organizationUID: "o1", companyUID: "c1", sentAt: "t", recipientCount: 3});
-    for (const w of ["sa", "ts", "oa", "ca", "adm", "sup", "hr"]) {
+    // TAS-268: branches marketing sends from «إرسال إشعار» and logs its own
+    // sends (senderUid == its uid only; see tas262-marketing-roles.test.js).
+    for (const w of ["sa", "ts", "oa", "ca", "adm", "sup", "hr", "bmm"]) {
       test(`ALLOW ${w} writes the notification log`, () => ok(setDoc(doc(as(w), `sent_notifications/s_${w}`), SN(w))));
     }
-    for (const w of ["acc", "bmm", "mk", "d1"]) {
+    for (const w of ["acc", "mk", "d1"]) {
       test(`DENY ${w} writes the notification log`, () => no(setDoc(doc(as(w), `sent_notifications/s_${w}`), SN(w))));
     }
   });

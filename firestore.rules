@@ -126,12 +126,13 @@ service cloud.firestore {
       return isSuperAdmin() || isTechnicalSupport();
     }
 
-    // TAS-266: a branches-marketing manager with no companyUID follows every
-    // company of its organization (like marketing). With a companyUID it
-    // stays company-scoped through isCompanyScopedStaff().
+    // TAS-266: the org-wide branches-marketing manager (no companyUID) is not
+    // added here on purpose: every extra roleIs() in this shared helper costs
+    // budget on delegate paths. Its org reads are granted per path instead
+    // (penaltyStaffReadOk, staffAttendanceTenantOk, taskEffectiveLevel,
+    // canReadDelegate).
     function isOrgScopedStaff() {
-      return isOrgAdmin() || isMarketing()
-        || (isBranchesMarketing() && callerCompany() == '');
+      return isOrgAdmin() || isMarketing();
     }
 
     function isCompanyScopedStaff() {
@@ -2273,13 +2274,24 @@ service cloud.firestore {
     // canReadNotification those list queries were denied on the budget.
     // 'all' is the app-wide broadcast (never a privileged staff alert type).
     function canReadMarketingRoleBroadcast() {
-      return !isPrivilegedStaffAlert() && (
-        (isMarketing() && resource.data.get('delegateUid', '') in [
-          'all', 'marketing', 'marketing_promotion', 'marketingPromotion'
-        ])
-        || (isBranchesMarketing() && resource.data.get('delegateUid', '') in [
-          'all', 'branchesMarketingManager', 'branches_marketing', 'branches-marketing'
-        ]));
+      // delegateUid first: any other target (supervisor_<co>, a uid, ...)
+      // stops here without a users/{uid} read, so other roles' list
+      // queries keep their budget.
+      let du = resource.data.get('delegateUid', '');
+      return du in ['all', 'marketing', 'marketing_promotion', 'marketingPromotion',
+          'branchesMarketingManager', 'branches_marketing', 'branches-marketing']
+        && !isPrivilegedStaffAlert()
+        && staffToken()
+        && marketingBroadcastRoleOk(du,
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', ''));
+    }
+
+    function marketingBroadcastRoleOk(du, role) {
+      return (role in ['marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion']
+          && du in ['all', 'marketing', 'marketing_promotion', 'marketingPromotion'])
+        || (role in ['branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+            'branches-marketing-manager', 'branchesmarketingmanager', 'branchesMarketingManager']
+          && du in ['all', 'branchesMarketingManager', 'branches_marketing', 'branches-marketing']);
     }
 
     // Cheap allow so a list query on delegateUid == 'supervisor_' +
@@ -2294,8 +2306,8 @@ service cloud.firestore {
     match /notifications/{notificationId} {
       allow read: if canReadOwnNotification();
       allow read: if canReadOrgAdminRoleBroadcast();
-      allow read: if canReadMarketingRoleBroadcast();
       allow read: if canReadCompanySupervisorBroadcast();
+      allow read: if canReadMarketingRoleBroadcast();
       allow read: if canReadNotification();
       allow create: if canCreateNotification();
       allow update: if (canReadOwnNotification() || canReadNotification()) && (
@@ -2309,9 +2321,13 @@ service cloud.firestore {
 
     match /sent_notifications/{docId} {
       allow read: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin();
+      // TAS-268: branches marketing logs and reads only its own sends.
+      allow read: if signedIn() && resource.data.get('senderUid', '') == request.auth.uid
+        && isBranchesMarketing();
       // The app's log payload carries senderUid (no supervisorUid); the
       // r4 delegate_requests F1 clause does not apply here (r5 B-r4-1).
-      allow create: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR();
+      allow create: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR()
+        || (isBranchesMarketing() && request.resource.data.get('senderUid', '') == request.auth.uid);
       allow update, delete: if isSuperAdmin() || isOrgAdmin();
     }
 

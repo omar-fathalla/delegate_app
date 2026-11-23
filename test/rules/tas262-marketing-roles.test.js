@@ -154,3 +154,13 @@ describe("TAS-269 role broadcast notifications", () => {
     await assertFails(q(as("bmm"), "marketing"));
   });
 });
+
+describe("TAS-268 sent notifications log for branches marketing", () => {
+  test("logs and reads only its own sends", async () => {
+    const db = as("bmm");
+    await assertSucceeds(setDoc(doc(db, "sent_notifications/s-bmm"), {senderUid: "bmm", title: "fake", createdAt: Timestamp.now()}));
+    await assertSucceeds(getDocs(query(collection(db, "sent_notifications"), where("senderUid", "==", "bmm"))));
+    await assertFails(setDoc(doc(db, "sent_notifications/s-forged"), {senderUid: "someone-else", title: "fake"}));
+    await assertFails(getDocs(collection(db, "sent_notifications")));
+  });
+});

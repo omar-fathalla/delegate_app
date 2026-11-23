@@ -3,6 +3,7 @@ import 'package:delegate_app/core/org/org_scope.dart';
 import 'package:delegate_app/features/marketing_search/presentation/bloc/marketing_search_bloc.dart';
 import 'package:delegate_app/features/notifications/presentation/pages/send_notification_screen.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
+import 'package:delegate_app/features/photo_permission/presentation/pages/super_admin_permissions_report_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/tasks/domain/task_assignee_label.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -138,5 +139,14 @@ void main() {
         contains('وتفعيله بنجاح'),
       );
     });
+  });
+
+  test('TAS-266: photo permissions report is scoped for non-global staff', () {
+    final bmm = _user(UserRole.branchesMarketingManager, org: 'org-f');
+    expect(reportOrgScope(bmm), 'org-f');
+    expect(reportCompanyScope(bmm), '');
+    final sa = _user(UserRole.superAdmin, org: 'org-f');
+    expect(reportOrgScope(sa), '');
+    expect(reportCompanyScope(sa), '');
   });
 }
