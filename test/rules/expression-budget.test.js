@@ -154,7 +154,7 @@ describe("expression budget headroom (TAS-105)", () => {
   test(`attendance_logs create keeps ${ATTENDANCE_PAD} spare pad units (OTP-verified delegate check-in)`, async () => {
     await assertBudgetHeadroom({
       rules: RULES,
-      line: "allow read: if canReadOrgAdminAttendanceByOrgId();\n      allow read: if canReadAttendance();\n" +
+      line: "allow read: if staffToken() && canReadOrgAdminAttendanceByOrgId();\n      allow read: if canReadAttendance();\n" +
         "      allow create: if canCreateAttendance();",
       pad: ATTENDANCE_PAD,
       projectId: "demo-expression-budget-attendance",
