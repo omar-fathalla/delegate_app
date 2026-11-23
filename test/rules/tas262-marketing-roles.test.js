@@ -164,3 +164,16 @@ describe("TAS-268 sent notifications log for branches marketing", () => {
     await assertFails(getDocs(collection(db, "sent_notifications")));
   });
 });
+
+describe("TAS-266 follow-up notifications after a penalty decision", () => {
+  const payload = (by) => ({title: "fake", type: "penalty", penaltyId: "pen-a", companyId: CO_A,
+    delegateUid: "company_" + CO_A, isRead: false, ...(by ? {createdBy: by} : {})});
+  test("org-wide manager sends them stamped with its uid", async () => {
+    await assertSucceeds(setDoc(doc(as("bmm"), "notifications/n-dec-1"), payload("bmm")));
+  });
+  // Denied, but by canCreateNotification's budget (baseline +2), TAS-291.
+  test("not without createdBy, and not as someone else", async () => {
+    await assertFails(setDoc(doc(as("bmm"), "notifications/n-dec-2"), payload(null)));
+    await assertFails(setDoc(doc(as("bmm"), "notifications/n-dec-3"), payload("someone-else")));
+  });
+});

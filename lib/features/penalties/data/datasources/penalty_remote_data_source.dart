@@ -1,6 +1,7 @@
 import 'package:delegate_app/core/firestore/chunked_batch.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:delegate_app/core/error/exceptions.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
@@ -57,10 +58,32 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
   final FirebaseFirestore firestore;
   final FirebaseStorage storage;
 
+  /// Signed-in uid stamped as `createdBy` on penalty notifications.
+  final String? Function() currentUid;
+
   PenaltyRemoteDataSourceImpl({
     required this.firestore,
     required this.storage,
-  });
+    String? Function()? currentUid,
+  }) : currentUid = currentUid ?? _authUid;
+
+  static String? _authUid() {
+    try {
+      return FirebaseAuth.instance.currentUser?.uid;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// TAS-266: penalty notifications carry no organization fields, so the
+  /// rules accept them from staff without a companyUID (branches marketing
+  /// manager, marketing) only through `createdBy == auth.uid`. Before this
+  /// the manager's approval updated the penalty but every follow-up
+  /// notification was denied.
+  Map<String, dynamic> get _sender {
+    final uid = currentUid();
+    return {if (uid != null && uid.isNotEmpty) 'createdBy': uid};
+  }
 
   CollectionReference<Map<String, dynamic>> get _penaltiesRef =>
       firestore.collection('penalties');
@@ -138,6 +161,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
               '${descStr.isNotEmpty ? "\nالسبب: $descStr" : ""}';
 
           await firestore.collection('notifications').add({
+            ..._sender,
             'title': delTitle,
             'body': delBody,
             'type': 'penalty',
@@ -187,6 +211,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
               notifiedSupervisorUids.add(uDoc.id);
               final phone = (uData['phoneNumber'] ?? uData['phone']) as String?;
               await firestore.collection('notifications').add({
+                ..._sender,
                 'title': supTitle,
                 'body': supBody,
                 'type': 'penalty',
@@ -227,6 +252,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
               notifiedSupervisorUids.add(uDoc.id);
               final phone = (uData['phoneNumber'] ?? uData['phone']) as String?;
               await firestore.collection('notifications').add({
+                ..._sender,
                 'title': supTitle,
                 'body': supBody,
                 'type': 'penalty',
@@ -269,6 +295,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
 
         for (final targetKey in supTargets) {
           await firestore.collection('notifications').add({
+            ..._sender,
             'title': supTitle,
             'body': supBody,
             'type': 'penalty',
@@ -306,6 +333,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
         if (!finalPenalty.isConfidential) {
           for (final roleKey in ['branchesMarketingManager', 'branches_marketing', 'marketing']) {
             await firestore.collection('notifications').add({
+              ..._sender,
               'title': bmmTitle,
               'body': bmmBody,
               'type': 'penalty',
@@ -348,6 +376,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
 
         for (final roleKey in adminRoleKeys) {
           await firestore.collection('notifications').add({
+            ..._sender,
             'title': gmTitle,
             'body': gmBody,
             'type': 'penalty',
@@ -704,6 +733,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
 
             for (final r in ['organizationAdmin', 'super-admin']) {
               await firestore.collection('notifications').add({
+                ..._sender,
                 'title': gmPendingTitle,
                 'body': gmPendingBody,
                 'type': 'penalty',
@@ -735,6 +765,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
             // Also inform Branches Marketing Manager if approved by GM
             for (final r in ['branchesMarketingManager', 'branches_marketing']) {
               await firestore.collection('notifications').add({
+                ..._sender,
                 'title': 'اعتماد نهائي للغرامة',
                 'body': 'اعتمد $revName الغرامة رسمياً بمبلغ $fineStr ج.م على المندوب ($delegateStr) بشركة (${pen.companyName}).',
                 'type': 'penalty',
@@ -767,6 +798,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
           // Notify delegate
           if (pen.targetDelegateId != null && pen.targetDelegateId!.isNotEmpty) {
             await firestore.collection('notifications').add({
+              ..._sender,
               'title': updateTitle,
               'body': updateBody,
               'type': 'penalty',
@@ -790,6 +822,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
 
           // Notify company supervisors
           await firestore.collection('notifications').add({
+            ..._sender,
             'title': updateTitle,
             'body': updateBody,
             'type': 'penalty',

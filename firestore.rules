@@ -2303,7 +2303,29 @@ service cloud.firestore {
         && resource.data.delegateUid == 'supervisor_' + callerCompany();
     }
 
+    // TAS-266: same principals as the createdBy branch of
+    // canCreateNotification (org- or company-scoped staff sending as
+    // themselves), with one users/{uid} read. The full helper ran out of the
+    // 1000-expression budget for the branches-marketing manager's penalty
+    // decision notifications.
+    function canCreateOwnStaffNotification() {
+      return request.auth != null
+        && request.resource.data.get('createdBy', '') == request.auth.uid
+        && staffToken()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in [
+          'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
+          'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion',
+          'company-admin', 'company_admin', 'companyadmin', 'admin',
+          'supervisor', 'company_supervisor',
+          'hr', 'company-hr', 'company_hr', 'human_resources',
+          'accountant', 'accounting', 'account_admin',
+          'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+          'branches-marketing-manager', 'branchesmarketingmanager', 'branchesMarketingManager'
+        ];
+    }
+
     match /notifications/{notificationId} {
+      allow create: if canCreateOwnStaffNotification();
       allow read: if canReadOwnNotification();
       allow read: if canReadOrgAdminRoleBroadcast();
       allow read: if canReadCompanySupervisorBroadcast();

@@ -315,6 +315,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
           'senderName': widget.senderDelegate.fullName,
           'senderRole': widget.senderDelegate.role.name,
           'senderUid': widget.senderDelegate.uid,
+            'createdBy': widget.senderDelegate.uid,
           'broadcastId': broadcastId,
         });
 
@@ -327,8 +328,15 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
         targetName = 'منظمة: ${org['name']}';
         targetDetails = 'جميع أعضاء ومناديب ${org['name']}';
 
-        final snap = await firestore.collectionGroup('delegates').get();
-        final batch = firestore.batch();
+        // TAS-268: a non-global sender lists only its organization's
+        // delegates (the rules deny an unfiltered collection-group read).
+        final delegatesQuery = _isGlobalSender
+            ? firestore.collectionGroup('delegates')
+            : firestore
+                .collectionGroup('delegates')
+                .where('organizationUID', isEqualTo: _selectedOrgUID);
+        final snap = await delegatesQuery.get();
+        var batch = firestore.batch();
         int count = 0;
 
         for (final doc in snap.docs) {
@@ -354,11 +362,13 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
               'senderName': widget.senderDelegate.fullName,
               'senderRole': widget.senderDelegate.role.name,
               'senderUid': widget.senderDelegate.uid,
+            'createdBy': widget.senderDelegate.uid,
               'broadcastId': broadcastId,
             });
             count++;
             if (count % 450 == 0) {
               await batch.commit();
+              batch = firestore.batch();
             }
           }
         }
@@ -369,11 +379,14 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
         targetName = 'فئة: $roleLabel';
         targetDetails = 'جميع المستخدمين الحاملين لرتبة $roleLabel';
 
-        final usersSnap = await firestore
-            .collection('users')
-            .where('role', isEqualTo: _selectedRole)
-            .get();
-        final batch = firestore.batch();
+        final usersQuery = _isGlobalSender
+            ? firestore.collection('users').where('role', isEqualTo: _selectedRole)
+            : firestore
+                .collection('users')
+                .where('role', isEqualTo: _selectedRole)
+                .where('organizationUID', isEqualTo: _orgScope);
+        final usersSnap = await usersQuery.get();
+        var batch = firestore.batch();
         int count = 0;
 
         for (final doc in usersSnap.docs) {
@@ -397,11 +410,13 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
             'senderName': widget.senderDelegate.fullName,
             'senderRole': widget.senderDelegate.role.name,
             'senderUid': widget.senderDelegate.uid,
+            'createdBy': widget.senderDelegate.uid,
             'broadcastId': broadcastId,
           });
           count++;
           if (count % 450 == 0) {
             await batch.commit();
+            batch = firestore.batch();
           }
         }
         await batch.commit();
@@ -430,6 +445,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
             'senderName': widget.senderDelegate.fullName,
             'senderRole': widget.senderDelegate.role.name,
             'senderUid': widget.senderDelegate.uid,
+            'createdBy': widget.senderDelegate.uid,
             'broadcastId': broadcastId,
           });
           sentCount = 1;
@@ -451,6 +467,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
             'senderName': widget.senderDelegate.fullName,
             'senderRole': widget.senderDelegate.role.name,
             'senderUid': widget.senderDelegate.uid,
+            'createdBy': widget.senderDelegate.uid,
             'broadcastId': broadcastId,
           });
           sentCount = 1;
@@ -464,6 +481,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
         'body': body,
         'type': _selectedType,
         'senderUid': widget.senderDelegate.uid,
+            'createdBy': widget.senderDelegate.uid,
         'senderName': widget.senderDelegate.fullName,
         'senderRole': widget.senderDelegate.role.name,
         'targetAudience': _targetAudience,
