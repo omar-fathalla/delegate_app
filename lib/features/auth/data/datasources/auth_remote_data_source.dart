@@ -5,6 +5,7 @@ import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/services/device_binding_service.dart';
 import 'package:delegate_app/features/auth/data/datasources/delegate_login_api.dart';
+import 'package:delegate_app/features/auth/data/datasources/totp_mfa.dart';
 import 'package:delegate_app/features/auth/domain/delegate_login_validator.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -27,6 +28,10 @@ abstract class AuthRemoteDataSource {
   });
 
   /// Verifies a non-delegate password with Firebase Auth email/password.
+  ///
+  /// Throws `MfaRequiredFailure` when the password is right and the account
+  /// has TOTP two-step verification (TAS-207), and an [AuthFailure] with code
+  /// `mfa_unsupported` when its only second factor is not TOTP.
   Future<bool> verifyAdminPassword(String email, String password);
 
   /// Looks up the staff email for [phoneNumber], then verifies it with
@@ -51,7 +56,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     this.delegateLoginApi,
     this.staffPhoneLookupApi,
     this.currentDeviceDetails,
+    this.totpSignInAssertion = defaultTotpSignInAssertion,
   });
+
+  /// Test seam for the TOTP sign-in assertion (TAS-207).
+  final TotpSignInAssertion totpSignInAssertion;
 
   /// Normalises a phone number by stripping common Egyptian prefixes
   /// (`+2`, `+20`, `002`, `0020`) so queries match the bare format
@@ -363,6 +372,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           )
           .timeout(const Duration(seconds: 12));
       return credential.user != null;
+    } on FirebaseAuthMultiFactorException catch (e) {
+      // TAS-207: the password is right, the account has two-step
+      // verification. Hand the resolver up so the screen asks for the code.
+      throw mfaFailureFromResolver(
+        e.resolver,
+        assertionFor: totpSignInAssertion,
+      );
     } on FirebaseAuthException catch (e) {
       debugPrint('FirebaseAuth admin signIn exception: ${e.code}');
       return false;
@@ -378,6 +394,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final email = await _staffEmailForPhone(phoneNumber);
       if (email == null) return false;
       return await verifyAdminPassword(email, password);
+    } on AuthFailure {
+      // Two-step verification required or unsupported (TAS-207).
+      rethrow;
     } catch (_) {
       return false;
     }

@@ -26,6 +26,19 @@ class AuthPhoneOtpRequired extends AuthState {
   List<Object> get props => [delegates, rememberMe, e164Phone];
 }
 
+/// TAS-207: the staff password was right and the account has TOTP
+/// two-step verification. The screen asks for the code, calls
+/// [challenge].resolve, then sends [MfaVerified].
+class AuthMfaRequired extends AuthState {
+  final MfaRequiredFailure challenge;
+  final bool rememberMe;
+
+  const AuthMfaRequired({required this.challenge, required this.rememberMe});
+
+  @override
+  List<Object> get props => [challenge, rememberMe];
+}
+
 class AuthOrganizationSelectionRequired extends AuthState {
   final List<Delegate> delegates;
   final bool rememberMe;

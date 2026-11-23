@@ -11,6 +11,7 @@ import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:delegate_app/features/auth/domain/delegate_login_validator.dart';
 import 'package:delegate_app/features/auth/presentation/auth_error_message.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:delegate_app/features/auth/presentation/widgets/totp_code_form.dart';
 import 'package:delegate_app/features/auth/presentation/pages/delegate_phone_otp_view.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
@@ -245,6 +246,14 @@ class _LoginScreenState extends State<LoginScreen>
         listener: (context, state) =>
             _onAuthState(context, state, l10n, colorScheme),
         builder: (context, state) {
+          if (state is AuthMfaRequired) {
+            final bloc = context.read<AuthBloc>();
+            return TotpLoginView(
+              onSubmit: state.challenge.resolve,
+              onVerified: () => bloc.add(const MfaVerified()),
+              onCancel: () => bloc.add(const MfaCancelled()),
+            );
+          }
           if (state is AuthPhoneOtpRequired) {
             return ColoredBox(
               color: colorScheme.surface,

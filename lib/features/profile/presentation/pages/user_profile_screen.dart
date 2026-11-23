@@ -11,6 +11,9 @@ import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/core/widgets/tashil_maestro_dev_semantics.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_adaptive_sheet.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:delegate_app/features/auth/data/datasources/totp_mfa.dart';
+import 'package:delegate_app/features/auth/presentation/widgets/totp_code_form.dart';
+import 'package:delegate_app/features/profile/presentation/widgets/totp_enrollment_sheet.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
@@ -1009,6 +1012,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 ),
               ),
             ),
+            // TAS-207: TOTP enrollment, super admin only.
+            TwoStepVerificationButton(
+              role: delegate?.role,
+              rawRole: _firestoreUserData?['role']?.toString(),
+            ),
           ],
         ),
       ),
@@ -1663,11 +1671,14 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
       if (fbUser != null && fbUser.email == email) {
         user = fbUser;
       } else {
-        final signedIn = await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: email,
-          password: currentPass,
+        final signedIn = await _withTwoStep(
+          () => FirebaseAuth.instance.signInWithEmailAndPassword(
+            email: email,
+            password: currentPass,
+          ),
         );
-        final signedInUser = signedIn.user;
+        final signedInUser = signedIn?.user;
+        if (signedIn == null) return;
         if (signedInUser == null) {
           throw Exception('كلمة المرور الحالية غير صحيحة');
         }
@@ -1678,7 +1689,10 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
         email: email,
         password: currentPass,
       );
-      await user.reauthenticateWithCredential(credential);
+      final reauthed = await _withTwoStep(
+        () => user.reauthenticateWithCredential(credential),
+      );
+      if (reauthed == null) return;
       await user.updatePassword(newPass);
 
       widget.onPasswordChanged?.call(newPass);
@@ -1707,6 +1721,32 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
       if (mounted) {
         _setLoading(false);
       }
+    }
+  }
+
+  /// Runs [action]. When the account has two-step verification (TAS-207),
+  /// asks for the TOTP code and finishes the sign-in with it. Null when the
+  /// user cancels the code step.
+  Future<UserCredential?> _withTwoStep(
+    Future<UserCredential> Function() action,
+  ) async {
+    try {
+      return await action();
+    } on FirebaseAuthMultiFactorException catch (error) {
+      if (!mounted) return null;
+      final resolver = error.resolver;
+      if (totpHint(resolver.hints) == null) {
+        throw Exception(mfaUnsupportedMessage);
+      }
+      UserCredential? resolved;
+      final ok = await showTotpCodeSheet(
+        context,
+        subtitle: '$totpCodeHint\nمطلوب لتأكيد تغيير كلمة المرور.',
+        onSubmit: (code) async {
+          resolved = await resolveTotpSignIn(resolver, code);
+        },
+      );
+      return ok ? resolved : null;
     }
   }
 

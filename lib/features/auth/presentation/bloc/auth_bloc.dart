@@ -12,6 +12,7 @@ import 'package:delegate_app/core/services/session_management_service.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/auth/domain/delegate_login_validator.dart';
 import 'package:delegate_app/features/auth/domain/delegate_otp_config.dart';
+import 'package:delegate_app/features/auth/domain/mfa_required_failure.dart';
 import 'package:delegate_app/core/services/firestore_session_subscriptions.dart';
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:delegate_app/features/auth/domain/usecases/check_auto_login.dart';
@@ -82,6 +83,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<HeldSessionDetected>(_onHeldSessionDetected);
     on<PhoneOtpVerified>(_onPhoneOtpVerified);
     on<PhoneOtpCancelled>(_onPhoneOtpCancelled);
+    on<MfaVerified>(_onMfaVerified);
+    on<MfaCancelled>(_onMfaCancelled);
 
     final restored = anonymousSessionRestored;
     if (restored != null) {
@@ -149,6 +152,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     await result.fold(
       (failure) async {
+        if (failure is MfaRequiredFailure &&
+            failure.pendingDelegates.isNotEmpty) {
+          emit(
+            AuthMfaRequired(
+              challenge: failure,
+              rememberMe: event.rememberMe,
+            ),
+          );
+          return;
+        }
         emit(
           AuthError(
             message: failure.message,
@@ -208,6 +221,31 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     PhoneOtpCancelled event,
     Emitter<AuthState> emit,
   ) async {
+    await _signOutIncompleteSession();
+    emit(const AuthUnauthenticated(fromLogout: true));
+  }
+
+  Future<void> _onMfaVerified(
+    MfaVerified event,
+    Emitter<AuthState> emit,
+  ) async {
+    final pending = state;
+    if (pending is! AuthMfaRequired) return;
+    final delegates = pending.challenge.pendingDelegates;
+    _explicitLogout = false;
+    await cacheAllDelegatesUseCase(delegates);
+    await _continueAfterCredentials(
+      delegates: delegates,
+      rememberMe: pending.rememberMe,
+      emit: emit,
+    );
+  }
+
+  Future<void> _onMfaCancelled(
+    MfaCancelled event,
+    Emitter<AuthState> emit,
+  ) async {
+    if (state is! AuthMfaRequired) return;
     await _signOutIncompleteSession();
     emit(const AuthUnauthenticated(fromLogout: true));
   }
