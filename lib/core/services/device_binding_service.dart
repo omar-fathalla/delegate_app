@@ -345,6 +345,36 @@ class DeviceBindingService {
     }
   }
 
+  /// TAS-51: a non-global staff notification must carry the sender's own
+  /// organization or company (the rules no longer accept `createdBy` alone).
+  /// Read from the admin's own users doc; empty values are left out.
+  @visibleForTesting
+  static Future<Map<String, String>> unbindNotificationTenant(String adminUid) async {
+    try {
+      final data = (await _firestore.collection('users').doc(adminUid).get()).data() ??
+          const <String, dynamic>{};
+      return callerTenantFields(data);
+    } catch (e) {
+      debugPrint('unbind notification: own tenant not read: $e');
+      return const <String, String>{};
+    }
+  }
+
+  /// The caller's own `organizationUID` / `companyUID` from a users doc.
+  @visibleForTesting
+  static Map<String, String> callerTenantFields(Map<String, dynamic> user) {
+    String pick(String a, String b) {
+      final v = (user[a] ?? user[b] ?? '').toString().trim();
+      return v == 'all' ? '' : v;
+    }
+    final org = pick('organizationUID', 'organizationId');
+    final co = pick('companyUID', 'companyId');
+    return {
+      if (org.isNotEmpty) 'organizationUID': org,
+      if (co.isNotEmpty) 'companyUID': co,
+    };
+  }
+
   /// الموافقة على طلب فك الارتباط من قِبل الإدارة
   static Future<void> approveUnbindRequest({
     required String requestId,
@@ -376,6 +406,7 @@ class DeviceBindingService {
     // 3. إرسال إشعار للمندوب
     try {
       await _firestore.collection('notifications').add({
+        ...await unbindNotificationTenant(adminUid),
         'delegateUid': delegateUid,
         'title': 'تمت الموافقة على فك ربط جهازك',
         'body': 'تم فك ربط هاتفك القديم بنجاح. يمكنك الآن تسجيل الدخول من جهازك الجديد وسيتم اعتماده تلقائياً.',
@@ -414,6 +445,7 @@ class DeviceBindingService {
     // 2. إرسال إشعار للمندوب
     try {
       await _firestore.collection('notifications').add({
+        ...await unbindNotificationTenant(adminUid),
         'delegateUid': delegateUid,
         'title': 'تم رفض طلب فك ربط الجهاز',
         'body': rejectMsg,

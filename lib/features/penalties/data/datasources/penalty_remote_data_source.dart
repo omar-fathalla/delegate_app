@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:delegate_app/core/firestore/chunked_batch.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -80,9 +81,41 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
   /// manager, marketing) only through `createdBy == auth.uid`. Before this
   /// the manager's approval updated the penalty but every follow-up
   /// notification was denied.
-  Map<String, dynamic> get _sender {
+  ///
+  /// TAS-51: `createdBy` alone is no longer accepted from non-global staff,
+  /// so the sender's own organization / company (from users/{uid}, read once)
+  /// rides along too.
+  Future<Map<String, dynamic>> _sender() async {
     final uid = currentUid();
-    return {if (uid != null && uid.isNotEmpty) 'createdBy': uid};
+    if (uid == null || uid.isEmpty) return const <String, dynamic>{};
+    return {...await _senderTenant(uid), 'createdBy': uid};
+  }
+
+  Map<String, String>? _senderTenantCache;
+  String? _senderTenantUid;
+
+  Future<Map<String, String>> _senderTenant(String uid) async {
+    if (_senderTenantUid == uid && _senderTenantCache != null) {
+      return _senderTenantCache!;
+    }
+    try {
+      final data = (await firestore.collection('users').doc(uid).get()).data() ??
+          const <String, dynamic>{};
+      String pick(String a, String b) {
+        final v = (data[a] ?? data[b] ?? '').toString().trim();
+        return v == 'all' ? '' : v;
+      }
+      final org = pick('organizationUID', 'organizationId');
+      final co = pick('companyUID', 'companyId');
+      _senderTenantUid = uid;
+      return _senderTenantCache = {
+        if (org.isNotEmpty) 'organizationUID': org,
+        if (co.isNotEmpty) 'companyUID': co,
+      };
+    } catch (e) {
+      debugPrint('penalty notification: sender tenant not read: $e');
+      return const <String, String>{};
+    }
   }
 
   CollectionReference<Map<String, dynamic>> get _penaltiesRef =>
@@ -161,7 +194,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
               '${descStr.isNotEmpty ? "\nالسبب: $descStr" : ""}';
 
           await firestore.collection('notifications').add({
-            ..._sender,
+            ...await _sender(),
             'title': delTitle,
             'body': delBody,
             'type': 'penalty',
@@ -211,7 +244,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
               notifiedSupervisorUids.add(uDoc.id);
               final phone = (uData['phoneNumber'] ?? uData['phone']) as String?;
               await firestore.collection('notifications').add({
-                ..._sender,
+                ...await _sender(),
                 'title': supTitle,
                 'body': supBody,
                 'type': 'penalty',
@@ -252,7 +285,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
               notifiedSupervisorUids.add(uDoc.id);
               final phone = (uData['phoneNumber'] ?? uData['phone']) as String?;
               await firestore.collection('notifications').add({
-                ..._sender,
+                ...await _sender(),
                 'title': supTitle,
                 'body': supBody,
                 'type': 'penalty',
@@ -295,7 +328,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
 
         for (final targetKey in supTargets) {
           await firestore.collection('notifications').add({
-            ..._sender,
+            ...await _sender(),
             'title': supTitle,
             'body': supBody,
             'type': 'penalty',
@@ -333,7 +366,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
         if (!finalPenalty.isConfidential) {
           for (final roleKey in ['branchesMarketingManager', 'branches_marketing', 'marketing']) {
             await firestore.collection('notifications').add({
-              ..._sender,
+              ...await _sender(),
               'title': bmmTitle,
               'body': bmmBody,
               'type': 'penalty',
@@ -376,7 +409,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
 
         for (final roleKey in adminRoleKeys) {
           await firestore.collection('notifications').add({
-            ..._sender,
+            ...await _sender(),
             'title': gmTitle,
             'body': gmBody,
             'type': 'penalty',
@@ -733,7 +766,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
 
             for (final r in ['organizationAdmin', 'super-admin']) {
               await firestore.collection('notifications').add({
-                ..._sender,
+                ...await _sender(),
                 'title': gmPendingTitle,
                 'body': gmPendingBody,
                 'type': 'penalty',
@@ -765,7 +798,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
             // Also inform Branches Marketing Manager if approved by GM
             for (final r in ['branchesMarketingManager', 'branches_marketing']) {
               await firestore.collection('notifications').add({
-                ..._sender,
+                ...await _sender(),
                 'title': 'اعتماد نهائي للغرامة',
                 'body': 'اعتمد $revName الغرامة رسمياً بمبلغ $fineStr ج.م على المندوب ($delegateStr) بشركة (${pen.companyName}).',
                 'type': 'penalty',
@@ -798,7 +831,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
           // Notify delegate
           if (pen.targetDelegateId != null && pen.targetDelegateId!.isNotEmpty) {
             await firestore.collection('notifications').add({
-              ..._sender,
+              ...await _sender(),
               'title': updateTitle,
               'body': updateBody,
               'type': 'penalty',
@@ -822,7 +855,7 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
 
           // Notify company supervisors
           await firestore.collection('notifications').add({
-            ..._sender,
+            ...await _sender(),
             'title': updateTitle,
             'body': updateBody,
             'type': 'penalty',
