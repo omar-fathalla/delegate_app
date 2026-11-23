@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
+import 'package:delegate_app/core/widgets/keyed_stream_builder.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_adjustments_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_attendance_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_leaves_and_excuses_screen.dart';
@@ -147,7 +148,9 @@ class SuperAdminHRSystemScreen extends StatelessWidget {
         subtitle: 'مراجعة واعتماد طلبات الإجازات السنوية والمرضية وأعذار الغياب، ومتابعة أرصدة الإجازات المتاحة.',
         icon: Icons.event_note_rounded,
         accentColor: Theme.of(context).colorScheme.tertiary,
-        badgeStream: _pendingLeavesStream(),
+        // A factory, not a stream: the card creates it once (TAS-90).
+        badgeStream: _pendingLeavesStream,
+        badgeStreamKey: ('leave_requests', delegate.companyUID),
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -251,7 +254,10 @@ class _HRModuleItem {
   final IconData icon;
   final Color accentColor;
   final VoidCallback onTap;
-  final Stream<int>? badgeStream;
+  /// Creates the live badge count. Called once per [badgeStreamKey] by the
+  /// card, not on every build (TAS-90).
+  final Stream<int> Function()? badgeStream;
+  final Object? badgeStreamKey;
 
   const _HRModuleItem({
     required this.title,
@@ -261,6 +267,7 @@ class _HRModuleItem {
     required this.accentColor,
     required this.onTap,
     this.badgeStream,
+    this.badgeStreamKey,
   });
 }
 
@@ -395,8 +402,9 @@ class _HRModuleCardState extends State<_HRModuleCard> {
                                 ],
                                 if (item.badgeStream != null) ...[
                                   const SizedBox(width: 8),
-                                  StreamBuilder<int>(
-                                    stream: item.badgeStream,
+                                  KeyedStreamBuilder<int>(
+                                    streamKey: item.badgeStreamKey,
+                                    create: item.badgeStream!,
                                     builder: (context, snapshot) {
                                       final count = snapshot.data ?? 0;
                                       if (count <= 0) return const SizedBox.shrink();

@@ -17,6 +17,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
+import 'package:delegate_app/core/widgets/keyed_stream_builder.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/services/security_audit_service.dart';
@@ -282,8 +283,10 @@ class _DelegateTaskSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
+    // TAS-90: subscribed once per delegate scope, not on every build.
+    return KeyedStreamBuilder<QuerySnapshot>(
+      streamKey: (delegate.organizationUID, delegate.companyUID, delegate.uid),
+      create: () => FirebaseFirestore.instance
           .collection('organizations')
           .doc(delegate.organizationUID)
           .collection('tasks')

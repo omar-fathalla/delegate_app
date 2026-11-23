@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
+import 'package:delegate_app/core/widgets/keyed_stream_builder.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_permissions.dart';
 import 'package:delegate_app/features/private_label/data/datasources/private_label_permissions_remote_data_source.dart';
@@ -482,13 +483,18 @@ class _MarketingPromotionHomeScreenState extends State<MarketingPromotionHomeScr
     ColorScheme colorScheme,
     bool isArabic,
   ) {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    final firestore = widget.firestore;
+    final companyUID = widget.delegate.companyUID;
+    final organizationUID = widget.delegate.organizationUID;
+    return KeyedStreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       // TAS-73: scoped to the user's company, or its organization when it
       // has none, so the rules can prove the list. Counted on the client.
-      stream: photoPermissionsTenantQuery(
-        widget.firestore ?? FirebaseFirestore.instance,
-        companyUID: widget.delegate.companyUID,
-        organizationUID: widget.delegate.organizationUID,
+      // TAS-90: subscribed once per scope, not on every build.
+      streamKey: (firestore, companyUID, organizationUID),
+      create: () => photoPermissionsTenantQuery(
+        firestore ?? FirebaseFirestore.instance,
+        companyUID: companyUID,
+        organizationUID: organizationUID,
       ).streamResilient(includeMetadataChanges: true),
       builder: (context, permissionsSnapshot) {
         int pendingCount = _cachedPendingCount;

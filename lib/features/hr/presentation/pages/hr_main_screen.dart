@@ -9,6 +9,7 @@ import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/services/browser_history_stub.dart'
     if (dart.library.js_interop) 'package:delegate_app/core/services/browser_history_web.dart';
 import 'package:delegate_app/core/widgets/universal_app_header.dart';
+import 'package:delegate_app/core/widgets/keyed_stream_builder.dart';
 import 'package:delegate_app/core/widgets/app_logout_modal.dart';
 import 'package:delegate_app/features/admin/presentation/pages/subscription_renewal_screen.dart';
 import 'package:delegate_app/features/admin/domain/entities/subscription_renewal.dart';
@@ -512,10 +513,12 @@ class _HRMainScreenState extends State<HRMainScreen> {
   /// شارة طلبات الإجازات والأذونات المعلقة
   Widget _buildLeaveRequestsBadge(Widget icon, ColorScheme colorScheme) {
     if (widget.delegate.companyUID.isEmpty) return icon;
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
+    final companyUID = widget.delegate.companyUID;
+    return KeyedStreamBuilder<QuerySnapshot>(
+      streamKey: ('leave_requests', companyUID),
+      create: () => FirebaseFirestore.instance
           .collection('leave_requests')
-          .where('companyUID', isEqualTo: widget.delegate.companyUID)
+          .where('companyUID', isEqualTo: companyUID)
           .where('status', isEqualTo: 'pending')
           .snapshots(),
       builder: (context, snapshot) {
@@ -542,19 +545,16 @@ class _HRMainScreenState extends State<HRMainScreen> {
   /// web menu (TAS-154). Shows nothing when the count is zero.
   Widget _buildPendingCountText(String collection, ColorScheme colorScheme) {
     if (widget.delegate.companyUID.isEmpty) return const SizedBox.shrink();
-    final Stream<QuerySnapshot> stream;
-    try {
-      stream = FirebaseFirestore.instance
+    final companyUID = widget.delegate.companyUID;
+    // Created once per (collection, company); if Firebase isn't ready
+    // (tests, or a build without a default app) the error shows nothing.
+    return KeyedStreamBuilder<QuerySnapshot>(
+      streamKey: (collection, companyUID),
+      create: () => FirebaseFirestore.instance
           .collection(collection)
-          .where('companyUID', isEqualTo: widget.delegate.companyUID)
+          .where('companyUID', isEqualTo: companyUID)
           .where('status', isEqualTo: 'pending')
-          .snapshots();
-    } catch (_) {
-      // Firebase isn't ready (tests, or a build without a default app).
-      return const SizedBox.shrink();
-    }
-    return StreamBuilder<QuerySnapshot>(
-      stream: stream,
+          .snapshots(),
       builder: (context, snapshot) {
         final count = snapshot.hasError ? 0 : snapshot.data?.docs.length ?? 0;
         if (count == 0) return const SizedBox.shrink();
@@ -573,10 +573,12 @@ class _HRMainScreenState extends State<HRMainScreen> {
   /// شارة طلبات فك وربط الأجهزة المعلقة
   Widget _buildDeviceRequestsBadge(Widget icon, ColorScheme colorScheme) {
     if (widget.delegate.companyUID.isEmpty) return icon;
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
+    final companyUID = widget.delegate.companyUID;
+    return KeyedStreamBuilder<QuerySnapshot>(
+      streamKey: ('device_unbind_requests', companyUID),
+      create: () => FirebaseFirestore.instance
           .collection('device_unbind_requests')
-          .where('companyUID', isEqualTo: widget.delegate.companyUID)
+          .where('companyUID', isEqualTo: companyUID)
           .where('status', isEqualTo: 'pending')
           .snapshots(),
       builder: (context, snapshot) {
