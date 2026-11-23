@@ -230,9 +230,18 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
 
     for (final phoneVar in variations) {
       for (final field in ['phoneNumber', 'phone', 'mobile', 'mobileNumber']) {
-        final query = await _scopedToOrg(
-          firestore.collection('users').where(field, isEqualTo: phoneVar),
-        ).limit(1).get();
+        // One legacy field without a collection-group index (e.g.
+        // `mobile` on delegates, FAILED_PRECONDITION) must not end the
+        // whole lookup.
+        final QuerySnapshot<Map<String, dynamic>> query;
+        try {
+          query = await _scopedToOrg(
+            firestore.collection('users').where(field, isEqualTo: phoneVar),
+          ).limit(1).get();
+        } on FirebaseException catch (e) {
+          debugPrint('phone lookup skipped $field: ${e.code}');
+          continue;
+        }
         if (query.docs.isNotEmpty) {
           final doc = query.docs.first;
           final data = doc.data();
@@ -250,9 +259,18 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
 
     for (final phoneVar in variations) {
       for (final field in ['phoneNumber', 'phone', 'mobile', 'mobileNumber']) {
-        final query = await _scopedToOrg(
-          firestore.collectionGroup('delegates').where(field, isEqualTo: phoneVar),
-        ).limit(1).get();
+        // One legacy field without a collection-group index (e.g.
+        // `mobile` on delegates, FAILED_PRECONDITION) must not end the
+        // whole lookup.
+        final QuerySnapshot<Map<String, dynamic>> query;
+        try {
+          query = await _scopedToOrg(
+            firestore.collectionGroup('delegates').where(field, isEqualTo: phoneVar),
+          ).limit(1).get();
+        } on FirebaseException catch (e) {
+          debugPrint('phone lookup skipped $field: ${e.code}');
+          continue;
+        }
         if (query.docs.isNotEmpty) {
           final doc = query.docs.first;
           final data = doc.data();
@@ -445,6 +463,11 @@ class _SendNotificationScreenState extends State<SendNotificationScreen>
             'broadcastId': broadcastId,
           });
           sentCount = 1;
+        } else if (!_isGlobalSender) {
+          // TAS-268: no phone_<number> fallback for non-global senders: it
+          // would reach a person of another organization with that number.
+          _showSendError('الرقم ده مش مسجّل لأي مستخدم في منظمتك.');
+          return;
         } else {
           targetUid = 'phone_$phoneInput';
           targetName = 'رقم الهاتف: $phoneInput';
