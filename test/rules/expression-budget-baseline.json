@@ -4,14 +4,13 @@
   "delegate-source-lock.test.js": 19,
   "delegate-status-guards.test.js": 20,
   "docs-pending.test.js": 230,
-  "firestore.rules.test.js": 36,
+  "firestore.rules.test.js": 33,
   "hr-web-company-reads.test.js": 6,
   "m31-delegate-own-reads.test.js": 5,
   "qa-hold-reads.test.js": 22,
   "staff-privileged-doc-reupload.test.js": 4,
   "suspend-login-penalties.test.js": 10,
-  "tas262-marketing-roles.test.js": 4,
   "users-nationalid-client-lock.test.js": 7,
-  "users-p0.test.js": 39,
-  "ut-nonblocking-fixes.test.js": 4
+  "users-p0.test.js": 38,
+  "ut-nonblocking-fixes.test.js": 2
 }

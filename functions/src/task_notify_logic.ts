@@ -235,25 +235,21 @@ function seesAllGroup(u: TaskUser, opts: TaskNotifyOpts): boolean {
   return isFieldDelegateRole(u.role);
 }
 
-function seesBranchMarketingGroup(u: TaskUser, opts: TaskNotifyOpts): boolean {
-  if (!isBranchMarketingRole(u.role)) return false;
+// TAS-270 #6 (product decision 2026-11-23): a company task belongs to that
+// company only. Org-level marketing / promotion (no company) get the
+// org-level sector tasks (no companyId), not every company's tasks.
+function seesSectorGroup(u: TaskUser, opts: TaskNotifyOpts): boolean {
   const co = String(opts.companyId || "").trim();
-  if (co) {
-    if (userInCompany(u, co)) return true;
-    // Org-level marketing (no company) still sees company-scoped sector tasks.
-    return companyIdsOf(u).length === 0 && userInOrg(u, opts.organizationId || "");
-  }
+  if (co) return userInCompany(u, co);
   return userInOrg(u, opts.organizationId || "");
 }
 
+function seesBranchMarketingGroup(u: TaskUser, opts: TaskNotifyOpts): boolean {
+  return isBranchMarketingRole(u.role) && seesSectorGroup(u, opts);
+}
+
 function seesMarketingPromotionGroup(u: TaskUser, opts: TaskNotifyOpts): boolean {
-  if (!isMarketingPromotionRole(u.role)) return false;
-  const co = String(opts.companyId || "").trim();
-  if (co) {
-    if (userInCompany(u, co)) return true;
-    return companyIdsOf(u).length === 0 && userInOrg(u, opts.organizationId || "");
-  }
-  return userInOrg(u, opts.organizationId || "");
+  return isMarketingPromotionRole(u.role) && seesSectorGroup(u, opts);
 }
 
 function matchesGroup(u: TaskUser, token: string, opts: TaskNotifyOpts): boolean {

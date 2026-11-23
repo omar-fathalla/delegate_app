@@ -144,18 +144,28 @@ describe("taskNotifyUserIds: sector groups", () => {
     u("promo-org", {role: "marketingPromotion", companyUID: ""}),
   ];
 
-  test("all_branch_marketing is company marketing only, plus org-level marketing", () => {
+  // TAS-270 #6: a company task is for that company only, not org-level staff.
+  test("all_branch_marketing on a company task is that company's marketing only", () => {
     const ids = taskNotifyUserIds(users, "all_branch_marketing", {
       companyId: co, organizationId: org,
     });
-    assert.deepEqual(ids.sort(), ["mkt", "mkt-org"].sort());
+    assert.deepEqual(ids.sort(), ["mkt"]);
   });
 
-  test("all_marketing_promotion is company promo only, plus org-level promo", () => {
+  test("all_marketing_promotion on a company task is that company's promo only", () => {
     const ids = taskNotifyUserIds(users, "all_marketing_promotion", {
       companyId: co, organizationId: org,
     });
-    assert.deepEqual(ids.sort(), ["promo", "promo-org"].sort());
+    assert.deepEqual(ids.sort(), ["promo"]);
+  });
+
+  test("an org-level task (no company) reaches org-level sector staff", () => {
+    const orgUsers = [
+      u("mkt-org", {role: "marketing", companyUID: "", organizationUID: org}),
+      u("mkt-other-org", {role: "marketing", companyUID: "", organizationUID: "org_other"}),
+    ];
+    const ids = taskNotifyUserIds(orgUsers, "all_branch_marketing", {organizationId: org});
+    assert.deepEqual(ids, ["mkt-org"]);
   });
 
   test("other-company marketing is not notified", () => {
@@ -279,24 +289,25 @@ describe("taskNotifyUserIdsFromSources: الكل vs sector tokens", () => {
     assert.equal(fromAll.includes("mkt-mgr"), false);
   });
 
-  test("all_branch_marketing reaches company and org-level sector staff, not field delegates", () => {
+  test("all_branch_marketing on a company task reaches that company's sector staff only", () => {
     const ids = taskNotifyUserIdsFromSources(
       delegates, sectorStaff, "all_branch_marketing",
       {companyId: co, organizationId: org},
     );
-    assert.deepEqual(ids.sort(), ["mkt", "mkt-mgr", "mkt-org"].sort());
+    assert.deepEqual(ids.sort(), ["mkt", "mkt-mgr"].sort());
+    assert.equal(ids.includes("mkt-org"), false);
     assert.equal(ids.includes("d1"), false);
     assert.equal(ids.includes("promo"), false);
     assert.equal(ids.includes("mkt-other"), false);
     assert.equal(ids.includes("mkt-held"), false);
   });
 
-  test("all_marketing_promotion reaches company and org-level promo staff, not field delegates", () => {
+  test("all_marketing_promotion on a company task reaches that company's promo only", () => {
     const ids = taskNotifyUserIdsFromSources(
       delegates, sectorStaff, "all_marketing_promotion",
       {companyId: co, organizationId: org},
     );
-    assert.deepEqual(ids.sort(), ["promo", "promo-org"].sort());
+    assert.deepEqual(ids.sort(), ["promo"]);
     assert.equal(ids.includes("d1"), false);
     assert.equal(ids.includes("mkt"), false);
   });
@@ -317,7 +328,7 @@ describe("taskNotifyUserIdsFromSources: الكل vs sector tokens", () => {
     const opts = {companyId: co, organizationId: org, createdBy: "sup"};
     const ids = newlyAssignedTaskUserIdsFromSources(
       delegates, sectorStaff, "all", "all_branch_marketing", opts);
-    assert.deepEqual(ids.sort(), ["mkt", "mkt-mgr", "mkt-org"].sort());
+    assert.deepEqual(ids.sort(), ["mkt", "mkt-mgr"].sort());
   });
 });
 
