@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:delegate_app/features/admin/data/collection_transactions_loader.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 
 /// صفحة ومنظومة التحصيلات والفواتير الرسمية المعكوسة على الرصيد المتبقي مع الطباعة والمشاركة
@@ -285,27 +286,7 @@ class _SuperAdminCollectionsScreenState extends State<SuperAdminCollectionsScree
       // 3. Fetch recorded collection transactions across all months
       List<Map<String, dynamic>> allTransactions = [];
       try {
-        final monthsSnapshot = await firestore.collection('monthly_collections').get();
-        for (final mDoc in monthsSnapshot.docs) {
-          final txSnapshot = await mDoc.reference
-              .collection('transactions')
-              .get();
-
-          for (final doc in txSnapshot.docs) {
-            final d = doc.data();
-            allTransactions.add({
-              'id': doc.id,
-              'periodKey': d['periodKey'] ?? mDoc.id,
-              ...d,
-            });
-          }
-        }
-
-        allTransactions.sort((a, b) {
-          final aTime = (a['createdAt'] as Timestamp?)?.toDate() ?? DateTime(2000);
-          final bTime = (b['createdAt'] as Timestamp?)?.toDate() ?? DateTime(2000);
-          return bTime.compareTo(aTime); // Latest first
-        });
+        allTransactions = await loadAllCollectionTransactions(firestore);
       } catch (e) {
         debugPrint('Transactions fetch notice: $e');
       }

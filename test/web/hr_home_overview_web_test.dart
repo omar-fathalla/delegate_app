@@ -6,6 +6,7 @@ import 'dart:io';
 
 import 'package:delegate_app/config/theme/app_theme.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
+import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_home_screen.dart';
@@ -272,6 +273,16 @@ void _silenceFirestore() {
           (_) => Completer<ByteData?>().future,
         );
   }
+}
+
+/// TAS-259: the HR attendance tab loads branches through
+/// [BranchesSessionCache], whose server read has a 4 s timeout. The fake
+/// Firebase app never answers, so let that timer fire before teardown and
+/// drop the hung load so the next test starts clean.
+Future<void> _drainBranchesLoad(WidgetTester t) async {
+  await t.pumpWidget(const SizedBox.shrink());
+  await t.pump(const Duration(seconds: 5));
+  BranchesSessionCache.invalidate();
 }
 
 void main() {
@@ -986,6 +997,7 @@ void main() {
         find.byKey(const ValueKey('hr_home_skeleton_row_0')),
         findsOneWidget,
       );
+      await _drainBranchesLoad(t);
     });
 
     for (final c in <(Size, String)>[
@@ -1119,6 +1131,7 @@ void main() {
       expect(bar.destinations, hasLength(5));
       expect(find.text('الحضور'), findsWidgets);
       expect(find.text('الرئيسية'), findsNothing);
+      await _drainBranchesLoad(t);
     });
 
     test('duty texts keep the mobile guide wording', () {
