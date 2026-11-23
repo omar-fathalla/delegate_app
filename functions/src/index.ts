@@ -2,6 +2,11 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import {photoPermissionNotifyUserIds} from "./photo_permission_notify_logic";
 import {pruneDeadFromMulticast, sendToUserToken} from "./fcm_token_cleanup";
+import {
+  loadSupervisorSources,
+  supervisorBroadcastCompany,
+  supervisorRecipientUids,
+} from "./supervisor_broadcast_push";
 
 admin.initializeApp();
 
@@ -235,6 +240,36 @@ export const onNotificationCreated = functions.firestore
           },
         });
         console.log("Successfully sent broadcast push notification to FCM topic 'app_updates'");
+      } else if (supervisorBroadcastCompany(delegateUid)) {
+        // TAS-211: one broadcast doc for the company's supervisors; push to
+        // each supervisor's / company admin's own token.
+        const co = supervisorBroadcastCompany(delegateUid);
+        const org = String(organizationId || notification.organizationUID || "").trim();
+        const db = admin.firestore();
+        const uids = supervisorRecipientUids(await loadSupervisorSources(db, co, org));
+        const tokenSnaps = await Promise.all(uids.map((uid) => db.collection("fcm_tokens").doc(uid).get()));
+        const recipients = tokenSnaps
+          .map((snap, i) => ({uid: uids[i], token: String(snap.get("token") || "")}))
+          .filter((r) => r.token);
+        if (recipients.length > 0) {
+          const multicast = await admin.messaging().sendEachForMulticast({
+            tokens: recipients.map((r) => r.token),
+            notification: {title, body},
+            android: {
+              priority: "high",
+              notification: {channelId: "task_notifications", sound: "default", clickAction: "FLUTTER_NOTIFICATION_CLICK"},
+            },
+            apns: {payload: {aps: {sound: "default", badge: 1}}},
+            data: {
+              type: type || "supervisor_alert",
+              organizationId: org,
+              companyId: companyId || co,
+              taskId: taskId || "",
+            },
+          });
+          await pruneDeadFromMulticast(db, recipients, multicast);
+        }
+        console.log(`Supervisor broadcast push: ${recipients.length}/${uids.length} recipients with a token`);
       } else if (delegateUid) {
         let recipientUid = delegateUid;
 
