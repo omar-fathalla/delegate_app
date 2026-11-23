@@ -1,7 +1,13 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import {photoPermissionNotifyUserIds} from "./photo_permission_notify_logic";
-import {pruneDeadFromMulticast, sendToUserToken} from "./fcm_token_cleanup";
+import {
+  sendMulticastAndPrune,
+  sendToUserTokens,
+  tokensForUser,
+  tokensForUsers,
+  UserToken,
+} from "./fcm_token_cleanup";
 import {
   loadSupervisorSources,
   supervisorBroadcastCompany,
@@ -77,8 +83,6 @@ export const onPhotoPermissionCreated = functions.firestore
       const notificationBody = `قام مندوب بطلب إذن تصوير في ${permission.companyName || "الشركة"}`;
 
       const batch = admin.firestore().batch();
-      const fcmTokens: string[] = [];
-      const fcmRecipients: Array<{uid: string; token: string}> = [];
 
       for (const userId of targetUserIds) {
         const notificationRef = admin.firestore().collection("notifications").doc();
@@ -93,18 +97,14 @@ export const onPhotoPermissionCreated = functions.firestore
           isRead: false,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-
-        const tokenDoc = await admin.firestore().collection("fcm_tokens").doc(userId).get();
-        if (tokenDoc.exists && tokenDoc.data()?.token) {
-          fcmTokens.push(tokenDoc.data()!.token);
-          fcmRecipients.push({uid: userId, token: tokenDoc.data()!.token});
-        }
       }
 
       await batch.commit();
 
-      if (fcmTokens.length > 0) {
-        const multicast = await admin.messaging().sendEachForMulticast({
+      // TAS-258: every device of every recipient (device docs + legacy doc).
+      const fcmTargets = await tokensForUsers(admin.firestore(), targetUserIds);
+      if (fcmTargets.length > 0) {
+        await sendMulticastAndPrune(admin.firestore(), admin.messaging(), fcmTargets, {
           notification: {
             title: notificationTitle,
             body: notificationBody,
@@ -115,9 +115,7 @@ export const onPhotoPermissionCreated = functions.firestore
             organizationId,
             companyId,
           },
-          tokens: fcmTokens,
         });
-        await pruneDeadFromMulticast(admin.firestore(), fcmRecipients, multicast);
       }
       return null;
     } catch (error) {
@@ -174,9 +172,9 @@ export const onPhotoPermissionUpdated = functions.firestore
 
       await batch.commit();
 
-      const tokenDoc = await admin.firestore().collection("fcm_tokens").doc(requestedBy).get();
-      if (tokenDoc.exists && tokenDoc.data()?.token) {
-        await sendToUserToken(admin.firestore(), admin.messaging(), requestedBy, {
+      const fcmTargets = await tokensForUser(admin.firestore(), requestedBy);
+      if (fcmTargets.length > 0) {
+        await sendToUserTokens(admin.firestore(), admin.messaging(), fcmTargets, {
           notification: {
             title: notificationTitle,
             body: notificationBody,
@@ -187,7 +185,6 @@ export const onPhotoPermissionUpdated = functions.firestore
             organizationId,
             companyId,
           },
-          token: tokenDoc.data()!.token,
         });
       }
 
@@ -247,13 +244,9 @@ export const onNotificationCreated = functions.firestore
         const org = String(organizationId || notification.organizationUID || "").trim();
         const db = admin.firestore();
         const uids = supervisorRecipientUids(await loadSupervisorSources(db, co, org));
-        const tokenSnaps = await Promise.all(uids.map((uid) => db.collection("fcm_tokens").doc(uid).get()));
-        const recipients = tokenSnaps
-          .map((snap, i) => ({uid: uids[i], token: String(snap.get("token") || "")}))
-          .filter((r) => r.token);
+        const recipients = await tokensForUsers(db, uids);
         if (recipients.length > 0) {
-          const multicast = await admin.messaging().sendEachForMulticast({
-            tokens: recipients.map((r) => r.token),
+          await sendMulticastAndPrune(db, admin.messaging(), recipients, {
             notification: {title, body},
             android: {
               priority: "high",
@@ -267,20 +260,16 @@ export const onNotificationCreated = functions.firestore
               taskId: taskId || "",
             },
           });
-          await pruneDeadFromMulticast(db, recipients, multicast);
         }
-        console.log(`Supervisor broadcast push: ${recipients.length}/${uids.length} recipients with a token`);
+        console.log(`Supervisor broadcast push: ${recipients.length} tokens for ${uids.length} recipients`);
       } else if (delegateUid) {
         let recipientUid = delegateUid;
 
-        // Try direct token lookup
-        let tokenDoc = await admin.firestore()
-          .collection("fcm_tokens")
-          .doc(recipientUid)
-          .get();
+        // Try direct token lookup (TAS-258: all devices + legacy doc)
+        let targets: UserToken[] = await tokensForUser(admin.firestore(), recipientUid);
 
         // If not found and phone number is provided or delegateUid is phone-based, resolve user
-        if ((!tokenDoc.exists || !tokenDoc.data()?.token) && (phoneNumber || recipientUid.startsWith("phone_"))) {
+        if (targets.length === 0 && (phoneNumber || recipientUid.startsWith("phone_"))) {
           const rawPhone = phoneNumber || recipientUid.replace("phone_", "");
           const cleanPhone = rawPhone.replace(/\D/g, "");
 
@@ -292,10 +281,7 @@ export const onNotificationCreated = functions.firestore
 
           if (!usersSnap.empty) {
             recipientUid = usersSnap.docs[0].id;
-            tokenDoc = await admin.firestore()
-              .collection("fcm_tokens")
-              .doc(recipientUid)
-              .get();
+            targets = await tokensForUser(admin.firestore(), recipientUid);
           } else if (cleanPhone.length >= 9) {
             const delegatesSnap = await admin.firestore()
               .collectionGroup("delegates")
@@ -305,17 +291,13 @@ export const onNotificationCreated = functions.firestore
 
             if (!delegatesSnap.empty) {
               recipientUid = delegatesSnap.docs[0].data().uid || delegatesSnap.docs[0].id;
-              tokenDoc = await admin.firestore()
-                .collection("fcm_tokens")
-                .doc(recipientUid)
-                .get();
+              targets = await tokensForUser(admin.firestore(), recipientUid);
             }
           }
         }
 
-        if (tokenDoc.exists && tokenDoc.data()?.token) {
-          const fcmToken = tokenDoc.data()!.token;
-          const delivered = await sendToUserToken(admin.firestore(), admin.messaging(), recipientUid, {
+        if (targets.length > 0) {
+          const delivered = await sendToUserTokens(admin.firestore(), admin.messaging(), targets, {
             notification: { title, body },
             android: {
               priority: "high",
@@ -339,9 +321,8 @@ export const onNotificationCreated = functions.firestore
               companyId: companyId || "",
               taskId: taskId || "",
             },
-            token: fcmToken,
           });
-          if (delivered) console.log(`Successfully sent FCM push notification to delegate ${recipientUid}`);
+          if (delivered) console.log(`Successfully sent FCM push notification to delegate ${recipientUid} (${delivered}/${targets.length} devices)`);
         } else {
           console.log(`No active FCM token found for recipient ${recipientUid}`);
         }

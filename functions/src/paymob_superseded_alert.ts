@@ -1,5 +1,5 @@
 import * as admin from "firebase-admin";
-import {sendToUserToken} from "./fcm_token_cleanup";
+import {PushMessaging, sendToUserTokens, tokensForUser} from "./fcm_token_cleanup";
 import {
   PRIVILEGED_ALERT_ROLE_VALUES,
   privilegedAlertDoc,
@@ -9,7 +9,8 @@ import {
 export const PAYMOB_SUPERSEDED_NOTIFICATION_TYPE = "paymob_superseded_payment";
 const ADMIN_ALERTS = "admin_alerts";
 
-export type PaymobMessaging = Pick<admin.messaging.Messaging, "send">;
+/** TAS-258: one device uses send (as before); several use sendEachForMulticast. */
+export type PaymobMessaging = PushMessaging;
 
 function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
@@ -45,11 +46,9 @@ async function sendFcmTokenPush(
     txId: string;
   },
 ): Promise<boolean> {
-  const tokenDoc = await db.collection("fcm_tokens").doc(recipientUid).get();
-  const token = str(tokenDoc.get("token"));
-  if (!token) return false;
-  return sendToUserToken(db, messaging, recipientUid, {
-    token,
+  const targets = await tokensForUser(db, recipientUid);
+  if (targets.length === 0) return false;
+  const delivered = await sendToUserTokens(db, messaging, targets, {
     notification: {title: payload.title, body: payload.body},
     android: {
       priority: "high",
@@ -71,6 +70,7 @@ async function sendFcmTokenPush(
       paymobTransactionId: payload.txId,
     },
   });
+  return delivered > 0;
 }
 
 export interface PaymobSupersededAlertResult {

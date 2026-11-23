@@ -2247,6 +2247,23 @@ service cloud.firestore {
       allow create, update, delete: if signedIn() && (
         ownsDelegateId(tokenId) || delegateOwns(tokenId)
       );
+
+      // TAS-258: one doc per app install, so every device of the user gets
+      // pushes. Owner only (no staff reads); functions read it via Admin SDK.
+      match /devices/{deviceId} {
+        allow read, delete: if signedIn() && (
+          ownsDelegateId(tokenId) || delegateOwns(tokenId)
+        );
+        allow create, update: if signedIn()
+          && deviceId.size() <= 128
+          && request.resource.data.keys().hasOnly(['token', 'platform', 'updatedAt'])
+          && request.resource.data.token is string
+          && request.resource.data.token.size() > 0
+          && request.resource.data.token.size() <= 4096
+          && (!('platform' in request.resource.data)
+            || request.resource.data.platform in ['android', 'ios'])
+          && (ownsDelegateId(tokenId) || delegateOwns(tokenId));
+      }
     }
 
     // ==================== MOBILE: FEEDBACK, PENALTIES, SUBSCRIPTIONS ====================
