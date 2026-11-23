@@ -232,6 +232,8 @@ class MarketingSearchRemoteDataSourceImpl
     } catch (e, stackTrace) {
       developer.log('❌ خطأ في البحث عن المندوب: $e');
       developer.log('Stack trace: $stackTrace');
+      // TAS-270: keep Firebase errors typed so the repository maps them.
+      if (e is FirebaseException) rethrow;
       throw Exception('Failed to search delegate: $e');
     }
   }
@@ -353,6 +355,8 @@ class MarketingSearchRemoteDataSourceImpl
     } catch (e, stackTrace) {
       developer.log('❌ خطأ في البحث عن المندوب بالاسم: $e');
       developer.log('Stack trace: $stackTrace');
+      // TAS-270: keep Firebase errors typed so the repository maps them.
+      if (e is FirebaseException) rethrow;
       throw Exception('Failed to search delegate by name: $e');
     }
   }

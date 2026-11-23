@@ -100,7 +100,7 @@ class _ReportView extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text('Private Label Report'),
+                    const Text('تقرير العلامة الخاصة'),
                     Text(
                       monthTitle,
                       style: theme.textTheme.labelMedium?.copyWith(
