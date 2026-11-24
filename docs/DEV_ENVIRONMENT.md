@@ -8,6 +8,16 @@ where the same target points at site `tashil-dev`.
 **Always pass `--project tashil-dev` (or `-P dev`) explicitly for dev work.**
 Never deploy dev builds to `practice-firebase-72df1`.
 
+## Warm the CDN after every web deploy (TAS-200)
+Right after a Hosting deploy the CDN is empty and the first visitor waits
+25-48 s for `main.dart.js` from the origin. Run this right after the deploy,
+from the same checkout (it also requests every big file in `build/web`):
+```bash
+bash scripts/warm_web_cdn.sh https://tashil-dev.web.app     # dev
+bash scripts/warm_web_cdn.sh https://hr.sw-point.com        # prod, after the prod deploy
+```
+It only warms the edge nearest to the machine that runs it.
+
 ## Storage bucket
 No `bucket` override is needed: the CLI uses each project's default bucket
 (`tashil-dev.firebasestorage.app` for dev, the existing bucket for prod).

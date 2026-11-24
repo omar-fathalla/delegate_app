@@ -61,4 +61,7 @@ CI_LEASE_PID=1 ci_lease_release slot "$a"
 CI_LEASE_PID=$$ ci_lease_release slot "$a"
 [[ ! -d "$CI_LEASE_ROOT/slot/$a" ]] || fail "owner could not release lease"
 
+# TAS-200: CDN warm-up script used after web deploys.
+bash test/scripts/warm_web_cdn.test.sh
+
 echo "OK test/scripts/ci_tooling_test.sh"
