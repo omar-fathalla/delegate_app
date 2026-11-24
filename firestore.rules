@@ -877,27 +877,37 @@ service cloud.firestore {
         || (isCompanyScopedStaff() && callerCompany() != '' && callerCompany() == compId);
     }
 
+    // TAS-55: the caller's own copy in this company says it is a supervisor.
+    // A missing copy makes get() fail, which denies.
+    function delegateIsSupervisorIn(orgId, compId) {
+      return get(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId)/delegates/$(request.auth.uid))
+        .data.get('position', '') in ['supervisor', 'Supervisor', 'مشرف'];
+    }
+
     function canReadNestedDelegate(orgId, compId, delegateId) {
       return signedIn() && (
         delegateId == request.auth.uid
         || (request.auth.token.keys().hasAll(['delegateIds'])
           && request.auth.token.delegateIds is list
           && delegateId in request.auth.token.delegateIds)
+        // TAS-55 (user decision 2026-11-24): only a supervisor (its own copy
+        // in this company has position supervisor) reads the other delegates
+        // of the company. A plain delegate reads its own document only; the
+        // supervisor card comes from the getMySupervisorCards callable.
         || (delegateOtpOk()
           && request.auth.token.keys().hasAll(['orgId'])
           && request.auth.token.orgId == orgId
           && request.auth.token.keys().hasAll(['companyId'])
-          && request.auth.token.companyId == compId)
-        // TAS-242: a delegate in several chains/companies (orgIds/companyIds
-        // claims) reads the delegates of a company it also belongs to there,
-        // e.g. the supervisor card after switching organization. Its own
-        // copy must exist in that org/company, so orgIds x companyIds pairs
-        // the delegate is not in stay closed.
+          && request.auth.token.companyId == compId
+          && delegateIsSupervisorIn(orgId, compId))
+        // TAS-242: a supervisor in several chains/companies (orgIds/companyIds
+        // claims) reads the delegates of a company it also belongs to there.
+        // Its own copy must exist in that org/company and be a supervisor.
         || (request.auth.token.get('role', '') == 'delegate'
           && delegateOtpOk()
           && delegateInOrg(orgId)
           && delegateInCompany(compId)
-          && exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId)/delegates/$(request.auth.uid)))
+          && delegateIsSupervisorIn(orgId, compId))
         // TAS-60: every stored spelling of each staff role is listed here.
         // Staff branches read users/{uid}; a delegate token never walks them,
         // so a delegate's deny comes from a rule, not the 1000-expression

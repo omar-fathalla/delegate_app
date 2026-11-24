@@ -23,6 +23,7 @@ import 'package:delegate_app/features/attendance/domain/entities/attendance.dart
 import 'package:delegate_app/core/services/trusted_time_service.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:delegate_app/features/home/data/supervisor_cards_api.dart';
 import 'package:delegate_app/features/hr/presentation/pages/delegate_leaves_and_requests_screen.dart';
 
 class DelegateHomeScreen extends StatefulWidget {
@@ -44,6 +45,7 @@ class DelegateHomeScreen extends StatefulWidget {
 class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     with AutomaticKeepAliveClientMixin {
   static final Map<String, List<Map<String, dynamic>>> _supervisorsCache = {};
+  final SupervisorCardsApi _supervisorCardsApi = SupervisorCardsApi();
   static final Map<String, DateTime> _supervisorsCacheTime = {};
 
   List<Map<String, dynamic>> _supervisorsData = [];
@@ -336,35 +338,68 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             (s) => (s['displayName'] as String? ?? '').isEmpty,
           )) {
         try {
-          final delSnapshot = await FirebaseFirestore.instance
-              .collection('organizations')
-              .doc(orgId)
-              .collection('companies')
-              .doc(compId)
-              .collection('delegates')
-              .where('position', whereIn: ['supervisor', 'Supervisor', 'مشرف'])
-              .getResilient(forceServer: forceRefresh);
-
-          for (final doc in delSnapshot.docs) {
-            final delData = doc.data();
-            final phone = (delData['phoneNumber'] as String?)?.trim() ?? '';
-            final name = _extractPersonName(delData, companyName);
-
-            final exists = fetchedSupervisors.any(
-              (s) =>
-                  (s['phoneNumber'] as String? ?? '') == phone &&
-                  phone.isNotEmpty,
+          // TAS-55: a plain delegate cannot read other delegate documents;
+          // it gets the supervisors' name / phone / email / photo from the
+          // getMySupervisorCards callable. A supervisor and staff keep the
+          // direct query (the rules allow them the whole company).
+          final isPlainDelegate = isDelegateViewer &&
+              widget.delegate.position != DelegatePosition.supervisor;
+          if (isPlainDelegate) {
+            final cards = await _supervisorCardsApi.fetch(
+              organizationUID: orgId,
+              companyUID: compId,
             );
-
-            if (!exists) {
+            for (final card in cards) {
+              final exists = fetchedSupervisors.any(
+                (s) =>
+                    (s['phoneNumber'] as String? ?? '') == card.phoneNumber &&
+                    card.phoneNumber.isNotEmpty,
+              );
+              if (exists) continue;
               fetchedSupervisors.add({
-                ...delData,
-                'displayName':
-                    name.isNotEmpty ? name : companySupervisorName,
-                'phoneNumber': phone.isNotEmpty ? phone : companyPhone,
-                'email': (delData['email'] as String?)?.trim() ?? companyEmail,
+                'uid': card.uid,
+                'displayName': card.displayName.isNotEmpty
+                    ? card.displayName
+                    : companySupervisorName,
+                'phoneNumber': card.phoneNumber.isNotEmpty
+                    ? card.phoneNumber
+                    : companyPhone,
+                'email': card.email.isNotEmpty ? card.email : companyEmail,
+                'profileImageUrl': card.photoUrl,
                 'companyName': companyName,
               });
+            }
+          } else {
+            final delSnapshot = await FirebaseFirestore.instance
+                .collection('organizations')
+                .doc(orgId)
+                .collection('companies')
+                .doc(compId)
+                .collection('delegates')
+                .where('position', whereIn: ['supervisor', 'Supervisor', 'مشرف'])
+                .getResilient(forceServer: forceRefresh);
+
+            for (final doc in delSnapshot.docs) {
+              final delData = doc.data();
+              final phone = (delData['phoneNumber'] as String?)?.trim() ?? '';
+              final name = _extractPersonName(delData, companyName);
+
+              final exists = fetchedSupervisors.any(
+                (s) =>
+                    (s['phoneNumber'] as String? ?? '') == phone &&
+                    phone.isNotEmpty,
+              );
+
+              if (!exists) {
+                fetchedSupervisors.add({
+                  ...delData,
+                  'displayName':
+                      name.isNotEmpty ? name : companySupervisorName,
+                  'phoneNumber': phone.isNotEmpty ? phone : companyPhone,
+                  'email': (delData['email'] as String?)?.trim() ?? companyEmail,
+                  'companyName': companyName,
+                });
+              }
             }
           }
         } catch (_) {}
