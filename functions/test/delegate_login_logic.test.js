@@ -340,3 +340,14 @@ test("extracts national id and phone aliases without preferring unrelated fields
   );
   assert.deepEqual(path, { orgId: "org9", companyId: "co9" });
 });
+
+// TAS-22: staff accounts planted as a delegate doc id are refused.
+const {isStaffAccountRecord} = require("../lib/delegate_login_logic");
+test("isStaffAccountRecord: staff claim, password account or staff users role", () => {
+  assert.equal(isStaffAccountRecord({claimRole: "super-admin", hasPassword: false, userDocRole: ""}), true);
+  assert.equal(isStaffAccountRecord({claimRole: undefined, hasPassword: true, userDocRole: ""}), true);
+  assert.equal(isStaffAccountRecord({claimRole: undefined, hasPassword: false, userDocRole: "company-admin"}), true);
+  assert.equal(isStaffAccountRecord({claimRole: "delegate", hasPassword: true, userDocRole: "delegate"}), false);
+  assert.equal(isStaffAccountRecord({claimRole: undefined, hasPassword: false, userDocRole: ""}), false);
+  assert.equal(isStaffAccountRecord({claimRole: undefined, hasPassword: false, userDocRole: " Delegate "}), false);
+});

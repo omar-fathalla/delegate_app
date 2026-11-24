@@ -26,6 +26,7 @@ import {
   stableDelegateAuthUid,
   validateDeviceId,
   validateLoginInput,
+  isStaffAccountRecord,
 } from "./delegate_login_logic";
 import {hasDelegateIdentity, isDeletedDelegateStatus} from "./delegate_identity";
 
@@ -187,6 +188,19 @@ async function handleDelegateLogin(data: unknown): Promise<{ token: string; dele
   const otpEnforcement = await readOtpEnforcementEnabled();
   const claims = applyOtpEnforcementClaims(baseClaims, otpEnforcement);
 
+  // TAS-22 (hotfix live on prod since 2026-11-20): never mint a token for,
+  // or overwrite the claims of, a staff account whose uid was planted as a
+  // delegate doc id.
+  if (await isStaffAccount(uid)) {
+    await writeFailure(phoneKey);
+    console.error("delegateLoginV2 refused: delegate id collides with a staff account", decision.primary.id);
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "This delegate account cannot sign in.",
+      { reason: "account_inactive" },
+    );
+  }
+
   try {
     await admin.auth().setCustomUserClaims(uid, claims);
   } catch (error) {
@@ -217,6 +231,22 @@ async function readOtpEnforcementEnabled(): Promise<boolean> {
     console.error("delegateLoginV2 otp enforcement read failed");
     return false;
   }
+}
+
+async function isStaffAccount(uid: string): Promise<boolean> {
+  let record: admin.auth.UserRecord | null = null;
+  try {
+    record = await admin.auth().getUser(uid);
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code !== "auth/user-not-found") throw error;
+  }
+  const userDoc = await admin.firestore().collection("users").doc(uid).get();
+  return isStaffAccountRecord({
+    claimRole: record?.customClaims?.role,
+    hasPassword: !!record?.providerData.some((p) => p.providerId === "password"),
+    userDocRole: userDoc.exists ? userDoc.get("role") : "",
+  });
 }
 
 async function readLock(phoneKey: string): Promise<{ locked: boolean; retryAfterSeconds: number }> {
