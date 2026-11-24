@@ -541,3 +541,22 @@ export function optionalDeviceLabel(raw: unknown): string {
   if (typeof raw !== "string") return "";
   return raw.trim().slice(0, 80);
 }
+
+/**
+ * TAS-22 (hotfix live on prod since 2026-11-20): a delegate login must never
+ * mint a token for, or overwrite the claims of, a staff account whose uid was
+ * planted as a delegate doc id. Staff = a custom-claim role other than
+ * delegate, a password provider without the delegate claim, or a users doc
+ * role other than delegate / empty.
+ */
+export function isStaffAccountRecord(input: {
+  claimRole: unknown;
+  hasPassword: boolean;
+  userDocRole: unknown;
+}): boolean {
+  const claim = typeof input.claimRole === "string" ? input.claimRole : undefined;
+  if (claim !== undefined && claim !== "delegate") return true;
+  if (input.hasPassword && claim !== "delegate") return true;
+  const role = String(input.userDocRole ?? "").trim().toLowerCase();
+  return role !== "" && role !== "delegate";
+}
