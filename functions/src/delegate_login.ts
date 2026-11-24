@@ -128,6 +128,19 @@ async function handleDelegateLogin(data: unknown): Promise<{ token: string; dele
   const uid = stableDelegateAuthUid(decision.primary.id);
   const claims = buildCustomClaimsForProfiles(profiles, decision.primary, decision.ids);
 
+  // The Auth uid is the delegate doc id, and delegate docs are client-creatable
+  // under the deployed rules. Never mint a token for (or overwrite the claims of)
+  // a staff account whose uid was planted as a delegate doc id.
+  if (await isStaffAccount(uid)) {
+    await writeFailure(phoneKey);
+    console.error("delegateLoginV2 refused: delegate id collides with a staff account", decision.primary.id);
+    throw new functions.https.HttpsError(
+      "permission-denied",
+      "This delegate account cannot sign in.",
+      { reason: "account_inactive" },
+    );
+  }
+
   try {
     await admin.auth().setCustomUserClaims(uid, claims);
   } catch (error) {
@@ -145,6 +158,35 @@ async function handleDelegateLogin(data: unknown): Promise<{ token: string; dele
     token,
     delegateIds: decision.ids,
   };
+}
+
+/**
+ * True when `uid` already belongs to a staff account:
+ *  - existing custom claims carry a non-delegate role, or
+ *  - the Auth record signs in with a password but was never a delegate, or
+ *  - users/{uid} holds a role other than delegate / empty.
+ * Checked on prod (Nov 2026): no current delegate account matches any of these.
+ */
+async function isStaffAccount(uid: string): Promise<boolean> {
+  let record: admin.auth.UserRecord | null = null;
+  try {
+    record = await admin.auth().getUser(uid);
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code !== "auth/user-not-found") throw error;
+  }
+  if (record) {
+    const claimRole = record.customClaims?.role;
+    if (typeof claimRole === "string" && claimRole !== "delegate") return true;
+    const hasPassword = record.providerData.some((p) => p.providerId === "password");
+    if (hasPassword && claimRole !== "delegate") return true;
+  }
+  const userDoc = await admin.firestore().collection("users").doc(uid).get();
+  if (userDoc.exists) {
+    const role = String(userDoc.get("role") ?? "").trim().toLowerCase();
+    if (role !== "" && role !== "delegate") return true;
+  }
+  return false;
 }
 
 async function readLock(phoneKey: string): Promise<{ locked: boolean; retryAfterSeconds: number }> {
