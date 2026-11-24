@@ -17,6 +17,7 @@ import 'package:delegate_app/features/attendance/presentation/attendance_action_
 import 'package:delegate_app/features/attendance/presentation/attendance_location_fetcher.dart';
 import 'package:delegate_app/features/attendance/presentation/scanner/close_range_lens.dart';
 import 'package:delegate_app/features/attendance/presentation/widgets/early_checkout_confirm_sheet.dart';
+import 'package:delegate_app/features/attendance/presentation/widgets/location_help_card.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
@@ -328,6 +329,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   final AttendanceLocationFetcher _locationFetcher =
       AttendanceLocationFetcher();
   String? _locationStatusMessage;
+
+  /// Why the last visible location check failed; null after a good fix.
+  /// Drives the open-settings help card (TAS-283).
+  LocationFailureKind? _locationFailure;
 
   bool get _isGeofenceMode => isGeofenceAttendanceMode(
         _orgAttendanceMode,
@@ -1388,6 +1393,17 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         ),
                       ],
                     ),
+                    // 4. Open-settings help when the location check failed (TAS-283)
+                    if (_locationFailure != null && !isBusy) ...[
+                      const SizedBox(height: 10),
+                      LocationHelpCard(
+                        kind: _locationFailure!,
+                        onRetry: () => _detectNearestBranch(
+                          showSnackBar: true,
+                          silent: false,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -2805,6 +2821,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       if (!context.mounted) return null;
       if (!silent) {
         AppSnackBar.showError(context, AppLocalizations.of(context)!.locationServicesOff);
+        _reportLocationFailure(context, LocationFailureKind.serviceOff);
       }
       return null;
     }
@@ -2816,6 +2833,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         if (!context.mounted) return null;
         if (!silent) {
           AppSnackBar.showError(context, AppLocalizations.of(context)!.locationPermissionDenied2);
+          _reportLocationFailure(context, LocationFailureKind.permissionDenied);
         }
         return null;
       }
@@ -2825,6 +2843,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       if (!context.mounted) return null;
       if (!silent) {
         AppSnackBar.showError(context, AppLocalizations.of(context)!.locationPermissionDeniedForever);
+        _reportLocationFailure(
+          context,
+          LocationFailureKind.permissionDeniedForever,
+        );
       }
       return null;
     }
@@ -2839,10 +2861,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             context,
             AppLocalizations.of(context)!.locationTimeout,
           );
+          _reportLocationFailure(context, LocationFailureKind.noFix);
         }
         return null;
       }
       final position = fix.position;
+      if (!silent && _locationFailure != null && mounted) {
+        setState(() => _locationFailure = null);
+      }
 
       // --- Anti-Fraud: Fake GPS / Mock Location Detection ---
       if (position.isMocked) {
@@ -2864,9 +2890,49 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     } catch (e) {
       if (context.mounted && !silent) {
         AppSnackBar.showError(context, AppLocalizations.of(context)!.locationError);
+        _reportLocationFailure(context, LocationFailureKind.error);
       }
       return null;
     }
+  }
+
+  /// Shows the open-settings help after a failed location check (TAS-283).
+  /// Geofence mode shows it inside the zone status card; the QR flow has no
+  /// such card, so it gets a bottom sheet instead.
+  void _reportLocationFailure(BuildContext context, LocationFailureKind kind) {
+    if (!mounted) return;
+    setState(() => _locationFailure = kind);
+    if (_isGeofenceMode || !context.mounted) return;
+    showModalBottomSheet<void>(
+      context: context,
+      sheetAnimationStyle: m3SheetAnimation,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) {
+        final colorScheme = Theme.of(sheetContext).colorScheme;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 38,
+                height: 4.5,
+                decoration: BoxDecoration(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              const SizedBox(height: 16),
+              LocationHelpCard(kind: kind),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<String> _getDeviceInfo() async {

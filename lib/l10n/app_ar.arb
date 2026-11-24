@@ -2017,5 +2017,14 @@
   "phoneChangeErrGeneric": "حصلت مشكلة. جرّب تاني بعد شوية.",
   "countryEgypt": "مصر",
   "countryUae": "الإمارات",
-  "phoneCountryLabel": "كود الدولة"
+  "phoneCountryLabel": "كود الدولة",
+  "locHelpTitle": "الموقع مش شغال؟ جرّب الخطوات دي",
+  "locHelpOpenLocationSettings": "فتح إعدادات الموقع",
+  "locHelpOpenAppSettings": "فتح إعدادات التطبيق",
+  "locHelpRetry": "إعادة فحص الموقع",
+  "locHelpStepGoogleAccuracy": "شغّل «دقة الموقع من Google» من إعدادات الموقع.",
+  "locHelpStepPermission": "إذن الموقع للتطبيق: «أثناء استخدام التطبيق» مع «الموقع الدقيق».",
+  "locHelpStepBattery": "طلّع تطبيق تسهيل من توفير البطارية وخليه «بلا قيود» (مهم في OPPO وRealme وXiaomi).",
+  "locHelpStepMapsRetry": "لو الموقع ما اشتغلش: افتح خرائط Google واستنى النقطة الزرقا تثبت، وبعدين ارجع ودوس «إعادة فحص الموقع».",
+  "locHelpStepMapsTryAgain": "لو الموقع ما اشتغلش: افتح خرائط Google واستنى النقطة الزرقا تثبت، وبعدين ارجع وجرّب تاني."
 }

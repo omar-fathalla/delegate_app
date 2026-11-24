@@ -5381,6 +5381,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Country code'**
   String get phoneCountryLabel;
+
+  /// TAS-283 location help card
+  ///
+  /// In en, this message translates to:
+  /// **'Location not working? Try these steps'**
+  String get locHelpTitle;
+
+  /// TAS-283 location help card
+  ///
+  /// In en, this message translates to:
+  /// **'Open location settings'**
+  String get locHelpOpenLocationSettings;
+
+  /// TAS-283 location help card
+  ///
+  /// In en, this message translates to:
+  /// **'Open app settings'**
+  String get locHelpOpenAppSettings;
+
+  /// TAS-283 location help card
+  ///
+  /// In en, this message translates to:
+  /// **'Check location again'**
+  String get locHelpRetry;
+
+  /// TAS-283 location help card
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on “Google Location Accuracy” in location settings.'**
+  String get locHelpStepGoogleAccuracy;
+
+  /// TAS-283 location help card
+  ///
+  /// In en, this message translates to:
+  /// **'Give the app location permission “While using the app” with “Precise location”.'**
+  String get locHelpStepPermission;
+
+  /// TAS-283 location help card
+  ///
+  /// In en, this message translates to:
+  /// **'Take Tashil out of battery saving and set it to “Unrestricted” (important on OPPO, Realme and Xiaomi).'**
+  String get locHelpStepBattery;
+
+  /// TAS-283 location help card
+  ///
+  /// In en, this message translates to:
+  /// **'Still no location: open Google Maps, wait for the blue dot to settle, then come back and tap “Check location again”.'**
+  String get locHelpStepMapsRetry;
+
+  /// TAS-283 location help card
+  ///
+  /// In en, this message translates to:
+  /// **'Still no location: open Google Maps, wait for the blue dot to settle, then come back and try again.'**
+  String get locHelpStepMapsTryAgain;
 }
 
 class _AppLocalizationsDelegate
