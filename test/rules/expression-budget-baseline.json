@@ -4,7 +4,7 @@
   "delegate-source-lock.test.js": 19,
   "delegate-status-guards.test.js": 20,
   "docs-pending.test.js": 230,
-  "firestore.rules.test.js": 25,
+  "firestore.rules.test.js": 24,
   "hr-web-company-reads.test.js": 6,
   "m31-delegate-own-reads.test.js": 5,
   "qa-hold-reads.test.js": 22,
