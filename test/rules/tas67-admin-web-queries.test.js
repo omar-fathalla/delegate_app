@@ -18,7 +18,7 @@ const assert = require("node:assert");
 const {readFileSync} = require("fs");
 const {resolve} = require("path");
 const {
-  initializeTestEnvironment, assertSucceeds, assertFails, assertDeniedByRule,
+  initializeTestEnvironment, assertSucceeds, assertDeniedByRule,
 } = require("./_rules_testing");
 const {
   doc, setDoc, getDocs, getCountFromServer, collection, collectionGroup,
@@ -251,11 +251,10 @@ describe("company-admin: another company is blocked", () => {
       where("companyUID", "==", CO_A2), where("organizationUID", "==", ORG_A),
       where("status", "in", REQUEST_STATUSES))));
   });
-  // Denied today, but by the 1000-expression budget of the collection-group
-  // delegates rule (same class as the TAS-108 leftovers), so assertFails and
-  // a baseline entry instead of assertDeniedByRule. Tracked in Linear.
+  // TAS-108: denied by the company check of cgDelegateStaffReadOk, no
+  // longer by the 1000-expression budget.
   test("nested delegates list of a sister company", async () => {
-    await assertFails(getDocs(query(
+    await assertDeniedByRule(getDocs(query(
       collection(db("admin-a"), `organizations/${ORG_A}/companies/${CO_A2}/delegates`), limit(10))));
   });
   test("organization-wide delegates (org-admin query shape)", async () => {
