@@ -392,8 +392,9 @@ describe("firestore tightened rules", () => {
     await assertFails(dbFor("comp").doc("fcm_tokens/del-1").get());
   });
 
-  test("mail can be created by a company admin and not by a delegate", async () => {
-    await assertSucceeds(dbFor("comp").collection("mail").add({to: ["new@example.com"]}));
+  test("mail can be created by super admin only (TAS-58), never by company staff or a delegate", async () => {
+    await assertSucceeds(dbFor("super").collection("mail").add({to: ["new@example.com"]}));
+    await assertFails(dbFor("comp").collection("mail").add({to: ["new@example.com"]}));
     await assertFails(dbFor("del-1", DELEGATE).collection("mail").add({to: ["new@example.com"]}));
     await assertFails(dbFor("comp").doc("mail/existing").get());
     // mail holds set-password links: no client reads, not even super-admin.
@@ -533,7 +534,7 @@ describe("firestore tightened rules", () => {
     await assertFails(superAdmin.doc("billing_cycles/o1_2027_H1").get());
   });
 
-  test("security logs can be created by the delegate and deleted only inside the company", async () => {
+  test("security logs can be created by the delegate and deleted only by global staff (TAS-57)", async () => {
     const delegate = dbFor("del-1", DELEGATE);
     await assertSucceeds(delegate.collection("security_audit_logs").add({
       delegateUid: "del-1",
@@ -542,7 +543,8 @@ describe("firestore tightened rules", () => {
       violationType: "fake_gps",
     }));
     await assertFails(delegate.doc("security_audit_logs/s1").delete());
-    await assertSucceeds(dbFor("comp").doc("security_audit_logs/s1").delete());
+    await assertFails(dbFor("comp").doc("security_audit_logs/s1").delete());
+    await assertSucceeds(dbFor("super").doc("security_audit_logs/s1").delete());
     await assertFails(dbFor("comp").doc("security_audit_logs/s2").delete());
   });
 

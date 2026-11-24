@@ -88,6 +88,12 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
       widget.delegate.role != UserRole.technicalSupport &&
       widget.delegate.role != UserRole.organizationAdmin;
 
+  /// TAS-57: fraud logs are append-only for company and org staff; only
+  /// super admin and technical support may delete one (the rules agree).
+  bool get _canDeleteLogs =>
+      widget.delegate.role == UserRole.superAdmin ||
+      widget.delegate.role == UserRole.technicalSupport;
+
   bool get _isOrgScoped =>
       widget.delegate.organizationUID.isNotEmpty &&
       widget.delegate.role != UserRole.superAdmin &&
@@ -2608,15 +2614,17 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                           compId: data['companyUID']?.toString(),
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                        icon: Icon(Icons.delete_outline_rounded, color: colorScheme.outline, size: 17),
-                        tooltip: isArabic ? 'حذف السجل' : 'Delete Log',
-                        onPressed: () => _deleteAuditLog(context, docId, delegateName),
-                      ),
+                      if (_canDeleteLogs) ...[
+                        const SizedBox(width: 4),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          icon: Icon(Icons.delete_outline_rounded, color: colorScheme.outline, size: 17),
+                          tooltip: isArabic ? 'حذف السجل' : 'Delete Log',
+                          onPressed: () => _deleteAuditLog(context, docId, delegateName),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -3075,11 +3083,12 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
                   ),
                 ),
                 const Spacer(),
-                IconButton(
-                  icon: Icon(Icons.delete_outline_rounded, color: colorScheme.outline, size: 19),
-                  tooltip: isArabic ? 'حذف السجل' : 'Delete Log',
-                  onPressed: () => _deleteAuditLog(context, docId, delegateName),
-                ),
+                if (_canDeleteLogs)
+                  IconButton(
+                    icon: Icon(Icons.delete_outline_rounded, color: colorScheme.outline, size: 19),
+                    tooltip: isArabic ? 'حذف السجل' : 'Delete Log',
+                    onPressed: () => _deleteAuditLog(context, docId, delegateName),
+                  ),
               ],
             ),
           ],
