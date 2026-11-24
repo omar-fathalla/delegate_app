@@ -242,7 +242,25 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     final pending = state;
     if (pending is! AuthMfaRequired) return;
-    final delegates = pending.challenge.pendingDelegates;
+    final pendingDelegates = pending.challenge.pendingDelegates;
+    // TAS-314: the pending profile may be the email-only placeholder; now
+    // that the user is signed in, load the full profile.
+    final resolved = await loginUseCase.resolveSignedInStaff(
+      pendingDelegates.first.phoneNumber,
+      pendingDelegates,
+    );
+    final delegates = resolved.fold((_) => null, (d) => d);
+    if (delegates == null) {
+      await _signOutIncompleteSession();
+      final failure = resolved.fold((f) => f, (_) => null);
+      emit(
+        AuthError(
+          message: failure?.message ?? '',
+          code: failure is AuthFailure ? failure.code : null,
+        ),
+      );
+      return;
+    }
     _explicitLogout = false;
     await cacheAllDelegatesUseCase(delegates);
     await _continueAfterCredentials(

@@ -31,7 +31,11 @@ abstract class DelegateLoginApi {
   });
 }
 
-/// Profile returned by `staffPhoneLookup` before the password is checked.
+/// Profile returned by `staffPhoneLookup`.
+///
+/// TAS-314: signed out, the callable returns the email only (everything else
+/// is empty here). Signed in as the account owner, it returns the full
+/// profile. [isComplete] tells the two apart.
 class StaffPhoneProfile {
   final String uid;
   final String email;
@@ -44,16 +48,19 @@ class StaffPhoneProfile {
   final String companyName;
 
   const StaffPhoneProfile({
-    required this.uid,
     required this.email,
-    required this.role,
-    required this.displayName,
-    required this.phoneNumber,
+    this.uid = '',
+    this.role = '',
+    this.displayName = '',
+    this.phoneNumber = '',
     this.organizationUID = '',
     this.organizationName = '',
     this.companyUID = '',
     this.companyName = '',
   });
+
+  /// False for the signed-out (email-only) answer.
+  bool get isComplete => uid.isNotEmpty && role.isNotEmpty;
 }
 
 class StaffPhoneLookupException implements Exception {
@@ -89,8 +96,7 @@ class FirebaseStaffPhoneLookupApi implements StaffPhoneLookupApi {
       }
       final data = Map<String, dynamic>.from(raw);
       final email = data['email'];
-      final uid = data['uid'];
-      if (email is! String || !email.contains('@') || uid is! String || uid.isEmpty) {
+      if (email is! String || !email.contains('@')) {
         throw const StaffPhoneLookupException('unavailable');
       }
       String text(String key) {
@@ -98,8 +104,9 @@ class FirebaseStaffPhoneLookupApi implements StaffPhoneLookupApi {
         return value is String ? value : '';
       }
 
+      // TAS-314: uid and role come back only to the signed-in owner.
       return StaffPhoneProfile(
-        uid: uid,
+        uid: text('uid'),
         email: email,
         role: text('role'),
         displayName: text('displayName'),

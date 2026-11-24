@@ -152,6 +152,27 @@ void main() {
       expect(result.first.nationalityID, '__firebase_auth__:omar@example.com');
     });
 
+    test('TAS-314: email-only lookup gives a placeholder with no uid', () async {
+      final source = AuthRemoteDataSourceImpl(
+        firestore: fakeFirestore,
+        firebaseAuth: mockFirebaseAuth,
+        staffPhoneLookupApi: _FakeStaffLookup(
+          const StaffPhoneProfile(email: 'omar@example.com'),
+        ),
+      );
+
+      final result = await source.getDelegatesByPhone('01508899965');
+
+      expect(result, hasLength(1));
+      expect(result.first.uid, isEmpty);
+      expect(result.first.organizationUID, isEmpty);
+      expect(result.first.nationalityID, '__firebase_auth__:omar@example.com');
+      expect(
+        const StaffPhoneProfile(email: 'omar@example.com').isComplete,
+        isFalse,
+      );
+    });
+
     test('falls back to users when staffPhoneLookup is not deployed', () async {
       await fakeFirestore.collection('users').doc('staff-1').set({
         'role': 'hr',

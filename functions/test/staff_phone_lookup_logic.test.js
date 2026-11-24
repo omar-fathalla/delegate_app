@@ -72,3 +72,56 @@ test("callerIp takes the first forwarded hop, else the socket ip", () => {
   assert.equal(callerIp({}, "9.9.9.9"), "9.9.9.9");
   assert.equal(callerIp(undefined, undefined), "");
 });
+
+// TAS-314: a signed-out caller gets the email only.
+const {lookupCallerOf, callerOwnsProfile, staffLookupResponse} = require("../lib/staff_phone_lookup_logic");
+
+function fullProfile() {
+  return publicStaffProfile("uid-1", {
+    role: "organization_admin",
+    email: "Owner@Example.com",
+    displayName: "Owner",
+    organizationUID: "org-1",
+    organizationName: "Chain",
+    companyUID: "co-1",
+    companyName: "Company",
+  }, "01500000001");
+}
+
+test("TAS-314: signed-out caller gets only the email", () => {
+  const body = staffLookupResponse(fullProfile(), lookupCallerOf(undefined));
+  assert.deepEqual(body, {email: "Owner@Example.com"});
+  for (const key of ["uid", "role", "displayName", "organizationUID", "organizationName", "companyUID", "companyName", "phoneNumber"]) {
+    assert.equal(Object.prototype.hasOwnProperty.call(body, key), false, key);
+  }
+});
+
+test("TAS-314: anonymous and other signed-in callers get only the email", () => {
+  const anon = lookupCallerOf({uid: "anon", token: {firebase: {sign_in_provider: "anonymous"}}});
+  assert.equal(anon.anonymous, true);
+  assert.deepEqual(staffLookupResponse(fullProfile(), anon), {email: "Owner@Example.com"});
+  // Anonymous never owns, even with the same uid.
+  const anonSameUid = lookupCallerOf({uid: "uid-1", token: {firebase: {sign_in_provider: "anonymous"}}});
+  assert.equal(callerOwnsProfile(fullProfile(), anonSameUid), false);
+  const other = lookupCallerOf({uid: "uid-9", token: {email: "other@example.com", firebase: {sign_in_provider: "password"}}});
+  assert.deepEqual(staffLookupResponse(fullProfile(), other), {email: "Owner@Example.com"});
+  const noEmail = lookupCallerOf({uid: "uid-9", token: {}});
+  assert.equal(callerOwnsProfile(fullProfile(), noEmail), false);
+});
+
+test("TAS-314: the signed-in owner gets the full profile (by uid or by email)", () => {
+  const byUid = lookupCallerOf({uid: "uid-1", token: {firebase: {sign_in_provider: "password"}}});
+  assert.equal(staffLookupResponse(fullProfile(), byUid).role, "organization_admin");
+  const byEmail = lookupCallerOf({uid: "auth-x", token: {email: " owner@example.COM ", firebase: {sign_in_provider: "password"}}});
+  const body = staffLookupResponse(fullProfile(), byEmail);
+  assert.equal(body.uid, "uid-1");
+  assert.equal(body.organizationName, "Chain");
+  assert.equal(body.companyUID, "co-1");
+});
+
+test("TAS-314: lookupCallerOf rejects malformed auth", () => {
+  assert.equal(lookupCallerOf(null), null);
+  assert.equal(lookupCallerOf({}), null);
+  assert.equal(lookupCallerOf({uid: ""}), null);
+  assert.deepEqual(lookupCallerOf({uid: "u"}), {uid: "u", email: "", anonymous: false});
+});
