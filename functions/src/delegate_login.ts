@@ -28,6 +28,7 @@ import {
   validateLoginInput,
   isStaffAccountRecord,
 } from "./delegate_login_logic";
+import {IP_WINDOW_MS, callerIp, ipWindowNext} from "./staff_phone_lookup_logic";
 import {hasDelegateIdentity, isDeletedDelegateStatus} from "./delegate_identity";
 
 const RATE_LIMIT_COLLECTION = "delegate_login_rate_limits";
@@ -60,8 +61,10 @@ const UNBIND_REQUESTS = "device_unbind_requests";
 export const delegateLoginV2 = functions
   .region("us-central1")
   .runWith({ timeoutSeconds: 30, memory: "256MB" })
-  .https.onCall(async (data: unknown) => {
+  .https.onCall(async (data: unknown, context) => {
     try {
+      const req = context.rawRequest;
+      await enforceLoginIpWindow(callerIp(req?.headers as Record<string, unknown> | undefined, req?.ip));
       return await handleDelegateLogin(data);
     } catch (error) {
       if (error instanceof functions.https.HttpsError) throw error;
@@ -109,15 +112,9 @@ async function handleDelegateLogin(data: unknown): Promise<{ token: string; dele
   const candidates = await findCandidates(validated.phone, validated.nationalId);
   const decision = evaluateCandidates(candidates);
 
-  if (decision.outcome === "not_found") {
-    await writeFailure(phoneKey);
-    throw new functions.https.HttpsError(
-      "not-found",
-      "Phone or national ID is incorrect.",
-      { reason: "not_found" },
-    );
-  }
-  if (decision.outcome === "bad_credentials") {
+  // TAS-29: an unknown phone and a wrong national ID answer exactly the
+  // same, so the callable no longer tells which phones are registered.
+  if (decision.outcome === "not_found" || decision.outcome === "bad_credentials") {
     await writeFailure(phoneKey);
     throw new functions.https.HttpsError(
       "unauthenticated",
@@ -247,6 +244,39 @@ async function isStaffAccount(uid: string): Promise<boolean> {
     hasPassword: !!record?.providerData.some((p) => p.providerId === "password"),
     userDocRole: userDoc.exists ? userDoc.get("role") : "",
   });
+}
+
+// TAS-29: per caller IP window on top of the per-phone lock, so the callable
+// cannot be used to walk many phones. Delegates log in from mobile data or
+// a shop's Wi-Fi, so the window is wider than staffPhoneLookup's.
+const LOGIN_IP_COLLECTION = "delegate_login_ip_limits";
+const LOGIN_IP_MAX = 40;
+
+async function enforceLoginIpWindow(ip: string): Promise<void> {
+  if (!ip) return;
+  const ref = admin.firestore().collection(LOGIN_IP_COLLECTION).doc(rateLimitDocId(`ip:${ip}`));
+  const next = await admin.firestore().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const d = snap.data() || {};
+    const state = snap.exists ? {
+      count: typeof d.count === "number" ? d.count : 0,
+      windowStartMs: createdAtMillis(d.windowStart) ?? 0,
+    } : null;
+    const n = ipWindowNext(state, Date.now(), IP_WINDOW_MS, LOGIN_IP_MAX);
+    tx.set(ref, {
+      count: n.count,
+      windowStart: admin.firestore.Timestamp.fromMillis(n.windowStartMs),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return n;
+  });
+  if (!next.allowed) {
+    throw new functions.https.HttpsError(
+      "resource-exhausted",
+      "Too many attempts. Try again later.",
+      { reason: "rate_limited", retryAfterSeconds: next.retryAfterSeconds },
+    );
+  }
 }
 
 async function readLock(phoneKey: string): Promise<{ locked: boolean; retryAfterSeconds: number }> {
