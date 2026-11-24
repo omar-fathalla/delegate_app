@@ -118,4 +118,29 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('الكود غلط. اتأكد منه وجرّب تاني.'), findsOneWidget);
   });
+
+  testWidgets('picking the UAE sends a 05 number', (tester) async {
+    Map<String, dynamic>? sent;
+    final api = DelegatePhoneChangeApi(call: (name, data) async {
+      sent = data;
+      return {'e164': '+971501234567'};
+    });
+    await tester.pumpWidget(_host(
+      DelegatePhoneChangeSheet(api: api, otp: _FakeOtp(), refreshToken: () async {}),
+      (_) {},
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    expect(find.text('+20'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('phone_country_picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('phone_country_uae')));
+    await tester.pumpAndSettle();
+    expect(find.text('+971'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('phone_change_new_phone')), '501234567');
+    await tester.enterText(find.byKey(const Key('phone_change_national_id')), '29001010000001');
+    await tester.tap(find.byKey(const Key('phone_change_primary')));
+    await tester.pumpAndSettle();
+    expect(sent?['newPhone'], '0501234567');
+  });
 }

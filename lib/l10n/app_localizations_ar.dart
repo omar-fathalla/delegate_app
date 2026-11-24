@@ -2992,4 +2992,13 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get phoneChangeErrGeneric => 'حصلت مشكلة. جرّب تاني بعد شوية.';
+
+  @override
+  String get countryEgypt => 'مصر';
+
+  @override
+  String get countryUae => 'الإمارات';
+
+  @override
+  String get phoneCountryLabel => 'كود الدولة';
 }

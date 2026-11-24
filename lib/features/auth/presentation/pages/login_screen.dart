@@ -10,6 +10,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:delegate_app/features/auth/domain/delegate_login_validator.dart';
+import 'package:delegate_app/features/auth/domain/phone_country.dart';
+import 'package:delegate_app/core/widgets/phone_country_picker.dart';
 import 'package:delegate_app/features/auth/presentation/auth_error_message.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/auth/presentation/widgets/totp_code_form.dart';
@@ -53,6 +55,8 @@ class _LoginScreenState extends State<LoginScreen>
   bool _obscureNationalId = true;
   final _shakeKey = GlobalKey<ShakeState>();
   bool _rememberMe = false;
+  // TAS-112: picked country of the phone field (Egypt by default).
+  PhoneCountry _phoneCountry = PhoneCountry.egypt;
   bool _webDelegateNotice = false;
   bool _suppressWebError = false;
   LoginMode _mode = LoginMode.delegate;
@@ -729,9 +733,15 @@ class _LoginScreenState extends State<LoginScreen>
           label: l10n.mobileNumber,
           helper: AppLocalizations.of(context)!.phoneHelper,
           colorScheme: colorScheme,
+          // TAS-112: the country code is picked, not typed (left side in RTL).
+          suffixIcon: PhoneCountryPicker(
+            value: _phoneCountry,
+            enabled: !loading,
+            onChanged: (c) => setState(() => _phoneCountry = c),
+          ),
         ),
         validator: (value) => validateLoginPhone(
-          value,
+          composePhone(_phoneCountry, value ?? ''),
           emptyMessage: l10n.enterMobileNumber,
           invalidMessage: l10n.invalidMobileNumber,
         ),
@@ -999,7 +1009,7 @@ class _LoginScreenState extends State<LoginScreen>
       if (!WebRuntimePolicy.isWeb) _submit.forward();
       BlocProvider.of<AuthBloc>(context).add(
         LoginRequested(
-          phoneNumber: _phoneController.text,
+          phoneNumber: composePhone(_phoneCountry, _phoneController.text),
           password: _passwordController.text,
           rememberMe: _rememberMe,
           mode: WebRuntimePolicy.isWeb ? LoginMode.staff : _mode,
@@ -1075,7 +1085,7 @@ class _LoginScreenState extends State<LoginScreen>
     final messenger = ScaffoldMessenger.of(context);
     final colorScheme = Theme.of(context).colorScheme;
     String? email;
-    final phone = _phoneController.text.trim();
+    final phone = composePhone(_phoneCountry, _phoneController.text);
     if (phone.isNotEmpty) {
       // TAS-20: with a phone, the server sends the Tashil reset email.
       final outcome = await StaffPasswordResetApi().request(phone);

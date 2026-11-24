@@ -5351,6 +5351,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Something went wrong. Try again in a moment.'**
   String get phoneChangeErrGeneric;
+
+  /// TAS-112 phone country picker
+  ///
+  /// In en, this message translates to:
+  /// **'Egypt'**
+  String get countryEgypt;
+
+  /// TAS-112 phone country picker
+  ///
+  /// In en, this message translates to:
+  /// **'United Arab Emirates'**
+  String get countryUae;
+
+  /// TAS-112 phone country picker
+  ///
+  /// In en, this message translates to:
+  /// **'Country code'**
+  String get phoneCountryLabel;
 }
 
 class _AppLocalizationsDelegate
