@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/attendance/domain/attendance_auto_close.dart';
 
 /// قواعد احتساب يوم العمل في مسير الرواتب.
@@ -66,6 +67,27 @@ class PayrollDayRules {
   /// هل طلب الإجازة سنوي بالأيام (وليس بالساعات)؟
   static bool isAnnualDayLeave(Map<String, dynamic> leave) =>
       categorize(leave) == PayrollLeaveCategory.annual;
+
+  /// TAS-313: أيام الإجازة السنوية المعتمدة في سنة معيّنة (التعريف الوحيد للرصيد).
+  /// بيحسب الإجازات السنوية بالأيام بس، زي مسير الرواتب. المرضي والطارئ وبدون
+  /// مرتب والإجازات بالساعة مابتتخصمش من الرصيد.
+  static int usedAnnualLeaveDaysInYear(
+    Iterable<Map<String, dynamic>> leaves,
+    int year,
+  ) {
+    var used = 0;
+    for (final leave in leaves) {
+      if (leave['status'] != 'approved') continue;
+      if (!isAnnualDayLeave(leave)) continue;
+      final start = leave['startDate'];
+      final DateTime? startDate = start is Timestamp
+          ? start.toDate()
+          : (start is DateTime ? start : null);
+      if (startDate == null || startDate.year != year) continue;
+      used += (leave['daysCount'] as num?)?.toInt() ?? 1;
+    }
+    return used;
+  }
 }
 
 /// فئات الطلبات المعتمدة في مسير الرواتب.
