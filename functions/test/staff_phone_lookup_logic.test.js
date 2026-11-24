@@ -48,3 +48,27 @@ test("pickStaffProfile prefers the higher staff role", () => {
   assert.equal(picked.uid, "sa");
   assert.equal(pickStaffProfile([]), null);
 });
+
+// TAS-24: per-IP window.
+const {ipWindowNext, callerIp, IP_MAX_LOOKUPS, IP_WINDOW_MS} = require("../lib/staff_phone_lookup_logic");
+
+test("ip window allows IP_MAX_LOOKUPS then blocks until the window ends", () => {
+  let s = null;
+  const t0 = 1_000_000;
+  for (let i = 1; i <= IP_MAX_LOOKUPS; i++) {
+    s = ipWindowNext(s, t0 + i);
+    assert.equal(s.allowed, true, `lookup ${i}`);
+  }
+  const blocked = ipWindowNext(s, t0 + IP_MAX_LOOKUPS + 1);
+  assert.equal(blocked.allowed, false);
+  assert.ok(blocked.retryAfterSeconds > 0);
+  const later = ipWindowNext(blocked, t0 + IP_WINDOW_MS + 5);
+  assert.equal(later.allowed, true);
+  assert.equal(later.count, 1);
+});
+
+test("callerIp takes the first forwarded hop, else the socket ip", () => {
+  assert.equal(callerIp({"x-forwarded-for": "1.2.3.4, 10.0.0.1"}, "9.9.9.9"), "1.2.3.4");
+  assert.equal(callerIp({}, "9.9.9.9"), "9.9.9.9");
+  assert.equal(callerIp(undefined, undefined), "");
+});

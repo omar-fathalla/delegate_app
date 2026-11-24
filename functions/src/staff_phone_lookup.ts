@@ -11,11 +11,15 @@ import {
 } from "./delegate_login_logic";
 import {
   PublicStaffProfile,
+  callerIp,
+  ipWindowNext,
   pickStaffProfile,
   publicStaffProfile,
 } from "./staff_phone_lookup_logic";
 
 const RATE_LIMIT_COLLECTION = "staff_login_rate_limits";
+// TAS-24: per-IP lookup window (client rules deny this collection).
+const IP_LIMIT_COLLECTION = "staff_lookup_ip_limits";
 
 /**
  * staffPhoneLookup
@@ -32,8 +36,10 @@ const RATE_LIMIT_COLLECTION = "staff_login_rate_limits";
 export const staffPhoneLookup = functions
   .region("us-central1")
   .runWith({ timeoutSeconds: 30, memory: "256MB" })
-  .https.onCall(async (data: unknown) => {
+  .https.onCall(async (data: unknown, context) => {
     try {
+      const req = context.rawRequest;
+      await enforceIpWindow(callerIp(req?.headers as Record<string, unknown> | undefined, req?.ip));
       return await handleStaffPhoneLookup(data);
     } catch (error) {
       if (error instanceof functions.https.HttpsError) throw error;
@@ -107,6 +113,33 @@ async function queryUsers(
   } catch {
     console.error("staffPhoneLookup query failed", field);
     return [];
+  }
+}
+
+async function enforceIpWindow(ip: string): Promise<void> {
+  if (!ip) return;
+  const ref = admin.firestore().collection(IP_LIMIT_COLLECTION).doc(rateLimitDocId(`ip:${ip}`));
+  const next = await admin.firestore().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const d = snap.data() || {};
+    const state = snap.exists ? {
+      count: typeof d.count === "number" ? d.count : 0,
+      windowStartMs: createdAtMillis(d.windowStart) ?? 0,
+    } : null;
+    const n = ipWindowNext(state, Date.now());
+    tx.set(ref, {
+      count: n.count,
+      windowStart: admin.firestore.Timestamp.fromMillis(n.windowStartMs),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return n;
+  });
+  if (!next.allowed) {
+    throw new functions.https.HttpsError(
+      "resource-exhausted",
+      "Too many attempts. Try again later.",
+      { reason: "rate_limited", retryAfterSeconds: next.retryAfterSeconds },
+    );
   }
 }
 
