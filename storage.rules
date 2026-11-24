@@ -50,6 +50,12 @@ service firebase.storage {
           firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('role', '')
         );
     }
+    function isStorageGlobalStaff() {
+      return isNonAnonymous()
+        && isStorageGlobalRole(
+          firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('role', '')
+        );
+    }
     function storageStaffOrGlobalAccess(folderId) {
       let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
       let role = u.get('role', '');
@@ -193,12 +199,23 @@ service firebase.storage {
           )
         );
     }
+    // TAS-62: every client upload has a size cap and a safe content type
+    // (no HTML, SVG or script served from the bucket domain). Reads and
+    // deletes have no request.resource and pass. Uploads with no type arrive
+    // as application/octet-stream, which browsers download, not render.
+    function uploadOk(maxMb, typeRe) {
+      return request.resource == null
+        || (request.resource.size < maxMb * 1024 * 1024
+          && (request.resource.contentType == null
+            || request.resource.contentType.matches(typeRe)));
+    }
+
     match /feedback_screenshots/{fileName} {
       // Overwrites must be evaluated against the existing object's
       // owner even if a client upload is classified as create.
       allow read: if isStorageStaff()
         || feedbackDelegateMayAccess(fileName);
-      allow create, update: if isStorageStaff()
+      allow create, update: if (isStorageStaff()
         || (
           isDelegateToken()
           && callerDelegateMayWriteStorage()
@@ -207,7 +224,8 @@ service firebase.storage {
             (resource == null && feedbackNameOwnedByCaller(fileName))
             || (resource != null && feedbackDelegateMayAccess(fileName))
           )
-        );
+        ))
+        && uploadOk(10, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream');
       allow delete: if isStorageStaff()
         || (feedbackDelegateMayAccess(fileName) && callerDelegateMayWriteStorage());
     }
@@ -243,11 +261,12 @@ service firebase.storage {
         || delegateTokenOwnsCompany(compId);
       // Filename photo_{uid}_* is treated as owned by that uid so a
       // create-classified overwrite cannot steal a colleague's object.
-      allow create, update: if canAccessCompanyFiles(compId)
+      allow create, update: if (canAccessCompanyFiles(compId)
         || (delegateTokenOwnsCompany(compId)
           && callerDelegateMayWriteStorage()
           && !permissionPhotoNameOwnedByOther(photoId)
-          && (resource == null || delegateOwnsPermissionPhoto(photoId)));
+          && (resource == null || delegateOwnsPermissionPhoto(photoId))))
+        && uploadOk(10, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream');
       allow delete: if canAccessCompanyFiles(compId)
         || (delegateTokenOwnsCompany(compId)
           && callerDelegateMayWriteStorage()
@@ -314,14 +333,16 @@ service firebase.storage {
     // Tenant-scope by the company segment so those paths stay usable
     // without an intent (the web repo is not changed in this PR).
     match /organizations/{orgId}/companies/{compId}/delegates/{delegateUid}/{allPaths=**} {
-      allow read, write: if canAccessWebIdDocs(compId)
-        || (isNonAnonymous() && request.auth.uid == delegateUid);
+      allow read, write: if (canAccessWebIdDocs(compId)
+        || (isNonAnonymous() && request.auth.uid == delegateUid))
+        && uploadOk(20, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|application/pdf');
     }
     // Storage ORs overlapping matches, so this residual must not also
     // match .../delegates/{uid}/** or canAccessWebIdDocs is undone and
     // accountant/marketing would regain ID-doc access.
     match /organizations/{orgId}/companies/{compId}/{segment}/{rest=**} {
-      allow read, write: if segment != 'delegates' && canAccessCompanyFiles(compId);
+      allow read, write: if (segment != 'delegates' && canAccessCompanyFiles(compId))
+        && uploadOk(20, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|application/pdf');
     }
 
     // ==================== ORGANIZATION FILES ====================
@@ -346,25 +367,29 @@ service firebase.storage {
     // Must not also match .../companies/{compId}/** or the company
     // tenant rule above is undone by this OR.
     match /organizations/{orgId}/{segment}/{rest=**} {
-      allow read, write: if segment != 'companies'
+      allow read, write: if (segment != 'companies'
         && segment != 'task_images'
         && segment != 'task_proof'
-        && canAccessOrganization(orgId);
+        && canAccessOrganization(orgId))
+        && uploadOk(20, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|application/pdf');
     }
 
     // ==================== COMPANY FILES ====================
     // Tenant-scoped when the path is the company id.
     match /companies/{compId}/{allPaths=**} {
-      allow read, write: if canAccessCompanyFiles(compId);
+      allow read, write: if (canAccessCompanyFiles(compId))
+        && uploadOk(20, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|application/pdf');
     }
 
     match /companies/{fileName} {
-      allow read, write: if isStorageStaff();
+      allow read, write: if (isStorageStaff())
+        && uploadOk(20, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|application/pdf');
     }
 
     // ==================== DELEGATE FILES ====================
     match /delegates/{delegateId}/{allPaths=**} {
-      allow read, write: if canAccessDelegateDocuments(delegateId);
+      allow read, write: if (canAccessDelegateDocuments(delegateId))
+        && uploadOk(20, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|application/pdf');
     }
 
     // ==================== PENALTIES ATTACHMENTS ====================
@@ -374,7 +399,8 @@ service firebase.storage {
     // clients that only GET remain usable; new writes on the legacy
     // path are denied.
     match /penalties/{compId}/evidence/{penaltyId}/{allPaths=**} {
-      allow read, write: if canAccessCompanyFiles(compId) || orgStaffOwnsCompany(compId);
+      allow read, write: if (canAccessCompanyFiles(compId) || orgStaffOwnsCompany(compId))
+        && uploadOk(50, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|video/.*|audio/.*|application/pdf');
     }
     match /penalties/evidence/{allPaths=**} {
       allow read: if isStorageStaff();
@@ -390,10 +416,11 @@ service firebase.storage {
     match /leave_attachments/{compId}/{uid}/{allPaths=**} {
       allow read: if canAccessWebIdDocs(compId)
         || (delegateTokenOwnsCompany(compId) && request.auth.uid == uid);
-      allow write: if canAccessWebIdDocs(compId)
+      allow write: if (canAccessWebIdDocs(compId)
         || (delegateTokenOwnsCompany(compId)
           && request.auth.uid == uid
-          && callerDelegateMayWriteStorage());
+          && callerDelegateMayWriteStorage()))
+        && uploadOk(20, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|application/pdf');
     }
 
     // ==================== DELEGATE REGISTRATION & SUBSCRIPTION DOCUMENTS ====================
@@ -416,19 +443,22 @@ service firebase.storage {
     // or these gets deny and staff uploads fail. Granted on tashil-dev;
     // prod is a separate, owner-approved change.
     match /delegate_documents/{delegateUid}/{allPaths=**} {
-      allow read, write: if canAccessDelegateDocuments(delegateUid);
+      allow read, write: if (canAccessDelegateDocuments(delegateUid))
+        && uploadOk(20, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|application/pdf');
     }
 
     // Same tenant check as documents when an intent exists for the request id
     // (registration writes the intent first). Anonymous is denied.
     match /delegate_subscription_receipts/{requestId}/{allPaths=**} {
-      allow read, write: if canAccessDelegateDocuments(requestId);
+      allow read, write: if (canAccessDelegateDocuments(requestId))
+        && uploadOk(20, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|application/pdf');
     }
 
     // ==================== PUBLIC FILES ====================
     match /public/{allPaths=**} {
       allow read: if true;
-      allow write: if isStorageStaff();
+      allow write: if (isStorageStaff())
+        && uploadOk(5, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream');
     }
 
     // ==================== STAGING PATH ====================
@@ -436,17 +466,20 @@ service firebase.storage {
     // tenant-scope it like delegate_documents (intent or folder owner).
     // Other staging prefixes are staff-only.
     match /staging/requests/{requestId}/{allPaths=**} {
-      allow read, write: if canAccessDelegateDocuments(requestId);
+      allow read, write: if (canAccessDelegateDocuments(requestId))
+        && uploadOk(20, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|application/pdf');
     }
     // Storage ORs overlapping matches, so this residual must not
     // also match staging/requests/{id} or the intent check above is undone.
     match /staging/{segment}/{rest=**} {
-      allow read, write: if segment != 'requests' && isStorageStaff();
+      allow read, write: if (segment != 'requests' && isStorageStaff())
+        && uploadOk(20, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|application/pdf');
     }
 
     // ==================== GUIDE VIDEOS PATH ====================
     match /guide-videos/{fileName} {
-      allow read, write: if isStorageStaff();
+      allow read, write: if (isStorageStaff())
+        && uploadOk(500, 'video/.*|image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream');
     }
 
     // ==================== FALLBACK FOR ALL OTHER AUTHENTICATED PATHS ====================
@@ -455,7 +488,7 @@ service firebase.storage {
     // Storage ORs overlapping matches, so tenant-scoped prefixes must be
     // excluded from this catch-all or the tighter rules above are undone.
     match /{firstSegment}/{rest=**} {
-      allow read, write: if isStorageStaff()
+      allow read: if (isStorageStaff()
         && firstSegment != 'delegate_documents'
         && firstSegment != 'delegate_subscription_receipts'
         && firstSegment != 'companies'
@@ -467,10 +500,29 @@ service firebase.storage {
         && firstSegment != 'feedback_screenshots'
         && firstSegment != 'public'
         && firstSegment != 'task_images'
-        && firstSegment != 'task_proof';
+        && firstSegment != 'task_proof')
+        && uploadOk(50, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|video/.*|audio/.*|application/pdf');
+      // TAS-62: unknown top-level prefixes are not tenant scoped, so only
+      // global staff may write them (company staff keep reading).
+      allow write: if isStorageGlobalStaff()
+        && firstSegment != 'delegate_documents'
+        && firstSegment != 'delegate_subscription_receipts'
+        && firstSegment != 'companies'
+        && firstSegment != 'organizations'
+        && firstSegment != 'delegates'
+        && firstSegment != 'staging'
+        && firstSegment != 'penalties'
+        && firstSegment != 'leave_attachments'
+        && firstSegment != 'feedback_screenshots'
+        && firstSegment != 'public'
+        && firstSegment != 'task_images'
+        && firstSegment != 'task_proof'
+        && uploadOk(50, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|video/.*|audio/.*|application/pdf');
     }
     match /{singleFile} {
-      allow read, write: if isStorageStaff();
+      allow read: if isStorageStaff();
+      allow write: if (isStorageGlobalStaff())
+        && uploadOk(50, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|video/.*|audio/.*|application/pdf');
     }
   }
 }

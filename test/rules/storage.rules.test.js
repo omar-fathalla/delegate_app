@@ -451,6 +451,30 @@ describe("storage.rules", () => {
     await assertFails(uploadBytes(path(dlg, confused), imageBytes, meta));
   });
 
+
+  // TAS-62: size caps and safe content types on every upload path.
+  test("uploads must be small and a safe type (no HTML / SVG)", async () => {
+    const hr = storage("hrA");
+    const jpeg = {contentType: "image/jpeg"};
+    await assertSucceeds(uploadBytes(path(hr, "delegate_documents/folderA/ok.jpg"), bytes, jpeg));
+    await assertSucceeds(uploadBytes(path(hr, "delegate_documents/folderA/ok.pdf"), bytes, {contentType: "application/pdf"}));
+    await assertFails(uploadBytes(path(hr, "delegate_documents/folderA/x.html"), bytes, {contentType: "text/html"}));
+    await assertFails(uploadBytes(path(hr, "delegate_documents/folderA/x.svg"), bytes, {contentType: "image/svg+xml"}));
+    const big = new Uint8Array(21 * 1024 * 1024);
+    await assertFails(uploadBytes(path(hr, "delegate_documents/folderA/big.jpg"), big, jpeg));
+  });
+
+  test("public files are small images only", async () => {
+    const sup = storage("supA");
+    await assertSucceeds(uploadBytes(path(sup, "public/logo.png"), bytes, {contentType: "image/png"}));
+    await assertFails(uploadBytes(path(sup, "public/page.html"), bytes, {contentType: "text/html"}));
+  });
+
+  test("company staff cannot write unknown top-level prefixes (catch-all)", async () => {
+    await assertFails(uploadBytes(path(storage("hrA"), "misc/coB-file.jpg"), bytes, {contentType: "image/jpeg"}));
+    await assertFails(uploadBytes(path(storage("supA"), "loose-file.jpg"), bytes, {contentType: "image/jpeg"}));
+  });
+
 });
 
 // Keep a named export so node --test counts the file even if helpers grow.
