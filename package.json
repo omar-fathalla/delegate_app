@@ -44,6 +44,7 @@
     "test:rules:tas5-high": "bash scripts/emulators_exec.sh --only firestore --project demo-tas5-high \"node --test test/rules/tas5-high-gaps.test.js\"",
     "test:rules:tas5-medium": "bash scripts/emulators_exec.sh --only firestore --project demo-tas5-medium \"node --test test/rules/tas5-medium-gaps.test.js\"",
     "test:rules:tas84": "bash scripts/emulators_exec.sh --only firestore --project demo-tas84 \"node --test test/rules/tas84-company-fields.test.js\"",
+    "test:rules:tas67": "bash scripts/emulators_exec.sh --only firestore --project demo-tas67 \"node --test test/rules/tas67-admin-web-queries.test.js\"",
     "test:rules:tas49": "bash scripts/emulators_exec.sh --only firestore --project demo-tas49 \"node --test test/rules/tas49-staff-contact.test.js\"",
     "test:rules:tas51-rest": "bash scripts/emulators_exec.sh --only firestore --project demo-tas51-rest \"node --test test/rules/tas51-notifications-rest.test.js\""
   },
