@@ -97,6 +97,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         DeviceBindingService.getCurrentDeviceDetails)();
     final deviceId = (details['deviceId'] ?? '').trim();
     final deviceModel = (details['deviceModel'] ?? '').trim();
+    final legacyDeviceId = (details['legacyDeviceId'] ?? '').trim();
 
     late final DelegateLoginResponse response;
     try {
@@ -105,6 +106,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         nationalId: nationalId,
         deviceId: deviceId,
         deviceModel: deviceModel,
+        legacyDeviceId: legacyDeviceId,
       );
     } on DelegateLoginException catch (error) {
       throw _failureForDelegateLogin(error);

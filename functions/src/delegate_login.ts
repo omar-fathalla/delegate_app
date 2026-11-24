@@ -91,6 +91,10 @@ async function handleDelegateLogin(data: unknown): Promise<{ token: string; dele
     );
   }
   const device = validateDeviceId(payload.deviceId ?? payload.device_id);
+  // TAS-261: optional old Android Build.ID (only used to move an old binding).
+  const legacyRaw = payload.legacyDeviceId;
+  const legacyDeviceId = typeof legacyRaw === "string" && legacyRaw.trim().length >= 4 &&
+    legacyRaw.trim().length <= 128 ? legacyRaw.trim() : "";
   if (!device.ok) {
     throw new functions.https.HttpsError(
       "invalid-argument",
@@ -159,6 +163,7 @@ async function handleDelegateLogin(data: unknown): Promise<{ token: string; dele
     deviceId: device.deviceId,
     deviceModel,
     phone: validated.phone,
+    legacyDeviceId,
   });
   if (deviceDecision.action === "profile_missing") {
     // The primary link doc was deleted (or is a ghost) between lookup and bind.
@@ -346,6 +351,7 @@ async function enforceDeviceBinding(input: {
   deviceId: string;
   deviceModel: string;
   phone: string;
+  legacyDeviceId?: string;
 }): Promise<
   { action: "bind" | "allow"; deviceId: string } | { action: "mismatch" } | { action: "profile_missing" }
 > {
@@ -375,6 +381,7 @@ async function enforceDeviceBinding(input: {
       requestedDeviceId: input.deviceId,
       approvedRequestId: approved ? approved.id : null,
       pendingRequestId: pending ? pending.id : null,
+      legacyDeviceId: input.legacyDeviceId,
     });
     if (decision.action === "mismatch") return decision;
 

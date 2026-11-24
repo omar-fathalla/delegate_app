@@ -31,6 +31,7 @@ class _LoginApi implements DelegateLoginApi {
     required String nationalId,
     required String deviceId,
     String deviceModel = '',
+    String legacyDeviceId = '',
   }) async {
     calls++;
     return const DelegateLoginResponse(token: 't', delegateIds: ['d1']);

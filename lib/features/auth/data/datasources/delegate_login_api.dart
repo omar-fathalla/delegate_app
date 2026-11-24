@@ -26,6 +26,8 @@ abstract class DelegateLoginApi {
     required String nationalId,
     required String deviceId,
     String deviceModel = '',
+    // TAS-261: the old Android Build.ID, so the server can move an old binding.
+    String legacyDeviceId = '',
   });
 }
 
@@ -139,6 +141,7 @@ class FirebaseDelegateLoginApi implements DelegateLoginApi {
     required String nationalId,
     required String deviceId,
     String deviceModel = '',
+    String legacyDeviceId = '',
   }) async {
     try {
       final callable = functions.httpsCallable('delegateLoginV2');
@@ -147,6 +150,7 @@ class FirebaseDelegateLoginApi implements DelegateLoginApi {
         'nationalId': nationalId,
         'deviceId': deviceId,
         if (deviceModel.isNotEmpty) 'deviceModel': deviceModel,
+        if (legacyDeviceId.isNotEmpty) 'legacyDeviceId': legacyDeviceId,
       });
       final raw = result.data;
       if (raw is! Map) {

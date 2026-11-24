@@ -65,6 +65,7 @@ class _FakeDelegateLoginApi implements DelegateLoginApi {
     required String nationalId,
     required String deviceId,
     String deviceModel = '',
+    String legacyDeviceId = '',
   }) async {
     calls++;
     this.phone = phone;

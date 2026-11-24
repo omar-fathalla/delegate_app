@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
@@ -43,12 +44,46 @@ class DeviceBindingService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final DeviceInfoPlugin _deviceInfoPlugin = DeviceInfoPlugin();
 
+  /// TAS-261: Android's Settings.Secure.ANDROID_ID through MainActivity.
+  static const MethodChannel _deviceIdChannel = MethodChannel('tashil/device_id');
+
+  /// Prefix of the new Android device id, so the server can tell it from the
+  /// legacy Build.ID value and migrate an old binding once.
+  static const String androidIdPrefix = 'aid_';
+
+  /// Pure choice of the ids for tests: [androidId] may be empty when the
+  /// platform call fails, then the legacy Build.ID stays the device id.
+  static Map<String, String> androidIds({
+    required String androidId,
+    required String buildId,
+  }) {
+    final aid = androidId.trim();
+    final legacy = buildId.trim();
+    if (aid.isEmpty) return {'deviceId': legacy, 'legacyDeviceId': ''};
+    return {'deviceId': '$androidIdPrefix$aid', 'legacyDeviceId': legacy};
+  }
+
+  /// True when [boundDeviceId] is this device: the current id, or (until the
+  /// server migrates the binding) the legacy Android Build.ID.
+  static bool isSameDevice({
+    required String boundDeviceId,
+    required String currentDeviceId,
+    String legacyDeviceId = '',
+  }) {
+    final bound = boundDeviceId.trim();
+    if (bound.isEmpty) return false;
+    if (bound == currentDeviceId.trim()) return true;
+    final legacy = legacyDeviceId.trim();
+    return legacy.isNotEmpty && !bound.startsWith(androidIdPrefix) && bound == legacy;
+  }
+
   /// رقم الدعم الفني المعتمد لفك ربط الأجهزة
   static const String technicalSupportPhone = '01211857725';
 
   /// استخراج بصمة ومعلومات العتاد للجهاز الحالي
   static Future<Map<String, String>> getCurrentDeviceDetails() async {
     String deviceId = '';
+    String legacyDeviceId = '';
     String deviceModel = 'Unknown Device';
     String brand = '';
     String osVersion = '';
@@ -61,7 +96,13 @@ class DeviceBindingService {
         osVersion = 'Web';
       } else if (Platform.isAndroid) {
         final androidInfo = await _deviceInfoPlugin.androidInfo;
-        deviceId = androidInfo.id;
+        String androidId = '';
+        try {
+          androidId = (await _deviceIdChannel.invokeMethod<String>('androidId')) ?? '';
+        } catch (_) {}
+        final ids = androidIds(androidId: androidId, buildId: androidInfo.id);
+        deviceId = ids['deviceId']!;
+        legacyDeviceId = ids['legacyDeviceId']!;
         brand = androidInfo.brand;
         final model = androidInfo.model;
         deviceModel = brand.isNotEmpty ? '$brand $model'.trim() : model;
@@ -95,6 +136,7 @@ class DeviceBindingService {
 
     return {
       'deviceId': deviceId.trim(),
+      'legacyDeviceId': legacyDeviceId.trim(),
       'deviceModel': deviceModel.trim(),
       'brand': brand.trim(),
       'osVersion': osVersion.trim(),
@@ -124,6 +166,7 @@ class DeviceBindingService {
     // 2. استخراج بيانات الجهاز الحالي
     final deviceDetails = await getCurrentDeviceDetails();
     final currentDeviceId = deviceDetails['deviceId'] ?? '';
+    final legacyDeviceId = deviceDetails['legacyDeviceId'] ?? '';
     final currentDeviceModel = deviceDetails['deviceModel'] ?? 'جهاز غير معروف';
 
     final boundDeviceId = delegate.boundDeviceId?.trim() ?? '';
@@ -132,7 +175,12 @@ class DeviceBindingService {
     // The server binds on delegateLoginV2. An empty field means there is no
     // legacy binding to compare (or the mirror has not arrived). Do not write
     // the binding from the client.
-    if (boundDeviceId.isEmpty || boundDeviceId == currentDeviceId) {
+    if (boundDeviceId.isEmpty ||
+        isSameDevice(
+          boundDeviceId: boundDeviceId,
+          currentDeviceId: currentDeviceId,
+          legacyDeviceId: legacyDeviceId,
+        )) {
       return DeviceVerificationResult(
         status: boundDeviceId.isEmpty
             ? DeviceVerificationStatus.boundNew

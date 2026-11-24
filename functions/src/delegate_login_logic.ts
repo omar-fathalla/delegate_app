@@ -526,14 +526,28 @@ export type DeviceBindingAction =
  * An approved, not-yet-consumed device_unbind_requests doc lets the next
  * login rebind. The device that is already bound does not consume it.
  */
+/** TAS-261: prefix of the new Android id (Settings.Secure.ANDROID_ID). */
+export const ANDROID_ID_PREFIX = "aid_";
+
 export function decideDeviceBinding(input: {
   storedDeviceId: string;
   requestedDeviceId: string;
   approvedRequestId: string | null;
   pendingRequestId: string | null;
+  /** TAS-261: the app's old Android Build.ID, sent next to the new id. */
+  legacyDeviceId?: string;
 }): DeviceBindingAction {
   const stored = input.storedDeviceId.trim();
   const requested = input.requestedDeviceId.trim();
+  const legacy = (input.legacyDeviceId || "").trim();
+  // TAS-261: an old binding holds Build.ID (not unique per phone). When the
+  // app proves it is that device (same Build.ID) and now sends the unique
+  // ANDROID_ID, move the binding to the new id once. A binding that already
+  // holds an ANDROID_ID is never moved this way.
+  if (stored && stored !== requested && legacy && stored === legacy &&
+      !stored.startsWith(ANDROID_ID_PREFIX) && requested.startsWith(ANDROID_ID_PREFIX)) {
+    return {action: "bind", deviceId: requested, consumeRequestId: null};
+  }
   if (!stored) {
     return {
       action: "bind",
