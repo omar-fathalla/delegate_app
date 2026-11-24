@@ -248,6 +248,13 @@ export const completeStaffPasswordSetup = functions
       console.error("completeStaffPasswordSetup failed", {code});
       throw new functions.https.HttpsError("internal", "Failed.");
     }
+    // TAS-40: a new password ends every older session (stolen refresh
+    // tokens included). Best effort: the password is already changed.
+    try {
+      await admin.auth().revokeRefreshTokens(claim.uid);
+    } catch (error) {
+      console.error("completeStaffPasswordSetup revoke failed", {code: (error as {code?: string}).code || ""});
+    }
     console.log("completeStaffPasswordSetup done", {uid: claim.uid});
     return {ok: true};
   });
