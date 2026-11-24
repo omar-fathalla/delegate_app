@@ -76,9 +76,10 @@ service cloud.firestore {
     }
 
     function isOrgAdmin() {
+      // TAS-60: 'org-admin' is what invites grant (orgAdminRoleList has it).
       return roleIs([
         'organization-admin', 'organization_admin', 'organizationadmin',
-        'organizationAdmin'
+        'organizationAdmin', 'org-admin'
       ]);
     }
 
@@ -816,20 +817,25 @@ service cloud.firestore {
         || (staffToken() && (
           staffRole() in [
             'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-            'technical_support', 'technical-support', 'technicalSupport'
+            'technical_support', 'technical-support', 'technicalSupport',
+            'technicalsupport', 'tech_support', 'techsupport'
           ]
           || (staffRole() in [
             'organization-admin', 'organization_admin', 'organizationAdmin',
-            'marketing', 'marketing_promotion'
+            'organizationadmin', 'org-admin',
+            'marketing', 'marketing_promotion', 'marketingPromotion', 'marketingpromotion'
           ] && resource.data.organizationUID == callerOrg())
           // TAS-266: org-wide branches-marketing manager (no companyUID).
           || (staffRole() in [
-            'branches_marketing', 'branches_marketing_manager', 'branchesMarketingManager'
+            'branches_marketing', 'branches_marketing_manager', 'branchesMarketingManager',
+            'branches-marketing', 'branches-marketing-manager', 'branchesmarketingmanager'
           ] && callerCompany() == '' && resource.data.organizationUID == callerOrg())
           || (staffRole() in [
-            'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
-            'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
-            'branches_marketing_manager', 'branchesMarketingManager'
+            'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
+            'hr', 'company-hr', 'company_hr', 'human_resources',
+            'accountant', 'accounting', 'account_admin', 'branches_marketing',
+            'branches_marketing_manager', 'branchesMarketingManager',
+            'branches-marketing', 'branches-marketing-manager', 'branchesmarketingmanager'
           ] && resource.data.companyUID == callerCompany())
         ))
       );
@@ -847,7 +853,10 @@ service cloud.firestore {
       let org = u.get('organizationUID', '');
       return r in staffRoleListGlobal()
         || (org == orgId && r in ['organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin'])
-        || (org == orgId && u.get('companyUID', '') == compId && r in staffRoleListCompany());
+        // TAS-59: only the company's admins edit the company doc (not HR,
+        // accountants or branches marketing).
+        || (org == orgId && u.get('companyUID', '') == compId
+          && r in ['company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor']);
     }
 
     function canManageNestedDelegate(orgId, compId) {
@@ -877,21 +886,26 @@ service cloud.firestore {
           && delegateInOrg(orgId)
           && delegateInCompany(compId)
           && exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId)/delegates/$(request.auth.uid)))
+        // TAS-60: every stored spelling of each staff role is listed here.
         // Staff branches read users/{uid}; a delegate token never walks them,
         // so a delegate's deny comes from a rule, not the 1000-expression
         // budget (TAS-242 / TAS-105).
         || (staffToken() && (
           staffRole() in [
             'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-            'technical_support', 'technical-support', 'technicalSupport'
+            'technical_support', 'technical-support', 'technicalSupport',
+            'technicalsupport', 'tech_support', 'techsupport'
           ]
           || (callerCompany() != '' && callerCompany() == compId && staffRole() in [
-            'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
-            'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
-            'branches_marketing_manager', 'branchesMarketingManager'
+            'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
+            'hr', 'company-hr', 'company_hr', 'human_resources',
+            'accountant', 'accounting', 'account_admin', 'branches_marketing',
+            'branches_marketing_manager', 'branchesMarketingManager',
+            'branches-marketing', 'branches-marketing-manager', 'branchesmarketingmanager'
           ])
           || (callerOrg() == orgId && staffRole() in [
-            'organization-admin', 'organization_admin', 'marketing', 'marketing_promotion'
+            'organization-admin', 'organization_admin', 'organizationAdmin', 'organizationadmin', 'org-admin',
+            'marketing', 'marketing_promotion', 'marketingPromotion', 'marketingpromotion'
           ])
         ))
       );
@@ -1470,8 +1484,9 @@ service cloud.firestore {
 
       match /branches/{branchId} {
         allow read: if signedIn();
-        allow write: if isGlobalStaff() || (isOrgScopedStaff() && callerOrg() == orgId)
-          || (isCompanyScopedStaff() && callerOrg() == orgId);
+        // TAS-54: the geofence decides attendance. Branches are edited by
+        // global staff (the app's branches screens) or this chain's admin.
+        allow write: if isGlobalStaff() || (isOrgAdmin() && callerOrg() == orgId);
       }
 
       match /sent_notifications/{notificationId} {
@@ -1555,10 +1570,10 @@ service cloud.firestore {
           // is authorized without a companyUID query constraint. The
           // collection-group rule below covers cross-chain / org / global reads.
           allow read: if signedIn() && callerCompany() != '' && callerCompany() == compId;
-          allow create: if signedIn() && (
-            canManageNestedDelegate(orgId, compId)
-            || (delegateInOrg(orgId) && delegateInCompany(compId))
-          );
+          // TAS-56: token split so a delegate's deny is a rule, not the budget.
+          allow create: if signedIn() && (staffToken()
+            ? staffTargetOk(orgId, compId, true)
+            : (delegateInOrg(orgId) && delegateInCompany(compId)));
           // Approving or toggling isSupervisorEnabled is super-admin,
           // technical support, or marketing-promotion (Mohamed 2026-11-10
           // 22:14), with marketing-promotion scoped to their org and to
@@ -1577,10 +1592,9 @@ service cloud.firestore {
           allow delete: if isGlobalStaff() || photoPromotionDeleteOnNested(orgId, compId);
 
           match /captured_photos/{photoId} {
-            allow create: if signedIn() && (
-              canManageNestedDelegate(orgId, compId)
-              || (delegateInOrg(orgId) && delegateInCompany(compId))
-            );
+            allow create: if signedIn() && (staffToken()
+              ? staffTargetOk(orgId, compId, true)
+              : (delegateInOrg(orgId) && delegateInCompany(compId)));
             allow update: if false;
             allow delete: if canManageNestedDelegate(orgId, compId);
           }
@@ -1589,9 +1603,20 @@ service cloud.firestore {
 
       match /companyRequests/{requestId} {
         allow read: if signedIn() && (isGlobalStaff() || callerOrg() == orgId);
-        allow create, update, delete: if isSuperAdmin()
+        // TAS-59: a company admin only touches its own company's request.
+        allow create: if isSuperAdmin()
           || (isOrgAdmin() && callerOrg() == orgId)
-          || (isCompanyAdmin() && callerOrg() == orgId && callerCompany() != '');
+          || (isCompanyAdmin() && callerOrg() == orgId && callerCompany() != ''
+            && request.resource.data.get('targetCompanyId', '') == callerCompany());
+        allow update: if isSuperAdmin()
+          || (isOrgAdmin() && callerOrg() == orgId)
+          || (isCompanyAdmin() && callerOrg() == orgId && callerCompany() != ''
+            && resource.data.get('targetCompanyId', '') == callerCompany()
+            && request.resource.data.get('targetCompanyId', '') == callerCompany());
+        allow delete: if isSuperAdmin()
+          || (isOrgAdmin() && callerOrg() == orgId)
+          || (isCompanyAdmin() && callerOrg() == orgId && callerCompany() != ''
+            && resource.data.get('targetCompanyId', '') == callerCompany());
       }
 
       match /tasks/{taskId} {
@@ -1917,18 +1942,24 @@ service cloud.firestore {
             || delegateOwns(request.resource.data.delegateUid)
           ))
         );
-        allow update: if signedIn() && (
-          isGlobalStaff() || (isStaffWriter() && callerOrg() == orgId)
-          || (delegateInOrg(orgId) && delegateOwns(resource.data.delegateUid))
-        );
+        // TAS-59: reviewers only. The delegate app creates an audit and never
+        // edits it (it could flip its own review status).
+        allow update: if signedIn() && staffToken()
+          && (isGlobalStaff() || (isStaffWriter() && callerOrg() == orgId));
         allow delete: if isGlobalStaff() || ((isOrgAdmin() || isMarketing()) && callerOrg() == orgId);
       }
 
       match /private_label_days/{dayId} {
         allow read: if signedIn() && (isGlobalStaff() || callerOrg() == orgId || delegateInOrg(orgId));
-        allow create, update: if signedIn() && (
-          isGlobalStaff() || (isStaffWriter() && callerOrg() == orgId) || delegateInOrg(orgId)
-        );
+        // TAS-59: a delegate writes only its own day doc.
+        // Token split: staff helpers never run on the delegate path (budget).
+        allow create: if signedIn() && (staffToken()
+          ? (isGlobalStaff() || (isStaffWriter() && callerOrg() == orgId))
+          : (delegateInOrg(orgId) && delegateOwns(request.resource.data.get('delegateUid', ''))));
+        allow update: if signedIn() && (staffToken()
+          ? (isGlobalStaff() || (isStaffWriter() && callerOrg() == orgId))
+          : (delegateInOrg(orgId) && delegateOwns(resource.data.get('delegateUid', ''))
+            && request.resource.data.get('delegateUid', '') == resource.data.get('delegateUid', '')));
         allow delete: if isGlobalStaff() || ((isOrgAdmin() || isMarketing()) && callerOrg() == orgId);
       }
 
@@ -2004,15 +2035,9 @@ service cloud.firestore {
             || claimListHas('companyIds', resource.data.get('companyUID', '')))
           : (companyScoped() || orgScoped() || isGlobalStaff())
       );
-      allow create: if signedIn() && (
-        isGlobalStaff()
-        || (isCompanyScopedStaff() && incomingCompanyScoped())
-        || (isOrgScopedStaff() && incomingOrgScoped())
-        || (isDelegate() && (
-          delegateInOrg(request.resource.data.organizationUID)
-          || delegateOwns(request.resource.data.delegateUid)
-        ))
-      );
+      // TAS-56: no create here. Creates go through the nested path, which
+      // checks the company in the path; this one let a doc land under any parent.
+      allow create: if false;
       // No allow update here. Nested photo_permissions updates are
       // decided only by the path-scoped match above. Overlapping
       // collection-group update rules are OR'd and would re-evaluate
@@ -2041,11 +2066,8 @@ service cloud.firestore {
         || delegateOwns(resource.data.get('delegateUID', ''))
         || isGlobalStaff() || orgScoped() || companyScoped() || delegateInOrg(resource.data.organizationUID)
       );
-      allow create: if signedIn() && (
-        isGlobalStaff()
-        || (isCompanyScopedStaff() && incomingCompanyScoped())
-        || (isDelegate() && delegateInOrg(request.resource.data.organizationUID))
-      );
+      // TAS-56: nested create only (see photo_permissions).
+      allow create: if false;
       allow update: if false;
       allow delete: if isGlobalStaff() || (isCompanyScopedStaff() && companyScoped());
     }
@@ -2128,7 +2150,10 @@ service cloud.firestore {
     match /mail/{mailId} {
       allow read, update: if false;
       allow delete: if isSuperAdmin();
-      allow create: if isSuperAdmin() || isTechnicalSupport() || isOrgAdmin() || isCompanyAdmin() || isHR();
+      // TAS-58: no client sends mail (the web invite sender is unused); emails
+      // go from functions with fixed templates. Super admin only, kept for
+      // manual ops.
+      allow create: if isSuperAdmin();
     }
 
     match /guide_videos/{videoId} {
@@ -2341,7 +2366,19 @@ service cloud.firestore {
 
     match /branches/{branchId} {
       allow read: if signedIn();
-      allow create, update, delete: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isBranchesMarketing();
+      // TAS-54: global staff, or an org admin for its own chain's branches
+      // (stored and incoming organizationUID). Company staff no longer move
+      // any branch's geofence.
+      allow create: if isGlobalStaff()
+        || (isOrgAdmin() && callerOrg() != ''
+          && request.resource.data.get('organizationUID', '') == callerOrg());
+      allow update: if isGlobalStaff()
+        || (isOrgAdmin() && callerOrg() != ''
+          && resource.data.get('organizationUID', '') == callerOrg()
+          && request.resource.data.get('organizationUID', '') == callerOrg());
+      allow delete: if isGlobalStaff()
+        || (isOrgAdmin() && callerOrg() != ''
+          && resource.data.get('organizationUID', '') == callerOrg());
     }
 
     // TAS-43 (from the 20 Nov prod hotfix): the delegate-id counter only
@@ -2605,10 +2642,10 @@ service cloud.firestore {
     }
 
     match /sent_notifications/{docId} {
-      allow read: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin();
-      // TAS-268: branches marketing logs and reads only its own sends.
-      allow read: if signedIn() && resource.data.get('senderUid', '') == request.auth.uid
-        && isBranchesMarketing();
+      allow read: if isGlobalStaff();
+      // TAS-53 / TAS-268: everyone else reads only its own sends (the send
+      // screen queries senderUid == own uid).
+      allow read: if signedIn() && resource.data.get('senderUid', '') == request.auth.uid;
       // The app's log payload carries senderUid (no supervisorUid); the
       // r4 delegate_requests F1 clause does not apply here (r5 B-r4-1).
       allow create: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR()
@@ -3179,9 +3216,32 @@ service cloud.firestore {
       }
     }
 
+    // Same principals as before (global, company admin / supervisor / HR,
+    // org admin), one users read, tenant from the doc's companyUID /
+    // organizationUID.
+    function receiptCodeStaffOk(d) {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let co = u.get('companyUID', '');
+      let org = u.get('organizationUID', '');
+      return r in staffRoleListGlobal()
+        || (co is string && co != '' && d.get('companyUID', '') == co
+          && r in ['company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
+            'hr', 'company-hr', 'company_hr', 'human_resources'])
+        || (org is string && org != '' && d.get('organizationUID', '') == org
+          && r in ['organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin', 'org-admin']);
+    }
+
     match /used_receipt_codes/{code} {
       allow read: if signedIn() && (isStaffWriter() || isDelegate());
-      allow create, update, delete: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR();
+      // TAS-57: a code is reserved for the caller's own company (or chain),
+      // and only that company / chain (or global staff) may approve or
+      // release it. A set on an existing code is an update, so another
+      // company's reserved code cannot be taken over.
+      allow create: if staffToken() && receiptCodeStaffOk(request.resource.data);
+      allow update: if staffToken() && receiptCodeStaffOk(resource.data)
+        && receiptCodeStaffOk(request.resource.data);
+      allow delete: if staffToken() && receiptCodeStaffOk(resource.data);
     }
 
     // ==================== MOBILE: BILLING ====================
@@ -3189,13 +3249,19 @@ service cloud.firestore {
     // filter. Company accountants and org admins can read and write them.
     // Delegates can read and update only their own wallet.
 
+    // TAS-53: platform-level collections (no company on the docs). Only
+    // global staff write them (the super-admin collections and wallets
+    // screens); accountants and org admins keep reading.
     match /monthly_collections/{periodId} {
-      allow read, write: if isGlobalStaff() || isAccountant() || isOrgAdmin();
+      allow read: if isGlobalStaff() || isAccountant() || isOrgAdmin();
+      allow write: if isGlobalStaff();
       match /transactions/{transactionId} {
-        allow read, write: if isGlobalStaff() || isAccountant() || isOrgAdmin();
+        allow read: if isGlobalStaff() || isAccountant() || isOrgAdmin();
+        allow write: if isGlobalStaff();
       }
       match /allocations/{allocationId} {
-        allow read, write: if isGlobalStaff() || isAccountant() || isOrgAdmin();
+        allow read: if isGlobalStaff() || isAccountant() || isOrgAdmin();
+        allow write: if isGlobalStaff();
       }
     }
 
@@ -3302,10 +3368,9 @@ service cloud.firestore {
         || (isCompanyScopedStaff() && incomingCompanyScoped())
         || isGlobalStaff()
       );
-      allow update: if isGlobalStaff()
-        || (isCompanyScopedStaff() && companyScoped())
-        || (isOrgScopedStaff() && orgScoped());
-      allow delete: if isGlobalStaff() || (isCompanyScopedStaff() && companyScoped());
+      // TAS-57: fraud evidence is append-only for company and org staff;
+      // only global staff may correct or remove a log.
+      allow update, delete: if isGlobalStaff();
     }
 
     match /device_unbind_requests/{requestId} {
@@ -3428,11 +3493,9 @@ service cloud.firestore {
 
     match /floor_checks/{checkId} {
       allow read: if signedIn() && (isStaffWriter() || isDelegate());
-      allow create, update: if isGlobalStaff() || isMarketing() || isBranchesMarketing() || isCompanyAdmin()
-        || (isDelegate() && (
-          request.resource.data.delegateId == request.auth.uid
-          || delegateOwns(request.resource.data.delegateId)
-        ));
+      // TAS-53: written by the marketing verifiers only (floor_verification
+      // _service); a delegate could overwrite a colleague's check.
+      allow create, update: if isGlobalStaff() || isMarketing() || isBranchesMarketing() || isCompanyAdmin();
       allow delete: if isGlobalStaff() || isMarketing() || isBranchesMarketing() || isCompanyAdmin();
     }
 
