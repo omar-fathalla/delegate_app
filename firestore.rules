@@ -281,47 +281,7 @@ service cloud.firestore {
       );
     }
 
-    // One user-doc get, used by org-admin create. Cheaper than chaining
-    // isOrgAdmin + incomingOrgScoped + incomingCompanyScoped (those
-    // re-read the user doc and can blow the 1000-expression budget on
-    // a large request payload).
-    function orgAdminCreatesOwnScopedRequest() {
-      let exists = signedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
-      let u = exists
-        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
-        : {};
-      let role = u.keys().hasAll(['role']) && u.role is string ? u.role : '';
-      let org = u.keys().hasAll(['organizationUID']) && u.organizationUID is string
-        && u.organizationUID != '' ? u.organizationUID : '';
-      let co = u.keys().hasAll(['companyUID']) && u.companyUID is string
-        && u.companyUID != '' ? u.companyUID : '';
-      let d = request.resource.data;
-      let incomingOrg = d.get('organizationUID', '') != ''
-        ? d.get('organizationUID', '') : d.get('organizationId', '');
-      let incomingCo = d.get('companyUID', '') != ''
-        ? d.get('companyUID', '') : d.get('companyId', '');
-      return role in [
-          'organization-admin', 'organization_admin', 'organizationadmin',
-          'organizationAdmin'
-        ]
-        && d.get('supervisorUid', '') == request.auth.uid
-        && org != ''
-        && co != ''
-        && incomingOrg == org
-        && incomingCo == co;
-    }
 
-    function delegatePhoneMatch() {
-      return isDelegate() && (
-        (resource.data.keys().hasAll(['phoneNumber'])
-          && resource.data.phoneNumber is string
-          && claimListHas('phones', resource.data.phoneNumber)) ||
-        (resource.data.keys().hasAll(['phone'])
-          && resource.data.phone is string
-          && claimListHas('phones', resource.data.phone))
-      );
-    }
 
     function legacySuperAdminSpelling(role) {
       return role in [
@@ -349,23 +309,7 @@ service cloud.firestore {
       ];
     }
 
-    function noSelfEscalation() {
-      return request.auth.uid != resource.id
-        || !request.resource.data.diff(resource.data).affectedKeys().hasAny(escalationKeys());
-    }
 
-    function ownerCreateSafe() {
-      return request.auth.uid == request.resource.id
-        && (
-          !request.resource.data.keys().hasAll(['role'])
-          || request.resource.data.role == 'delegate'
-          || request.resource.data.role == ''
-        )
-        && (
-          !request.resource.data.keys().hasAll(['uid'])
-          || request.resource.data.uid == request.auth.uid
-        );
-    }
 
     // P0 (N4/NEW-2): delegate self-update is an ALLOW-LIST of the fields the
     // app itself writes on a delegate's own doc (dev, v1.14.2 and
@@ -390,11 +334,6 @@ service cloud.firestore {
     // exists anywhere in the old list: matching is by value, not index, so
     // removing an earlier entry does not break a later approved one. Unknown
     // keys can never be approved (the app parses unknown keys as personalPhoto).
-    function knownDocKeys() {
-      return ['personalPhoto', 'nationalityId', 'authorizationLetter', 'insuranceLetter',
-        'healthCertificate', 'paymentReceipt', 'electronicPaymentReceipt',
-        'electronic_payment_receipt'];
-    }
 
     function docIsApproved(e) {
       return e.get('documentStatus', '') is string
@@ -502,9 +441,6 @@ service cloud.firestore {
       return r in ['supervisor', 'company_supervisor'];
     }
 
-    function delegatePendingStatusOnly(st1) {
-      return st1 is string && st1.lower().trim() == 'pending';
-    }
 
     function delegateStatusLower(st) {
       return st is string ? st.lower().trim() : '';
@@ -708,11 +644,6 @@ service cloud.firestore {
     // direct client edit by company/org/marketing staff, including on
     // pending / action_required records (Mohamed 2026-11-10). Super-admin
     // and tech support remain unrestricted (approval batches / Admin SDK).
-    function companyEditorRole(r) {
-      return r in [
-        'company-admin', 'company_admin', 'companyadmin', 'admin',
-        'supervisor', 'company_supervisor'];
-    }
 
     function profileEditKeys() {
       return ['fullName', 'firstName', 'secondName', 'thirdName', 'middleName', 'lastName',
@@ -940,17 +871,7 @@ service cloud.firestore {
       return ['organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin', 'org-admin'];
     }
 
-    // Roles only a super-admin may grant, edit or hold-and-be-edited.
-    function privilegedRoleList() {
-      return superAdminRoleList().concat(orgAdminRoleList()).concat([
-        'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport',
-        'tech_support', 'techsupport'
-      ]);
-    }
 
-    function companyAdminRoleList() {
-      return ['company-admin', 'company_admin', 'companyadmin', 'admin'];
-    }
 
     function fieldRoleList() {
       return ['delegate', 'promoter', ''];
@@ -997,9 +918,6 @@ service cloud.firestore {
         && (d.get('organizationId', '') == '' || d.get('organizationId', '') == d.get('organizationUID', ''));
     }
 
-    function pinKeysChanged() {
-      return changedKeys().hasAny(['role', 'organizationUID', 'companyUID', 'organizationId', 'companyId']);
-    }
 
     // ==================== SHARED: USERS ====================
 
