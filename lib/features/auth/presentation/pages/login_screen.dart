@@ -27,6 +27,7 @@ import 'package:delegate_app/features/auth/presentation/widgets/web_hr_login_vie
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_remote_data_source.dart';
+import 'package:delegate_app/features/auth/data/staff_password_reset_api.dart';
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 
 /// SharedPreferences key for the last account type picked on login.
@@ -1074,6 +1075,24 @@ class _LoginScreenState extends State<LoginScreen>
     final colorScheme = Theme.of(context).colorScheme;
     String? email;
     final phone = _phoneController.text.trim();
+    if (phone.isNotEmpty) {
+      // TAS-20: with a phone, the server sends the Tashil reset email.
+      final outcome = await StaffPasswordResetApi().request(phone);
+      if (!context.mounted) return;
+      if (outcome != StaffResetOutcome.invalidPhone) {
+        messenger.showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor:
+                outcome == StaffResetOutcome.failed ? colorScheme.error : null,
+            content: Text(outcome == StaffResetOutcome.failed
+                ? l10n.resetLinkFailed
+                : l10n.resetLinkSentIfRegistered),
+          ),
+        );
+        return;
+      }
+    }
     if (phone.isNotEmpty) {
       try {
         final ds = sl<AuthRemoteDataSource>();
