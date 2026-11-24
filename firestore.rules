@@ -1542,7 +1542,12 @@ service cloud.firestore {
         match /notifications/{notificationId} {
           allow read: if signedIn() && (isGlobalStaff() || canManageNestedDelegate(orgId, compId) || delegateInCompany(compId));
           allow create, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
-          allow update: if signedIn() && (isGlobalStaff() || canManageNestedDelegate(orgId, compId) || delegateInCompany(compId));
+          // TAS-51: company staff (the web bell) only flip the read flags;
+          // delegates no longer edit these company notifications.
+          allow update: if staffToken()
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['read', 'isRead', 'readAt', 'readBy'])
+            && staffTargetOk(orgId, compId, true);
         }
 
         match /photo_permissions/{permissionId} {
@@ -2457,15 +2462,34 @@ service cloud.firestore {
     // caller and the payload is scoped to a company in the token.
     // A held-account get() is not applied here: it blows the 1000-expression
     // budget. Storage writes and the app status listener cover M3 instead.
+    // TAS-51: a delegate notifies one person only: its company's
+    // supervisors (supervisor_<own company>) or a single user id. Never a
+    // broadcast (all, delegates, company_*, roles), which every signed-in
+    // user of that audience reads.
+    function delegateNotifyTargetOk(t, co) {
+      return t is string && t != '' && (
+        t == 'supervisor_' + co
+        || (t.matches('^[A-Za-z0-9_-]{1,128}$')
+          && !t.matches('^(all|delegates|company_|supervisor_|role_).*')
+          && !(t in ['hr', 'admin', 'supervisor', 'delegate', 'accountant',
+            'organizationAdmin', 'organization-admin', 'organization_admin',
+            'super-admin', 'super_admin', 'superAdmin', 'technicalSupport',
+            'technical-support', 'technical_support', 'company-hr', 'company_hr',
+            'marketing', 'marketing_promotion', 'marketingPromotion',
+            'branchesMarketingManager', 'branches_marketing', 'branches-marketing']))
+      );
+    }
+
     function canDelegateCreateNotification() {
       let d = request.resource.data;
+      let co = dataHasString(d, 'companyUID') ? d.companyUID
+        : (dataHasString(d, 'companyId') ? d.companyId : '');
       return isDelegate()
         && dataHasString(d, 'createdBy')
         && d.createdBy == request.auth.uid
-        && (
-          (dataHasString(d, 'companyUID') && delegateInCompany(d.companyUID))
-          || (dataHasString(d, 'companyId') && delegateInCompany(d.companyId))
-        );
+        && co != ''
+        && delegateInCompany(co)
+        && delegateNotifyTargetOk(d.get('delegateUid', ''), co);
     }
 
     // TAS-291: staff tokens in one pass over the caller's users doc. The
@@ -2531,18 +2555,52 @@ service cloud.firestore {
         && resource.data.delegateUid == 'supervisor_' + callerCompany();
     }
 
+    // Same owners as canReadOwnNotification, one pass over the target
+    // fields (canReadOwnNotification ran the update over the budget).
+    function notifOwnTarget() {
+      let t = resource.data.get('delegateUid', '');
+      let u = resource.data.get('userId', '');
+      return signedIn() && delegateOtpOk() && !isPrivilegedStaffAlert() && (
+        (t is string && t != '' && (t == request.auth.uid || t == claimString('delegateId')
+          || claimListHas('delegateIds', t) || claimListHas('phones', t)))
+        || (u is string && u != '' && (u == request.auth.uid || u == claimString('delegateId')))
+        || claimListHas('phones', resource.data.get('phoneNumber', ''))
+      );
+    }
+
+    function notifUpdateOk() {
+      let keys = request.resource.data.diff(resource.data).affectedKeys();
+      return keys.hasOnly(['isRead', 'readAt', 'read', 'readBy', 'deletedBy'])
+        && notifListAddsOnlySelf('readBy')
+        && notifListAddsOnlySelf('deletedBy')
+        && (keys.hasOnly(['readBy', 'deletedBy']) || notifOwnTarget());
+    }
+
+    // readBy / deletedBy may only grow, and only by the caller's own ids
+    // (auth uid, or a delegate id from the token).
+    function notifListAddsOnlySelf(key) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([key])
+        || (request.resource.data[key] is list
+          && (!resource.data.keys().hasAny([key]) || !(resource.data[key] is list)
+            || request.resource.data[key].hasAll(resource.data[key]))
+          && request.resource.data[key].removeAll(
+              resource.data.keys().hasAny([key]) && resource.data[key] is list ? resource.data[key] : [])
+            .hasOnly([request.auth.uid, claimString('delegateId')]));
+    }
+
     match /notifications/{notificationId} {
       allow read: if canReadOwnNotification();
       allow read: if canReadOrgAdminRoleBroadcast();
       allow read: if canReadCompanySupervisorBroadcast();
       allow read: if canReadNotification();
       allow create: if canCreateNotification();
-      allow update: if (canReadOwnNotification() || canReadNotification()) && (
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']) ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']) ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedBy']) ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt', 'read'])
-      );
+      // Own notification: the read flags and the caller's soft delete.
+      // One update rule (two separate ones ran out of budget together).
+      // - readBy / deletedBy: per user, only the caller's own ids added
+      //   (TAS-51). Works on shared broadcasts and own notifications.
+      // - isRead / readAt / read (doc-wide): own notification only; on a
+      //   shared doc it would mark it for everyone.
+      allow update: if signedIn() && resource != null && notifUpdateOk();
       allow delete: if isSuperAdmin();
     }
 
