@@ -2332,7 +2332,9 @@
   "taskProofBy": "Proof of work — {name}",
   "@taskProofBy": {
     "placeholders": {
-      "name": {"type": "String"}
+      "name": {
+        "type": "String"
+      }
     }
   },
   "taskProofSave": "Save proof photos",
@@ -2422,8 +2424,12 @@
   "@updateRequiredVersions": {
     "description": "Small line showing the installed and the minimum version",
     "placeholders": {
-      "current": {"type": "String"},
-      "minimum": {"type": "String"}
+      "current": {
+        "type": "String"
+      },
+      "minimum": {
+        "type": "String"
+      }
     }
   },
   "updateRequiredButton": "Update now",
@@ -2438,7 +2444,7 @@
   "@updateRequiredOpenFailed": {
     "description": "Snackbar when the store link could not be launched"
   },
-  "profileIdentityEditViaSupervisor": "To change your name, email or phone number, please contact your supervisor.",
+  "profileIdentityEditViaSupervisor": "To change your name or email, please contact your supervisor.",
   "@profileIdentityEditViaSupervisor": {
     "description": "Hint under the delegate's personal info: delegates cannot edit identity fields themselves (TAS-72)"
   },
@@ -2486,5 +2492,82 @@
         "type": "String"
       }
     }
+  },
+  "phoneChangeTitle": "Change phone number",
+  "@phoneChangeTitle": {
+    "description": "TAS-112 delegate phone change"
+  },
+  "phoneChangeIntro": "Enter the new number and your national ID. A confirmation code will be sent to the new number.",
+  "@phoneChangeIntro": {
+    "description": "TAS-112 delegate phone change"
+  },
+  "phoneChangeNewPhone": "New mobile number",
+  "@phoneChangeNewPhone": {
+    "description": "TAS-112 delegate phone change"
+  },
+  "phoneChangeNationalId": "National ID",
+  "@phoneChangeNationalId": {
+    "description": "TAS-112 delegate phone change"
+  },
+  "phoneChangeSendCode": "Send code",
+  "@phoneChangeSendCode": {
+    "description": "TAS-112 delegate phone change"
+  },
+  "phoneChangeCodeSent": "Enter the code sent to {phone}",
+  "@phoneChangeCodeSent": {
+    "description": "TAS-112 delegate phone change",
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "phoneChangeCodeLabel": "Confirmation code",
+  "@phoneChangeCodeLabel": {
+    "description": "TAS-112 delegate phone change"
+  },
+  "phoneChangeConfirm": "Confirm",
+  "@phoneChangeConfirm": {
+    "description": "TAS-112 delegate phone change"
+  },
+  "phoneChangeResend": "Resend code",
+  "@phoneChangeResend": {
+    "description": "TAS-112 delegate phone change"
+  },
+  "phoneChangeDone": "Your phone number was changed. Use the new number to sign in from now on.",
+  "@phoneChangeDone": {
+    "description": "TAS-112 delegate phone change"
+  },
+  "phoneChangeErrBadPhone": "Enter a valid Egyptian mobile number.",
+  "@phoneChangeErrBadPhone": {
+    "description": "TAS-112 delegate phone change"
+  },
+  "phoneChangeErrNationalId": "The national ID does not match your profile.",
+  "@phoneChangeErrNationalId": {
+    "description": "TAS-112 delegate phone change"
+  },
+  "phoneChangeErrSamePhone": "This is already your number.",
+  "@phoneChangeErrSamePhone": {
+    "description": "TAS-112 delegate phone change"
+  },
+  "phoneChangeErrTaken": "This number belongs to another account.",
+  "@phoneChangeErrTaken": {
+    "description": "TAS-112 delegate phone change"
+  },
+  "phoneChangeErrTooMany": "Too many attempts today. Try again tomorrow.",
+  "@phoneChangeErrTooMany": {
+    "description": "TAS-112 delegate phone change"
+  },
+  "phoneChangeErrExpired": "The request expired. Start again.",
+  "@phoneChangeErrExpired": {
+    "description": "TAS-112 delegate phone change"
+  },
+  "phoneChangeErrWrongCode": "Wrong code. Check it and try again.",
+  "@phoneChangeErrWrongCode": {
+    "description": "TAS-112 delegate phone change"
+  },
+  "phoneChangeErrGeneric": "Something went wrong. Try again in a moment.",
+  "@phoneChangeErrGeneric": {
+    "description": "TAS-112 delegate phone change"
   }
 }

@@ -22,6 +22,7 @@ import 'package:delegate_app/features/profile/data/staff_contact_api.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 
 import '../../../../l10n/app_localizations.dart';
+import 'package:delegate_app/features/profile/presentation/widgets/delegate_phone_change_sheet.dart';
 
 /// صفحة الملف الشخصي للمستخدم
 /// User Profile Screen with ability to change password and photo
@@ -56,6 +57,18 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     super.initState();
     _delegate = widget.delegate;
     _loadUserData();
+  }
+
+  Future<void> _changeDelegatePhone(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final newPhone = await showDelegatePhoneChangeSheet(context);
+    if (newPhone == null || !mounted) return;
+    setState(() {
+      _firestoreUserData = {...?_firestoreUserData, 'phoneNumber': newPhone};
+    });
+    messenger.showSnackBar(SnackBar(content: Text(l10n.phoneChangeDone)));
+    await _loadUserData();
   }
 
   Future<void> _loadUserData() async {
@@ -915,8 +928,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               colorScheme: colorScheme,
               theme: theme,
               maestroValueIdentifier: 'tashil_profile_phone_value',
+              // TAS-112: a delegate changes its phone with an OTP on the new
+              // number (server callables); staff keep the direct edit.
               onEdit: !canEditIdentity
-                  ? null
+                  ? (delegate?.role == UserRole.delegate
+                      ? () => _changeDelegatePhone(context)
+                      : null)
                   : () => _showEditInfoSheet(
                         context,
                         fieldType: 'phone',

@@ -1849,7 +1849,9 @@
   "@taskProofBy": {
     "description": "Read-only proof section labeled with the uploader name",
     "placeholders": {
-      "name": {"type": "String"}
+      "name": {
+        "type": "String"
+      }
     }
   },
   "taskProofSave": "حفظ إثبات العمل",
@@ -1957,8 +1959,12 @@
   "@updateRequiredVersions": {
     "description": "Small line showing the installed and the minimum version",
     "placeholders": {
-      "current": {"type": "String"},
-      "minimum": {"type": "String"}
+      "current": {
+        "type": "String"
+      },
+      "minimum": {
+        "type": "String"
+      }
     }
   },
   "updateRequiredButton": "تحديث الآن",
@@ -1973,7 +1979,7 @@
   "@updateRequiredOpenFailed": {
     "description": "Snackbar when the store link could not be launched"
   },
-  "profileIdentityEditViaSupervisor": "لتغيير الاسم أو البريد الإلكتروني أو رقم الموبايل، يرجى التواصل مع المشرف.",
+  "profileIdentityEditViaSupervisor": "لتغيير الاسم أو البريد الإلكتروني، يرجى التواصل مع المشرف.",
   "@profileIdentityEditViaSupervisor": {
     "description": "Hint under the delegate's personal info: delegates cannot edit identity fields themselves (TAS-72)"
   },
@@ -1981,5 +1987,30 @@
   "autoSwitchedToChainBranch": "أنت في {branch} — تم التبديل تلقائياً إلى {chain}",
   "autoSwitchUndo": "تراجع",
   "autoSwitchPickCompany": "أنت في {branch} التابع لـ {chain}. اختر الشركة",
-  "autoSwitchBlockedActiveSession": "أنت في {branch} التابع لـ {chain}، لكن لديك حضور مفتوح. سجّل الانصراف أولاً."
+  "autoSwitchBlockedActiveSession": "أنت في {branch} التابع لـ {chain}، لكن لديك حضور مفتوح. سجّل الانصراف أولاً.",
+  "phoneChangeTitle": "تغيير رقم الموبايل",
+  "phoneChangeIntro": "اكتب الرقم الجديد ورقمك القومي، وهيوصلك كود تأكيد على الرقم الجديد.",
+  "phoneChangeNewPhone": "رقم الموبايل الجديد",
+  "phoneChangeNationalId": "الرقم القومي",
+  "phoneChangeSendCode": "إرسال الكود",
+  "phoneChangeCodeSent": "اكتب الكود اللي وصل على {phone}",
+  "@phoneChangeCodeSent": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "phoneChangeCodeLabel": "كود التأكيد",
+  "phoneChangeConfirm": "تأكيد",
+  "phoneChangeResend": "إعادة إرسال الكود",
+  "phoneChangeDone": "تم تغيير رقم الموبايل. استخدم الرقم الجديد في تسجيل الدخول بعد كده.",
+  "phoneChangeErrBadPhone": "اكتب رقم موبايل مصري صحيح.",
+  "phoneChangeErrNationalId": "الرقم القومي مش مطابق لبياناتك.",
+  "phoneChangeErrSamePhone": "ده رقمك الحالي.",
+  "phoneChangeErrTaken": "الرقم ده مستخدم في حساب تاني.",
+  "phoneChangeErrTooMany": "محاولات كتير النهارده. جرّب بكرة.",
+  "phoneChangeErrExpired": "الطلب انتهى. ابدأ من الأول.",
+  "phoneChangeErrWrongCode": "الكود غلط. اتأكد منه وجرّب تاني.",
+  "phoneChangeErrGeneric": "حصلت مشكلة. جرّب تاني بعد شوية."
 }

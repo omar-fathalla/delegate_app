@@ -361,3 +361,4 @@ export {
   paymobSubscriptionWebhook,
 } from "./paymob_subscription";
 export {getMySupervisorCards} from "./supervisor_cards";
+export {requestDelegatePhoneChange, confirmDelegatePhoneChange} from "./delegate_phone_change";

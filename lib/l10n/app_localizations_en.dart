@@ -2910,7 +2910,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileIdentityEditViaSupervisor =>
-      'To change your name, email or phone number, please contact your supervisor.';
+      'To change your name or email, please contact your supervisor.';
 
   @override
   String attYouAreAtChainBranch(String chain, String branch) {
@@ -2934,4 +2934,65 @@ class AppLocalizationsEn extends AppLocalizations {
   String autoSwitchBlockedActiveSession(String branch, String chain) {
     return 'You are at $branch ($chain), but you have an open check-in. Check out first.';
   }
+
+  @override
+  String get phoneChangeTitle => 'Change phone number';
+
+  @override
+  String get phoneChangeIntro =>
+      'Enter the new number and your national ID. A confirmation code will be sent to the new number.';
+
+  @override
+  String get phoneChangeNewPhone => 'New mobile number';
+
+  @override
+  String get phoneChangeNationalId => 'National ID';
+
+  @override
+  String get phoneChangeSendCode => 'Send code';
+
+  @override
+  String phoneChangeCodeSent(String phone) {
+    return 'Enter the code sent to $phone';
+  }
+
+  @override
+  String get phoneChangeCodeLabel => 'Confirmation code';
+
+  @override
+  String get phoneChangeConfirm => 'Confirm';
+
+  @override
+  String get phoneChangeResend => 'Resend code';
+
+  @override
+  String get phoneChangeDone =>
+      'Your phone number was changed. Use the new number to sign in from now on.';
+
+  @override
+  String get phoneChangeErrBadPhone => 'Enter a valid Egyptian mobile number.';
+
+  @override
+  String get phoneChangeErrNationalId =>
+      'The national ID does not match your profile.';
+
+  @override
+  String get phoneChangeErrSamePhone => 'This is already your number.';
+
+  @override
+  String get phoneChangeErrTaken => 'This number belongs to another account.';
+
+  @override
+  String get phoneChangeErrTooMany =>
+      'Too many attempts today. Try again tomorrow.';
+
+  @override
+  String get phoneChangeErrExpired => 'The request expired. Start again.';
+
+  @override
+  String get phoneChangeErrWrongCode => 'Wrong code. Check it and try again.';
+
+  @override
+  String get phoneChangeErrGeneric =>
+      'Something went wrong. Try again in a moment.';
 }
