@@ -1,4 +1,5 @@
 import 'package:delegate_app/features/hr/domain/services/payroll_day_rules.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -79,6 +80,39 @@ void main() {
         expect(PayrollDayRules.categorize({'type': t}), PayrollLeaveCategory.notALeaveDay, reason: t);
       }
       expect(PayrollDayRules.categorize({'type': 'sick', 'isHourly': true}), PayrollLeaveCategory.notALeaveDay);
+    });
+  });
+
+  group('usedAnnualLeaveDaysInYear (TAS-313)', () {
+    Map<String, dynamic> leave(String type, int days,
+            {String status = 'approved', bool hourly = false, int year = 2026}) =>
+        {
+          'type': type,
+          'daysCount': days,
+          'status': status,
+          'isHourly': hourly,
+          'startDate': Timestamp.fromDate(DateTime(year, 3, 1)),
+        };
+
+    test('counts approved annual day leaves only', () {
+      final leaves = [
+        leave('annual', 3),
+        leave('sick', 2),
+        leave('emergency', 1),
+        leave('unpaid', 4),
+        leave('annual', 1, hourly: true),
+        leave('annual', 5, status: 'pending'),
+        leave('annual', 2, status: 'rejected'),
+      ];
+      expect(PayrollDayRules.usedAnnualLeaveDaysInYear(leaves, 2026), 3);
+    });
+
+    test('ignores other years and treats a missing type as annual', () {
+      final leaves = [
+        leave('annual', 3, year: 2025),
+        {'daysCount': 2, 'status': 'approved', 'startDate': DateTime(2026, 5, 1)},
+      ];
+      expect(PayrollDayRules.usedAnnualLeaveDaysInYear(leaves, 2026), 2);
     });
   });
 }
