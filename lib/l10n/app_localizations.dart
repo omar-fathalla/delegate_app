@@ -5211,7 +5211,7 @@ abstract class AppLocalizations {
   /// Hint under the delegate's personal info: delegates cannot edit identity fields themselves (TAS-72)
   ///
   /// In en, this message translates to:
-  /// **'To change your name, email or phone number, please contact your supervisor.'**
+  /// **'To change your name or email, please contact your supervisor.'**
   String get profileIdentityEditViaSupervisor;
 
   /// No description provided for @attYouAreAtChainBranch.
@@ -5243,6 +5243,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You are at {branch} ({chain}), but you have an open check-in. Check out first.'**
   String autoSwitchBlockedActiveSession(String branch, String chain);
+
+  /// TAS-112 delegate phone change
+  ///
+  /// In en, this message translates to:
+  /// **'Change phone number'**
+  String get phoneChangeTitle;
+
+  /// TAS-112 delegate phone change
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the new number and your national ID. A confirmation code will be sent to the new number.'**
+  String get phoneChangeIntro;
+
+  /// TAS-112 delegate phone change
+  ///
+  /// In en, this message translates to:
+  /// **'New mobile number'**
+  String get phoneChangeNewPhone;
+
+  /// TAS-112 delegate phone change
+  ///
+  /// In en, this message translates to:
+  /// **'National ID'**
+  String get phoneChangeNationalId;
+
+  /// TAS-112 delegate phone change
+  ///
+  /// In en, this message translates to:
+  /// **'Send code'**
+  String get phoneChangeSendCode;
+
+  /// TAS-112 delegate phone change
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the code sent to {phone}'**
+  String phoneChangeCodeSent(String phone);
+
+  /// TAS-112 delegate phone change
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmation code'**
+  String get phoneChangeCodeLabel;
+
+  /// TAS-112 delegate phone change
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get phoneChangeConfirm;
+
+  /// TAS-112 delegate phone change
+  ///
+  /// In en, this message translates to:
+  /// **'Resend code'**
+  String get phoneChangeResend;
+
+  /// TAS-112 delegate phone change
+  ///
+  /// In en, this message translates to:
+  /// **'Your phone number was changed. Use the new number to sign in from now on.'**
+  String get phoneChangeDone;
+
+  /// TAS-112 delegate phone change
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid Egyptian mobile number.'**
+  String get phoneChangeErrBadPhone;
+
+  /// TAS-112 delegate phone change
+  ///
+  /// In en, this message translates to:
+  /// **'The national ID does not match your profile.'**
+  String get phoneChangeErrNationalId;
+
+  /// TAS-112 delegate phone change
+  ///
+  /// In en, this message translates to:
+  /// **'This is already your number.'**
+  String get phoneChangeErrSamePhone;
+
+  /// TAS-112 delegate phone change
+  ///
+  /// In en, this message translates to:
+  /// **'This number belongs to another account.'**
+  String get phoneChangeErrTaken;
+
+  /// TAS-112 delegate phone change
+  ///
+  /// In en, this message translates to:
+  /// **'Too many attempts today. Try again tomorrow.'**
+  String get phoneChangeErrTooMany;
+
+  /// TAS-112 delegate phone change
+  ///
+  /// In en, this message translates to:
+  /// **'The request expired. Start again.'**
+  String get phoneChangeErrExpired;
+
+  /// TAS-112 delegate phone change
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong code. Check it and try again.'**
+  String get phoneChangeErrWrongCode;
+
+  /// TAS-112 delegate phone change
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong. Try again in a moment.'**
+  String get phoneChangeErrGeneric;
 }
 
 class _AppLocalizationsDelegate

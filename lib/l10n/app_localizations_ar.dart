@@ -2910,7 +2910,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get profileIdentityEditViaSupervisor =>
-      'لتغيير الاسم أو البريد الإلكتروني أو رقم الموبايل، يرجى التواصل مع المشرف.';
+      'لتغيير الاسم أو البريد الإلكتروني، يرجى التواصل مع المشرف.';
 
   @override
   String attYouAreAtChainBranch(String chain, String branch) {
@@ -2934,4 +2934,62 @@ class AppLocalizationsAr extends AppLocalizations {
   String autoSwitchBlockedActiveSession(String branch, String chain) {
     return 'أنت في $branch التابع لـ $chain، لكن لديك حضور مفتوح. سجّل الانصراف أولاً.';
   }
+
+  @override
+  String get phoneChangeTitle => 'تغيير رقم الموبايل';
+
+  @override
+  String get phoneChangeIntro =>
+      'اكتب الرقم الجديد ورقمك القومي، وهيوصلك كود تأكيد على الرقم الجديد.';
+
+  @override
+  String get phoneChangeNewPhone => 'رقم الموبايل الجديد';
+
+  @override
+  String get phoneChangeNationalId => 'الرقم القومي';
+
+  @override
+  String get phoneChangeSendCode => 'إرسال الكود';
+
+  @override
+  String phoneChangeCodeSent(String phone) {
+    return 'اكتب الكود اللي وصل على $phone';
+  }
+
+  @override
+  String get phoneChangeCodeLabel => 'كود التأكيد';
+
+  @override
+  String get phoneChangeConfirm => 'تأكيد';
+
+  @override
+  String get phoneChangeResend => 'إعادة إرسال الكود';
+
+  @override
+  String get phoneChangeDone =>
+      'تم تغيير رقم الموبايل. استخدم الرقم الجديد في تسجيل الدخول بعد كده.';
+
+  @override
+  String get phoneChangeErrBadPhone => 'اكتب رقم موبايل مصري صحيح.';
+
+  @override
+  String get phoneChangeErrNationalId => 'الرقم القومي مش مطابق لبياناتك.';
+
+  @override
+  String get phoneChangeErrSamePhone => 'ده رقمك الحالي.';
+
+  @override
+  String get phoneChangeErrTaken => 'الرقم ده مستخدم في حساب تاني.';
+
+  @override
+  String get phoneChangeErrTooMany => 'محاولات كتير النهارده. جرّب بكرة.';
+
+  @override
+  String get phoneChangeErrExpired => 'الطلب انتهى. ابدأ من الأول.';
+
+  @override
+  String get phoneChangeErrWrongCode => 'الكود غلط. اتأكد منه وجرّب تاني.';
+
+  @override
+  String get phoneChangeErrGeneric => 'حصلت مشكلة. جرّب تاني بعد شوية.';
 }
