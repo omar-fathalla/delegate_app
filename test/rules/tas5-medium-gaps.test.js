@@ -186,3 +186,22 @@ describe("TAS-60 org-admin role from invites", () => {
     await assertSucceeds(updateDoc(doc(as("orgadmin-invite"), "branches/br-a"), {geofenceRadius: 120}));
   });
 });
+
+describe("TAS-60 role spellings can read their delegates", () => {
+  test("every stored spelling of a staff role reads a delegate of its company", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, `organizations/${ORG}/companies/${CO}/delegates/dl-x`), {
+        uid: "dl-x", organizationUID: ORG, companyUID: CO, fullName: "Fake", fake: true,
+      });
+      for (const [uid, role] of [["r-techsupport", "techsupport"], ["r-hres", "human_resources"],
+        ["r-acc", "accounting"], ["r-coadm", "companyadmin"], ["r-bm", "branchesmarketingmanager"]]) {
+        await setDoc(doc(db, `users/${uid}`), {role, organizationUID: ORG, companyUID: CO, fake: true});
+      }
+      await setDoc(doc(db, "users/r-orgadm"), {role: "organizationadmin", organizationUID: ORG, fake: true});
+    });
+    for (const uid of ["r-techsupport", "r-hres", "r-acc", "r-coadm", "r-bm", "r-orgadm"]) {
+      await assertSucceeds(getDoc(doc(as(uid), `organizations/${ORG}/companies/${CO}/delegates/dl-x`)));
+    }
+  });
+});

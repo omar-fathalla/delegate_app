@@ -817,20 +817,25 @@ service cloud.firestore {
         || (staffToken() && (
           staffRole() in [
             'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-            'technical_support', 'technical-support', 'technicalSupport'
+            'technical_support', 'technical-support', 'technicalSupport',
+            'technicalsupport', 'tech_support', 'techsupport'
           ]
           || (staffRole() in [
             'organization-admin', 'organization_admin', 'organizationAdmin',
-            'marketing', 'marketing_promotion'
+            'organizationadmin', 'org-admin',
+            'marketing', 'marketing_promotion', 'marketingPromotion', 'marketingpromotion'
           ] && resource.data.organizationUID == callerOrg())
           // TAS-266: org-wide branches-marketing manager (no companyUID).
           || (staffRole() in [
-            'branches_marketing', 'branches_marketing_manager', 'branchesMarketingManager'
+            'branches_marketing', 'branches_marketing_manager', 'branchesMarketingManager',
+            'branches-marketing', 'branches-marketing-manager', 'branchesmarketingmanager'
           ] && callerCompany() == '' && resource.data.organizationUID == callerOrg())
           || (staffRole() in [
-            'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
-            'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
-            'branches_marketing_manager', 'branchesMarketingManager'
+            'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
+            'hr', 'company-hr', 'company_hr', 'human_resources',
+            'accountant', 'accounting', 'account_admin', 'branches_marketing',
+            'branches_marketing_manager', 'branchesMarketingManager',
+            'branches-marketing', 'branches-marketing-manager', 'branchesmarketingmanager'
           ] && resource.data.companyUID == callerCompany())
         ))
       );
@@ -881,21 +886,26 @@ service cloud.firestore {
           && delegateInOrg(orgId)
           && delegateInCompany(compId)
           && exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId)/delegates/$(request.auth.uid)))
+        // TAS-60: every stored spelling of each staff role is listed here.
         // Staff branches read users/{uid}; a delegate token never walks them,
         // so a delegate's deny comes from a rule, not the 1000-expression
         // budget (TAS-242 / TAS-105).
         || (staffToken() && (
           staffRole() in [
             'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-            'technical_support', 'technical-support', 'technicalSupport'
+            'technical_support', 'technical-support', 'technicalSupport',
+            'technicalsupport', 'tech_support', 'techsupport'
           ]
           || (callerCompany() != '' && callerCompany() == compId && staffRole() in [
-            'company-admin', 'company_admin', 'admin', 'supervisor', 'company_supervisor',
-            'hr', 'company-hr', 'company_hr', 'accountant', 'branches_marketing',
-            'branches_marketing_manager', 'branchesMarketingManager'
+            'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
+            'hr', 'company-hr', 'company_hr', 'human_resources',
+            'accountant', 'accounting', 'account_admin', 'branches_marketing',
+            'branches_marketing_manager', 'branchesMarketingManager',
+            'branches-marketing', 'branches-marketing-manager', 'branchesmarketingmanager'
           ])
           || (callerOrg() == orgId && staffRole() in [
-            'organization-admin', 'organization_admin', 'marketing', 'marketing_promotion'
+            'organization-admin', 'organization_admin', 'organizationAdmin', 'organizationadmin', 'org-admin',
+            'marketing', 'marketing_promotion', 'marketingPromotion', 'marketingpromotion'
           ])
         ))
       );
