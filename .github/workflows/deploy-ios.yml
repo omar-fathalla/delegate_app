@@ -107,6 +107,12 @@ jobs:
             -exportPath $PWD/build \
             -exportOptionsPlist ExportOptions.plist
 
+      # TAS-21: the App Store build of 2026-10-19 shipped without
+      # aps-environment, so iOS got no push. Stop before upload if the
+      # exported ipa is not signed with aps-environment=production.
+      - name: 🔔 Check push entitlement (aps-environment=production)
+        run: bash scripts/ci/check_ipa_entitlements.sh ios/build/Runner.ipa
+
       - name: 🚀 Upload to TestFlight
         if: github.event.inputs.upload_to_app_store == 'true'
         env:
