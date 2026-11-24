@@ -1,6 +1,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import {photoPermissionNotifyUserIds} from "./photo_permission_notify_logic";
+import {pushDataFor} from "./notification_push_logic";
 import {
   sendMulticastAndPrune,
   sendToUserTokens,
@@ -82,9 +83,10 @@ export const onPhotoPermissionCreated = functions.firestore
       const notificationTitle = "طلب إذن تصوير جديد";
       const notificationBody = `قام مندوب بطلب إذن تصوير في ${permission.companyName || "الشركة"}`;
 
+      // TAS-34: chunks of 450 (a Firestore batch holds at most 500 writes).
+      for (let i = 0; i < targetUserIds.length; i += 450) {
       const batch = admin.firestore().batch();
-
-      for (const userId of targetUserIds) {
+      for (const userId of targetUserIds.slice(i, i + 450)) {
         const notificationRef = admin.firestore().collection("notifications").doc();
         batch.set(notificationRef, {
           delegateUid: userId,
@@ -99,23 +101,9 @@ export const onPhotoPermissionCreated = functions.firestore
         });
       }
 
+      // TAS-34: the push goes out once, from onNotificationCreated for each
+      // doc above. Sending it here too delivered every alert twice.
       await batch.commit();
-
-      // TAS-258: every device of every recipient (device docs + legacy doc).
-      const fcmTargets = await tokensForUsers(admin.firestore(), targetUserIds);
-      if (fcmTargets.length > 0) {
-        await sendMulticastAndPrune(admin.firestore(), admin.messaging(), fcmTargets, {
-          notification: {
-            title: notificationTitle,
-            body: notificationBody,
-          },
-          data: {
-            type: "photo_permission",
-            permissionId,
-            organizationId,
-            companyId,
-          },
-        });
       }
       return null;
     } catch (error) {
@@ -170,24 +158,8 @@ export const onPhotoPermissionUpdated = functions.firestore
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
+      // TAS-34: pushed once by onNotificationCreated.
       await batch.commit();
-
-      const fcmTargets = await tokensForUser(admin.firestore(), requestedBy);
-      if (fcmTargets.length > 0) {
-        await sendToUserTokens(admin.firestore(), admin.messaging(), fcmTargets, {
-          notification: {
-            title: notificationTitle,
-            body: notificationBody,
-          },
-          data: {
-            type: "photo_permission",
-            permissionId,
-            organizationId,
-            companyId,
-          },
-        });
-      }
-
       return null;
     } catch (error) {
       console.error("Error in onPhotoPermissionUpdated:", error);
@@ -204,6 +176,8 @@ export const onNotificationCreated = functions.firestore
   .onCreate(async (snap, context) => {
     const notification = snap.data();
     const { delegateUid, title, body, organizationId, companyId, type, phoneNumber, taskId } = notification;
+    // organizationId / companyId / type / taskId are still read below for
+    // the broadcast branches; single-recipient data comes from pushDataFor.
 
     if (!title || !body) return null;
 
@@ -315,12 +289,7 @@ export const onNotificationCreated = functions.firestore
                 },
               },
             },
-            data: {
-              type: type || "support_alert",
-              organizationId: organizationId || "",
-              companyId: companyId || "",
-              taskId: taskId || "",
-            },
+            data: pushDataFor(notification, "support_alert"),
           });
           if (delivered) console.log(`Successfully sent FCM push notification to delegate ${recipientUid} (${delivered}/${targets.length} devices)`);
         } else {

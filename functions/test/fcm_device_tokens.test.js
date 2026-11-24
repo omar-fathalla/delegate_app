@@ -156,12 +156,19 @@ test("every send path reads tokens through tokensForUser (no direct fcm_tokens r
     assert.doesNotMatch(code, /collection\(\s*["']fcm_tokens["']\s*\)/, `${f} reads fcm_tokens directly`);
   }
   const index = fs.readFileSync(path.join(src, "index.ts"), "utf8");
-  for (const fn of ["onPhotoPermissionCreated", "onPhotoPermissionUpdated", "onNotificationCreated"]) {
+  const bodyOf = (fn) => {
     const start = index.indexOf(`export const ${fn}`);
     assert.ok(start >= 0, fn);
     const next = index.indexOf("export const ", start + 1);
-    const body = index.slice(start, next < 0 ? undefined : next);
-    assert.match(body, /tokensForUsers?\(/, `${fn} uses tokensForUser`);
+    return index.slice(start, next < 0 ? undefined : next);
+  };
+  assert.match(bodyOf("onNotificationCreated"), /tokensForUsers?\(/, "onNotificationCreated uses tokensForUser");
+  // TAS-34: the photo-permission triggers only write notification docs; the
+  // push goes out once, from onNotificationCreated.
+  for (const fn of ["onPhotoPermissionCreated", "onPhotoPermissionUpdated"]) {
+    const body = bodyOf(fn);
+    assert.doesNotMatch(body, /messaging\(\)|sendToUserTokens|sendMulticastAndPrune/, `${fn} must not push itself`);
+    assert.match(body, /collection\("notifications"\)/, `${fn} writes a notification doc`);
   }
   const paymob = fs.readFileSync(path.join(src, "paymob_superseded_alert.ts"), "utf8");
   assert.match(paymob, /tokensForUser\(/);
