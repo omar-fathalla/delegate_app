@@ -1568,7 +1568,14 @@ service cloud.firestore {
         }
 
         match /notifications/{notificationId} {
-          allow read: if signedIn() && (isGlobalStaff() || canManageNestedDelegate(orgId, compId) || delegateInCompany(compId));
+          // TAS-307: the web bell counts these every 10 s. The old read
+          // (isGlobalStaff || canManageNestedDelegate || delegateInCompany)
+          // ran out of the 1000-expression budget for company admins, so the
+          // count was denied. Same principals as the update below: one users
+          // read for staff, and a delegate token never walks users/{uid}.
+          allow read: if signedIn() && (
+            staffToken() ? staffTargetOk(orgId, compId, true) : delegateInCompany(compId)
+          );
           allow create, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
           // TAS-51: company staff (the web bell) only flip the read flags;
           // delegates no longer edit these company notifications.
