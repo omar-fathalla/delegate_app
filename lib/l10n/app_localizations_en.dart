@@ -2996,4 +2996,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get phoneChangeErrGeneric =>
       'Something went wrong. Try again in a moment.';
+
+  @override
+  String get countryEgypt => 'Egypt';
+
+  @override
+  String get countryUae => 'United Arab Emirates';
+
+  @override
+  String get phoneCountryLabel => 'Country code';
 }

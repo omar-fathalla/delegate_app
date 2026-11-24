@@ -1,6 +1,8 @@
 // TAS-112: the delegate changes its own phone number. Step 1: new number +
 // national ID (server checks both). Step 2: the code sent to the new number.
 // The server then updates every copy of the delegate.
+import 'package:delegate_app/core/widgets/phone_country_picker.dart';
+import 'package:delegate_app/features/auth/domain/phone_country.dart';
 import 'package:delegate_app/features/profile/data/phone_change/delegate_phone_change_api.dart';
 import 'package:delegate_app/features/profile/data/phone_change/phone_change_otp_client.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -82,6 +84,7 @@ class _DelegatePhoneChangeSheetState extends State<DelegatePhoneChangeSheet> {
   final _code = TextEditingController();
 
   _Step _step = _Step.form;
+  PhoneCountry _country = PhoneCountry.egypt;
   String _e164 = '';
   bool _busy = false;
   String? _error;
@@ -141,7 +144,10 @@ class _DelegatePhoneChangeSheetState extends State<DelegatePhoneChangeSheet> {
     });
     try {
       if (!resend) {
-        _e164 = await _api.request(newPhone: _phone.text, nationalId: _nationalId.text);
+        _e164 = await _api.request(
+          newPhone: composePhone(_country, _phone.text),
+          nationalId: _nationalId.text,
+        );
       }
       await _otp.sendCode(
         e164Phone: _e164,
@@ -235,10 +241,16 @@ class _DelegatePhoneChangeSheetState extends State<DelegatePhoneChangeSheet> {
                 controller: _phone,
                 keyboardType: TextInputType.phone,
                 textDirection: TextDirection.ltr,
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+]'))],
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(11)],
                 decoration: InputDecoration(
                   labelText: l10n.phoneChangeNewPhone,
                   prefixIcon: const Icon(Icons.phone_iphone_rounded),
+                  // TAS-112: country picked, not typed (left side in RTL).
+                  suffixIcon: PhoneCountryPicker(
+                    value: _country,
+                    enabled: !_busy,
+                    onChanged: (c) => setState(() => _country = c),
+                  ),
                   border: const OutlineInputBorder(),
                 ),
               ),

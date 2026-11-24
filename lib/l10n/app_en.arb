@@ -2569,5 +2569,11 @@
   "phoneChangeErrGeneric": "Something went wrong. Try again in a moment.",
   "@phoneChangeErrGeneric": {
     "description": "TAS-112 delegate phone change"
-  }
+  },
+  "countryEgypt": "Egypt",
+  "@countryEgypt": {"description": "TAS-112 phone country picker"},
+  "countryUae": "United Arab Emirates",
+  "@countryUae": {"description": "TAS-112 phone country picker"},
+  "phoneCountryLabel": "Country code",
+  "@phoneCountryLabel": {"description": "TAS-112 phone country picker"}
 }

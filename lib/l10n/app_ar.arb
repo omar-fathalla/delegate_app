@@ -2012,5 +2012,8 @@
   "phoneChangeErrTooMany": "محاولات كتير النهارده. جرّب بكرة.",
   "phoneChangeErrExpired": "الطلب انتهى. ابدأ من الأول.",
   "phoneChangeErrWrongCode": "الكود غلط. اتأكد منه وجرّب تاني.",
-  "phoneChangeErrGeneric": "حصلت مشكلة. جرّب تاني بعد شوية."
+  "phoneChangeErrGeneric": "حصلت مشكلة. جرّب تاني بعد شوية.",
+  "countryEgypt": "مصر",
+  "countryUae": "الإمارات",
+  "phoneCountryLabel": "كود الدولة"
 }
