@@ -16,7 +16,8 @@ String _swapDigits(String value) {
   return normalized;
 }
 
-/// Normalizes Egyptian mobile numbers to the local `01xxxxxxxxx` form.
+/// Normalizes Egyptian mobiles to `01xxxxxxxxx` and UAE mobiles to
+/// `05xxxxxxxx` (TAS-112). Other numbers come back digits-only.
 String normalizeEgyptianPhone(String phone) {
   var normalized = _swapDigits(phone.trim()).replaceAll(RegExp(r'[^\d+]'), '');
 
@@ -34,17 +35,41 @@ String normalizeEgyptianPhone(String phone) {
     normalized = '0$normalized';
   }
 
+  // TAS-112 (user decision 2026-11-24): UAE mobiles are accepted too and
+  // stored as 05xxxxxxxx, the same shape as the server's normalizePhone.
+  if (normalized.startsWith('+971')) {
+    normalized = '0${normalized.substring(4)}';
+  } else if (normalized.startsWith('00971')) {
+    normalized = '0${normalized.substring(5)}';
+  } else if (normalized.startsWith('971') && normalized.length == 12) {
+    normalized = '0${normalized.substring(3)}';
+  } else if (normalized.length == 9 && normalized.startsWith('5')) {
+    normalized = '0$normalized';
+  }
+
   return normalized;
 }
 
-/// Egyptian mobile in E.164 (`+20` plus the number without the trunk 0).
+final _egyptianMobile = RegExp(r'^01[0125]\d{8}$');
+final _uaeMobile = RegExp(r'^05\d{8}$');
+
+/// Egyptian `01[0125]xxxxxxxx` or UAE `05xxxxxxxx` after normalizing.
+bool isDelegateMobile(String phone) {
+  final local = normalizeEgyptianPhone(phone);
+  return _egyptianMobile.hasMatch(local) || _uaeMobile.hasMatch(local);
+}
+
+/// Egyptian or UAE mobile in E.164 (`+20` / `+971` plus the number without
+/// the trunk 0).
 ///
 /// `01211857725` becomes `+201211857725`. Returns null when [phone] is not
 /// an Egyptian mobile, so OTP is not sent to an unparsed number.
 String? egyptianPhoneToE164(String phone) {
   final local = normalizeEgyptianPhone(phone);
-  if (!RegExp(r'^01[0125]\d{8}$').hasMatch(local)) return null;
-  return '+20${local.substring(1)}';
+  if (_egyptianMobile.hasMatch(local)) return '+20${local.substring(1)}';
+  // TAS-112: UAE mobile, `0501234567` becomes `+971501234567`.
+  if (_uaeMobile.hasMatch(local)) return '+971${local.substring(1)}';
+  return null;
 }
 
 /// Variants stored on existing delegate documents for the same mobile number.
@@ -59,6 +84,13 @@ List<String> egyptianPhoneVariants(String normalizedPhone) {
     variants.add('+2$normalizedPhone');
     variants.add('002$normalizedPhone');
   }
+  if (_uaeMobile.hasMatch(normalizedPhone)) {
+    final rest = normalizedPhone.substring(1);
+    variants.add(rest);
+    variants.add('971$rest');
+    variants.add('+971$rest');
+    variants.add('00971$rest');
+  }
   return variants.toList();
 }
 
@@ -72,10 +104,7 @@ String? validateLoginPhone(
   required String invalidMessage,
 }) {
   if (value == null || value.trim().isEmpty) return emptyMessage;
-  final normalized = normalizeEgyptianPhone(value);
-  if (!RegExp(r'^01[0125]\d{8}$').hasMatch(normalized)) {
-    return invalidMessage;
-  }
+  if (!isDelegateMobile(value)) return invalidMessage;
   return null;
 }
 

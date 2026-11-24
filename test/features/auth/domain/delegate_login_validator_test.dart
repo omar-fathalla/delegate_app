@@ -131,6 +131,42 @@ void main() {
       );
     });
   });
+
+  // TAS-112 (user decision 2026-11-24): UAE mobiles for login and OTP.
+  group('UAE mobiles', () {
+    test('every UAE form normalizes to 05xxxxxxxx', () {
+      for (final raw in [
+        '+971 50 123 4567',
+        '00971501234567',
+        '971501234567',
+        '0501234567',
+        '501234567',
+        '+٩٧١٥٠١٢٣٤٥٦٧',
+      ]) {
+        expect(normalizeEgyptianPhone(raw), '0501234567', reason: raw);
+      }
+    });
+
+    test('login accepts UAE and Egyptian mobiles only', () {
+      String? v(String s) =>
+          validateLoginPhone(s, emptyMessage: 'empty', invalidMessage: 'bad');
+      expect(v('+971501234567'), isNull);
+      expect(v('0501234567'), isNull);
+      expect(v('01000000002'), isNull);
+      expect(v('+966501234567'), 'bad');
+      expect(v('0601234567'), 'bad');
+    });
+
+    test('OTP number and lookup variants', () {
+      expect(egyptianPhoneToE164('0501234567'), '+971501234567');
+      expect(egyptianPhoneToE164('01000000002'), '+201000000002');
+      expect(egyptianPhoneToE164('0601234567'), isNull);
+      expect(
+        egyptianPhoneVariants('0501234567'),
+        containsAll(['0501234567', '501234567', '971501234567', '+971501234567', '00971501234567']),
+      );
+    });
+  });
 }
 
 Delegate _profile(String nationalityId) {

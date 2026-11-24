@@ -5307,7 +5307,7 @@ abstract class AppLocalizations {
   /// TAS-112 delegate phone change
   ///
   /// In en, this message translates to:
-  /// **'Enter a valid Egyptian mobile number.'**
+  /// **'Enter a valid Egyptian or UAE mobile number.'**
   String get phoneChangeErrBadPhone;
 
   /// TAS-112 delegate phone change

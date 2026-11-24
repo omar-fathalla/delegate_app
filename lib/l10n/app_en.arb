@@ -2538,7 +2538,7 @@
   "@phoneChangeDone": {
     "description": "TAS-112 delegate phone change"
   },
-  "phoneChangeErrBadPhone": "Enter a valid Egyptian mobile number.",
+  "phoneChangeErrBadPhone": "Enter a valid Egyptian or UAE mobile number.",
   "@phoneChangeErrBadPhone": {
     "description": "TAS-112 delegate phone change"
   },

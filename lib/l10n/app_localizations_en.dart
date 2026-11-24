@@ -2970,7 +2970,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your phone number was changed. Use the new number to sign in from now on.';
 
   @override
-  String get phoneChangeErrBadPhone => 'Enter a valid Egyptian mobile number.';
+  String get phoneChangeErrBadPhone =>
+      'Enter a valid Egyptian or UAE mobile number.';
 
   @override
   String get phoneChangeErrNationalId =>
