@@ -43,6 +43,12 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, List<Delegate>>> refreshDelegateProfiles(
+    String phoneNumber,
+  ) async =>
+      const Right([]);
+
+  @override
   Future<Either<Failure, List<Delegate>>> getDelegatesByPhone(
     String phoneNumber,
   ) async {
