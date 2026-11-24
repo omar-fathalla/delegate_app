@@ -98,3 +98,37 @@ export function pickStaffProfile(
   const ordered = profiles.slice().sort((a, b) => staffRoleWeight(b.role) - staffRoleWeight(a.role));
   return ordered[0];
 }
+
+/**
+ * TAS-24: per-caller (IP) window on top of the per-phone lock, so the
+ * callable cannot be used to walk many numbers. Every lookup counts.
+ */
+export const IP_WINDOW_MS = 15 * 60 * 1000;
+export const IP_MAX_LOOKUPS = 20;
+
+export interface IpWindowState {
+  count: number;
+  windowStartMs: number;
+}
+
+export function ipWindowNext(
+  state: IpWindowState | null,
+  now: number,
+  windowMs = IP_WINDOW_MS,
+  max = IP_MAX_LOOKUPS,
+): IpWindowState & {allowed: boolean; retryAfterSeconds: number} {
+  const fresh = !state || now - state.windowStartMs >= windowMs || now < state.windowStartMs;
+  const windowStartMs = fresh ? now : (state as IpWindowState).windowStartMs;
+  const count = (fresh ? 0 : (state as IpWindowState).count) + 1;
+  const allowed = count <= max;
+  const retryAfterSeconds = allowed ? 0 : Math.max(1, Math.ceil((windowStartMs + windowMs - now) / 1000));
+  return {count, windowStartMs, allowed, retryAfterSeconds};
+}
+
+/** Best-effort caller IP from the callable request (first X-Forwarded-For hop). */
+export function callerIp(headers: Record<string, unknown> | undefined, ip: unknown): string {
+  const fwd = headers ? headers["x-forwarded-for"] : undefined;
+  const first = typeof fwd === "string" ? fwd.split(",")[0].trim() : "";
+  if (first) return first;
+  return typeof ip === "string" ? ip : "";
+}
