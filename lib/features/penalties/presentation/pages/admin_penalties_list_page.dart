@@ -1048,9 +1048,8 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               actions: [
-                if (widget.adminDelegate.role == UserRole.superAdmin ||
-                    widget.adminDelegate.role == UserRole.technicalSupport ||
-                    widget.adminDelegate.role == UserRole.organizationAdmin)
+                // TAS-50: only a super-admin edits the shared catalog.
+                if (widget.adminDelegate.role == UserRole.superAdmin)
                   IconButton(
                     tooltip: 'إعدادات الغرامات والمخالفات',
                     icon: const Icon(Icons.tune_rounded),

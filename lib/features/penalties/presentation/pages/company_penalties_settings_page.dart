@@ -598,8 +598,8 @@ class _CompanyPenaltiesSettingsPageState
                     );
                   },
                 ),
-                if (widget.delegate.role == UserRole.superAdmin ||
-                    widget.delegate.role == UserRole.technicalSupport)
+                // TAS-50: only a super-admin edits the shared catalog.
+                if (widget.delegate.role == UserRole.superAdmin)
                   IconButton(
                     icon: const Icon(Icons.tune_rounded),
                     tooltip: AppLocalizations.of(context)!.finesSettings,

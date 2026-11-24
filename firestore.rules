@@ -2853,9 +2853,12 @@ service cloud.firestore {
       allow delete: if isGlobalStaff() || (isCompanyAdmin() && companyScoped()) || (isOrgAdmin() && orgScoped());
     }
 
+    // TAS-50 (user decision 2026-11-24): one fixed catalog for every company.
+    // Everyone signed in reads it; only a super-admin edits it, so one
+    // company's staff can no longer change another company's fines.
     match /penalty_rules/{ruleId} {
       allow read: if signedIn();
-      allow create, update, delete: if isStaffWriter();
+      allow create, update, delete: if staffToken() && isSuperAdmin();
     }
 
     // SUBSCRIPTIONS (PR feat/subscription-cycles): only the server (verified

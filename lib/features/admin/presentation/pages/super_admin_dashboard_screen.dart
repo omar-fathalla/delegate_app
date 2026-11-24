@@ -665,19 +665,21 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                 icon: Icons.admin_panel_settings_rounded,
                 onTap: widget.onNavigateToCreateAdmin,
               ),
-              _buildActionButton(
-                label: 'إعدادات الغرامات',
-                icon: Icons.gavel_rounded,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => PenaltyRulesSettingsPage(
-                        adminDelegate: widget.delegate,
+              // TAS-50: only a super-admin edits the shared catalog.
+              if (widget.delegate.role == UserRole.superAdmin)
+                _buildActionButton(
+                  label: 'إعدادات الغرامات',
+                  icon: Icons.gavel_rounded,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => PenaltyRulesSettingsPage(
+                          adminDelegate: widget.delegate,
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                    );
+                  },
+                ),
               _buildActionButton(
                 label: 'إدارة المحافظ والمستحقات',
                 icon: Icons.account_balance_wallet_rounded,
@@ -976,19 +978,21 @@ class _SuperAdminDashboardScreenState extends State<SuperAdminDashboardScreen> {
                   );
                 },
               ),
-              _buildActionButton(
-                label: 'إعدادات الغرامات',
-                icon: Icons.gavel_rounded,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => PenaltyRulesSettingsPage(
-                        adminDelegate: widget.delegate,
+              // TAS-50: only a super-admin edits the shared catalog.
+              if (widget.delegate.role == UserRole.superAdmin)
+                _buildActionButton(
+                  label: 'إعدادات الغرامات',
+                  icon: Icons.gavel_rounded,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => PenaltyRulesSettingsPage(
+                          adminDelegate: widget.delegate,
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                    );
+                  },
+                ),
             ],
           ),
           const SizedBox(height: 28),
