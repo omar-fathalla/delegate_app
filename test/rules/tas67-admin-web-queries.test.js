@@ -43,6 +43,11 @@ const users = {
   },
   "admin-a": {doc: {role: "company-admin", organizationUID: ORG_A, companyUID: CO_A}, claims: {}},
   "admin-a2": {doc: {role: "company-admin", organizationUID: ORG_A, companyUID: CO_A2}, claims: {}},
+  // Company admins on prod carry claims since the 24 Nov backfill (TAS-23).
+  "admin-a-claims": {
+    doc: {role: "company-admin", organizationUID: ORG_A, companyUID: CO_A},
+    claims: {role: "company-admin", orgId: ORG_A, organizationId: ORG_A, companyId: CO_A},
+  },
 };
 
 const REQUEST_STATUSES = ["pending", "approved", "rejected", "cancelled", "action_required"];
@@ -70,6 +75,9 @@ before(async () => {
       await setDoc(doc(fs, `organizations/${org}/companies/${co}/delegates/d-${co}`), {
         organizationUID: org, companyUID: co, status: "active", isPrinted: false,
         nationalityID: "29001010000000", createdAt: since, updatedAt: since, fake: true,
+      });
+      await setDoc(doc(fs, `organizations/${org}/companies/${co}/notifications/n-${co}`), {
+        title: "fake", read: false, createdAt: since, fake: true,
       });
       await setDoc(doc(fs, `organizations/${org}/companies/${co}/requests/r-${co}`), {
         uid: `r-${co}`, organizationUID: org, companyUID: co, status: "approved",
@@ -276,5 +284,30 @@ describe("super-admin pages", () => {
     await assertSucceeds(getCountFromServer(cgDelegates("sa", where("organizationUID", "==", ORG_B))));
     await assertSucceeds(getDocs(cgRequests("sa",
       where("organizationUID", "==", ORG_B), where("status", "in", REQUEST_STATUSES))));
+  });
+});
+
+// TAS-307: the web bell (notification.service.ts:200-212, getUnreadCount$)
+// counts the company's unread notifications every 10 seconds.
+describe("company bell (unread company notifications count)", () => {
+  const unread = (uid, org, co) => query(
+    collection(db(uid), `organizations/${org}/companies/${co}/notifications`), where("read", "==", false));
+  for (const uid of ["admin-a", "admin-a-claims"]) {
+    test(`${uid}: own company count is allowed`, async () => {
+      const snap = await assertSucceeds(getCountFromServer(unread(uid, ORG_A, CO_A)));
+      assert.equal(snap.data().count, 1);
+    });
+    test(`${uid}: own company list is allowed`, async () => {
+      await assertSucceeds(getDocs(query(unread(uid, ORG_A, CO_A), limit(10))));
+    });
+    test(`${uid}: sister company count is denied by a rule`, async () => {
+      await assertDeniedByRule(getCountFromServer(unread(uid, ORG_A, CO_A2)));
+    });
+  }
+  test("organization-admin: count inside its organization", async () => {
+    await assertSucceeds(getCountFromServer(unread("orgadmin-a", ORG_A, CO_A)));
+  });
+  test("organization-admin: another organization is denied", async () => {
+    await assertDeniedByRule(getCountFromServer(unread("orgadmin-a", ORG_B, CO_B)));
   });
 });
