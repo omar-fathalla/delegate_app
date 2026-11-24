@@ -3861,8 +3861,14 @@ abstract class AppLocalizations {
   /// No description provided for @retakePhoto.
   ///
   /// In en, this message translates to:
-  /// **'Retake this photo'**
+  /// **'Retake'**
   String get retakePhoto;
+
+  /// No description provided for @viewPhotoFullScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'View full screen'**
+  String get viewPhotoFullScreen;
 
   /// No description provided for @addAction.
   ///

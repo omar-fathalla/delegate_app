@@ -1968,7 +1968,8 @@
       "number": {}
     }
   },
-  "retakePhoto": "Retake this photo",
+  "retakePhoto": "Retake",
+  "viewPhotoFullScreen": "View full screen",
   "addAction": "Add",
   "visitNotesLabel": "Visit notes ({count} photos) (optional)",
   "@visitNotesLabel": {

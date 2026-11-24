@@ -11,6 +11,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import '../../data/services/photo_watermark.dart';
 import '../widgets/sync_status_banner.dart';
+import '../widgets/captured_photo_full_screen_viewer.dart';
 import '../bloc/photo_permission_bloc.dart';
 import '../../domain/entities/photo_permission.dart';
 
@@ -140,6 +141,26 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
     } catch (e) {
       if (mounted) setState(() => _isStamping = false);
       _showErrorSnackBar(l10n.cameraOpenFailed(e));
+    }
+  }
+
+  /// TAS-302: opens the selected photo on the whole screen; the viewer can
+  /// ask to retake or delete it.
+  Future<void> _openFullScreen(String branchName) async {
+    if (_shots.isEmpty) return;
+    final index = _selectedPhotoIndex;
+    final action = await CapturedPhotoFullScreenViewer.open(
+      context,
+      photo: _shots[index].stamped,
+      photoNumber: index + 1,
+    );
+    if (!mounted || action == null || index >= _shots.length) return;
+    switch (action) {
+      case CapturedPhotoViewerAction.retake:
+        setState(() => _selectedPhotoIndex = index);
+        await _capturePhoto(isAddingMore: false, branchName: branchName);
+      case CapturedPhotoViewerAction.delete:
+        _removePhotoAt(index);
     }
   }
 
@@ -657,36 +678,41 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                           ),
                           const SizedBox(height: 12),
 
-                          // Big Active Photo Showcase Preview with AnimatedSwitcher
+                          // TAS-302: the whole photo (uncropped) so the branch/date strip
+                          // is visible before sending. Tap opens it on the full screen.
                           ClipRRect(
                             borderRadius: BorderRadius.circular(20),
                             child: Container(
-                              height: 270,
+                              height: 340,
                               width: double.infinity,
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+                                color: Colors.black,
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(color: colorScheme.outlineVariant),
                               ),
                               child: Stack(
                                 children: [
                                   Positioned.fill(
-                                    child: AnimatedSwitcher(
-                                      duration: AppMotionDurations.medium2,
-                                      switchInCurve: AppMotionCurves.emphasizedDecelerate,
-                                      switchOutCurve: AppMotionCurves.emphasizedAccelerate,
-                                      transitionBuilder: (child, animation) {
-                                        return FadeTransition(
-                                          opacity: animation,
-                                          child: child,
-                                        );
-                                      },
-                                      child: Image.file(
-                                        _capturedPhotos[_selectedPhotoIndex],
-                                        key: ValueKey(_capturedPhotos[_selectedPhotoIndex].path),
-                                        fit: BoxFit.cover,
-                                        width: double.infinity,
-                                        height: double.infinity,
+                                    child: GestureDetector(
+                                      key: const ValueKey('captured_photo_preview'),
+                                      onTap: () => _openFullScreen(effectiveBranchName!),
+                                      child: AnimatedSwitcher(
+                                        duration: AppMotionDurations.medium2,
+                                        switchInCurve: AppMotionCurves.emphasizedDecelerate,
+                                        switchOutCurve: AppMotionCurves.emphasizedAccelerate,
+                                        transitionBuilder: (child, animation) {
+                                          return FadeTransition(
+                                            opacity: animation,
+                                            child: child,
+                                          );
+                                        },
+                                        child: Image.file(
+                                          _capturedPhotos[_selectedPhotoIndex],
+                                          key: ValueKey(_capturedPhotos[_selectedPhotoIndex].path),
+                                          fit: BoxFit.contain,
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -711,58 +737,51 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                       ),
                                     ),
                                   ),
-                                  // Bottom Action Bar Overlay
-                                  Positioned(
-                                    bottom: 0,
-                                    left: 0,
-                                    right: 0,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topCenter,
-                                          end: Alignment.bottomCenter,
-                                          colors: [
-                                            Colors.transparent,
-                                            Colors.black.withValues(alpha: 0.75),
-                                          ],
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          TextButton.icon(
-                                            onPressed: () => _capturePhoto(isAddingMore: false, branchName: effectiveBranchName!),
-                                            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 18),
-                                            label: Text(
-                                              AppLocalizations.of(context)!.retakePhoto,
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 12.5,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            style: TextButton.styleFrom(
-                                              backgroundColor: Colors.white.withValues(alpha: 0.2),
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                            ),
-                                          ),
-                                          const Spacer(),
-                                          IconButton.filledTonal(
-                                            onPressed: () => _removePhotoAt(_selectedPhotoIndex),
-                                            icon: const Icon(Icons.delete_outline_rounded, size: 20),
-                                            style: IconButton.styleFrom(
-                                              backgroundColor: Colors.red.withValues(alpha: 0.8),
-                                              foregroundColor: Colors.white,
-                                            ),
-                                            tooltip: AppLocalizations.of(context)!.deletePhoto,
-                                          ),
-                                        ],
+                                  // Top-Start full screen button
+                                  PositionedDirectional(
+                                    top: 6,
+                                    start: 6,
+                                    child: IconButton(
+                                      key: const ValueKey('captured_photo_full_screen'),
+                                      onPressed: () => _openFullScreen(effectiveBranchName!),
+                                      icon: const Icon(Icons.fullscreen_rounded),
+                                      tooltip: AppLocalizations.of(context)!.viewPhotoFullScreen,
+                                      style: IconButton.styleFrom(
+                                        backgroundColor: Colors.black.withValues(alpha: 0.55),
+                                        foregroundColor: Colors.white,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
+                          ),
+                          const SizedBox(height: 6),
+                          // Actions under the photo, so they never cover the stamp.
+                          Row(
+                            children: [
+                              TextButton.icon(
+                                key: const ValueKey('captured_photo_retake'),
+                                onPressed: () => _capturePhoto(isAddingMore: false, branchName: effectiveBranchName!),
+                                icon: const Icon(Icons.refresh_rounded, size: 18),
+                                label: Text(AppLocalizations.of(context)!.retakePhoto),
+                                style: TextButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              ),
+                              const Spacer(),
+                              IconButton.filledTonal(
+                                key: const ValueKey('captured_photo_delete'),
+                                onPressed: () => _removePhotoAt(_selectedPhotoIndex),
+                                icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.red.withValues(alpha: 0.8),
+                                  foregroundColor: Colors.white,
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                tooltip: AppLocalizations.of(context)!.deletePhoto,
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 12),
 

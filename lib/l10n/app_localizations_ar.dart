@@ -2149,7 +2149,10 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get retakePhoto => 'أعد التقاط هذه الصورة';
+  String get retakePhoto => 'إعادة الالتقاط';
+
+  @override
+  String get viewPhotoFullScreen => 'عرض الصورة بحجم الشاشة';
 
   @override
   String get addAction => 'إضافة';

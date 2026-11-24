@@ -2141,7 +2141,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get retakePhoto => 'Retake this photo';
+  String get retakePhoto => 'Retake';
+
+  @override
+  String get viewPhotoFullScreen => 'View full screen';
 
   @override
   String get addAction => 'Add';
