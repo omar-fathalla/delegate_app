@@ -755,31 +755,29 @@ service cloud.firestore {
         || ownsDelegateId(resource.data.get('uid', ''))
         // TAS-242: staff branches (users/{uid} reads) only for staff tokens,
         // so a delegate's deny is decided by a rule, not the budget.
-        || (staffToken() && (
-          staffRole() in [
-            'super-admin', 'super_admin', 'superadmin', 'superAdmin',
-            'technical_support', 'technical-support', 'technicalSupport',
-            'technicalsupport', 'tech_support', 'techsupport'
-          ]
-          || (staffRole() in [
-            'organization-admin', 'organization_admin', 'organizationAdmin',
-            'organizationadmin', 'org-admin',
-            'marketing', 'marketing_promotion', 'marketingPromotion', 'marketingpromotion'
-          ] && resource.data.organizationUID == callerOrg())
-          // TAS-266: org-wide branches-marketing manager (no companyUID).
-          || (staffRole() in [
-            'branches_marketing', 'branches_marketing_manager', 'branchesMarketingManager',
-            'branches-marketing', 'branches-marketing-manager', 'branchesmarketingmanager'
-          ] && callerCompany() == '' && resource.data.organizationUID == callerOrg())
-          || (staffRole() in [
-            'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
-            'hr', 'company-hr', 'company_hr', 'human_resources',
-            'accountant', 'accounting', 'account_admin', 'branches_marketing',
-            'branches_marketing_manager', 'branchesMarketingManager',
-            'branches-marketing', 'branches-marketing-manager', 'branchesmarketingmanager'
-          ] && resource.data.companyUID == callerCompany())
-        ))
+        // TAS-108: one users/{uid} get (cgDelegateStaffReadOk) instead of a
+        // staffRole()/callerOrg()/callerCompany() call per branch, so a
+        // company admin listing a sister company's nested delegates is
+        // denied by the company check, not by the 1000-expression budget.
+        || (staffToken() && cgDelegateStaffReadOk())
       );
+    }
+
+    function cgDelegateStaffReadOk() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let uOrg = u.get('organizationUID', '');
+      let uCo = u.get('companyUID', '');
+      let org = uOrg is string && uOrg != '' ? uOrg : request.auth.token.get('orgId', '');
+      let co = uCo is string && uCo != '' ? uCo : request.auth.token.get('companyId', '');
+      let bm = ['branches_marketing', 'branches_marketing_manager', 'branchesMarketingManager',
+        'branches-marketing', 'branches-marketing-manager', 'branchesmarketingmanager'];
+      return r in staffRoleListGlobal()
+        || ((r in staffRoleListOrg() || r == 'org-admin')
+          && org != '' && resource.data.organizationUID == org)
+        // TAS-266: org-wide branches-marketing manager (no companyUID).
+        || (r in bm && co == '' && org != '' && resource.data.organizationUID == org)
+        || (r in staffRoleListCompany() && co != '' && resource.data.companyUID == co);
     }
 
     // TAS-108: a nested delete is decided by the nested match; the
