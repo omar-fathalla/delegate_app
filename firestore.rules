@@ -837,6 +837,42 @@ service cloud.firestore {
           'hr', 'company-hr', 'company_hr', 'human_resources']);
     }
 
+    // TAS-67: staff reads of requests (nested list and collection group).
+    // Same principals as canManageNestedDelegate / isGlobalStaff +
+    // isOrgScopedStaff + isCompanyScopedStaff, but one users/{uid} get: the
+    // old chain of roleIs() calls ran out of the 1000-expression budget on
+    // the admin web's requests queries (status in [...], actionType in [...]).
+    function staffRequestScope() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let org = u.get('organizationUID', '');
+      let co = u.get('companyUID', '');
+      return {
+        'global': r in staffRoleListGlobal(),
+        'org': (r in staffRoleListOrg() || r == 'org-admin')
+          ? (org is string && org != '' ? org : request.auth.token.get('orgId', ''))
+          : '',
+        'company': r in staffRoleListCompany()
+          ? (co is string && co != '' ? co : request.auth.token.get('companyId', ''))
+          : ''
+      };
+    }
+
+    function nestedRequestStaffReadOk(orgId, compId) {
+      let s = staffRequestScope();
+      return s.global
+        || (s.org != '' && s.org == orgId)
+        || (s.company != '' && s.company == compId);
+    }
+
+    function cgRequestStaffReadOk() {
+      let s = staffRequestScope();
+      let d = resource.data;
+      return s.global
+        || (s.org != '' && d.get('organizationUID', d.get('organizationId', '')) == s.org)
+        || (s.company != '' && d.get('companyUID', d.get('companyId', '')) == s.company);
+    }
+
     function canManageNestedDelegate(orgId, compId) {
       return isGlobalStaff()
         || (isOrgScopedStaff() && callerOrg() == orgId)
@@ -1515,8 +1551,9 @@ service cloud.firestore {
         }
 
         match /requests/{requestId} {
+          // TAS-67: a delegate token never walks the users/{uid} branch.
           allow read: if signedIn() && (
-            isGlobalStaff() || canManageNestedDelegate(orgId, compId) || delegateInCompany(compId)
+            staffToken() ? nestedRequestStaffReadOk(orgId, compId) : delegateInCompany(compId)
           );
           // Same principals as canManageNestedDelegate, one users read (TAS-45).
           allow create, update, delete: if staffToken() && staffTargetOk(orgId, compId, true);
@@ -2041,7 +2078,9 @@ service cloud.firestore {
     }
 
     match /{path=**}/requests/{requestId} {
-      allow read: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped()));
+      // TAS-67: one users/{uid} get (cgRequestStaffReadOk); delegates have
+      // no collection-group read here, as before.
+      allow read: if signedIn() && staffToken() && cgRequestStaffReadOk();
       // TAS-45: no write here. It checked only the incoming data, so staff
       // could overwrite another company's request by putting their own
       // companyUID in it. Writes go through the nested requests rule.

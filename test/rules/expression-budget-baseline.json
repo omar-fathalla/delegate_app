@@ -10,6 +10,7 @@
   "qa-hold-reads.test.js": 2,
   "staff-privileged-doc-reupload.test.js": 4,
   "suspend-login-penalties.test.js": 10,
+  "tas67-admin-web-queries.test.js": 1,
   "users-nationalid-client-lock.test.js": 7,
   "users-p0.test.js": 20,
   "ut-nonblocking-fixes.test.js": 2
