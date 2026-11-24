@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,7 @@ import 'package:delegate_app/features/profile/presentation/widgets/totp_enrollme
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
+import 'package:delegate_app/features/profile/data/staff_contact_api.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 
 import '../../../../l10n/app_localizations.dart';
@@ -139,6 +141,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         setState(() {
           _firestoreUserData = data;
         });
+
+        // TAS-49: copy a confirmed new Auth email into users/{uid}.
+        if (!isDelegateProfile &&
+            staffEmailNeedsSync(FirebaseAuth.instance.currentUser?.email, data['email'])) {
+          StaffContactApi().syncEmail().catchError((Object _) {});
+        }
 
         // Synchronize local cache if applicable
         if (_delegate is DelegateModel) {
@@ -1224,114 +1232,141 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
       final isName = widget.fieldType == 'name';
       final isEmail = widget.fieldType == 'email';
 
-      final db = FirebaseFirestore.instance;
       final fbUser = FirebaseAuth.instance.currentUser;
+      var storedValue = newValue;
 
-      // Determine effective user doc id
-      String? effectiveDocId = widget.firestoreData?['uid'] ?? widget.delegate?.uid;
+      if (isEmail) {
+        // TAS-49: the email changes in Firebase Auth only after the user
+        // confirms it from the link; the profile then copies it into
+        // users/{uid} (staffEmailNeedsSync + updateOwnStaffContact).
+        if (fbUser == null) throw Exception('سجّل الدخول من جديد.');
+        await fbUser.verifyBeforeUpdateEmail(newValue);
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('اتبعت رابط تأكيد على الإيميل الجديد. الإيميل هيتغيّر بعد ما تفتح الرابط.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
 
-      // 1. Update direct doc in users if known
-      if (effectiveDocId != null && effectiveDocId.isNotEmpty && effectiveDocId != 'super-admin-login') {
-        final docRef = db.collection('users').doc(effectiveDocId);
-        final docSnap = await docRef.get();
-        if (docSnap.exists) {
+      if (!isName) {
+        // TAS-49: phone goes through the server (uniqueness check). Other
+        // users' docs and delegate docs are no longer rewritten from here.
+        storedValue = await StaffContactApi().updatePhone(newValue);
+      } else {
+        final db = FirebaseFirestore.instance;
+        final fbUser = FirebaseAuth.instance.currentUser;
+
+        // Determine effective user doc id
+        String? effectiveDocId = widget.firestoreData?['uid'] ?? widget.delegate?.uid;
+
+        // 1. Update direct doc in users if known
+        if (effectiveDocId != null && effectiveDocId.isNotEmpty && effectiveDocId != 'super-admin-login') {
+          final docRef = db.collection('users').doc(effectiveDocId);
+          final docSnap = await docRef.get();
+          if (docSnap.exists) {
+            if (isName) {
+              await docRef.set({
+                'displayName': newValue,
+                'fullName': newValue,
+                'name': newValue,
+                'updatedAt': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+            } else {
+              final fieldName = isEmail ? 'email' : 'phoneNumber';
+              await docRef.set({
+                fieldName: newValue,
+                'updatedAt': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+            }
+          }
+        }
+
+        // 2. Query users collection by phone / email to ensure complete sync
+        // Skip for delegates: users-list queries are unprovable and denied.
+        final phone = widget.firestoreData?['phoneNumber'] ?? widget.delegate?.phoneNumber;
+        final email = widget.firestoreData?['email'] ?? widget.delegate?.email;
+
+        final queryDocs = <DocumentReference>[];
+        final isDelegateUpdate = widget.delegate?.role == UserRole.delegate;
+        if (!isDelegateUpdate && phone != null && phone.isNotEmpty) {
+          final q = await db.collection('users').where('phoneNumber', isEqualTo: phone).get();
+          queryDocs.addAll(q.docs.map((d) => d.reference));
+        }
+        if (!isDelegateUpdate && email != null && email.isNotEmpty) {
+          final q = await db.collection('users').where('email', isEqualTo: email).get();
+          queryDocs.addAll(q.docs.map((d) => d.reference));
+        }
+
+        for (final ref in queryDocs) {
+          if (ref.id != effectiveDocId) {
+            if (isName) {
+              await ref.set({
+                'displayName': newValue,
+                'fullName': newValue,
+                'name': newValue,
+                'updatedAt': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+            } else {
+              final fieldName = isEmail ? 'email' : 'phoneNumber';
+              await ref.set({
+                fieldName: newValue,
+                'updatedAt': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+            }
+          }
+        }
+
+        // 3. Update delegates collection if applicable
+        if (phone != null && phone.isNotEmpty) {
+          final delegateQuery = await db
+              .collectionGroup('delegates')
+              .where('phoneNumber', isEqualTo: phone)
+              .get();
+          for (final dDoc in delegateQuery.docs) {
+            if (isName) {
+              final names = newValue.split(RegExp(r'\s+'));
+              final firstName = names.isNotEmpty ? names.first : newValue;
+              final lastName = names.length > 1 ? names.last : '';
+              final secondName = names.length > 2 ? names[1] : '';
+              final thirdName = names.length > 3 ? names[2] : '';
+              await dDoc.reference.update({
+                'fullName': newValue,
+                'firstName': firstName,
+                'secondName': secondName,
+                'thirdName': thirdName,
+                'lastName': lastName,
+                'updatedAt': FieldValue.serverTimestamp(),
+              });
+            } else {
+              final fieldName = isEmail ? 'email' : 'phoneNumber';
+              await dDoc.reference.update({
+                fieldName: newValue,
+                'updatedAt': FieldValue.serverTimestamp(),
+              });
+            }
+          }
+        }
+
+        // 4. Update Firebase Auth if applicable
+        if (fbUser != null) {
           if (isName) {
-            await docRef.set({
-              'displayName': newValue,
-              'fullName': newValue,
-              'name': newValue,
-              'updatedAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
-          } else {
-            final fieldName = isEmail ? 'email' : 'phoneNumber';
-            await docRef.set({
-              fieldName: newValue,
-              'updatedAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
+            try {
+              await fbUser.updateDisplayName(newValue);
+            } catch (_) {}
+          } else if (isEmail) {
+            try {
+              await fbUser.verifyBeforeUpdateEmail(newValue);
+            } catch (_) {}
           }
         }
       }
 
-      // 2. Query users collection by phone / email to ensure complete sync
-      // Skip for delegates: users-list queries are unprovable and denied.
-      final phone = widget.firestoreData?['phoneNumber'] ?? widget.delegate?.phoneNumber;
-      final email = widget.firestoreData?['email'] ?? widget.delegate?.email;
-
-      final queryDocs = <DocumentReference>[];
-      final isDelegateUpdate = widget.delegate?.role == UserRole.delegate;
-      if (!isDelegateUpdate && phone != null && phone.isNotEmpty) {
-        final q = await db.collection('users').where('phoneNumber', isEqualTo: phone).get();
-        queryDocs.addAll(q.docs.map((d) => d.reference));
-      }
-      if (!isDelegateUpdate && email != null && email.isNotEmpty) {
-        final q = await db.collection('users').where('email', isEqualTo: email).get();
-        queryDocs.addAll(q.docs.map((d) => d.reference));
-      }
-
-      for (final ref in queryDocs) {
-        if (ref.id != effectiveDocId) {
-          if (isName) {
-            await ref.set({
-              'displayName': newValue,
-              'fullName': newValue,
-              'name': newValue,
-              'updatedAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
-          } else {
-            final fieldName = isEmail ? 'email' : 'phoneNumber';
-            await ref.set({
-              fieldName: newValue,
-              'updatedAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
-          }
-        }
-      }
-
-      // 3. Update delegates collection if applicable
-      if (phone != null && phone.isNotEmpty) {
-        final delegateQuery = await db
-            .collectionGroup('delegates')
-            .where('phoneNumber', isEqualTo: phone)
-            .get();
-        for (final dDoc in delegateQuery.docs) {
-          if (isName) {
-            final names = newValue.split(RegExp(r'\s+'));
-            final firstName = names.isNotEmpty ? names.first : newValue;
-            final lastName = names.length > 1 ? names.last : '';
-            final secondName = names.length > 2 ? names[1] : '';
-            final thirdName = names.length > 3 ? names[2] : '';
-            await dDoc.reference.update({
-              'fullName': newValue,
-              'firstName': firstName,
-              'secondName': secondName,
-              'thirdName': thirdName,
-              'lastName': lastName,
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-          } else {
-            final fieldName = isEmail ? 'email' : 'phoneNumber';
-            await dDoc.reference.update({
-              fieldName: newValue,
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-          }
-        }
-      }
-
-      // 4. Update Firebase Auth if applicable
-      if (fbUser != null) {
-        if (isName) {
-          try {
-            await fbUser.updateDisplayName(newValue);
-          } catch (_) {}
-        } else if (isEmail) {
-          try {
-            await fbUser.verifyBeforeUpdateEmail(newValue);
-          } catch (_) {}
-        }
-      }
-
-      widget.onUpdated?.call(widget.fieldType, newValue);
+      widget.onUpdated?.call(widget.fieldType, storedValue);
 
       if (mounted) {
         Navigator.pop(context);
@@ -1356,7 +1391,9 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ حدث خطأ أثناء التحديث: ${e.toString().replaceAll('Exception: ', '')}'),
+            content: Text(e is FirebaseFunctionsException
+                ? staffContactErrorMessage(e)
+                : '❌ حدث خطأ أثناء التحديث: ${e.toString().replaceAll('Exception: ', '')}'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),

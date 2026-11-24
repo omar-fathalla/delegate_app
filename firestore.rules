@@ -1358,7 +1358,8 @@ service cloud.firestore {
       let selfCreate = request.auth.uid == request.resource.id
         && nr in ['delegate', '']
         && d.get('uid', request.auth.uid) == request.auth.uid
-        && !d.keys().hasAny(['status', 'organizationUID', 'companyUID', 'organizationId', 'companyId', 'isActive'])
+        && !d.keys().hasAny(['status', 'organizationUID', 'companyUID', 'organizationId', 'companyId', 'isActive',
+          'phoneNumber', 'phone', 'email'])
         && !d.keys().hasAny(privilegeKeys())
         && !isPrivilegedRoleStr(nr);
       return usersIdentityClientLocked(d.keys())
@@ -1423,8 +1424,12 @@ service cloud.firestore {
         && staffMaySetUserStatus(d, old, changed, r)
         && (!changed.hasAny(['role', 'organizationUID', 'companyUID', 'organizationId', 'companyId']) || companyPinned(d))
         && (
+          // TAS-49: phone and email are not self-editable. Rules match a
+          // user to their own records and notifications by them, so a
+          // self-edit to someone else's number handed over that person's
+          // data. Staff change them through updateOwnStaffContact.
           (request.auth.uid == userId
-            && !changed.hasAny(escalationKeys().concat(['isActive']))) ||
+            && !changed.hasAny(escalationKeys().concat(['isActive', 'phoneNumber', 'phone', 'email']))) ||
           (request.auth.uid != userId
             && !isPrivilegedRoleStr(or) && !isPrivilegedRoleStr(nr)
             && (
