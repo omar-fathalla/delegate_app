@@ -21,6 +21,7 @@ import 'package:delegate_app/core/security/delegate_status_policy.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_hold_access.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/delete_delegate_request_sheet.dart';
 import 'package:delegate_app/features/admin/presentation/pages/edit_delegate_profile_screen.dart';
+import 'package:delegate_app/features/penalties/presentation/widgets/supervisor_penalty_sheet.dart';
 
 class AdminDelegatesScreen extends StatelessWidget {
   final Delegate adminDelegate;
@@ -1530,6 +1531,38 @@ class _CompactDelegateTile extends StatelessWidget {
           )
         : null;
 
+    // TAS-320: supervisor delegate adds a penalty on a delegate of its company.
+    final canAddPenalty = SupervisorPenaltySheet.canAdd(
+      viewer: adminDelegate,
+      target: delegate,
+    );
+    final penaltyBtn = canAddPenalty
+        ? _buildActionPill(
+            context: context,
+            icon: const Icon(Icons.gavel_rounded),
+            label: 'إضافة جزاء',
+            backgroundColor: theme.colorScheme.error.withValues(
+              alpha: isDark ? 0.22 : 0.10,
+            ),
+            borderColor: theme.colorScheme.error.withValues(alpha: 0.4),
+            foregroundColor: theme.colorScheme.error,
+            tooltip: 'تسجيل جزاء على المندوب، ويتخصم من المرتب',
+            height: 30,
+            width: 104,
+            fontSize: 10.5,
+            onPressed: () async {
+              final result = await SupervisorPenaltySheet.show(
+                context,
+                delegate: delegate,
+                supervisor: adminDelegate!,
+              );
+              if (result == true) {
+                onRefresh?.call();
+              }
+            },
+          )
+        : null;
+
     // 3. Force Logout Button (SuperAdmin only)
     final logoutBtn = isSuperAdmin
         ? _buildActionPill(
@@ -1579,6 +1612,7 @@ class _CompactDelegateTile extends StatelessWidget {
     final extras = <Widget>[
       ?editBtn,
       if (canRequestDelete) ?deleteRequestBtn,
+      if (canAddPenalty) ?penaltyBtn,
       if (isSuperAdmin) ?logoutBtn,
       if (_showHoldControl) ?holdBtn,
     ];
