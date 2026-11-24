@@ -119,7 +119,12 @@ export function decideClaim(
   expiresAtMs: number | null,
 ): Decision {
   if (!invite) return {ok: false, reason: "invite_not_found"};
-  if (!user.emailVerified) return {ok: false, reason: "email_not_verified"};
+  // TAS-68 (option A): the invite link only reaches the invited mailbox, and
+  // the signed-in email must equal the invite's email, so holding the link
+  // proves the email. finish-signup creates the account with a password, so
+  // the email is never verified at claim time. user.emailVerified is kept in
+  // the signature for callers but no longer blocks the claim.
+  void user.emailVerified;
   if (invite.claimedBy || invite.claimedByUid || invite.claimedAt) {
     return {ok: false, reason: "invite_already_claimed"};
   }

@@ -74,7 +74,8 @@ test("claimInvite checks", () => {
   const inv = {email: "A@x.com", roleToAssign: "company-admin", organizationId: "o", companyId: "c", status: "pending"};
   const u = {email: "a@x.com", emailVerified: true};
   assert.deepEqual(L.decideClaim(inv, u, 1, 2), {ok: true});
-  assert.equal(L.decideClaim(inv, {...u, emailVerified: false}, 1, 2).reason, "email_not_verified");
+  // TAS-68: the invite link proves the email; an unverified email may claim.
+  assert.equal(L.decideClaim(inv, {...u, emailVerified: false}, 1, 2).ok, true);
   assert.equal(L.decideClaim({...inv, status: "claimed"}, u, 1, 2).reason, "invite_not_pending");
   assert.equal(L.decideClaim(inv, u, 3, 2).reason, "invite_expired");
   assert.equal(L.decideClaim(inv, {...u, email: "b@x.com"}, 1, 2).reason, "email_mismatch");
