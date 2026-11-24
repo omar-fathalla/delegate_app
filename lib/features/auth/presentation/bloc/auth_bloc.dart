@@ -462,16 +462,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
     onCached(delegate);
 
-    // 0. A cached delegate with no Firebase user can read nothing and every
+    // 0. A cached session with no Firebase user can read nothing and every
     // write is permission-denied (TAS-286). Send them to sign in again.
-    if (delegate.role == UserRole.delegate) {
-      final check = hasAuthUser;
-      if (check != null && !await check()) {
-        return const _AutoLoginDecision(
-          AuthUnauthenticated(message: sessionLostMessage),
-          logout: true,
-        );
-      }
+    // TAS-300: staff too (a company supervisor hit «خطأ في الصلاحيات» on
+    // photo permissions with an empty list): every staff account signs in to
+    // Firebase with email + password, so a missing user is a lost session.
+    final check = hasAuthUser;
+    if (check != null && !await check()) {
+      return const _AutoLoginDecision(
+        AuthUnauthenticated(message: sessionLostMessage),
+        logout: true,
+      );
     }
 
     // 1. فحص إبطال الجلسة أو الخروج الإجباري من الإدارة

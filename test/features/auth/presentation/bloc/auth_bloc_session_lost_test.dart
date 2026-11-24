@@ -147,10 +147,22 @@ void main() {
       verifyNever(() => logout(any()));
     });
 
-    test('staff roles are not affected by the check', () async {
+    // TAS-300: a cached staff session with no Firebase user is lost too.
+    test('cached staff with no Firebase user goes back to login', () async {
       final staff = tStaff;
       when(() => checkAutoLogin(any())).thenAnswer((_) async => Right(staff));
       final states = await run(build(hasAuthUser: () async => false));
+      expect(
+        states.last,
+        const AuthUnauthenticated(message: AuthBloc.sessionLostMessage),
+      );
+      verify(() => logout(any())).called(1);
+    });
+
+    test('cached staff with a Firebase user stays signed in', () async {
+      final staff = tStaff;
+      when(() => checkAutoLogin(any())).thenAnswer((_) async => Right(staff));
+      final states = await run(build(hasAuthUser: () async => true));
       expect(states.last, AuthAuthenticated(delegate: staff));
       verifyNever(() => logout(any()));
     });
