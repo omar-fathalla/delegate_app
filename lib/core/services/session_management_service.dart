@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'package:delegate_app/core/services/firestore_session_subscriptions.dart';
@@ -102,10 +103,37 @@ class SessionManagementService {
     return sub;
   }
 
+  /// TAS-273: when this device's session started. A forced logout applies
+  /// only to sessions that started before it. `delegate.createdAt` is the
+  /// oldest copy's creation date, so comparing with it logged the delegate
+  /// out on every launch, forever. Firebase Auth's last sign-in time moves
+  /// on every login (delegateLoginV2 custom token / staff password).
+  static DateTime sessionStartedAt(Delegate delegate, {DateTime? authLastSignIn}) {
+    return authLastSignIn ?? delegate.createdAt;
+  }
+
+  /// TAS-273: true when a reset stamp lands after this session started.
+  static bool forceLogoutApplies(DateTime? resetAt, DateTime sessionStart) {
+    return resetAt != null && resetAt.isAfter(sessionStart);
+  }
+
+  static DateTime? _authLastSignIn() {
+    try {
+      return FirebaseAuth.instance.currentUser?.metadata.lastSignInTime;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// فحص صلاحية جلسة المندوب المسجل محلياً
   static Future<SessionVerificationResult> checkSessionStatus({
     required Delegate delegate,
+    DateTime? authLastSignIn,
   }) async {
+    final sessionStart = sessionStartedAt(
+      delegate,
+      authLastSignIn: authLastSignIn ?? _authLastSignIn(),
+    );
     // الرتب الإدارية والمشرفون لا ينطبق عليهم خروج المناديب الإجباري
     if (delegate.role != UserRole.delegate) {
       return const SessionVerificationResult.valid();
@@ -129,9 +157,8 @@ class SessionManagementService {
           final gData = globalConfigDoc.data()!;
           final globalResetAt = gData['globalForceLogoutBefore'] as Timestamp?;
           if (globalResetAt != null) {
-            // إذا تم تفعيل إعادة التعيين العام بعد وقت إنشاء الجلسة، الجلسة ملغاة
-            final sessionCreatedAt = delegate.createdAt;
-            if (globalResetAt.toDate().isAfter(sessionCreatedAt)) {
+            // إذا تم تفعيل إعادة التعيين العام بعد بداية الجلسة، الجلسة ملغاة
+            if (forceLogoutApplies(globalResetAt.toDate(), sessionStart)) {
               return SessionVerificationResult.invalid(
                 reason: gData['reason'] as String? ??
                     'تم إنهاء الجلسة بواسطة الإدارة لتحديث عام في النظام. يُرجى تسجيل الدخول مجدداً.',
@@ -180,8 +207,7 @@ class SessionManagementService {
             final compData = companyDoc.data()!;
             final compResetAt = compData['delegatesForceLogoutAt'] as Timestamp?;
             if (compResetAt != null) {
-              final sessionCreatedAt = delegate.createdAt;
-              if (compResetAt.toDate().isAfter(sessionCreatedAt)) {
+              if (forceLogoutApplies(compResetAt.toDate(), sessionStart)) {
                 return SessionVerificationResult.invalid(
                   reason: compData['forceLogoutReason'] as String? ??
                       'تم إنهاء جلسات مناديب الشركة لتحديث البيانات. يُرجى تسجيل الدخول برقم الهاتف والرقم القومي.',
