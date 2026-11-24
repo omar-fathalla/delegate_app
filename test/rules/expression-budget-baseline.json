@@ -3,7 +3,7 @@
   "delegate-profile-edit.test.js": 3,
   "delegate-source-lock.test.js": 19,
   "delegate-status-guards.test.js": 20,
-  "docs-pending.test.js": 22,
+  "docs-pending.test.js": 18,
   "firestore.rules.test.js": 20,
   "hr-web-company-reads.test.js": 6,
   "m31-delegate-own-reads.test.js": 5,
