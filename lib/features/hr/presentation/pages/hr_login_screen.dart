@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/widgets/organization_selector_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -579,56 +580,51 @@ class _HrLoginScreenState extends State<HrLoginScreen>
       isDismissible: false,
       enableDrag: false,
       builder: (sheetContext) {
-        return Container(
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(HrRadius.pill)),
+        final sorted = sortedByOrganizationName(
+          delegates,
+          (Delegate d) => d.organizationName,
+        );
+        return OrganizationSelectorSheet(
+          topRadius: HrRadius.pill,
+          itemCount: sorted.length,
+          itemBuilder: (_, i) => _buildOrgCard(
+            blocContext,
+            sheetContext: sheetContext,
+            delegate: sorted[i],
+            rememberMe: rememberMe,
           ),
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+          header: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 20),
-              Text(
-                isArabic ? 'اختر المنظمة' : 'Select Organization',
-                style: TextStyle(
-                  fontSize: HrFont.titleLarge,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              isArabic ? 'اختر المنظمة' : 'Select Organization',
+              style: TextStyle(
+                fontSize: HrFont.titleLarge,
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
               ),
-              const SizedBox(height: 8),
-              Text(
-                isArabic
-                    ? 'أنت مسجل في أكثر من منظمة. اختر للمتابعة.'
-                    : 'You are registered in multiple organizations.',
-                style: TextStyle(
-                  fontSize: HrFont.body,
-                  color: colorScheme.onSurfaceVariant,
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isArabic
+                  ? 'أنت مسجل في أكثر من منظمة. اختر للمتابعة.'
+                  : 'You are registered in multiple organizations.',
+              style: TextStyle(
+                fontSize: HrFont.body,
+                color: colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(height: 16),
-              ...delegates.map(
-                (delegate) => _buildOrgCard(
-                  blocContext,
-                  sheetContext: sheetContext,
-                  delegate: delegate,
-                  rememberMe: rememberMe,
-                ),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+          ],
         );
       },
     );
