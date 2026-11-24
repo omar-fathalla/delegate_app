@@ -40,6 +40,8 @@ dependencies:
   collection: ^1.18.0
   dartz: ^0.10.1
   firebase_core: ^4.15.2
+  # TAS-16: monitoring mode only; keep on the same FlutterFire release as firebase_core.
+  firebase_app_check: ^0.4.9
   cloud_firestore: ^6.10.2
   cloud_functions: ^6.2.0
   firebase_auth: ^6.7.1
