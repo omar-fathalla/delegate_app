@@ -1,5 +1,6 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
+import {storeDelegateClaims} from "./ensure_auth_user";
 import {
   DelegateCandidate,
   OTP_ENFORCEMENT_DOC,
@@ -199,7 +200,9 @@ async function handleDelegateLogin(data: unknown): Promise<{ token: string; dele
   }
 
   try {
-    await admin.auth().setCustomUserClaims(uid, claims);
+    // TAS-303: create the Auth user on the first login so the claims are
+    // stored on it, not only in this session's custom token.
+    await storeDelegateClaims(admin.auth(), uid, claims);
   } catch (error) {
     console.error("delegateLoginV2 claims update failed", decision.primary.id);
   }
