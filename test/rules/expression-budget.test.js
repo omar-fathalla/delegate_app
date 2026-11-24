@@ -104,8 +104,8 @@ describe("expression budget headroom (TAS-105)", () => {
   // Each guard keeps a margin of 5 below the measured lower bound. TAS-108
   // (delegates) should raise its PAD once the rule is cheaper.
   const DELEGATE_PAD = Number(process.env.RULES_BUDGET_PAD_DELEGATES || 35);
-  const ATTENDANCE_PAD = Number(process.env.RULES_BUDGET_PAD_ATTENDANCE || 20);
-  const TASKS_PAD = Number(process.env.RULES_BUDGET_PAD_TASKS || 15);
+  const ATTENDANCE_PAD = Number(process.env.RULES_BUDGET_PAD_ATTENDANCE || 150);
+  const TASKS_PAD = Number(process.env.RULES_BUDGET_PAD_TASKS || 150);
 
   // Worst ALLOW in docs-pending.test.js: delegate self-update with 8 approved
   // entries, photo re-upload backing entry moved to slot 7, on the top-level
