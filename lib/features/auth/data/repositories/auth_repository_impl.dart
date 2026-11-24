@@ -67,6 +67,24 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, List<Delegate>>> refreshDelegateProfiles(
+    String phoneNumber,
+  ) async {
+    try {
+      final delegates = await remoteDataSource.refreshDelegateProfiles(phoneNumber);
+      return Right(delegates
+          .where((d) =>
+              d.status != DelegateStatus.suspended &&
+              d.status != DelegateStatus.rejected)
+          .toList());
+    } on Failure catch (failure) {
+      return Left(failure);
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<Delegate>>> getDelegatesByPhone(
     String phoneNumber,
   ) async {

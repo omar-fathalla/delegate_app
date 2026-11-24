@@ -14,6 +14,11 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   String? lastPhoneNumber;
   int callCount = 0;
 
+  List<DelegateModel> refreshResult = const [];
+
+  @override
+  Future<List<DelegateModel>> refreshDelegateProfiles(String phoneNumber) async => refreshResult;
+
   @override
   Future<List<DelegateModel>> getDelegatesByPhone(String phoneNumber) {
     callCount++;
@@ -141,6 +146,24 @@ void main() {
     version: 1,
     documents: const [],
   );
+
+  // TAS-272: a delegate refreshes its own chains (staff lookup returned none).
+  group('refreshDelegateProfiles', () {
+    test('returns the delegate copies, without suspended / rejected ones', () async {
+      final suspended = tDelegateModel.copyWith(uid: '2', organizationUID: 'org2', status: DelegateStatus.suspended);
+      final rejected = tDelegateModel.copyWith(uid: '3', organizationUID: 'org3', status: DelegateStatus.rejected);
+      final other = tDelegateModel.copyWith(uid: '4', organizationUID: 'org4');
+      mockRemoteDataSource.refreshResult = [tDelegateModel, suspended, rejected, other];
+      final result = await repository.refreshDelegateProfiles(tPhoneNumber);
+      result.fold((l) => fail('Should be right'), (r) => expect(r.map((d) => d.uid), ['1', '4']));
+    });
+
+    test('an empty refresh is a valid empty list (not a failure)', () async {
+      mockRemoteDataSource.refreshResult = const [];
+      final result = await repository.refreshDelegateProfiles(tPhoneNumber);
+      expect(result.isRight(), isTrue);
+    });
+  });
 
   group('getDelegatesByPhone', () {
     test(
@@ -340,3 +363,4 @@ void main() {
     });
   });
 }
+

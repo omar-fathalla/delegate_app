@@ -13,6 +13,11 @@ abstract class AuthRepository {
   Future<Either<Failure, List<Delegate>>> getDelegatesByPhone(
     String phoneNumber,
   );
+
+  /// TAS-272: refresh a signed-in delegate's chains (active / pending only).
+  Future<Either<Failure, List<Delegate>>> refreshDelegateProfiles(
+    String phoneNumber,
+  );
   Future<Either<Failure, void>> cacheDelegate(Delegate delegate);
   Future<Either<Failure, Delegate?>> getCachedDelegate();
   Future<Either<Failure, void>> cacheAllDelegates(List<Delegate> delegates);

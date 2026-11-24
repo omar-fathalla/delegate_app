@@ -105,8 +105,13 @@ class _MainScreenState extends State<MainScreen> {
 
     // Stale-While-Revalidate: fetch latest delegates from remote to sync new chains/organizations
     if (widget.delegate.phoneNumber.isNotEmpty) {
-      final remoteResult =
-          await di.sl<AuthRepository>().getDelegatesByPhone(widget.delegate.phoneNumber);
+      // TAS-272: a delegate refreshes its own copies in every chain; the
+      // staff lookup returned nothing for delegates, so new chains never
+      // showed up until a re-login.
+      final repo = di.sl<AuthRepository>();
+      final remoteResult = widget.delegate.role == UserRole.delegate
+          ? await repo.refreshDelegateProfiles(widget.delegate.phoneNumber)
+          : await repo.getDelegatesByPhone(widget.delegate.phoneNumber);
       remoteResult.fold((_) {}, (latestDelegates) {
         if (latestDelegates.isNotEmpty) {
           di.sl<AuthRepository>().cacheAllDelegates(latestDelegates);

@@ -20,6 +20,12 @@ abstract class AuthRemoteDataSource {
   /// Delegate credential login uses [loginDelegate] and does not call this.
   Future<List<DelegateModel>> getDelegatesByPhone(String phoneNumber);
 
+  /// TAS-272: a signed-in delegate's own copies in every chain (the same
+  /// collectionGroup('delegates') phone query as login; the rules allow it
+  /// for the phones in the delegate token). Used to refresh the
+  /// «تبديل المنظمة» list, which [getDelegatesByPhone] (staff only) never did.
+  Future<List<DelegateModel>> refreshDelegateProfiles(String phoneNumber);
+
   /// Verifies phone + national ID with `delegateLoginV2`, then signs in with
   /// the returned custom token. Does not compare the national ID on the device.
   Future<List<DelegateModel>> loginDelegate({
@@ -324,6 +330,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
 
     return delegatesMap.values.toList();
+  }
+
+  @override
+  Future<List<DelegateModel>> refreshDelegateProfiles(String phoneNumber) {
+    return _loadDelegateModelsByPhone(_normalizePhone(phoneNumber));
   }
 
   @override
