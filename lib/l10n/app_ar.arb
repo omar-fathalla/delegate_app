@@ -1581,6 +1581,7 @@
   "delegateCommentField": "تعليق المندوب",
   "cameraOpenFailed": "تعذّر فتح الكاميرا: {error}",
   "photoRemovedFromSession": "تم حذف الصورة",
+  "photoStampFailed": "تعذّر كتابة التاريخ والفرع على الصورة، وستُرفع الصورة من غيرهم.",
   "offerPhotosSupervisor": "تصوير العروض (مشرف)",
   "photosSavedOffline": "حُفظت {count} صور على الجهاز، وستُرفع تلقائيًا عند الاتصال بالإنترنت.",
   "photosUploaded": "تم رفع {count} صور وحفظ التقرير.",

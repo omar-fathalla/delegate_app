@@ -2048,6 +2048,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get photoRemovedFromSession => 'Photo deleted';
 
   @override
+  String get photoStampFailed =>
+      'Couldn\'t add the date and branch to the photo. It will be uploaded without them.';
+
+  @override
   String get offerPhotosSupervisor => 'Offer photos (supervisor)';
 
   @override

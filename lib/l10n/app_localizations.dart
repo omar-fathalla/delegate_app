@@ -3720,6 +3720,12 @@ abstract class AppLocalizations {
   /// **'Photo deleted'**
   String get photoRemovedFromSession;
 
+  /// No description provided for @photoStampFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t add the date and branch to the photo. It will be uploaded without them.'**
+  String get photoStampFailed;
+
   /// No description provided for @offerPhotosSupervisor.
   ///
   /// In en, this message translates to:

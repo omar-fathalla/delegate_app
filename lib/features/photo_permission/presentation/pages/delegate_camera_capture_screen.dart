@@ -8,6 +8,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/widgets/app_loading_indicator.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
+import '../../data/services/photo_watermark.dart';
 import '../widgets/sync_status_banner.dart';
 import '../bloc/photo_permission_bloc.dart';
 import '../../domain/entities/photo_permission.dart';
@@ -31,7 +33,11 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
   PhotoPermission? _selectedPermission;
   String? _selectedBranchId;
   String? _selectedBranchName;
-  final List<File> _capturedPhotos = [];
+  /// TAS-302: each shot keeps the camera original, its capture time and the
+  /// stamped copy (branch + date burned in). Only stamped copies are uploaded.
+  final List<_StampedShot> _shots = [];
+  List<File> get _capturedPhotos => [for (final s in _shots) s.stamped];
+  bool _isStamping = false;
   int _selectedPhotoIndex = 0;
   final TextEditingController _commentController = TextEditingController();
   Map<String, String>? _orgBranchesMap;
@@ -99,7 +105,10 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
     super.dispose();
   }
 
-  Future<void> _capturePhoto({bool isAddingMore = true}) async {
+  Future<void> _capturePhoto({
+    bool isAddingMore = true,
+    required String branchName,
+  }) async {
     final l10n = AppLocalizations.of(context)!;
     final ImagePicker picker = ImagePicker();
     try {
@@ -112,25 +121,71 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
       );
 
       if (photo != null) {
+        // Trusted (server-calibrated) clock, shown as Cairo wall time.
+        final capturedAt = SubscriptionCycleHelper.cairoTime();
+        final original = File(photo.path);
+        setState(() => _isStamping = true);
+        final shot = await _stamp(original, capturedAt, branchName);
+        if (!mounted) return;
         setState(() {
-          final file = File(photo.path);
-          if (isAddingMore || _capturedPhotos.isEmpty) {
-            _capturedPhotos.add(file);
-            _selectedPhotoIndex = _capturedPhotos.length - 1;
+          _isStamping = false;
+          if (isAddingMore || _shots.isEmpty) {
+            _shots.add(shot);
+            _selectedPhotoIndex = _shots.length - 1;
           } else {
-            _capturedPhotos[_selectedPhotoIndex] = file;
+            _shots[_selectedPhotoIndex] = shot;
           }
         });
       }
     } catch (e) {
+      if (mounted) setState(() => _isStamping = false);
       _showErrorSnackBar(l10n.cameraOpenFailed(e));
     }
+  }
+
+  /// Burns [branchName] and [capturedAt] into [original]. If stamping fails
+  /// the original is kept (the visit is still recorded) and the user is told.
+  Future<_StampedShot> _stamp(
+    File original,
+    DateTime capturedAt,
+    String branchName,
+  ) async {
+    final display = BranchDisplayCache.instance.displayName(branchName, fallback: branchName);
+    try {
+      final stamped = await PhotoWatermark.stampFile(
+        original,
+        branchName: display,
+        capturedAt: capturedAt,
+      );
+      return _StampedShot(original, capturedAt, stamped, branchName);
+    } catch (e) {
+      debugPrint('TAS-302: photo stamp failed: $e');
+      if (mounted) {
+        _showErrorSnackBar(AppLocalizations.of(context)!.photoStampFailed);
+      }
+      return _StampedShot(original, capturedAt, original, branchName);
+    }
+  }
+
+  /// Re-stamps every shot whose stamp names another branch (the user changed
+  /// the branch after taking photos). Capture times stay as they were.
+  Future<void> _restampForBranch(String branchName) async {
+    if (_shots.every((s) => s.branchName == branchName)) return;
+    setState(() => _isStamping = true);
+    for (var i = 0; i < _shots.length; i++) {
+      final shot = _shots[i];
+      if (shot.branchName == branchName) continue;
+      final updated = await _stamp(shot.original, shot.capturedAt, branchName);
+      if (!mounted) return;
+      if (i < _shots.length && identical(_shots[i], shot)) _shots[i] = updated;
+    }
+    if (mounted) setState(() => _isStamping = false);
   }
 
   void _removePhotoAt(int index) {
     if (index < 0 || index >= _capturedPhotos.length) return;
     setState(() {
-      _capturedPhotos.removeAt(index);
+      _shots.removeAt(index);
       if (_selectedPhotoIndex >= _capturedPhotos.length) {
         _selectedPhotoIndex = _capturedPhotos.isEmpty ? 0 : _capturedPhotos.length - 1;
       }
@@ -197,7 +252,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
               ),
             );
             setState(() {
-              _capturedPhotos.clear();
+              _shots.clear();
               _selectedPhotoIndex = 0;
               _commentController.clear();
             });
@@ -229,7 +284,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
               ),
             );
             setState(() {
-              _capturedPhotos.clear();
+              _shots.clear();
               _selectedPhotoIndex = 0;
               _commentController.clear();
             });
@@ -472,10 +527,12 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                           }).toList(),
                           onChanged: (value) {
                             if (value == null) return;
+                            final name = uniqueBranches[value] ?? value;
                             setState(() {
                               _selectedBranchId = value;
-                              _selectedBranchName = uniqueBranches[value] ?? value;
+                              _selectedBranchName = name;
                             });
+                            _restampForBranch(name);
                           },
                         ),
 
@@ -485,7 +542,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                       if (effectiveBranchId != null) ...[
                         if (_capturedPhotos.isEmpty)
                           InkWell(
-                            onTap: () => _capturePhoto(isAddingMore: true),
+                            onTap: () => _capturePhoto(isAddingMore: true, branchName: effectiveBranchName!),
                             borderRadius: BorderRadius.circular(20),
                             child: Container(
                               height: 230,
@@ -532,7 +589,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                   ),
                                   const SizedBox(height: 12),
                                   FilledButton.tonalIcon(
-                                    onPressed: () => _capturePhoto(isAddingMore: true),
+                                    onPressed: () => _capturePhoto(isAddingMore: true, branchName: effectiveBranchName!),
                                     icon: const Icon(Icons.add_a_photo_rounded, size: 18),
                                     label: Text(AppLocalizations.of(context)!.takeFirstPhoto),
                                   ),
@@ -587,7 +644,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                   ),
                                 ),
                                 FilledButton.tonalIcon(
-                                  onPressed: () => _capturePhoto(isAddingMore: true),
+                                  onPressed: () => _capturePhoto(isAddingMore: true, branchName: effectiveBranchName!),
                                   icon: const Icon(Icons.add_a_photo_rounded, size: 18),
                                   label: Text(AppLocalizations.of(context)!.addPhoto),
                                   style: FilledButton.styleFrom(
@@ -674,7 +731,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                       child: Row(
                                         children: [
                                           TextButton.icon(
-                                            onPressed: () => _capturePhoto(isAddingMore: false),
+                                            onPressed: () => _capturePhoto(isAddingMore: false, branchName: effectiveBranchName!),
                                             icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 18),
                                             label: Text(
                                               AppLocalizations.of(context)!.retakePhoto,
@@ -720,7 +777,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                 if (index == _capturedPhotos.length) {
                                   // Add photo thumbnail card
                                   return InkWell(
-                                    onTap: () => _capturePhoto(isAddingMore: true),
+                                    onTap: () => _capturePhoto(isAddingMore: true, branchName: effectiveBranchName!),
                                     borderRadius: BorderRadius.circular(14),
                                     child: Container(
                                       width: 70,
@@ -909,7 +966,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                             )
                           else
                             ElevatedButton.icon(
-                              onPressed: () {
+                              onPressed: _isStamping ? null : () async {
                                 final currentPerm = _selectedPermission ?? availablePermissions.first;
                                 final orgUID = currentPerm.organizationUID.isNotEmpty
                                     ? currentPerm.organizationUID
@@ -937,6 +994,10 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                   _showErrorSnackBar(AppLocalizations.of(context)!.takeAtLeastOnePhoto);
                                   return;
                                 }
+
+                                // TAS-302: every uploaded photo must carry the branch it is sent for.
+                                await _restampForBranch(finalBranchName);
+                                if (!context.mounted || _capturedPhotos.isEmpty) return;
 
                                 context.read<PhotoPermissionBloc>().add(
                                       UploadBatchPhotosRequested(
@@ -1064,4 +1125,13 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
       ),
     );
   }
+}
+
+/// TAS-302: one captured photo and its stamped copy.
+class _StampedShot {
+  final File original;
+  final DateTime capturedAt;
+  final File stamped;
+  final String branchName;
+  const _StampedShot(this.original, this.capturedAt, this.stamped, this.branchName);
 }

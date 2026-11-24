@@ -2056,6 +2056,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get photoRemovedFromSession => 'تم حذف الصورة';
 
   @override
+  String get photoStampFailed =>
+      'تعذّر كتابة التاريخ والفرع على الصورة، وستُرفع الصورة من غيرهم.';
+
+  @override
   String get offerPhotosSupervisor => 'تصوير العروض (مشرف)';
 
   @override
