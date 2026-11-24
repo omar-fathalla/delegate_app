@@ -86,7 +86,41 @@ class Login implements UseCase<List<Delegate>, LoginParams> {
         );
       }
 
-      return _finish(matched, params);
+      final resolved = await resolveSignedInStaff(params.phoneNumber, matched);
+      return resolved.fold(
+        (failure) async => Left(failure),
+        (delegates) => _finish(delegates, params),
+      );
+    });
+  }
+
+  /// TAS-314: true for the email-only placeholder built from the signed-out
+  /// `staffPhoneLookup` answer. It must never be cached or used as a session.
+  static bool isPendingStaffProfile(Delegate delegate) =>
+      delegate.uid.isEmpty &&
+      delegate.nationalityID.startsWith('__firebase_auth__:');
+
+  /// TAS-314: after Firebase Auth accepted the password (and the TOTP code,
+  /// when there is one), ask the lookup again as the signed-in owner to get
+  /// the role and organisation. Full profiles (an older server) pass through.
+  Future<Either<Failure, List<Delegate>>> resolveSignedInStaff(
+    String phoneNumber,
+    List<Delegate> verified,
+  ) async {
+    if (!verified.any(isPendingStaffProfile)) return Right(verified);
+    final result = await repository.getDelegatesByPhone(phoneNumber);
+    return result.fold((failure) => Left(failure), (delegates) {
+      final complete =
+          delegates.where((d) => !isPendingStaffProfile(d)).toList();
+      if (complete.isEmpty) {
+        return const Left(
+          AuthFailure(
+            'تعذر تحميل بيانات الحساب. حاول مرة أخرى.',
+            'profile_unavailable',
+          ),
+        );
+      }
+      return Right(complete);
     });
   }
 

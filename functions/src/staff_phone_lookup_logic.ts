@@ -1,8 +1,10 @@
 /**
  * Pure helpers for staffPhoneLookup.
  *
- * The callable returns only the fields the login screen needs. It does not
- * return a password, a national ID, or documents whose role is not staff.
+ * TAS-314: a signed-out caller gets the email only (Firebase Auth needs it
+ * for signInWithEmailAndPassword). The role, names and org/company fields go
+ * back only to the signed-in owner of the account. Nothing here returns a
+ * password, a national ID, or documents whose role is not staff.
  */
 
 const STAFF_WEIGHTS: Record<string, number> = {
@@ -89,6 +91,53 @@ export function publicStaffProfile(
     companyUID: text(data, ["companyUID", "companyId"]),
     companyName: text(data, ["companyName", "company_name"]),
   };
+}
+
+/** What a signed-out (or anonymous, or other) caller receives. */
+export interface MinimalStaffLookup {
+  email: string;
+}
+
+export interface LookupCaller {
+  uid: string;
+  email: string;
+  anonymous: boolean;
+}
+
+/** Caller identity from the callable context; null when signed out. */
+export function lookupCallerOf(auth: unknown): LookupCaller | null {
+  if (!auth || typeof auth !== "object") return null;
+  const a = auth as {uid?: unknown; token?: Record<string, unknown>};
+  const uid = typeof a.uid === "string" ? a.uid : "";
+  if (!uid) return null;
+  const token = a.token && typeof a.token === "object" ? a.token : {};
+  const firebase = token.firebase && typeof token.firebase === "object" ?
+    token.firebase as Record<string, unknown> : {};
+  return {
+    uid,
+    email: typeof token.email === "string" ? token.email : "",
+    anonymous: firebase.sign_in_provider === "anonymous",
+  };
+}
+
+/** True when the signed-in caller is the account the phone belongs to. */
+export function callerOwnsProfile(profile: PublicStaffProfile, caller: LookupCaller | null): boolean {
+  if (!caller || caller.anonymous) return false;
+  if (caller.uid === profile.uid) return true;
+  const a = caller.email.trim().toLowerCase();
+  return a !== "" && a === profile.email.trim().toLowerCase();
+}
+
+/**
+ * TAS-314: the response body. The owner (after password sign-in) gets the
+ * full profile; everyone else gets the email only.
+ */
+export function staffLookupResponse(
+  profile: PublicStaffProfile,
+  caller: LookupCaller | null,
+): PublicStaffProfile | MinimalStaffLookup {
+  if (callerOwnsProfile(profile, caller)) return profile;
+  return {email: profile.email};
 }
 
 export function pickStaffProfile(
