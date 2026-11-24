@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/hr/domain/payroll_penalty_policy.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -279,7 +280,7 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
         walletConfigByDelegateId[doc.id] = doc.data();
       }
 
-      // 4. Fetch Penalties approved in this month
+      // 4. Fetch Penalties issued in this month
       final penaltiesSnap = await HRMonthlyPayrollScreen._firestore
           .collection('penalties')
           .where('companyId', isEqualTo: widget.hrDelegate.companyUID)
@@ -288,8 +289,8 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
       final Map<String, List<Map<String, dynamic>>> penaltiesByDelegateId = {};
       for (final doc in penaltiesSnap.docs) {
         final data = doc.data();
-        final status = (data['status'] ?? '').toString();
-        if (status.contains('approved') || status == 'applied') {
+        // TAS-308: stored statuses are ISSUED / ACKNOWLEDGED / DEDUCTED.
+        if (isPayrollDeductiblePenaltyStatus(data['status'])) {
           final ts = data['createdAt'];
           if (ts is Timestamp) {
             final pDate = ts.toDate();
