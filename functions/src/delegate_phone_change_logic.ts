@@ -10,8 +10,14 @@
  * it to the delegate's Auth user; confirmDelegatePhoneChange() checks the
  * Auth phone is the requested one, then updates every copy at once.
  */
-import {isValidEgyptianPhone, normalizeEgyptianPhone} from "./check_delegate_duplicate_logic";
-import {nationalIdsMatch, normalizePhone, phoneQueryVariants} from "./delegate_login_logic";
+import {
+  isEgyptianMobile,
+  isUaeMobile,
+  nationalIdsMatch,
+  normalizePhone,
+  phoneQueryVariants,
+  phoneToE164,
+} from "./delegate_login_logic";
 
 export const PHONE_CHANGE_TTL_MS = 15 * 60 * 1000;
 export const PHONE_CHANGE_MAX_PER_DAY = 5;
@@ -35,9 +41,9 @@ function deny(code: DenialCode, reason: string, message: string): Denial {
   return {code, reason, message};
 }
 
-/** 01xxxxxxxxx -> +201xxxxxxxxx */
+/** 01xxxxxxxxx -> +201xxxxxxxxx, 05xxxxxxxx -> +9715xxxxxxxx (TAS-112). */
 export function toE164(local: string): string {
-  return "+2" + local;
+  return phoneToE164(local);
 }
 
 export function isDelegateToken(token: Record<string, unknown> | undefined): boolean {
@@ -53,13 +59,15 @@ export function parseRequest(data: unknown): ParsedRequest | Denial {
   const d = (typeof data === "object" && data !== null ? data : {}) as Record<string, unknown>;
   const rawPhone = typeof d.newPhone === "string" ? d.newPhone : "";
   const rawId = typeof d.nationalId === "string" ? d.nationalId : "";
-  if (!isValidEgyptianPhone(rawPhone)) {
-    return deny("invalid-argument", "bad_phone", "Enter a valid Egyptian mobile number.");
+  const phone = normalizePhone(rawPhone);
+  // User decision 2026-11-24: Egyptian or UAE mobiles.
+  if (!isEgyptianMobile(phone) && !isUaeMobile(phone)) {
+    return deny("invalid-argument", "bad_phone", "Enter a valid Egyptian or UAE mobile number.");
   }
   if (!rawId.trim()) {
     return deny("invalid-argument", "bad_national_id", "Enter your national ID.");
   }
-  return {newPhone: normalizeEgyptianPhone(rawPhone), nationalId: rawId};
+  return {newPhone: phone, nationalId: rawId};
 }
 
 export interface OwnDelegateDoc {

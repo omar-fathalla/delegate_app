@@ -2970,7 +2970,7 @@ class AppLocalizationsAr extends AppLocalizations {
       'تم تغيير رقم الموبايل. استخدم الرقم الجديد في تسجيل الدخول بعد كده.';
 
   @override
-  String get phoneChangeErrBadPhone => 'اكتب رقم موبايل مصري صحيح.';
+  String get phoneChangeErrBadPhone => 'اكتب رقم موبايل مصري أو إماراتي صحيح.';
 
   @override
   String get phoneChangeErrNationalId => 'الرقم القومي مش مطابق لبياناتك.';

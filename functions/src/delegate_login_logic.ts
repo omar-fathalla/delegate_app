@@ -109,7 +109,35 @@ export function normalizePhone(phone: string): string {
     normalized = "0" + normalized;
   }
 
+  // TAS-112 (user decision 2026-11-24): UAE mobiles are stored as
+  // 05xxxxxxxx (trunk 0, like the Egyptian 01xxxxxxxxx form).
+  if (normalized.startsWith("+971")) {
+    normalized = "0" + normalized.substring(4);
+  } else if (normalized.startsWith("00971")) {
+    normalized = "0" + normalized.substring(5);
+  } else if (normalized.startsWith("971") && normalized.length === 12) {
+    normalized = "0" + normalized.substring(3);
+  } else if (normalized.length === 9 && normalized.startsWith("5")) {
+    normalized = "0" + normalized;
+  }
+
   return normalized;
+}
+
+/** Egyptian 01[0125]xxxxxxxx or UAE 05xxxxxxxx, after normalizePhone. */
+export function isEgyptianMobile(normalized: string): boolean {
+  return /^01[0125]\d{8}$/.test(normalized);
+}
+
+export function isUaeMobile(normalized: string): boolean {
+  return /^05\d{8}$/.test(normalized);
+}
+
+/** normalizePhone output to E.164, or "" for anything else. */
+export function phoneToE164(normalized: string): string {
+  if (isEgyptianMobile(normalized)) return "+20" + normalized.substring(1);
+  if (isUaeMobile(normalized)) return "+971" + normalized.substring(1);
+  return "";
 }
 
 /** Lookup variants so existing docs do not need a phone-format backfill. */
@@ -125,6 +153,13 @@ export function phoneQueryVariants(normalizedPhone: string): string[] {
     variants.add("0020" + withoutZero);
     variants.add("+2" + normalizedPhone);
     variants.add("002" + normalizedPhone);
+  }
+  if (/^05\d{8}$/.test(normalizedPhone)) {
+    const rest = normalizedPhone.substring(1);
+    variants.add(rest);
+    variants.add("971" + rest);
+    variants.add("+971" + rest);
+    variants.add("00971" + rest);
   }
   return Array.from(variants);
 }

@@ -80,3 +80,41 @@ describe("claims and patches", () => {
     assert.equal(L.toE164("01000000002"), "+201000000002");
   });
 });
+
+// TAS-112 (user decision 2026-11-24): UAE mobiles too.
+const LL = require("../lib/delegate_login_logic");
+describe("UAE numbers", () => {
+  test("every UAE form normalizes to 05xxxxxxxx", () => {
+    for (const raw of ["+971 50 123 4567", "00971501234567", "971501234567", "0501234567", "501234567", "+٩٧١٥٠١٢٣٤٥٦٧"]) {
+      assert.equal(LL.normalizePhone(raw), "0501234567", raw);
+    }
+  });
+  test("Egyptian forms are unchanged", () => {
+    for (const raw of ["+201000000002", "00201000000002", "1000000002", "01000000002"]) {
+      assert.equal(LL.normalizePhone(raw), "01000000002", raw);
+    }
+  });
+  test("variants cover the stored UAE forms", () => {
+    const v = LL.phoneQueryVariants("0501234567");
+    for (const x of ["0501234567", "501234567", "971501234567", "+971501234567", "00971501234567"]) assert.ok(v.includes(x), x);
+  });
+  test("E.164", () => {
+    assert.equal(LL.phoneToE164("0501234567"), "+971501234567");
+    assert.equal(LL.phoneToE164("01000000002"), "+201000000002");
+    assert.equal(LL.phoneToE164("0601234567"), "");
+    assert.equal(L.toE164("0501234567"), "+971501234567");
+  });
+  test("phone change accepts a UAE number and confirms against the +971 Auth phone", () => {
+    assert.deepEqual(L.parseRequest({newPhone: "+971501234567", nationalId: "1"}), {newPhone: "0501234567", nationalId: "1"});
+    assert.equal(L.parseRequest({newPhone: "+966501234567", nationalId: "1"}).reason, "bad_phone");
+    const r = L.decideConfirm({pending: {newPhone: "0501234567", status: "pending", expiresAtMs: 2000},
+      authPhoneE164: "+971501234567", nowMs: 1000, otherDelegateWithPhone: false, staffWithPhone: false});
+    assert.deepEqual(r, {ok: true, newPhone: "0501234567"});
+  });
+  test("login accepts a UAE number and OTP claims match it", () => {
+    const v = LL.validateLoginInput("+971501234567", "29001010000001");
+    assert.equal(v.ok, true);
+    assert.equal(v.phone, "0501234567");
+    assert.equal(LL.phoneMatchesDelegateClaims("+971501234567", LL.phoneQueryVariants("0501234567")), true);
+  });
+});

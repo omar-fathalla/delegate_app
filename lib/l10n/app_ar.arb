@@ -2005,7 +2005,7 @@
   "phoneChangeConfirm": "تأكيد",
   "phoneChangeResend": "إعادة إرسال الكود",
   "phoneChangeDone": "تم تغيير رقم الموبايل. استخدم الرقم الجديد في تسجيل الدخول بعد كده.",
-  "phoneChangeErrBadPhone": "اكتب رقم موبايل مصري صحيح.",
+  "phoneChangeErrBadPhone": "اكتب رقم موبايل مصري أو إماراتي صحيح.",
   "phoneChangeErrNationalId": "الرقم القومي مش مطابق لبياناتك.",
   "phoneChangeErrSamePhone": "ده رقمك الحالي.",
   "phoneChangeErrTaken": "الرقم ده مستخدم في حساب تاني.",
