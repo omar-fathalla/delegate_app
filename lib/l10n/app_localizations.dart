@@ -3720,6 +3720,12 @@ abstract class AppLocalizations {
   /// **'Photo deleted'**
   String get photoRemovedFromSession;
 
+  /// No description provided for @photoStampFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t add the date and branch to the photo. It will be uploaded without them.'**
+  String get photoStampFailed;
+
   /// No description provided for @offerPhotosSupervisor.
   ///
   /// In en, this message translates to:
@@ -3855,8 +3861,14 @@ abstract class AppLocalizations {
   /// No description provided for @retakePhoto.
   ///
   /// In en, this message translates to:
-  /// **'Retake this photo'**
+  /// **'Retake'**
   String get retakePhoto;
+
+  /// No description provided for @viewPhotoFullScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'View full screen'**
+  String get viewPhotoFullScreen;
 
   /// No description provided for @addAction.
   ///

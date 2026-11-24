@@ -8,7 +8,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/widgets/app_loading_indicator.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
+import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
+import '../../data/services/photo_watermark.dart';
 import '../widgets/sync_status_banner.dart';
+import '../widgets/captured_photo_full_screen_viewer.dart';
 import '../bloc/photo_permission_bloc.dart';
 import '../../domain/entities/photo_permission.dart';
 
@@ -31,7 +34,11 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
   PhotoPermission? _selectedPermission;
   String? _selectedBranchId;
   String? _selectedBranchName;
-  final List<File> _capturedPhotos = [];
+  /// TAS-302: each shot keeps the camera original, its capture time and the
+  /// stamped copy (branch + date burned in). Only stamped copies are uploaded.
+  final List<_StampedShot> _shots = [];
+  List<File> get _capturedPhotos => [for (final s in _shots) s.stamped];
+  bool _isStamping = false;
   int _selectedPhotoIndex = 0;
   final TextEditingController _commentController = TextEditingController();
   Map<String, String>? _orgBranchesMap;
@@ -99,7 +106,10 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
     super.dispose();
   }
 
-  Future<void> _capturePhoto({bool isAddingMore = true}) async {
+  Future<void> _capturePhoto({
+    bool isAddingMore = true,
+    required String branchName,
+  }) async {
     final l10n = AppLocalizations.of(context)!;
     final ImagePicker picker = ImagePicker();
     try {
@@ -112,25 +122,91 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
       );
 
       if (photo != null) {
+        // Trusted (server-calibrated) clock, shown as Cairo wall time.
+        final capturedAt = SubscriptionCycleHelper.cairoTime();
+        final original = File(photo.path);
+        setState(() => _isStamping = true);
+        final shot = await _stamp(original, capturedAt, branchName);
+        if (!mounted) return;
         setState(() {
-          final file = File(photo.path);
-          if (isAddingMore || _capturedPhotos.isEmpty) {
-            _capturedPhotos.add(file);
-            _selectedPhotoIndex = _capturedPhotos.length - 1;
+          _isStamping = false;
+          if (isAddingMore || _shots.isEmpty) {
+            _shots.add(shot);
+            _selectedPhotoIndex = _shots.length - 1;
           } else {
-            _capturedPhotos[_selectedPhotoIndex] = file;
+            _shots[_selectedPhotoIndex] = shot;
           }
         });
       }
     } catch (e) {
+      if (mounted) setState(() => _isStamping = false);
       _showErrorSnackBar(l10n.cameraOpenFailed(e));
     }
+  }
+
+  /// TAS-302: opens the selected photo on the whole screen; the viewer can
+  /// ask to retake or delete it.
+  Future<void> _openFullScreen(String branchName) async {
+    if (_shots.isEmpty) return;
+    final index = _selectedPhotoIndex;
+    final action = await CapturedPhotoFullScreenViewer.open(
+      context,
+      photo: _shots[index].stamped,
+      photoNumber: index + 1,
+    );
+    if (!mounted || action == null || index >= _shots.length) return;
+    switch (action) {
+      case CapturedPhotoViewerAction.retake:
+        setState(() => _selectedPhotoIndex = index);
+        await _capturePhoto(isAddingMore: false, branchName: branchName);
+      case CapturedPhotoViewerAction.delete:
+        _removePhotoAt(index);
+    }
+  }
+
+  /// Burns [branchName] and [capturedAt] into [original]. If stamping fails
+  /// the original is kept (the visit is still recorded) and the user is told.
+  Future<_StampedShot> _stamp(
+    File original,
+    DateTime capturedAt,
+    String branchName,
+  ) async {
+    final display = BranchDisplayCache.instance.displayName(branchName, fallback: branchName);
+    try {
+      final stamped = await PhotoWatermark.stampFile(
+        original,
+        branchName: display,
+        capturedAt: capturedAt,
+      );
+      return _StampedShot(original, capturedAt, stamped, branchName);
+    } catch (e) {
+      debugPrint('TAS-302: photo stamp failed: $e');
+      if (mounted) {
+        _showErrorSnackBar(AppLocalizations.of(context)!.photoStampFailed);
+      }
+      return _StampedShot(original, capturedAt, original, branchName);
+    }
+  }
+
+  /// Re-stamps every shot whose stamp names another branch (the user changed
+  /// the branch after taking photos). Capture times stay as they were.
+  Future<void> _restampForBranch(String branchName) async {
+    if (_shots.every((s) => s.branchName == branchName)) return;
+    setState(() => _isStamping = true);
+    for (var i = 0; i < _shots.length; i++) {
+      final shot = _shots[i];
+      if (shot.branchName == branchName) continue;
+      final updated = await _stamp(shot.original, shot.capturedAt, branchName);
+      if (!mounted) return;
+      if (i < _shots.length && identical(_shots[i], shot)) _shots[i] = updated;
+    }
+    if (mounted) setState(() => _isStamping = false);
   }
 
   void _removePhotoAt(int index) {
     if (index < 0 || index >= _capturedPhotos.length) return;
     setState(() {
-      _capturedPhotos.removeAt(index);
+      _shots.removeAt(index);
       if (_selectedPhotoIndex >= _capturedPhotos.length) {
         _selectedPhotoIndex = _capturedPhotos.isEmpty ? 0 : _capturedPhotos.length - 1;
       }
@@ -197,7 +273,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
               ),
             );
             setState(() {
-              _capturedPhotos.clear();
+              _shots.clear();
               _selectedPhotoIndex = 0;
               _commentController.clear();
             });
@@ -229,7 +305,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
               ),
             );
             setState(() {
-              _capturedPhotos.clear();
+              _shots.clear();
               _selectedPhotoIndex = 0;
               _commentController.clear();
             });
@@ -472,10 +548,12 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                           }).toList(),
                           onChanged: (value) {
                             if (value == null) return;
+                            final name = uniqueBranches[value] ?? value;
                             setState(() {
                               _selectedBranchId = value;
-                              _selectedBranchName = uniqueBranches[value] ?? value;
+                              _selectedBranchName = name;
                             });
+                            _restampForBranch(name);
                           },
                         ),
 
@@ -485,7 +563,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                       if (effectiveBranchId != null) ...[
                         if (_capturedPhotos.isEmpty)
                           InkWell(
-                            onTap: () => _capturePhoto(isAddingMore: true),
+                            onTap: () => _capturePhoto(isAddingMore: true, branchName: effectiveBranchName!),
                             borderRadius: BorderRadius.circular(20),
                             child: Container(
                               height: 230,
@@ -532,7 +610,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                   ),
                                   const SizedBox(height: 12),
                                   FilledButton.tonalIcon(
-                                    onPressed: () => _capturePhoto(isAddingMore: true),
+                                    onPressed: () => _capturePhoto(isAddingMore: true, branchName: effectiveBranchName!),
                                     icon: const Icon(Icons.add_a_photo_rounded, size: 18),
                                     label: Text(AppLocalizations.of(context)!.takeFirstPhoto),
                                   ),
@@ -587,7 +665,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                   ),
                                 ),
                                 FilledButton.tonalIcon(
-                                  onPressed: () => _capturePhoto(isAddingMore: true),
+                                  onPressed: () => _capturePhoto(isAddingMore: true, branchName: effectiveBranchName!),
                                   icon: const Icon(Icons.add_a_photo_rounded, size: 18),
                                   label: Text(AppLocalizations.of(context)!.addPhoto),
                                   style: FilledButton.styleFrom(
@@ -600,36 +678,41 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                           ),
                           const SizedBox(height: 12),
 
-                          // Big Active Photo Showcase Preview with AnimatedSwitcher
+                          // TAS-302: the whole photo (uncropped) so the branch/date strip
+                          // is visible before sending. Tap opens it on the full screen.
                           ClipRRect(
                             borderRadius: BorderRadius.circular(20),
                             child: Container(
-                              height: 270,
+                              height: 340,
                               width: double.infinity,
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+                                color: Colors.black,
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(color: colorScheme.outlineVariant),
                               ),
                               child: Stack(
                                 children: [
                                   Positioned.fill(
-                                    child: AnimatedSwitcher(
-                                      duration: AppMotionDurations.medium2,
-                                      switchInCurve: AppMotionCurves.emphasizedDecelerate,
-                                      switchOutCurve: AppMotionCurves.emphasizedAccelerate,
-                                      transitionBuilder: (child, animation) {
-                                        return FadeTransition(
-                                          opacity: animation,
-                                          child: child,
-                                        );
-                                      },
-                                      child: Image.file(
-                                        _capturedPhotos[_selectedPhotoIndex],
-                                        key: ValueKey(_capturedPhotos[_selectedPhotoIndex].path),
-                                        fit: BoxFit.cover,
-                                        width: double.infinity,
-                                        height: double.infinity,
+                                    child: GestureDetector(
+                                      key: const ValueKey('captured_photo_preview'),
+                                      onTap: () => _openFullScreen(effectiveBranchName!),
+                                      child: AnimatedSwitcher(
+                                        duration: AppMotionDurations.medium2,
+                                        switchInCurve: AppMotionCurves.emphasizedDecelerate,
+                                        switchOutCurve: AppMotionCurves.emphasizedAccelerate,
+                                        transitionBuilder: (child, animation) {
+                                          return FadeTransition(
+                                            opacity: animation,
+                                            child: child,
+                                          );
+                                        },
+                                        child: Image.file(
+                                          _capturedPhotos[_selectedPhotoIndex],
+                                          key: ValueKey(_capturedPhotos[_selectedPhotoIndex].path),
+                                          fit: BoxFit.contain,
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -654,58 +737,51 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                       ),
                                     ),
                                   ),
-                                  // Bottom Action Bar Overlay
-                                  Positioned(
-                                    bottom: 0,
-                                    left: 0,
-                                    right: 0,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topCenter,
-                                          end: Alignment.bottomCenter,
-                                          colors: [
-                                            Colors.transparent,
-                                            Colors.black.withValues(alpha: 0.75),
-                                          ],
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          TextButton.icon(
-                                            onPressed: () => _capturePhoto(isAddingMore: false),
-                                            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 18),
-                                            label: Text(
-                                              AppLocalizations.of(context)!.retakePhoto,
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 12.5,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            style: TextButton.styleFrom(
-                                              backgroundColor: Colors.white.withValues(alpha: 0.2),
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                            ),
-                                          ),
-                                          const Spacer(),
-                                          IconButton.filledTonal(
-                                            onPressed: () => _removePhotoAt(_selectedPhotoIndex),
-                                            icon: const Icon(Icons.delete_outline_rounded, size: 20),
-                                            style: IconButton.styleFrom(
-                                              backgroundColor: Colors.red.withValues(alpha: 0.8),
-                                              foregroundColor: Colors.white,
-                                            ),
-                                            tooltip: AppLocalizations.of(context)!.deletePhoto,
-                                          ),
-                                        ],
+                                  // Top-Start full screen button
+                                  PositionedDirectional(
+                                    top: 6,
+                                    start: 6,
+                                    child: IconButton(
+                                      key: const ValueKey('captured_photo_full_screen'),
+                                      onPressed: () => _openFullScreen(effectiveBranchName!),
+                                      icon: const Icon(Icons.fullscreen_rounded),
+                                      tooltip: AppLocalizations.of(context)!.viewPhotoFullScreen,
+                                      style: IconButton.styleFrom(
+                                        backgroundColor: Colors.black.withValues(alpha: 0.55),
+                                        foregroundColor: Colors.white,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
+                          ),
+                          const SizedBox(height: 6),
+                          // Actions under the photo, so they never cover the stamp.
+                          Row(
+                            children: [
+                              TextButton.icon(
+                                key: const ValueKey('captured_photo_retake'),
+                                onPressed: () => _capturePhoto(isAddingMore: false, branchName: effectiveBranchName!),
+                                icon: const Icon(Icons.refresh_rounded, size: 18),
+                                label: Text(AppLocalizations.of(context)!.retakePhoto),
+                                style: TextButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              ),
+                              const Spacer(),
+                              IconButton.filledTonal(
+                                key: const ValueKey('captured_photo_delete'),
+                                onPressed: () => _removePhotoAt(_selectedPhotoIndex),
+                                icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.red.withValues(alpha: 0.8),
+                                  foregroundColor: Colors.white,
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                tooltip: AppLocalizations.of(context)!.deletePhoto,
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 12),
 
@@ -720,7 +796,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                 if (index == _capturedPhotos.length) {
                                   // Add photo thumbnail card
                                   return InkWell(
-                                    onTap: () => _capturePhoto(isAddingMore: true),
+                                    onTap: () => _capturePhoto(isAddingMore: true, branchName: effectiveBranchName!),
                                     borderRadius: BorderRadius.circular(14),
                                     child: Container(
                                       width: 70,
@@ -909,7 +985,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                             )
                           else
                             ElevatedButton.icon(
-                              onPressed: () {
+                              onPressed: _isStamping ? null : () async {
                                 final currentPerm = _selectedPermission ?? availablePermissions.first;
                                 final orgUID = currentPerm.organizationUID.isNotEmpty
                                     ? currentPerm.organizationUID
@@ -937,6 +1013,10 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                   _showErrorSnackBar(AppLocalizations.of(context)!.takeAtLeastOnePhoto);
                                   return;
                                 }
+
+                                // TAS-302: every uploaded photo must carry the branch it is sent for.
+                                await _restampForBranch(finalBranchName);
+                                if (!context.mounted || _capturedPhotos.isEmpty) return;
 
                                 context.read<PhotoPermissionBloc>().add(
                                       UploadBatchPhotosRequested(
@@ -1064,4 +1144,13 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
       ),
     );
   }
+}
+
+/// TAS-302: one captured photo and its stamped copy.
+class _StampedShot {
+  final File original;
+  final DateTime capturedAt;
+  final File stamped;
+  final String branchName;
+  const _StampedShot(this.original, this.capturedAt, this.stamped, this.branchName);
 }

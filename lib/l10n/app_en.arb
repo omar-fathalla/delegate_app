@@ -1893,6 +1893,7 @@
     }
   },
   "photoRemovedFromSession": "Photo deleted",
+  "photoStampFailed": "Couldn't add the date and branch to the photo. It will be uploaded without them.",
   "offerPhotosSupervisor": "Offer photos (supervisor)",
   "photosSavedOffline": "{count} photos saved on this device. They will upload automatically when you are back online.",
   "@photosSavedOffline": {
@@ -1967,7 +1968,8 @@
       "number": {}
     }
   },
-  "retakePhoto": "Retake this photo",
+  "retakePhoto": "Retake",
+  "viewPhotoFullScreen": "View full screen",
   "addAction": "Add",
   "visitNotesLabel": "Visit notes ({count} photos) (optional)",
   "@visitNotesLabel": {

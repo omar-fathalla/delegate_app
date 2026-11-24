@@ -53,6 +53,8 @@ dependencies:
   mobile_scanner: ^7.2.0
   qr_flutter: ^4.1.0
   image_picker: ^1.0.7
+  # TAS-302: JPEG decode/encode for the date+branch stamp on field photos.
+  image: ^4.8.0
   firebase_storage: ^13.6.1
   shared_preferences: ^2.5.4
   go_router: ^17.1.0
