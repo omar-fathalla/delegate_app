@@ -180,7 +180,7 @@ export const claimInvite = functions.region("us-central1")
     const email = normalizeEmail(ctx.auth.token.email);
     const db = admin.firestore();
     const ts = admin.firestore.FieldValue.serverTimestamp();
-    return db.runTransaction(async (tx) => {
+    const result = await db.runTransaction(async (tx) => {
       const ref = db.collection("invites").doc(inviteId);
       const s = await tx.get(ref);
       const inv = s.data() as Record<string, unknown> | undefined;
@@ -227,4 +227,21 @@ export const claimInvite = functions.region("us-central1")
         companyId: co || null, isFirstAdmin: i.isFirstAdmin === true,
       };
     });
+    // TAS-68: the claim proved the email; record it, and give the admin the
+    // role claims the approval callables read (TAS-23). Best effort: the
+    // Firestore claim above is the source of truth.
+    try {
+      const user = await admin.auth().getUser(uid);
+      const isOrgAdmin = result.roleToAssign === "org-admin";
+      await admin.auth().setCustomUserClaims(uid, {
+        ...(user.customClaims || {}),
+        role: isOrgAdmin ? "organization-admin" : "company-admin",
+        orgId: result.organizationId,
+        ...(isOrgAdmin || !result.companyId ? {} : {companyId: result.companyId}),
+      });
+      if (!user.emailVerified) await admin.auth().updateUser(uid, {emailVerified: true});
+    } catch (error) {
+      console.warn("claimInvite auth update skipped", {uid});
+    }
+    return result;
   }));

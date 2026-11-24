@@ -79,11 +79,16 @@ test("kill switch: disabled by default", async () => {
   process.env.STAFF_CREATE_ENABLED = "true";
 });
 
-test("claimInvite: verified email claims once; unverified refused", async () => {
+test("claimInvite: the invite link proves the email (TAS-68); claims once", async () => {
   const exp = admin.firestore.Timestamp.fromMillis(Date.now() + 86400000);
   await db.doc("invites/i1").set({email: "inv@e.com", roleToAssign: "company-admin", organizationId: "o1",
     companyId: "c1", companyName: "C", status: "pending", expiresAt: exp, invitedByUid: "sa"});
-  assert.equal(await code(fn.claimInvite.run({inviteId: "i1", displayName: "I"}, ctx("u1", {email: "inv@e.com", email_verified: false}))), "email_not_verified");
+  // TAS-68: finish-signup signs up with a password, so the email is not verified yet.
+  assert.equal((await fn.claimInvite.run({inviteId: "i1", displayName: "I"}, ctx("u1", {email: "inv@e.com", email_verified: false}))).status, "claimed");
+  // A different email is still refused, verified or not.
+  await db.doc("invites/i9").set({email: "other@e.com", roleToAssign: "company-admin", organizationId: "o1",
+    companyId: "c1", companyName: "C", status: "pending", expiresAt: exp, invitedByUid: "sa"});
+  assert.equal(await code(fn.claimInvite.run({inviteId: "i9", displayName: "I"}, ctx("u3", {email: "inv@e.com", email_verified: true}))), "email_mismatch");
   const r = await fn.claimInvite.run({inviteId: "i1", displayName: "I"}, ctx("u1", {email: "inv@e.com", email_verified: true}));
   assert.equal(r.status, "claimed");
   assert.equal((await db.doc("users/u1").get()).data().role, "company-admin");
