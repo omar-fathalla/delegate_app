@@ -320,12 +320,16 @@ service cloud.firestore {
     // full-map write still pass. Delegate login (delegateLoginV2) is Admin SDK
     // and not affected.
     function delegateFieldsSafe() {
+      // TAS-108: ternaries, because `&&` keeps evaluating after a false.
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'updatedAt', 'requireReLogin', 'reLoginCompletedAt',
         'profileImageUrl', 'personalPhotoURL', 'photoURL',
         'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'
-      ]) && request.resource.data.get('requireReLogin', false) == false
-        && delegateDocsOk() && delegateUrlsWithDocs();
+      ])
+        ? (request.resource.data.get('requireReLogin', false) == false
+          ? (delegateDocsOk() ? delegateUrlsWithDocs() : false)
+          : false)
+        : false;
     }
 
     // Docs-pending (Mohamed 2026-11-04): a delegate (re)upload is written as
@@ -353,12 +357,13 @@ service cloud.firestore {
     function delegateDocsOk() {
       let n = request.resource.data.get('documents', []);
       let o = resource.data.get('documents', []);
-      return !changedKeys().hasAny(['documents']) || (
-        n is list && o is list && n.size() <= 8 && o.size() <= 8
-        && newDocEntryOk(n, o, 0) && newDocEntryOk(n, o, 1)
-        && newDocEntryOk(n, o, 2) && newDocEntryOk(n, o, 3)
-        && newDocEntryOk(n, o, 4) && newDocEntryOk(n, o, 5)
-        && newDocEntryOk(n, o, 6) && newDocEntryOk(n, o, 7));
+      return !changedKeys().hasAny(['documents']) ? true
+        : ((n is list && o is list && n.size() <= 8 && o.size() <= 8)
+          ? (newDocEntryOk(n, o, 0) ? (newDocEntryOk(n, o, 1) ? (newDocEntryOk(n, o, 2)
+            ? (newDocEntryOk(n, o, 3) ? (newDocEntryOk(n, o, 4) ? (newDocEntryOk(n, o, 5)
+            ? (newDocEntryOk(n, o, 6) ? newDocEntryOk(n, o, 7) : false)
+            : false) : false) : false) : false) : false) : false)
+          : false);
     }
 
     // A delegate may change a photo / ID URL only together with `documents`
@@ -384,8 +389,8 @@ service cloud.firestore {
 
     function urlFieldOk(f, keys, field) {
       let v = request.resource.data.get(f, null);
-      return !changedKeys().hasAny([f]) || v == null || v == ''
-        || (v is string && urlBacked(keys, field, v));
+      return (!changedKeys().hasAny([f]) || v == null || v == '') ? true
+        : (v is string && urlBacked(keys, field, v));
     }
 
     // The three photo fields are scanned once (budget): every changed photo
@@ -400,9 +405,10 @@ service cloud.firestore {
       let d = request.resource.data;
       let v = ch.hasAny(['profileImageUrl']) ? d.get('profileImageUrl', null)
         : (ch.hasAny(['personalPhotoURL']) ? d.get('personalPhotoURL', null) : d.get('photoURL', null));
-      return !ch.hasAny(['profileImageUrl', 'personalPhotoURL', 'photoURL'])
-        || (photoSame('profileImageUrl', v) && photoSame('personalPhotoURL', v) && photoSame('photoURL', v)
-          && (v == null || v == '' || (v is string && urlBacked(['personalPhoto'], 'documentURL', v))));
+      return !ch.hasAny(['profileImageUrl', 'personalPhotoURL', 'photoURL']) ? true
+        : ((photoSame('profileImageUrl', v) && photoSame('personalPhotoURL', v) && photoSame('photoURL', v))
+          ? ((v == null || v == '') ? true : (v is string && urlBacked(['personalPhoto'], 'documentURL', v)))
+          : false);
     }
 
     // ID front / back are checked in ONE scan (budget): the same pending
@@ -432,9 +438,11 @@ service cloud.firestore {
 
     function delegateUrlsWithDocs() {
       return photoUrlsOk()
-        && idUrlsOk()
-        && urlFieldOk('receiptImageUrl',
-          ['paymentReceipt', 'electronicPaymentReceipt', 'electronic_payment_receipt'], 'documentURL');
+        ? (idUrlsOk()
+          ? urlFieldOk('receiptImageUrl',
+            ['paymentReceipt', 'electronicPaymentReceipt', 'electronic_payment_receipt'], 'documentURL')
+          : false)
+        : false;
     }
 
     function supervisorOnlyRole(r) {
@@ -550,12 +558,14 @@ service cloud.firestore {
       // request-approval batch (4 document flips) stays under budget.
       // Supervisor active→pending doc replace is server-only (callable).
       // SA / tech doc replace and pending review are server-only (privileged callable).
-      return !(stCh && st1 == 'pending' && !approver)
-        && !privGlobalStaffDocsServer
-        && ((techSignup && techFlipOk(delegateId) && techReqOk(o1, c1, delegateId))
-          || (!techSignup && (delegateDocsOk() || approver)
-            && staffDelegateAccountFieldsOk(r, approver)
-            && sourceStampKeysLocked()));
+      // TAS-108: ternaries so only the branch that applies is evaluated.
+      return (stCh && st1 == 'pending' && !approver) ? false
+        : (privGlobalStaffDocsServer ? false
+          : (techSignup
+            ? (techFlipOk(delegateId) ? techReqOk(o1, c1, delegateId) : false)
+            : ((approver ? true : delegateDocsOk())
+              ? (staffDelegateAccountFieldsOk(r, approver) ? sourceStampKeysLocked() : false)
+              : false)));
     }
 
     // r4: tech support may create a delegate that is active or carries an
