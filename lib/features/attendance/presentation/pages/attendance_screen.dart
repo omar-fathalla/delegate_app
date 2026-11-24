@@ -15,6 +15,7 @@ import 'package:delegate_app/features/attendance/domain/usecases/get_history_for
 import 'package:delegate_app/features/attendance/presentation/bloc/attendance_bloc.dart';
 import 'package:delegate_app/features/attendance/presentation/attendance_action_lock.dart';
 import 'package:delegate_app/features/attendance/presentation/attendance_location_fetcher.dart';
+import 'package:delegate_app/features/attendance/presentation/scanner/close_range_lens.dart';
 import 'package:delegate_app/features/attendance/presentation/widgets/early_checkout_confirm_sheet.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
@@ -3144,6 +3145,7 @@ class _ScannerModalState extends State<_ScannerModal>
   late final MobileScannerController _scannerController;
   late final AnimationController _laserController;
   bool _isProcessing = false;
+  bool _lensChecked = false;
   late final TrustedTimeService _timeService;
 
   @override
@@ -3162,6 +3164,8 @@ class _ScannerModalState extends State<_ScannerModal>
       returnImage: false,
       facing: CameraFacing.back,
     );
+    // TAS-290: once the camera runs, move to the close-focus lens (iOS).
+    _scannerController.addListener(_onScannerState);
 
     _laserController = AnimationController(
       vsync: this,
@@ -3169,8 +3173,15 @@ class _ScannerModalState extends State<_ScannerModal>
     )..repeat(reverse: true);
   }
 
+  void _onScannerState() {
+    if (_lensChecked || !_scannerController.value.isRunning) return;
+    _lensChecked = true;
+    preferCloseRangeLens(_scannerController);
+  }
+
   @override
   void dispose() {
+    _scannerController.removeListener(_onScannerState);
     _laserController.dispose();
     _scannerController.dispose();
     super.dispose();
@@ -3188,7 +3199,16 @@ class _ScannerModalState extends State<_ScannerModal>
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          MobileScanner(
+          // TAS-290: tap the preview to focus there.
+          LayoutBuilder(
+            builder: (context, constraints) => GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTapUp: (d) {
+                _scannerController
+                    .setFocusPoint(focusPointFor(d.localPosition, constraints.biggest))
+                    .catchError((Object _) {});
+              },
+              child: MobileScanner(
             controller: _scannerController,
             onDetect: (capture) {
               if (!mounted || _isProcessing) return;
@@ -3233,6 +3253,8 @@ class _ScannerModalState extends State<_ScannerModal>
                 _isProcessing = false;
               }
             },
+          ),
+            ),
           ),
 
           // Central Scan Target Overlay with glowing corners and laser line
@@ -3319,6 +3341,18 @@ class _ScannerModalState extends State<_ScannerModal>
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.8),
                       fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  // TAS-290: hint for phones that cannot focus very close.
+                  Text(
+                    locale == 'ar'
+                        ? 'لو الصورة مش واضحة، بعّد الموبايل شوية أو المس الكود'
+                        : 'If the image is blurry, move the phone back a little or tap the code',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 12,
                     ),
                   ),
                 ],
