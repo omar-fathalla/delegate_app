@@ -7,6 +7,7 @@ import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/error/firestore_error_handler.dart';
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
+import 'package:delegate_app/features/marketing/data/datasources/branch_attendance_query.dart';
 import 'package:delegate_app/features/marketing/data/services/delegate_profile_cache.dart';
 import 'package:delegate_app/features/marketing/data/services/real_test_metrics.dart';
 import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
@@ -91,6 +92,29 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
   });
 
   /// التطبيع الموحد لأسماء الفروع لمنع أي فقدان في السجلات بسبب الهمزات والمسافات
+  /// TAS-335: the favorites' branch ids (from the session branch catalog) and
+  /// name terms, grouped into `branchId in … OR branchName in …` chunks. If
+  /// the catalog can't be loaded, the plan falls back to names only.
+  Future<BranchAttendancePlan> _branchAttendancePlan(List<String> branchNames) async {
+    var catalog = const <({String id, String name})>[];
+    try {
+      final docs = await BranchesSessionCache.load(firestore);
+      catalog = [
+        for (final d in docs)
+          (
+            id: d.id,
+            name: (d.data()['branchName'] as String?) ??
+                (d.data()['name'] as String?) ??
+                (d.data()['title'] as String?) ??
+                '',
+          ),
+      ];
+    } catch (e) {
+      debugPrint('branch attendance: catalog unavailable, names only: $e');
+    }
+    return BranchAttendancePlan.build(branchNames, catalog);
+  }
+
   static String normalizeBranchName(String name) {
     return name
         .trim()
@@ -357,16 +381,18 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
     final start = DateTime(target.year, target.month, target.day);
     final end = start.add(const Duration(days: 1));
     final orgId = attendanceQueryOrgId(organizationId);
-    final chunks = branchQueryChunks(branchQueryTerms(branchNames).toList());
     final controller = StreamController<void>();
     final subs = <StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>[];
-    controller.onListen = () {
-      for (final chunk in chunks) {
+    var cancelled = false;
+    controller.onListen = () async {
+      final plan = await _branchAttendancePlan(branchNames);
+      if (cancelled) return;
+      for (final chunk in plan.chunks) {
         var first = true;
         subs.add(firestore
             .collection(kAttendanceCollection)
             .where('organizationId', isEqualTo: orgId)
-            .where('branchName', whereIn: chunk)
+            .where(chunk.filter)
             .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
             .where('timestamp', isLessThan: Timestamp.fromDate(end))
             .limit(2000)
@@ -385,6 +411,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       }
     };
     controller.onCancel = () async {
+      cancelled = true;
       for (final s in subs) {
         await s.cancel();
       }
@@ -408,13 +435,10 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       final todayEnd = todayStart.add(const Duration(days: 1));
 
       // ── Step 1: جلب سجلات الحضور مع تطبيع أسماء الفروع والاستعلام الموثوق ──
-      final Map<String, String> normalizedToBranch = {
-        for (final b in branchNames)
-          if (b.trim().isNotEmpty) normalizeBranchName(b.trim()): b,
-      };
-      final queryBranchTerms = branchQueryTerms(branchNames);
-      final queryBranchList = queryBranchTerms.toList();
-      final branchChunks = branchQueryChunks(queryBranchList);
+      // TAS-335: match by branchId (spelling-proof) OR by name (legacy logs
+      // without branchId), one Filter.or per chunk, de-duplicated by doc id.
+      final plan = await _branchAttendancePlan(branchNames);
+      final branchChunks = plan.chunks;
 
       // attendance_logs writes use `organizationId` (see AttendanceRemoteDataSource).
       // Bound the query by org + branchName variants + today's local calendar day
@@ -432,13 +456,17 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
         final snap = await firestore
             .collection(kAttendanceCollection)
             .where('organizationId', isEqualTo: queryOrgId)
-            .where('branchName', whereIn: chunk)
+            .where(chunk.filter)
             .where('timestamp', isGreaterThanOrEqualTo: todayStartTs)
             .where('timestamp', isLessThan: todayEndTs)
             .limit(todayAttendanceQueryLimit)
             .getResilient(forceServer: true);
         todayDocs.addAll(snap.docs);
       }
+      final uniqueDocs = dedupeAttendanceDocs(todayDocs);
+      todayDocs
+        ..clear()
+        ..addAll(uniqueDocs);
       attSw.stop();
       if (RealTestMetrics.enabled) {
         RealTestMetrics.attendanceQueryMs = attSw.elapsedMilliseconds;
@@ -456,8 +484,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
       for (final doc in todayDocs) {
         final data = doc.data();
         final type = data['type'] as String? ?? '';
-        final rawBranch = data['branchName'] as String? ?? '';
-        final branch = normalizedToBranch[normalizeBranchName(rawBranch)] ?? rawBranch;
+        final branch = plan.favoriteFor(data) ?? (data['branchName'] as String? ?? '');
         if (!checkInsByBranch.containsKey(branch)) continue;
 
         if (type == 'check_in') {
@@ -528,8 +555,7 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
         final type = data['type'] as String? ?? '';
         if (type != 'check_out') continue;
 
-        final rawBranch = data['branchName'] as String? ?? '';
-        final branch = normalizedToBranch[normalizeBranchName(rawBranch)] ?? rawBranch;
+        final branch = plan.favoriteFor(data) ?? (data['branchName'] as String? ?? '');
         final delegateId = data['delegateId'] as String? ??
             data['userId'] as String? ??
             '';
@@ -1244,21 +1270,9 @@ String attendanceQueryOrgId(String organizationId) {
 
 /// Branch name spellings sent to `whereIn` (hamza, taa marbuta, alef maqsura
 /// variants), so no attendance record is missed.
-Set<String> branchQueryTerms(List<String> branchNames) {
-  final terms = <String>{};
-  for (final b in branchNames) {
-    final trimmed = b.trim();
-    if (trimmed.isEmpty) continue;
-    terms
-      ..add(trimmed)
-      ..add(trimmed.replaceAll(RegExp(r'[أإآ]'), 'ا'))
-      ..add(trimmed.replaceAll('ا', 'أ'))
-      ..add(trimmed.replaceAll('ه', 'ة'))
-      ..add(trimmed.replaceAll('ة', 'ه'))
-      ..add(trimmed.replaceAll('ى', 'ي'));
-  }
-  return terms;
-}
+Set<String> branchQueryTerms(List<String> branchNames) => {
+      for (final b in branchNames) ...branchNameSpellings(b),
+    };
 
 /// Firestore caps (filter clauses * whereIn size) at 100. With
 /// organizationId + branchName + timestamp>= + timestamp< (=4), max whereIn
