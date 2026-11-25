@@ -1,4 +1,5 @@
 import java.util.Base64
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
 plugins {
@@ -6,7 +7,6 @@ plugins {
     // START: FlutterFire Configuration
     id("com.google.gms.google-services")
     // END: FlutterFire Configuration
-    id("org.jetbrains.kotlin.android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -38,10 +38,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
         isCoreLibraryDesugaringEnabled = true
-    }
-
-    kotlinOptions {
-        jvmTarget = "21"
     }
 
     defaultConfig {
@@ -195,5 +191,12 @@ afterEvaluate {
     tasks.matching { it.name.matches(Regex("^assemble.+AndroidTest$")) }.configureEach {
         val appAssembleName = name.removeSuffix("AndroidTest")
         tasks.findByName(appAssembleName)?.let { dependsOn(it) }
+    }
+}
+
+// TAS-327: AGP 9 built-in Kotlin; jvmTarget moved out of android { kotlinOptions }.
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_21)
     }
 }
