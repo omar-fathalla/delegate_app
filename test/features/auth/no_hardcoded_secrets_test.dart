@@ -32,6 +32,11 @@ void main() {
       if (text.contains('signInAnonymously')) {
         hits.add('${entity.path} calls signInAnonymously');
       }
+      // TAS-17: accounts are created on the server only (createStaffUser,
+      // claimInvite, delegateLoginV2), so Auth sign-up can stay closed.
+      if (text.contains('createUserWithEmailAndPassword')) {
+        hits.add('${entity.path} calls createUserWithEmailAndPassword');
+      }
       for (final m in _stringLiteral.allMatches(text)) {
         final literal = m.group(1) ?? m.group(2) ?? '';
         final candidates = <String>{literal, ...literal.split(_tokenSplit)};

@@ -95,3 +95,27 @@ test("setup email escapes the name and never carries a password", () => {
   assert.ok(m.html.includes("&amp;c=2"));
   assert.ok(!/password|كلمة السر المؤقتة/i.test(m.html));
 });
+
+test("TAS-17: registerInvitedAdmin only for a pending, unexpired admin invite with a usable password", () => {
+  const inv = {status: "pending", email: "New@X.test", roleToAssign: "company-admin", organizationId: "o1", companyId: "c1"};
+  const pw = "longenough";
+  assert.deepEqual(L.decideInviteRegistration(inv, pw, 1, 2), {ok: true});
+  assert.deepEqual(L.decideInviteRegistration({...inv, roleToAssign: "org-admin", companyId: ""}, pw, 1, 2), {ok: true});
+  // password
+  assert.equal(L.decideInviteRegistration(inv, "short", 1, 2).reason, "weak_password");
+  assert.equal(L.decideInviteRegistration(inv, "x".repeat(129), 1, 2).reason, "weak_password");
+  assert.equal(L.decideInviteRegistration(inv, 12345678, 1, 2).reason, "weak_password");
+  assert.equal(L.decideInviteRegistration(inv, undefined, 1, 2).reason, "weak_password");
+  // invite state
+  assert.equal(L.decideInviteRegistration(undefined, pw, 1, 2).reason, "invite_not_found");
+  assert.equal(L.decideInviteRegistration({...inv, status: "claimed"}, pw, 1, 2).reason, "invite_not_pending");
+  assert.equal(L.decideInviteRegistration({...inv, claimedByUid: "u"}, pw, 1, 2).reason, "invite_already_claimed");
+  assert.equal(L.decideInviteRegistration(inv, pw, 5, 2).reason, "invite_expired");
+  assert.equal(L.decideInviteRegistration(inv, pw, 1, null).reason, "invite_expired");
+  // what the invite grants
+  assert.equal(L.decideInviteRegistration({...inv, roleToAssign: "super-admin"}, pw, 1, 2).reason, "role_not_allowed");
+  assert.equal(L.decideInviteRegistration({...inv, roleToAssign: "hr"}, pw, 1, 2).reason, "role_not_allowed");
+  assert.equal(L.decideInviteRegistration({...inv, organizationId: ""}, pw, 1, 2).reason, "invite_invalid");
+  assert.equal(L.decideInviteRegistration({...inv, companyId: ""}, pw, 1, 2).reason, "invite_invalid");
+  assert.equal(L.decideInviteRegistration({...inv, email: "not-an-email"}, pw, 1, 2).reason, "invite_invalid");
+});

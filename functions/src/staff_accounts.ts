@@ -2,7 +2,7 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import {normalizePhone} from "./delegate_login_logic";
 import {
-  Caller, decideClaim, decideStaffCreate, isValidEmail, nextRate,
+  Caller, decideClaim, decideInviteRegistration, decideStaffCreate, isValidEmail, nextRate,
   normalizeEmail, setupEmail, staffCreateEnabled, isSuperRole,
 } from "./staff_accounts_logic";
 
@@ -244,4 +244,46 @@ export const claimInvite = functions.region("us-central1")
       console.warn("claimInvite auth update skipped", {uid});
     }
     return result;
+  }));
+
+/**
+ * TAS-17: the invite page (finish-signup) used to create the admin's Auth
+ * account in the browser (createUserWithEmailAndPassword), which keeps
+ * Identity Platform sign-up open for anyone with the API key. This callable
+ * creates it with the Admin SDK instead, only for a pending, unexpired
+ * invite and only for the invite's own email. The browser then signs in
+ * with the password and calls claimInvite as before. No sign-in needed;
+ * App Check is enforced and each invite id is rate limited.
+ * Returns {created: true} for a new account, {created: false} when the
+ * email already has an account (the page then signs in with it).
+ */
+export const registerInvitedAdmin = functions.region("us-central1")
+  .runWith({...opts, enforceAppCheck: true})
+  .https.onCall(wrap("registerInvitedAdmin", async (data) => {
+    const p = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+    const inviteId = typeof p.inviteId === "string" ? p.inviteId.trim() : "";
+    const displayName = typeof p.displayName === "string" ? p.displayName.trim().slice(0, 120) : "";
+    if (!inviteId || inviteId.length > 200 || inviteId.includes("/")) fail("invalid-argument", "invalid_input");
+    const snap = await admin.firestore().collection("invites").doc(inviteId).get();
+    if (!snap.exists) fail("failed-precondition", "invite_not_found");
+    // Rate limit only real invites, so random ids cost no writes.
+    await takeRate(`register_${inviteId}`);
+    const inv = snap.data() as Record<string, unknown>;
+    const exp = inv?.expiresAt as {toMillis?: () => number} | undefined;
+    const d = decideInviteRegistration(inv, p.password, Date.now(),
+      typeof exp?.toMillis === "function" ? exp.toMillis() : null);
+    if (!d.ok) fail(d.reason === "weak_password" ? "invalid-argument" : "failed-precondition", d.reason);
+    const email = normalizeEmail((inv as Record<string, unknown>).email);
+    try {
+      await admin.auth().createUser({
+        email, password: p.password as string,
+        ...(displayName ? {displayName} : {}),
+      });
+      return {created: true};
+    } catch (e) {
+      const code = (e as {code?: string})?.code ?? "";
+      if (code === "auth/email-already-exists") return {created: false};
+      if (code === "auth/invalid-password") fail("invalid-argument", "weak_password");
+      throw e;
+    }
   }));

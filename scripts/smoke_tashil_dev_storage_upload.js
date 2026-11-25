@@ -142,6 +142,9 @@ async function signInAnonymous(key, userTok) {
   );
   if (!signIn.ok || !signIn.json.idToken) {
     const code = signIn.json?.error?.message || `http ${signIn.status}`;
+    // TAS-15: anonymous sign-in is turned off on tashil-dev (and on
+    // production after the forced update). That is the stronger deny.
+    if (/ADMIN_ONLY_OPERATION|OPERATION_NOT_ALLOWED/.test(code)) return null;
     fail(`anonymous sign-in failed: ${code}`);
   }
   return {idToken: signIn.json.idToken, uid: signIn.json.localId || ""};
@@ -344,10 +347,14 @@ async function main() {
   console.log(`upload ok: ${objectPath} http ${uploadRes.status}`);
 
   const anon = await signInAnonymous(key, userTok);
-  console.log(`anonymous uid=${anon.uid}`);
-  expectDenied("anon get", await storageGet(anon.idToken, objectPath));
-  expectDenied("anon list", await storageList(anon.idToken, prefix));
-  expectDenied("anon upload", await storageUpload(anon.idToken, `${prefix}anon.txt`, body));
+  if (!anon) {
+    console.log("deny ok: anonymous sign-in is disabled for this project (TAS-15)");
+  } else {
+    console.log(`anonymous uid=${anon.uid}`);
+    expectDenied("anon get", await storageGet(anon.idToken, objectPath));
+    expectDenied("anon list", await storageList(anon.idToken, prefix));
+    expectDenied("anon upload", await storageUpload(anon.idToken, `${prefix}anon.txt`, body));
+  }
 
   const other = accounts.find((a) => a.email && a.password && a.email !== email);
   if (other) {
