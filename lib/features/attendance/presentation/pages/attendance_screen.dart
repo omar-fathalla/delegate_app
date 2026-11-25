@@ -22,6 +22,7 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/admin/domain/entities/branch.dart';
 import 'package:delegate_app/features/admin/data/models/branch_model.dart';
 import 'package:delegate_app/features/attendance/domain/geofence_helpers.dart';
+import 'package:delegate_app/features/attendance/domain/attendance_branch_chain_guard.dart';
 import 'package:delegate_app/features/attendance/domain/branch_auto_locator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
@@ -357,6 +358,41 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       _otherChainOrgIds.isNotEmpty;
 
   bool get _hasSeveralChains => _otherChainOrgIds.isNotEmpty;
+
+  /// The open chain plus every other chain the delegate belongs to.
+  Set<String> get _memberOrgIds => {
+        widget.delegate.organizationUID.trim(),
+        ..._otherChainOrgIds,
+      };
+
+  /// Refuses a check-in on a branch outside the open chain (TAS-333). The
+  /// branch is never swapped for another one: the delegate gets a message
+  /// and nothing is written. Returns true when refused.
+  bool _refuseBranchOfOtherChain(
+    BuildContext context,
+    AttendanceBranchRef ref,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    switch (checkBranchChain(
+      branchOrganizationUID: ref.branchOrganizationUID,
+      currentOrgId: widget.delegate.organizationUID,
+      memberOrgIds: _memberOrgIds,
+    )) {
+      case BranchChainCheck.ok:
+        return false;
+      case BranchChainCheck.otherOwnChain:
+        final org = ref.branchOrganizationUID.trim();
+        final chain = widget.memberships
+            .where((m) => m.organizationUID.trim() == org)
+            .map((m) => m.organizationName.trim())
+            .firstWhere((n) => n.isNotEmpty, orElse: () => org);
+        AppSnackBar.showError(context, l10n.attBranchOtherChain(chain));
+        return true;
+      case BranchChainCheck.notMember:
+        AppSnackBar.showError(context, l10n.attBranchNotYourChain);
+        return true;
+    }
+  }
 
   @override
   bool get wantKeepAlive => true;
@@ -2182,7 +2218,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             .collection('branches')
             .get();
         for (final doc in snap.docs) {
-          nested.add(BranchModel.fromMap(doc.data(), id: doc.id));
+          // The path is the chain: a stale organizationUID in the doc
+          // must not attribute the branch to another chain (TAS-333).
+          nested.add(BranchModel.fromMap(
+            {...doc.data(), 'organizationUID': orgId},
+            id: doc.id,
+          ));
         }
       } catch (e, st) {
         debugPrint('Attendance: nested branches fetch failed: $e\n$st');
@@ -2203,7 +2244,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         debugPrint('Attendance: root branches fetch failed: $e\n$st');
       }
 
-      final branchesList = mergeOrgBranches(nested, root);
+      final branchesList =
+          keepMemberChainBranches(mergeOrgBranches(nested, root), {orgId});
       for (final b in branchesList) {
         BranchDisplayCache.instance.registerFromMap({
           'branchName': b.branchName,
@@ -2345,7 +2387,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       } else if (closest != null) {
         AppSnackBar.showError(
           context,
-          AppLocalizations.of(context)!.attOutsideBranchWithRadius(minDistance.toInt(), (closest.geofenceRadius + 50).toInt()),
+          AppLocalizations.of(context)!.attOutsideBranchWithRadius(minDistance.toInt(), allowedGeofenceRadius(closest).toInt()),
         );
       }
     }
@@ -2405,7 +2447,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     _otherGeofenceOrgIds
       ..clear()
       ..addAll(geofenced);
-    _otherChainBranches = all;
+    // Only branches of the delegate's own chains (TAS-333).
+    _otherChainBranches = keepMemberChainBranches(all, _memberOrgIds);
   }
 
   /// True when the delegate has an open check-in in any chain, or when that
@@ -2581,6 +2624,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       branchToUse,
       fallbackOrganizationUID: widget.delegate.organizationUID,
     );
+    if (_refuseBranchOfOtherChain(parentContext, branchRef)) return;
     final branchName = branchRef.branchName;
     final position = _currentPosition!;
 
@@ -2675,6 +2719,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       if (scannedRef != null && scannedRef.branchName.isNotEmpty) {
         final scannedBranch = scannedRef.branchName;
         if (!parentContext.mounted) return;
+        // The scanned branch is the one recorded and checked; a code of
+        // another chain is refused, never swapped for a nearby branch.
+        if (_refuseBranchOfOtherChain(parentContext, scannedRef)) return;
         AppSnackBar.showInfo(parentContext, 'Fetching location...');
 
         final position = await _getCurrentLocation(

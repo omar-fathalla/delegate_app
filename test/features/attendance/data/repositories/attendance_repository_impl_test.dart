@@ -455,4 +455,116 @@ void main() {
       },
     );
   });
+
+  // TAS-333: two chains with a branch at the same place. The QR check-in
+  // checks and records the scanned branch only.
+  group('checkIn with a scanned QR branch (TAS-333)', () {
+    const ownOrg = 'seed-fake-tas112-org';
+    const foreignOrg = 'seed-fake-hr-org';
+    Map<String, dynamic> branchDoc(String org, String name, num radius) => {
+          'branchName': name,
+          'organizationUID': org,
+          'latitude': 30.1001,
+          'longitude': 31.2001,
+          'geofenceRadius': radius,
+        };
+
+    late List<Map<String, String?>> resolveCalls;
+    late Map<String, String?> written;
+
+    void stubBranches({required num ownRadius}) {
+      resolveCalls = [];
+      mockRemote.resolveBranchStub = ({
+        String? branchId,
+        String? organizationUID,
+        String? branchName,
+      }) async {
+        resolveCalls.add({'id': branchId, 'org': organizationUID});
+        if (branchId == 'seed-fake-tas112-br-qr' && organizationUID == ownOrg) {
+          return ResolvedBranchDocument(
+            documentId: branchId!,
+            data: branchDoc(ownOrg, 'Fake Branch QR', ownRadius),
+          );
+        }
+        if (branchId == 'seed-fake-br-alpha' && organizationUID == foreignOrg) {
+          return ResolvedBranchDocument(
+            documentId: branchId!,
+            data: branchDoc(foreignOrg, 'Fake Branch Alpha', 100),
+          );
+        }
+        return null;
+      };
+      mockRemote.checkInStub = (
+        String userId,
+        double lat,
+        double long, {
+        required String companyId,
+        required String organizationId,
+        required String deviceInfo,
+        String? branchName,
+        String? branchId,
+        String? branchOrganizationUID,
+        String? delegateName,
+        String? phoneNumber,
+        String? companyName,
+        String? personalPhotoURL,
+      }) async {
+        written = {
+          'organizationId': organizationId,
+          'branchId': branchId,
+          'branchOrganizationUID': branchOrganizationUID,
+          'branchName': branchName,
+        };
+        return AttendanceModel(
+          id: 'log1',
+          userId: userId,
+          organizationId: organizationId,
+          checkInTime: DateTime(2026, 11, 25, 9),
+          latitude: lat,
+          longitude: long,
+          branchName: branchName,
+          branchId: branchId,
+          branchOrganizationUID: branchOrganizationUID,
+        );
+      };
+    }
+
+    // ~200 m north of both branches: outside Alpha (150), inside 300 + 50.
+    Future<Either<Failure, dynamic>> scanOwnQr() => repository.checkIn(
+          'seed-fake-tas320-pro',
+          30.1019,
+          31.2001,
+          companyId: 'seed-fake-tas112-co',
+          organizationId: ownOrg,
+          deviceInfo: 'test',
+          branchName: 'Fake Branch QR',
+          branchId: 'seed-fake-tas112-br-qr',
+          branchOrganizationUID: ownOrg,
+        );
+
+    test('records the scanned branch and checks its own radius', () async {
+      stubBranches(ownRadius: 300);
+      final result = await scanOwnQr();
+      expect(result.isRight(), isTrue, reason: '$result');
+      expect(resolveCalls, [
+        {'id': 'seed-fake-tas112-br-qr', 'org': ownOrg},
+      ]);
+      expect(written, {
+        'organizationId': ownOrg,
+        'branchId': 'seed-fake-tas112-br-qr',
+        'branchOrganizationUID': ownOrg,
+        'branchName': 'Fake Branch QR',
+      });
+    });
+
+    test('out of range message uses the scanned branch radius', () async {
+      stubBranches(ownRadius: 120);
+      final result = await scanOwnQr();
+      result.fold(
+        (f) => expect(f.message, contains('170')),
+        (_) => fail('should be out of range'),
+      );
+      expect(resolveCalls.single['id'], 'seed-fake-tas112-br-qr');
+    });
+  });
 }

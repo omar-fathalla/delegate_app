@@ -3044,4 +3044,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get locHelpStepMapsTryAgain =>
       'Still no location: open Google Maps, wait for the blue dot to settle, then come back and try again.';
+
+  @override
+  String attBranchOtherChain(String chain) {
+    return 'This branch belongs to $chain. Switch to that chain first, then try again.';
+  }
+
+  @override
+  String get attBranchNotYourChain =>
+      'This branch is not in any of your chains. Scan your own branch\'s code.';
 }
