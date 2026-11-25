@@ -3038,6 +3038,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Take Tashil out of battery saving and set it to “Unrestricted” (important on OPPO, Realme and Xiaomi).';
 
   @override
+  String get attFetchingLocation => 'Fetching location...';
+
+  @override
   String get locHelpStepMapsRetry =>
       'Still no location: open Google Maps, wait for the blue dot to settle, then come back and tap “Check location again”.';
 

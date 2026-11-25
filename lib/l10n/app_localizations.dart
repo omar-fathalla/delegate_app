@@ -5424,6 +5424,12 @@ abstract class AppLocalizations {
   /// **'Take Tashil out of battery saving and set it to “Unrestricted” (important on OPPO, Realme and Xiaomi).'**
   String get locHelpStepBattery;
 
+  /// No description provided for @attFetchingLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Fetching location...'**
+  String get attFetchingLocation;
+
   /// TAS-283 location help card
   ///
   /// In en, this message translates to:
