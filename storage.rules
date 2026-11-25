@@ -27,7 +27,7 @@ service firebase.storage {
         'supervisor', 'company_supervisor',
         'hr', 'company-hr', 'company_hr', 'human_resources',
         'organization-admin', 'organization_admin', 'organizationadmin',
-        'organizationAdmin'
+        'organizationAdmin', 'org-admin'
       ];
     }
     // Other non-delegate staff (marketing, accountant, …) may use
@@ -41,6 +41,7 @@ service firebase.storage {
           'marketingpromotion',
           'branches_marketing_manager', 'branches-marketing-manager',
           'branches_marketing', 'branchesMarketingManager',
+          'branches-marketing', 'branchesmarketingmanager',
           'accountant', 'accounting', 'account_admin', 'account-admin'
         ];
     }
@@ -94,12 +95,95 @@ service firebase.storage {
       let role = u.get('role', '');
       let org = u.get('organizationUID', '');
       return isNonAnonymous()
-        && role in [
-          'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
-          'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion'
-        ]
+        && (storageOrgAdminRole(role) || storageMarketingRole(role))
         && org != ''
         && firestore.exists(/databases/(default)/documents/organizations/$(org)/companies/$(compId));
+    }
+
+    // ==================== TAS-332: READ PARITY WITH FIRESTORE ====================
+    // The app (TAS-42) stores a Storage path and resolves it at display
+    // time, so whoever reads the Firestore doc must also pass these reads
+    // (and nobody else). Each helper names the firestore.rules read it
+    // mirrors. Delegate branches use token claims only (no get); staff
+    // branches read users/{uid} once plus, at most, one tenant doc.
+    function storageOrgAdminRole(role) {
+      return role in ['organization-admin', 'organization_admin', 'organizationadmin',
+        'organizationAdmin', 'org-admin'];
+    }
+    function storageMarketingRole(role) {
+      return role in ['marketing', 'marketing_promotion', 'marketingpromotion',
+        'marketingPromotion'];
+    }
+    function storageBranchesMarketingRole(role) {
+      return role in ['branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+        'branches-marketing-manager', 'branchesmarketingmanager', 'branchesMarketingManager'];
+    }
+    // firestore.rules delegateOtpOk().
+    function storageDelegateOtpOk() {
+      return request.auth.token.get('otp_required', false) != true
+        || request.auth.token.get('otp_verified', false) == true;
+    }
+    // firestore.rules ownsDelegateId / delegateOwns on a delegate token.
+    function delegateTokenIsDelegate(id) {
+      return isDelegateToken()
+        && storageDelegateOtpOk()
+        && id != ''
+        && (id == request.auth.uid
+          || request.auth.token.get('delegateId', '') == id
+          || id in request.auth.token.get('delegateIds', []));
+    }
+    // firestore.rules callerOrg() == org (claim orgId) or delegateInOrg(org).
+    function delegateTokenInOrg(orgId) {
+      return isDelegateToken()
+        && orgId != ''
+        && (request.auth.token.get('orgId', '') == orgId
+          || (orgId in request.auth.token.get('orgIds', []) && storageDelegateOtpOk()));
+    }
+    // captured_photos (collection group): orgScoped() / delegateInOrg() let
+    // any staff or delegate of the chain read. The company must sit under
+    // the org in the path, or a forged org segment would open it.
+    function photoOrgMemberRead(orgId, compId) {
+      let companyInOrg = firestore.exists(
+        /databases/(default)/documents/organizations/$(orgId)/companies/$(compId));
+      return isDelegateToken()
+        ? (delegateTokenInOrg(orgId) && companyInOrg)
+        : (isNonAnonymous()
+          && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data
+            .get('organizationUID', '') == orgId
+          && isStorageNamedStaffRole(
+            firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.get('role', ''))
+          && companyInOrg);
+    }
+    // leave_requests read: org admin (canReadOrgAdminRequestInOwnOrg) and
+    // org-scoped staff (org admin, marketing) on their chain. Branches
+    // marketing reads only as company staff (isCompanyScopedStaff).
+    function leaveOrgStaffRead(compId) {
+      return orgStaffOwnsCompany(compId);
+    }
+    // penalties get (penaltyStaffReadOk / canReadOrgAdminPenaltyByOrgId):
+    // org admin on its chain; marketing / branches marketing on the chain
+    // only when they have no companyUID.
+    function penaltyOrgStaffRead(compId) {
+      let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      let role = u.get('role', '');
+      let org = u.get('organizationUID', '');
+      return isNonAnonymous()
+        && org != ''
+        && (storageOrgAdminRole(role)
+          || (u.get('companyUID', '') == ''
+            && (storageMarketingRole(role) || storageBranchesMarketingRole(role))))
+        && firestore.exists(/databases/(default)/documents/organizations/$(org)/companies/$(compId));
+    }
+    // penalties get for a delegate token (delegatePenaltySelfReadOk): the
+    // target of the penalty named in the path. The penalty must belong to
+    // the company in the path. Evidence uploaded before the doc existed
+    // sits under evidence/temp and stays staff-only.
+    function delegatePenaltyEvidenceRead(compId, penaltyId) {
+      let p = firestore.get(/databases/(default)/documents/penalties/$(penaltyId)).data;
+      return isDelegateToken()
+        && (p.get('companyUID', '') == compId || p.get('companyId', '') == compId)
+        && (delegateTokenIsDelegate(p.get('targetDelegateId', ''))
+          || delegateTokenIsDelegate(p.get('delegateUid', '')));
     }
 
     // Delegate tokens always have role=delegate and companyId (singular).
@@ -257,8 +341,11 @@ service firebase.storage {
         );
     }
     match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
-      allow read: if canAccessCompanyFiles(compId)
-        || delegateTokenOwnsCompany(compId);
+      // TAS-332: delegate of the company first (no get), then company staff,
+      // then anyone of the chain (captured_photos collection-group read).
+      allow read: if delegateTokenOwnsCompany(compId)
+        || canAccessCompanyFiles(compId)
+        || photoOrgMemberRead(orgId, compId);
       // Filename photo_{uid}_* is treated as owned by that uid so a
       // create-classified overwrite cannot steal a colleague's object.
       allow create, update: if (canAccessCompanyFiles(compId)
@@ -374,6 +461,16 @@ service firebase.storage {
         && uploadOk(20, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|application/pdf');
     }
 
+    // TAS-332: private_label_audits / private_label_products are read by
+    // every delegate of the chain (firestore.rules callerOrg / delegateInOrg).
+    // Read only: staff keep the org rule above for writes.
+    match /organizations/{orgId}/private_label/{rest=**} {
+      allow read: if delegateTokenInOrg(orgId);
+    }
+    match /organizations/{orgId}/private_label_products/{rest=**} {
+      allow read: if delegateTokenInOrg(orgId);
+    }
+
     // ==================== COMPANY FILES ====================
     // Tenant-scoped when the path is the company id.
     match /companies/{compId}/{allPaths=**} {
@@ -399,7 +496,12 @@ service firebase.storage {
     // clients that only GET remain usable; new writes on the legacy
     // path are denied.
     match /penalties/{compId}/evidence/{penaltyId}/{allPaths=**} {
-      allow read, write: if (canAccessCompanyFiles(compId) || orgStaffOwnsCompany(compId))
+      // TAS-332: reads follow the penalties get rule (the write side keeps
+      // org-scoped marketing, as penaltyCreateOk does).
+      allow read: if isDelegateToken()
+        ? delegatePenaltyEvidenceRead(compId, penaltyId)
+        : (canAccessCompanyFiles(compId) || penaltyOrgStaffRead(compId));
+      allow write: if (canAccessCompanyFiles(compId) || orgStaffOwnsCompany(compId))
         && uploadOk(50, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|video/.*|audio/.*|application/pdf');
     }
     match /penalties/evidence/{allPaths=**} {
@@ -414,8 +516,13 @@ service firebase.storage {
     // their screens do not use this path. The folder owner may write
     // their own uid segment when the token company matches.
     match /leave_attachments/{compId}/{uid}/{allPaths=**} {
-      allow read: if canAccessWebIdDocs(compId)
-        || (delegateTokenOwnsCompany(compId) && request.auth.uid == uid);
+      // TAS-332: reads follow leave_requests: the owner (uid or delegateId
+      // claims), company staff incl. accountant / branches marketing
+      // (canAccessCompanyFiles), and org admin / marketing of the chain.
+      allow read: if isDelegateToken()
+        ? ((delegateTokenOwnsCompany(compId) && request.auth.uid == uid)
+          || delegateTokenIsDelegate(uid))
+        : (canAccessCompanyFiles(compId) || leaveOrgStaffRead(compId));
       allow write: if (canAccessWebIdDocs(compId)
         || (delegateTokenOwnsCompany(compId)
           && request.auth.uid == uid
