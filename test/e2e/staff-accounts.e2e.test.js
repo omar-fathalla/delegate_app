@@ -104,3 +104,39 @@ test("claimInvite: the invite link proves the email (TAS-68); claims once", asyn
   for (let i = 0; i < 3; i++) r2.push(await code(fn.claimInvite.run({inviteId: "i1", displayName: "I"}, ctx("u1", {email: "inv@e.com", email_verified: true}))));
   assert.deepEqual(r2, ["ok", "ok", "rate_limited"]);
 });
+
+test("registerInvitedAdmin (TAS-17): creates the invite's own account server-side, never touches an existing one", async () => {
+  const exp = admin.firestore.Timestamp.fromMillis(Date.now() + 86400000);
+  await db.doc("invites/r1").set({status: "pending", email: "Reg.Admin@E.com", roleToAssign: "company-admin",
+    organizationId: "o1", companyId: "c1", expiresAt: exp});
+  await db.doc("invites/r2").set({status: "claimed", email: "r2@e.com", roleToAssign: "company-admin",
+    organizationId: "o1", companyId: "c1", expiresAt: exp, claimedByUid: "x"});
+  await db.doc("invites/r3").set({status: "pending", email: "r3@e.com", roleToAssign: "company-admin",
+    organizationId: "o1", companyId: "c1", expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() - 1000)});
+  const anon = {rawRequest: {headers: {}}};
+  // No sign-in needed; the account gets the invite's email, nothing from the caller.
+  const r = await fn.registerInvitedAdmin.run({inviteId: "r1", password: "Passw0rd!x", displayName: "Reg",
+    email: "attacker@e.com"}, anon);
+  assert.deepEqual(r, {created: true});
+  const u = await admin.auth().getUserByEmail("reg.admin@e.com");
+  assert.equal(u.displayName, "Reg");
+  assert.ok(u.passwordHash !== undefined || u.providerData.some((p) => p.providerId === "password"));
+  await assert.rejects(admin.auth().getUserByEmail("attacker@e.com"));
+  // No role, no claims, no users doc: claimInvite still does that part.
+  assert.equal(u.customClaims, undefined);
+  assert.equal((await db.doc(`users/${u.uid}`).get()).exists, false);
+  // Existing account: untouched (no password change), page signs in instead.
+  const before = (await admin.auth().getUser(u.uid)).tokensValidAfterTime;
+  assert.deepEqual(await fn.registerInvitedAdmin.run({inviteId: "r1", password: "Other-pass-1"}, anon), {created: false});
+  assert.equal((await admin.auth().getUser(u.uid)).tokensValidAfterTime, before);
+  // Invite state and input checks.
+  assert.equal(await code(fn.registerInvitedAdmin.run({inviteId: "r2", password: "Passw0rd!x"}, anon)), "invite_already_claimed");
+  assert.equal(await code(fn.registerInvitedAdmin.run({inviteId: "r3", password: "Passw0rd!x"}, anon)), "invite_expired");
+  assert.equal(await code(fn.registerInvitedAdmin.run({inviteId: "nope", password: "Passw0rd!x"}, anon)), "invite_not_found");
+  assert.equal(await code(fn.registerInvitedAdmin.run({inviteId: "r1", password: "short"}, anon)), "weak_password");
+  assert.equal(await code(fn.registerInvitedAdmin.run({inviteId: "a/b", password: "Passw0rd!x"}, anon)), "invalid_input");
+  // Rate limit per invite id (5/hour; r1 has used 3: two calls + weak password).
+  const seen = [];
+  for (let i = 0; i < 3; i++) seen.push(await code(fn.registerInvitedAdmin.run({inviteId: "r1", password: "Passw0rd!x"}, anon)));
+  assert.equal(seen[seen.length - 1], "rate_limited");
+});

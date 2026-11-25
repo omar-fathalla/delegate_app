@@ -140,6 +140,40 @@ export function decideClaim(
   return {ok: true};
 }
 
+export const INVITE_PASSWORD_MIN = 8;
+export const INVITE_PASSWORD_MAX = 128;
+
+/**
+ * TAS-17: registerInvitedAdmin creates the invited admin's Auth account on
+ * the server, so Identity Platform sign-up (disabledUserSignup) can be
+ * closed for browsers. Same invite checks as decideClaim, minus the email
+ * match: the account is created for the invite's own email and nothing
+ * else. An existing account is never touched (no password reset here).
+ */
+export function decideInviteRegistration(
+  invite: InviteData | undefined,
+  password: unknown,
+  nowMs: number,
+  expiresAtMs: number | null,
+): Decision {
+  if (typeof password !== "string" || password.length < INVITE_PASSWORD_MIN ||
+      password.length > INVITE_PASSWORD_MAX) {
+    return {ok: false, reason: "weak_password"};
+  }
+  if (!invite) return {ok: false, reason: "invite_not_found"};
+  if (invite.claimedBy || invite.claimedByUid || invite.claimedAt) {
+    return {ok: false, reason: "invite_already_claimed"};
+  }
+  if (invite.status !== "pending") return {ok: false, reason: "invite_not_pending"};
+  if (expiresAtMs === null || expiresAtMs <= nowMs) return {ok: false, reason: "invite_expired"};
+  if (!isValidEmail(normalizeEmail(invite.email))) return {ok: false, reason: "invite_invalid"};
+  const role = invite.roleToAssign;
+  if (role !== "org-admin" && role !== "company-admin") return {ok: false, reason: "role_not_allowed"};
+  if (!str(invite.organizationId)) return {ok: false, reason: "invite_invalid"};
+  if (role === "company-admin" && !str(invite.companyId)) return {ok: false, reason: "invite_invalid"};
+  return {ok: true};
+}
+
 export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (ch) => (
     {"&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"}[ch] as string));

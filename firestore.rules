@@ -42,6 +42,21 @@ service cloud.firestore {
         && request.auth.token.firebase.sign_in_provider == 'anonymous';
     }
 
+    // TAS-15 / TAS-17: an identity the system issued. Anonymous tokens
+    // (store builds up to v1.14.0) are already out via signedIn(). A
+    // self-registered email/password account (Identity Platform sign-up is
+    // still open on production) has no role claim and at most a bare
+    // self-created users doc (role '' or 'delegate', see usersCreateOk), so
+    // it is out too. Delegates carry role 'delegate' from delegateLoginV2;
+    // staff carry a role claim (claimInvite / createAdminUser /
+    // createStaffUser / backfill) or a staff role in users/{uid}.
+    // Used where a read was open to any signed-in token.
+    function knownIdentity() {
+      return signedIn() && (
+        request.auth.token.get('role', '') != ''
+        || !(userRole() in ['', 'delegate']));
+    }
+
     function userExists() {
       return signedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid));
@@ -1577,7 +1592,7 @@ service cloud.firestore {
     }
 
     match /organizations/{orgId} {
-      allow read: if signedIn();
+      allow read: if knownIdentity();
       allow create: if isSuperAdmin();
       // TAS-324: one users/{uid} read (orgUpdateOk) so another chain's deny
       // is a rule, not the 1000-expression budget. Same principals as before.
@@ -1585,7 +1600,7 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
 
       match /branches/{branchId} {
-        allow read: if signedIn();
+        allow read: if knownIdentity();
         // TAS-54: the geofence decides attendance. Branches are edited by
         // global staff (the app's branches screens) or this chain's admin.
         allow write: if isGlobalStaff() || (isOrgAdmin() && callerOrg() == orgId);
@@ -1618,7 +1633,7 @@ service cloud.firestore {
       }
 
       match /companies/{compId} {
-        allow read: if signedIn();
+        allow read: if knownIdentity();
         // Org admin of this chain, or company staff of this company in this
         // chain (TAS-44: one users read, so a cross-chain deny is a rule).
         allow create, update, delete: if staffToken() && companyDocWriteOk(orgId, compId);
@@ -2149,7 +2164,7 @@ service cloud.firestore {
     }
 
     match /{path=**}/companies/{companyId} {
-      allow read: if signedIn();
+      allow read: if knownIdentity();
       // TAS-44: no write here. A recursive match also covers direct writes to
       // organizations/{org}/companies/{co}, so a write on it OR-ed past the
       // nested rule's org/company check (org admin of chain A writing chain B).
@@ -2329,12 +2344,12 @@ service cloud.firestore {
     }
 
     match /guide_videos/{videoId} {
-      allow read: if signedIn();
+      allow read: if knownIdentity();
       allow write: if isSuperAdmin();
     }
 
     match /app_updates/{updateId} {
-      allow read: if signedIn();
+      allow read: if knownIdentity();
       allow write: if isSuperAdmin();
     }
 
@@ -2545,7 +2560,7 @@ service cloud.firestore {
     // ==================== MOBILE: BRANCHES, NOTIFICATIONS, TOKENS ====================
 
     match /branches/{branchId} {
-      allow read: if signedIn();
+      allow read: if knownIdentity();
       // TAS-54: global staff, or an org admin for its own chain's branches
       // (stored and incoming organizationUID). Company staff no longer move
       // any branch's geofence.
@@ -3032,7 +3047,7 @@ service cloud.firestore {
     // Everyone signed in reads it; only a super-admin edits it, so one
     // company's staff can no longer change another company's fines.
     match /penalty_rules/{ruleId} {
-      allow read: if signedIn();
+      allow read: if knownIdentity();
       allow create, update, delete: if staffToken() && isSuperAdmin();
     }
 
@@ -3730,12 +3745,12 @@ service cloud.firestore {
     // signed-in app reads it at start; only a super admin writes it from
     // «إدارة جلسات المناديب».
     match /system_config/session_control {
-      allow read: if signedIn();
+      allow read: if knownIdentity();
       allow write: if isSuperAdmin();
     }
 
     match /config/subscriptions {
-      allow read: if signedIn();
+      allow read: if knownIdentity();
       allow write: if false;
     }
     match /config/{docId} {
