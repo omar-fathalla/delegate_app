@@ -137,3 +137,30 @@ test("backfill: dry-run changes nothing, --apply sets confirmed rows with a back
   assert.deepEqual((await auth.getUser("bf-oa")).customClaims, {role: "organization-admin", organizationId: ORG, x: 1});
   assert.equal((await auth.getUser("bf-mkt")).customClaims.changed, true);
 });
+
+test("payments: org-admin claim pays inside its own chain, other chain and unknown company denied", {skip: !live}, async () => {
+  const admin = require("firebase-admin");
+  if (!admin.apps.length) admin.initializeApp({projectId: process.env.GCLOUD_PROJECT || "demo-tas23-claims"});
+  const {previewSubscriptionQuote} = require("../lib/paymob_subscription");
+  const db = admin.firestore();
+  await db.doc(`organizations/${ORG}/companies/${CO}`).set({name: "fake co"});
+  await db.doc("organizations/seed-fake-tas23-org2/companies/seed-fake-tas23-x").set({name: "other chain co"});
+  await db.doc("users/pay-oa").set({role: "organization-admin", organizationUID: ORG});
+  await db.doc("users/pay-hr").set({role: "hr", organizationUID: ORG, companyUID: CO});
+  const ctx = (uid, claims) => ({auth: {uid, token: {firebase: {sign_in_provider: "password"}, ...claims}}, rawRequest: {headers: {}}});
+  const oa = ctx("pay-oa", {role: "organization-admin", orgId: ORG, organizationId: ORG});
+  const reason = async (p) => { try { await p; return "ok"; } catch (e) { return e.details?.reason || e.code; } };
+  const q = (organizationUID, companyUID, c) => reason(previewSubscriptionQuote.run({organizationUID, companyUID, uids: ["nobody"]}, c));
+  const authz = new Set(["out_of_scope", "caller_not_allowed", "caller_not_staff"]);
+  // Own chain: past the scope check (fails later on the fake delegate, not on authz).
+  assert.ok(!authz.has(await q(ORG, CO, oa)), "own chain company passes the scope check");
+  assert.equal(await q("seed-fake-tas23-org2", "seed-fake-tas23-x", oa), "out_of_scope");
+  assert.equal(await q(ORG, "seed-fake-tas23-x", oa), "out_of_scope", "company of another chain named under own org");
+  assert.equal(await q(ORG, "no-such-co", oa), "out_of_scope");
+  // Org admin from the users doc only (no claim): denied.
+  assert.equal(await q(ORG, CO, ctx("pay-oa", {})), "caller_not_allowed");
+  // Company staff unchanged: own company only.
+  const hr = ctx("pay-hr", {role: "hr", orgId: ORG, organizationId: ORG, companyId: CO});
+  assert.ok(!authz.has(await q(ORG, CO, hr)));
+  assert.equal(await q(ORG, CO2, hr), "out_of_scope");
+});

@@ -447,3 +447,33 @@ export function quoteFor(uids: string[], at: Date, opts?: QuoteOptions): Quote {
     amountCents: toCents(amount),
   };
 }
+
+/**
+ * TAS-23 (user decision 25 Nov): who may pay / quote for a company, from the
+ * caller's claim-backed role and scope (claimBackedCaller).
+ * - super-admin: any company.
+ * - organization admin: any company of its own chain. The caller must also
+ *   check server-side that organizations/{callerOrg}/companies/{company}
+ *   exists ("needs_company_check"); the request's own organizationUID is
+ *   never trusted on its own.
+ * - company staff (company admin / supervisor / HR): its own company only.
+ */
+export type PayScope = "allow" | "needs_company_check" | "out_of_scope";
+
+export function payScopeDecision(input: {
+  role: string;
+  callerOrg: string;
+  callerCompany: string;
+  requestOrg: string;
+  requestCompany: string;
+}): PayScope {
+  const role = input.role.trim().toLowerCase().replace(/[^a-z]/g, "");
+  if (role === "superadmin") return "allow";
+  if (!input.requestCompany) return "out_of_scope";
+  if (role === "organizationadmin" || role === "orgadmin") {
+    if (!input.callerOrg || input.requestOrg !== input.callerOrg) return "out_of_scope";
+    return "needs_company_check";
+  }
+  if (!input.callerCompany || input.callerCompany !== input.requestCompany) return "out_of_scope";
+  return "allow";
+}

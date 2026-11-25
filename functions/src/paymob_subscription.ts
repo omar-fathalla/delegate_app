@@ -20,7 +20,7 @@ import {
   previewRenewalQuote,
   quoteSubscriptionRequest,
 } from "./subscription_jobs";
-import {CHECKOUT_IN_PROGRESS_SECONDS, isAwaitingPaymentExpired} from "./subscription_logic";
+import {CHECKOUT_IN_PROGRESS_SECONDS, isAwaitingPaymentExpired, payScopeDecision} from "./subscription_logic";
 import {verifyTransactionPostHmac} from "./paymob_hmac";
 import {notifyPaymobSupersededPaymentRefund, PaymobMessaging} from "./paymob_superseded_alert";
 import {claimBackedCaller} from "./staff_claims";
@@ -233,13 +233,16 @@ async function assertCallerMayPay(
   }
   const callerOrg = str(c.organizationUID || c.organizationId);
   const callerCompany = str(c.companyUID || c.companyId);
-  const requestOrg = str(request.organizationUID || request.organizationId);
   const requestCompany = str(request.companyUID || request.companyId);
-  if (!callerCompany || callerCompany !== requestCompany) {
-    fail("permission-denied", "out_of_scope");
-  }
-  if (role.startsWith("organization") || role.includes("organization")) {
-    if (!callerOrg || callerOrg !== requestOrg) fail("permission-denied", "out_of_scope");
+  const decision = payScopeDecision({
+    role, callerOrg, callerCompany, requestCompany,
+    requestOrg: str(request.organizationUID || request.organizationId),
+  });
+  if (decision === "out_of_scope") fail("permission-denied", "out_of_scope");
+  if (decision === "needs_company_check") {
+    // Org admin (user decision 25 Nov): any company of its own chain, checked here.
+    const co = await db.doc(`organizations/${callerOrg}/companies/${requestCompany}`).get();
+    if (!co.exists) fail("permission-denied", "out_of_scope");
   }
 }
 

@@ -126,3 +126,18 @@ test("the sync trigger is exported and documented with its deploy name", () => {
   const src = require("fs").readFileSync(require("path").join(__dirname, "../src/index.ts"), "utf8");
   assert.match(src, /export \{syncStaffClaimsOnUserWrite\} from "\.\/staff_claims_sync"/);
 });
+
+test("payments: org admin pays for any company of its own chain only (user decision 25 Nov)", () => {
+  const {payScopeDecision} = require("../lib/subscription_logic");
+  const d = (role, callerOrg, callerCompany, requestOrg, requestCompany) =>
+    payScopeDecision({role, callerOrg, callerCompany, requestOrg, requestCompany});
+  assert.equal(d("organization-admin", "o1", "", "o1", "c7"), "needs_company_check");
+  assert.equal(d("organization-admin", "o1", "", "o2", "c7"), "out_of_scope");
+  assert.equal(d("organization-admin", "o1", "", "", "c7"), "out_of_scope");
+  assert.equal(d("organization-admin", "", "", "o1", "c7"), "out_of_scope");
+  assert.equal(d("organization-admin", "o1", "", "o1", ""), "out_of_scope");
+  assert.equal(d("company-admin", "o1", "c1", "o1", "c1"), "allow");
+  assert.equal(d("hr", "o1", "c1", "o1", "c2"), "out_of_scope");
+  assert.equal(d("supervisor", "o1", "", "o1", "c1"), "out_of_scope");
+  assert.equal(d("super-admin", "", "", "o9", "c9"), "allow");
+});
