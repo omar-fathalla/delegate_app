@@ -8,7 +8,7 @@ const assert = require("node:assert");
 const {describe, test, before, after, beforeEach} = require("node:test");
 const {readFileSync} = require("fs");
 const {resolve} = require("path");
-const {initializeTestEnvironment, assertFails, assertSucceeds} = require("./_rules_testing");
+const {initializeTestEnvironment, assertFails, assertSucceeds, assertDeniedByRule} = require("./_rules_testing");
 const {doc, setDoc, updateDoc, getDoc, deleteDoc, writeBatch} = require("firebase/firestore");
 
 const PROJECT_ID = "demo-docs-pending";
@@ -207,6 +207,8 @@ describe("docs-pending round 2", () => {
   const T = (p) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error("TIMEOUT_EMULATOR_ERROR")), OP_TIMEOUT_MS))]);
   const ok = (p) => T(assertSucceeds(p));
   const no = (p) => T(assertFails(p));
+  // TAS-61: denied by a rule condition, never by the 1000-expression budget.
+  const noRule = (p) => T(assertDeniedByRule(p));
   const ALL = {
     nested: "organizations/o1/companies/c1/delegates/d1",
     top: "delegates/d1",
@@ -307,7 +309,7 @@ describe("docs-pending round 2", () => {
   for (const [label, path] of Object.entries({...ALL, request: "delegate_requests/d1"})) {
     describe(`B2 URL must be backed by a pending entry (${label})`, () => {
       const allow = (n, f) => test(`ALLOW ${n}`, async () => ok(updateDoc(doc(del(), path), await f())));
-      const deny = (n, f) => test(`DENY ${n}`, async () => no(updateDoc(doc(del(), path), await f())));
+      const deny = (n, f) => test(`DENY ${n}`, async () => noRule(updateDoc(doc(del(), path), await f())));
       deny("photo fields set to two different URLs", () =>
         ({documents: [{...PHOTO, documentStatus: "pending", documentURL: "p1"}, NID, RCPT], profileImageUrl: "p1", personalPhotoURL: "pE"}));
       deny("drop photo entry + new profileImageUrl/photoURL", () => ({documents: [NID, RCPT], profileImageUrl: "pE", photoURL: "pE"}));
@@ -353,16 +355,30 @@ describe("docs-pending round 2", () => {
         documents: [{...PHOTO, documentStatus: "pending", documentURL: "p9"}, RCPT,
           {...NID, documentStatus: "pending", documentURL: "f9", secondaryURL: "b9"}],
         profileImageUrl: "p9", personalPhotoURL: "p9", nationalIdFrontUrl: "f9", nationalIdBackUrl: "b9", updatedAt: "t"}));
-      // Photo AND ID in one write over a full 8-entry list exceeds the
-      // 1000-expression budget and is denied (fails closed). The app writes
-      // one document per update, which is covered by the 8-entry cases above.
-      deny("photo + ID in one write over 8 entries (budget, fails closed)", async () => {
-        await seed(path, {...BASE, documents: EIGHT});
-        const docs = [...EIGHT.slice(2)].reverse();
-        docs.push({...EIGHT[1], documentStatus: "pending", documentURL: "f9", secondaryURL: "b9"});
-        docs.push({...EIGHT[0], documentStatus: "pending", documentURL: "p9"});
+      // TAS-61: photo AND ID URLs in one write are allowed only over a list
+      // of at most 3 entries (idUrlsOk). Over a longer list the deny
+      // used to come from the 1000-expression budget; it is now a condition.
+      // The app writes one document per update (profile_screen), which is
+      // covered by the 8-entry cases above.
+      const combo = (n) => {
+        const E = EIGHT.slice(0, n);
+        const docs = [...E.slice(2)].reverse();
+        docs.push({...E[1], documentStatus: "pending", documentURL: "f9", secondaryURL: "b9"});
+        docs.push({...E[0], documentStatus: "pending", documentURL: "p9"});
         return {documents: docs, profileImageUrl: "p9", personalPhotoURL: "p9",
           nationalIdFrontUrl: "f9", nationalIdBackUrl: "b9", updatedAt: "t"};
+      };
+      allow("photo + ID in one write over 3 entries (size cap edge)", async () => {
+        await seed(path, {...BASE, documents: EIGHT.slice(0, 3)});
+        return combo(3);
+      });
+      deny("photo + ID in one write over 4 entries (size cap, TAS-61)", async () => {
+        await seed(path, {...BASE, documents: EIGHT.slice(0, 4)});
+        return combo(4);
+      });
+      deny("photo + ID in one write over 8 entries (size cap, TAS-61)", async () => {
+        await seed(path, {...BASE, documents: EIGHT});
+        return combo(8);
       });
     });
   }
@@ -494,20 +510,34 @@ describe("docs-pending round 2", () => {
       test(`${nestedOnly ? "ALLOW" : "DENY"} ts creates active delegate with approved docs batched with its pending request [r4/r5]`, async () => {
         await seed("delegate_requests/newT", REQ);
         const p = batchApprove(as("ts"), "newT", cpath, {...BASE, uid: "newT", status: "active", documents: [PHOTO]}, true);
-        await (nestedOnly ? ok(p) : no(p));
+        await (nestedOnly ? ok(p) : noRule(p));
       });
       test("DENY ts creates active delegate for an already-approved request (not batched) [r4 F2]", async () => {
         await seed("delegate_requests/newT", {...REQ, status: "approved"});
-        await no(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "active", documents: [PHOTO]}));
+        await noRule(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "active", documents: [PHOTO]}));
       });
       test("DENY ts creates an active delegate without a signup request", () =>
-        no(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "active", documents: pendDocs})));
+        noRule(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "active", documents: pendDocs})));
       test("DENY ts creates approved-docs delegate when the request is rejected", async () => {
         await seed("delegate_requests/newT", {status: "rejected", organizationUID: "o1", companyUID: "c1"});
-        await no(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "pending", documents: [PHOTO]}));
+        await noRule(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "pending", documents: [PHOTO]}));
       });
       test("ALLOW super-admin creates active delegate with approved docs", () =>
         ok(setDoc(doc(as("sa"), cpath), {...BASE, uid: "newT", status: "active", documents: [PHOTO]})));
+      // TAS-61: the tech gate on non-nested paths leaves pending creates alone.
+      test("ALLOW ts creates a pending delegate with no approved document", () =>
+        ok(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "pending", documents: pendDocs})));
+      test("DENY ts creates a pending delegate carrying an approved document", () =>
+        noRule(setDoc(doc(as("ts"), cpath), {...BASE, uid: "newT", status: "pending", documents: [PHOTO]})));
+      // TAS-61: off the nested path, org / company staff creates were denied
+      // only by the expression budget; now by cgDelegateCreateDenied. On the
+      // nested path the same pending create stays allowed.
+      for (const w of ["sup", "hr", "ca", "oa"]) {
+        test(`${nestedOnly ? "ALLOW" : "DENY"} ${w} creates a pending delegate in its company`, () => {
+          const p = setDoc(doc(as(w), cpath), {...BASE, uid: "newT", status: "pending", documents: pendDocs});
+          return nestedOnly ? ok(p) : noRule(p);
+        });
+      }
     });
   }
   describe("H1 (a) delegate_requests", () => {

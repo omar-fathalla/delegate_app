@@ -440,6 +440,12 @@ service cloud.firestore {
 
     // ID front / back are checked in ONE scan (budget): the same pending
     // nationalityId entry must carry every changed, non-empty ID URL.
+    // TAS-61: the app re-uploads one document per write (profile_screen).
+    // A new ID URL together with a photo URL change (set or removed) is
+    // allowed only over a list of at most 3 entries (photo, ID, receipt).
+    // Over a longer list the second URL scan ran out of the 1000-expression
+    // budget (4 entries fit on delegate_requests with only ~6 pad units
+    // spare); that deny is now this condition, checked before the scan.
     function idAt(n, i, needF, fv, needB, bv) {
       return i < n.size()
         && (!needF || n[i].get('documentURL', '') == fv)
@@ -456,7 +462,8 @@ service cloud.firestore {
       let needF = ch.hasAny(['nationalIdFrontUrl']) && fv != null && fv != '';
       let needB = ch.hasAny(['nationalIdBackUrl']) && bv != null && bv != '';
       let n = d.get('documents', []);
-      return !(needF || needB) || (n is list && (
+      return !(needF || needB) || (n is list
+        && (n.size() <= 3 || !ch.hasAny(['profileImageUrl', 'personalPhotoURL', 'photoURL'])) && (
         idAt(n, 0, needF, fv, needB, bv) || idAt(n, 1, needF, fv, needB, bv)
         || idAt(n, 2, needF, fv, needB, bv) || idAt(n, 3, needF, fv, needB, bv)
         || idAt(n, 4, needF, fv, needB, bv) || idAt(n, 5, needF, fv, needB, bv)
@@ -649,6 +656,26 @@ service cloud.firestore {
         sa || ((r in companyPlaceholderCreateRoleList() || r in orgAdminRoleList()) && pendingOk)
         || (r in techRoleList() && ((stl != 'active' && cheapCreateDocsNotApproved(n))
           || (techCreateBound(delegateId) && techReqOk(orgId, compId, delegateId)))));
+    }
+
+    // TAS-61: creates outside organizations/{o}/companies/{c}/delegates
+    // (delegates/{id}, branches/{b}/delegates/{id}) that the old rule denied
+    // only because it ran out of the 1000-expression budget. One users/{uid}
+    // read; true means deny.
+    // - Tech support: an active delegate, or one with an approved document.
+    //   nestedDelegateCreateOk allowed that only through techCreateBound +
+    //   techReqOk, and the request-approval batch needs the nested doc.
+    // - Org / company staff: every create here (the role helpers alone ran
+    //   out of budget). The app creates delegates on the nested path only.
+    // Super-admin (any create) and tech support (pending, nothing approved)
+    // go on to the full check below, unchanged.
+    function cgDelegateCreateDenied() {
+      let d = request.resource.data;
+      let r = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '');
+      let stl = d.get('status', '') is string ? d.get('status', '').lower().trim() : '';
+      return r in techRoleList()
+        ? (stl == 'active' ? true : !cheapCreateDocsNotApproved(d.get('documents', [])))
+        : !(r in superAdminRoleList());
     }
 
     function techCreateBound(delegateId) {
@@ -2094,7 +2121,12 @@ service cloud.firestore {
       // 1000-expression budget. Nested updates are locked via
       // staffDocsApproveOk / delegateFieldsSafe instead.
       // TAS-324: a ternary so a nested path stops at onNestedDelegate().
-      allow create: if onNestedDelegate() ? false : (signedIn() && !delegateOwns(delegateId)
+      // TAS-61: on any other delegates path only super-admin creates, and
+      // technical support creates a pending delegate with no approved
+      // document (a tech approval needs the nested doc, which
+      // techRequestReviewOk reads). cgDelegateCreateDenied denies the rest
+      // with one users/{uid} read; it used to be the expression budget.
+      allow create: if onNestedDelegate() ? false : cgDelegateCreateDenied() ? false : (signedIn() && !delegateOwns(delegateId)
         && delegateCreateHasIdentity() && deviceBindingAbsent() && (
         isGlobalStaff() ||
         (isOrgScopedStaff() && incomingOrgScoped()) ||
@@ -3342,9 +3374,15 @@ service cloud.firestore {
           ? ((request.auth.uid == requestId
                 && changedKeys().hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
                   'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents']))
-              ? ((delegateDocsOk() && delegateUrlsWithDocs())
+              // TAS-61: a delegate token whose upload fails the document /
+              // URL checks is denied here; only a staff token falls through
+              // to the staff branch (which a delegate can never pass). The
+              // deny used to come from the 1000-expression budget.
+              ? ((delegateDocsOk() ? delegateUrlsWithDocs() : false)
                 ? true
-                : (subscriptionPaymentUntouched() ? requestStaffUpdateOk(requestId) : false))
+                : (staffToken()
+                  ? (subscriptionPaymentUntouched() ? requestStaffUpdateOk(requestId) : false)
+                  : false))
               : (subscriptionPaymentUntouched() ? requestStaffUpdateOk(requestId) : false))
           : false)
         : false;
