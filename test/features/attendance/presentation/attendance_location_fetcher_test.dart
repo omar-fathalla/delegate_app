@@ -121,4 +121,66 @@ void main() {
       expect(f.fetch(), throwsA(isA<LocationServiceDisabledException>()));
     });
   });
+
+  group('isRecentLastKnownFix (TAS-161)', () {
+    bool check({
+      Duration? age = const Duration(seconds: 30),
+      double? accuracy = 20,
+    }) =>
+        isRecentLastKnownFix(
+          timestamp: age == null ? null : _now.subtract(age),
+          accuracyMeters: accuracy,
+          now: _now,
+        );
+
+    test('accepts a fresh, precise fix', () {
+      expect(check(), isTrue);
+      expect(check(age: Duration.zero), isTrue);
+      expect(check(age: const Duration(minutes: 2)), isTrue);
+    });
+
+    test('rejects a stale fix', () {
+      expect(check(age: const Duration(minutes: 2, seconds: 1)), isFalse);
+      expect(check(age: const Duration(hours: 3)), isFalse);
+    });
+
+    test('rejects a fix stamped at the epoch (unknown time)', () {
+      expect(
+        isRecentLastKnownFix(
+          timestamp: DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+          accuracyMeters: 10,
+          now: _now,
+        ),
+        isFalse,
+      );
+    });
+
+    test('rejects a null timestamp', () {
+      expect(check(age: null), isFalse);
+    });
+
+    test('rejects poor or unknown accuracy', () {
+      expect(check(accuracy: 100), isTrue);
+      expect(check(accuracy: 101), isFalse);
+      expect(check(accuracy: 3900), isFalse);
+      expect(check(accuracy: 0), isFalse);
+      expect(check(accuracy: -1), isFalse);
+      expect(check(accuracy: double.nan), isFalse);
+      expect(check(accuracy: double.infinity), isFalse);
+      expect(check(accuracy: null), isFalse);
+    });
+
+    test('tolerates a small clock skew but not a far-future stamp', () {
+      expect(check(age: const Duration(seconds: -20)), isTrue);
+      expect(check(age: const Duration(minutes: -5)), isFalse);
+    });
+  });
+
+  test('fetcher drops a last known fix with unknown (0 m) accuracy', () async {
+    final fix = await _fetcher(
+      current: [TimeoutException('a'), TimeoutException('b')],
+      lastKnown: _pos(age: const Duration(seconds: 5), accuracy: 0),
+    ).fetch();
+    expect(fix, isNull);
+  });
 }

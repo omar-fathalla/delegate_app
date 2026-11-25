@@ -82,9 +82,43 @@ class AttendanceLocationFetcher {
 
   /// True when [position] is recent and precise enough to stand in for a
   /// live fix.
-  bool isUsableLastKnown(Position position) {
-    final age = _now().difference(position.timestamp).abs();
-    return age <= maxLastKnownAge &&
-        position.accuracy <= maxLastKnownAccuracyMeters;
-  }
+  bool isUsableLastKnown(Position position) => isRecentLastKnownFix(
+        timestamp: position.timestamp,
+        accuracyMeters: position.accuracy,
+        now: _now(),
+        maxAge: maxLastKnownAge,
+        maxAccuracyMeters: maxLastKnownAccuracyMeters,
+      );
+}
+
+/// How far in the future a last known fix may be stamped and still count:
+/// small clock differences between the GPS chip and the phone are normal.
+const Duration lastKnownClockSkewTolerance = Duration(seconds: 30);
+
+/// Decides whether a cached (last known) position may stand in for a live GPS
+/// fix when judging a delegate's distance to a branch (TAS-161, TAS-280).
+///
+/// A stale fix can sit near another branch kilometres away, so it is only
+/// accepted when all of these hold:
+/// * [timestamp] is known (null means the age cannot be judged);
+/// * it is at most [maxAge] old, and not more than
+///   [lastKnownClockSkewTolerance] in the future;
+/// * [accuracyMeters] is a real, positive value no larger than
+///   [maxAccuracyMeters] (Android reports 0 when the accuracy is unknown).
+///
+/// This only filters genuine fixes. Mock-location handling stays with the
+/// caller and must never be relaxed because of this check.
+bool isRecentLastKnownFix({
+  required DateTime? timestamp,
+  required double? accuracyMeters,
+  required DateTime now,
+  Duration maxAge = const Duration(minutes: 2),
+  double maxAccuracyMeters = 100,
+}) {
+  if (timestamp == null || accuracyMeters == null) return false;
+  final age = now.difference(timestamp);
+  if (age > maxAge) return false;
+  if (age < -lastKnownClockSkewTolerance) return false;
+  if (accuracyMeters.isNaN || accuracyMeters.isInfinite) return false;
+  return accuracyMeters > 0 && accuracyMeters <= maxAccuracyMeters;
 }
