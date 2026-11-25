@@ -1,6 +1,7 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import {PRIVILEGED_ALERT_ROLE_VALUES} from "./delegate_profile_edit_logic";
+import {claimBackedCaller} from "./staff_claims";
 
 /** Firestore `whereIn` role spellings for global notify targets (TA-35). */
 export const GLOBAL_NOTIFY_TARGET_ROLES = [
@@ -78,7 +79,8 @@ export const listGlobalNotifyStaff = functions
       throw new functions.https.HttpsError("unauthenticated", "Sign in required.");
     }
     const db = admin.firestore();
-    const caller = (await db.collection("users").doc(context.auth.uid).get()).data() || {};
+    // TAS-23: role and scope from the token claims, not the users doc.
+    const caller = claimBackedCaller((await db.collection("users").doc(context.auth.uid).get()).data(), context.auth.token);
     if (!companyNotifyCallerAllowed(caller)) {
       throw new functions.https.HttpsError("permission-denied", "Not allowed.");
     }

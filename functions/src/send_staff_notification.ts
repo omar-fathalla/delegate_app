@@ -22,6 +22,7 @@ import {
   senderRoleName,
   targetRoleSpellings,
 } from "./send_staff_notification_logic";
+import {claimBackedCaller} from "./staff_claims";
 
 type Db = admin.firestore.Firestore;
 type Snap = admin.firestore.QueryDocumentSnapshot | admin.firestore.DocumentSnapshot;
@@ -56,7 +57,7 @@ export const sendStaffNotification = functions
       throw new functions.https.HttpsError("unauthenticated", "Sign in required.", {reason: "unauthenticated"});
     }
     try {
-      return await handle(admin.firestore(), context.auth.uid, context.auth.token?.role, data);
+      return await handle(admin.firestore(), context.auth.uid, (context.auth.token || {}) as Record<string, unknown>, data);
     } catch (error) {
       if (error instanceof functions.https.HttpsError) throw error;
       console.error("sendStaffNotification failed", (error as Error)?.message);
@@ -64,10 +65,11 @@ export const sendStaffNotification = functions
     }
   });
 
-async function handle(db: Db, uid: string, tokenRole: unknown, data: unknown) {
+async function handle(db: Db, uid: string, token: Record<string, unknown>, data: unknown) {
   const userSnap = await db.collection("users").doc(uid).get();
-  const user = userSnap.exists ? (userSnap.data() || {}) : null;
-  const scope = callerScopeFrom(user, tokenRole);
+  // TAS-23: role and scope from the token claims, not the users doc.
+  const user = userSnap.exists ? claimBackedCaller(userSnap.data(), token) : null;
+  const scope = callerScopeFrom(user, token.role);
   if ("ok" in scope) fail(scope);
   const req = parseRequest(data);
   if (!req.ok) fail(req);

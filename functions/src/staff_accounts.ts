@@ -5,6 +5,7 @@ import {
   Caller, decideClaim, decideInviteRegistration, decideStaffCreate, isValidEmail, nextRate,
   normalizeEmail, setupEmail, staffCreateEnabled, isSuperRole,
 } from "./staff_accounts_logic";
+import {claimBackedCaller, staffClaimsFor} from "./staff_claims";
 
 /**
  * Staff (admin) accounts only. Delegate login and delegate account creation
@@ -38,7 +39,8 @@ async function loadCaller(ctx: functions.https.CallableContext): Promise<Caller>
   }
   const snap = await admin.firestore().collection("users").doc(ctx.auth.uid).get();
   if (!snap.exists) fail("permission-denied", "caller_not_staff");
-  return snap.data() as Caller;
+  // TAS-23: role and scope from the token claims, not the users doc.
+  return claimBackedCaller(snap.data(), ctx.auth.token) as unknown as Caller;
 }
 
 function requireEnabled(): void {
@@ -126,6 +128,10 @@ export const createStaffUser = functions.region("us-central1").runWith(opts).htt
       createdBy: ctx.auth!.uid,
     };
     try {
+      // TAS-23: the staff callables read the role and scope from claims, so the
+      // new account gets them now (Admin SDK only), before its profile exists.
+      const claims = staffClaimsFor(target.role, target.organizationUID, target.companyUID);
+      if (claims) await admin.auth().setCustomUserClaims(user.uid, {...claims});
       // Uniqueness re-checked inside the transaction; create() never overwrites.
       await db.runTransaction(async (tx) => {
         await taken((q) => tx.get(q));

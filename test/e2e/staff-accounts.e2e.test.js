@@ -8,7 +8,15 @@ const assert = require("node:assert/strict");
 const admin = require("../../functions/node_modules/firebase-admin");
 
 let fn; let db;
-const ctx = (uid, extra = {}) => ({auth: {uid, token: {firebase: {sign_in_provider: "password"}, ...extra}}, rawRequest: {headers: {}}});
+// TAS-23: the callables read the caller role and scope from the token claims.
+const CLAIMS = {
+  sa: {role: "super-admin"},
+  ca: {role: "company-admin", orgId: "o1", companyId: "c1"},
+  sup: {role: "supervisor", orgId: "o1", companyId: "c1"},
+  hr2: {role: "hr", orgId: "o1", companyId: "c1"},
+  del: {role: "delegate"},
+};
+const ctx = (uid, extra = {}) => ({auth: {uid, token: {firebase: {sign_in_provider: "password"}, ...(CLAIMS[uid] || {}), ...extra}}, rawRequest: {headers: {}}});
 
 test.before(async () => {
   process.env.STAFF_CREATE_ENABLED = "true";
@@ -36,6 +44,8 @@ test("super-admin creates staff: Auth user with no password, no password in Fire
   const doc = (await db.doc(`users/${r.uid}`).get()).data();
   for (const k of ["password", "temporaryPassword", "tempPassword"]) assert.equal(doc[k], undefined);
   assert.equal(doc.role, "hr");
+  // TAS-23: the new account gets its role claims from the server.
+  assert.deepEqual(u.customClaims, {role: "hr", orgId: "o1", organizationId: "o1", companyId: "c1"});
   const mail = await db.collection("mail").where("to", "array-contains", "new.hr@example.com").get();
   assert.equal(mail.size, 1);
   assert.ok(mail.docs[0].data().message.html.includes("oobCode"));
@@ -139,4 +149,16 @@ test("registerInvitedAdmin (TAS-17): creates the invite's own account server-sid
   const seen = [];
   for (let i = 0; i < 3; i++) seen.push(await code(fn.registerInvitedAdmin.run({inviteId: "r1", password: "Passw0rd!x"}, anon)));
   assert.equal(seen[seen.length - 1], "rate_limited");
+});
+
+test("TAS-23: a users doc role without a matching claim grants nothing", async () => {
+  // No staff claim: role and scope are cleared, so the scope check refuses first.
+  const base = {phoneNumber: "01234567899", displayName: "X", role: "hr", organizationUID: "o1", companyUID: "c1"};
+  await db.doc("users/forged").set({role: "super-admin"});
+  assert.equal(await code(fn.createStaffUser.run({...base, email: "forged1@e.com"}, ctx("forged"))), "out_of_scope");
+  assert.equal(await code(fn.createStaffUser.run({...base, email: "forged2@e.com"},
+    ctx("forged", {role: "delegate"}))), "out_of_scope");
+  // Doc says super-admin, claim says company admin of another company: the claim wins.
+  assert.equal(await code(fn.createStaffUser.run({...base, email: "forged3@e.com"},
+    ctx("forged", {role: "company-admin", orgId: "o1", companyId: "c9"}))), "out_of_scope");
 });

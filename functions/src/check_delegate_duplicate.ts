@@ -5,6 +5,7 @@ import {
   isValidEgyptianNationalId,
 } from "./check_delegate_duplicate_logic";
 import {findDuplicatePublic} from "./check_delegate_duplicate_query";
+import {claimBackedCaller} from "./staff_claims";
 
 const STAFF_ROLES = new Set([
   "super-admin", "super_admin", "superadmin", "superAdmin",
@@ -72,7 +73,8 @@ export const checkDelegateDuplicate = functions
     }
     const db = admin.firestore();
     const callerSnap = await db.collection("users").doc(context.auth.uid).get();
-    const caller = callerSnap.data() || {};
+    // TAS-23: role from the token claims, not the users doc.
+    const caller = claimBackedCaller(callerSnap.data(), context.auth.token);
     const role = String(caller.role || "");
     if (!STAFF_ROLES.has(role) && !STAFF_ROLES.has(canonicalizeRole(role))) {
       throw new functions.https.HttpsError("permission-denied", "Not allowed.");

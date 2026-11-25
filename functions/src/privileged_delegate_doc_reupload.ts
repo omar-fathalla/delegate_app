@@ -15,6 +15,7 @@ import {
   resolveReuploadObject,
 } from "./privileged_delegate_doc_reupload_logic";
 import {refFieldsForDocType} from "./delegate_doc_ref_fields";
+import {claimBackedCaller} from "./staff_claims";
 
 const opts = {timeoutSeconds: 60, memory: "256MB" as const};
 
@@ -41,7 +42,7 @@ function storageErrorMessage(reason: string): string {
   }
 }
 
-async function loadCaller(uid: string) {
+async function loadCaller(uid: string, token: unknown) {
   const snap = await admin.firestore().collection("users").doc(uid).get();
   if (!snap.exists) {
     throw new functions.https.HttpsError(
@@ -49,7 +50,8 @@ async function loadCaller(uid: string) {
       "تعذر التحقق من صلاحيات المستخدم.",
     );
   }
-  const d = snap.data() || {};
+  // TAS-23: role and scope from the token claims, not the users doc.
+  const d = claimBackedCaller(snap.data(), token);
   return {uid, role: d.role};
 }
 
@@ -95,7 +97,7 @@ export const privilegedReuploadDelegateDocument = functions
       throw new functions.https.HttpsError("invalid-argument", "بيانات الطلب غير مكتملة.");
     }
 
-    const caller = await loadCaller(ctx.auth.uid);
+    const caller = await loadCaller(ctx.auth.uid, ctx.auth.token);
     const db = admin.firestore();
     const delegateRef = db
       .collection("organizations")

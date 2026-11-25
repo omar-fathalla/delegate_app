@@ -22,6 +22,7 @@ import {
   str,
   taskProofPathsFrom,
 } from "./task_proof_access_logic";
+import {claimBackedCaller} from "./staff_claims";
 
 if (admin.apps.length === 0) admin.initializeApp();
 
@@ -64,11 +65,13 @@ async function loadCaller(
   uid: string,
   orgId: string,
   companyId: string,
+  token: unknown,
   delegateId: string = uid,
 ): Promise<{role: unknown; companyUID: string}> {
   const userSnap = await db.collection("users").doc(uid).get();
   if (userSnap.exists) {
-    const d = (userSnap.data() || {}) as Record<string, unknown>;
+    // TAS-23: role and scope from the token claims, not the users doc.
+    const d = claimBackedCaller(userSnap.data(), token);
     return {
       role: d.role,
       companyUID: str(d.companyUID) || str(d.companyId),
@@ -118,7 +121,7 @@ export const getTaskProofImage = functions
     const proofPaths = taskProofPathsFrom(proof.imagePaths);
     const proofCompany = str(proof.companyUID) || str(proof.companyId);
 
-    const caller = await loadCaller(db, ctx.auth.uid, organizationId, taskCompany,
+    const caller = await loadCaller(db, ctx.auth.uid, organizationId, taskCompany, ctx.auth.token,
       callerDelegateId(ctx.auth.uid, ctx.auth.token as unknown as Record<string, unknown>));
     const decision = canReadTaskProof({
       authenticated: true,

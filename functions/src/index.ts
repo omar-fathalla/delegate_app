@@ -312,6 +312,7 @@ export {sendStaffNotification} from "./send_staff_notification";
 export {updateOwnStaffContact} from "./staff_contact";
 
 export {createStaffUser, resendStaffSetupLink, claimInvite, registerInvitedAdmin} from "./staff_accounts";
+export {syncStaffClaimsOnUserWrite} from "./staff_claims_sync";
 export {
   sendStaffPasswordSetupEmail,
   requestStaffPasswordReset,
