@@ -9,6 +9,7 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import {onObjectFinalized} from "firebase-functions/v2/storage";
+import {defineString} from "firebase-functions/params";
 import {
   assignmentNeedsCompanyDelegates,
   assignmentNeedsSectorStaff,
@@ -371,18 +372,27 @@ export const getTaskImage = functions
   });
 
 /**
- * 2nd-gen Storage finalize trigger in the bucket region (EUR4 /
- * europe-west4). Strips download tokens immediately, including orphan
- * uploads that are never attached to a task. Do not deploy a 1st-gen
- * us-central1 storage trigger against this bucket.
+ * Default Storage bucket and its region, per project (TAS-30). Values come
+ * from functions/.env.<projectId>; a deploy to a project without them stops
+ * at the missing param instead of listening on another project's bucket.
+ *   tashil-dev:              tashil-dev.firebasestorage.app (EUR4, europe-west4)
+ *   practice-firebase-72df1: practice-firebase-72df1.firebasestorage.app
+ *                            (US-CENTRAL1, us-central1)
+ */
+const TASK_IMAGE_BUCKET = defineString("TASK_IMAGE_BUCKET");
+const TASK_IMAGE_TRIGGER_REGION = defineString("TASK_IMAGE_TRIGGER_REGION");
+
+/**
+ * 2nd-gen Storage finalize trigger in the default bucket's region. Strips
+ * download tokens immediately, including orphan uploads that are never
+ * attached to a task. The trigger region must match the bucket location.
  *
  * Deploy: functions:tashil-mobile-notifications:onTaskImageFinalize
- *   --project tashil-dev
  */
 export const onTaskImageFinalize = onObjectFinalized(
   {
-    region: "europe-west4",
-    bucket: "tashil-dev.firebasestorage.app",
+    region: TASK_IMAGE_TRIGGER_REGION,
+    bucket: TASK_IMAGE_BUCKET,
     memory: "256MiB",
     timeoutSeconds: 30,
   },
