@@ -131,6 +131,19 @@ describe("TAS-28 phase 0: delegate id from the claim, old uid equality kept", ()
         uploadedBy: "d1", companyUID: "c1", taskId: "t1", imagePaths: ["task_proof/c1/d2/proof_d2_q.jpg"],
       }));
     });
+
+    test("notify supervisor: createdBy is the own id (old, today, phase 1); another id is refused", async () => {
+      const note = (createdBy) => ({
+        title: "t", body: "b", companyUID: "c1", delegateUid: "supervisor_c1", createdBy,
+      });
+      for (const who of OWNERS) {
+        await assertSucceeds(setDoc(doc(fs(who), `notifications/n_${who}`), note("d1")));
+      }
+      // The old equality (uid) is still accepted for a phase-1 token.
+      await assertSucceeds(setDoc(doc(fs("PHASE1"), "notifications/n_uid"), note("dlg_x")));
+      await assertDeniedByRule(setDoc(doc(fs("ATTACKER"), "notifications/n_att"), note("d1")));
+      await assertDeniedByRule(setDoc(doc(fs("OLD"), "notifications/n_old_other"), note("d2")));
+    });
   });
 
   describe("storage", () => {
