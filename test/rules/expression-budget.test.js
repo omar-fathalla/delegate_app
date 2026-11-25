@@ -139,6 +139,69 @@ describe("expression budget headroom (TAS-105)", () => {
     });
   });
 
+  // TAS-61: hot paths touched by the budget-deny fixes. Measured 25 Nov 2026
+  // (spare pad units): delegate_requests delegate 8-entry photo re-upload ~28,
+  // collection-group delegates create by tech support (pending) ~41 and by
+  // super-admin (active, approved docs) ~172. Margins below the measurement.
+  const REQ_SELF_PAD = Number(process.env.RULES_BUDGET_PAD_REQ_SELF || 20);
+  const CG_CREATE_TS_PAD = Number(process.env.RULES_BUDGET_PAD_CG_CREATE_TS || 30);
+  const CG_CREATE_SA_PAD = Number(process.env.RULES_BUDGET_PAD_CG_CREATE_SA || 150);
+  const CG_CREATE_LINE = "allow create: if onNestedDelegate() ? false : cgDelegateCreateDenied() ? false : (";
+  const seedCgCreate = async (db) => {
+    await db.doc("users/sa").set({role: "super-admin"});
+    await db.doc("users/ts").set({role: "technical_support", organizationUID: "o1"});
+    await db.doc("organizations/o1").set({name: "O1"});
+    await db.doc("organizations/o1/companies/c1").set({name: "C1"});
+  };
+  const NEW_DEL = {uid: "newT", organizationUID: "o1", companyUID: "c1", fullName: "Fake", profileImageUrl: "p0"};
+
+  test(`delegate_requests update keeps ${REQ_SELF_PAD} spare pad units (delegate 8-entry photo re-upload)`, async () => {
+    await assertBudgetHeadroom({
+      rules: RULES,
+      line: UPDATE_LINE,
+      pad: REQ_SELF_PAD,
+      projectId: "demo-expression-budget-req-self",
+      seed: async (db) => {
+        await db.doc("users/d1").set({role: "delegate", organizationUID: "o1", companyUID: "c1"});
+        await db.doc("delegate_requests/d1").set({
+          status: "pending", requestType: "new_delegate", orgCompanyCheck: "ok",
+          organizationUID: "o1", companyUID: "c1", profileImageUrl: "p0", documents: EIGHT,
+        });
+      },
+      request: (e) => e.authenticatedContext("d1", {firebase: {sign_in_provider: "password"}, role: "delegate"})
+        .firestore().doc("delegate_requests/d1").update({
+          documents: [...EIGHT.slice(1).reverse(), {...EIGHT[0], documentStatus: "pending", documentURL: "p9"}],
+          profileImageUrl: "p9", personalPhotoURL: "p9", updatedAt: "t",
+        }),
+    });
+  });
+
+  test(`delegates CG create keeps ${CG_CREATE_TS_PAD} spare pad units (tech support, pending, top-level)`, async () => {
+    await assertBudgetHeadroom({
+      rules: RULES,
+      line: CG_CREATE_LINE,
+      pad: CG_CREATE_TS_PAD,
+      projectId: "demo-expression-budget-cg-create-ts",
+      seed: seedCgCreate,
+      request: (e) => e.authenticatedContext("ts", {firebase: {sign_in_provider: "password"}}).firestore()
+        .doc("delegates/newT").set({...NEW_DEL, status: "pending",
+          documents: [{documentKey: "personalPhoto", documentStatus: "pending", documentURL: "p0"}]}),
+    });
+  });
+
+  test(`delegates CG create keeps ${CG_CREATE_SA_PAD} spare pad units (super-admin, active, top-level)`, async () => {
+    await assertBudgetHeadroom({
+      rules: RULES,
+      line: CG_CREATE_LINE,
+      pad: CG_CREATE_SA_PAD,
+      projectId: "demo-expression-budget-cg-create-sa",
+      seed: seedCgCreate,
+      request: (e) => e.authenticatedContext("sa", {firebase: {sign_in_provider: "password"}}).firestore()
+        .doc("delegates/newT").set({...NEW_DEL, status: "active",
+          documents: [{documentKey: "personalPhoto", documentStatus: "approved", documentURL: "p0"}]}),
+    });
+  });
+
   // Worst ALLOW in firestore.rules.test.js: OTP-verified delegate check-in
   // under OTP enforcement.
   const DELEGATE_TOKEN = {
