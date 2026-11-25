@@ -50,6 +50,7 @@ DelegateSubscriptionRequest _request({
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(loadPromoTestFonts);
   setUp(SubscriptionCycleHelper.resetConfigForTest);
   tearDown(SubscriptionCycleHelper.resetConfigForTest);
 

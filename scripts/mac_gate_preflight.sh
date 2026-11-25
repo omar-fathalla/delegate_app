@@ -39,7 +39,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-info "worker hints: use self-hosted label fathalla-mac; Flutter 3.44.5; Patrol 4.9.0; Maestro 2.12.x"
+info "worker hints: use self-hosted label fathalla-mac; Flutter 3.50.1; Patrol 4.9.0; Maestro 2.12.x"
 info "project store: $PROJECT_STORE (screenshots → $MEDIA_DIR)"
 info "sim UDID: $SIM_UDID · bundle: $DEV_BUNDLE · git: $GIT_SHA"
 

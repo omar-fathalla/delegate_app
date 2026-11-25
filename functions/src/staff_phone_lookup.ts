@@ -10,11 +10,15 @@ import {
   recordFailedAttempt,
 } from "./delegate_login_logic";
 import {
+  LookupCaller,
+  MinimalStaffLookup,
   PublicStaffProfile,
   callerIp,
   ipWindowNext,
+  lookupCallerOf,
   pickStaffProfile,
   publicStaffProfile,
+  staffLookupResponse,
 } from "./staff_phone_lookup_logic";
 
 const RATE_LIMIT_COLLECTION = "staff_login_rate_limits";
@@ -25,8 +29,11 @@ const IP_LIMIT_COLLECTION = "staff_lookup_ip_limits";
  * staffPhoneLookup
  *
  * Unauthenticated staff login used to list the users collection. Rules no
- * longer allow that read. This callable returns the email and org fields for
- * one staff phone, or not-found. It does not check the password.
+ * longer allow that read. This callable returns, for one staff phone, the
+ * email only (TAS-314) to a signed-out caller, or not-found. After the
+ * password sign-in the app calls it again and, as the owner of the account,
+ * gets the role and org/company fields. It does not check the password.
+ * App Check is not enforced here (out of scope for TAS-314).
  *
  * Deploy this function before the tightened Firestore rules:
  *   firebase deploy --only functions:tashil-mobile-notifications:staffPhoneLookup
@@ -40,7 +47,7 @@ export const staffPhoneLookup = functions
     try {
       const req = context.rawRequest;
       await enforceIpWindow(callerIp(req?.headers as Record<string, unknown> | undefined, req?.ip));
-      return await handleStaffPhoneLookup(data);
+      return await handleStaffPhoneLookup(data, lookupCallerOf(context.auth));
     } catch (error) {
       if (error instanceof functions.https.HttpsError) throw error;
       console.error("staffPhoneLookup failed");
@@ -52,7 +59,10 @@ export const staffPhoneLookup = functions
     }
   });
 
-async function handleStaffPhoneLookup(data: unknown): Promise<PublicStaffProfile> {
+async function handleStaffPhoneLookup(
+  data: unknown,
+  caller: LookupCaller | null,
+): Promise<PublicStaffProfile | MinimalStaffLookup> {
   const payload = data && typeof data === "object" ? data as Record<string, unknown> : {};
   const phoneRaw = payload.phone ?? payload.phoneNumber;
   const phone = normalizePhone(typeof phoneRaw === "string" ? phoneRaw : "");
@@ -85,8 +95,9 @@ async function handleStaffPhoneLookup(data: unknown): Promise<PublicStaffProfile
   }
 
   await clearFailures(phoneKey);
-  console.log("staffPhoneLookup success", { uid: profile.uid });
-  return profile;
+  const body = staffLookupResponse(profile, caller);
+  console.log("staffPhoneLookup success", { uid: profile.uid, full: "role" in body });
+  return body;
 }
 
 async function findStaff(phone: string): Promise<PublicStaffProfile | null> {

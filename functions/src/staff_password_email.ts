@@ -9,9 +9,25 @@ import {
   rateLimitDocId,
   recordFailedAttempt,
 } from "./delegate_login_logic";
-import {isStaffRole, pickStaffProfile, publicStaffProfile, PublicStaffProfile} from "./staff_phone_lookup_logic";
+import {
+  callerIp,
+  ipWindowNext,
+  isStaffRole,
+  pickStaffProfile,
+  publicStaffProfile,
+  PublicStaffProfile,
+} from "./staff_phone_lookup_logic";
 import {buildPasswordEmail, canSendStaffInvite, DEFAULT_ACTION_PAGE_URL, DEFAULT_LOGO_URL, PasswordEmailVariant} from "./password_email_template";
-import {resolveCallerRole, staffCreateAllowed} from "./staff_password_email_logic";
+import {
+  PASSWORD_EMAIL_LIMIT_COLLECTION,
+  PASSWORD_EMAIL_MAX_PER_TARGET,
+  PASSWORD_EMAIL_WINDOW_MS,
+  PASSWORD_RESET_MAX_PER_IP,
+  PASSWORD_SETUP_MAX_PER_CALLER,
+  passwordEmailLimitKey,
+  resolveCallerRole,
+  staffCreateAllowed,
+} from "./staff_password_email_logic";
 import {
   buildSetupLink,
   hashSetupToken,
@@ -92,6 +108,10 @@ async function queueEmail(variant: PasswordEmailVariant, email: string, displayN
  * Input: { userId: string, variant?: "new_account" | "forgot_password" }
  * Ensures a Firebase Auth account exists for users/{userId}.email and queues
  * the branded "set your password" email.
+ * TAS-317: at most PASSWORD_SETUP_MAX_PER_CALLER per admin per hour and
+ * PASSWORD_EMAIL_MAX_PER_TARGET per target email per hour (shared with the
+ * public reset). The caller is signed-in staff, so a limit is reported as
+ * `resource-exhausted` (reason rate_limited); there is nothing to enumerate.
  */
 export const sendStaffPasswordSetupEmail = functions
   .region("us-central1")
@@ -117,6 +137,9 @@ export const sendStaffPasswordSetupEmail = functions
     if (!userId || userId.includes("/")) {
       throw new functions.https.HttpsError("invalid-argument", "userId is required.");
     }
+    const callerLimit = await countInWindow(
+      passwordEmailLimitKey("caller", context.auth.uid), PASSWORD_SETUP_MAX_PER_CALLER);
+    if (!callerLimit.allowed) throw rateLimited(callerLimit.retryAfterSeconds);
     const snap = await admin.firestore().collection("users").doc(userId).get();
     const user = snap.data() as Record<string, unknown> | undefined;
     if (!user || !isStaffRole(user.role)) {
@@ -126,6 +149,9 @@ export const sendStaffPasswordSetupEmail = functions
     if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(email) || /\.con$/.test(email)) {
       throw new functions.https.HttpsError("failed-precondition", "Invalid email.", {reason: "invalid_email"});
     }
+    const targetLimit = await countInWindow(
+      passwordEmailLimitKey("email", email), PASSWORD_EMAIL_MAX_PER_TARGET);
+    if (!targetLimit.allowed) throw rateLimited(targetLimit.retryAfterSeconds);
     const displayName = String(user.displayName || user.fullName || user.name || "");
     const authUid = await ensureAuthUser(email, displayName, userId);
     await queueEmail(variant, email, displayName, authUid);
@@ -154,11 +180,15 @@ async function callerRoleOf(uid: string, email: string | undefined, emailVerifie
  * requestStaffPasswordReset (public)
  * Input: { phone }. Always returns { ok: true } (no account enumeration).
  * Rate-limited per phone (5 requests / 15 min, then 15 min lock).
+ * TAS-317: also PASSWORD_RESET_MAX_PER_IP requests per IP per hour (every
+ * request counts) and PASSWORD_EMAIL_MAX_PER_TARGET emails per target address
+ * per hour (shared with the admin callable). A limited request still returns
+ * { ok: true }, so the caller cannot tell a limit from an unknown phone.
  */
 export const requestStaffPasswordReset = functions
   .region("us-central1")
   .runWith({timeoutSeconds: 30, memory: "256MB"})
-  .https.onCall(async (data: unknown) => {
+  .https.onCall(async (data: unknown, context) => {
     const payload = data && typeof data === "object" ? data as Record<string, unknown> : {};
     const phoneRaw = payload.phone ?? payload.phoneNumber;
     const phone = normalizePhone(typeof phoneRaw === "string" ? phoneRaw : "");
@@ -166,11 +196,24 @@ export const requestStaffPasswordReset = functions
       throw new functions.https.HttpsError("invalid-argument", "Phone is required.", {reason: "invalid_phone"});
     }
     const key = rateLimitDocId(phone);
+    const req = context.rawRequest;
+    const ip = callerIp(req?.headers as Record<string, unknown> | undefined, req?.ip);
     try {
+      const ipLimit = await countInWindow(passwordEmailLimitKey("ip", ip), PASSWORD_RESET_MAX_PER_IP);
+      if (!ipLimit.allowed) {
+        console.log("requestStaffPasswordReset: ip limited");
+        return GENERIC_RESPONSE;
+      }
       if ((await readLock(key)).locked) return GENERIC_RESPONSE;
       await countRequest(key);
       const profile = await findStaff(phone);
       if (!profile) return GENERIC_RESPONSE;
+      const targetLimit = await countInWindow(
+        passwordEmailLimitKey("email", profile.email), PASSWORD_EMAIL_MAX_PER_TARGET);
+      if (!targetLimit.allowed) {
+        console.log("requestStaffPasswordReset: target limited", {uid: profile.uid});
+        return GENERIC_RESPONSE;
+      }
       let authUid: string;
       try {
         authUid = (await admin.auth().getUserByEmail(profile.email)).uid;
@@ -302,5 +345,41 @@ async function countRequest(key: string): Promise<void> {
         Timestamp.fromMillis(next.lockedUntilMs) : FieldValue.delete(),
       updatedAt: FieldValue.serverTimestamp(),
     }, {merge: true});
+  });
+}
+
+function rateLimited(retryAfterSeconds: number): functions.https.HttpsError {
+  return new functions.https.HttpsError(
+    "resource-exhausted",
+    "Too many emails. Try again later.",
+    {reason: "rate_limited", retryAfterSeconds},
+  );
+}
+
+/**
+ * TAS-317: one fixed-window counter in PASSWORD_EMAIL_LIMIT_COLLECTION
+ * (same transaction shape as staffPhoneLookup's IP window). An empty key
+ * (no IP known) is not limited here.
+ */
+async function countInWindow(
+  docId: string,
+  max: number,
+): Promise<{allowed: boolean; retryAfterSeconds: number}> {
+  if (!docId) return {allowed: true, retryAfterSeconds: 0};
+  const ref = admin.firestore().collection(PASSWORD_EMAIL_LIMIT_COLLECTION).doc(docId);
+  return admin.firestore().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const d = snap.data() || {};
+    const state = snap.exists ? {
+      count: typeof d.count === "number" ? d.count : 0,
+      windowStartMs: createdAtMillis(d.windowStart) ?? 0,
+    } : null;
+    const n = ipWindowNext(state, Date.now(), PASSWORD_EMAIL_WINDOW_MS, max);
+    tx.set(ref, {
+      count: n.count,
+      windowStart: Timestamp.fromMillis(n.windowStartMs),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return {allowed: n.allowed, retryAfterSeconds: n.retryAfterSeconds};
   });
 }

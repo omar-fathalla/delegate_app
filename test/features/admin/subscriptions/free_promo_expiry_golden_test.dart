@@ -119,6 +119,7 @@ Widget _homeCard({required bool isFree}) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(loadPromoTestFonts);
   setUp(SubscriptionCycleHelper.resetConfigForTest);
   tearDown(SubscriptionCycleHelper.resetConfigForTest);
 

@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/hr/domain/services/leave_notification_target.dart';
+import 'package:delegate_app/features/hr/domain/services/payroll_day_rules.dart';
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_selected_card_colors.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
@@ -202,16 +203,9 @@ class _DelegateLeavesAndRequestsScreenState
 
           // المقترح 5: احتساب رصيد الإجازات السنوي المستهلك والمتبقي للعام الحالي
           final currentYear = DateTime.now().year;
-          int usedLeaveDaysThisYear = 0;
-          for (final req in allLeaves) {
-            if (req['status'] == 'approved' && req['isHourly'] != true) {
-              final start = req['startDate'];
-              if (start is Timestamp && start.toDate().year == currentYear) {
-                final days = (req['daysCount'] as num?)?.toInt() ?? 1;
-                usedLeaveDaysThisYear += days;
-              }
-            }
-          }
+          // TAS-313: السنوية بس، بنفس تعريف مسير الرواتب.
+          final usedLeaveDaysThisYear =
+              PayrollDayRules.usedAnnualLeaveDaysInYear(allLeaves, currentYear);
           final remainingBalance = (_annualLeaveQuota - usedLeaveDaysThisYear)
               .clamp(0, _annualLeaveQuota);
           _currentRemainingBalance = remainingBalance;

@@ -7,6 +7,7 @@ import '../../../../config/theme/app_motion.dart';
 import '../../../../core/widgets/app_avatar.dart';
 import '../../domain/entities/delegate_tracking_session.dart';
 import '../../domain/utils/tracking_geofence_status.dart';
+import 'tracking_mismatch_chip.dart';
 
 class DelegateTrackingCard extends StatefulWidget {
   final DelegateTrackingSession session;
@@ -426,6 +427,10 @@ class _DelegateTrackingCardState extends State<DelegateTrackingCard> {
             ),
           ),
         ),
+        if (session.statusMismatch) ...[
+          const SizedBox(width: 4),
+          Flexible(child: TrackingMismatchChip(session: session)),
+        ],
         if (session.isMockLocationDetected) ...[
           const SizedBox(width: 4),
           Tooltip(

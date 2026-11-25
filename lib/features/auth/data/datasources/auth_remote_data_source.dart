@@ -449,6 +449,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       final profile = await api.lookup(phoneNumber);
       if (profile == null) return const [];
+      if (!profile.isComplete) {
+        // TAS-314: signed out, the callable gives the email only. This
+        // placeholder (empty uid) carries the email to the password check;
+        // the Login use case swaps it for the full profile after sign-in.
+        final pending = _staffModelFromData(
+          '',
+          {'role': 'admin', 'email': profile.email},
+          normalizedPhone,
+        );
+        return pending == null ? const [] : [pending];
+      }
       final model = _staffModelFromData(
         profile.uid,
         {

@@ -4,7 +4,7 @@
 
 ## التقنيات المستخدمة
 
-- **Flutter 3.44.5** + Dart **3.12.2** (انظر `.fvmrc` و CI)
+- **Flutter 3.50.1** + Dart **3.14.0** (انظر `.fvmrc` و CI)
 - **Firebase:** Firestore, Authentication, Storage
 - **البنية:** Clean Architecture + BLoC + GetIt (DI)
 - **المنصات:** Android, iOS, Web, macOS
@@ -21,7 +21,7 @@
 
 ## التشغيل
 
-**Flutter:** 3.44.5 (نفس نسخة CI — `.fvmrc` و `.github/workflows/ci.yml`).
+**Flutter:** 3.50.1 (نفس نسخة CI — `.fvmrc` و `.github/workflows/ci.yml`).
 
 ```bash
 # اختياري: fvm install && fvm use   # يقرأ .fvmrc

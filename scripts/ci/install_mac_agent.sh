@@ -17,7 +17,7 @@ if [[ "${1:-}" == "--remove" ]]; then
   exit 0
 fi
 
-TOOLS="$HOME/toolchains/flutter-3.44.5/bin:$HOME/.pub-cache/bin:$HOME/.maestro/bin:$HOME/Library/Android/sdk/platform-tools"
+TOOLS="$HOME/toolchains/flutter-3.50.1/bin:$HOME/.pub-cache/bin:$HOME/.maestro/bin:$HOME/Library/Android/sdk/platform-tools"
 mkdir -p "$HOME/Library/LaunchAgents" /Users/Shared/tashil-ci/state
 cat >"$PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

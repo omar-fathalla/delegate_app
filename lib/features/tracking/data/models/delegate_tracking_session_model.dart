@@ -30,6 +30,11 @@ class DelegateTrackingSessionModel extends DelegateTrackingSession {
     super.batteryLevel,
     super.isMoving,
     super.avatarUrl,
+    super.verifiedStatus,
+    super.verifiedDistanceMeters,
+    super.verifiedBranchRadius,
+    super.statusMismatch = false,
+    super.scopeMismatch = false,
   });
 
   factory DelegateTrackingSessionModel.fromFirestore(DocumentSnapshot doc) {
@@ -144,6 +149,13 @@ class DelegateTrackingSessionModel extends DelegateTrackingSession {
       batteryLevel: batteryLevel,
       isMoving: isMoving,
       avatarUrl: avatarUrl,
+      // TAS-48: server-only fields (the rules deny them to clients).
+      verifiedStatus: json['verifiedStatus']?.toString(),
+      verifiedDistanceMeters:
+          (json['verifiedDistanceMeters'] as num?)?.toDouble(),
+      verifiedBranchRadius: (json['verifiedBranchRadius'] as num?)?.toDouble(),
+      statusMismatch: json['statusMismatch'] == true,
+      scopeMismatch: json['scopeMismatch'] == true,
     );
   }
 

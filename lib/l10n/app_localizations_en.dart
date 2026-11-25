@@ -3012,4 +3012,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get phoneCountryLabel => 'Country code';
+
+  @override
+  String get locHelpTitle => 'Location not working? Try these steps';
+
+  @override
+  String get locHelpOpenLocationSettings => 'Open location settings';
+
+  @override
+  String get locHelpOpenAppSettings => 'Open app settings';
+
+  @override
+  String get locHelpRetry => 'Check location again';
+
+  @override
+  String get locHelpStepGoogleAccuracy =>
+      'Turn on “Google Location Accuracy” in location settings.';
+
+  @override
+  String get locHelpStepPermission =>
+      'Give the app location permission “While using the app” with “Precise location”.';
+
+  @override
+  String get locHelpStepBattery =>
+      'Take Tashil out of battery saving and set it to “Unrestricted” (important on OPPO, Realme and Xiaomi).';
+
+  @override
+  String get locHelpStepMapsRetry =>
+      'Still no location: open Google Maps, wait for the blue dot to settle, then come back and tap “Check location again”.';
+
+  @override
+  String get locHelpStepMapsTryAgain =>
+      'Still no location: open Google Maps, wait for the blue dot to settle, then come back and try again.';
 }

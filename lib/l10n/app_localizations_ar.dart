@@ -3008,4 +3008,36 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get phoneCountryLabel => 'كود الدولة';
+
+  @override
+  String get locHelpTitle => 'الموقع مش شغال؟ جرّب الخطوات دي';
+
+  @override
+  String get locHelpOpenLocationSettings => 'فتح إعدادات الموقع';
+
+  @override
+  String get locHelpOpenAppSettings => 'فتح إعدادات التطبيق';
+
+  @override
+  String get locHelpRetry => 'إعادة فحص الموقع';
+
+  @override
+  String get locHelpStepGoogleAccuracy =>
+      'شغّل «دقة الموقع من Google» من إعدادات الموقع.';
+
+  @override
+  String get locHelpStepPermission =>
+      'إذن الموقع للتطبيق: «أثناء استخدام التطبيق» مع «الموقع الدقيق».';
+
+  @override
+  String get locHelpStepBattery =>
+      'طلّع تطبيق تسهيل من توفير البطارية وخليه «بلا قيود» (مهم في OPPO وRealme وXiaomi).';
+
+  @override
+  String get locHelpStepMapsRetry =>
+      'لو الموقع ما اشتغلش: افتح خرائط Google واستنى النقطة الزرقا تثبت، وبعدين ارجع ودوس «إعادة فحص الموقع».';
+
+  @override
+  String get locHelpStepMapsTryAgain =>
+      'لو الموقع ما اشتغلش: افتح خرائط Google واستنى النقطة الزرقا تثبت، وبعدين ارجع وجرّب تاني.';
 }

@@ -35,7 +35,7 @@ dependencies:
 
   flutter_bloc: ^9.1.1
   get_it: ^9.2.0
-  injectable: ^2.7.1+4
+  injectable: ^3.0.0
   equatable: ^2.0.8
   collection: ^1.18.0
   dartz: ^0.10.1
@@ -99,9 +99,9 @@ dev_dependencies:
     sdk: flutter
 
   build_runner: ^2.4.11
-  freezed: ^3.2.5
+  freezed: ^4.0.1
   json_serializable: ^6.8.0
-  injectable_generator: ^2.6.1
+  injectable_generator: ^3.1.2
   faker: ^2.2.0
   crypto: ^3.0.7
 

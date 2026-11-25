@@ -118,8 +118,8 @@ const _sms = MultiFactorInfo(
   uid: 'sms-enrollment-1',
 );
 
-Delegate _staff() => Delegate(
-  uid: 'super-uid',
+Delegate _staff({String uid = 'super-uid'}) => Delegate(
+  uid: uid,
   firstName: 'Super',
   middleName: '',
   lastName: 'Admin',
@@ -388,6 +388,9 @@ void main() {
       when(() => cacheAll(any())).thenAnswer((_) async => const Right(null));
       when(() => mockLogout(any())).thenAnswer((_) async => const Right(null));
       when(() => mockLogin(any())).thenAnswer((_) async => Left(challenge));
+      when(() => mockLogin.resolveSignedInStaff(any(), any())).thenAnswer(
+        (inv) async => Right(inv.positionalArguments[1] as List<Delegate>),
+      );
     });
 
     const request = LoginRequested(
@@ -442,5 +445,152 @@ void main() {
         verify(() => mockLogout(any())).called(1);
       },
     );
+
+    // TAS-314: the pending profile is the email-only placeholder.
+    final placeholder = _staff(uid: '');
+    final placeholderChallenge = MfaRequiredFailure(
+      resolve: (_) async {},
+      pendingDelegates: [placeholder],
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'TAS-314: loads the full profile after the code, then continues',
+      build: () {
+        when(
+          () => mockLogin(any()),
+        ).thenAnswer((_) async => Left(placeholderChallenge));
+        when(
+          () => mockLogin.resolveSignedInStaff('01500000001', [placeholder]),
+        ).thenAnswer((_) async => Right([staff]));
+        return build();
+      },
+      act: (bloc) async {
+        bloc.add(request);
+        await bloc.stream.firstWhere((s) => s is AuthMfaRequired);
+        bloc.add(const MfaVerified());
+      },
+      expect: () => [
+        AuthLoading(),
+        isA<AuthMfaRequired>(),
+        AuthAuthenticated(delegate: staff),
+      ],
+      verify: (_) {
+        verify(() => cacheAll([staff])).called(1);
+        verifyNever(() => cacheAll([placeholder]));
+      },
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'TAS-314: signs out when the full profile cannot be loaded',
+      build: () {
+        when(
+          () => mockLogin(any()),
+        ).thenAnswer((_) async => Left(placeholderChallenge));
+        when(() => mockLogin.resolveSignedInStaff(any(), any())).thenAnswer(
+          (_) async => const Left(AuthFailure('x', 'profile_unavailable')),
+        );
+        return build();
+      },
+      act: (bloc) async {
+        bloc.add(request);
+        await bloc.stream.firstWhere((s) => s is AuthMfaRequired);
+        bloc.add(const MfaVerified());
+      },
+      expect: () => [
+        AuthLoading(),
+        isA<AuthMfaRequired>(),
+        const AuthError(message: 'x', code: 'profile_unavailable'),
+      ],
+      verify: (_) {
+        verify(() => mockLogout(any())).called(1);
+        verifyNever(() => cacheAll(any()));
+      },
+    );
+  });
+
+  group('Login use case, email-only lookup (TAS-314)', () {
+    late _MockRepository repo;
+    late Login login;
+    final full = _staff();
+    final placeholder = _staff(uid: '');
+    const params = LoginParams(
+      phoneNumber: '01500000001',
+      password: 'pw',
+      mode: LoginMode.staff,
+    );
+
+    setUp(() {
+      repo = _MockRepository();
+      login = Login(repo);
+      when(
+        () => repo.verifyAdminPassword(any(), any()),
+      ).thenAnswer((_) async => const Right(true));
+    });
+
+    test('placeholder is recognised; full profiles are not', () {
+      expect(Login.isPendingStaffProfile(placeholder), isTrue);
+      expect(Login.isPendingStaffProfile(full), isFalse);
+    });
+
+    test('asks again after sign-in and returns the full profile', () async {
+      var calls = 0;
+      when(() => repo.getDelegatesByPhone(any())).thenAnswer((_) async {
+        calls++;
+        return Right(calls == 1 ? [placeholder] : [full]);
+      });
+
+      final result = await login(params);
+
+      expect(result.fold((_) => null, (d) => d), [full]);
+      expect(calls, 2);
+      verify(
+        () => repo.verifyAdminPassword('super@example.com', 'pw'),
+      ).called(1);
+    });
+
+    test('an older server (full profile first) needs no second call', () async {
+      when(
+        () => repo.getDelegatesByPhone(any()),
+      ).thenAnswer((_) async => Right([full]));
+
+      final result = await login(params);
+
+      expect(result.fold((_) => null, (d) => d), [full]);
+      verify(() => repo.getDelegatesByPhone(any())).called(1);
+    });
+
+    test(
+      'fails with profile_unavailable when the second answer is still email-only',
+      () async {
+        when(
+          () => repo.getDelegatesByPhone(any()),
+        ).thenAnswer((_) async => Right([placeholder]));
+
+        final result = await login(params);
+
+        expect(
+          result.fold((f) => (f as AuthFailure).code, (_) => null),
+          'profile_unavailable',
+        );
+        verifyNever(() => repo.cacheDelegate(any()));
+      },
+    );
+
+    test('wrong password never triggers the second lookup', () async {
+      when(
+        () => repo.getDelegatesByPhone(any()),
+      ).thenAnswer((_) async => Right([placeholder]));
+      when(
+        () => repo.verifyAdminPassword(any(), any()),
+      ).thenAnswer((_) async => const Right(false));
+
+      final result = await login(params);
+
+      expect(
+        result.fold((f) => (f as AuthFailure).code, (_) => null),
+        'invalid_credentials',
+      );
+      verify(() => repo.getDelegatesByPhone(any())).called(1);
+    });
   });
 }
