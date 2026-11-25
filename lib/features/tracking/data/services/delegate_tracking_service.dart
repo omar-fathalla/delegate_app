@@ -88,8 +88,10 @@ class DelegateTrackingService {
     }
 
     return query.snapshots().map((snapshot) {
+      // TAS-48: staff screens show the server verdict when it exists.
       final sessions = snapshot.docs
-          .map((doc) => DelegateTrackingSessionModel.fromFirestore(doc))
+          .map((doc) =>
+              DelegateTrackingSessionModel.fromFirestore(doc).preferServerVerdict())
           .toList();
       // Dual-layer company isolation (AGENTS.md): query + in-memory guard.
       if (companyId != null && companyId.isNotEmpty) {

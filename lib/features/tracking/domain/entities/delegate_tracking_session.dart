@@ -40,6 +40,18 @@ class DelegateTrackingSession extends Equatable {
   final bool? isMoving;
   final String? avatarUrl;
 
+  /// TAS-48: server verdict written by onDelegateTrackingWritten
+  /// ('inside' / 'outside' / 'unknown'); null on docs it has not seen yet.
+  final String? verifiedStatus;
+  final double? verifiedDistanceMeters;
+  final double? verifiedBranchRadius;
+
+  /// The app's inside/outside claim disagrees with the server's distance.
+  final bool statusMismatch;
+
+  /// The written company/organization is not the delegate's membership.
+  final bool scopeMismatch;
+
   const DelegateTrackingSession({
     required this.delegateId,
     required this.delegateName,
@@ -68,7 +80,37 @@ class DelegateTrackingSession extends Equatable {
     this.batteryLevel,
     this.isMoving,
     this.avatarUrl,
+    this.verifiedStatus,
+    this.verifiedDistanceMeters,
+    this.verifiedBranchRadius,
+    this.statusMismatch = false,
+    this.scopeMismatch = false,
   });
+
+  /// True when the server verdict can replace the app's geofence status.
+  bool get hasServerVerdict =>
+      (verifiedStatus == 'inside' || verifiedStatus == 'outside') &&
+      verifiedDistanceMeters != null;
+
+  /// TAS-48: what the supervisor/HR screens show. The app's own
+  /// inside/outside (and distance) can be faked by the delegate's device, so
+  /// the server verdict wins when present. Other statuses (checked out,
+  /// offline, forgot signature, suspended) and docs without a verdict keep
+  /// the app's values, so old data still shows.
+  DelegateTrackingSession preferServerVerdict() {
+    if (!hasServerVerdict) return this;
+    if (currentStatus != TrackingStatus.insideZone &&
+        currentStatus != TrackingStatus.outsideZone) {
+      return this;
+    }
+    return copyWith(
+      currentStatus: verifiedStatus == 'inside'
+          ? TrackingStatus.insideZone
+          : TrackingStatus.outsideZone,
+      currentDistanceMeters: verifiedDistanceMeters,
+      geofenceRadius: verifiedBranchRadius,
+    );
+  }
 
   bool get isInside =>
       currentStatus == TrackingStatus.insideZone ||
@@ -119,6 +161,11 @@ class DelegateTrackingSession extends Equatable {
     int? batteryLevel,
     bool? isMoving,
     String? avatarUrl,
+    String? verifiedStatus,
+    double? verifiedDistanceMeters,
+    double? verifiedBranchRadius,
+    bool? statusMismatch,
+    bool? scopeMismatch,
   }) {
     return DelegateTrackingSession(
       delegateId: delegateId ?? this.delegateId,
@@ -150,6 +197,12 @@ class DelegateTrackingSession extends Equatable {
       batteryLevel: batteryLevel ?? this.batteryLevel,
       isMoving: isMoving ?? this.isMoving,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      verifiedStatus: verifiedStatus ?? this.verifiedStatus,
+      verifiedDistanceMeters:
+          verifiedDistanceMeters ?? this.verifiedDistanceMeters,
+      verifiedBranchRadius: verifiedBranchRadius ?? this.verifiedBranchRadius,
+      statusMismatch: statusMismatch ?? this.statusMismatch,
+      scopeMismatch: scopeMismatch ?? this.scopeMismatch,
     );
   }
 
@@ -182,5 +235,10 @@ class DelegateTrackingSession extends Equatable {
         batteryLevel,
         isMoving,
         avatarUrl,
+        verifiedStatus,
+        verifiedDistanceMeters,
+        verifiedBranchRadius,
+        statusMismatch,
+        scopeMismatch,
       ];
 }

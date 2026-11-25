@@ -362,4 +362,5 @@ export {
 } from "./paymob_subscription";
 export {getMySupervisorCards} from "./supervisor_cards";
 export {createSupervisorPenalty} from "./supervisor_penalty";
+export {onDelegateTrackingWritten} from "./delegate_tracking_verify";
 export {requestDelegatePhoneChange, confirmDelegatePhoneChange} from "./delegate_phone_change";

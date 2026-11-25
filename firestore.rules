@@ -3561,15 +3561,32 @@ service cloud.firestore {
         || (org != '' && t.get('organizationUID', '') == org && r in orgRoles);
     }
 
+    // TAS-48: verified*, statusMismatch and scopeMismatch are written by the
+    // onDelegateTrackingWritten trigger only (server verdict of the
+    // delegate's own geofence claim). No client may create or change them.
+    // Update checks the changed keys only, so merge writes of old app builds
+    // (which never send these fields) keep working.
+    function trackingServerKeysUntouched() {
+      let ks = ['verifiedStatus', 'verifiedDistanceMeters', 'verifiedBranchLat',
+        'verifiedBranchLng', 'verifiedBranchRadius', 'verifiedReason', 'verifiedAt',
+        'statusMismatch', 'scopeMismatch'];
+      return resource == null
+        ? !request.resource.data.keys().hasAny(ks)
+        : !changedKeys().hasAny(ks);
+    }
+
     match /delegate_tracking/{delegateId} {
       allow read: if signedIn() && (
         delegateOwns(delegateId) || isGlobalStaff()
         || (isCompanyScopedStaff() && (companyScoped() || resource.data.companyUID == callerCompany()))
         || (isOrgScopedStaff() && orgScoped())
       );
-      allow create, update: if signedIn() && (
+      // Ternary, not &&: the rules engine evaluates every && term, so a
+      // denied staff write would otherwise walk the staff helpers and hit
+      // the expression budget instead of this condition (TAS-105).
+      allow create, update: if signedIn() && (trackingServerKeysUntouched() ? (
         delegateOwns(delegateId) || isGlobalStaff() || (isHR() && incomingCompanyScoped()) || (isCompanyAdmin() && incomingCompanyScoped())
-      );
+      ) : false);
       allow delete: if isGlobalStaff();
 
       match /breadcrumbs/{breadcrumbId} {
