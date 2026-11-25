@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/widgets/storage_resolved_image.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -1847,8 +1848,8 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(10),
                                         child: isImage
-                                            ? CachedNetworkImage(
-                                                imageUrl: file.fileUrl,
+                                            ? StorageResolvedImage(pathOrUrl: file.fileUrl, builder: (_, resolved) => CachedNetworkImage(
+                                                imageUrl: resolved,
                                                 fit: BoxFit.cover,
                                                 placeholder: (context, url) => Center(
                                                   child: SizedBox(
@@ -1867,7 +1868,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                                                     color: colorScheme.error,
                                                   ),
                                                 ),
-                                              )
+                                              ),)
                                             : Center(
                                                 child: Column(
                                                   mainAxisAlignment: MainAxisAlignment.center,

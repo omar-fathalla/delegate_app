@@ -1,3 +1,5 @@
+import 'package:delegate_app/core/storage/storage_media.dart';
+import 'package:delegate_app/core/widgets/storage_resolved_image.dart';
 import 'package:delegate_app/features/hr/data/hr_leave_settings_writer.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -866,7 +868,11 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
     final daysCount = (leave['daysCount'] as num?)?.toInt() ?? 1;
     final isHourly = leave['isHourly'] == true;
     final hoursCount = (leave['hoursCount'] as num?)?.toDouble() ?? 0;
-    final attachmentUrl = (leave['attachmentUrl'] ?? '').toString();
+    // TAS-42: new requests carry the Storage path; old ones only a URL.
+    final attachmentUrl = StorageMediaRef.pick(
+      path: leave['attachmentPath'],
+      url: leave['attachmentUrl'],
+    );
     final fromTime = (leave['fromTime'] ?? '').toString();
     final toTime = (leave['toTime'] ?? '').toString();
 
@@ -2066,8 +2072,10 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
               ),
               child: InteractiveViewer(
                 maxScale: 4.0,
-                child: Image.network(
-                  url,
+                child: StorageResolvedImage(
+                  pathOrUrl: url,
+                  builder: (_, resolved) => Image.network(
+                    resolved,
                   fit: BoxFit.contain,
                   loadingBuilder: (_, child, progress) {
                     if (progress == null) return child;
@@ -2082,6 +2090,7 @@ class _HRLeavesAndExcusesScreenState extends State<HRLeavesAndExcusesScreen> {
                       child: Text('فشل في تحميل صورة المرفق'),
                     ),
                   ),
+                ),
                 ),
               ),
             ),

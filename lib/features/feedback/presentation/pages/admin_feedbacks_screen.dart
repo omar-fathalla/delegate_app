@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/widgets/app_photo_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/feedback/domain/entities/feedback_entity.dart';
@@ -786,8 +787,8 @@ class _FeedbackDetailsSheetState extends State<_FeedbackDetailsSheet> {
                         const SizedBox(height: 8),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            widget.feedback.screenshotUrl!,
+                          child: AppPhotoImage(
+                            photoUrl: widget.feedback.screenshotUrl!,
                             width: double.infinity,
                             fit: BoxFit.cover,
                           ),

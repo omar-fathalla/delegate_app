@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -191,7 +192,9 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
 
   // ─────────────────────────── Audits ───────────────────────────
 
-  Future<String> _uploadPhoto({
+  /// TAS-42: uploads and returns the object path plus, while old app
+  /// versions need it, the download URL.
+  Future<({String path, String? legacyUrl})> _uploadPhoto({
     required PrivateLabelAuditDraft draft,
     required String localPath,
     required String kind,
@@ -202,7 +205,7 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
           '${draft.auditMonth}/${draft.id}_$kind.jpg',
         );
     await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
-    return ref.getDownloadURL();
+    return (path: ref.fullPath, legacyUrl: await LegacyStorageUrls.urlFor(ref));
   }
 
   @override
@@ -217,12 +220,12 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
       final existing = await auditRef.get().timeout(_timeout);
       if (existing.exists) return; // Already synced (idempotent retry).
 
-      final productUrl = await _uploadPhoto(
+      final productPhoto = await _uploadPhoto(
         draft: draft,
         localPath: draft.productImagePath,
         kind: 'product',
       );
-      final priceUrl = await _uploadPhoto(
+      final pricePhoto = await _uploadPhoto(
         draft: draft,
         localPath: draft.priceImagePath,
         kind: 'price',
@@ -237,8 +240,10 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
           auditRef,
           PrivateLabelAuditModel.firestoreFromDraft(
             draft,
-            productPhotoUrl: productUrl,
-            pricePhotoUrl: priceUrl,
+            productPhotoPath: productPhoto.path,
+            pricePhotoPath: pricePhoto.path,
+            productPhotoUrl: productPhoto.legacyUrl,
+            pricePhotoUrl: pricePhoto.legacyUrl,
           ),
         );
 
@@ -634,7 +639,8 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
       } else {
         final existing = list[matchIdx];
         final raw = rawDocs[existing.id] ?? const <String, dynamic>{};
-        final storedImage = (raw['imageUrl'] ?? raw['photoUrl'] ?? '').toString().trim();
+        final storedImage =
+            (raw['imagePath'] ?? raw['imageUrl'] ?? raw['photoUrl'] ?? '').toString().trim();
         final storedCategory = (raw['category'] ?? '').toString().trim();
         final storedBarcode = (raw['barcode'] ?? '').toString().trim();
         final hasStoredPrice = raw['referencePrice'] != null;
@@ -677,6 +683,8 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
           : _products(product.organizationUID).doc(product.id);
 
       var finalImageUrl = product.imageUrl?.trim();
+      String? legacyImageUrl;
+      var uploaded = false;
       if (finalImageUrl != null &&
           finalImageUrl.isNotEmpty &&
           !finalImageUrl.startsWith('http://') &&
@@ -688,7 +696,10 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
                 'organizations/${product.organizationUID}/private_label_products/${ref.id}.jpg',
               );
           await storageRef.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
-          finalImageUrl = await storageRef.getDownloadURL();
+          // TAS-42: keep the object path; the URL only for old app versions.
+          finalImageUrl = storageRef.fullPath;
+          uploaded = true;
+          legacyImageUrl = await LegacyStorageUrls.urlFor(storageRef);
         } catch (_) {
           // Keep local path if upload is unavailable so local preview still works.
         }
@@ -698,8 +709,13 @@ class PrivateLabelRemoteDataSourceImpl implements PrivateLabelRemoteDataSource {
         product.copyWith(id: ref.id, imageUrl: finalImageUrl),
       );
 
+      final pathStored = StorageMediaRef.isStoragePath(toSave.imageUrl);
       await ref.set({
         ...toSave.toJson(),
+        // TAS-42: a new upload replaces the old URL (merge keeps fields); an
+        // unchanged stored path keeps whatever URL the doc already has.
+        if (uploaded) 'imageUrl': legacyImageUrl ?? FieldValue.delete(),
+        if (!pathStored && toSave.imageUrl != null) 'imagePath': FieldValue.delete(),
         'updatedAt': FieldValue.serverTimestamp(),
         if (product.id.isEmpty) 'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true)).timeout(_timeout);

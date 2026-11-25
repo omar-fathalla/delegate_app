@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'package:delegate_app/features/feedback/data/datasources/feedback_remote_datasource.dart';
 import 'package:delegate_app/features/feedback/data/models/feedback_model.dart';
 import 'package:delegate_app/features/feedback/domain/entities/feedback_entity.dart';
@@ -121,6 +122,7 @@ void main() {
       
       when(() => mockChildReference.putFile(any(), any())).thenAnswer((_) => FakeUploadTask(mockTaskSnapshot));
       when(() => mockChildReference.getDownloadURL()).thenAnswer((_) async => 'http://test.com/my_image.jpg');
+      when(() => mockChildReference.fullPath).thenReturn('feedback_screenshots/f.jpg');
       when(() => mockCollectionReference.add(any())).thenAnswer((_) async => mockDocumentReference);
 
       await dataSource.submitFeedback(tFeedbackModel, mockFile);
@@ -128,7 +130,37 @@ void main() {
       verify(() => mockStorage.ref()).called(1);
       verify(() => mockChildReference.putFile(any(), any())).called(1);
       verify(() => mockFirestore.collection('feedbacks')).called(1);
-      verify(() => mockCollectionReference.add(any())).called(1);
+      final written = verify(() => mockCollectionReference.add(captureAny()))
+          .captured
+          .single as Map<String, dynamic>;
+      // TAS-42: the path is stored; the URL stays only for old app versions.
+      expect(written['screenshotPath'], 'feedback_screenshots/f.jpg');
+      expect(written['screenshotUrl'], 'http://test.com/my_image.jpg');
+    });
+
+    test('TAS-42: with legacy URLs off only the path is stored', () async {
+      LegacyStorageUrls.debugOverride = false;
+      addTearDown(() => LegacyStorageUrls.debugOverride = null);
+      final mockFile = MockFile();
+      final mockRootReference = MockReference();
+      final mockChildReference = MockReference();
+      final mockTaskSnapshot = FakeTaskSnapshot(mockChildReference);
+      when(() => mockStorage.ref()).thenReturn(mockRootReference);
+      when(() => mockRootReference.child(any())).thenReturn(mockChildReference);
+      when(() => mockChildReference.putFile(any(), any()))
+          .thenAnswer((_) => FakeUploadTask(mockTaskSnapshot));
+      when(() => mockChildReference.fullPath).thenReturn('feedback_screenshots/f.jpg');
+      when(() => mockCollectionReference.add(any()))
+          .thenAnswer((_) async => mockDocumentReference);
+
+      await dataSource.submitFeedback(tFeedbackModel, mockFile);
+
+      verifyNever(() => mockChildReference.getDownloadURL());
+      final written = verify(() => mockCollectionReference.add(captureAny()))
+          .captured
+          .single as Map<String, dynamic>;
+      expect(written['screenshotPath'], 'feedback_screenshots/f.jpg');
+      expect(written.containsKey('screenshotUrl'), isFalse);
     });
   });
 

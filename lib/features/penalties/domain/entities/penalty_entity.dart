@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:equatable/equatable.dart';
 
@@ -138,30 +139,51 @@ enum PenaltyStatus {
 }
 
 class EvidenceFile extends Equatable {
+  /// TAS-42: the Storage object path for new uploads, or the download URL
+  /// of older documents. Display it through [StorageMediaResolver].
   final String fileUrl;
   final String fileType; // IMAGE, PDF, DOC
   final String fileName;
+
+  /// Download URL also written as `fileUrl` next to `filePath`, for app
+  /// versions that only read the URL (see [LegacyStorageUrls]).
+  final String? legacyUrl;
 
   const EvidenceFile({
     required this.fileUrl,
     required this.fileType,
     required this.fileName,
+    this.legacyUrl,
   });
 
   @override
   List<Object?> get props => [fileUrl, fileType, fileName];
 
-  Map<String, dynamic> toJson() => {
-        'fileUrl': fileUrl,
+  Map<String, dynamic> toJson() {
+    if (StorageMediaRef.isStoragePath(fileUrl)) {
+      final legacy = legacyUrl?.trim() ?? '';
+      return {
+        'filePath': fileUrl,
+        if (legacy.isNotEmpty) 'fileUrl': legacy,
         'fileType': fileType,
         'fileName': fileName,
       };
+    }
+    return {
+      'fileUrl': fileUrl,
+      'fileType': fileType,
+      'fileName': fileName,
+    };
+  }
 
   factory EvidenceFile.fromJson(Map<String, dynamic> json) {
+    final path = json['filePath'];
+    final hasPath = path is String && path.trim().isNotEmpty;
     return EvidenceFile(
-      fileUrl: json['fileUrl'] ?? '',
+      fileUrl: StorageMediaRef.pick(path: path, url: json['fileUrl']),
       fileType: json['fileType'] ?? 'IMAGE',
       fileName: json['fileName'] ?? '',
+      legacyUrl: hasPath ? json['fileUrl'] as String? : null,
     );
   }
 }

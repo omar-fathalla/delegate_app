@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../services/photo_cache_manager.dart';
+import '../storage/storage_media.dart';
 import '../utils/image_url_helper.dart';
 import 'app_loading_indicator.dart';
 
@@ -34,6 +35,9 @@ class _AppPhotoImageState extends State<AppPhotoImage> {
   File? _resolvedLocalFile;
   bool _isCheckingLocal = false;
 
+  /// TAS-42: download URL for a Storage path (resolved at read time).
+  String? _resolvedRemoteUrl;
+
   @override
   void initState() {
     super.initState();
@@ -49,21 +53,35 @@ class _AppPhotoImageState extends State<AppPhotoImage> {
   }
 
   Future<void> _checkLocalFile() async {
-    if (kIsWeb ||
+    if ((kIsWeb && !StorageMediaRef.isStoragePath(widget.photoUrl)) ||
         widget.photoUrl.startsWith('http://') ||
         widget.photoUrl.startsWith('https://') ||
         widget.photoUrl.startsWith('assets/')) {
       return;
     }
 
+    final requested = widget.photoUrl;
+    final cached = StorageMediaRef.isStoragePath(requested)
+        ? StorageMediaResolver.instance.cachedUrl(requested)
+        : null;
     setState(() {
-      _isCheckingLocal = true;
+      _resolvedLocalFile = null;
+      _resolvedRemoteUrl = cached;
+      _isCheckingLocal = cached == null;
     });
+    if (cached != null) return;
 
-    final file = await PhotoCacheManager.resolveLocalPhotoFile(widget.photoUrl);
-    if (mounted) {
+    final file =
+        kIsWeb ? null : await PhotoCacheManager.resolveLocalPhotoFile(requested);
+    String? remote;
+    if ((file == null || !file.existsSync()) &&
+        StorageMediaRef.isStoragePath(requested)) {
+      remote = await StorageMediaResolver.instance.tryResolve(requested);
+    }
+    if (mounted && widget.photoUrl == requested) {
       setState(() {
         _resolvedLocalFile = file;
+        _resolvedRemoteUrl = remote;
         _isCheckingLocal = false;
       });
     }
@@ -75,7 +93,11 @@ class _AppPhotoImageState extends State<AppPhotoImage> {
 
     Widget content;
     final isAsset = widget.photoUrl.startsWith('assets/');
-    final isNetwork = widget.photoUrl.startsWith('http://') || widget.photoUrl.startsWith('https://');
+    final directNetwork = widget.photoUrl.startsWith('http://') || widget.photoUrl.startsWith('https://');
+    final isNetwork = directNetwork || _resolvedRemoteUrl != null;
+    final networkUrl = directNetwork ? widget.photoUrl : (_resolvedRemoteUrl ?? widget.photoUrl);
+    // A Storage path is a stable cache key; its download URL may change.
+    final cacheKey = directNetwork ? null : widget.photoUrl;
 
     if (isAsset) {
       content = Image.asset(
@@ -89,7 +111,7 @@ class _AppPhotoImageState extends State<AppPhotoImage> {
     } else if (isNetwork) {
       if (kIsWeb) {
         final webUrl = ImageUrlHelper.getWebSafeUrl(
-          widget.photoUrl,
+          networkUrl,
           width: widget.isThumbnail ? 400 : 1800,
         );
         content = Image.network(
@@ -108,7 +130,7 @@ class _AppPhotoImageState extends State<AppPhotoImage> {
             );
           },
           errorBuilder: (context, error, stackTrace) => Image.network(
-            widget.photoUrl,
+            networkUrl,
             width: widget.width,
             height: widget.height,
             fit: widget.fit,
@@ -118,7 +140,8 @@ class _AppPhotoImageState extends State<AppPhotoImage> {
         );
       } else {
         content = CachedNetworkImage(
-        imageUrl: widget.photoUrl,
+        imageUrl: networkUrl,
+        cacheKey: cacheKey,
         cacheManager: PhotoCacheManager.instance,
         width: widget.width,
         height: widget.height,
@@ -137,7 +160,7 @@ class _AppPhotoImageState extends State<AppPhotoImage> {
         errorWidget: (context, url, error) {
           // Fallback to basic Image.network in case custom cache manager had a transient issue
           return Image.network(
-            widget.photoUrl,
+            networkUrl,
             width: widget.width,
             height: widget.height,
             fit: widget.fit,

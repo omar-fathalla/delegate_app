@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/feedback/domain/entities/feedback_entity.dart';
 
@@ -28,7 +29,8 @@ class FeedbackModel extends FeedbackEntity {
         orElse: () => FeedbackType.other,
       ),
       content: json['content'] as String,
-      screenshotUrl: json['screenshotUrl'] as String?,
+      // TAS-42: new docs carry the Storage path; old ones only a URL.
+      screenshotUrl: _screenshotRef(json),
       status: FeedbackStatus.values.firstWhere(
         (e) => e.value == json['status'],
         orElse: () => FeedbackStatus.pending,
@@ -49,11 +51,22 @@ class FeedbackModel extends FeedbackEntity {
       'userEmail': userEmail,
       'type': type.value,
       'content': content,
-      'screenshotUrl': screenshotUrl,
+      if (StorageMediaRef.isStoragePath(screenshotUrl))
+        'screenshotPath': screenshotUrl
+      else
+        'screenshotUrl': screenshotUrl,
       'status': status.value,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
       'adminResponse': adminResponse,
     };
+  }
+
+  static String? _screenshotRef(Map<String, dynamic> json) {
+    final ref = StorageMediaRef.pick(
+      path: json['screenshotPath'],
+      url: json['screenshotUrl'],
+    );
+    return ref.isEmpty ? null : ref;
   }
 }
