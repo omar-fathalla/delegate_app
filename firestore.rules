@@ -376,17 +376,55 @@ service cloud.firestore {
     // payment, supervisor, origin ...) is denied. Unchanged values in a
     // full-map write still pass. Delegate login (delegateLoginV2) is Admin SDK
     // and not affected.
-    function delegateFieldsSafe() {
+    // TAS-331: the Storage path fields (profileImagePath, nationalIdFrontPath,
+    // nationalIdBackPath, receiptImagePath; documentPath / secondaryPath per
+    // entry) are allowed wherever the URL fields are, with the same pending
+    // backing. ids: the Storage folder ids a new path may name (the
+    // delegate doc id and the caller's own uid, see delegatePathOk).
+    function delegateFieldsSafe(ids) {
       // TAS-108: ternaries, because `&&` keeps evaluating after a false.
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+      // TAS-331 (budget): the changed keys are computed once and passed
+      // down; a write without Storage path fields (old builds) is matched by
+      // the old allow-list first and takes the URL-only checks.
+      let ch = request.resource.data.diff(resource.data).affectedKeys();
+      return ch.hasOnly([
         'updatedAt', 'requireReLogin', 'reLoginCompletedAt',
         'profileImageUrl', 'personalPhotoURL', 'photoURL',
         'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'
       ])
         ? (request.resource.data.get('requireReLogin', false) == false
-          ? (delegateDocsOk() ? delegateUrlsWithDocs() : false)
+          ? (delegateDocsOk(ch, ids) ? delegateUrlsOnlyOk(ch, request.resource.data) : false)
           : false)
-        : false;
+        : (ch.hasOnly([
+          'updatedAt', 'requireReLogin', 'reLoginCompletedAt',
+          'profileImageUrl', 'personalPhotoURL', 'photoURL',
+          'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents',
+          'profileImagePath', 'nationalIdFrontPath', 'nationalIdBackPath', 'receiptImagePath'
+        ])
+          ? (request.resource.data.get('requireReLogin', false) == false
+            ? (delegateDocsOk(ch, ids) ? delegateRefsOk(ch, request.resource.data) : false)
+            : false)
+          : false);
+    }
+
+    // TAS-331: a stored Storage path inside one of the delegate's own
+    // folders: delegate_documents/{id}/, delegate_subscription_receipts/{id}/
+    // (app uploads) or organizations/{o}/companies/{c}/delegates/{id}/ (HR
+    // web uploads, moved there by its approval function). ids is a regex
+    // alternation of document ids ('d1' or 'd1|uid'); Firestore ids hold no
+    // regex characters. Empty / absent passes.
+    // A segment is never '.' or '..' (no climbing out of the folder).
+    function delegatePathOk(v, ids) {
+      return v == '' || (v is string && v.matches(
+          '(delegate_documents|delegate_subscription_receipts|organizations/[^/.][^/]*/companies/[^/.][^/]*/delegates)/('
+          + ids + ')(/(?:[^/.]|\\.[^/.]|\\.\\.[^/])[^/]*)+'));
+    }
+
+    // TAS-331: a new or changed entry's documentPath / secondaryPath (an
+    // entry without paths costs one comparison).
+    function entryPathsOk(e, ids) {
+      return !e.keys().hasAny(['documentPath', 'secondaryPath'])
+        || (delegatePathOk(e.get('documentPath', ''), ids) && delegatePathOk(e.get('secondaryPath', ''), ids));
     }
 
     // Docs-pending (Mohamed 2026-11-04): a delegate (re)upload is written as
@@ -405,20 +443,27 @@ service cloud.firestore {
     // odd types included). A new or changed entry must have a string
     // documentStatus and must not be approved. A new approved value is never
     // `in o`, so unknown keys can never be newly approved.
-    function newDocEntryOk(n, o, i) {
+    // TAS-331: ids (delegate self-writes) also keeps a new or changed
+    // entry's documentPath / secondaryPath inside the delegate's own folders
+    // (entryPathsOk). The top-level path fields must equal a pending entry's
+    // path (delegateUrlsWithDocs), so checking the entries covers them.
+    // Staff writes pass null (no folder check; HR web paths are checked by
+    // its approval function).
+    function newDocEntryOk(n, o, i, ids) {
       return i >= n.size() || n[i] in o
-        || (n[i].get('documentStatus', '') is string && !docIsApproved(n[i]));
+        || (n[i].get('documentStatus', '') is string && !docIsApproved(n[i])
+          && (ids == '' || entryPathsOk(n[i], ids)));
     }
 
     // True when the write introduces no new 'approved' document entry.
-    function delegateDocsOk() {
+    function delegateDocsOk(ch, ids) {
       let n = request.resource.data.get('documents', []);
       let o = resource.data.get('documents', []);
-      return !changedKeys().hasAny(['documents']) ? true
+      return !ch.hasAny(['documents']) ? true
         : ((n is list && o is list && n.size() <= 8 && o.size() <= 8)
-          ? (newDocEntryOk(n, o, 0) ? (newDocEntryOk(n, o, 1) ? (newDocEntryOk(n, o, 2)
-            ? (newDocEntryOk(n, o, 3) ? (newDocEntryOk(n, o, 4) ? (newDocEntryOk(n, o, 5)
-            ? (newDocEntryOk(n, o, 6) ? newDocEntryOk(n, o, 7) : false)
+          ? (newDocEntryOk(n, o, 0, ids) ? (newDocEntryOk(n, o, 1, ids) ? (newDocEntryOk(n, o, 2, ids)
+            ? (newDocEntryOk(n, o, 3, ids) ? (newDocEntryOk(n, o, 4, ids) ? (newDocEntryOk(n, o, 5, ids)
+            ? (newDocEntryOk(n, o, 6, ids) ? newDocEntryOk(n, o, 7, ids) : false)
             : false) : false) : false) : false) : false) : false)
           : false);
     }
@@ -444,26 +489,27 @@ service cloud.firestore {
         || pendingUrlAt(n, 6, keys, field, url) || pendingUrlAt(n, 7, keys, field, url));
     }
 
-    function urlFieldOk(f, keys, field) {
-      let v = request.resource.data.get(f, null);
-      return (!changedKeys().hasAny([f]) || v == null || v == '') ? true
-        : (v is string && urlBacked(keys, field, v));
+    function urlFieldOk(ch, d, f, keys) {
+      let v = d.get(f, null);
+      return (!ch.hasAny([f]) || v == null || v == '') ? true
+        : (v is string && urlBacked(keys, 'documentURL', v));
     }
 
     // The three photo fields are scanned once (budget): every changed photo
     // field must be removed or equal the same value v, and v must be backed.
-    function photoSame(f, v) {
-      let x = request.resource.data.get(f, null);
-      return !changedKeys().hasAny([f]) || x == null || x == '' || x == v;
+    function photoSame(ch, d, f, v) {
+      let x = d.get(f, null);
+      return !ch.hasAny([f]) || x == null || x == '' || x == v;
     }
 
-    function photoUrlsOk() {
-      let ch = changedKeys();
-      let d = request.resource.data;
-      let v = ch.hasAny(['profileImageUrl']) ? d.get('profileImageUrl', null)
+    function photoV(ch, d) {
+      return ch.hasAny(['profileImageUrl']) ? d.get('profileImageUrl', null)
         : (ch.hasAny(['personalPhotoURL']) ? d.get('personalPhotoURL', null) : d.get('photoURL', null));
+    }
+
+    function photoUrlsOk(ch, d, v) {
       return !ch.hasAny(['profileImageUrl', 'personalPhotoURL', 'photoURL']) ? true
-        : ((photoSame('profileImageUrl', v) && photoSame('personalPhotoURL', v) && photoSame('photoURL', v))
+        : ((photoSame(ch, d, 'profileImageUrl', v) && photoSame(ch, d, 'personalPhotoURL', v) && photoSame(ch, d, 'photoURL', v))
           ? ((v == null || v == '') ? true : (v is string && urlBacked(['personalPhoto'], 'documentURL', v)))
           : false);
     }
@@ -476,37 +522,119 @@ service cloud.firestore {
     // Over a longer list the second URL scan ran out of the 1000-expression
     // budget (4 entries fit on delegate_requests with only ~6 pad units
     // spare); that deny is now this condition, checked before the scan.
-    function idAt(n, i, needF, fv, needB, bv) {
+    // fv / bv: the value the entry's ff / bf must hold, null = not checked.
+    function idAt(n, i, ff, fv, bf, bv) {
       return i < n.size()
-        && (!needF || n[i].get('documentURL', '') == fv)
-        && (!needB || n[i].get('secondaryURL', '') == bv)
+        && (fv == null || n[i].get(ff, '') == fv)
+        && (bv == null || n[i].get(bf, '') == bv)
         && n[i].get('documentStatus', '') == 'pending'
         && n[i].get('documentKey', '') == 'nationalityId';
     }
 
-    function idUrlsOk() {
-      let ch = changedKeys();
-      let d = request.resource.data;
-      let fv = d.get('nationalIdFrontUrl', null);
-      let bv = d.get('nationalIdBackUrl', null);
-      let needF = ch.hasAny(['nationalIdFrontUrl']) && fv != null && fv != '';
-      let needB = ch.hasAny(['nationalIdBackUrl']) && bv != null && bv != '';
-      let n = d.get('documents', []);
-      return !(needF || needB) || (n is list
-        && (n.size() <= 3 || !ch.hasAny(['profileImageUrl', 'personalPhotoURL', 'photoURL'])) && (
-        idAt(n, 0, needF, fv, needB, bv) || idAt(n, 1, needF, fv, needB, bv)
-        || idAt(n, 2, needF, fv, needB, bv) || idAt(n, 3, needF, fv, needB, bv)
-        || idAt(n, 4, needF, fv, needB, bv) || idAt(n, 5, needF, fv, needB, bv)
-        || idAt(n, 6, needF, fv, needB, bv) || idAt(n, 7, needF, fv, needB, bv)));
+    function idScan(n, ff, fv, bf, bv) {
+      return idAt(n, 0, ff, fv, bf, bv) || idAt(n, 1, ff, fv, bf, bv)
+        || idAt(n, 2, ff, fv, bf, bv) || idAt(n, 3, ff, fv, bf, bv)
+        || idAt(n, 4, ff, fv, bf, bv) || idAt(n, 5, ff, fv, bf, bv)
+        || idAt(n, 6, ff, fv, bf, bv) || idAt(n, 7, ff, fv, bf, bv);
     }
 
-    function delegateUrlsWithDocs() {
-      return photoUrlsOk()
-        ? (idUrlsOk()
-          ? urlFieldOk('receiptImageUrl',
-            ['paymentReceipt', 'electronicPaymentReceipt', 'electronic_payment_receipt'], 'documentURL')
+    // The changed, non-empty value of f, else null (nothing to back).
+    function setValue(ch, d, f) {
+      return (ch.hasAny([f]) && d.get(f, null) != null && d.get(f, null) != '') ? d.get(f, null) : null;
+    }
+
+    function idUrlsOk(ch, d) {
+      let fv = setValue(ch, d, 'nationalIdFrontUrl');
+      let bv = setValue(ch, d, 'nationalIdBackUrl');
+      let n = d.get('documents', []);
+      return (fv == null && bv == null) ? true
+        : ((n is list
+          && (n.size() <= 3 || !ch.hasAny(['profileImageUrl', 'personalPhotoURL', 'photoURL', 'profileImagePath'])))
+          ? idScan(n, 'documentURL', fv, 'secondaryURL', bv) : false);
+    }
+
+    // TAS-331: the Storage path fields. A write that changes one keeps the
+    // single scan per document: while the legacy URL is written next to the
+    // path, the URL is backed by the scan (as above) and the path must name
+    // the same object (urlNamesPath: the URL is that object's Firebase
+    // download URL); once only the path is written, the scan matches the
+    // entry's documentPath (secondaryPath for the ID back) instead. The
+    // folder of every new entry path is checked by delegateDocsOk. Writes
+    // that change no path field (old builds) take the checks above.
+    function urlNamesPath(u, p) {
+      return u is string && p is string
+        && u.matches('https?://[^/]+/v0/b/[^/]+/o/' + p.replace('/', '%2F') + '([?].*)?');
+    }
+
+    // URL field f + path field pf (receipt).
+    function refFieldOk(ch, d, f, pf, keys) {
+      let p = setValue(ch, d, pf);
+      let v = setValue(ch, d, f);
+      return v != null ? ((p == null || urlNamesPath(v, p)) && v is string && urlBacked(keys, 'documentURL', v))
+        : (p == null || (p is string && urlBacked(keys, 'documentPath', p)));
+    }
+
+    function photoRefsOk(ch, d, v) {
+      let p = setValue(ch, d, 'profileImagePath');
+      return p == null ? photoUrlsOk(ch, d, v)
+        : ((photoSame(ch, d, 'profileImageUrl', v) && photoSame(ch, d, 'personalPhotoURL', v) && photoSame(ch, d, 'photoURL', v))
+          ? ((!ch.hasAny(['profileImageUrl', 'personalPhotoURL', 'photoURL']) || v == null || v == '')
+            ? (p is string && urlBacked(['personalPhoto'], 'documentPath', p))
+            : (urlNamesPath(v, p) && urlBacked(['personalPhoto'], 'documentURL', v)))
+          : false);
+    }
+
+    function idRefsOk(ch, d) {
+      let fp = setValue(ch, d, 'nationalIdFrontPath');
+      let bp = setValue(ch, d, 'nationalIdBackPath');
+      let fv = setValue(ch, d, 'nationalIdFrontUrl');
+      let bv = setValue(ch, d, 'nationalIdBackUrl');
+      let n = d.get('documents', []);
+      return (fp == null && bp == null) ? idUrlsOk(ch, d)
+        : ((n is list
+          && (n.size() <= 3 || !ch.hasAny(['profileImageUrl', 'personalPhotoURL', 'photoURL', 'profileImagePath'])))
+          ? ((fv != null || bv != null)
+            ? (((fp == null || urlNamesPath(fv, fp)) && (bp == null || urlNamesPath(bv, bp)))
+              ? idScan(n, 'documentURL', fv, 'secondaryURL', bv) : false)
+            : idScan(n, 'documentPath', fp, 'secondaryPath', bp))
+          : false);
+    }
+
+    // URL-only writes (no Storage path field changed).
+    // The ID check runs first: its TAS-61 size cap then denies before the
+    // photo scan spends the budget.
+    function delegateUrlsOnlyOk(ch, d) {
+      return idUrlsOk(ch, d)
+        ? (photoUrlsOk(ch, d, photoV(ch, d))
+          ? urlFieldOk(ch, d, 'receiptImageUrl', ['paymentReceipt', 'electronicPaymentReceipt', 'electronic_payment_receipt'])
           : false)
         : false;
+    }
+
+    // Writes that change a Storage path field (TAS-331).
+    function delegateRefsOk(ch, d) {
+      return (!ch.hasAny(['nationalIdFrontUrl', 'nationalIdBackUrl', 'nationalIdFrontPath', 'nationalIdBackPath'])
+          || idRefsOk(ch, d))
+        ? (photoRefsOk(ch, d, photoV(ch, d))
+          ? (!ch.hasAny(['receiptImageUrl', 'receiptImagePath']) || refFieldOk(ch, d, 'receiptImageUrl', 'receiptImagePath',
+            ['paymentReceipt', 'electronicPaymentReceipt', 'electronic_payment_receipt']))
+          : false)
+        : false;
+    }
+
+    // delegate_requests self clause: the delegate (uid == request id)
+    // re-uploads its own documents. Same split as delegateFieldsSafe: a
+    // write without Storage path fields matches the old allow-list first.
+    function requestSelfUploadOk(requestId) {
+      let ch = request.resource.data.diff(resource.data).affectedKeys();
+      return ch.hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
+          'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'])
+        ? (delegateDocsOk(ch, requestId + '|' + request.auth.uid) ? delegateUrlsOnlyOk(ch, request.resource.data) : false)
+        : (ch.hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
+            'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents',
+            'profileImagePath', 'nationalIdFrontPath', 'nationalIdBackPath', 'receiptImagePath'])
+          ? (delegateDocsOk(ch, requestId + '|' + request.auth.uid) ? delegateRefsOk(ch, request.resource.data) : false)
+          : false);
     }
 
     function supervisorOnlyRole(r) {
@@ -571,6 +699,11 @@ service cloud.firestore {
 
     // Request URL per document key; '#nidBack' is the national ID back URL
     // (compared as the nationalityId entry's secondaryURL).
+    // TAS-331: the client-side tech activation (old builds) binds the URLs
+    // only; the 4-flip batch has no budget left for the Storage paths. The
+    // approveDelegateDocuments callable binds both (documentPath /
+    // secondaryPath = the request's paths). Before write_legacy_storage_urls
+    // is turned off (URLs ''), this client path must be closed.
     function reqUrlMap(a) {
       return {
         'personalPhoto': a.get('profileImageUrl', ''),
@@ -627,7 +760,7 @@ service cloud.firestore {
         : (privGlobalStaffDocsServer ? false
           : (techSignup
             ? (techFlipOk(delegateId) ? techReqOk(o1, c1, delegateId) : false)
-            : ((approver ? true : delegateDocsOk())
+            : ((approver ? true : delegateDocsOk(changedKeys(), ''))
               ? (staffDelegateAccountFieldsOk(r, approver) ? sourceStampKeysLocked() : false)
               : false)));
     }
@@ -755,7 +888,9 @@ service cloud.firestore {
       return ['fullName', 'firstName', 'secondName', 'thirdName', 'middleName', 'lastName',
         'phoneNumber', 'phone',
         'profileImageUrl', 'personalPhotoURL', 'personalPhotoUrl', 'photoURL',
-        'nationalIdFrontUrl', 'nationalIdBackUrl'];
+        'nationalIdFrontUrl', 'nationalIdBackUrl',
+        // TAS-331: the Storage paths are edited with the URLs (callable).
+        'profileImagePath', 'nationalIdFrontPath', 'nationalIdBackPath'];
     }
     function staffProfileFieldsOk(r) {
       // nationalId / nationalityID: company/org/marketing clients (TA-32).
@@ -1694,7 +1829,7 @@ service cloud.firestore {
           // updates take staffDocsApproveOk, which locks source keys on
           // the non-techSignup branch only (techFlipOk already hasOnly).
           allow update: if delegateOwns(delegateId)
-            ? delegateFieldsSafe()
+            ? delegateFieldsSafe(delegateId + '|' + request.auth.uid)
             : (deviceBindingUntouched() && signedIn()
               && staffManagesDelegate([orgId], [compId], false)
               && staffDocsApproveOk(orgId, compId, compId, delegateId));
@@ -2184,7 +2319,7 @@ service cloud.firestore {
       // update is decided by the nested match alone, for every role.
       allow update: if signedIn() && !onNestedDelegate()
         && (delegateOwns(delegateId)
-        ? delegateFieldsSafe()
+        ? delegateFieldsSafe(delegateId + '|' + request.auth.uid)
         : (deviceBindingUntouched() && staffManagesDelegate(
             [resource.data.get('organizationUID', ''), resource.data.get('organizationId', '')],
             [resource.data.get('companyUID', ''), resource.data.get('companyId', '')], false)
@@ -3423,14 +3558,13 @@ service cloud.firestore {
           // the upload keys. Staff branch: reads users/{uid} only after the
           // payment checks pass. Same as `(A && B && C && D) || S`, written as
           // `(A && B) ? ((C && D) ? true : S) : S`.
-          ? ((isSelfId(requestId)
-                && changedKeys().hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
-                  'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents']))
+          ? (isSelfId(requestId)
               // TAS-61: a delegate token whose upload fails the document /
               // URL checks is denied here; only a staff token falls through
               // to the staff branch (which a delegate can never pass). The
               // deny used to come from the 1000-expression budget.
-              ? ((delegateDocsOk() ? delegateUrlsWithDocs() : false)
+              // TAS-331: requestSelfUploadOk holds the upload allow-list.
+              ? (requestSelfUploadOk(requestId)
                 ? true
                 : (staffToken()
                   ? (subscriptionPaymentUntouched() ? requestStaffUpdateOk(requestId) : false)

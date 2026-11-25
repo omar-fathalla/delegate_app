@@ -1,4 +1,5 @@
 import 'package:delegate_app/features/admin/domain/entities/chain_selection.dart';
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'package:equatable/equatable.dart';
 
 List<String> _stringList(dynamic raw) {
@@ -6,6 +7,8 @@ List<String> _stringList(dynamic raw) {
   return [for (final e in raw) e.toString().trim()].where((e) => e.isNotEmpty).toList();
 }
 
+
+String _trimmed(Object? v) => v is String ? v.trim() : '';
 
 enum SubscriptionPaymentMethod {
   companyDeduction,
@@ -151,6 +154,14 @@ class DelegateSubscriptionRequest extends Equatable {
   final SubscriptionPaymentMethod paymentMethod;
   final String? receiptCode;
   final String? receiptImageUrl;
+
+  /// TAS-331: Storage object paths next to the URL fields above
+  /// (`profileImagePath`, `nationalIdFrontPath`, `nationalIdBackPath`,
+  /// `receiptImagePath`). Empty on requests written before this change.
+  final String profileImagePath;
+  final String nationalIdFrontPath;
+  final String nationalIdBackPath;
+  final String receiptImagePath;
   final String subscriptionCycle;
   final DateTime cycleStartDate;
   final DateTime cycleEndDate;
@@ -195,6 +206,10 @@ class DelegateSubscriptionRequest extends Equatable {
     required this.paymentMethod,
     this.receiptCode,
     this.receiptImageUrl,
+    this.profileImagePath = '',
+    this.nationalIdFrontPath = '',
+    this.nationalIdBackPath = '',
+    this.receiptImagePath = '',
     required this.subscriptionCycle,
     required this.cycleStartDate,
     required this.cycleEndDate,
@@ -252,6 +267,12 @@ class DelegateSubscriptionRequest extends Equatable {
       },
       'receiptCode': receiptCode,
       'receiptImageUrl': receiptImageUrl,
+      if (profileImagePath.isNotEmpty) 'profileImagePath': profileImagePath,
+      if (nationalIdFrontPath.isNotEmpty)
+        'nationalIdFrontPath': nationalIdFrontPath,
+      if (nationalIdBackPath.isNotEmpty)
+        'nationalIdBackPath': nationalIdBackPath,
+      if (receiptImagePath.isNotEmpty) 'receiptImagePath': receiptImagePath,
       'subscriptionCycle': subscriptionCycle,
       'cycleStartDate': cycleStartDate.toIso8601String(),
       'cycleEndDate': cycleEndDate.toIso8601String(),
@@ -331,6 +352,10 @@ class DelegateSubscriptionRequest extends Equatable {
       paymentMethod: parsePaymentMethod(map['paymentMethod']),
       receiptCode: map['receiptCode'],
       receiptImageUrl: map['receiptImageUrl'],
+      profileImagePath: _trimmed(map['profileImagePath']),
+      nationalIdFrontPath: _trimmed(map['nationalIdFrontPath']),
+      nationalIdBackPath: _trimmed(map['nationalIdBackPath']),
+      receiptImagePath: _trimmed(map['receiptImagePath']),
       subscriptionCycle: map['subscriptionCycle'] ?? '',
       cycleStartDate: parseDate(map['cycleStartDate']),
       cycleEndDate: parseDate(map['cycleEndDate']),
@@ -383,6 +408,10 @@ class DelegateSubscriptionRequest extends Equatable {
     SubscriptionPaymentMethod? paymentMethod,
     String? receiptCode,
     String? receiptImageUrl,
+    String? profileImagePath,
+    String? nationalIdFrontPath,
+    String? nationalIdBackPath,
+    String? receiptImagePath,
     String? subscriptionCycle,
     DateTime? cycleStartDate,
     DateTime? cycleEndDate,
@@ -425,6 +454,10 @@ class DelegateSubscriptionRequest extends Equatable {
       paymentMethod: paymentMethod ?? this.paymentMethod,
       receiptCode: receiptCode ?? this.receiptCode,
       receiptImageUrl: receiptImageUrl ?? this.receiptImageUrl,
+      profileImagePath: profileImagePath ?? this.profileImagePath,
+      nationalIdFrontPath: nationalIdFrontPath ?? this.nationalIdFrontPath,
+      nationalIdBackPath: nationalIdBackPath ?? this.nationalIdBackPath,
+      receiptImagePath: receiptImagePath ?? this.receiptImagePath,
       subscriptionCycle: subscriptionCycle ?? this.subscriptionCycle,
       cycleStartDate: cycleStartDate ?? this.cycleStartDate,
       cycleEndDate: cycleEndDate ?? this.cycleEndDate,
@@ -478,6 +511,17 @@ class DelegateSubscriptionRequest extends Equatable {
   bool get isAwaitingPaymobPayment =>
       paymentMethod == SubscriptionPaymentMethod.paymob &&
       paymentStatus == SubscriptionPaymentStatus.pending;
+
+  /// Path-or-URL values to display (path first, see
+  /// [StorageMediaRef.pickFresh]). Never write these back to Firestore.
+  String get profileImageDisplay =>
+      StorageMediaRef.pickFresh(path: profileImagePath, url: profileImageUrl);
+  String get nationalIdFrontDisplay => StorageMediaRef.pickFresh(
+      path: nationalIdFrontPath, url: nationalIdFrontUrl);
+  String get nationalIdBackDisplay => StorageMediaRef.pickFresh(
+      path: nationalIdBackPath, url: nationalIdBackUrl);
+  String get receiptImageDisplay =>
+      StorageMediaRef.pickFresh(path: receiptImagePath, url: receiptImageUrl);
 
   @override
   List<Object?> get props => [

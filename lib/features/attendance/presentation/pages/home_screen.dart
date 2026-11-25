@@ -163,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               companyName: widget.delegate.companyName.isNotEmpty
                                   ? widget.delegate.companyName
                                   : null,
-                              personalPhotoURL: widget.delegate.personalPhotoUrl,
+                              personalPhotoURL: widget.delegate.personalPhotoForCopy,
                             ),
                           );
                         }

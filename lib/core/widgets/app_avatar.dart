@@ -2,7 +2,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../storage/storage_media.dart';
 import '../utils/image_url_helper.dart';
+import 'storage_resolved_image.dart';
 
 /// ويدجت موحد وآمن لعرض الصور الشخصية والأفاتار في التطبيق
 /// يتعامل تلقائياً وبأمان تام مع أخطاء الروابط المنتهية أو غير المصرح بها (مثل 403 Forbidden و 404)
@@ -32,9 +34,32 @@ class AppAvatar extends StatelessWidget {
     this.verbatimFallback = false,
   });
 
+  AppAvatar _withImage(String? url) => AppAvatar(
+        imageUrl: url,
+        fallbackText: fallbackText,
+        radius: radius,
+        backgroundColor: backgroundColor,
+        foregroundColor: foregroundColor,
+        badge: badge,
+        fallbackIcon: fallbackIcon,
+        verbatimFallback: verbatimFallback,
+      );
+
   @override
   Widget build(BuildContext context) {
     if (radius <= 0) return const SizedBox.shrink();
+    // TAS-331: a stored Storage path is turned into a URL through the
+    // Storage rules; the initial shows while it resolves or when denied.
+    final stored = imageUrl?.trim() ?? '';
+    if (StorageMediaRef.isStoragePath(stored)) {
+      final placeholder = _withImage(null);
+      return StorageResolvedImage(
+        pathOrUrl: stored,
+        builder: (context, url) => _withImage(url),
+        loading: placeholder,
+        error: placeholder,
+      );
+    }
     final theme = Theme.of(context);
     final bg = backgroundColor ?? theme.colorScheme.primaryContainer;
     final fg = foregroundColor ?? theme.colorScheme.onPrimaryContainer;

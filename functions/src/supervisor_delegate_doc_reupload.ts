@@ -11,8 +11,9 @@ import {
   decideSupervisorDocReupload,
   isKnownSupervisorReuploadDocType,
   mergeReuploadedDocument,
-  urlFieldsForDocType,
 } from "./supervisor_delegate_doc_reupload_logic";
+import {validateDelegateDocumentObjectPath} from "./privileged_delegate_doc_reupload_logic";
+import {refFieldsForDocType} from "./delegate_doc_ref_fields";
 
 const opts = {timeoutSeconds: 60, memory: "256MB" as const};
 
@@ -43,8 +44,15 @@ export const supervisorReuploadDelegateDocument = functions
     const delegateUid = str(p.uid);
     const docType = str(p.docType);
     const newUrl = str(p.newUrl);
-    if (!delegateUid || !docType || !newUrl) {
+    // TAS-331: the Storage path of the uploaded file (new clients); it must
+    // be inside this delegate's own delegate_documents folder.
+    const newPath = str(p.newPath);
+    if (!delegateUid || !docType || (!newUrl && !newPath)) {
       throw new functions.https.HttpsError("invalid-argument", "missing_fields");
+    }
+    if (newPath && (/^[a-z]+:/i.test(newPath) ||
+        !validateDelegateDocumentObjectPath(newPath, delegateUid).ok)) {
+      throw new functions.https.HttpsError("invalid-argument", "invalid_storage_path");
     }
     if (!isKnownSupervisorReuploadDocType(docType)) {
       throw new functions.https.HttpsError("invalid-argument", "unknown_doc_type");
@@ -83,11 +91,11 @@ export const supervisorReuploadDelegateDocument = functions
     }
 
     const at = new Date().toISOString();
-    const urlFields = urlFieldsForDocType(docType, newUrl);
-    const documents = mergeReuploadedDocument(delegateData.documents, docType, newUrl, at);
+    const refFields = refFieldsForDocType(docType, newUrl, newPath);
+    const documents = mergeReuploadedDocument(delegateData.documents, docType, newUrl, at, newPath);
     const batch = db.batch();
     batch.update(delegateRef, {
-      ...urlFields,
+      ...refFields,
       status: "pending",
       documents,
       updatedAt: FieldValue.serverTimestamp(),
@@ -96,9 +104,9 @@ export const supervisorReuploadDelegateDocument = functions
     const reqRef = db.collection("delegate_requests").doc(delegateUid);
     const reqSnap = await reqRef.get();
     if (reqSnap.exists) {
-      const reqDocs = mergeReuploadedDocument(reqSnap.data()?.documents, docType, newUrl, at);
+      const reqDocs = mergeReuploadedDocument(reqSnap.data()?.documents, docType, newUrl, at, newPath);
       batch.set(reqRef, {
-        ...urlFields,
+        ...refFields,
         documents: reqDocs,
         updatedAt: FieldValue.serverTimestamp(),
       }, {merge: true});
@@ -110,6 +118,7 @@ export const supervisorReuploadDelegateDocument = functions
         {
           photoURL: newUrl,
           profileImageUrl: newUrl,
+          profileImagePath: newPath || FieldValue.delete(),
           updatedAt: FieldValue.serverTimestamp(),
         },
         {merge: true},

@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'dart:io';
 
 import 'package:cloud_functions/cloud_functions.dart';
@@ -118,6 +119,10 @@ String delegateDocumentStoragePath({
 
 /// Ensures upload intent, then writes [file] to [storagePath]. Used before
 /// client Firestore merges and before [SupervisorDelegateDocReuploadRemote.reupload].
+///
+/// TAS-331: [storagePath] is what gets stored (`<field>Path`). The returned
+/// value is the legacy download URL, '' when `write_legacy_storage_urls` is
+/// off.
 Future<String> uploadDelegateDocumentFile({
   required String folderId,
   required String companyUID,
@@ -145,7 +150,7 @@ Future<String> uploadDelegateDocumentFile({
   try {
     final ref = (storage ?? FirebaseStorage.instance).ref(storagePath);
     final task = await ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
-    return await task.ref.getDownloadURL();
+    return await LegacyStorageUrls.urlFor(task.ref) ?? '';
   } on FirebaseException catch (e) {
     throw SupervisorDocReuploadException(storageUploadErrorMessage(e));
   }
@@ -219,6 +224,7 @@ class SupervisorDelegateDocReuploadRemote {
     required String companyUID,
     required String docType,
     required String newUrl,
+    String? newPath,
   }) async {
     try {
       await _functions.httpsCallable('supervisorReuploadDelegateDocument').call({
@@ -227,6 +233,7 @@ class SupervisorDelegateDocReuploadRemote {
         'companyUID': companyUID,
         'docType': docType,
         'newUrl': newUrl,
+        if (newPath != null && newPath.isNotEmpty) 'newPath': newPath,
       });
     } on FirebaseFunctionsException catch (e) {
       throw SupervisorDocReuploadException(
@@ -280,6 +287,7 @@ class SupervisorDelegateDocReuploadRemote {
       companyUID: companyUID,
       docType: docType,
       newUrl: newUrl,
+      newPath: path,
     );
   }
 }
@@ -333,6 +341,7 @@ class PrivilegedDelegateDocReuploadRemote {
     required String companyUID,
     required String docType,
     required String newUrl,
+    String? newPath,
   }) async {
     try {
       await _functions.httpsCallable('privilegedReuploadDelegateDocument').call({
@@ -341,6 +350,7 @@ class PrivilegedDelegateDocReuploadRemote {
         'companyUID': companyUID,
         'docType': docType,
         'newUrl': newUrl,
+        if (newPath != null && newPath.isNotEmpty) 'newPath': newPath,
       });
     } on FirebaseFunctionsException catch (e) {
       throw SupervisorDocReuploadException(
@@ -393,6 +403,7 @@ class PrivilegedDelegateDocReuploadRemote {
       companyUID: companyUID,
       docType: docType,
       newUrl: newUrl,
+      newPath: path,
     );
   }
 }

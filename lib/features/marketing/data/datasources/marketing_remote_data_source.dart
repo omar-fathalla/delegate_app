@@ -1,3 +1,4 @@
+import 'package:delegate_app/features/tracking/data/services/delegate_tracking_service.dart' show storedPhotoPath;
 import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'dart:async';
 
@@ -1258,6 +1259,10 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
         }
       }
     }
+
+    // TAS-331: only a Storage path stored (no URL).
+    final storedPath = storedPhotoPath(data);
+    if (storedPath.isNotEmpty) return storedPath;
 
     // 3. من كائن personalPhoto
     final photoObj = data['personalPhoto'];

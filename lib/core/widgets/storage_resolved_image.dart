@@ -15,6 +15,28 @@ class StorageResolvedImage extends StatefulWidget {
     this.resolver,
   });
 
+  /// TAS-331: [builder] right away for a value that is not a Storage path
+  /// (URLs, local files, assets: no extra frame), [StorageResolvedImage]
+  /// for a path.
+  static Widget wrap({
+    Key? key,
+    required String pathOrUrl,
+    required Widget Function(BuildContext context, String url) builder,
+    Widget? loading,
+    Widget? error,
+  }) {
+    if (!StorageMediaRef.isStoragePath(pathOrUrl)) {
+      return Builder(key: key, builder: (context) => builder(context, pathOrUrl));
+    }
+    return StorageResolvedImage(
+      key: key,
+      pathOrUrl: pathOrUrl,
+      builder: builder,
+      loading: loading,
+      error: error,
+    );
+  }
+
   final String pathOrUrl;
   final Widget Function(BuildContext context, String url) builder;
   final Widget? loading;

@@ -12,6 +12,8 @@ import {
   assertImageFields,
   auditDoc,
   fieldArabicLabel,
+  imageRef,
+  isImageField,
   isEditableDelegateStatus,
   isEditableRequestStatus,
   canCallEditDelegateProfile,
@@ -299,7 +301,7 @@ export const editDelegateProfile = functions
       actorRole: caller.role,
       field,
       oldValue: valueOf(before, field),
-      newValue: String(fields[field] || ""),
+      newValue: isImageField(field) ? imageRef(fields, field) : String(fields[field] || ""),
       delegateUid: collected.delegateUid,
       delegateName: String(fields.fullName || collected.displayName || ""),
       companyUID,
@@ -443,6 +445,13 @@ export const submitNationalIdUpdate = functions
       profileImageUrl: String(src.profileImageUrl || src.personalPhotoURL || ""),
       nationalIdFrontUrl: String(src.nationalIdFrontUrl || ""),
       nationalIdBackUrl: String(src.nationalIdBackUrl || ""),
+      // TAS-331: the Storage paths travel with the URLs.
+      ...(typeof src.profileImagePath === "string" && src.profileImagePath ?
+        {profileImagePath: src.profileImagePath} : {}),
+      ...(typeof src.nationalIdFrontPath === "string" && src.nationalIdFrontPath ?
+        {nationalIdFrontPath: src.nationalIdFrontPath} : {}),
+      ...(typeof src.nationalIdBackPath === "string" && src.nationalIdBackPath ?
+        {nationalIdBackPath: src.nationalIdBackPath} : {}),
       fee: 0,
       remainingMonths: 0,
       createdAt: new Date().toISOString(),

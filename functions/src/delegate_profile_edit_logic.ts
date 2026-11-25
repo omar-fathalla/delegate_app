@@ -35,6 +35,10 @@ export const PROFILE_FIELD_KEYS = [
   "photoURL",
   "nationalIdFrontUrl",
   "nationalIdBackUrl",
+  // TAS-331: Storage paths next to the URLs.
+  "profileImagePath",
+  "nationalIdFrontPath",
+  "nationalIdBackPath",
   "documents",
   "updatedAt",
 ] as const;
@@ -58,6 +62,27 @@ export interface ProfileEditInput {
   personalPhotoURL?: string;
   nationalIdFrontUrl?: string;
   nationalIdBackUrl?: string;
+  /**
+   * TAS-331: Storage paths of the uploaded images (new clients). The URL of
+   * the same image is the legacy copy, sent only while
+   * write_legacy_storage_urls is on.
+   */
+  personalPhotoPath?: string;
+  nationalIdFrontPath?: string;
+  nationalIdBackPath?: string;
+}
+
+/** TAS-331: image field (URL key, used for audits) -> its path input key. */
+export const IMAGE_PATH_INPUT: Record<string, keyof ProfileEditInput> = {
+  personalPhotoURL: "personalPhotoPath",
+  nationalIdFrontUrl: "nationalIdFrontPath",
+  nationalIdBackUrl: "nationalIdBackPath",
+};
+
+/** The image's new value for audits and checks: the path, else the URL. */
+export function imageRef(fields: ProfileEditInput, urlKey: ProfileEditField): string {
+  const pathKey = IMAGE_PATH_INPUT[urlKey];
+  return String((pathKey && fields[pathKey]) || fields[urlKey] || "");
 }
 
 export function canonicalizeRole(role: unknown): string {
@@ -144,6 +169,13 @@ export function sanitizeProfileEdit(raw: ProfileEditInput): {
   take("personalPhotoURL", raw.personalPhotoURL);
   take("nationalIdFrontUrl", raw.nationalIdFrontUrl);
   take("nationalIdBackUrl", raw.nationalIdBackUrl);
+  // TAS-331: an image sent as a path only still counts as that field.
+  for (const [urlKey, pathKey] of Object.entries(IMAGE_PATH_INPUT)) {
+    const value = (raw as Record<string, unknown>)[pathKey];
+    if (typeof value !== "string" || !value.trim()) continue;
+    fields[pathKey] = value.trim();
+    if (!keys.includes(urlKey as ProfileEditField)) keys.push(urlKey as ProfileEditField);
+  }
   return {fields, keys};
 }
 
@@ -211,10 +243,16 @@ export function patchDocuments(
   existing: unknown,
   fields: ProfileEditInput,
 ): unknown[] | undefined {
-  const photo = fields.personalPhotoURL;
-  const front = fields.nationalIdFrontUrl;
-  const back = fields.nationalIdBackUrl;
-  if (!photo && !front && !back) return undefined;
+  const photo = fields.personalPhotoURL || "";
+  const front = fields.nationalIdFrontUrl || "";
+  const back = fields.nationalIdBackUrl || "";
+  const photoPath = fields.personalPhotoPath || "";
+  const frontPath = fields.nationalIdFrontPath || "";
+  const backPath = fields.nationalIdBackPath || "";
+  const hasPhoto = !!(photo || photoPath);
+  const hasFront = !!(front || frontPath);
+  const hasBack = !!(back || backPath);
+  if (!hasPhoto && !hasFront && !hasBack) return undefined;
   const list = Array.isArray(existing) ? existing.map((e) => ({...(e as Record<string, unknown>)})) : [];
   const upsert = (key: string, patch: Record<string, unknown>) => {
     const idx = list.findIndex((e) => String(e.documentKey || e.key || "") === key);
@@ -224,16 +262,32 @@ export function patchDocuments(
       list.push({documentKey: key, documentStatus: "approved", ...patch});
     }
   };
-  if (photo) {
-    upsert("personalPhoto", {documentURL: photo, documentStatus: "approved"});
-  }
-  if (front || back) {
-    const prev = list.find((e) => String(e.documentKey || "") === "nationalityId") || {};
-    upsert("nationalityId", {
-      documentURL: front || prev.documentURL || "",
-      secondaryURL: back || prev.secondaryURL || "",
+  // TAS-331: a new image sets its URL (legacy copy, may be "") and its
+  // Storage path; a URL-only edit drops the entry's old path (stale).
+  const withPath = (key: string, value: string) =>
+    value ? {[key]: value} : {[key]: undefined};
+  if (hasPhoto) {
+    upsert("personalPhoto", {
+      documentURL: photo,
+      ...withPath("documentPath", photoPath),
       documentStatus: "approved",
     });
+  }
+  if (hasFront || hasBack) {
+    const prev = list.find((e) => String(e.documentKey || "") === "nationalityId") || {};
+    upsert("nationalityId", {
+      documentURL: hasFront ? front : (prev.documentURL || ""),
+      secondaryURL: hasBack ? back : (prev.secondaryURL || ""),
+      ...(hasFront ? withPath("documentPath", frontPath) : {}),
+      ...(hasBack ? withPath("secondaryPath", backPath) : {}),
+      documentStatus: "approved",
+    });
+  }
+  // Drop keys set to undefined (Firestore rejects undefined values).
+  for (const e of list as Record<string, unknown>[]) {
+    for (const k of ["documentPath", "secondaryPath"]) {
+      if (k in e && e[k] === undefined) delete e[k];
+    }
   }
   return list;
 }
@@ -258,24 +312,33 @@ export function applyProfileFields(
       patch.phone = fields.phoneNumber;
     }
   }
-  if (fields.personalPhotoURL) {
-    patch.profileImageUrl = fields.personalPhotoURL;
-    patch.personalPhotoURL = fields.personalPhotoURL;
+  if (fields.personalPhotoURL || fields.personalPhotoPath) {
+    const photo = fields.personalPhotoURL || "";
+    patch.profileImageUrl = photo;
+    patch.personalPhotoURL = photo;
     if (Object.prototype.hasOwnProperty.call(current, "personalPhotoUrl")
       || Object.prototype.hasOwnProperty.call(current, "photoURL")) {
       if (Object.prototype.hasOwnProperty.call(current, "personalPhotoUrl")) {
-        patch.personalPhotoUrl = fields.personalPhotoURL;
+        patch.personalPhotoUrl = photo;
       }
       if (Object.prototype.hasOwnProperty.call(current, "photoURL")) {
-        patch.photoURL = fields.personalPhotoURL;
+        patch.photoURL = photo;
       }
     } else {
-      patch.personalPhotoUrl = fields.personalPhotoURL;
-      patch.photoURL = fields.personalPhotoURL;
+      patch.personalPhotoUrl = photo;
+      patch.photoURL = photo;
     }
+    // TAS-331: null clears a stale path when only a URL was sent.
+    patch.profileImagePath = fields.personalPhotoPath || null;
   }
-  if (fields.nationalIdFrontUrl) patch.nationalIdFrontUrl = fields.nationalIdFrontUrl;
-  if (fields.nationalIdBackUrl) patch.nationalIdBackUrl = fields.nationalIdBackUrl;
+  if (fields.nationalIdFrontUrl || fields.nationalIdFrontPath) {
+    patch.nationalIdFrontUrl = fields.nationalIdFrontUrl || "";
+    patch.nationalIdFrontPath = fields.nationalIdFrontPath || null;
+  }
+  if (fields.nationalIdBackUrl || fields.nationalIdBackPath) {
+    patch.nationalIdBackUrl = fields.nationalIdBackUrl || "";
+    patch.nationalIdBackPath = fields.nationalIdBackPath || null;
+  }
   const docs = patchDocuments(current.documents, fields);
   if (docs) patch.documents = docs;
   return patch;
@@ -377,6 +440,13 @@ export function assertImageFields(fields: ProfileEditInput, delegateUid?: string
   for (const key of keys) {
     const value = fields[key];
     if (value && !isAllowedImageUrl(value, delegateUid)) {
+      throw new Error("invalid-image-url");
+    }
+  }
+  // TAS-331: a path must be a plain delegate_documents/{uid}/ object path.
+  for (const key of ["personalPhotoPath", "nationalIdFrontPath", "nationalIdBackPath"] as const) {
+    const value = fields[key];
+    if (value && (!value.startsWith("delegate_documents/") || !isAllowedImageUrl(value, delegateUid))) {
       throw new Error("invalid-image-url");
     }
   }
@@ -573,10 +643,11 @@ export function usersProfileSyncPatch(fields: ProfileEditInput): Record<string, 
     patch.phoneNumber = fields.phoneNumber;
     patch.phone = fields.phoneNumber;
   }
-  if (fields.personalPhotoURL) {
-    patch.personalPhotoURL = fields.personalPhotoURL;
-    patch.profileImageUrl = fields.personalPhotoURL;
-    patch.photoURL = fields.personalPhotoURL;
+  if (fields.personalPhotoURL || fields.personalPhotoPath) {
+    patch.personalPhotoURL = fields.personalPhotoURL || "";
+    patch.profileImageUrl = fields.personalPhotoURL || "";
+    patch.photoURL = fields.personalPhotoURL || "";
+    if (fields.personalPhotoPath) patch.profileImagePath = fields.personalPhotoPath;
   }
   return Object.keys(patch).length ? patch : null;
 }

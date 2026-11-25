@@ -29,10 +29,17 @@ List<Map<String, dynamic>> _copyEntries(dynamic raw) {
 /// Returns the new `documents` list after re-uploading [docType] with [newUrl].
 /// [approverUid] null means the caller is the delegate (or a non-approver):
 /// the entry is written as `pending`.
+///
+/// TAS-331: [newPath] is the uploaded object's Storage path, written as
+/// `documentPath` (`secondaryPath` for the ID back). [newUrl] is the legacy
+/// download URL, '' when `write_legacy_storage_urls` is off. Without a path
+/// the entry's previous path is removed, so a stale path never outlives the
+/// file it pointed to.
 List<Map<String, dynamic>> mergeReuploadedDocument(
   dynamic raw, {
   required String docType,
   required String newUrl,
+  String? newPath,
   String? approverUid,
   DateTime? now,
 }) {
@@ -44,14 +51,24 @@ List<Map<String, dynamic>> mergeReuploadedDocument(
       ? Map<String, dynamic>.from(docs[idx])
       : {'documentKey': key};
 
+  final path = (newPath ?? '').trim();
+  void setRef(String urlKey, String pathKey) {
+    base[urlKey] = newUrl;
+    if (path.isNotEmpty) {
+      base[pathKey] = path;
+    } else {
+      base.remove(pathKey);
+    }
+  }
+
   if (docType == 'nationalIdFront') {
-    base['documentURL'] = newUrl;
+    setRef('documentURL', 'documentPath');
     base.putIfAbsent('secondaryURL', () => '');
   } else if (docType == 'nationalIdBack') {
-    base['secondaryURL'] = newUrl;
+    setRef('secondaryURL', 'secondaryPath');
     base.putIfAbsent('documentURL', () => '');
   } else {
-    base['documentURL'] = newUrl;
+    setRef('documentURL', 'documentPath');
   }
   base['uploadedAt'] = ts;
   base.remove('rejectionReason');

@@ -1010,6 +1010,24 @@ class DelegateTrackingService {
         }
       }
     }
-    return '';
+    return storedPhotoPath(data);
   }
+}
+
+/// TAS-331: the delegate photo's Storage path (`profileImagePath`, or the
+/// personalPhoto entry's `documentPath`) when no URL is stored; '' if none.
+/// AppAvatar resolves it through the Storage rules.
+String storedPhotoPath(Map<String, dynamic> data) {
+  final top = data['profileImagePath'];
+  if (top is String && top.trim().isNotEmpty) return top.trim();
+  final docs = data['documents'];
+  if (docs is List) {
+    for (final doc in docs) {
+      if (doc is Map && doc['documentKey'] == 'personalPhoto') {
+        final p = doc['documentPath'];
+        if (p is String && p.trim().isNotEmpty) return p.trim();
+      }
+    }
+  }
+  return '';
 }

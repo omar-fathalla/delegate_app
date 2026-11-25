@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -44,6 +45,10 @@ class DelegateProfileSaveResult {
 
 /// Uploads any picked images, then saves profile fields. A failed image
 /// upload does not drop name/phone changes from the same save.
+///
+/// TAS-331: [upload] returns the uploaded object's Storage path, and [edit]
+/// receives paths (the callable stores them; the legacy URL is added by
+/// [DelegateProfileEditRepository.editProfile] while the flag is on).
 @visibleForTesting
 Future<DelegateProfileSaveResult> saveDelegateProfileEdit({
   required Future<String> Function({
@@ -54,9 +59,9 @@ Future<DelegateProfileSaveResult> saveDelegateProfileEdit({
   required Future<void> Function({
     String? fullName,
     String? phoneNumber,
-    String? personalPhotoURL,
-    String? nationalIdFrontUrl,
-    String? nationalIdBackUrl,
+    String? personalPhotoPath,
+    String? nationalIdFrontPath,
+    String? nationalIdBackPath,
   }) edit,
   required String delegateUid,
   String? fullName,
@@ -79,14 +84,14 @@ Future<DelegateProfileSaveResult> saveDelegateProfileEdit({
     }
   }
 
-  final photoUrl = await tryUpload(personalPhoto, 'profile');
-  final frontUrl = await tryUpload(idFront, 'national_id_front');
-  final backUrl = await tryUpload(idBack, 'national_id_back');
+  final photoPath = await tryUpload(personalPhoto, 'profile');
+  final frontPath = await tryUpload(idFront, 'national_id_front');
+  final backPath = await tryUpload(idBack, 'national_id_back');
 
   final hasText = (fullName != null && fullName.isNotEmpty) ||
       (phoneNumber != null && phoneNumber.isNotEmpty);
-  final hasUrl = photoUrl != null || frontUrl != null || backUrl != null;
-  if (!hasText && !hasUrl) {
+  final hasImage = photoPath != null || frontPath != null || backPath != null;
+  if (!hasText && !hasImage) {
     throw DelegateProfileEditException(
       imageError ?? 'لم يتم تغيير أي بيان.',
     );
@@ -95,9 +100,9 @@ Future<DelegateProfileSaveResult> saveDelegateProfileEdit({
   await edit(
     fullName: fullName,
     phoneNumber: phoneNumber,
-    personalPhotoURL: photoUrl,
-    nationalIdFrontUrl: frontUrl,
-    nationalIdBackUrl: backUrl,
+    personalPhotoPath: photoPath,
+    nationalIdFrontPath: frontPath,
+    nationalIdBackPath: backPath,
   );
 
   if (imageError != null) {
@@ -145,7 +150,14 @@ class DelegateProfileEditRepository {
       bytes,
       SettableMetadata(contentType: 'image/jpeg'),
     );
-    return ref.getDownloadURL();
+    return ref.fullPath;
+  }
+
+  /// The legacy download URL for [path] while write_legacy_storage_urls is
+  /// on, else null.
+  Future<String?> _legacyUrl(String? path) async {
+    if (path == null || path.isEmpty) return null;
+    return LegacyStorageUrls.urlFor(_storage.ref(path));
   }
 
   Future<void> editProfile({
@@ -154,10 +166,15 @@ class DelegateProfileEditRepository {
     String? requestId,
     String? fullName,
     String? phoneNumber,
-    String? personalPhotoURL,
-    String? nationalIdFrontUrl,
-    String? nationalIdBackUrl,
+    String? personalPhotoPath,
+    String? nationalIdFrontPath,
+    String? nationalIdBackPath,
   }) async {
+    // TAS-331: the callable stores the paths; the URLs only while the
+    // legacy flag is on (older app versions read them).
+    final personalPhotoURL = await _legacyUrl(personalPhotoPath);
+    final nationalIdFrontUrl = await _legacyUrl(nationalIdFrontPath);
+    final nationalIdBackUrl = await _legacyUrl(nationalIdBackPath);
     await _call('editDelegateProfile', {
       'companyUID': companyUID,
       if (delegateUid != null && delegateUid.isNotEmpty) 'delegateUid': delegateUid,
@@ -171,6 +188,12 @@ class DelegateProfileEditRepository {
         'nationalIdFrontUrl': nationalIdFrontUrl,
       if (nationalIdBackUrl != null && nationalIdBackUrl.isNotEmpty)
         'nationalIdBackUrl': nationalIdBackUrl,
+      if (personalPhotoPath != null && personalPhotoPath.isNotEmpty)
+        'personalPhotoPath': personalPhotoPath,
+      if (nationalIdFrontPath != null && nationalIdFrontPath.isNotEmpty)
+        'nationalIdFrontPath': nationalIdFrontPath,
+      if (nationalIdBackPath != null && nationalIdBackPath.isNotEmpty)
+        'nationalIdBackPath': nationalIdBackPath,
     });
   }
 
@@ -203,9 +226,9 @@ class DelegateProfileEditRepository {
       edit: ({
         String? fullName,
         String? phoneNumber,
-        String? personalPhotoURL,
-        String? nationalIdFrontUrl,
-        String? nationalIdBackUrl,
+        String? personalPhotoPath,
+        String? nationalIdFrontPath,
+        String? nationalIdBackPath,
       }) {
         return editProfile(
           companyUID: companyUID,
@@ -213,9 +236,9 @@ class DelegateProfileEditRepository {
           requestId: requestId,
           fullName: fullName,
           phoneNumber: phoneNumber,
-          personalPhotoURL: personalPhotoURL,
-          nationalIdFrontUrl: nationalIdFrontUrl,
-          nationalIdBackUrl: nationalIdBackUrl,
+          personalPhotoPath: personalPhotoPath,
+          nationalIdFrontPath: nationalIdFrontPath,
+          nationalIdBackPath: nationalIdBackPath,
         );
       },
       delegateUid: id,

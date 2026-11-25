@@ -176,6 +176,57 @@ describe("expression budget headroom (TAS-105)", () => {
     });
   });
 
+  // TAS-331: the same 8-entry photo re-upload by a new build, which also
+  // writes the Storage path (profileImagePath + the entry's documentPath)
+  // next to its download URL. Measured 25 Nov 2026 (spare pad units):
+  // delegates ~22, delegate_requests ~13 (URL-only writes above: ~39 / ~30).
+  const PATH_DELEGATE_PAD = Number(process.env.RULES_BUDGET_PAD_PATH_DELEGATES || 17);
+  const PATH_REQ_SELF_PAD = Number(process.env.RULES_BUDGET_PAD_PATH_REQ_SELF || 8);
+  const P1 = "delegate_documents/d1/personalPhoto_1.jpg";
+  const U1 = "https://firebasestorage.googleapis.com/v0/b/tashil-dev.firebasestorage.app/o/"
+    + encodeURIComponent(P1) + "?alt=media&token=t";
+  const pathPhotoWrite = {
+    documents: [...EIGHT.slice(1).reverse(),
+      {...EIGHT[0], documentStatus: "pending", documentURL: U1, documentPath: P1}],
+    profileImageUrl: U1, personalPhotoURL: U1, profileImagePath: P1, updatedAt: "t",
+  };
+
+  test(`delegates update keeps ${PATH_DELEGATE_PAD} spare pad units (8-entry photo re-upload with path)`, async () => {
+    await assertBudgetHeadroom({
+      rules: RULES,
+      line: "allow update: if signedIn() && !onNestedDelegate()",
+      pad: PATH_DELEGATE_PAD,
+      projectId: "demo-expression-budget-delegates-path",
+      seed: async (db) => {
+        await db.doc("users/d1").set({role: "delegate", organizationUID: "o1", companyUID: "c1"});
+        await db.doc(TOP_D1).set({
+          uid: "d1", organizationUID: "o1", companyUID: "c1", status: "active", fullName: "Fake",
+          profileImageUrl: "p0", nationalIdFrontUrl: "f0", nationalIdBackUrl: "b0", documents: EIGHT,
+        });
+      },
+      request: (e) => e.authenticatedContext("d1", {firebase: {sign_in_provider: "password"}, role: "delegate"})
+        .firestore().doc(TOP_D1).update(pathPhotoWrite),
+    });
+  });
+
+  test(`delegate_requests update keeps ${PATH_REQ_SELF_PAD} spare pad units (8-entry photo re-upload with path)`, async () => {
+    await assertBudgetHeadroom({
+      rules: RULES,
+      line: UPDATE_LINE,
+      pad: PATH_REQ_SELF_PAD,
+      projectId: "demo-expression-budget-req-self-path",
+      seed: async (db) => {
+        await db.doc("users/d1").set({role: "delegate", organizationUID: "o1", companyUID: "c1"});
+        await db.doc("delegate_requests/d1").set({
+          status: "pending", requestType: "new_delegate", orgCompanyCheck: "ok",
+          organizationUID: "o1", companyUID: "c1", profileImageUrl: "p0", documents: EIGHT,
+        });
+      },
+      request: (e) => e.authenticatedContext("d1", {firebase: {sign_in_provider: "password"}, role: "delegate"})
+        .firestore().doc("delegate_requests/d1").update(pathPhotoWrite),
+    });
+  });
+
   test(`delegates CG create keeps ${CG_CREATE_TS_PAD} spare pad units (tech support, pending, top-level)`, async () => {
     await assertBudgetHeadroom({
       rules: RULES,

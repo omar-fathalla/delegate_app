@@ -129,7 +129,26 @@ export function requestUrlMap(req: Record<string, unknown>): Record<string, stri
     "paymentReceipt": s("receiptImageUrl"),
     "electronicPaymentReceipt": s("receiptImageUrl"),
     "electronic_payment_receipt": s("receiptImageUrl"),
+    // TAS-331: '<key>#p' = the request's Storage path for that key
+    // (documentPath; '#nidBack#p' = the ID back's secondaryPath). '' on a
+    // request written before TAS-331.
+    "personalPhoto#p": s("profileImagePath"),
+    "nationalityId#p": s("nationalIdFrontPath"),
+    "#nidBack#p": s("nationalIdBackPath"),
+    "paymentReceipt#p": s("receiptImagePath"),
+    "electronicPaymentReceipt#p": s("receiptImagePath"),
+    "electronic_payment_receipt#p": s("receiptImagePath"),
   };
+}
+
+/**
+ * TAS-331 (flipAt / entryOk): an entry's stored path, when it has one, must
+ * be the request's path for that key. An entry without the field (older
+ * app) passes.
+ */
+function pathMatches(entry: Record<string, unknown>, field: string, expected: string | undefined): boolean {
+  if (!Object.prototype.hasOwnProperty.call(entry, field)) return true;
+  return entry[field] === (expected ?? "");
 }
 
 export interface Activation {
@@ -183,13 +202,19 @@ export function planActivation(
     const entry = e as Record<string, unknown>;
     const key = typeof entry.documentKey === "string" ? entry.documentKey : "";
     const url = typeof entry.documentURL === "string" ? entry.documentURL : "";
-    const expected = Object.prototype.hasOwnProperty.call(urls, key) && !key.startsWith("#") ? urls[key] : null;
+    const expected = Object.prototype.hasOwnProperty.call(urls, key) && !key.includes("#") ? urls[key] : null;
     if (expected === null || expected !== url) {
+      return {ok: false, reason: "document_url_mismatch", documentKey: key};
+    }
+    if (!pathMatches(entry, "documentPath", urls[key + "#p"])) {
       return {ok: false, reason: "document_url_mismatch", documentKey: key};
     }
     if (key === "nationalityId") {
       const back = typeof entry.secondaryURL === "string" ? entry.secondaryURL : "";
       if (back !== urls["#nidBack"]) return {ok: false, reason: "document_url_mismatch", documentKey: key};
+      if (!pathMatches(entry, "secondaryPath", urls["#nidBack#p"])) {
+        return {ok: false, reason: "document_url_mismatch", documentKey: key};
+      }
     }
     out.push({...entry, documentStatus: "approved", reviewedBy: reviewerName, reviewedAt: reviewedAtIso});
     flipped++;

@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../../core/storage/storage_media.dart';
+
 enum DelegateGender { male, female }
 
 enum DelegatePosition { supervisor, promoter }
@@ -195,12 +197,26 @@ class Delegate extends Equatable {
       final doc = documents.firstWhere(
         (d) =>
             d.documentKey == DocumentKey.personalPhoto &&
-            d.documentURL.isNotEmpty,
+            d.displayUrl.isNotEmpty,
       );
-      return doc.documentURL;
+      return doc.displayUrl;
     } catch (_) {
       return null;
     }
+  }
+
+  /// TAS-331: the photo value to copy into another document (attendance,
+  /// requests): the legacy URL while one is stored, else the path. Copies
+  /// keep working on app versions that only read URLs.
+  String? get personalPhotoForCopy {
+    for (final d in documents) {
+      if (d.documentKey != DocumentKey.personalPhoto) continue;
+      final url = d.documentURL.trim();
+      final fresh = d.displayUrl;
+      if (fresh.isEmpty) continue;
+      return StorageMediaRef.isRemoteUrl(fresh) || url.isEmpty ? fresh : url;
+    }
+    return null;
   }
 }
 
@@ -215,6 +231,12 @@ class DelegateDocument extends Equatable {
   final String? receiptCode;
   final String? secondaryURL;
 
+  /// TAS-331: Storage object paths written next to [documentURL] /
+  /// [secondaryURL] (`documentPath` / `secondaryPath`). Display with
+  /// [displayUrl] / [secondaryDisplayUrl], never the raw URL fields.
+  final String? documentPath;
+  final String? secondaryPath;
+
   const DelegateDocument({
     required this.documentKey,
     required this.documentStatus,
@@ -225,7 +247,17 @@ class DelegateDocument extends Equatable {
     this.uploadedAt,
     this.receiptCode,
     this.secondaryURL,
+    this.documentPath,
+    this.secondaryPath,
   });
+
+  /// Path or URL to show (path first, a newer URL wins over a stale path).
+  String get displayUrl =>
+      StorageMediaRef.pickFresh(path: documentPath, url: documentURL);
+
+  /// Same for the second image (national ID back, S1 receipt...).
+  String get secondaryDisplayUrl =>
+      StorageMediaRef.pickFresh(path: secondaryPath, url: secondaryURL);
 
   @override
   List<Object?> get props => [
@@ -238,5 +270,7 @@ class DelegateDocument extends Equatable {
     uploadedAt,
     receiptCode,
     secondaryURL,
+    documentPath,
+    secondaryPath,
   ];
 }

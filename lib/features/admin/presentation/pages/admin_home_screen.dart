@@ -1136,9 +1136,9 @@ class AdminHomeHeroCard extends StatelessWidget with _AdminHomeHelpers {
                       (adminDelegate.documents
                           .where((d) =>
                               d.documentKey == DocumentKey.personalPhoto &&
-                              d.documentURL.isNotEmpty)
+                              d.displayUrl.isNotEmpty)
                           .firstOrNull
-                          ?.documentURL) ??
+                          ?.displayUrl) ??
                       FirebaseAuth.instance.currentUser?.photoURL;
 
                   return Container(

@@ -1,3 +1,5 @@
+import 'package:delegate_app/core/widgets/storage_resolved_image.dart';
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -301,9 +303,9 @@ class _ProfileBody extends StatelessWidget {
       final photoDoc = delegate.documents.firstWhere(
         (doc) =>
             doc.documentKey == DocumentKey.personalPhoto &&
-            doc.documentURL.isNotEmpty,
+            doc.displayUrl.isNotEmpty,
       );
-      return photoDoc.documentURL;
+      return photoDoc.displayUrl;
     } catch (_) {
       return null;
     }
@@ -880,7 +882,7 @@ class _ProfileBody extends StatelessWidget {
           _DisplayDocument(
             id: 'personalPhoto',
             title: l10n.personalPhoto,
-            imageUrl: doc.documentURL,
+            imageUrl: doc.displayUrl,
             status: doc.documentStatus,
             docType: 'personalPhoto',
             uploadedAt: doc.uploadedAt,
@@ -893,7 +895,7 @@ class _ProfileBody extends StatelessWidget {
           _DisplayDocument(
             id: 'nationalIdFront',
             title: 'بطاقة الرقم القومي (الوجه)',
-            imageUrl: doc.documentURL,
+            imageUrl: doc.displayUrl,
             status: doc.documentStatus,
             docType: 'nationalIdFront',
             uploadedAt: doc.uploadedAt,
@@ -901,12 +903,12 @@ class _ProfileBody extends StatelessWidget {
             defaultIcon: Icons.credit_card_outlined,
           ),
         );
-        if (doc.secondaryURL != null && doc.secondaryURL!.isNotEmpty) {
+        if (doc.secondaryDisplayUrl.isNotEmpty) {
           list.add(
             _DisplayDocument(
               id: 'nationalIdBack',
               title: 'بطاقة الرقم القومي (الظهر)',
-              imageUrl: doc.secondaryURL!,
+              imageUrl: doc.secondaryDisplayUrl,
               status: doc.documentStatus,
               docType: 'nationalIdBack',
               uploadedAt: doc.uploadedAt,
@@ -920,7 +922,7 @@ class _ProfileBody extends StatelessWidget {
           _DisplayDocument(
             id: doc.documentKey.name,
             title: _getDocumentTitleHelper(doc.documentKey, l10n),
-            imageUrl: doc.documentURL,
+            imageUrl: doc.displayUrl,
             status: doc.documentStatus,
             docType: doc.documentKey.name,
             uploadedAt: doc.uploadedAt,
@@ -1179,15 +1181,21 @@ class _ProfileBody extends StatelessWidget {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
+      // TAS-331: the Storage path next to each URL field; the URL is ''
+      // when write_legacy_storage_urls is off.
       if (item.docType == 'personalPhoto') {
         updateFields['profileImageUrl'] = newUrl;
         updateFields['personalPhotoURL'] = newUrl;
+        updateFields['profileImagePath'] = storagePath;
       } else if (item.docType == 'nationalIdFront') {
         updateFields['nationalIdFrontUrl'] = newUrl;
+        updateFields['nationalIdFrontPath'] = storagePath;
       } else if (item.docType == 'nationalIdBack') {
         updateFields['nationalIdBackUrl'] = newUrl;
+        updateFields['nationalIdBackPath'] = storagePath;
       } else if (item.docType == 'paymentReceipt') {
         updateFields['receiptImageUrl'] = newUrl;
+        updateFields['receiptImagePath'] = storagePath;
       }
 
       // Docs-pending (Mohamed 2026-11-04): a delegate's own re-upload is
@@ -1212,6 +1220,7 @@ class _ProfileBody extends StatelessWidget {
                 check.data()?['documents'],
                 docType: item.docType,
                 newUrl: newUrl,
+                newPath: storagePath,
                 approverUid: null,
               ),
             }, SetOptions(merge: true));
@@ -1228,6 +1237,7 @@ class _ProfileBody extends StatelessWidget {
           await usersRef.update({
             'photoURL': newUrl,
             'profileImageUrl': newUrl,
+            'profileImagePath': storagePath,
             'updatedAt': FieldValue.serverTimestamp(),
           });
         }
@@ -1244,6 +1254,7 @@ class _ProfileBody extends StatelessWidget {
               reqSnap.data()?['documents'],
               docType: item.docType,
               newUrl: newUrl,
+              newPath: storagePath,
               approverUid: null,
             ),
           }, SetOptions(merge: true));
@@ -1571,8 +1582,10 @@ class _DocumentCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   hasImage
-                      ? CachedNetworkImage(
-                          imageUrl: item.imageUrl,
+                      ? StorageResolvedImage.wrap(
+                          pathOrUrl: item.imageUrl,
+                          builder: (context, resolvedUrl) => CachedNetworkImage(
+                          imageUrl: resolvedUrl,
                           fit: BoxFit.cover,
                           placeholder: (context, url) => Container(
                             color: colorScheme.surfaceContainerHighest,
@@ -1607,6 +1620,7 @@ class _DocumentCard extends StatelessWidget {
                               ],
                             ),
                           ),
+                        ),
                         )
                       : Container(
                           color: colorScheme.surfaceContainerHighest,
@@ -1785,8 +1799,16 @@ class _DocumentCard extends StatelessWidget {
     );
   }
 
-  void _showFullScreenImage(BuildContext context, String title, String url) {
-    Navigator.of(context).push(
+  Future<void> _showFullScreenImage(
+    BuildContext context,
+    String title,
+    String stored,
+  ) async {
+    // TAS-331: a stored Storage path opens through the Storage rules.
+    final url =
+        await StorageMediaResolver.instance.tryResolve(stored) ?? stored;
+    if (!context.mounted) return;
+    await Navigator.of(context).push(
       PageRouteBuilder(
         opaque: false,
         barrierDismissible: true,

@@ -100,7 +100,7 @@ class SubscriptionRequestPaymentChips extends StatelessWidget {
               ],
             ),
           ),
-          if (request.receiptImageUrl != null)
+          if (request.receiptImageDisplay.isNotEmpty)
             IconButton.filledTonal(
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               padding: EdgeInsets.zero,
@@ -108,7 +108,7 @@ class SubscriptionRequestPaymentChips extends StatelessWidget {
               icon: const Icon(Icons.receipt_long_rounded, size: 16),
               onPressed: () => onReceiptTap?.call(
                 'إشعار تحويل انستاباي - ${request.fullName}',
-                request.receiptImageUrl!,
+                request.receiptImageDisplay,
               ),
             ),
         ] else if (request.paymentMethod ==
@@ -187,7 +187,7 @@ class SubscriptionRequestPaymentChips extends StatelessWidget {
               ),
             ),
           ),
-          if (request.receiptImageUrl != null)
+          if (request.receiptImageDisplay.isNotEmpty)
             IconButton.filledTonal(
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               padding: EdgeInsets.zero,
@@ -195,7 +195,7 @@ class SubscriptionRequestPaymentChips extends StatelessWidget {
               icon: const Icon(Icons.receipt_long_rounded, size: 16),
               onPressed: () => onReceiptTap?.call(
                 'إيصال إلكتروني - كود ${request.receiptCode}',
-                request.receiptImageUrl!,
+                request.receiptImageDisplay,
               ),
             ),
         ],

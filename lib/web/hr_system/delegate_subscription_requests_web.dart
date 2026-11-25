@@ -1,5 +1,6 @@
 // Web-only list-detail for «طلبات اشتراك واعتماد المناديب».
 // Built only when WebRuntimePolicy.isWeb. Mobile keeps the card list.
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/admin/data/company_chain_request_history.dart';
 import 'package:delegate_app/features/admin/data/company_chains.dart';
@@ -1400,7 +1401,7 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final url = request.profileImageUrl.trim();
+    final url = request.profileImageDisplay.trim();
     return AppAvatar(
       imageUrl: url.isEmpty ? null : url,
       fallbackText: _initials(request.fullName),
@@ -1837,9 +1838,9 @@ class _DetailContent extends StatelessWidget {
   }
 
   Widget _documents(BuildContext context) {
-    final front = request.nationalIdFrontUrl.trim();
-    final back = request.nationalIdBackUrl.trim();
-    final photo = request.profileImageUrl.trim();
+    final front = request.nationalIdFrontDisplay.trim();
+    final back = request.nationalIdBackDisplay.trim();
+    final photo = request.profileImageDisplay.trim();
     final hasId = front.isNotEmpty || back.isNotEmpty;
     if (!hasId && photo.isEmpty) {
       return Text(
@@ -1958,7 +1959,15 @@ class _DetailContent extends StatelessWidget {
     }
   }
 
-  void _showImage(BuildContext context, String title, String url) {
+  /// TAS-331: a stored Storage path opens through the Storage rules.
+  void _showImage(BuildContext context, String title, String stored) {
+    StorageMediaResolver.instance.tryResolve(stored).then((url) {
+      if (!context.mounted) return;
+      _showResolvedImage(context, title, url ?? stored);
+    });
+  }
+
+  void _showResolvedImage(BuildContext context, String title, String url) {
     final wide = MediaQuery.sizeOf(context).width > 768;
     if (!wide) {
       showModalBottomSheet<void>(

@@ -357,9 +357,9 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
                       (widget.delegate.documents
                           .where((d) =>
                               d.documentKey == DocumentKey.personalPhoto &&
-                              d.documentURL.isNotEmpty)
+                              d.displayUrl.isNotEmpty)
                           .firstOrNull
-                          ?.documentURL);
+                          ?.displayUrl);
                   if (photoUrl == null) {
                     try {
                       photoUrl = FirebaseAuth.instance.currentUser?.photoURL;
