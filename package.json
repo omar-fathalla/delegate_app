@@ -37,6 +37,7 @@
     "test:rules:tas73-tracking": "bash scripts/emulators_exec.sh --only storage,firestore --project demo-tas73-tracking \"node --test test/rules/tas73-tracking-evidence.test.js\"",
     "test:rules:tas73-photos": "bash scripts/emulators_exec.sh --only firestore --project demo-tas73-photos \"node --test test/rules/tas73-photo-scoped-queries.test.js\"",
     "test:rules:storage": "bash scripts/emulators_exec.sh --only storage,firestore --project demo-tashil-storage \"node --test test/rules/storage.rules.test.js\"",
+    "test:rules:tas28": "bash scripts/emulators_exec.sh --only storage,firestore --project demo-tas28 \"node --test test/rules/tas28-delegate-id-claim.test.js\"",
     "test:rules:tas332": "bash scripts/emulators_exec.sh --only storage,firestore --project demo-tas332 \"node --test test/rules/tas332-storage-read-parity.test.js\"",
     "test:scripts:ipa-entitlements": "bash test/scripts/check_ipa_entitlements.test.sh",
     "test:rules:ghost": "bash scripts/emulators_exec.sh --only firestore --project demo-ghost-rules \"node --test test/rules/ghost-delegate-create.test.js\"",

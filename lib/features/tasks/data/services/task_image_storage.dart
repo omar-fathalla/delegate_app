@@ -9,6 +9,7 @@ import 'package:delegate_app/features/tasks/domain/task_proof_paths.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:delegate_app/core/security/delegate_identity.dart';
 
 /// Result of a finished task image upload.
 ///
@@ -115,7 +116,8 @@ class TaskImageStorage {
     required File file,
     void Function(double progress)? onProgress,
   }) async {
-    final uid = (_auth ?? FirebaseAuth.instance).currentUser?.uid;
+    // TAS-28: the path owner is the delegate id (claim), not the Auth uid.
+    final uid = DelegateIdentity.current(_auth ?? FirebaseAuth.instance);
     if (uid == null) throw StateError('not-signed-in');
     final company = companyId.trim();
     if (company.isEmpty) throw StateError('company_required');

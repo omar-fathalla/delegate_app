@@ -4,7 +4,6 @@ import 'package:delegate_app/features/tasks/domain/entities/task_proof.dart';
 import 'package:delegate_app/features/tasks/domain/task_proof_paths.dart';
 
 import 'package:delegate_app/features/tasks/presentation/widgets/task_image_widgets.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -17,6 +16,7 @@ import 'package:delegate_app/features/tasks/presentation/bloc/delegate_tasks_eve
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:delegate_app/injection_container.dart' as di;
+import 'package:delegate_app/core/security/delegate_identity.dart';
 
 class TaskDetailsScreen extends StatefulWidget {
   final TaskEntity task;
@@ -80,17 +80,19 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   /// Only the supervisor who sent the task may edit or delete it.
   bool get _isSender {
     if (!widget.isAdmin) return false;
-    final authUid =
-        widget.authUidOverride ?? FirebaseAuth.instance.currentUser?.uid;
     final createdBy = _task.createdBy;
     if (createdBy.isEmpty) return false;
-    return createdBy == authUid || createdBy == widget.currentUserId;
+    if (createdBy == widget.currentUserId) return true;
+    final override = widget.authUidOverride;
+    if (override != null) return createdBy == override;
+    // TAS-28: Auth uid (old equality) or the delegateId claim.
+    return DelegateIdentity.selfIds().contains(createdBy);
   }
 
   String? get _viewerId =>
       widget.currentUserId ??
       widget.authUidOverride ??
-      FirebaseAuth.instance.currentUser?.uid;
+      DelegateIdentity.current();
 
   bool get _canViewAllProofs {
     if (_isSender) return true;
@@ -108,7 +110,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       role: widget.currentUserRole,
       viewerIds: [
         widget.currentUserId,
-        widget.authUidOverride ?? FirebaseAuth.instance.currentUser?.uid,
+        widget.authUidOverride ?? DelegateIdentity.current(),
+        if (widget.authUidOverride == null) ...DelegateIdentity.selfIds(),
       ],
       viewerCompanyId: widget.currentUserCompanyId,
       taskCompanyId: _task.companyId,

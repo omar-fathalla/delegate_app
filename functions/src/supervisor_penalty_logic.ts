@@ -64,6 +64,8 @@ export function isActiveDelegate(data: Record<string, unknown> | undefined): boo
 /** Which delegate ids the token may act as (its uid plus the delegateIds claim). */
 export function callerDelegateIds(uid: string, token: Record<string, unknown> | undefined): string[] {
   const ids = [uid];
+  // TAS-28 phase 0: the delegateId claim names the caller too.
+  if (typeof token?.delegateId === "string" && token.delegateId.trim()) ids.push(token.delegateId.trim());
   const claim = token?.delegateIds;
   if (Array.isArray(claim)) for (const x of claim) if (typeof x === "string" && x.trim()) ids.push(x.trim());
   return [...new Set(ids.filter(Boolean))];

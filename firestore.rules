@@ -295,6 +295,21 @@ service cloud.firestore {
       );
     }
 
+    // TAS-28 phase 0: the caller's own delegate document id. delegateLoginV2
+    // puts it in the delegateId claim; a token without it (old token, staff)
+    // falls back to the Auth uid. Today both are the same id; phase 1 gives
+    // new logins a different uid (dlg_<hash>), so own-id checks read this.
+    function myDelegateId() {
+      return request.auth.token.get('delegateId', request.auth.uid);
+    }
+
+    // TAS-28 phase 0: id names the caller. The old equality (Auth uid) is
+    // still accepted for current sessions and v1.14.x; phase 2 drops it.
+    // No get(): two comparisons, cheap on every path.
+    function isSelfId(id) {
+      return id == request.auth.uid || id == myDelegateId();
+    }
+
     function companyScoped() {
       return callerCompany() != '' && (
         resource.data.get('companyUID', '') == callerCompany() ||
@@ -830,6 +845,10 @@ service cloud.firestore {
         || (request.auth.token.keys().hasAll(['delegateIds'])
           && request.auth.token.delegateIds is list
           && resource.id in request.auth.token.delegateIds)
+        // TAS-28: no isSelfId() here. delegateLoginV2 always lists the
+        // primary id in delegateIds (checked above), and this collection-group
+        // read is also evaluated for nested paths, where the extra terms
+        // pushed a delegate's deny over the 1000-expression budget.
         || resource.id == request.auth.uid
         // Field uid (not document id) so a collection-group query
         // where uid==auth.uid / delegateId is provable. Own data only.
@@ -961,11 +980,15 @@ service cloud.firestore {
     // TAS-55: the caller's own copy in this company says it is a supervisor.
     // A missing copy makes get() fail, which denies.
     function delegateIsSupervisorIn(orgId, compId) {
-      return get(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId)/delegates/$(request.auth.uid))
+      return get(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId)/delegates/$(myDelegateId()))
         .data.get('position', '') in ['supervisor', 'Supervisor', 'مشرف'];
     }
 
     function canReadNestedDelegate(orgId, compId, delegateId) {
+      // TAS-28: own doc by the old uid equality or by delegateIds (always
+      // holds the delegateId claim). isSelfId() is left out on purpose: the
+      // collection-group read runs too, and a plain delegate's deny of a
+      // colleague must stay a rule deny, not a budget deny.
       return signedIn() && (
         delegateId == request.auth.uid
         || (request.auth.token.keys().hasAll(['delegateIds'])
@@ -1855,10 +1878,15 @@ service cloud.firestore {
         // An attached image must sit under the uploader's company folder
         // with an N1-r name: task_images/{companyId}/{uid}/task_{uid}_{token}.
         // Legacy org-level paths cannot be written on create or image change.
+        // TAS-28 phase 0: the owner segment is the Auth uid (old) or the
+        // delegateId claim; the second regex runs only when they differ.
         function incomingTaskImagePathOk(path) {
+          let pre = '^task_images/' + request.resource.data.get('companyId', '') + '/';
+          let me = myDelegateId();
           return path is string
-            && path.matches(
-              '^task_images/' + request.resource.data.get('companyId', '') + '/' + request.auth.uid + '/task_' + request.auth.uid + '_[^_]+$');
+            && (path.matches(pre + request.auth.uid + '/task_' + request.auth.uid + '_[^_]+$')
+              || (me != request.auth.uid
+                && path.matches(pre + me + '/task_' + me + '_[^_]+$')));
         }
         function incomingTaskImageListOk() {
           return !request.resource.data.keys().hasAny(['imagePaths'])
@@ -1963,7 +1991,7 @@ service cloud.firestore {
             return proofTask().get('companyId', '');
           }
           function isProofSender() {
-            return signedIn() && proofTask().get('createdBy', '') == request.auth.uid;
+            return signedIn() && isSelfId(proofTask().get('createdBy', ''));
           }
           function isProofCompanySupervisor() {
             return signedIn()
@@ -1989,7 +2017,7 @@ service cloud.firestore {
           // Held / inactive callers cannot write (users doc, else the
           // company delegate doc). Reads of existing proofs stay allowed.
           function proofCallerBlocked(taskCo, ud) {
-            let delPath = /databases/$(database)/documents/organizations/$(orgId)/companies/$(taskCo)/delegates/$(request.auth.uid);
+            let delPath = /databases/$(database)/documents/organizations/$(orgId)/companies/$(taskCo)/delegates/$(myDelegateId());
             let data = ud.size() > 0 ? ud : (exists(delPath) ? get(delPath).data : {});
             let holds = data.get('holds', {});
             return (holds is map
@@ -2049,7 +2077,8 @@ service cloud.firestore {
             let task = proofTask();
             let taskCo = task.get('companyId', '');
             let data = request.resource.data;
-            let uid = request.auth.uid;
+            // TAS-28: the match already checked isSelfId(uploaderUid).
+            let uid = uploaderUid;
             let ud = taskUserData();
             return task.get('status', '') != 'cancelled'
               && taskCo is string && taskCo != ''
@@ -2066,15 +2095,15 @@ service cloud.firestore {
           }
 
           allow get: if signedIn() && (
-            request.auth.uid == uploaderUid
+            isSelfId(uploaderUid)
             || isProofSender()
             || isProofCompanySupervisor()
           );
           allow list: if signedIn() && (isProofSender() || isProofCompanySupervisor());
           allow create, update: if signedIn()
-            && request.auth.uid == uploaderUid
+            && isSelfId(uploaderUid)
             && proofWriteOk();
-          allow delete: if signedIn() && request.auth.uid == uploaderUid;
+          allow delete: if signedIn() && isSelfId(uploaderUid);
         }
       }
 
@@ -2718,7 +2747,7 @@ service cloud.firestore {
         : (dataHasString(d, 'companyId') ? d.companyId : '');
       return isDelegate()
         && dataHasString(d, 'createdBy')
-        && d.createdBy == request.auth.uid
+        && isSelfId(d.createdBy)
         && co != ''
         && delegateInCompany(co)
         && delegateNotifyTargetOk(d.get('delegateUid', ''), co);
@@ -3149,8 +3178,8 @@ service cloud.firestore {
           'supervisor', 'company_supervisor', 'hr', 'company-hr', 'company_hr', 'human_resources']
           && co != '' && docCo == co)
         || d.get('supervisorUid', '') == request.auth.uid
-        || d.get('delegateUid', '') == request.auth.uid
-        || resource.id == request.auth.uid;
+        || isSelfId(d.get('delegateUid', ''))
+        || isSelfId(resource.id);
     }
 
 
@@ -3394,7 +3423,7 @@ service cloud.firestore {
           // the upload keys. Staff branch: reads users/{uid} only after the
           // payment checks pass. Same as `(A && B && C && D) || S`, written as
           // `(A && B) ? ((C && D) ? true : S) : S`.
-          ? ((request.auth.uid == requestId
+          ? ((isSelfId(requestId)
                 && changedKeys().hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
                   'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents']))
               // TAS-61: a delegate token whose upload fails the document /

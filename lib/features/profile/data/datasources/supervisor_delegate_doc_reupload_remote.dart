@@ -4,15 +4,11 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:delegate_app/features/admin/data/datasources/storage_upload_intent.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:delegate_app/core/security/delegate_identity.dart';
 
-/// Signed-in uid, or null when Firebase is not initialised (unit tests).
-String? _currentUid() {
-  try {
-    return FirebaseAuth.instance.currentUser?.uid;
-  } catch (_) {
-    return null;
-  }
-}
+/// Signed-in delegate id (TAS-28: delegateId claim, else the Auth uid), or
+/// null when Firebase is not initialised (unit tests).
+String? _currentUid() => DelegateIdentity.current();
 
 /// TAS-72: Storage already lets the signed-in user write its own
 /// `delegate_documents/<uid>/` folder (`request.auth.uid == folderId`).
@@ -58,9 +54,12 @@ Future<String> resolveDelegateDocumentFolder(String profileUid) async {
     if (user == null || user.uid == profileUid) return profileUid;
     final claims = (await user.getIdTokenResult()).claims ?? const {};
     final ids = claims['delegateIds'];
+    // TAS-28: the caller's own folder is its delegate id (claim).
+    final me = DelegateIdentity.fromClaims(uid: user.uid, claims: claims) ?? user.uid;
+    if (me == profileUid) return profileUid;
     return chooseDelegateDocumentFolder(
       profileUid: profileUid,
-      callerUid: user.uid,
+      callerUid: me,
       callerRole: (claims['role'] ?? '').toString(),
       callerDelegateIds: ids is List ? ids.map((e) => e.toString()).toList() : const [],
     );

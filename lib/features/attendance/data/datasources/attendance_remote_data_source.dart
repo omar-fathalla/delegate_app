@@ -19,6 +19,7 @@ import 'package:delegate_app/core/services/trusted_time_service.dart';
 import 'package:delegate_app/features/attendance/data/models/attendance_model.dart';
 import 'package:delegate_app/features/tracking/data/services/delegate_tracking_engine.dart';
 import 'package:delegate_app/injection_container.dart';
+import 'package:delegate_app/core/security/delegate_identity.dart';
 
 abstract class AttendanceRemoteDataSource {
   Future<AttendanceModel> checkIn(
@@ -1333,7 +1334,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'senderName': delegateName,
         'senderRole': 'delegate',
         'delegateUid': 'supervisor_$companyId',
-        'createdBy': auth?.currentUser?.uid ?? userId,
+        // TAS-28: own delegate id (delegateId claim), not the Auth uid.
+        'createdBy': (auth != null ? DelegateIdentity.current(auth) : null) ?? userId,
         'isRead': false,
         'read': false,
         'createdAt': FieldValue.serverTimestamp(),

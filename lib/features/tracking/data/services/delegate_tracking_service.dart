@@ -13,6 +13,7 @@ import '../models/delegate_tracking_session_model.dart';
 import '../../domain/entities/delegate_tracking_session.dart';
 import '../../domain/entities/tracking_breadcrumb.dart';
 import '../models/tracking_breadcrumb_model.dart';
+import 'package:delegate_app/core/security/delegate_identity.dart';
 
 /// TAS-82: breadcrumbs are fetched newest-first (so `limit` keeps the most
 /// recent points) and drawn oldest-first; this flips a newest-first page.
@@ -35,7 +36,8 @@ class DelegateTrackingService {
 
   String _writerUid(DelegateTrackingSession session) {
     try {
-      return (_auth ?? FirebaseAuth.instance).currentUser?.uid ??
+      // TAS-28: delegateId claim (same as the uid for today's tokens).
+      return DelegateIdentity.current(_auth ?? FirebaseAuth.instance) ??
           session.delegateId;
     } catch (_) {
       // No Firebase app (unit tests).

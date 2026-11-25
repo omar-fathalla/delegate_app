@@ -11,6 +11,7 @@ import 'package:delegate_app/features/profile/data/models/delegate_model.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:delegate_app/core/security/delegate_identity.dart';
 
 abstract class AuthRemoteDataSource {
   /// Staff lookup by phone. Uses `staffPhoneLookup` when it is deployed.
@@ -114,6 +115,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
     try {
       await firebaseAuth.signInWithCustomToken(response.token);
+      // TAS-28 phase 0: cache the delegateId claim for DelegateIdentity.
+      await DelegateIdentity.refresh(firebaseAuth);
     } catch (error) {
       debugPrint('delegate custom token sign-in failed: $error');
       throw const AuthFailure(

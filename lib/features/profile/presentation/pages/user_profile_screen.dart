@@ -23,6 +23,7 @@ import 'package:delegate_app/injection_container.dart' as di;
 
 import '../../../../l10n/app_localizations.dart';
 import 'package:delegate_app/features/profile/presentation/widgets/delegate_phone_change_sheet.dart';
+import 'package:delegate_app/core/security/delegate_identity.dart';
 
 /// صفحة الملف الشخصي للمستخدم
 /// User Profile Screen with ability to change password and photo
@@ -97,7 +98,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   Future<void> _fetchFirestoreData() async {
     try {
       final firestore = FirebaseFirestore.instance;
-      final targetUid = _delegate?.uid ?? _currentUser?.uid;
+      final targetUid = _delegate?.uid ?? DelegateIdentity.current(_auth);
       final targetPhone = _delegate?.phoneNumber ?? _currentUser?.phoneNumber;
       final targetEmail = _delegate?.email ?? _currentUser?.email;
 
@@ -296,7 +297,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       setState(() => _isUploadingPhoto = true);
 
       final file = File(picked.path);
-      final uid = _delegate?.uid ?? delegate?.uid ?? _firestoreUserData?['uid'] ?? _currentUser?.uid;
+      final uid = _delegate?.uid ?? delegate?.uid ?? _firestoreUserData?['uid'] ?? DelegateIdentity.current(_auth);
       if (uid == null || uid.isEmpty || uid == 'super-admin-login') {
         if (mounted) {
           AppSnackBar.showError(context, AppLocalizations.of(context)!.accountNotIdentified);
@@ -432,7 +433,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   Future<void> _removePhoto(Delegate? delegate) async {
     try {
       setState(() => _isUploadingPhoto = true);
-      final uid = _delegate?.uid ?? delegate?.uid ?? _firestoreUserData?['uid'] ?? _currentUser?.uid;
+      final uid = _delegate?.uid ?? delegate?.uid ?? _firestoreUserData?['uid'] ?? DelegateIdentity.current(_auth);
       if (uid == null || uid.isEmpty || uid == 'super-admin-login') {
         if (mounted) {
           AppSnackBar.showError(context, AppLocalizations.of(context)!.accountNotIdentified);
@@ -1178,7 +1179,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               } else if (fType == 'phone') {
                 json['phoneNumber'] = nVal;
               }
-              final uid = _delegate?.uid ?? _firestoreUserData?['uid'] ?? _currentUser?.uid ?? '';
+              final uid = _delegate?.uid ?? _firestoreUserData?['uid'] ?? DelegateIdentity.current(_auth) ?? '';
               final updated = DelegateModel.fromJson(json, uid);
               _delegate = updated;
               di.sl<AuthLocalDataSource>().cacheDelegateData(updated).ignore();
