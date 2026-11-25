@@ -1,10 +1,14 @@
 import 'package:delegate_app/core/l10n/display_names.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:material_symbols_icons/symbols.dart';
+
 import 'dart:async';
+
 import 'package:delegate_app/core/attendance/attendance_branch_ref.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
+
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -34,7 +38,9 @@ import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geolocator/geolocator.dart';
+
 import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:delegate_app/core/services/trusted_time_service.dart';
 import 'package:delegate_app/core/services/security_audit_service.dart';
@@ -53,7 +59,7 @@ class AttendanceScreen extends StatefulWidget {
   /// Called when the delegate stands in a branch of another chain. The
   /// owner switches to [target]; null turns automatic switching off.
   final Future<void> Function(Delegate target, String branchLabel)?
-      onAutoSwitchChain;
+  onAutoSwitchChain;
 
   const AttendanceScreen({
     super.key,
@@ -234,16 +240,17 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           .doc(orgId)
           .getResilient(forceServer: false)
           .then((doc) {
-        if (doc.exists && mounted) {
-          final name = (doc.data()?['name'] as String?)?.trim() ?? '';
-          if (name.isNotEmpty) {
-            setState(() {
-              _orgNamesCache[orgId] = name;
-              _recomputeFilteredHistory();
-            });
-          }
-        }
-      }).ignore();
+            if (doc.exists && mounted) {
+              final name = (doc.data()?['name'] as String?)?.trim() ?? '';
+              if (name.isNotEmpty) {
+                setState(() {
+                  _orgNamesCache[orgId] = name;
+                  _recomputeFilteredHistory();
+                });
+              }
+            }
+          })
+          .ignore();
       raw = widget.delegate.organizationName;
     }
     return _formatChainName(raw, branchName: branchName, isArabic: isArabic);
@@ -297,7 +304,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         final start = data['startDate'];
         if (start is Timestamp) {
           final date = start.toDate();
-          if (date.year == _selectedMonth.year && date.month == _selectedMonth.month) {
+          if (date.year == _selectedMonth.year &&
+              date.month == _selectedMonth.month) {
             final days = (data['daysCount'] as num?)?.toInt() ?? 1;
             count += days;
           }
@@ -336,9 +344,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   LocationFailureKind? _locationFailure;
 
   bool get _isGeofenceMode => isGeofenceAttendanceMode(
-        _orgAttendanceMode,
-        widget.delegate.organizationName,
-      );
+    _orgAttendanceMode,
+    widget.delegate.organizationName,
+  );
 
   // --- Automatic chain + branch detection (TAS-245) ---
   /// Branches of the delegate's OTHER chains (null until loaded).
@@ -361,9 +369,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
   /// The open chain plus every other chain the delegate belongs to.
   Set<String> get _memberOrgIds => {
-        widget.delegate.organizationUID.trim(),
-        ..._otherChainOrgIds,
-      };
+    widget.delegate.organizationUID.trim(),
+    ..._otherChainOrgIds,
+  };
 
   /// Refuses a check-in on a branch outside the open chain (TAS-333). The
   /// branch is never swapped for another one: the delegate gets a message
@@ -493,7 +501,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         _attendanceBloc.add(
           LoadMoreHistoryRequested(
             userId: widget.delegate.uid,
-            organizationId: '', // Cross-org query for unified monthly attendance
+            organizationId:
+                '', // Cross-org query for unified monthly attendance
             nationalityID: widget.delegate.nationalityID,
             phoneNumber: widget.delegate.phoneNumber,
           ),
@@ -569,7 +578,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   /// Recomputes filtered/grouped data only when source data or month changes.
   void _recomputeFilteredHistory() {
     final currentOrg = widget.delegate.organizationUID.trim();
-    final isArabic = true; // Canonical chain keys in Arabic for consistent matching
+    final isArabic =
+        true; // Canonical chain keys in Arabic for consistent matching
 
     final allDaysSet = <String>{};
     final chainDaysSets = <String, Set<String>>{};
@@ -592,8 +602,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
     // Whole-month sessions when loaded; otherwise the loaded page as a
     // temporary preview until the month query returns.
-    final statsSource =
-        _hasMonthSessionsForSelected ? _monthSessions! : _rawHistory;
+    final statsSource = _hasMonthSessionsForSelected
+        ? _monthSessions!
+        : _rawHistory;
     for (final item in statsSource) {
       if (item.checkInTime.month == _selectedMonth.month &&
           item.checkInTime.year == _selectedMonth.year) {
@@ -624,7 +635,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     }
 
     _filteredHistory = _rawHistory.where((attendance) {
-      final inMonth = attendance.checkInTime.month == _selectedMonth.month &&
+      final inMonth =
+          attendance.checkInTime.month == _selectedMonth.month &&
           attendance.checkInTime.year == _selectedMonth.year;
       if (!inMonth) return false;
 
@@ -661,7 +673,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         listener: (context, state) {
           if (state is AttendanceCheckedIn) {
             if (!widget.viewOnly && WebRuntimePolicy.liveTrackingEnabled) {
-              DelegateTrackingEngine().startTrackingSession(delegateId: widget.delegate.uid);
+              DelegateTrackingEngine().startTrackingSession(
+                delegateId: widget.delegate.uid,
+              );
             }
             if (state.attendance.isSynced) {
               AppSnackBar.showSuccess(context, l10n.checkedInSuccessfully);
@@ -712,7 +726,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               context.read<AttendanceBloc>().add(
                 LoadMoreHistoryRequested(
                   userId: widget.delegate.uid,
-                  organizationId: '', // Cross-org query for unified monthly attendance
+                  organizationId:
+                      '', // Cross-org query for unified monthly attendance
                   nationalityID: widget.delegate.nationalityID,
                   phoneNumber: widget.delegate.phoneNumber,
                 ),
@@ -728,7 +743,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   context.read<AttendanceBloc>().add(
                     HistoryRequested(
                       userId: widget.delegate.uid,
-                      organizationId: '', // Cross-org query for unified monthly attendance
+                      organizationId:
+                          '', // Cross-org query for unified monthly attendance
                       nationalityID: widget.delegate.nationalityID,
                       phoneNumber: widget.delegate.phoneNumber,
                     ),
@@ -736,7 +752,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 }
               });
             } else if (state.syncStatus == SyncStatus.failure) {
-              AppSnackBar.showError(context, AppLocalizations.of(context)!.syncFailed);
+              AppSnackBar.showError(
+                context,
+                AppLocalizations.of(context)!.syncFailed,
+              );
             }
           }
         },
@@ -770,8 +789,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               WebRuntimePolicy.liveTrackingEnabled &&
               isCheckedIn &&
               !DelegateTrackingEngine().isTracking) {
-            DelegateTrackingEngine()
-                .startTrackingSession(delegateId: widget.delegate.uid);
+            DelegateTrackingEngine().startTrackingSession(
+              delegateId: widget.delegate.uid,
+            );
           }
 
           return Scaffold(
@@ -782,8 +802,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       widget.delegate.fullName.isNotEmpty
                           ? widget.delegate.fullName
                           : (widget.delegate.companyName.isNotEmpty
-                              ? AppLocalizations.of(context)!.attDelegateOfCompany(widget.delegate.companyName)
-                              : AppLocalizations.of(context)!.attendanceLog),
+                                ? AppLocalizations.of(context)!
+                                      .attDelegateOfCompany(
+                                        widget.delegate.companyName,
+                                      )
+                                : AppLocalizations.of(context)!.attendanceLog),
                     ),
                   )
                 : null,
@@ -795,99 +818,133 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             ),
             floatingActionButton: widget.viewOnly
                 ? null
-                : M3PressScale(child: FloatingActionButton.extended(
-                    elevation: 3,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                    extendedPadding:
-                        const EdgeInsetsDirectional.only(start: 16, end: 20),
-                    onPressed: (_actionLock.isBusy ||
-                            state is AttendanceLoading ||
-                            isSyncing)
-                        ? null
-                        : () {
-                            _actionLock.run(
-                              bloc: _attendanceBloc,
-                              onChanged: () {
-                                if (mounted) setState(() {});
-                              },
-                              action: () {
-                                if (!WebRuntimePolicy.checkInEnabled) {
-                                  AppSnackBar.showInfo(
-                                    context,
-                                    WebRuntimePolicy.checkInWebMessage,
-                                  );
-                                  return Future<void>.value();
-                                }
-                                return _isGeofenceMode
-                                    ? _handleGeofenceAction(
-                                        isCheckedIn: isCheckedIn,
-                                        activeAttendance: activeAttendance,
-                                      )
-                                    : _showQRScanner(
-                                        context,
-                                        isCheckedIn,
-                                        activeAttendance,
-                                      );
-                              },
-                            );
-                          },
-                    backgroundColor: isCheckedIn
-                        ? Theme.of(context).colorScheme.primaryContainer
-                        : (_isGeofenceMode
-                            ? (_isInsideGeofence
-                                ? Theme.of(context).colorScheme.primaryContainer
-                                : Theme.of(context).colorScheme.secondaryContainer)
-                            : Theme.of(context).colorScheme.primaryContainer),
-                    icon: _actionLock.isBusy
-                        ? SizedBox.square(
-                            key: const Key('attendanceFabBusy'),
-                            dimension: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: isCheckedIn || !_isGeofenceMode || _isInsideGeofence
-                                  ? Theme.of(context).colorScheme.onPrimaryContainer
-                                  : Theme.of(context).colorScheme.onSecondaryContainer,
-                            ),
-                          )
-                        : Icon(
-                      isCheckedIn
-                          ? Symbols.logout_rounded
+                : M3PressScale(
+                    child: FloatingActionButton.extended(
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      extendedPadding: const EdgeInsetsDirectional.only(
+                        start: 16,
+                        end: 20,
+                      ),
+                      onPressed:
+                          (_actionLock.isBusy ||
+                              state is AttendanceLoading ||
+                              isSyncing)
+                          ? null
+                          : () {
+                              _actionLock.run(
+                                bloc: _attendanceBloc,
+                                onChanged: () {
+                                  if (mounted) setState(() {});
+                                },
+                                action: () {
+                                  if (!WebRuntimePolicy.checkInEnabled) {
+                                    AppSnackBar.showInfo(
+                                      context,
+                                      WebRuntimePolicy.checkInWebMessage,
+                                    );
+                                    return Future<void>.value();
+                                  }
+                                  return _isGeofenceMode
+                                      ? _handleGeofenceAction(
+                                          isCheckedIn: isCheckedIn,
+                                          activeAttendance: activeAttendance,
+                                        )
+                                      : _showQRScanner(
+                                          context,
+                                          isCheckedIn,
+                                          activeAttendance,
+                                        );
+                                },
+                              );
+                            },
+                      backgroundColor: isCheckedIn
+                          ? Theme.of(context).colorScheme.primaryContainer
                           : (_isGeofenceMode
-                              ? (_isCheckingLocation
-                                  ? Symbols.radar_rounded
-                                  : (_isInsideGeofence
-                                      ? Symbols.how_to_reg_rounded
-                                      : Symbols.location_searching_rounded))
-                              : Symbols.qr_code_scanner_rounded),
-                      color: isCheckedIn
-                          ? Theme.of(context).colorScheme.onPrimaryContainer
-                          : (_isGeofenceMode
-                              ? (_isInsideGeofence
-                                  ? Theme.of(context).colorScheme.onPrimaryContainer
-                                  : Theme.of(context).colorScheme.onSecondaryContainer)
-                              : Theme.of(context).colorScheme.onPrimaryContainer),
-                    ),
-                    label: Text(
-                      _actionLock.isBusy
-                          ? l10n.attLocatingShort
-                          : _buildFabLabel(
-                              context,
-                              isCheckedIn: isCheckedIn,
-                              activeAttendance: activeAttendance,
-                              l10n: l10n,
-                            ),
-                      style: m3ButtonLabel(context).copyWith(
-                        color: isCheckedIn
-                            ? Theme.of(context).colorScheme.onPrimaryContainer
-                            : (_isGeofenceMode
                                 ? (_isInsideGeofence
-                                    ? Theme.of(context).colorScheme.onPrimaryContainer
-                                    : Theme.of(context).colorScheme.onSecondaryContainer)
-                                : Theme.of(context).colorScheme.onPrimaryContainer),
+                                      ? Theme.of(context)
+                                            .colorScheme
+                                            .primaryContainer
+                                      : Theme.of(context)
+                                            .colorScheme
+                                            .secondaryContainer)
+                                : Theme.of(context)
+                                      .colorScheme
+                                      .primaryContainer),
+                      icon: _actionLock.isBusy
+                          ? SizedBox.square(
+                              key: const Key('attendanceFabBusy'),
+                              dimension: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color:
+                                    isCheckedIn ||
+                                        !_isGeofenceMode ||
+                                        _isInsideGeofence
+                                    ? Theme.of(context)
+                                          .colorScheme
+                                          .onPrimaryContainer
+                                    : Theme.of(context)
+                                          .colorScheme
+                                          .onSecondaryContainer,
+                              ),
+                            )
+                          : Icon(
+                              isCheckedIn
+                                  ? Symbols.logout_rounded
+                                  : (_isGeofenceMode
+                                        ? (_isCheckingLocation
+                                              ? Symbols.radar_rounded
+                                              : (_isInsideGeofence
+                                                    ? Symbols.how_to_reg_rounded
+                                                    : Symbols
+                                                          .location_searching_rounded))
+                                        : Symbols.qr_code_scanner_rounded),
+                              color: isCheckedIn
+                                  ? Theme.of(context)
+                                        .colorScheme
+                                        .onPrimaryContainer
+                                  : (_isGeofenceMode
+                                        ? (_isInsideGeofence
+                                              ? Theme.of(context)
+                                                    .colorScheme
+                                                    .onPrimaryContainer
+                                              : Theme.of(context)
+                                                    .colorScheme
+                                                    .onSecondaryContainer)
+                                        : Theme.of(context)
+                                              .colorScheme
+                                              .onPrimaryContainer),
+                            ),
+                      label: Text(
+                        _actionLock.isBusy
+                            ? l10n.attLocatingShort
+                            : _buildFabLabel(
+                                context,
+                                isCheckedIn: isCheckedIn,
+                                activeAttendance: activeAttendance,
+                                l10n: l10n,
+                              ),
+                        style: m3ButtonLabel(context).copyWith(
+                          color: isCheckedIn
+                              ? Theme.of(context).colorScheme.onPrimaryContainer
+                              : (_isGeofenceMode
+                                    ? (_isInsideGeofence
+                                          ? Theme.of(context)
+                                                .colorScheme
+                                                .onPrimaryContainer
+                                          : Theme.of(context)
+                                                .colorScheme
+                                                .onSecondaryContainer)
+                                    : Theme.of(context)
+                                          .colorScheme
+                                          .onPrimaryContainer),
+                        ),
                       ),
                     ),
-                  )),
+                  ),
             floatingActionButtonLocation:
                 FloatingActionButtonLocation.centerFloat,
           );
@@ -919,8 +976,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       }
     } catch (_) {}
 
-    final sessions =
-        _hasMonthSessionsForSelected ? _monthSessions! : _rawHistory;
+    final sessions = _hasMonthSessionsForSelected
+        ? _monthSessions!
+        : _rawHistory;
     return MonthlyAttendanceStats.compute(
       sessions: sessions,
       month: _selectedMonth,
@@ -941,7 +999,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     final locale = Localizations.localeOf(context).languageCode;
     final l10n = AppLocalizations.of(context)!;
     final trustedNow = _getTrustedNow();
-    final isCurrentMonth = _selectedMonth.year == trustedNow.year &&
+    final isCurrentMonth =
+        _selectedMonth.year == trustedNow.year &&
         _selectedMonth.month == trustedNow.month;
 
     final attendedDays = _allAttendedDaysCount;
@@ -965,14 +1024,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       headerIcon = Symbols.verified_rounded;
       statusTitle = AppLocalizations.of(context)!.attInsideZone;
       statusSubtitle = activeBranch != null
-          ? AppLocalizations.of(context)!.attWithinBranchRange(BranchDisplayCache.instance.displayName(activeBranch.branchName))
+          ? AppLocalizations.of(context)!.attWithinBranchRange(
+              BranchDisplayCache.instance.displayName(activeBranch.branchName),
+            )
           : AppLocalizations.of(context)!.attInsideZone;
     } else {
       statusColor = colorScheme.error;
       headerIcon = Symbols.wrong_location_rounded;
       statusTitle = AppLocalizations.of(context)!.attOutsideZone;
       statusSubtitle = activeBranch != null
-          ? AppLocalizations.of(context)!.attMoveCloserTo(BranchDisplayCache.instance.displayName(activeBranch.branchName))
+          ? AppLocalizations.of(context)!.attMoveCloserTo(
+              BranchDisplayCache.instance.displayName(activeBranch.branchName),
+            )
           : AppLocalizations.of(context)!.attOutsideApprovedBranches;
     }
 
@@ -981,25 +1044,25 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (_distanceToNearest != null && _distanceToNearest!.isFinite) {
       final meters = _distanceToNearest!.toInt();
       if (meters < 1000) {
-        formattedDistance = AppLocalizations.of(context)!.distanceMeters(meters);
+        formattedDistance = AppLocalizations.of(context)!
+            .distanceMeters(meters);
       } else {
         final km = (_distanceToNearest! / 1000).toStringAsFixed(1);
-        formattedDistance = AppLocalizations.of(context)!.distanceKmM(km, meters);
+        formattedDistance = AppLocalizations.of(context)!
+            .distanceKmM(km, meters);
       }
     }
 
     final allowedRadius = activeBranch != null
         ? (activeBranch.geofenceRadius > 0
-            ? (activeBranch.geofenceRadius + 50.0).toInt()
-            : 150)
+              ? (activeBranch.geofenceRadius + 50.0).toInt()
+              : 150)
         : null;
 
     return Card(
       elevation: 0,
       margin: const EdgeInsetsDirectional.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       color: colorScheme.surfaceContainerHigh,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -1012,7 +1075,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               children: [
                 IconButton.filledTonal(
                   style: IconButton.styleFrom(
-                    backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                    backgroundColor: colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.6),
                     foregroundColor: colorScheme.onSurface,
                   ),
                   iconSize: 22,
@@ -1028,7 +1092,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     });
                   },
                   icon: Icon(
-                    Directionality.of(context) == TextDirection.rtl ? Symbols.chevron_right_rounded : Symbols.chevron_left_rounded,
+                    Directionality.of(context) == TextDirection.rtl
+                        ? Symbols.chevron_right_rounded
+                        : Symbols.chevron_left_rounded,
                     textDirection: TextDirection.ltr,
                   ),
                 ),
@@ -1038,7 +1104,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       AnimatedSwitcher(
                         duration: AppMotionDurations.medium2,
                         child: Text(
-                          DateFormat('MMMM yyyy', locale).format(_selectedMonth),
+                          DateFormat(
+                            'MMMM yyyy',
+                            locale,
+                          ).format(_selectedMonth),
                           key: ValueKey(_selectedMonth),
                           style: textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w800,
@@ -1059,13 +1128,21 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           },
                           borderRadius: BorderRadius.circular(12),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Symbols.restore_rounded, size: 12, color: colorScheme.primary),
+                                Icon(
+                                  Symbols.restore_rounded,
+                                  size: 12,
+                                  color: colorScheme.primary,
+                                ),
                                 const SizedBox(width: 4),
-                                Text(AppLocalizations.of(context)!.currentMonth,
+                                Text(
+                                  AppLocalizations.of(context)!.currentMonth,
                                   style: textTheme.labelSmall?.copyWith(
                                     color: colorScheme.primary,
                                     fontWeight: FontWeight.bold,
@@ -1081,7 +1158,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 ),
                 IconButton.filledTonal(
                   style: IconButton.styleFrom(
-                    backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                    backgroundColor: colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.6),
                     foregroundColor: colorScheme.onSurface,
                   ),
                   iconSize: 22,
@@ -1097,7 +1175,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     });
                   },
                   icon: Icon(
-                    Directionality.of(context) == TextDirection.rtl ? Symbols.chevron_left_rounded : Symbols.chevron_right_rounded,
+                    Directionality.of(context) == TextDirection.rtl
+                        ? Symbols.chevron_left_rounded
+                        : Symbols.chevron_right_rounded,
                     textDirection: TextDirection.ltr,
                   ),
                 ),
@@ -1109,7 +1189,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             ],
 
             const SizedBox(height: 12),
-            Divider(height: 1, thickness: 0.8, color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+            Divider(
+              height: 1,
+              thickness: 0.8,
+              color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+            ),
             const SizedBox(height: 12),
 
             // ================= 2. ATTENDANCE & ABSENCE STATS =================
@@ -1118,9 +1202,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 // Attendance Stat (Condensed with Google Icon)
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                      color: colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.35,
+                      ),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
@@ -1128,7 +1217,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                            color: Theme.of(context).colorScheme.primary
+                                .withValues(alpha: 0.15),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
@@ -1142,14 +1232,17 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(AppLocalizations.of(context)!.statAttended,
+                              Text(
+                                AppLocalizations.of(context)!.statAttended,
                                 style: textTheme.labelSmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
                                 ),
                               ),
                               AnimatedSwitcher(
                                 duration: AppMotionDurations.short4,
-                                child: Text(AppLocalizations.of(context)!.daysCount(attendedDays),
+                                child: Text(
+                                  AppLocalizations.of(context)!
+                                      .daysCount(attendedDays),
                                   key: ValueKey(attendedDays),
                                   style: textTheme.titleSmall?.copyWith(
                                     fontWeight: FontWeight.bold,
@@ -1168,9 +1261,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 // Absence Stat (Condensed with Google Icon)
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                      color: colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.35,
+                      ),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
@@ -1192,18 +1290,23 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(AppLocalizations.of(context)!.statAbsent,
+                              Text(
+                                AppLocalizations.of(context)!.statAbsent,
                                 style: textTheme.labelSmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
                                 ),
                               ),
                               AnimatedSwitcher(
                                 duration: AppMotionDurations.short4,
-                                child: Text(AppLocalizations.of(context)!.daysCount(absentDays),
+                                child: Text(
+                                  AppLocalizations.of(context)!
+                                      .daysCount(absentDays),
                                   key: ValueKey(absentDays),
                                   style: textTheme.titleSmall?.copyWith(
                                     fontWeight: FontWeight.bold,
-                                    color: absentDays > 0 ? colorScheme.error : colorScheme.onSurface,
+                                    color: absentDays > 0
+                                        ? colorScheme.error
+                                        : colorScheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -1227,7 +1330,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   color: colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(width: 4),
-                Text(AppLocalizations.of(context)!.attWorkPolicyNote,
+                Text(
+                  AppLocalizations.of(context)!.attWorkPolicyNote,
                   style: textTheme.labelSmall?.copyWith(
                     fontSize: 10.5,
                     color: colorScheme.onSurfaceVariant,
@@ -1239,7 +1343,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             // ================= 3. GEOFENCE ZONE STATUS =================
             if (_isGeofenceMode) ...[
               const SizedBox(height: 12),
-              Divider(height: 1, thickness: 0.8, color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+              Divider(
+                height: 1,
+                thickness: 0.8,
+                color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+              ),
               const SizedBox(height: 12),
 
               AnimatedContainer(
@@ -1248,10 +1356,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: _isInsideGeofence
-                      ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.08)
+                      ? Theme.of(context).colorScheme.primary
+                            .withValues(alpha: 0.08)
                       : (isBusy
-                          ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
-                          : colorScheme.error.withValues(alpha: 0.08)),
+                            ? colorScheme.surfaceContainerHighest.withValues(
+                                alpha: 0.3,
+                              )
+                            : colorScheme.error.withValues(alpha: 0.08)),
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(
                     color: statusColor.withValues(alpha: 0.25),
@@ -1313,7 +1424,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       Align(
                         alignment: AlignmentDirectional.centerStart,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
                           decoration: BoxDecoration(
                             color: statusColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
@@ -1332,7 +1446,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                 color: statusColor,
                               ),
                               const SizedBox(width: 5),
-                              Text(AppLocalizations.of(context)!.distanceLabel(formattedDistance),
+                              Text(
+                                AppLocalizations.of(context)!
+                                    .distanceLabel(formattedDistance),
                                 style: textTheme.labelSmall?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: statusColor,
@@ -1350,7 +1466,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       Align(
                         alignment: AlignmentDirectional.centerStart,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
                           decoration: BoxDecoration(
                             color: colorScheme.surface.withValues(alpha: 0.8),
                             borderRadius: BorderRadius.circular(8),
@@ -1358,7 +1477,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Symbols.storefront_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                              Icon(
+                                Symbols.storefront_rounded,
+                                size: 14,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
                               const SizedBox(width: 5),
                               Text(
                                 activeBranch.branchName,
@@ -1380,7 +1503,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       children: [
                         if (allowedRadius != null)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
                             decoration: BoxDecoration(
                               color: colorScheme.surface.withValues(alpha: 0.8),
                               borderRadius: BorderRadius.circular(8),
@@ -1388,9 +1514,15 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Symbols.radar_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                                Icon(
+                                  Symbols.radar_rounded,
+                                  size: 14,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
                                 const SizedBox(width: 5),
-                                Text(AppLocalizations.of(context)!.radiusLabel(allowedRadius),
+                                Text(
+                                  AppLocalizations.of(context)!
+                                      .radiusLabel(allowedRadius),
                                   style: textTheme.labelSmall?.copyWith(
                                     color: colorScheme.onSurfaceVariant,
                                   ),
@@ -1403,12 +1535,20 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         OutlinedButton.icon(
                           onPressed: isBusy
                               ? null
-                              : () => _detectNearestBranch(showSnackBar: true, silent: false),
+                              : () => _detectNearestBranch(
+                                  showSnackBar: true,
+                                  silent: false,
+                                ),
                           style: OutlinedButton.styleFrom(
                             shape: const StadiumBorder(),
                             visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            backgroundColor: colorScheme.surface.withValues(alpha: 0.7),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            backgroundColor: colorScheme.surface.withValues(
+                              alpha: 0.7,
+                            ),
                           ),
                           icon: isBusy
                               ? SizedBox(
@@ -1419,11 +1559,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                     color: colorScheme.primary,
                                   ),
                                 )
-                              : Icon(Symbols.refresh_rounded, size: 16, color: colorScheme.primary),
-                          label: Text(AppLocalizations.of(context)!.recheckLocation,
+                              : Icon(
+                                  Symbols.refresh_rounded,
+                                  size: 16,
+                                  color: colorScheme.primary,
+                                ),
+                          label: Text(
+                            AppLocalizations.of(context)!.recheckLocation,
                             style: textTheme.labelSmall?.copyWith(
                               fontWeight: FontWeight.w600,
-                              color: isBusy ? colorScheme.onSurfaceVariant : colorScheme.primary,
+                              color: isBusy
+                                  ? colorScheme.onSurfaceVariant
+                                  : colorScheme.primary,
                             ),
                           ),
                         ),
@@ -1485,7 +1632,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   Widget _buildChainFilterBar(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isArabic = Localizations.localeOf(context).languageCode.startsWith('ar');
+    final isArabic = Localizations.localeOf(context).languageCode
+        .startsWith('ar');
     final chains = _availableChains.isNotEmpty
         ? _availableChains
         : [
@@ -1549,7 +1697,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 color: isSelected
                     ? activeFg
                     : (accentFg?.withValues(alpha: 0.8) ??
-                        colorScheme.onSurfaceVariant),
+                          colorScheme.onSurfaceVariant),
               ),
               const SizedBox(width: 4),
               Flexible(
@@ -1559,8 +1707,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     label,
                     style: TextStyle(
                       fontSize: 11.5,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                      color: isSelected ? activeFg : colorScheme.onSurfaceVariant,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w600,
+                      color: isSelected
+                          ? activeFg
+                          : colorScheme.onSurfaceVariant,
                     ),
                     maxLines: 1,
                   ),
@@ -1568,7 +1720,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               ),
               const SizedBox(width: 4),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 1.5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 5.5,
+                  vertical: 1.5,
+                ),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? activeBg
@@ -1580,9 +1735,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.bold,
-                    color: isSelected
-                        ? activeFg
-                        : colorScheme.onSurfaceVariant,
+                    color: isSelected ? activeFg : colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -1660,7 +1813,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Symbols.error_outline_rounded, size: 64, color: colorScheme.error),
+            Icon(
+              Symbols.error_outline_rounded,
+              size: 64,
+              color: colorScheme.error,
+            ),
             const SizedBox(height: 16),
             Text(
               state.message,
@@ -1687,7 +1844,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     } else if (state is AttendanceHistoryLoaded) {
       final colorScheme = Theme.of(context).colorScheme;
       final isArabic = locale.startsWith('ar');
-      final selectedChainLabel = _chainFilter != 'all' && _chainFilter != 'active'
+      final selectedChainLabel =
+          _chainFilter != 'all' && _chainFilter != 'active'
           ? _formatChainName(_chainFilter, isArabic: isArabic)
           : _formatChainName(
               widget.delegate.organizationName.isNotEmpty
@@ -1726,7 +1884,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     margin: const EdgeInsets.symmetric(horizontal: 20),
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                      color: colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.4,
+                      ),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Column(
@@ -1737,7 +1897,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           color: colorScheme.outline,
                         ),
                         const SizedBox(height: 12),
-                        Text(AppLocalizations.of(context)!.attNoSessionsInChain(selectedChainLabel),
+                        Text(
+                          AppLocalizations.of(context)!
+                              .attNoSessionsInChain(selectedChainLabel),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 14,
@@ -1746,7 +1908,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Text(AppLocalizations.of(context)!.attDaysInOtherChains(_allAttendedDaysCount),
+                        Text(
+                          AppLocalizations.of(context)!
+                              .attDaysInOtherChains(_allAttendedDaysCount),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 12,
@@ -1762,7 +1926,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             });
                           },
                           icon: const Icon(Symbols.hub_rounded, size: 18),
-                          label: Text(AppLocalizations.of(context)!.allChains,
+                          label: Text(
+                            AppLocalizations.of(context)!.allChains,
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -1939,7 +2104,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   final outTime = effectiveOut != null
                       ? DateFormat('hh:mm a', locale).format(effectiveOut)
                       : '--:--';
-                  final rawBranchName = item.branchName ?? l10n.unspecifiedBranch;
+                  final rawBranchName =
+                      item.branchName ?? l10n.unspecifiedBranch;
                   final cleanBranchName = _cleanBranchName(rawBranchName);
                   final chainName = _resolveOrgName(
                     item.organizationId,
@@ -1953,9 +2119,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
                   String durationStr;
                   if (effectiveOut != null) {
-                    final diff = effectiveOut.difference(
-                      item.checkInTime,
-                    );
+                    final diff = effectiveOut.difference(item.checkInTime);
                     final hours = diff.inHours;
                     final minutes = diff.inMinutes.remainder(60);
                     durationStr = l10n.duration('$hours', '$minutes');
@@ -1983,7 +2147,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                         ),
                                         decoration: BoxDecoration(
                                           color: chipBg,
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                           border: Border.all(
                                             color: chipBorder,
                                             width: 1,
@@ -2018,7 +2184,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                     ),
                                     const SizedBox(width: 4),
                                     Expanded(
-                                      child: Text(AppLocalizations.of(context)!.branchLabel(cleanBranchName),
+                                      child: Text(
+                                        AppLocalizations.of(context)!
+                                            .branchLabel(cleanBranchName),
                                         style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w700,
@@ -2055,7 +2223,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                           : Symbols.logout_rounded,
                                       size: 16,
                                       color: item.isEffectiveAutoCheckOut
-                                          ? Theme.of(context).colorScheme.onTertiaryContainer
+                                          ? Theme.of(context)
+                                                .colorScheme
+                                                .onTertiaryContainer
                                           : colorScheme.error,
                                     ),
                                     const SizedBox(width: 4),
@@ -2064,7 +2234,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                       style: TextStyle(
                                         fontWeight: FontWeight.w500,
                                         color: item.isEffectiveAutoCheckOut
-                                            ? Theme.of(context).colorScheme.onTertiaryContainer
+                                            ? Theme.of(context)
+                                                  .colorScheme
+                                                  .onTertiaryContainer
                                             : null,
                                       ),
                                     ),
@@ -2076,19 +2248,32 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                           vertical: 2,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(4),
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .tertiary
+                                              .withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
                                           border: Border.all(
-                                            color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.5),
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .tertiary
+                                                .withValues(alpha: 0.5),
                                           ),
                                         ),
                                         child: Tooltip(
-                                          message: AppLocalizations.of(context)!.attAutoClosedNote,
-                                          child: Text(AppLocalizations.of(context)!.autoClosedAuto,
+                                          message: AppLocalizations.of(context)!
+                                              .attAutoClosedNote,
+                                          child: Text(
+                                            AppLocalizations.of(context)!
+                                                .autoClosedAuto,
                                             style: TextStyle(
                                               fontSize: 10,
                                               fontWeight: FontWeight.bold,
-                                              color: Theme.of(context).colorScheme.onTertiaryContainer,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onTertiaryContainer,
                                             ),
                                           ),
                                         ),
@@ -2220,10 +2405,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         for (final doc in snap.docs) {
           // The path is the chain: a stale organizationUID in the doc
           // must not attribute the branch to another chain (TAS-333).
-          nested.add(BranchModel.fromMap(
-            {...doc.data(), 'organizationUID': orgId},
-            id: doc.id,
-          ));
+          nested.add(
+            BranchModel.fromMap({
+              ...doc.data(),
+              'organizationUID': orgId,
+            }, id: doc.id),
+          );
         }
       } catch (e, st) {
         debugPrint('Attendance: nested branches fetch failed: $e\n$st');
@@ -2244,8 +2431,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         debugPrint('Attendance: root branches fetch failed: $e\n$st');
       }
 
-      final branchesList =
-          keepMemberChainBranches(mergeOrgBranches(nested, root), {orgId});
+      final branchesList = keepMemberChainBranches(
+        mergeOrgBranches(nested, root),
+        {orgId},
+      );
       for (final b in branchesList) {
         BranchDisplayCache.instance.registerFromMap({
           'branchName': b.branchName,
@@ -2259,7 +2448,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           _orgBranches = branchesList;
           _isLoadingBranches = false;
           if (branchesList.isEmpty) {
-            _locationStatusMessage = AppLocalizations.of(context)!.noBranchesForOrg;
+            _locationStatusMessage = AppLocalizations.of(context)!
+                .noBranchesForOrg;
             _isInsideGeofence = false;
           }
         });
@@ -2315,8 +2505,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (position == null) {
       setState(() {
         _isCheckingLocation = false;
-        _locationStatusMessage =
-            AppLocalizations.of(context)!.attLocationUnavailable;
+        _locationStatusMessage = AppLocalizations.of(context)!
+            .attLocationUnavailable;
       });
       return;
     }
@@ -2347,7 +2537,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       }
     }
 
-
     setState(() {
       _isCheckingLocation = false;
       _nearestBranch = closest;
@@ -2356,9 +2545,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       _isInsideGeofence = matched != null;
 
       if (matched != null) {
-        final branchLabel =
-            BranchDisplayCache.instance.displayName(matched.branchName);
-        _locationStatusMessage = _hasSeveralChains &&
+        final branchLabel = BranchDisplayCache.instance.displayName(
+          matched.branchName,
+        );
+        _locationStatusMessage =
+            _hasSeveralChains &&
                 widget.delegate.organizationName.trim().isNotEmpty
             ? AppLocalizations.of(context)!.attYouAreAtChainBranch(
                 widget.delegate.organizationName.trim(),
@@ -2368,7 +2559,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       } else if (closest != null && minDistance.isFinite) {
         _locationStatusMessage = AppLocalizations.of(context)!.attMoveCloser;
       } else {
-        _locationStatusMessage = AppLocalizations.of(context)!.attOutsideApprovedBranches;
+        _locationStatusMessage = AppLocalizations.of(context)!
+            .attOutsideApprovedBranches;
       }
     });
 
@@ -2382,12 +2574,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       if (_isInsideGeofence && matched != null) {
         AppSnackBar.showSuccess(
           context,
-          AppLocalizations.of(context)!.attInsideBranchWithDistance(BranchDisplayCache.instance.displayName(matched.branchName), minDistance.toInt()),
+          AppLocalizations.of(context)!.attInsideBranchWithDistance(
+            BranchDisplayCache.instance.displayName(matched.branchName),
+            minDistance.toInt(),
+          ),
         );
       } else if (closest != null) {
         AppSnackBar.showError(
           context,
-          AppLocalizations.of(context)!.attOutsideBranchWithRadius(minDistance.toInt(), allowedGeofenceRadius(closest).toInt()),
+          AppLocalizations.of(context)!.attOutsideBranchWithRadius(
+            minDistance.toInt(),
+            allowedGeofenceRadius(closest).toInt(),
+          ),
         );
       }
     }
@@ -2503,8 +2701,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       }
 
       final branch = result.branch!;
-      final branchLabel =
-          BranchDisplayCache.instance.displayName(branch.branchName);
+      final branchLabel = BranchDisplayCache.instance.displayName(
+        branch.branchName,
+      );
       final chainLabel = result.memberships.first.organizationName.trim();
       final l10n = AppLocalizations.of(context)!;
 
@@ -2587,10 +2786,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (!parentContext.mounted) return;
 
     if (_currentPosition == null) {
-      AppSnackBar.showError(
-        parentContext,
-        l10n.attEnsureGps,
-      );
+      AppSnackBar.showError(parentContext, l10n.attEnsureGps);
       return;
     }
 
@@ -2599,22 +2795,33 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       final nearestName = BranchDisplayCache.instance
           .displayName((_nearestBranch ?? _matchedBranch)?.branchName)
           .trim();
-      final distStr = (_distanceToNearest != null && _distanceToNearest!.isFinite)
+      final distStr =
+          (_distanceToNearest != null && _distanceToNearest!.isFinite)
           ? l10n.distanceMeters(_distanceToNearest!.toInt())
           : '';
-      final action = isCheckedIn ? l10n.attActionCheckOut : l10n.attActionCheckIn;
+      final action = isCheckedIn
+          ? l10n.attActionCheckOut
+          : l10n.attActionCheckIn;
       final message = switch (classifyGeofenceOutside(
         branchName: nearestName,
         distanceMeters: _distanceToNearest,
       )) {
-        GeofenceOutsideKind.atBranch =>
-          l10n.attCannotActOutsideAtBranch(action, nearestName, distStr),
-        GeofenceOutsideKind.branchOnly =>
-          l10n.attCannotActOutsideBranchOnly(action, nearestName),
-        GeofenceOutsideKind.distanceOnly =>
-          l10n.attCannotActOutside(action, distStr),
-        GeofenceOutsideKind.noDetails =>
-          l10n.attCannotActOutsideNoDistance(action),
+        GeofenceOutsideKind.atBranch => l10n.attCannotActOutsideAtBranch(
+          action,
+          nearestName,
+          distStr,
+        ),
+        GeofenceOutsideKind.branchOnly => l10n.attCannotActOutsideBranchOnly(
+          action,
+          nearestName,
+        ),
+        GeofenceOutsideKind.distanceOnly => l10n.attCannotActOutside(
+          action,
+          distStr,
+        ),
+        GeofenceOutsideKind.noDetails => l10n.attCannotActOutsideNoDistance(
+          action,
+        ),
       };
       AppSnackBar.showError(parentContext, message);
       return;
@@ -2631,7 +2838,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     // Dynamically resolve latest active attendance to prevent stale closure state
     Attendance? currentActive = activeAttendance;
     final currentState = attendanceBloc.state;
-    if (currentState is AttendanceHistoryLoaded && currentState.activeAttendance != null) {
+    if (currentState is AttendanceHistoryLoaded &&
+        currentState.activeAttendance != null) {
       currentActive = currentState.activeAttendance;
     } else if (_rawHistory.isNotEmpty) {
       currentActive = _rawHistory.cast<Attendance?>().firstWhere(
@@ -2687,14 +2895,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     } else {
       await _checkIn(attendanceBloc, branchRef, position);
       if (parentContext.mounted) {
-        AppSnackBar.showInfo(
-          parentContext,
-          l10n.attCheckingInAt(branchName),
-        );
+        AppSnackBar.showInfo(parentContext, l10n.attCheckingInAt(branchName));
       }
     }
   }
-
 
   Future<void> _showQRScanner(
     BuildContext context,
@@ -2722,7 +2926,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         // The scanned branch is the one recorded and checked; a code of
         // another chain is refused, never swapped for a nearby branch.
         if (_refuseBranchOfOtherChain(parentContext, scannedRef)) return;
-        AppSnackBar.showInfo(parentContext, 'Fetching location...');
+        AppSnackBar.showInfo(
+          parentContext,
+          AppLocalizations.of(parentContext)!.attFetchingLocation,
+        );
 
         final position = await _getCurrentLocation(
           parentContext,
@@ -2733,7 +2940,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           // Dynamically resolve latest active attendance to prevent stale closure state
           Attendance? currentActive = activeAttendance;
           final currentState = attendanceBloc.state;
-          if (currentState is AttendanceHistoryLoaded && currentState.activeAttendance != null) {
+          if (currentState is AttendanceHistoryLoaded &&
+              currentState.activeAttendance != null) {
             currentActive = currentState.activeAttendance;
           } else if (_rawHistory.isNotEmpty) {
             currentActive = _rawHistory.cast<Attendance?>().firstWhere(
@@ -2867,7 +3075,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (!serviceEnabled) {
       if (!context.mounted) return null;
       if (!silent) {
-        AppSnackBar.showError(context, AppLocalizations.of(context)!.locationServicesOff);
+        AppSnackBar.showError(
+          context,
+          AppLocalizations.of(context)!.locationServicesOff,
+        );
         _reportLocationFailure(context, LocationFailureKind.serviceOff);
       }
       return null;
@@ -2879,7 +3090,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       if (permission == LocationPermission.denied) {
         if (!context.mounted) return null;
         if (!silent) {
-          AppSnackBar.showError(context, AppLocalizations.of(context)!.locationPermissionDenied2);
+          AppSnackBar.showError(
+            context,
+            AppLocalizations.of(context)!.locationPermissionDenied2,
+          );
           _reportLocationFailure(context, LocationFailureKind.permissionDenied);
         }
         return null;
@@ -2889,7 +3103,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (permission == LocationPermission.deniedForever) {
       if (!context.mounted) return null;
       if (!silent) {
-        AppSnackBar.showError(context, AppLocalizations.of(context)!.locationPermissionDeniedForever);
+        AppSnackBar.showError(
+          context,
+          AppLocalizations.of(context)!.locationPermissionDeniedForever,
+        );
         _reportLocationFailure(
           context,
           LocationFailureKind.permissionDeniedForever,
@@ -2936,7 +3153,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       return position;
     } catch (e) {
       if (context.mounted && !silent) {
-        AppSnackBar.showError(context, AppLocalizations.of(context)!.locationError);
+        AppSnackBar.showError(
+          context,
+          AppLocalizations.of(context)!.locationError,
+        );
         _reportLocationFailure(context, LocationFailureKind.error);
       }
       return null;
@@ -3004,15 +3224,17 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     String? branchName,
     String? actionType,
   }) {
-    _getDeviceInfo().then((device) {
-      SecurityAuditService.logMockLocationViolation(
-        delegate: widget.delegate,
-        position: position,
-        deviceModel: device,
-        branchName: branchName,
-        actionType: actionType,
-      );
-    }).catchError((_) {});
+    _getDeviceInfo()
+        .then((device) {
+          SecurityAuditService.logMockLocationViolation(
+            delegate: widget.delegate,
+            position: position,
+            deviceModel: device,
+            branchName: branchName,
+            actionType: actionType,
+          );
+        })
+        .catchError((_) {});
   }
 
   void _showForgotCheckoutDialog(
@@ -3155,7 +3377,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       },
     );
   }
-
 }
 
 /// Animated shimmer card that mimics attendance history card layout.
@@ -3318,55 +3539,60 @@ class _ScannerModalState extends State<_ScannerModal>
               behavior: HitTestBehavior.translucent,
               onTapUp: (d) {
                 _scannerController
-                    .setFocusPoint(focusPointFor(d.localPosition, constraints.biggest))
+                    .setFocusPoint(
+                      focusPointFor(d.localPosition, constraints.biggest),
+                    )
                     .catchError((Object _) {});
               },
               child: MobileScanner(
-            controller: _scannerController,
-            onDetect: (capture) {
-              if (!mounted || _isProcessing) return;
-              _isProcessing = true;
+                controller: _scannerController,
+                onDetect: (capture) {
+                  if (!mounted || _isProcessing) return;
+                  _isProcessing = true;
 
-              final List<Barcode> barcodes = capture.barcodes;
-              if (barcodes.isNotEmpty) {
-                HapticFeedback.mediumImpact();
-                final String rawValue = barcodes.first.rawValue ?? '';
-                AttendanceBranchRef? scannedRef;
-                try {
-                  final dynamic decoded = jsonDecode(rawValue);
+                  final List<Barcode> barcodes = capture.barcodes;
+                  if (barcodes.isNotEmpty) {
+                    HapticFeedback.mediumImpact();
+                    final String rawValue = barcodes.first.rawValue ?? '';
+                    AttendanceBranchRef? scannedRef;
+                    try {
+                      final dynamic decoded = jsonDecode(rawValue);
 
-                  if (decoded is Map<String, dynamic> &&
-                      decoded['type'] == 'attendance') {
-                    scannedRef = AttendanceBranchRef.fromQrMap(
-                      decoded,
-                      delegateOrganizationUID: widget.delegateOrganizationUID,
-                    );
-                    if (scannedRef.branchName.isEmpty &&
-                        decoded['branch'] is String) {
-                      scannedRef = AttendanceBranchRef.legacyNameOnly(
-                        branchName: decoded['branch'] as String,
-                        delegateOrganizationUID: widget.delegateOrganizationUID,
-                      );
+                      if (decoded is Map<String, dynamic> &&
+                          decoded['type'] == 'attendance') {
+                        scannedRef = AttendanceBranchRef.fromQrMap(
+                          decoded,
+                          delegateOrganizationUID:
+                              widget.delegateOrganizationUID,
+                        );
+                        if (scannedRef.branchName.isEmpty &&
+                            decoded['branch'] is String) {
+                          scannedRef = AttendanceBranchRef.legacyNameOnly(
+                            branchName: decoded['branch'] as String,
+                            delegateOrganizationUID:
+                                widget.delegateOrganizationUID,
+                          );
+                        }
+                      }
+                    } catch (_) {
+                      if (rawValue.isNotEmpty && !rawValue.startsWith('{')) {
+                        scannedRef = AttendanceBranchRef.legacyNameOnly(
+                          branchName: rawValue.trim(),
+                          delegateOrganizationUID:
+                              widget.delegateOrganizationUID,
+                        );
+                      }
                     }
-                  }
-                } catch (_) {
-                  if (rawValue.isNotEmpty && !rawValue.startsWith('{')) {
-                    scannedRef = AttendanceBranchRef.legacyNameOnly(
-                      branchName: rawValue.trim(),
-                      delegateOrganizationUID: widget.delegateOrganizationUID,
-                    );
-                  }
-                }
 
-                if (mounted) {
-                  _scannerController.stop();
-                  Navigator.pop(context, scannedRef);
-                }
-              } else {
-                _isProcessing = false;
-              }
-            },
-          ),
+                    if (mounted) {
+                      _scannerController.stop();
+                      Navigator.pop(context, scannedRef);
+                    }
+                  } else {
+                    _isProcessing = false;
+                  }
+                },
+              ),
             ),
           ),
 
@@ -3430,10 +3656,7 @@ class _ScannerModalState extends State<_ScannerModal>
               padding: const EdgeInsets.fromLTRB(20, 50, 20, 24),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    Colors.black87,
-                    Colors.transparent,
-                  ],
+                  colors: [Colors.black87, Colors.transparent],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -3547,7 +3770,9 @@ class _ScannerModalState extends State<_ScannerModal>
                                     AppLocalizations.of(context)!.trustedTime,
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color: Theme.of(context).colorScheme.primary,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -3698,8 +3923,8 @@ class _GeofenceRadarWidget extends StatelessWidget {
                     isChecking
                         ? Symbols.radar_rounded
                         : (isInside
-                            ? Symbols.check_rounded
-                            : Symbols.location_off_rounded),
+                              ? Symbols.check_rounded
+                              : Symbols.location_off_rounded),
                     key: ValueKey('${isChecking}_$isInside'),
                     color: Colors.white,
                     size: 20,
@@ -3713,5 +3938,3 @@ class _GeofenceRadarWidget extends StatelessWidget {
     );
   }
 }
-
-

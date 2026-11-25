@@ -3034,6 +3034,9 @@ class AppLocalizationsAr extends AppLocalizations {
       'طلّع تطبيق تسهيل من توفير البطارية وخليه «بلا قيود» (مهم في موبايلات OPPO أو Realme أو Xiaomi).';
 
   @override
+  String get attFetchingLocation => 'جاري تحديد موقعك...';
+
+  @override
   String get locHelpStepMapsRetry =>
       'لو الموقع ما اشتغلش: افتح خرائط Google واستنى النقطة الزرقا تثبت، وبعدين ارجع ودوس «إعادة فحص الموقع».';
 
