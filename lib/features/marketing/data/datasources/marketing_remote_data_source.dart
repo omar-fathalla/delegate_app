@@ -1057,8 +1057,52 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
   }
 
 
-  /// Batch-fetch company display names with whereIn(documentId) chunks + in-memory cache.
+  /// Session memo of company display names (TAS-231, from PR #188).
+  /// The branch screen reloads on every live attendance change, and each
+  /// reload used to re-read the same company docs. Names are near-static, so
+  /// each id is read at most once per [companyNameTtl] per Firestore
+  /// instance and organization.
+  static final Map<String, ({String name, DateTime at})> _sessionCompanyNames =
+      {};
+  static const Duration companyNameTtl = Duration(hours: 6);
+
+  @visibleForTesting
+  static void debugClearCompanyNameCache() => _sessionCompanyNames.clear();
+
   Future<void> _fillCompanyNameCache({
+    required String organizationId,
+    required Iterable<String> companyIds,
+    required Map<String, String> companyNameCache,
+  }) async {
+    final now = DateTime.now();
+    final scope = '${identityHashCode(firestore)}|$organizationId';
+    final toFetch = <String>[];
+    for (final id in companyIds.toSet()) {
+      if (id.isEmpty) continue;
+      if (companyNameCache[id]?.isNotEmpty ?? false) continue;
+      final hit = _sessionCompanyNames['$scope|$id'];
+      if (hit != null && now.difference(hit.at) < companyNameTtl) {
+        companyNameCache[id] = hit.name;
+      } else {
+        toFetch.add(id);
+      }
+    }
+    if (toFetch.isEmpty) return;
+    await _fillCompanyNameCacheNetwork(
+      organizationId: organizationId,
+      companyIds: toFetch,
+      companyNameCache: companyNameCache,
+    );
+    for (final id in toFetch) {
+      final name = companyNameCache[id];
+      if (name != null && name.isNotEmpty) {
+        _sessionCompanyNames['$scope|$id'] = (name: name, at: now);
+      }
+    }
+  }
+
+  /// Batch-fetch company display names with whereIn(documentId) chunks.
+  Future<void> _fillCompanyNameCacheNetwork({
     required String organizationId,
     required Iterable<String> companyIds,
     required Map<String, String> companyNameCache,

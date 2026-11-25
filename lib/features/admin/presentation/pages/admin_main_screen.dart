@@ -1,5 +1,6 @@
 import 'package:delegate_app/features/admin/domain/usecases/get_marketing_employees.dart';
 import 'package:flutter/material.dart';
+import 'package:delegate_app/core/widgets/keyed_stream_builder.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
@@ -70,7 +71,6 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       ? 2
       : 0;
   late final List<Widget> _screens;
-  Widget? _branchHomeCache;
   @override
   void initState() {
     super.initState();
@@ -185,16 +185,16 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
 
   List<Widget> get _indexedScreens {
     if (!isBranchesMarketingManager) return _screens;
-    // Lazily mount BranchHomeScreen the first time tab index 2 is selected
-    // (or when REAL_TEST starts on that tab).
-    if (_currentIndex == 2) {
-      _branchHomeCache ??=
-          BranchHomeScreen(marketingUser: widget.delegate);
-    }
+    // The lazy stack mounts BranchHomeScreen the first time tab index 2 is
+    // selected (or when REAL_TEST starts on that tab). Its live listener only
+    // runs while the tab is selected (TAS-231).
     return [
       for (var i = 0; i < _screens.length; i++)
         if (i == 2)
-          (_branchHomeCache ?? const SizedBox.shrink())
+          BranchHomeScreen(
+            marketingUser: widget.delegate,
+            isActive: _currentIndex == 2,
+          )
         else
           _screens[i],
     ];
@@ -667,8 +667,17 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       } else {
         return Icon(icon, size: 20);
       }
-      return StreamBuilder<QuerySnapshot>(
-        stream: badgeQuery.snapshots(),
+      // TAS-231: subscribed once per scope, not on every build of the shell
+      // (each tab switch / setState used to open a new listener).
+      final query = badgeQuery;
+      return KeyedStreamBuilder<QuerySnapshot>(
+        streamKey: (
+          collection,
+          widget.delegate.role,
+          widget.delegate.organizationUID,
+          widget.delegate.companyUID,
+        ),
+        create: query.snapshots,
         builder: (context, snapshot) {
           final count = snapshot.data?.docs.length ?? 0;
           final iconWidget = Icon(icon, size: 20);
@@ -1016,6 +1025,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       ),
       body: M3FadeThroughIndexedStack(
         index: _currentIndex,
+        lazy: true,
         children: _indexedScreens,
       ),
       bottomNavigationBar: Container(

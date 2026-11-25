@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/admin/presentation/utils/anti_fraud_audit_display.dart';
+import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'package:delegate_app/core/services/device_binding_service.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/hr/presentation/device_unbind_labels.dart';
@@ -79,8 +80,18 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
   bool _isExporting = false;
   List<Map<String, dynamic>> _currentFilteredLogs = [];
 
-  /// The audit log stream in the HR web layout, created once.
-  Stream<QuerySnapshot>? _hrAuditStream;
+  /// Listeners created once per query scope and reused across rebuilds
+  /// (TAS-231, from PR #188). Calling `.snapshots()` inside `build()` gave
+  /// StreamBuilder a new stream on every setState (filter chips, search,
+  /// keystrokes on HR web), which re-subscribed and re-read the whole result
+  /// set each time.
+  final Map<String, Stream<QuerySnapshot>> _memoStreams = {};
+
+  Stream<QuerySnapshot> _memoStream(String slot, Query query) {
+    final key = '$slot|$_isCompanyScoped|$_isOrgScoped|'
+        '${widget.delegate.companyUID}|${widget.delegate.organizationUID}';
+    return _memoStreams[key] ??= query.snapshots();
+  }
 
   bool get _isCompanyScoped =>
       widget.delegate.companyUID.isNotEmpty &&
@@ -250,8 +261,12 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
 
   Future<void> _loadBranches() async {
     try {
-      final snap = await FirebaseFirestore.instance.collection('branches').get();
-      final list = snap.docs.map((d) {
+      // TAS-231: shared once-per-session branches list instead of a full
+      // collection read every time the screen opens.
+      final docs = await BranchesSessionCache.load(
+        widget.firestore ?? FirebaseFirestore.instance,
+      );
+      final list = docs.map((d) {
         final data = d.data();
         final name = (data['branchName'] as String?) ??
             (data['name'] as String?) ??
@@ -1402,11 +1417,9 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     }
 
     // HR web searches as the user types, so every keystroke rebuilds the
-    // page. Keep one stream there; a new one would drop back to the
-    // spinner and take the focus from the search field.
-    final Stream<QuerySnapshot> auditStream = widget.hrWebLayout
-        ? (_hrAuditStream ??= auditQuery.snapshots())
-        : auditQuery.snapshots();
+    // page. One stream per scope (also on mobile): a new one would drop back
+    // to the spinner, take the focus from the search field and re-read logs.
+    final Stream<QuerySnapshot> auditStream = _memoStream('audit', auditQuery);
 
     final body = StreamBuilder<QuerySnapshot>(
       stream: auditStream,
@@ -3728,7 +3741,7 @@ class _AntiFraudAuditScreenState extends State<AntiFraudAuditScreen> {
     }
 
     return StreamBuilder<QuerySnapshot>(
-      stream: requestsQuery.snapshots(),
+      stream: _memoStream('unbind', requestsQuery),
       builder: (context, requestsSnapshot) {
         if (requestsSnapshot.connectionState == ConnectionState.waiting && !requestsSnapshot.hasData) {
           return const Center(

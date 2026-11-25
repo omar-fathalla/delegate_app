@@ -156,7 +156,12 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
                 setState(() => _currentIndex = tabIndex);
               },
             ),
-            BranchHomeScreen(marketingUser: delegate),
+            // Index 1 of this list; its live listener runs only while the
+            // tab is selected (TAS-231).
+            BranchHomeScreen(
+              marketingUser: delegate,
+              isActive: _currentIndex == 1,
+            ),
             BlocProvider(
               create: (_) => di.sl<PhotoPermissionBloc>(),
               child: MarketingPermissionsScreen(marketingDelegate: delegate),
@@ -281,7 +286,11 @@ class _MarketingMainScreenState extends State<MarketingMainScreen> {
           ),
         ],
       ),
-      body: M3FadeThroughIndexedStack(index: _currentIndex, children: screens),
+      body: M3FadeThroughIndexedStack(
+        index: _currentIndex,
+        lazy: true,
+        children: screens,
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainer,

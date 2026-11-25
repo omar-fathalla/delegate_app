@@ -475,11 +475,17 @@ class M3FadeThroughIndexedStack extends StatefulWidget {
   final List<Widget> children;
   final Duration duration;
 
+  /// When true, a child is only built after its index has been selected
+  /// once, and is then kept alive. Tabs the user never opens don't mount, so
+  /// they don't start Firestore reads or listeners (TAS-231, from PR #188).
+  final bool lazy;
+
   const M3FadeThroughIndexedStack({
     super.key,
     required this.index,
     required this.children,
     this.duration = AppMotionDurations.medium2, // 90 + 210
+    this.lazy = false,
   });
 
   @override
@@ -493,12 +499,14 @@ class _M3FadeThroughIndexedStackState extends State<M3FadeThroughIndexedStack>
   late final AnimationController _controller;
   late int _currentIndex;
   late int _previousIndex;
+  final Set<int> _visited = <int>{};
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.index;
     _previousIndex = widget.index;
+    _visited.add(widget.index);
     _controller = AnimationController(
       vsync: this,
       duration: widget.duration,
@@ -512,6 +520,7 @@ class _M3FadeThroughIndexedStackState extends State<M3FadeThroughIndexedStack>
     if (oldWidget.index != widget.index) {
       _previousIndex = _currentIndex;
       _currentIndex = widget.index;
+      _visited.add(widget.index);
       final reduced = MediaQuery.of(context).disableAnimations;
       _controller.duration =
           reduced ? AppMotionDurations.short3 : widget.duration;
@@ -525,9 +534,18 @@ class _M3FadeThroughIndexedStackState extends State<M3FadeThroughIndexedStack>
     super.dispose();
   }
 
+  List<Widget> get _children {
+    if (!widget.lazy) return widget.children;
+    return [
+      for (var i = 0; i < widget.children.length; i++)
+        _visited.contains(i) ? widget.children[i] : const SizedBox.shrink(),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final reduced = MediaQuery.of(context).disableAnimations;
+    final children = _children;
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
@@ -535,7 +553,7 @@ class _M3FadeThroughIndexedStackState extends State<M3FadeThroughIndexedStack>
         if (reduced) {
           return Opacity(
             opacity: t,
-            child: IndexedStack(index: _currentIndex, children: widget.children),
+            child: IndexedStack(index: _currentIndex, children: children),
           );
         }
         final outgoing = t < _outFrac && _previousIndex != _currentIndex;
@@ -557,7 +575,7 @@ class _M3FadeThroughIndexedStackState extends State<M3FadeThroughIndexedStack>
             scale: scale,
             child: IndexedStack(
               index: outgoing ? _previousIndex : _currentIndex,
-              children: widget.children,
+              children: children,
             ),
           ),
         );
