@@ -14,8 +14,9 @@
  * and nothing is counted twice. Writes that do not change a counted field
  * (most updates) write nothing at all.
  *
- * Never throws on bad data. Write failures are retried (retry: true) for at
- * most an hour, then dropped; the backfill script repairs any drift:
+ * Never throws on bad data. No retry policy (it would need the CLI's
+ * force flag on deploy, which we do not use): a failed write is logged and
+ * the backfill script repairs the drift; its dry-run prints `differ`:
  *   node scripts/backfill-delegate-stats.js --project tashil-dev [--apply]
  *
  * Deploy: functions:tashil-mobile-notifications:onDelegateStatsWrite
@@ -90,7 +91,7 @@ export const onDelegateStatsWrite = onDocumentWritten(
     memory: "256MiB",
     timeoutSeconds: 60,
     maxInstances: 20,
-    retry: true,
+    retry: false,
   },
   async (event) => {
     const ageMs = Date.now() - Date.parse(event.time);
