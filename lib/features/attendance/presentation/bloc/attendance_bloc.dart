@@ -46,8 +46,8 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     required this.getHistoryPaginated,
     required this.syncAttendance,
     ReviewService? reviewService,
-  })  : _reviewService = reviewService,
-        super(AttendanceInitial()) {
+  }) : _reviewService = reviewService,
+       super(AttendanceInitial()) {
     // droppable: a second check-in/out while one is running is ignored.
     on<CheckInRequested>(_onCheckIn, transformer: droppable());
     on<CheckOutRequested>(_onCheckOut, transformer: droppable());
@@ -71,7 +71,8 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     final currentHistory = previousLoadedState?.history;
 
     // Fast memory check: guard against duplicate check-in if there's already an active session
-    final activeAttendance = previousLoadedState?.activeAttendance ??
+    final activeAttendance =
+        previousLoadedState?.activeAttendance ??
         currentHistory?.cast<Attendance?>().firstWhere(
           (a) => a?.checkOutTime == null,
           orElse: () => null,
@@ -79,7 +80,8 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
 
     if (activeAttendance != null) {
       final now = DateTime.now();
-      final isToday = activeAttendance.checkInTime.year == now.year &&
+      final isToday =
+          activeAttendance.checkInTime.year == now.year &&
           activeAttendance.checkInTime.month == now.month &&
           activeAttendance.checkInTime.day == now.day;
 
@@ -97,16 +99,21 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
           branchName: event.branchName ?? '',
         );
         if (attendanceSameBranch(activeRef, incomingRef)) {
-          emit(const AttendanceError(
-            message: 'أنت مسجل حضور بالفعل في هذا الفرع وما زالت الجلسة جارية.',
-          ));
+          emit(
+            const AttendanceError(
+              message:
+                  'أنت مسجل حضور بالفعل في هذا الفرع وما زالت الجلسة جارية.',
+            ),
+          );
           if (previousLoadedState != null) emit(previousLoadedState);
           return;
         } else {
-          emit(AttendanceError(
-            message:
-                'لديك تسجيل حضور نشط في فرع ${activeAttendance.branchName == null ? "آخر" : BranchDisplayCache.instance.displayName(activeAttendance.branchName!)}. يرجى تسجيل الانصراف أولاً.',
-          ));
+          emit(
+            AttendanceError(
+              message:
+                  'لديك تسجيل حضور نشط في فرع ${activeAttendance.branchName == null ? "آخر" : BranchDisplayCache.instance.displayName(activeAttendance.branchName!)}. يرجى تسجيل الانصراف أولاً.',
+            ),
+          );
           if (previousLoadedState != null) emit(previousLoadedState);
           return;
         }
@@ -160,13 +167,12 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         long: event.long,
       ),
     );
-    result.fold(
-      (failure) => emit(AttendanceError(message: failure.message)),
-      (attendance) {
-        emit(AttendanceCheckedOut(attendance: attendance));
-        _reviewService?.triggerSmartReview();
-      },
-    );
+    result.fold((failure) => emit(AttendanceError(message: failure.message)), (
+      attendance,
+    ) {
+      emit(AttendanceCheckedOut(attendance: attendance));
+      _reviewService?.triggerSmartReview();
+    });
   }
 
   Future<void> _onGetHistory(
@@ -322,7 +328,15 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
         if (previousLoadedState != null) emit(previousLoadedState);
       },
       (attendance) async {
-        // 2. If check-out is successful, proceed to check-in to the new branch
+        // 2. If check-out is successful, proceed to check-in to the new branch.
+        // The history captured above still shows the old session as open;
+        // hand check-in the closed copy, or its "active session" guard
+        // refuses the new check-in we were asked for (TAS-337).
+        final historyAfterCheckOut = historyWithCheckedOut(
+          currentHistory,
+          event.oldAttendanceId,
+          attendance,
+        );
         final checkInResult = await checkIn(
           CheckInParams(
             userId: event.userId,
@@ -334,7 +348,7 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
             branchName: event.branchName,
             branchId: event.branchId,
             branchOrganizationUID: event.branchOrganizationUID,
-            currentHistory: currentHistory,
+            currentHistory: historyAfterCheckOut,
             delegateName: event.delegateName,
             phoneNumber: event.phoneNumber,
             companyName: event.companyName,
@@ -353,4 +367,36 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
       },
     );
   }
+}
+
+/// [history] with the session [oldAttendanceId] replaced by its checked-out
+/// copy [checkedOut] (TAS-337). A session missing from [history] is left out:
+/// check-in then sees no open session, which is the state after check-out.
+List<Attendance>? historyWithCheckedOut(
+  List<Attendance>? history,
+  String oldAttendanceId,
+  Attendance checkedOut,
+) {
+  if (history == null) return null;
+  return [
+    for (final a in history)
+      if (a.id == oldAttendanceId)
+        (a.checkOutTime == null && checkedOut.checkOutTime == null)
+            ? Attendance(
+                id: a.id,
+                userId: a.userId,
+                organizationId: a.organizationId,
+                checkInTime: a.checkInTime,
+                checkOutTime: DateTime.now(),
+                latitude: a.latitude,
+                longitude: a.longitude,
+                imageUrl: a.imageUrl,
+                branchName: a.branchName,
+                branchId: a.branchId,
+                branchOrganizationUID: a.branchOrganizationUID,
+              )
+            : checkedOut
+      else
+        a,
+  ];
 }

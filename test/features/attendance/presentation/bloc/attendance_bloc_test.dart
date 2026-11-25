@@ -331,4 +331,105 @@ void main() {
       ],
     );
   });
+  group('CheckOutAndCheckInRequested (TAS-337)', () {
+    final openAtOldBranch = Attendance(
+      id: 'att-old',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      checkInTime: DateTime.now().subtract(const Duration(hours: 1)),
+      branchName: 'Old Branch',
+    );
+    final closedOld = Attendance(
+      id: 'att-old',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      checkInTime: openAtOldBranch.checkInTime,
+      checkOutTime: DateTime.now(),
+      branchName: 'Old Branch',
+    );
+    final newSession = Attendance(
+      id: 'att-new',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      checkInTime: DateTime.now(),
+      branchName: 'New Branch',
+    );
+
+    blocTest<AttendanceBloc, AttendanceState>(
+      'hands check-in a history where the old session is already closed',
+      build: () {
+        when(
+          () => mockCheckOut(any()),
+        ).thenAnswer((_) async => Right(closedOld));
+        when(
+          () => mockCheckIn(any()),
+        ).thenAnswer((_) async => Right(newSession));
+        return bloc;
+      },
+      seed: () => AttendanceHistoryLoaded(
+        history: [openAtOldBranch],
+        activeAttendance: openAtOldBranch,
+      ),
+      act: (bloc) => bloc.add(
+        const CheckOutAndCheckInRequested(
+          oldAttendanceId: 'att-old',
+          userId: 'user-1',
+          companyId: 'co-1',
+          organizationId: 'org-1',
+          deviceInfo: 'test',
+          lat: 30.0,
+          long: 31.0,
+          branchName: 'New Branch',
+        ),
+      ),
+      expect: () => [
+        AttendanceLoading(),
+        AttendanceCheckedIn(attendance: newSession),
+      ],
+      verify: (_) {
+        final params =
+            verify(() => mockCheckIn(captureAny())).captured.single
+                as CheckInParams;
+        final history = params.currentHistory!;
+        expect(history.where((a) => a.checkOutTime == null), isEmpty);
+        expect(history.single.id, 'att-old');
+      },
+    );
+  });
+
+  group('historyWithCheckedOut (TAS-337)', () {
+    test('replaces the old session and keeps the others', () {
+      final other = tAttendanceWithCheckOut;
+      final open = Attendance(
+        id: 'x',
+        userId: 'u',
+        organizationId: 'o',
+        checkInTime: DateTime(2026, 11, 25, 9),
+      );
+      final closed = Attendance(
+        id: 'x',
+        userId: 'u',
+        organizationId: 'o',
+        checkInTime: DateTime(2026, 11, 25, 9),
+        checkOutTime: DateTime(2026, 11, 25, 10),
+      );
+      final out = historyWithCheckedOut([open, other], 'x', closed)!;
+      expect(out, [closed, other]);
+    });
+
+    test('closes the session even if check-out returned no checkOutTime', () {
+      final open = Attendance(
+        id: 'x',
+        userId: 'u',
+        organizationId: 'o',
+        checkInTime: DateTime(2026, 11, 25, 9),
+      );
+      final out = historyWithCheckedOut([open], 'x', open)!;
+      expect(out.single.checkOutTime, isNotNull);
+    });
+
+    test('null history stays null', () {
+      expect(historyWithCheckedOut(null, 'x', tAttendance), isNull);
+    });
+  });
 }
