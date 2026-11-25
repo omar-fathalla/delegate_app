@@ -5,6 +5,7 @@ import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_table.dart';
 import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
 import 'package:flutter/material.dart';
+import 'package:delegate_app/core/widgets/keyed_stream_builder.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
@@ -390,9 +391,13 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
         ],
       )
           : null,
-      body: StreamBuilder<List<DelegateTrackingSession>>(
+      // TAS-231: one listener per scope (and per retry generation). Creating
+      // the stream in build() re-subscribed, and re-read every session doc,
+      // on each setState (search, filters, map/table toggle).
+      body: KeyedStreamBuilder<List<DelegateTrackingSession>>(
         key: ValueKey('live_tracking_stream_$_streamGeneration'),
-        stream: _trackingService.streamTrackingSessions(
+        streamKey: (companyId, orgId, _streamGeneration),
+        create: () => _trackingService.streamTrackingSessions(
           companyId: companyId.isNotEmpty ? companyId : null,
           organizationId: companyId.isEmpty ? orgId : null,
         ),

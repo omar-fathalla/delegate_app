@@ -30,10 +30,17 @@ class BranchHomeScreen extends StatelessWidget {
   final Delegate marketingUser;
   final bool showAppBar;
 
+  /// False while this screen sits in a hidden tab of a shell's
+  /// IndexedStack. The live listener is stopped then, so check-ins at the
+  /// favorite branches don't trigger full reloads nobody sees; showing the
+  /// tab again reloads once and re-subscribes (TAS-231, from PR #188).
+  final bool isActive;
+
   const BranchHomeScreen({
     super.key,
     required this.marketingUser,
     this.showAppBar = false,
+    this.isActive = true,
   });
 
   @override
@@ -49,6 +56,7 @@ class BranchHomeScreen extends StatelessWidget {
       child: _BranchHomeView(
         marketingUser: marketingUser,
         showAppBar: showAppBar,
+        isActive: isActive,
       ),
     );
   }
@@ -57,10 +65,12 @@ class BranchHomeScreen extends StatelessWidget {
 class _BranchHomeView extends StatefulWidget {
   final Delegate marketingUser;
   final bool showAppBar;
+  final bool isActive;
 
   const _BranchHomeView({
     required this.marketingUser,
     this.showAppBar = false,
+    this.isActive = true,
   });
 
   @override
@@ -124,6 +134,8 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       _lifecycleListener = AppLifecycleListener(
         onHide: _stopLive,
         onResume: () {
+          // A hidden tab catches up when it is shown again (didUpdateWidget).
+          if (!widget.isActive) return;
           if (mounted && _favoriteBranches.isNotEmpty) {
             _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
             _syncFloorVerificationsFromCloud();
@@ -134,6 +146,25 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     } catch (e, st) {
       debugPrint('BranchHomeScreen: initState branch prefs/load failed: $e\n$st');
     }
+  }
+
+  @override
+  void didUpdateWidget(covariant _BranchHomeView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive == widget.isActive) return;
+    if (!widget.isActive) {
+      _stopLive();
+      return;
+    }
+    // Shown again: catch up on what changed while hidden, then listen.
+    if (_favoriteBranches.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !widget.isActive || _favoriteBranches.isEmpty) return;
+        _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
+        _syncFloorVerificationsFromCloud();
+      });
+    }
+    _watchLive();
   }
 
   @override
@@ -155,6 +186,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   /// Disabled during REAL_TEST_METRICS so cold/warm measurements stay clean.
   void _watchLive() {
     _stopLive();
+    if (!widget.isActive) return;
     if (RealTestMetrics.enabled || _favoriteBranches.isEmpty) return;
     if (!di.sl.isRegistered<MarketingRemoteDataSource>()) return;
     _liveSub = di.sl<MarketingRemoteDataSource>()
