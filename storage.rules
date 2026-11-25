@@ -71,9 +71,26 @@ service firebase.storage {
           && firestore.get(intentPath).data.get('companyUID', '') == co
         );
     }
+    // TAS-28 phase 0: the caller's own delegate id is the delegateId claim
+    // (delegateLoginV2), else the Auth uid (old tokens, staff). Today both
+    // are the same id. The old uid equality stays accepted until phase 2.
+    function storageMyDelegateId() {
+      return request.auth.token.get('delegateId', request.auth.uid);
+    }
+    function storageIsSelf(id) {
+      return id == request.auth.uid || id == storageMyDelegateId();
+    }
+    // prefix{uid}_<token>[.ext] or prefix{delegateId}_<token>[.ext]; the
+    // second regex only runs when the claim differs from the uid.
+    function nameOwnedBySelf(name, prefix) {
+      let me = storageMyDelegateId();
+      return name.matches(prefix + request.auth.uid + '_[^_]+(\\.[A-Za-z0-9]+)?$')
+        || (me != request.auth.uid
+          && name.matches(prefix + me + '_[^_]+(\\.[A-Za-z0-9]+)?$'));
+    }
     function canAccessDelegateDocuments(folderId) {
       return isNonAnonymous() && (
-        request.auth.uid == folderId
+        storageIsSelf(folderId)
         || storageStaffOrGlobalAccess(folderId)
       );
     }
@@ -232,7 +249,7 @@ service firebase.storage {
     function callerDelegateMayWriteStorage() {
       let orgId = request.auth.token.get('orgId', '');
       let co = request.auth.token.get('companyId', '');
-      let uid = request.auth.uid;
+      let uid = storageMyDelegateId();
       return !isDelegateToken()
         || orgId == ''
         || co == ''
@@ -259,7 +276,7 @@ service firebase.storage {
     // segment). New clients write feedback_{uid}_{ts}.jpg.
     function feedbackNameOwnedByCaller(fileName) {
       return request.auth.uid != ''
-        && fileName.matches('feedback_' + request.auth.uid + '_[^_]+(\\.[A-Za-z0-9]+)?$');
+        && nameOwnedBySelf(fileName, 'feedback_');
     }
     function feedbackNameOwnedByOther(fileName) {
       return fileName.matches('feedback_.*_.*')
@@ -269,7 +286,7 @@ service firebase.storage {
       return meta == null ? '' : meta.get('userId', '');
     }
     function feedbackMetaOk(userId) {
-      return userId == '' || userId == request.auth.uid;
+      return userId == '' || storageIsSelf(userId);
     }
     function feedbackDelegateMayAccess(fileName) {
       return isDelegateToken()
@@ -279,7 +296,7 @@ service firebase.storage {
           feedbackNameOwnedByCaller(fileName)
           || (
             !feedbackNameOwnedByOther(fileName)
-            && storageMetaUserId(resource.metadata) == request.auth.uid
+            && storageIsSelf(storageMetaUserId(resource.metadata))
           )
         );
     }
@@ -325,7 +342,7 @@ service firebase.storage {
     // still upload photo_{timestamp}.jpg can create new objects.
     function permissionPhotoNameOwnedByCaller(photoId) {
       return request.auth.uid != ''
-        && photoId.matches('photo_' + request.auth.uid + '_[^_]+(\\.[A-Za-z0-9]+)?$');
+        && nameOwnedBySelf(photoId, 'photo_');
     }
     function permissionPhotoNameOwnedByOther(photoId) {
       return photoId.matches('photo_.*_.*')
@@ -336,8 +353,8 @@ service firebase.storage {
         && request.auth.uid != ''
         && (
           permissionPhotoNameOwnedByCaller(photoId)
-          || storageMetaUserId(resource.metadata) == request.auth.uid
-          || (resource.metadata != null && resource.metadata.get('delegateUid', '') == request.auth.uid)
+          || storageIsSelf(storageMetaUserId(resource.metadata))
+          || (resource.metadata != null && storageIsSelf(resource.metadata.get('delegateUid', '')))
         );
     }
     match /organizations/{orgId}/companies/{compId}/permissions/{permissionId}/{photoId} {
@@ -382,20 +399,20 @@ service firebase.storage {
     match /task_images/{compId}/{uploaderUid}/{fileName} {
       allow get, list: if false;
       allow create: if isNonAnonymous()
-        && request.auth.uid == uploaderUid
-        && isOwnedTaskImageName(fileName, request.auth.uid)
+        && storageIsSelf(uploaderUid)
+        && isOwnedTaskImageName(fileName, uploaderUid)
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*')
         && taskImageIntentMatchesCompany(fileName, compId);
       allow update: if false;
-      allow delete: if isNonAnonymous() && request.auth.uid == uploaderUid;
+      allow delete: if isNonAnonymous() && storageIsSelf(uploaderUid);
     }
 
     // Legacy org-level path: no new creates, no client reads. The
     // uploader may still delete when the task image is removed.
     match /organizations/{orgId}/task_images/{uploaderUid}/{fileName} {
       allow get, list, create, update: if false;
-      allow delete: if isNonAnonymous() && request.auth.uid == uploaderUid;
+      allow delete: if isNonAnonymous() && storageIsSelf(uploaderUid);
     }
 
     // Phase 4: delegate proof photos. Distinct root so clients cannot
@@ -406,13 +423,13 @@ service firebase.storage {
     match /task_proof/{compId}/{uploaderUid}/{fileName} {
       allow get, list: if false;
       allow create: if isNonAnonymous()
-        && request.auth.uid == uploaderUid
-        && isOwnedProofName(fileName, request.auth.uid)
+        && storageIsSelf(uploaderUid)
+        && isOwnedProofName(fileName, uploaderUid)
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*')
         && taskImageIntentMatchesCompany(fileName, compId);
       allow update: if false;
-      allow delete: if isNonAnonymous() && request.auth.uid == uploaderUid;
+      allow delete: if isNonAnonymous() && storageIsSelf(uploaderUid);
     }
 
     // Web stores ID documents at
@@ -421,7 +438,7 @@ service firebase.storage {
     // without an intent (the web repo is not changed in this PR).
     match /organizations/{orgId}/companies/{compId}/delegates/{delegateUid}/{allPaths=**} {
       allow read, write: if (canAccessWebIdDocs(compId)
-        || (isNonAnonymous() && request.auth.uid == delegateUid))
+        || (isNonAnonymous() && storageIsSelf(delegateUid)))
         && uploadOk(20, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|application/pdf');
     }
     // Storage ORs overlapping matches, so this residual must not also
@@ -520,12 +537,12 @@ service firebase.storage {
       // claims), company staff incl. accountant / branches marketing
       // (canAccessCompanyFiles), and org admin / marketing of the chain.
       allow read: if isDelegateToken()
-        ? ((delegateTokenOwnsCompany(compId) && request.auth.uid == uid)
+        ? ((delegateTokenOwnsCompany(compId) && storageIsSelf(uid))
           || delegateTokenIsDelegate(uid))
         : (canAccessCompanyFiles(compId) || leaveOrgStaffRead(compId));
       allow write: if (canAccessWebIdDocs(compId)
         || (delegateTokenOwnsCompany(compId)
-          && request.auth.uid == uid
+          && storageIsSelf(uid)
           && callerDelegateMayWriteStorage()))
         && uploadOk(20, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|application/pdf');
     }

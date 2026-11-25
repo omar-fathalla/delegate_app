@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:delegate_app/features/notifications/data/models/notification_model.dart';
 import 'package:delegate_app/features/notifications/domain/notification_account_cutoff.dart';
+import 'package:delegate_app/core/security/delegate_identity.dart';
 
 abstract class NotificationRemoteDataSource {
   Future<List<NotificationModel>> getNotifications(
@@ -84,13 +84,9 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
     String? Function()? currentAuthUid,
   }) : currentAuthUid = currentAuthUid ?? _firebaseAuthUid;
 
-  static String? _firebaseAuthUid() {
-    try {
-      return FirebaseAuth.instance.currentUser?.uid;
-    } catch (_) {
-      return null;
-    }
-  }
+  // TAS-28: the delegate id (claim) for delegates, the Auth uid otherwise.
+  // The rules accept either in readBy / deletedBy.
+  static String? _firebaseAuthUid() => DelegateIdentity.current();
 
   /// TAS-51: ids this user writes into readBy / deletedBy of a shared
   /// notification. The rules accept only the caller's own ids.

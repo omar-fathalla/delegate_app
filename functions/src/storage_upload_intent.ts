@@ -22,6 +22,7 @@ import {
 } from "./storage_upload_intent_logic";
 import {hasAnyHold, parseHolds} from "./holds";
 import {canWriteTaskProof} from "./task_proof_access_logic";
+import {callerDelegateId, callerSelfIds} from "./caller_delegate_id";
 
 if (admin.apps.length === 0) admin.initializeApp();
 
@@ -76,10 +77,14 @@ export const ensureStorageUploadIntent = functions
     const folderId = normalizeFolderId(p.folderId ?? p.id);
     if (!isValidFolderId(folderId)) fail("invalid-argument", "folder_id_required");
     const purpose = typeof p.purpose === "string" ? p.purpose.trim() : "";
-    if (isTaskImagePurpose(purpose) && !isTaskImageFolderId(folderId, ctx.auth.uid)) {
+    // TAS-28 phase 0: the file name may carry the Auth uid (old equality)
+    // or the delegateId claim.
+    const tokenClaims = ctx.auth.token as unknown as Record<string, unknown>;
+    const selfIds = callerSelfIds(ctx.auth.uid, tokenClaims);
+    if (isTaskImagePurpose(purpose) && !selfIds.some((id) => isTaskImageFolderId(folderId, id))) {
       fail("invalid-argument", "folder_id_required");
     }
-    if (isTaskProofPurpose(purpose) && !isTaskProofFolderId(folderId, ctx.auth.uid)) {
+    if (isTaskProofPurpose(purpose) && !selfIds.some((id) => isTaskProofFolderId(folderId, id))) {
       fail("invalid-argument", "folder_id_required");
     }
 
@@ -93,7 +98,7 @@ export const ensureStorageUploadIntent = functions
       let delSnap: FirebaseFirestore.DocumentSnapshot | null = null;
       if (orgHint && coHint) {
         delSnap = await db.doc(
-          `organizations/${orgHint}/companies/${coHint}/delegates/${ctx.auth.uid}`,
+          `organizations/${orgHint}/companies/${coHint}/delegates/${callerDelegateId(ctx.auth.uid, tokenClaims)}`,
         ).get();
       }
       if (!delSnap || !delSnap.exists) {

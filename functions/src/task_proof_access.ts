@@ -13,6 +13,7 @@
  */
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
+import {callerDelegateId} from "./caller_delegate_id";
 import {
   canReadTaskProof,
   normalizeTaskProofPath,
@@ -63,6 +64,7 @@ async function loadCaller(
   uid: string,
   orgId: string,
   companyId: string,
+  delegateId: string = uid,
 ): Promise<{role: unknown; companyUID: string}> {
   const userSnap = await db.collection("users").doc(uid).get();
   if (userSnap.exists) {
@@ -74,7 +76,7 @@ async function loadCaller(
   }
   if (orgId && companyId) {
     const del = await db.doc(
-      `organizations/${orgId}/companies/${companyId}/delegates/${uid}`,
+      `organizations/${orgId}/companies/${companyId}/delegates/${delegateId}`,
     ).get();
     if (del.exists) {
       const d = (del.data() || {}) as Record<string, unknown>;
@@ -116,11 +118,13 @@ export const getTaskProofImage = functions
     const proofPaths = taskProofPathsFrom(proof.imagePaths);
     const proofCompany = str(proof.companyUID) || str(proof.companyId);
 
-    const caller = await loadCaller(db, ctx.auth.uid, organizationId, taskCompany);
+    const caller = await loadCaller(db, ctx.auth.uid, organizationId, taskCompany,
+      callerDelegateId(ctx.auth.uid, ctx.auth.token as unknown as Record<string, unknown>));
     const decision = canReadTaskProof({
       authenticated: true,
       anonymous: false,
-      callerUid: ctx.auth.uid,
+      // TAS-28 phase 0: delegateId claim (same as the uid today).
+      callerUid: callerDelegateId(ctx.auth.uid, ctx.auth.token as unknown as Record<string, unknown>),
       callerRole: caller.role,
       callerCompany: caller.companyUID,
       uploaderUid: parsed.uploaderUid,

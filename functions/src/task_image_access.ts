@@ -10,6 +10,7 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import {onObjectFinalized} from "firebase-functions/v2/storage";
 import {defineString} from "firebase-functions/params";
+import {callerDelegateId} from "./caller_delegate_id";
 import {
   assignmentNeedsCompanyDelegates,
   assignmentNeedsSectorStaff,
@@ -293,7 +294,9 @@ export const getTaskImage = functions
     if (!imagePath) fail("invalid-argument", "image_path_required");
     const taskId = str(p.taskId);
     const organizationId = str(p.organizationId) || str(p.organizationUID);
-    const caller = ctx.auth.uid;
+    // TAS-28 phase 0: a delegate is named by its delegateId claim (same as
+    // the uid for every token minted today).
+    const caller = callerDelegateId(ctx.auth.uid, ctx.auth.token as unknown as Record<string, unknown>);
 
     if (!taskId) {
       const preview = canPreviewUnsentTaskImage({callerUid: caller, requestedPath: imagePath});

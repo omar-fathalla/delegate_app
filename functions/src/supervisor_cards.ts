@@ -1,6 +1,7 @@
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import {SUPERVISOR_POSITIONS, cardsFrom, isDenial, parseScope} from "./supervisor_cards_logic";
+import {callerDelegateId} from "./caller_delegate_id";
 
 /**
  * getMySupervisorCards (TAS-55)
@@ -28,7 +29,8 @@ export const getMySupervisorCards = functions
       .limit(20)
       .get();
     const supervisors = cardsFrom(
-      context.auth?.uid ?? "",
+      // TAS-28 phase 0: skip the caller's own card by its delegateId claim.
+      callerDelegateId(context.auth?.uid, context.auth?.token as Record<string, unknown> | undefined),
       snap.docs.map((d) => ({id: d.id, data: d.data()})),
     );
     return {supervisors};
