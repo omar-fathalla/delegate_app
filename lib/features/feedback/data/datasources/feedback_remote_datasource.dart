@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:delegate_app/features/feedback/data/models/feedback_model.dart';
@@ -28,6 +29,7 @@ class FeedbackRemoteDataSourceImpl implements FeedbackRemoteDataSource {
 
   @override
   Future<void> submitFeedback(FeedbackModel feedback, File? screenshot) async {
+    String? screenshotPath;
     String? screenshotUrl;
 
     // رفع الصورة إذا كانت موجودة
@@ -45,13 +47,17 @@ class FeedbackRemoteDataSourceImpl implements FeedbackRemoteDataSource {
       );
 
       final uploadTask = await ref.putFile(screenshot, metadata);
-      screenshotUrl = await uploadTask.ref.getDownloadURL();
+      // TAS-42: the path is stored; the URL only for old app versions.
+      screenshotPath = uploadTask.ref.fullPath;
+      screenshotUrl = await LegacyStorageUrls.urlFor(uploadTask.ref);
     }
 
-    // إنشاء المقترح مع رابط الصورة
+    // إنشاء المقترح مع مسار الصورة
     final feedbackData = feedback.toJson();
-    if (screenshotUrl != null) {
-      feedbackData['screenshotUrl'] = screenshotUrl;
+    if (screenshotPath != null) {
+      feedbackData['screenshotPath'] = screenshotPath;
+      feedbackData.remove('screenshotUrl');
+      if (screenshotUrl != null) feedbackData['screenshotUrl'] = screenshotUrl;
     }
 
     await firestore.collection('feedbacks').add(feedbackData);

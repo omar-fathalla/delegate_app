@@ -1,3 +1,5 @@
+import 'package:delegate_app/core/storage/storage_media.dart';
+import 'package:delegate_app/core/widgets/storage_resolved_image.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -118,8 +120,8 @@ class PenaltyEvidenceViewer {
                     child: InteractiveViewer(
                       minScale: 0.8,
                       maxScale: 5.0,
-                      child: CachedNetworkImage(
-                        imageUrl: imageUrl,
+                      child: StorageResolvedImage(pathOrUrl: imageUrl, builder: (_, resolved) => CachedNetworkImage(
+                        imageUrl: resolved,
                         fit: BoxFit.contain,
                         placeholder: (context, url) => const Center(
                           child: Padding(
@@ -143,7 +145,7 @@ class PenaltyEvidenceViewer {
                                 const SizedBox(height: 8),
                                 TextButton.icon(
                                   onPressed: () async {
-                                    final uri = Uri.parse(imageUrl);
+                                    final uri = Uri.parse(resolved);
                                     if (await canLaunchUrl(uri)) {
                                       await launchUrl(uri,
                                           mode: LaunchMode.externalApplication);
@@ -157,7 +159,7 @@ class PenaltyEvidenceViewer {
                             ),
                           ),
                         ),
-                      ),
+                      ),),
                     ),
                   ),
                 ),
@@ -381,8 +383,8 @@ class _EvidenceListBottomSheet extends StatelessWidget {
                             height: 60,
                             color: colorScheme.surfaceContainerHighest,
                             child: isImage
-                                ? CachedNetworkImage(
-                                    imageUrl: file.fileUrl,
+                                ? StorageResolvedImage(pathOrUrl: file.fileUrl, builder: (_, resolved) => CachedNetworkImage(
+                                    imageUrl: resolved,
                                     fit: BoxFit.cover,
                                     placeholder: (context, url) => const Center(
                                       child: SizedBox(
@@ -395,7 +397,7 @@ class _EvidenceListBottomSheet extends StatelessWidget {
                                       Icons.image_rounded,
                                       color: colorScheme.primary,
                                     ),
-                                  )
+                                  ),)
                                 : Icon(
                                     file.fileType == 'PDF'
                                         ? Icons.picture_as_pdf_rounded
@@ -492,7 +494,10 @@ class _EvidenceListBottomSheet extends StatelessWidget {
     );
   }
 
-  void _openFile(String url) async {
+  void _openFile(String pathOrUrl) async {
+    // TAS-42: a stored Storage path is resolved through the rules first.
+    final url = await StorageMediaResolver.instance.tryResolve(pathOrUrl);
+    if (url == null) return;
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);

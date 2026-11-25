@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../../core/storage/storage_media.dart';
 import '../../domain/entities/captured_photo.dart';
 
 class CapturedPhotoModel extends CapturedPhoto {
@@ -40,7 +41,11 @@ class CapturedPhotoModel extends CapturedPhoto {
       branchName: data['branchName']?.toString() ?? '',
       delegateUID: data['delegateUID']?.toString() ?? '',
       delegateName: data['delegateName']?.toString() ?? '',
-      photoUrl: data['photoUrl']?.toString() ?? '',
+      // TAS-42: new docs carry the Storage path; old ones only a URL.
+      photoUrl: StorageMediaRef.pick(
+        path: data['photoPath'],
+        url: data['photoUrl'],
+      ),
       comment: data['comment']?.toString() ?? '',
       latitude: geoPoint?.latitude ?? 0.0,
       longitude: geoPoint?.longitude ?? 0.0,
@@ -60,7 +65,11 @@ class CapturedPhotoModel extends CapturedPhoto {
       'branchName': branchName,
       'delegateUID': delegateUID,
       'delegateName': delegateName,
-      'photoUrl': photoUrl,
+      // TAS-42: [photoUrl] holds a Storage path for new uploads.
+      if (StorageMediaRef.isStoragePath(photoUrl))
+        'photoPath': photoUrl
+      else
+        'photoUrl': photoUrl,
       'comment': comment,
       'location': GeoPoint(latitude, longitude),
       'capturedAt': Timestamp.fromDate(capturedAt),

@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'package:flutter/foundation.dart';
 import 'package:delegate_app/core/firestore/chunked_batch.dart';
 import 'dart:io';
@@ -937,12 +938,12 @@ class PenaltyRemoteDataSourceImpl implements PenaltyRemoteDataSource {
           .child('${DateTime.now().millisecondsSinceEpoch}_$fileName');
 
       final uploadTask = await ref.putFile(file);
-      final downloadUrl = await uploadTask.ref.getDownloadURL();
-
+      // TAS-42: keep the object path; the URL only for old app versions.
       return EvidenceFile(
-        fileUrl: downloadUrl,
+        fileUrl: uploadTask.ref.fullPath,
         fileType: fileType,
         fileName: fileName,
+        legacyUrl: await LegacyStorageUrls.urlFor(uploadTask.ref),
       );
     } catch (e) {
       throw ServerException('فشل في رفع المستند/الصورة المرفقة.');

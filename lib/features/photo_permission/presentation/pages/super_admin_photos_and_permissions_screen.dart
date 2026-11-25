@@ -3453,12 +3453,8 @@ class _SuperAdminPhotosAndPermissionsScreenState
                       IconButton.filledTonal(
                         onPressed: () async {
                           try {
-                            File? file;
-                            if (photo.photoUrl.startsWith('http://') || photo.photoUrl.startsWith('https://')) {
-                              file = await PhotoCacheManager.instance.getSingleFile(photo.photoUrl);
-                            } else {
-                              file = await PhotoCacheManager.resolveLocalPhotoFile(photo.photoUrl);
-                            }
+                            final File? file =
+                                await PhotoCacheManager.fileForStoredPhoto(photo.photoUrl);
                             if (file != null && await file.exists()) {
                               // ignore: deprecated_member_use
                               await Share.shareXFiles([XFile(file.path)], text: 'صورة ميدانية - ${BranchDisplayCache.instance.displayName(photo.branchName)}');

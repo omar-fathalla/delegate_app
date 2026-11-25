@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/private_label/data/models/private_label_json.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_audit.dart';
@@ -49,8 +50,15 @@ class PrivateLabelAuditModel extends PrivateLabelAudit {
       shelfPrice: PrivateLabelJson.parseDouble(json['shelfPrice']) ?? 0,
       stockStatus: privateLabelStockStatusFromString(json['stockStatus'] as String?),
       notes: PrivateLabelJson.parseNullableString(json['notes']),
-      productPhotoUrl: PrivateLabelJson.parseString(json['productPhotoUrl']),
-      pricePhotoUrl: PrivateLabelJson.parseString(json['pricePhotoUrl']),
+      // TAS-42: new audits carry Storage paths; old ones only URLs.
+      productPhotoUrl: StorageMediaRef.pick(
+        path: json['productPhotoPath'],
+        url: json['productPhotoUrl'],
+      ),
+      pricePhotoUrl: StorageMediaRef.pick(
+        path: json['pricePhotoPath'],
+        url: json['pricePhotoUrl'],
+      ),
       reviewStatus:
           privateLabelReviewStatusFromString(json['reviewStatus'] as String?),
       reviewedBy: PrivateLabelJson.parseNullableString(json['reviewedBy']),
@@ -64,11 +72,15 @@ class PrivateLabelAuditModel extends PrivateLabelAudit {
     );
   }
 
-  /// Builds the server document from a local draft + uploaded photo URLs.
+  /// Builds the server document from a local draft + uploaded photos.
+  /// TAS-42: the Storage paths are stored; the URLs only when given, for
+  /// app versions that read just `productPhotoUrl` / `pricePhotoUrl`.
   static Map<String, dynamic> firestoreFromDraft(
     PrivateLabelAuditDraft draft, {
-    required String productPhotoUrl,
-    required String pricePhotoUrl,
+    required String productPhotoPath,
+    required String pricePhotoPath,
+    String? productPhotoUrl,
+    String? pricePhotoUrl,
   }) {
     return {
       'id': draft.id,
@@ -85,8 +97,12 @@ class PrivateLabelAuditModel extends PrivateLabelAudit {
       'priceMismatch': draft.hasPriceMismatch,
       'stockStatus': draft.stockStatus.name,
       'notes': draft.notes,
-      'productPhotoUrl': productPhotoUrl,
-      'pricePhotoUrl': pricePhotoUrl,
+      'productPhotoPath': productPhotoPath,
+      'pricePhotoPath': pricePhotoPath,
+      if (productPhotoUrl != null && productPhotoUrl.isNotEmpty)
+        'productPhotoUrl': productPhotoUrl,
+      if (pricePhotoUrl != null && pricePhotoUrl.isNotEmpty)
+        'pricePhotoUrl': pricePhotoUrl,
       'reviewStatus': PrivateLabelReviewStatus.pending.name,
       'auditDate': draft.auditDate,
       'auditMonth': draft.auditMonth,

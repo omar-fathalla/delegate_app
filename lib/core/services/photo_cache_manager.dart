@@ -7,6 +7,8 @@ import 'package:gal/gal.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../storage/storage_media.dart';
+
 class PhotoCacheManager {
   static const String cacheKey = 'tashil_persistent_photo_cache';
 
@@ -28,8 +30,31 @@ class PhotoCacheManager {
       if (url.startsWith('http://') || url.startsWith('https://')) {
         instance.downloadFile(url).ignore();
         count++;
+      } else if (StorageMediaRef.isStoragePath(url)) {
+        // TAS-42: a stored Storage path; resolve through the rules first.
+        StorageMediaResolver.instance.tryResolve(url).then((resolved) {
+          if (resolved != null) {
+            instance.downloadFile(resolved, key: url).ignore();
+          }
+        }).ignore();
+        count++;
       }
     }
+  }
+
+  /// A file on disk for a stored photo: a URL (disk cache), a Storage path
+  /// (local copy first, then resolved through the rules) or a local path.
+  static Future<File?> fileForStoredPhoto(String stored) async {
+    if (stored.startsWith('http://') || stored.startsWith('https://')) {
+      return instance.getSingleFile(stored);
+    }
+    final local = await resolveLocalPhotoFile(stored);
+    if (local != null && await local.exists()) return local;
+    if (StorageMediaRef.isStoragePath(stored)) {
+      final url = await StorageMediaResolver.instance.resolve(stored);
+      if (url != null) return instance.getSingleFile(url, key: stored);
+    }
+    return null;
   }
 
   /// Resolves local image files across iOS/Android sandbox path rotations
@@ -105,7 +130,7 @@ class PhotoCacheManager {
           filePath = tempFile.path;
         }
       } else {
-        final resolvedFile = await resolveLocalPhotoFile(photoUrl);
+        final resolvedFile = await fileForStoredPhoto(photoUrl);
         if (resolvedFile == null || !await resolvedFile.exists()) {
           throw Exception('ملف الصورة غير موجود على الهاتف');
         }

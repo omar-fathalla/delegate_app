@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'package:delegate_app/features/private_label/data/models/private_label_json.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_product.dart';
 
@@ -17,7 +18,9 @@ class PrivateLabelProductModel extends PrivateLabelProduct {
   factory PrivateLabelProductModel.fromJson(Map<String, dynamic> json, String id) {
     final name = PrivateLabelJson.parseString(json['name']);
     final barcode = PrivateLabelJson.parseNullableString(json['barcode']);
-    var imageUrl = PrivateLabelJson.parseNullableString(json['imageUrl'] ?? json['photoUrl']);
+    // TAS-42: new products carry the Storage path; old ones a URL.
+    var imageUrl = PrivateLabelJson.parseNullableString(StorageMediaRef.pick(
+        path: json['imagePath'], url: json['imageUrl'] ?? json['photoUrl']));
     if (imageUrl == null || imageUrl.isEmpty) {
       imageUrl = _resolveDefaultImage(id: id, name: name, barcode: barcode);
     }
@@ -81,7 +84,10 @@ class PrivateLabelProductModel extends PrivateLabelProduct {
         'barcode': barcode,
         'category': category,
         'referencePrice': referencePrice,
-        'imageUrl': imageUrl,
+        if (StorageMediaRef.isStoragePath(imageUrl))
+          'imagePath': imageUrl
+        else
+          'imageUrl': imageUrl,
         'isActive': isActive,
       };
 

@@ -1,3 +1,5 @@
+import 'package:delegate_app/core/storage/storage_media.dart';
+import 'package:delegate_app/core/widgets/storage_resolved_image.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -893,7 +895,11 @@ class _DelegateLeavesAndRequestsScreenState
     final daysCount = (req['daysCount'] as num?)?.toInt() ?? 1;
     final reason = (req['reason'] ?? '').toString();
     final rejectReason = (req['rejectReason'] ?? '').toString();
-    final attachmentUrl = (req['attachmentUrl'] ?? '').toString();
+    // TAS-42: new requests carry the Storage path; old ones only a URL.
+    final attachmentUrl = StorageMediaRef.pick(
+      path: req['attachmentPath'],
+      url: req['attachmentUrl'],
+    );
     final resolvedByName = (req['resolvedByName'] ?? '').toString();
     final resolvedAt = req['resolvedAt'] is Timestamp
         ? (req['resolvedAt'] as Timestamp).toDate()
@@ -1368,8 +1374,10 @@ class _DelegateLeavesAndRequestsScreenState
               ),
               child: InteractiveViewer(
                 maxScale: 4.0,
-                child: Image.network(
-                  url,
+                child: StorageResolvedImage(
+                  pathOrUrl: url,
+                  builder: (_, resolved) => Image.network(
+                    resolved,
                   fit: BoxFit.contain,
                   loadingBuilder: (_, child, progress) {
                     if (progress == null) return child;
@@ -1384,6 +1392,7 @@ class _DelegateLeavesAndRequestsScreenState
                       child: Text(AppLocalizations.of(context)!.attachmentLoadFailed),
                     ),
                   ),
+                ),
                 ),
               ),
             ),
@@ -2289,6 +2298,7 @@ class _DelegateLeavesAndRequestsScreenState
                                       setDlgState(() => isSubmitting = true);
 
                                       try {
+                                        String? attachmentPath;
                                         String? attachmentUrl;
 
                                         // رفع المرفق إلى Firebase Storage (skip on retry if leave already written)
@@ -2310,7 +2320,9 @@ class _DelegateLeavesAndRequestsScreenState
 
                                           final uploadTask =
                                               await storageRef.putData(bytes, metadata);
-                                          attachmentUrl = await uploadTask.ref.getDownloadURL();
+                                          // TAS-42: store the path; the URL only for old app versions.
+                                          attachmentPath = uploadTask.ref.fullPath;
+                                          attachmentUrl = await LegacyStorageUrls.urlFor(uploadTask.ref);
                                         }
 
                                         if (submittedLeaveId == null) {
@@ -2340,6 +2352,7 @@ class _DelegateLeavesAndRequestsScreenState
                                             'daysCount': finalDays,
                                             'reason': reason,
                                             'attachmentUrl': attachmentUrl,
+                                            'attachmentPath': ?attachmentPath,
                                             'status': 'pending', // يبدأ دائماً بقيد المراجعة للمندوب
                                             'createdAt': FieldValue.serverTimestamp(),
                                             'resolvedAt': null,

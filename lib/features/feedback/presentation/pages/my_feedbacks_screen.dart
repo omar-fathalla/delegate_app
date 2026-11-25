@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/widgets/app_photo_image.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -231,18 +232,16 @@ class _FeedbackCard extends StatelessWidget {
             if (feedback.screenshotUrl != null) ...[
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  feedback.screenshotUrl!,
+                child: AppPhotoImage(
+                  photoUrl: feedback.screenshotUrl!,
                   height: 120,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      height: 120,
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      child: const Icon(Icons.broken_image),
-                    );
-                  },
+                  errorWidget: Container(
+                    height: 120,
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    child: const Icon(Icons.broken_image),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),

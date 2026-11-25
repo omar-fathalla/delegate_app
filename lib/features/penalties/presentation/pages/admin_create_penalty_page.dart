@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/widgets/storage_resolved_image.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -1529,13 +1530,13 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                                     if (isImg)
                                       ClipRRect(
                                         borderRadius: BorderRadius.circular(6),
-                                        child: CachedNetworkImage(
-                                          imageUrl: ev.fileUrl,
+                                        child: StorageResolvedImage(pathOrUrl: ev.fileUrl, builder: (_, resolved) => CachedNetworkImage(
+                                          imageUrl: resolved,
                                           width: 28,
                                           height: 28,
                                           fit: BoxFit.cover,
                                           errorWidget: (context, url, error) => const Icon(Icons.broken_image_rounded, size: 20),
-                                        ),
+                                        ),),
                                       )
                                     else
                                       Icon(

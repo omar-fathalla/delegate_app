@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart' show UserRole;
@@ -419,7 +420,9 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
           },
         ),
       );
-      final photoUrl = await ref.getDownloadURL();
+      // TAS-42: store the object path; the URL only for old app versions.
+      final photoPath = ref.fullPath;
+      final legacyUrl = await LegacyStorageUrls.urlFor(ref);
 
       final docRef = firestore
           .collection('organizations')
@@ -442,7 +445,7 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
         branchName: branchName,
         delegateUID: delegateUID,
         delegateName: delegateName,
-        photoUrl: photoUrl,
+        photoUrl: photoPath,
         comment: comment,
         latitude: latitude,
         longitude: longitude,
@@ -452,7 +455,7 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
       // TAS-77: the stored capture time is the server's (a device clock is
       // easy to change and the photo is proof of a visit). The device time
       // is kept beside it for reference only.
-      await docRef.set(capturedPhotoWriteData(model));
+      await docRef.set(capturedPhotoWriteData(model, legacyUrl: legacyUrl));
       return model;
     } on FirebaseException catch (e) {
       throwFirestoreFailure(e, 'فشل في رفع الصورة وتسجيلها في النظام.');
@@ -609,8 +612,7 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
       // 1. Delete image from Storage if URL is available
       if (photoUrl.isNotEmpty) {
         try {
-          final ref = storage.refFromURL(photoUrl);
-          await ref.delete();
+          await StorageMediaRef.refFor(storage, photoUrl)?.delete();
         } catch (e) {
           debugPrint('Error deleting image from storage using photoUrl: $e');
         }
@@ -635,11 +637,13 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
 
           final directDoc = await directDocRef.get();
           if (directDoc.exists) {
-            final storedUrl = directDoc.data()?['photoUrl'] as String?;
-            if (photoUrl.isEmpty && storedUrl != null && storedUrl.isNotEmpty) {
+            final storedUrl = StorageMediaRef.pick(
+              path: directDoc.data()?['photoPath'],
+              url: directDoc.data()?['photoUrl'],
+            );
+            if (photoUrl.isEmpty && storedUrl.isNotEmpty) {
               try {
-                final ref = storage.refFromURL(storedUrl);
-                await ref.delete();
+                await StorageMediaRef.refFor(storage, storedUrl)?.delete();
               } catch (_) {}
             }
             await directDocRef.delete();
@@ -659,10 +663,12 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
 
         for (var doc in snapshot.docs) {
           try {
-            final storedUrl = (doc.data()['photoUrl'] ?? doc.data()['imageUrl']) as String?;
-            if (storedUrl != null && storedUrl.isNotEmpty) {
-              final ref = storage.refFromURL(storedUrl);
-              await ref.delete();
+            final storedUrl = StorageMediaRef.pick(
+              path: doc.data()['photoPath'],
+              url: doc.data()['photoUrl'] ?? doc.data()['imageUrl'],
+            );
+            if (storedUrl.isNotEmpty) {
+              await StorageMediaRef.refFor(storage, storedUrl)?.delete();
             }
           } catch (e) {
             debugPrint('Error deleting image from storage: $e');
@@ -679,10 +685,12 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
 
           for (var doc in uidSnapshot.docs) {
             try {
-              final storedUrl = (doc.data()['photoUrl'] ?? doc.data()['imageUrl']) as String?;
-              if (storedUrl != null && storedUrl.isNotEmpty) {
-                final ref = storage.refFromURL(storedUrl);
-                await ref.delete();
+              final storedUrl = StorageMediaRef.pick(
+                path: doc.data()['photoPath'],
+                url: doc.data()['photoUrl'] ?? doc.data()['imageUrl'],
+              );
+              if (storedUrl.isNotEmpty) {
+                await StorageMediaRef.refFor(storage, storedUrl)?.delete();
               }
             } catch (_) {}
             await doc.reference.delete();
@@ -726,10 +734,12 @@ class PhotoPermissionRemoteDataSourceImpl implements PhotoPermissionRemoteDataSo
 
       for (var doc in photosSnapshot.docs) {
         try {
-          final imageUrl = doc.data()['photoUrl'] as String?;
-          if (imageUrl != null && imageUrl.isNotEmpty) {
-            final ref = storage.refFromURL(imageUrl);
-            await ref.delete();
+          final imageUrl = StorageMediaRef.pick(
+            path: doc.data()['photoPath'],
+            url: doc.data()['photoUrl'],
+          );
+          if (imageUrl.isNotEmpty) {
+            await StorageMediaRef.refFor(storage, imageUrl)?.delete();
           }
         } catch (e) {
           debugPrint('Error deleting photo image from storage during permission deletion: $e');
@@ -896,8 +906,14 @@ String photoListOrgScope(UserRole role, String organizationUID) {
 
 /// TAS-77: what [PhotoPermissionRemoteDataSourceImpl.uploadPhoto] stores:
 /// `capturedAt` is the server time, `deviceCapturedAt` the device's.
-Map<String, dynamic> capturedPhotoWriteData(CapturedPhotoModel model) {
+/// TAS-42: [legacyUrl] is also written as `photoUrl` for app versions that
+/// only read the URL (see [LegacyStorageUrls]).
+Map<String, dynamic> capturedPhotoWriteData(
+  CapturedPhotoModel model, {
+  String? legacyUrl,
+}) {
   final data = model.toFirestore();
+  if (legacyUrl != null && legacyUrl.isNotEmpty) data['photoUrl'] = legacyUrl;
   data['deviceCapturedAt'] = data['capturedAt'];
   data['capturedAt'] = FieldValue.serverTimestamp();
   return data;

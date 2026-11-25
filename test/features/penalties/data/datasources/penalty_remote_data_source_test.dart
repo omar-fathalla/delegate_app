@@ -296,10 +296,15 @@ void main() {
       when(() => mockFileReference.putFile(any())).thenAnswer((_) => FakeUploadTask(mockTaskSnapshot));
       when(() => mockTaskSnapshot.ref).thenReturn(mockFileReference);
       when(() => mockFileReference.getDownloadURL()).thenAnswer((_) async => 'http://test.com/my_image.jpg');
+      when(() => mockFileReference.fullPath)
+          .thenReturn('penalties/coA/evidence/test_id/1_my_image.jpg');
 
       final result = await dataSource.uploadEvidenceFile(file: mockFile, penaltyId: 'test_id', companyId: 'coA');
 
-      expect(result.fileUrl, equals('http://test.com/my_image.jpg'));
+      // TAS-42: the object path is kept; the URL only for old app versions.
+      expect(result.fileUrl, equals('penalties/coA/evidence/test_id/1_my_image.jpg'));
+      expect(result.legacyUrl, equals('http://test.com/my_image.jpg'));
+      expect(result.toJson()['filePath'], result.fileUrl);
       expect(result.fileName, equals('my_image.jpg'));
       expect(result.fileType, equals('IMAGE'));
     });
