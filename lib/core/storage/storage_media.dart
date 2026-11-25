@@ -53,6 +53,30 @@ abstract final class StorageMediaRef {
     return u;
   }
 
+  /// TAS-331: like [pick], for fields an older writer may still overwrite
+  /// by URL only (delegate documents: old store builds, the HR web and
+  /// callables replace `documentURL` and leave the entry's previous
+  /// `documentPath` in place). The path wins unless the URL is a Firebase
+  /// download URL of a different object: then the URL is newer.
+  static String pickFresh({Object? path, Object? url}) {
+    final p = path is String ? path.trim() : '';
+    final u = url is String ? url.trim() : '';
+    if (p.isEmpty) return u;
+    if (u.isEmpty) return p;
+    final urlObject = pathFromDownloadUrl(u);
+    if (urlObject != null && urlObject != objectPath(p)) return u;
+    return pick(path: p, url: u);
+  }
+
+  /// [value] without a `gs://bucket/` prefix.
+  static String objectPath(String value) {
+    final v = value.trim();
+    if (!v.startsWith('gs://')) return v;
+    final rest = v.substring(5);
+    final slash = rest.indexOf('/');
+    return slash < 0 ? '' : rest.substring(slash + 1);
+  }
+
   static final Map<String, String> _legacyUrls = <String, String>{};
   static const int _maxLegacyUrls = 3000;
 

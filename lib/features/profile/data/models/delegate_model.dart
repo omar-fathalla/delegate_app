@@ -319,7 +319,7 @@ class DelegateModel extends Delegate {
         final bool hasPersonalPhoto = parsedDocs.any(
           (d) =>
               d.documentKey == DocumentKey.personalPhoto &&
-              d.documentURL.isNotEmpty,
+              d.displayUrl.isNotEmpty,
         );
         if (!hasPersonalPhoto) {
           final photoUrl = json['profileImageUrl'] ??
@@ -329,12 +329,15 @@ class DelegateModel extends Delegate {
               json['photoURL'] ??
               json['photoUrl'] ??
               json['avatarUrl'];
-          if (photoUrl is String && photoUrl.trim().isNotEmpty) {
+          final photoPath = _pathOrNull(json['profileImagePath']);
+          if ((photoUrl is String && photoUrl.trim().isNotEmpty) ||
+              photoPath != null) {
             parsedDocs.add(
               DelegateDocumentModel(
                 documentKey: DocumentKey.personalPhoto,
                 documentStatus: DocumentStatus.approved,
-                documentURL: photoUrl.trim(),
+                documentURL: photoUrl is String ? photoUrl.trim() : '',
+                documentPath: photoPath,
                 uploadedAt:
                     DateTimeUtils.parseNullableDate(json['createdAt']) ??
                         DateTime.now(),
@@ -346,7 +349,7 @@ class DelegateModel extends Delegate {
         final bool hasNationalId = parsedDocs.any(
           (d) =>
               d.documentKey == DocumentKey.nationalityId &&
-              d.documentURL.isNotEmpty,
+              d.displayUrl.isNotEmpty,
         );
         if (!hasNationalId) {
           final frontUrl = json['nationalIdFrontUrl'] ??
@@ -354,15 +357,20 @@ class DelegateModel extends Delegate {
               json['nationalIdUrl'];
           final backUrl =
               json['nationalIdBackUrl'] ?? json['nationalIdBackURL'];
-          if (frontUrl is String && frontUrl.trim().isNotEmpty) {
+          final frontPath = _pathOrNull(json['nationalIdFrontPath']);
+          final backPath = _pathOrNull(json['nationalIdBackPath']);
+          if ((frontUrl is String && frontUrl.trim().isNotEmpty) ||
+              frontPath != null) {
             parsedDocs.add(
               DelegateDocumentModel(
                 documentKey: DocumentKey.nationalityId,
                 documentStatus: DocumentStatus.approved,
-                documentURL: frontUrl.trim(),
+                documentURL: frontUrl is String ? frontUrl.trim() : '',
+                documentPath: frontPath,
                 secondaryURL: backUrl is String && backUrl.trim().isNotEmpty
                     ? backUrl.trim()
                     : null,
+                secondaryPath: backPath,
                 uploadedAt:
                     DateTimeUtils.parseNullableDate(json['createdAt']) ??
                         DateTime.now(),
@@ -374,16 +382,19 @@ class DelegateModel extends Delegate {
         final bool hasReceipt = parsedDocs.any(
           (d) =>
               d.documentKey == DocumentKey.paymentReceipt &&
-              d.documentURL.isNotEmpty,
+              d.displayUrl.isNotEmpty,
         );
         if (!hasReceipt) {
           final receiptUrl = json['receiptImageUrl'] ?? json['receiptUrl'];
-          if (receiptUrl is String && receiptUrl.trim().isNotEmpty) {
+          final receiptPath = _pathOrNull(json['receiptImagePath']);
+          if ((receiptUrl is String && receiptUrl.trim().isNotEmpty) ||
+              receiptPath != null) {
             parsedDocs.add(
               DelegateDocumentModel(
                 documentKey: DocumentKey.paymentReceipt,
                 documentStatus: DocumentStatus.approved,
-                documentURL: receiptUrl.trim(),
+                documentURL: receiptUrl is String ? receiptUrl.trim() : '',
+                documentPath: receiptPath,
                 receiptCode: json['receiptCode']?.toString(),
                 uploadedAt:
                     DateTimeUtils.parseNullableDate(json['createdAt']) ??
@@ -640,6 +651,8 @@ class DelegateDocumentModel extends DelegateDocument {
     super.uploadedAt,
     super.receiptCode,
     super.secondaryURL,
+    super.documentPath,
+    super.secondaryPath,
   });
 
   factory DelegateDocumentModel.fromJson(Map<String, dynamic> json) {
@@ -690,6 +703,8 @@ class DelegateDocumentModel extends DelegateDocument {
       uploadedAt: DateTimeUtils.parseNullableDate(json['uploadedAt']),
       receiptCode: json['receiptCode'],
       secondaryURL: json['secondaryURL'],
+      documentPath: _pathOrNull(json['documentPath']),
+      secondaryPath: _pathOrNull(json['secondaryPath']),
     );
   }
 
@@ -736,6 +751,8 @@ class DelegateDocumentModel extends DelegateDocument {
       'uploadedAt': uploadedAt != null ? Timestamp.fromDate(uploadedAt!) : null,
       'receiptCode': receiptCode,
       'secondaryURL': secondaryURL,
+      if (documentPath != null) 'documentPath': documentPath,
+      if (secondaryPath != null) 'secondaryPath': secondaryPath,
     };
   }
 
@@ -783,6 +800,14 @@ class DelegateDocumentModel extends DelegateDocument {
       'uploadedAt': uploadedAt?.toIso8601String(),
       'receiptCode': receiptCode,
       'secondaryURL': secondaryURL,
+      if (documentPath != null) 'documentPath': documentPath,
+      if (secondaryPath != null) 'secondaryPath': secondaryPath,
     };
   }
+}
+
+String? _pathOrNull(Object? v) {
+  if (v is! String) return null;
+  final t = v.trim();
+  return t.isEmpty ? null : t;
 }

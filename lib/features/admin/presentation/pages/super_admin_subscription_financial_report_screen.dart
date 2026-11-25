@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -1074,7 +1075,7 @@ class _SuperAdminSubscriptionFinancialReportScreenState
           _buildPaymentMethodBadge(req.paymentMethod, isMini: true),
 
           // Receipt Image button if available
-          if (req.receiptImageUrl != null && req.receiptImageUrl!.isNotEmpty) ...[
+          if (req.receiptImageDisplay.isNotEmpty) ...[
             const SizedBox(width: 4),
             InkWell(
               onTap: () => _showReceiptImageDialog(context, req),
@@ -1256,7 +1257,7 @@ class _SuperAdminSubscriptionFinancialReportScreenState
               ),
             ],
 
-            if (req.receiptImageUrl != null && req.receiptImageUrl!.isNotEmpty) ...[
+            if (req.receiptImageDisplay.isNotEmpty) ...[
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 icon: const Icon(Icons.image_search_rounded, size: 16),
@@ -1440,7 +1441,19 @@ class _SuperAdminSubscriptionFinancialReportScreenState
 
   // ================= RECEIPT IMAGE DIALOG =================
   void _showReceiptImageDialog(BuildContext context, DelegateSubscriptionRequest req) {
-    if (req.receiptImageUrl == null || req.receiptImageUrl!.isEmpty) return;
+    if (req.receiptImageDisplay.isEmpty) return;
+    // TAS-331: a stored Storage path opens through the Storage rules.
+    StorageMediaResolver.instance.tryResolve(req.receiptImageDisplay).then((url) {
+      if (!context.mounted) return;
+      _showResolvedReceiptDialog(context, req, url ?? req.receiptImageDisplay);
+    });
+  }
+
+  void _showResolvedReceiptDialog(
+    BuildContext context,
+    DelegateSubscriptionRequest req,
+    String receiptUrl,
+  ) {
 
     showDialog(
       context: context,
@@ -1482,7 +1495,7 @@ class _SuperAdminSubscriptionFinancialReportScreenState
               minScale: 1.0,
               maxScale: 4.0,
               child: CachedNetworkImage(
-                imageUrl: req.receiptImageUrl!,
+                imageUrl: receiptUrl,
                 fit: BoxFit.contain,
                 height: 380,
                 placeholder: (context, url) => const Center(

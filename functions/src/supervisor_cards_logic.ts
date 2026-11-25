@@ -82,7 +82,8 @@ function photoOf(d: Record<string, unknown>): string {
     const v = str(d[k]);
     if (v) return v;
   }
-  return "";
+  // TAS-331: only a Storage path stored (no legacy URL); the app resolves it.
+  return str(d.profileImagePath);
 }
 
 /** Only the four allowed fields leave the server. */

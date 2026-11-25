@@ -36,13 +36,13 @@ void main() {
         edit: ({
           String? fullName,
           String? phoneNumber,
-          String? personalPhotoURL,
-          String? nationalIdFrontUrl,
-          String? nationalIdBackUrl,
+          String? personalPhotoPath,
+          String? nationalIdFrontPath,
+          String? nationalIdBackPath,
         }) async {
           editedName = fullName ?? '';
           editedPhone = phoneNumber ?? '';
-          photoUrl = personalPhotoURL ?? '';
+          photoUrl = personalPhotoPath ?? '';
         },
         delegateUid: 'd1',
         fullName: 'أحمد علي',
@@ -67,9 +67,9 @@ void main() {
           edit: ({
             String? fullName,
             String? phoneNumber,
-            String? personalPhotoURL,
-            String? nationalIdFrontUrl,
-            String? nationalIdBackUrl,
+            String? personalPhotoPath,
+            String? nationalIdFrontPath,
+            String? nationalIdBackPath,
           }) async {
             editCalled = true;
           },
@@ -97,11 +97,11 @@ void main() {
         edit: ({
           String? fullName,
           String? phoneNumber,
-          String? personalPhotoURL,
-          String? nationalIdFrontUrl,
-          String? nationalIdBackUrl,
+          String? personalPhotoPath,
+          String? nationalIdFrontPath,
+          String? nationalIdBackPath,
         }) async {
-          savedPhoto = personalPhotoURL;
+          savedPhoto = personalPhotoPath;
         },
         delegateUid: 'd1',
         personalPhoto: file,

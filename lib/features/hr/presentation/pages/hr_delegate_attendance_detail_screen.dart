@@ -1021,7 +1021,7 @@ class _HRDelegateAttendanceDetailScreenState
     final String delegateDisplayName = widget.delegate.fullName.trim();
     final String delegatePhone = widget.delegate.phoneNumber.trim();
     final String delegateCompany = widget.delegate.companyName.trim();
-    final String? delegatePhoto = widget.delegate.personalPhotoUrl;
+    final String? delegatePhoto = widget.delegate.personalPhotoForCopy;
 
     batch.update(checkInRef, {
       'timestamp': Timestamp.fromDate(newInTime),
@@ -1115,7 +1115,7 @@ class _HRDelegateAttendanceDetailScreenState
       'organizationUID': orgUID,
       'delegateUID': widget.delegate.uid,
       'delegateName': widget.delegate.fullName,
-      'delegatePhotoUrl': widget.delegate.personalPhotoUrl,
+      'delegatePhotoUrl': widget.delegate.personalPhotoForCopy,
       'delegatePhone': widget.delegate.phoneNumber,
       'delegateRole': widget.delegate.role.name,
       'branchName': session.branchName,

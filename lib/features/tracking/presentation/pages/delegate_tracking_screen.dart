@@ -124,8 +124,8 @@ class _DelegateTrackingScreenState extends State<DelegateTrackingScreen> {
               if (d.phoneNumber.trim().isNotEmpty) {
                 _delegatePhonesMap[d.uid] = d.phoneNumber.trim();
               }
-              if (d.personalPhotoUrl != null && d.personalPhotoUrl!.isNotEmpty) {
-                _delegatePhotosMap[d.uid] = d.personalPhotoUrl!;
+              if ((d.personalPhotoForCopy ?? "").isNotEmpty) {
+                _delegatePhotosMap[d.uid] = d.personalPhotoForCopy!;
               }
             }
           },

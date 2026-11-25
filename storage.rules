@@ -258,6 +258,44 @@ service firebase.storage {
         || storageDelegateAccountWritable(orgId, co, uid);
     }
 
+    // ==================== TAS-331: DELEGATE DOCUMENT PATHS ====================
+    // Delegate documents now store the Storage path (profileImagePath,
+    // documents[].documentPath, ...). Two Firestore readers of the delegate
+    // doc (canReadNestedDelegate) were missing here; both are scoped by the
+    // folder's company from storage_upload_intents/{folderId} (two reads at
+    // most: the intent plus users/{uid} or the caller's own delegate copy):
+    // - accountant and branches-marketing staff of that company;
+    // - a delegate token whose own copy in that company is a supervisor.
+    // Known gaps (the app falls back to the legacy URL while
+    // write_legacy_storage_urls is on): org-level staff without a company,
+    // a folder with no intent, and a delegate added to a second company
+    // (the intent names the first one).
+    function delegateFolderParityRead(folderId) {
+      let intentPath = /databases/(default)/documents/storage_upload_intents/$(folderId);
+      return isNonAnonymous() && firestore.exists(intentPath) && (isDelegateToken()
+        ? delegateTokenSupervisesIn(firestore.get(intentPath).data.get('companyUID', ''))
+        : delegateFolderStaffRead(firestore.get(intentPath).data.get('companyUID', '')));
+    }
+    // The request's supervisorUid reads delegate_requests/{id} (and its
+    // photo / ID / receipt paths, stored under the request id).
+    function requestSupervisorRead(requestId) {
+      return isNonAnonymous()
+        && firestore.get(/databases/(default)/documents/delegate_requests/$(requestId)).data
+          .get('supervisorUid', '') == request.auth.uid;
+    }
+    function delegateFolderStaffRead(co) {
+      let u = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      return co != '' && u.get('companyUID', '') == co
+        && (u.get('role', '') in ['accountant', 'accounting', 'account_admin']
+          || storageBranchesMarketingRole(u.get('role', '')));
+    }
+    function delegateTokenSupervisesIn(co) {
+      let orgId = request.auth.token.get('orgId', '');
+      return storageDelegateOtpOk() && delegateTokenOwnsCompany(co) && orgId != ''
+        && firestore.get(/databases/(default)/documents/organizations/$(orgId)/companies/$(co)/delegates/$(request.auth.uid))
+          .data.get('position', '') in ['supervisor', 'Supervisor', 'مشرف'];
+    }
+
     // ==================== FEEDBACK SCREENSHOTS ====================
     // Flat path kept so existing objects remain addressable. New
     // delegate creates must be named feedback_{uid}_<token> where
@@ -569,6 +607,8 @@ service firebase.storage {
     match /delegate_documents/{delegateUid}/{allPaths=**} {
       allow read, write: if (canAccessDelegateDocuments(delegateUid))
         && uploadOk(20, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|application/pdf');
+      // TAS-331: read parity for the stored paths (profileImagePath, ...).
+      allow read: if delegateFolderParityRead(delegateUid) || requestSupervisorRead(delegateUid);
     }
 
     // Same tenant check as documents when an intent exists for the request id
@@ -576,6 +616,9 @@ service firebase.storage {
     match /delegate_subscription_receipts/{requestId}/{allPaths=**} {
       allow read, write: if (canAccessDelegateDocuments(requestId))
         && uploadOk(20, 'image/(jpeg|jpg|png|webp|gif|heic|heif)|application/octet-stream|application/pdf');
+      // TAS-331: the supervisor who filed the request reads it in Firestore
+      // (delegateRequestReadOk: supervisorUid), so it reads its receipt.
+      allow read: if requestSupervisorRead(requestId);
     }
 
     // ==================== PUBLIC FILES ====================

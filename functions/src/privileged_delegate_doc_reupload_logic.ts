@@ -2,10 +2,12 @@ import {isReviewerRole} from "./delegate_profile_edit_logic";
 import {
   documentKeyForDocType,
   isKnownSupervisorReuploadDocType,
+  pathFieldsForDocType,
+  setEntryRef,
   urlFieldsForDocType,
 } from "./supervisor_delegate_doc_reupload_logic";
 
-export {isKnownSupervisorReuploadDocType, urlFieldsForDocType};
+export {isKnownSupervisorReuploadDocType, pathFieldsForDocType, urlFieldsForDocType};
 
 export type DelegateDocStorageResolve =
   | {ok: true; objectPath: string}
@@ -132,6 +134,7 @@ export function mergePrivilegedReuploadedDocument(
   newUrl: string,
   at: string,
   reviewerUid: string,
+  newPath?: string,
 ): Record<string, unknown>[] {
   const key = documentKeyForDocType(docType);
   const docs: Record<string, unknown>[] = Array.isArray(raw)
@@ -141,15 +144,7 @@ export function mergePrivilegedReuploadedDocument(
   const base: Record<string, unknown> =
     idx >= 0 ? {...docs[idx]} : {documentKey: key};
 
-  if (docType === "nationalIdFront") {
-    base.documentURL = newUrl;
-    if (base.secondaryURL === undefined) base.secondaryURL = "";
-  } else if (docType === "nationalIdBack") {
-    base.secondaryURL = newUrl;
-    if (base.documentURL === undefined) base.documentURL = "";
-  } else {
-    base.documentURL = newUrl;
-  }
+  setEntryRef(base, docType, newUrl, newPath);
   base.uploadedAt = at;
   delete base.rejectionReason;
   base.documentStatus = "approved";
@@ -159,6 +154,30 @@ export function mergePrivilegedReuploadedDocument(
   if (idx >= 0) docs[idx] = base;
   else docs.push(base);
   return docs;
+}
+
+/**
+ * TAS-331: the object a re-upload names, from its Storage path and/or its
+ * legacy download URL. The path must be inside delegate_documents/{uid}/;
+ * when both are sent they must name the same object.
+ */
+export function resolveReuploadObject(
+  newUrl: string,
+  newPath: string,
+  delegateUid: string,
+  defaultBucket: string,
+): DelegateDocStorageResolve {
+  const url = String(newUrl || "").trim();
+  const path = String(newPath || "").trim();
+  if (!path) return resolveDelegateDocumentStorageObject(url, delegateUid, defaultBucket);
+  if (/^[a-z]+:/i.test(path)) return {ok: false, reason: "invalid_storage_path"};
+  const fromPath = validateDelegateDocumentObjectPath(path, delegateUid);
+  if (!fromPath.ok || !url) return fromPath;
+  const fromUrl = resolveDelegateDocumentStorageObject(url, delegateUid, defaultBucket);
+  if (!fromUrl.ok) return fromUrl;
+  return fromUrl.objectPath === fromPath.objectPath
+    ? fromPath
+    : {ok: false, reason: "url_path_mismatch"};
 }
 
 export type PrivilegedDocReuploadDecision =

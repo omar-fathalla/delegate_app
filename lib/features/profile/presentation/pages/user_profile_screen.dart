@@ -1,3 +1,5 @@
+import 'package:delegate_app/core/widgets/storage_resolved_image.dart';
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -311,7 +313,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         'delegate_documents/$effectiveUid/personalPhoto_$timestamp.jpg',
       );
       final uploadTask = await storageRef.putFile(file);
-      final downloadUrl = await uploadTask.ref.getDownloadURL();
+      // TAS-331: the path is the source of truth; the download URL is only
+      // written for older app versions while write_legacy_storage_urls is on.
+      final photoPath = uploadTask.ref.fullPath;
+      final downloadUrl = await LegacyStorageUrls.urlFor(uploadTask.ref) ?? '';
 
       final firestore = FirebaseFirestore.instance;
 
@@ -335,12 +340,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               check.data()?['documents'],
               docType: 'personalPhoto',
               newUrl: downloadUrl,
+              newPath: photoPath,
             );
 
             await delRef.set({
               'profileImageUrl': downloadUrl,
               'personalPhotoURL': downloadUrl,
               'photoURL': downloadUrl,
+              'profileImagePath': photoPath,
               'documents': updatedDocs,
               'updatedAt': FieldValue.serverTimestamp(),
             }, SetOptions(merge: true));
@@ -360,6 +367,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             'photoURL': downloadUrl,
             'profileImageUrl': downloadUrl,
             'personalPhotoURL': downloadUrl,
+            'profileImagePath': photoPath,
             'updatedAt': FieldValue.serverTimestamp(),
           });
         }
@@ -377,10 +385,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           await reqRef.set({
             'profileImageUrl': downloadUrl,
             'personalPhotoURL': downloadUrl,
+            'profileImagePath': photoPath,
             'documents': mergeReuploadedDocument(
               reqSnap.data()?['documents'],
               docType: 'personalPhoto',
               newUrl: downloadUrl,
+              newPath: photoPath,
             ),
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
@@ -391,7 +401,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
       // 4. تحديث حساب Firebase Auth (فقط إذا كان نفس المستخدم صاحب الجلسة)
       try {
-        if (_currentUser != null && _currentUser!.uid == effectiveUid) {
+        if (_currentUser != null &&
+            _currentUser!.uid == effectiveUid &&
+            downloadUrl.isNotEmpty) {
           await _currentUser?.updatePhotoURL(downloadUrl);
           await _currentUser?.reload();
           _currentUser = _auth.currentUser;
@@ -405,12 +417,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           _firestoreUserData!['photoURL'] = downloadUrl;
           _firestoreUserData!['profileImageUrl'] = downloadUrl;
           _firestoreUserData!['personalPhotoURL'] = downloadUrl;
+          _firestoreUserData!['profileImagePath'] = photoPath;
         });
 
         if (_delegate is DelegateModel) {
           final json = (_delegate as DelegateModel).toLocalJson();
           json['personalPhotoURL'] = downloadUrl;
           json['photoURL'] = downloadUrl;
+          json['profileImagePath'] = photoPath;
           final updated = DelegateModel.fromJson(json, effectiveUid);
           _delegate = updated;
           di.sl<AuthLocalDataSource>().cacheDelegateData(updated).ignore();
@@ -451,6 +465,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           'photoURL': FieldValue.delete(),
           'profileImageUrl': FieldValue.delete(),
           'personalPhotoURL': FieldValue.delete(),
+          'profileImagePath': FieldValue.delete(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
       }
@@ -473,6 +488,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               'profileImageUrl': FieldValue.delete(),
               'personalPhotoURL': FieldValue.delete(),
               'photoURL': FieldValue.delete(),
+              'profileImagePath': FieldValue.delete(),
               'documents': updatedDocs,
               'updatedAt': FieldValue.serverTimestamp(),
             }, SetOptions(merge: true));
@@ -520,17 +536,27 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     }
   }
 
+  /// TAS-331: the photo on the users doc, path first; null when unset
+  /// (an empty URL written while write_legacy_storage_urls is off falls
+  /// through to the next source).
+  String? _userDocPhoto() {
+    final d = _firestoreUserData;
+    if (d == null) return null;
+    String? firstUrl;
+    for (final k in const ['photoURL', 'profileImageUrl', 'personalPhotoURL']) {
+      final v = d[k];
+      if (v is String && v.trim().isNotEmpty) {
+        firstUrl = v.trim();
+        break;
+      }
+    }
+    final v = StorageMediaRef.pickFresh(path: d['profileImagePath'], url: firstUrl);
+    return v.isEmpty ? null : v;
+  }
+
   void _showPhotoOptionsSheet(BuildContext context, Delegate? delegate) {
-    final photoUrl = _firestoreUserData?['photoURL'] ??
-        _firestoreUserData?['profileImageUrl'] ??
-        _firestoreUserData?['personalPhotoURL'] ??
+    final photoUrl = _userDocPhoto() ??
         delegate?.personalPhotoUrl ??
-        (delegate?.documents
-            .where((d) =>
-                d.documentKey == DocumentKey.personalPhoto &&
-                d.documentURL.isNotEmpty)
-            .firstOrNull
-            ?.documentURL) ??
         _currentUser?.photoURL;
     final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
 
@@ -639,16 +665,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         '';
     final email = rawEmail;
 
-    final photoUrl = _firestoreUserData?['photoURL'] ??
-        _firestoreUserData?['profileImageUrl'] ??
-        _firestoreUserData?['personalPhotoURL'] ??
+    final photoUrl = _userDocPhoto() ??
         delegate?.personalPhotoUrl ??
-        (delegate?.documents
-            .where((d) =>
-                d.documentKey == DocumentKey.personalPhoto &&
-                d.documentURL.isNotEmpty)
-            .firstOrNull
-            ?.documentURL) ??
         _currentUser?.photoURL;
     final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
 
@@ -672,8 +690,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   ),
                   child: hasPhoto
                       ? ClipOval(
-                          child: CachedNetworkImage(
-                            imageUrl: photoUrl,
+                          child: StorageResolvedImage.wrap(
+                            pathOrUrl: photoUrl,
+                            builder: (context, resolvedUrl) => CachedNetworkImage(
+                            imageUrl: resolvedUrl,
                             width: 96,
                             height: 96,
                             fit: BoxFit.cover,
@@ -702,6 +722,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                 ),
                               ),
                             ),
+                          ),
                           ),
                         )
                       : CircleAvatar(

@@ -19,11 +19,42 @@ export function documentKeyForDocType(docType: string): string {
   return docType;
 }
 
+/**
+ * TAS-331: sets the re-uploaded file on a documents[] entry. [newUrl] is the
+ * legacy download URL ("" once write_legacy_storage_urls is off); [newPath]
+ * the Storage object path, written as documentPath / secondaryPath. Without
+ * a path the entry's previous path is removed, so a stale path never
+ * outlives the file it pointed to (readers pick the path first).
+ */
+export function setEntryRef(
+  base: Record<string, unknown>,
+  docType: string,
+  newUrl: string,
+  newPath?: string,
+): void {
+  const path = String(newPath || "").trim();
+  const set = (urlKey: string, pathKey: string) => {
+    base[urlKey] = newUrl;
+    if (path) base[pathKey] = path;
+    else delete base[pathKey];
+  };
+  if (docType === "nationalIdFront") {
+    set("documentURL", "documentPath");
+    if (base.secondaryURL === undefined) base.secondaryURL = "";
+  } else if (docType === "nationalIdBack") {
+    set("secondaryURL", "secondaryPath");
+    if (base.documentURL === undefined) base.documentURL = "";
+  } else {
+    set("documentURL", "documentPath");
+  }
+}
+
 export function mergeReuploadedDocument(
   raw: unknown,
   docType: string,
   newUrl: string,
   at: string,
+  newPath?: string,
 ): Record<string, unknown>[] {
   const key = documentKeyForDocType(docType);
   const docs: Record<string, unknown>[] = Array.isArray(raw)
@@ -33,15 +64,7 @@ export function mergeReuploadedDocument(
   const base: Record<string, unknown> =
     idx >= 0 ? {...docs[idx]} : {documentKey: key};
 
-  if (docType === "nationalIdFront") {
-    base.documentURL = newUrl;
-    if (base.secondaryURL === undefined) base.secondaryURL = "";
-  } else if (docType === "nationalIdBack") {
-    base.secondaryURL = newUrl;
-    if (base.documentURL === undefined) base.documentURL = "";
-  } else {
-    base.documentURL = newUrl;
-  }
+  setEntryRef(base, docType, newUrl, newPath);
   base.uploadedAt = at;
   delete base.rejectionReason;
   base.documentStatus = "pending";
@@ -51,6 +74,30 @@ export function mergeReuploadedDocument(
   if (idx >= 0) docs[idx] = base;
   else docs.push(base);
   return docs;
+}
+
+/**
+ * TAS-331: top-level Storage path field for [docType]: the new path, or
+ * null (= delete the field) when the caller sent only a URL, so an old
+ * path never sits next to a newer URL.
+ */
+export function pathFieldsForDocType(
+  docType: string,
+  newPath: string,
+): Record<string, string | null> {
+  const v = String(newPath || "").trim() || null;
+  switch (docType) {
+    case "personalPhoto":
+      return {profileImagePath: v};
+    case "nationalIdFront":
+      return {nationalIdFrontPath: v};
+    case "nationalIdBack":
+      return {nationalIdBackPath: v};
+    case "paymentReceipt":
+      return {receiptImagePath: v};
+    default:
+      return {};
+  }
 }
 
 export function urlFieldsForDocType(

@@ -12,9 +12,9 @@ import {
   decidePrivilegedDocReupload,
   isKnownSupervisorReuploadDocType,
   mergePrivilegedReuploadedDocument,
-  resolveDelegateDocumentStorageObject,
-  urlFieldsForDocType,
+  resolveReuploadObject,
 } from "./privileged_delegate_doc_reupload_logic";
+import {refFieldsForDocType} from "./delegate_doc_ref_fields";
 
 const opts = {timeoutSeconds: 60, memory: "256MB" as const};
 
@@ -29,6 +29,8 @@ function storageErrorMessage(reason: string): string {
       return "رابط المستند غير صالح أو غير مسموح.";
     case "wrong_delegate_folder":
     case "path_traversal":
+    case "invalid_storage_path":
+    case "url_path_mismatch":
       return "مسار الملف لا يخص هذا المندوب.";
     case "wrong_bucket":
       return "رابط المستند من خارج تخزين التطبيق.";
@@ -81,13 +83,15 @@ export const privilegedReuploadDelegateDocument = functions
     const docType = str(p.docType);
     const reviewMode = typeof p.approve === "boolean";
     const newUrl = str(p.newUrl);
+    // TAS-331: the Storage path of the uploaded file (new clients).
+    const newPath = str(p.newPath);
     if (!delegateUid || !organizationUID || !companyUID || !docType) {
       throw new functions.https.HttpsError("invalid-argument", "بيانات الطلب غير مكتملة.");
     }
     if (!isKnownSupervisorReuploadDocType(docType)) {
       throw new functions.https.HttpsError("invalid-argument", "نوع المستند غير مدعوم.");
     }
-    if (!reviewMode && !newUrl) {
+    if (!reviewMode && !newUrl && !newPath) {
       throw new functions.https.HttpsError("invalid-argument", "بيانات الطلب غير مكتملة.");
     }
 
@@ -177,8 +181,9 @@ export const privilegedReuploadDelegateDocument = functions
     }
 
     const defaultBucket = admin.storage().bucket().name;
-    const resolved = resolveDelegateDocumentStorageObject(
+    const resolved = resolveReuploadObject(
       newUrl,
+      newPath,
       delegateUid,
       defaultBucket,
     );
@@ -187,17 +192,18 @@ export const privilegedReuploadDelegateDocument = functions
     }
     await assertStorageObjectExists(resolved.objectPath);
 
-    const urlFields = urlFieldsForDocType(docType, newUrl);
+    const refFields = refFieldsForDocType(docType, newUrl, newPath);
     const documents = mergePrivilegedReuploadedDocument(
       delegateData.documents,
       docType,
       newUrl,
       at,
       caller.uid,
+      newPath,
     );
     const batch = db.batch();
     batch.update(delegateRef, {
-      ...urlFields,
+      ...refFields,
       documents,
       updatedAt: FieldValue.serverTimestamp(),
     });
@@ -211,11 +217,12 @@ export const privilegedReuploadDelegateDocument = functions
         newUrl,
         at,
         caller.uid,
+        newPath,
       );
       batch.set(
         reqRef,
         {
-          ...urlFields,
+          ...refFields,
           documents: reqDocs,
           updatedAt: FieldValue.serverTimestamp(),
         },
@@ -229,6 +236,7 @@ export const privilegedReuploadDelegateDocument = functions
         {
           photoURL: newUrl,
           profileImageUrl: newUrl,
+          profileImagePath: newPath || FieldValue.delete(),
           updatedAt: FieldValue.serverTimestamp(),
         },
         {merge: true},

@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'package:delegate_app/core/l10n/display_names.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -195,6 +196,14 @@ class UniversalAppHeader extends StatelessWidget
   String? _resolvePhotoUrl(Delegate del, Map<String, dynamic>? userData) {
     // 1. تحقق من بيانات فايرستور المباشرة
     if (userData != null) {
+      // TAS-331: the Storage path first, unless a newer URL replaced it.
+      final path = userData['profileImagePath'];
+      if (path is String && path.trim().isNotEmpty) {
+        final url = [userData['photoURL'], userData['profileImageUrl'], userData['personalPhotoURL']]
+            .whereType<String>()
+            .firstWhere((u) => u.trim().isNotEmpty, orElse: () => '');
+        return StorageMediaRef.pickFresh(path: path, url: url);
+      }
       final p1 = userData['photoURL'] as String?;
       if (p1 != null && p1.trim().isNotEmpty) return p1.trim();
       final p2 = userData['profileImageUrl'] as String?;
@@ -216,8 +225,12 @@ class UniversalAppHeader extends StatelessWidget
               (doc['documentKey'] == 'personalPhoto' ||
                   doc['key'] == 'personalPhoto' ||
                   doc['type'] == 'personalPhoto')) {
+            final fresh = StorageMediaRef.pickFresh(
+              path: doc['documentPath'],
+              url: doc['documentURL'],
+            );
             final url =
-                doc['documentURL'] as String? ??
+                (fresh.isEmpty ? null : fresh) ??
                 doc['url'] as String? ??
                 doc['downloadUrl'] as String?;
             if (url != null && url.trim().isNotEmpty) {
@@ -250,10 +263,10 @@ class UniversalAppHeader extends StatelessWidget
         .where(
           (d) =>
               d.documentKey == DocumentKey.personalPhoto &&
-              d.documentURL.isNotEmpty,
+              d.displayUrl.isNotEmpty,
         )
         .firstOrNull
-        ?.documentURL;
+        ?.displayUrl;
     if (docPhoto != null && docPhoto.trim().isNotEmpty) {
       return docPhoto.trim();
     }

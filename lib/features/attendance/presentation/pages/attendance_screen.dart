@@ -2843,7 +2843,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         companyName: widget.delegate.companyName.isNotEmpty
             ? widget.delegate.companyName
             : null,
-        personalPhotoURL: widget.delegate.personalPhotoUrl,
+        personalPhotoURL: widget.delegate.personalPhotoForCopy,
       ),
     );
   }
@@ -3064,7 +3064,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     companyName: widget.delegate.companyName.isNotEmpty
                         ? widget.delegate.companyName
                         : null,
-                    personalPhotoURL: widget.delegate.personalPhotoUrl,
+                    personalPhotoURL: widget.delegate.personalPhotoForCopy,
                   ),
                 );
               },
@@ -3125,7 +3125,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     companyName: widget.delegate.companyName.isNotEmpty
                         ? widget.delegate.companyName
                         : null,
-                    personalPhotoURL: widget.delegate.personalPhotoUrl,
+                    personalPhotoURL: widget.delegate.personalPhotoForCopy,
                   ),
                 );
               },

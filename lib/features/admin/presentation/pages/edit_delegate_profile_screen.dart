@@ -54,29 +54,30 @@ class _EditDelegateProfileScreenState extends State<EditDelegateProfileScreen> {
   String get _delegateUid =>
       widget.delegate?.uid ?? widget.request?.existingDelegateUid ?? '';
   String? get _requestId => widget.request?.id;
+  // TAS-331: path first (AppPhotoImage resolves Storage paths).
   String get _photoUrl =>
-      widget.delegate?.personalPhotoUrl ?? widget.request?.profileImageUrl ?? '';
+      widget.delegate?.personalPhotoUrl ??
+      widget.request?.profileImageDisplay ??
+      '';
   String get _frontUrl {
-    if ((widget.request?.nationalIdFrontUrl ?? '').isNotEmpty) {
-      return widget.request!.nationalIdFrontUrl;
-    }
+    final fromRequest = widget.request?.nationalIdFrontDisplay ?? '';
+    if (fromRequest.isNotEmpty) return fromRequest;
     final docs = widget.delegate?.documents ?? const [];
     for (final d in docs) {
-      if (d.documentKey == DocumentKey.nationalityId && d.documentURL.isNotEmpty) {
-        return d.documentURL;
+      if (d.documentKey == DocumentKey.nationalityId && d.displayUrl.isNotEmpty) {
+        return d.displayUrl;
       }
     }
     return '';
   }
   String get _backUrl {
-    if ((widget.request?.nationalIdBackUrl ?? '').isNotEmpty) {
-      return widget.request!.nationalIdBackUrl;
-    }
+    final fromRequest = widget.request?.nationalIdBackDisplay ?? '';
+    if (fromRequest.isNotEmpty) return fromRequest;
     final docs = widget.delegate?.documents ?? const [];
     for (final d in docs) {
       if (d.documentKey == DocumentKey.nationalityId &&
-          (d.secondaryURL ?? '').isNotEmpty) {
-        return d.secondaryURL!;
+          d.secondaryDisplayUrl.isNotEmpty) {
+        return d.secondaryDisplayUrl;
       }
     }
     return '';

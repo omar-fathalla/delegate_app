@@ -67,7 +67,10 @@ export const AUTO_LINK_COPY_FIELDS = [
   "uid", "delegatePublicId", "firstName", "secondName", "thirdName", "fullName",
   "phoneNumber", "nationalId", "nationalityID", "city", "birthDate", "gender",
   "companyUID", "companyName", "profileImageUrl", "personalPhotoUrl",
-  "nationalIdFrontUrl", "nationalIdBackUrl", "documents", "status", "role",
+  "nationalIdFrontUrl", "nationalIdBackUrl",
+  // TAS-331: Storage paths next to the URLs.
+  "profileImagePath", "nationalIdFrontPath", "nationalIdBackPath",
+  "documents", "status", "role",
   "isDeductedFromCompany", "receiptCode", "subscription", "nextSubscription",
   "originOrganizationName", "registeredVia", "approvedRequestId", "email",
   "holds", "statusReason",

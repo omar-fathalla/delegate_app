@@ -1,3 +1,5 @@
+import 'package:delegate_app/core/widgets/storage_resolved_image.dart';
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
@@ -854,7 +856,15 @@ class SubscriptionRequestListCard extends StatelessWidget {
     required this.onReject,
   });
 
-  void _showImageDialog(BuildContext context, String title, String imageUrl) {
+  /// TAS-331: a stored Storage path opens through the Storage rules.
+  void _showImageDialog(BuildContext context, String title, String stored) {
+    StorageMediaResolver.instance.tryResolve(stored).then((url) {
+      if (!context.mounted) return;
+      _showResolvedImageDialog(context, title, url ?? stored);
+    });
+  }
+
+  void _showResolvedImageDialog(BuildContext context, String title, String imageUrl) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     showDialog(
@@ -1142,12 +1152,14 @@ class SubscriptionRequestListCard extends StatelessWidget {
                           onTap: () => _showImageDialog(
                             context,
                             'الصورة الشخصية - ${request.fullName}',
-                            request.profileImageUrl,
+                            request.profileImageDisplay,
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: CachedNetworkImage(
-                              imageUrl: request.profileImageUrl,
+                            child: StorageResolvedImage.wrap(
+                              pathOrUrl: request.profileImageDisplay,
+                              builder: (context, resolvedUrl) => CachedNetworkImage(
+                              imageUrl: resolvedUrl,
                               width: 50,
                               height: 50,
                               fit: BoxFit.cover,
@@ -1163,6 +1175,7 @@ class SubscriptionRequestListCard extends StatelessWidget {
                                 color: colorScheme.surfaceContainerHighest,
                                 child: Icon(Icons.person_rounded, color: colorScheme.outlineVariant),
                               ),
+                            ),
                             ),
                           ),
                         ),
@@ -1241,12 +1254,12 @@ class SubscriptionRequestListCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          if (request.nationalIdFrontUrl.isNotEmpty || request.nationalIdBackUrl.isNotEmpty) ...[
+                          if (request.nationalIdFrontDisplay.isNotEmpty || request.nationalIdBackDisplay.isNotEmpty) ...[
                             const SizedBox(width: 8),
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                if (request.nationalIdFrontUrl.isNotEmpty)
+                                if (request.nationalIdFrontDisplay.isNotEmpty)
                                   IconButton.outlined(
                                     constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                                     padding: EdgeInsets.zero,
@@ -1255,10 +1268,10 @@ class SubscriptionRequestListCard extends StatelessWidget {
                                     onPressed: () => _showImageDialog(
                                       context,
                                       'بطاقة الرقم القومي (الوجه) - ${request.fullName}',
-                                      request.nationalIdFrontUrl,
+                                      request.nationalIdFrontDisplay,
                                     ),
                                   ),
-                                if (request.nationalIdBackUrl.isNotEmpty) ...[
+                                if (request.nationalIdBackDisplay.isNotEmpty) ...[
                                   const SizedBox(width: 4),
                                   IconButton.outlined(
                                     constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
@@ -1268,7 +1281,7 @@ class SubscriptionRequestListCard extends StatelessWidget {
                                     onPressed: () => _showImageDialog(
                                       context,
                                       'بطاقة الرقم القومي (الظهر) - ${request.fullName}',
-                                      request.nationalIdBackUrl,
+                                      request.nationalIdBackDisplay,
                                     ),
                                   ),
                                 ],
@@ -1299,7 +1312,7 @@ class SubscriptionRequestListCard extends StatelessWidget {
                                 onPressed: () => _showImageDialog(
                                   context,
                                   'بطاقة الرقم القومي (الوجه) - ${request.fullName}',
-                                  request.nationalIdFrontUrl,
+                                  request.nationalIdFrontDisplay,
                                 ),
                               ),
                               const SizedBox(width: 4),
@@ -1311,7 +1324,7 @@ class SubscriptionRequestListCard extends StatelessWidget {
                                 onPressed: () => _showImageDialog(
                                   context,
                                   'بطاقة الرقم القومي (الظهر) - ${request.fullName}',
-                                  request.nationalIdBackUrl,
+                                  request.nationalIdBackDisplay,
                                 ),
                               ),
                             ],

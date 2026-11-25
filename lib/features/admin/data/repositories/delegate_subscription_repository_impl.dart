@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/storage/storage_media.dart';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -147,31 +148,38 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         return Left(ServerFailure(intentError));
       }
 
-      // 2. Upload Profile Image
+      // 2. Upload Profile Image. TAS-331: each file is stored by its
+      // Storage path (`<field>Path`); the download URL is written only for
+      // older app versions while write_legacy_storage_urls is on ('' after).
       final profileSnap = await _storage
           .ref('delegate_documents/$requestId/profile.jpg')
           .putFile(profileImage);
-      final profileUrl = await profileSnap.ref.getDownloadURL();
+      final profilePath = profileSnap.ref.fullPath;
+      final profileUrl = await LegacyStorageUrls.urlFor(profileSnap.ref) ?? '';
 
       // 2. Upload National ID Front
       final frontSnap = await _storage
           .ref('delegate_documents/$requestId/national_id_front.jpg')
           .putFile(nationalIdFront);
-      final frontUrl = await frontSnap.ref.getDownloadURL();
+      final frontPath = frontSnap.ref.fullPath;
+      final frontUrl = await LegacyStorageUrls.urlFor(frontSnap.ref) ?? '';
 
       // 3. Upload National ID Back
       final backSnap = await _storage
           .ref('delegate_documents/$requestId/national_id_back.jpg')
           .putFile(nationalIdBack);
-      final backUrl = await backSnap.ref.getDownloadURL();
+      final backPath = backSnap.ref.fullPath;
+      final backUrl = await LegacyStorageUrls.urlFor(backSnap.ref) ?? '';
 
       // 4. Upload Receipt Image (if provided)
       String? receiptUrl;
+      String receiptPath = '';
       if (receiptImage != null) {
         final receiptSnap = await _storage
             .ref('delegate_subscription_receipts/$requestId/receipt.jpg')
             .putFile(receiptImage);
-        receiptUrl = await receiptSnap.ref.getDownloadURL();
+        receiptPath = receiptSnap.ref.fullPath;
+        receiptUrl = await LegacyStorageUrls.urlFor(receiptSnap.ref) ?? '';
       }
 
       // 5. Subscription cycle dates and prorated fee
@@ -231,6 +239,10 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         profileImageUrl: profileUrl,
         nationalIdFrontUrl: frontUrl,
         nationalIdBackUrl: backUrl,
+        profileImagePath: profilePath,
+        nationalIdFrontPath: frontPath,
+        nationalIdBackPath: backPath,
+        receiptImagePath: receiptPath,
         paymentMethod: paymentMethod,
         receiptCode: receiptCode,
         receiptImageUrl: receiptUrl,
@@ -289,11 +301,16 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         'profileImageUrl': profileUrl,
         'nationalIdFrontUrl': frontUrl,
         'nationalIdBackUrl': backUrl,
+        'profileImagePath': profilePath,
+        'nationalIdFrontPath': frontPath,
+        'nationalIdBackPath': backPath,
+        if (receiptPath.isNotEmpty) 'receiptImagePath': receiptPath,
         'documents': [
           {
             'documentKey': 'personalPhoto',
             'documentStatus': 'pending',
             'documentURL': profileUrl,
+            'documentPath': profilePath,
             'uploadedAt': DateTime.now().toIso8601String(),
           },
           {
@@ -301,13 +318,16 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
             'documentStatus': 'pending',
             'documentURL': frontUrl,
             'secondaryURL': backUrl,
+            'documentPath': frontPath,
+            'secondaryPath': backPath,
             'uploadedAt': DateTime.now().toIso8601String(),
           },
-          if (receiptUrl != null && receiptUrl.isNotEmpty)
+          if (receiptPath.isNotEmpty)
             {
               'documentKey': 'paymentReceipt',
               'documentStatus': 'pending',
-              'documentURL': receiptUrl,
+              'documentURL': receiptUrl ?? '',
+              'documentPath': receiptPath,
               'receiptCode': receiptCode,
               'uploadedAt': DateTime.now().toIso8601String(),
             },
@@ -586,11 +606,13 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
 
       // 1. Upload Receipt Image (if provided)
       String? receiptUrl;
+      String receiptPath = '';
       if (receiptImage != null) {
         final receiptSnap = await _storage
             .ref('delegate_subscription_receipts/$requestId/receipt.jpg')
             .putFile(receiptImage);
-        receiptUrl = await receiptSnap.ref.getDownloadURL();
+        receiptPath = receiptSnap.ref.fullPath;
+        receiptUrl = await LegacyStorageUrls.urlFor(receiptSnap.ref) ?? '';
       }
 
       // 2. Subscription cycle dates and prorated fee
@@ -600,17 +622,11 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
       const calculatedRemainingMonths = 0;
       const calculatedFee = 0.0;
 
-      // 3. Extract existing document URLs
-      final profileUrl = existingDelegate.personalPhotoUrl ?? '';
-      String frontUrl = '';
-      String backUrl = '';
-      for (final doc in existingDelegate.documents) {
-        if (doc.documentKey == DocumentKey.nationalityId) {
-          frontUrl = doc.documentURL;
-          backUrl = doc.secondaryURL ?? '';
-          break;
-        }
-      }
+      // 3. Extract existing document URLs and (TAS-331) Storage paths.
+      final refs = existingDelegateDocumentRefs(existingDelegate);
+      final profileUrl = refs.profileUrl;
+      final frontUrl = refs.frontUrl;
+      final backUrl = refs.backUrl;
 
       final request = DelegateSubscriptionRequest(
         id: requestId,
@@ -636,6 +652,10 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         profileImageUrl: profileUrl,
         nationalIdFrontUrl: frontUrl,
         nationalIdBackUrl: backUrl,
+        profileImagePath: refs.profilePath,
+        nationalIdFrontPath: refs.frontPath,
+        nationalIdBackPath: refs.backPath,
+        receiptImagePath: receiptPath,
         paymentMethod: paymentMethod,
         receiptCode: receiptCode,
         receiptImageUrl: receiptUrl,
@@ -782,7 +802,9 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         'fullName': delegate.fullName,
         'phoneNumber': delegate.phoneNumber,
         'nationalId': delegate.nationalityID,
-        'profileImageUrl': delegate.personalPhotoUrl,
+        'profileImageUrl': existingDelegateDocumentRefs(delegate).profileUrl,
+        if (existingDelegateDocumentRefs(delegate).profilePath.isNotEmpty)
+          'profileImagePath': existingDelegateDocumentRefs(delegate).profilePath,
         'nationalIdFrontUrl': '',
         'nationalIdBackUrl': '',
         'paymentMethod': 'free_promotion',
@@ -1165,33 +1187,8 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         'profileImageUrl': request.profileImageUrl,
         'nationalIdFrontUrl': request.nationalIdFrontUrl,
         'nationalIdBackUrl': request.nationalIdBackUrl,
-        'documents': [
-          if (request.profileImageUrl.isNotEmpty)
-            {
-              'documentKey': 'personalPhoto',
-              'documentStatus': 'approved',
-              'documentURL': request.profileImageUrl,
-              'uploadedAt': now.toIso8601String(),
-            },
-          if (request.nationalIdFrontUrl.isNotEmpty ||
-              request.nationalIdBackUrl.isNotEmpty)
-            {
-              'documentKey': 'nationalityId',
-              'documentStatus': 'approved',
-              'documentURL': request.nationalIdFrontUrl,
-              'secondaryURL': request.nationalIdBackUrl,
-              'uploadedAt': now.toIso8601String(),
-            },
-          if (request.receiptImageUrl != null &&
-              request.receiptImageUrl!.isNotEmpty)
-            {
-              'documentKey': 'paymentReceipt',
-              'documentStatus': 'approved',
-              'documentURL': request.receiptImageUrl,
-              'receiptCode': request.receiptCode,
-              'uploadedAt': now.toIso8601String(),
-            },
-        ],
+        ...requestPathFields(request),
+        'documents': approvedDocumentsFromRequest(request, now),
         'status': 'active',
         'position': 'Promoter',
         'role': 'delegate',
@@ -2021,6 +2018,9 @@ Map<String, dynamic> profileMergeFields(Map<String, dynamic> full) {
     'status', 'documents', 'approvedRequestId', 'profileImageUrl',
     'personalPhotoURL', 'photoURL', 'nationalIdFrontUrl', 'nationalIdBackUrl',
     'receiptImageUrl',
+    // TAS-331: the Storage paths are document fields too.
+    'profileImagePath', 'nationalIdFrontPath', 'nationalIdBackPath',
+    'receiptImagePath',
   };
   return Map<String, dynamic>.from(full)..removeWhere((k, _) => excluded.contains(k));
 }
@@ -2131,4 +2131,107 @@ Future<List<DocumentReference<Map<String, dynamic>>>> resolveDelegateDeleteTarge
     // lookups above already cover the company's copies.
   }
   return found.values.toList();
+}
+
+
+/// TAS-331: top-level Storage path fields copied from a request (only the
+/// ones it has, so an approval of an older request writes no path keys).
+@visibleForTesting
+Map<String, dynamic> requestPathFields(DelegateSubscriptionRequest r) => {
+      if (r.profileImagePath.isNotEmpty) 'profileImagePath': r.profileImagePath,
+      if (r.nationalIdFrontPath.isNotEmpty)
+        'nationalIdFrontPath': r.nationalIdFrontPath,
+      if (r.nationalIdBackPath.isNotEmpty)
+        'nationalIdBackPath': r.nationalIdBackPath,
+      if (r.receiptImagePath.isNotEmpty) 'receiptImagePath': r.receiptImagePath,
+    };
+
+/// The approved `documents` list an approval writes from [r]: the request's
+/// URLs and (TAS-331) Storage paths, an entry per document that has either.
+@visibleForTesting
+List<Map<String, dynamic>> approvedDocumentsFromRequest(
+  DelegateSubscriptionRequest r,
+  DateTime now,
+) {
+  final receiptUrl = r.receiptImageUrl ?? '';
+  return [
+    if (r.profileImageUrl.isNotEmpty || r.profileImagePath.isNotEmpty)
+      {
+        'documentKey': 'personalPhoto',
+        'documentStatus': 'approved',
+        'documentURL': r.profileImageUrl,
+        if (r.profileImagePath.isNotEmpty) 'documentPath': r.profileImagePath,
+        'uploadedAt': now.toIso8601String(),
+      },
+    if (r.nationalIdFrontUrl.isNotEmpty ||
+        r.nationalIdBackUrl.isNotEmpty ||
+        r.nationalIdFrontPath.isNotEmpty ||
+        r.nationalIdBackPath.isNotEmpty)
+      {
+        'documentKey': 'nationalityId',
+        'documentStatus': 'approved',
+        'documentURL': r.nationalIdFrontUrl,
+        'secondaryURL': r.nationalIdBackUrl,
+        if (r.nationalIdFrontPath.isNotEmpty)
+          'documentPath': r.nationalIdFrontPath,
+        if (r.nationalIdBackPath.isNotEmpty)
+          'secondaryPath': r.nationalIdBackPath,
+        'uploadedAt': now.toIso8601String(),
+      },
+    if (receiptUrl.isNotEmpty || r.receiptImagePath.isNotEmpty)
+      {
+        'documentKey': 'paymentReceipt',
+        'documentStatus': 'approved',
+        'documentURL': receiptUrl,
+        if (r.receiptImagePath.isNotEmpty) 'documentPath': r.receiptImagePath,
+        'receiptCode': r.receiptCode,
+        'uploadedAt': now.toIso8601String(),
+      },
+  ];
+}
+
+/// TAS-331: an existing delegate's photo / national ID references, URL and
+/// path apart (a request copies both). A URL that replaced the path
+/// ([StorageMediaRef.pickFresh]) drops the stale path.
+@visibleForTesting
+({
+  String profileUrl,
+  String profilePath,
+  String frontUrl,
+  String frontPath,
+  String backUrl,
+  String backPath,
+}) existingDelegateDocumentRefs(Delegate d) {
+  String freshPath(String? path, String? url) {
+    final p = (path ?? '').trim();
+    if (p.isEmpty) return '';
+    return StorageMediaRef.pickFresh(path: p, url: url) == p ? p : '';
+  }
+
+  var profileUrl = '', profilePath = '';
+  var frontUrl = '', frontPath = '', backUrl = '', backPath = '';
+  for (final doc in d.documents) {
+    if (doc.documentKey == DocumentKey.personalPhoto &&
+        profileUrl.isEmpty &&
+        profilePath.isEmpty &&
+        doc.displayUrl.isNotEmpty) {
+      profileUrl = doc.documentURL.trim();
+      profilePath = freshPath(doc.documentPath, doc.documentURL);
+    } else if (doc.documentKey == DocumentKey.nationalityId &&
+        frontUrl.isEmpty &&
+        frontPath.isEmpty) {
+      frontUrl = doc.documentURL.trim();
+      frontPath = freshPath(doc.documentPath, doc.documentURL);
+      backUrl = (doc.secondaryURL ?? '').trim();
+      backPath = freshPath(doc.secondaryPath, doc.secondaryURL);
+    }
+  }
+  return (
+    profileUrl: profileUrl,
+    profilePath: profilePath,
+    frontUrl: frontUrl,
+    frontPath: frontPath,
+    backUrl: backUrl,
+    backPath: backPath,
+  );
 }
