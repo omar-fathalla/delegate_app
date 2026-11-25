@@ -5435,6 +5435,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Still no location: open Google Maps, wait for the blue dot to settle, then come back and try again.'**
   String get locHelpStepMapsTryAgain;
+
+  /// TAS-333 QR/branch of another chain of the delegate
+  ///
+  /// In en, this message translates to:
+  /// **'This branch belongs to {chain}. Switch to that chain first, then try again.'**
+  String attBranchOtherChain(String chain);
+
+  /// TAS-333 QR/branch of a chain the delegate is not a member of
+  ///
+  /// In en, this message translates to:
+  /// **'This branch is not in any of your chains. Scan your own branch\'s code.'**
+  String get attBranchNotYourChain;
 }
 
 class _AppLocalizationsDelegate

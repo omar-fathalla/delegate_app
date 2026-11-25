@@ -2451,8 +2451,16 @@ service cloud.firestore {
         ? attendanceOwnCreateOk()
           && (staffToken()
             ? staffTargetOk(attendanceOrgOf(d), attendanceCoOf(d), true)
-            : delegateInOrg(attendanceOrgOf(d)))
+            : delegateInOrg(attendanceOrgOf(d))
+              && attendanceBranchOrgOk(d))
         : staffToken() && staffTargetOk(attendanceOrgOf(d), attendanceCoOf(d), true));
+    }
+
+    // TAS-333: a delegate's check-in names a branch of one of its own chains
+    // (claims only, no reads). Logs without branchOrganizationUID still pass.
+    function attendanceBranchOrgOk(d) {
+      return !d.keys().hasAny(['branchOrganizationUID'])
+        || delegateInOrg(d.branchOrganizationUID);
     }
 
     // Staff may not move a record to another company or chain (stored and

@@ -3040,4 +3040,13 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get locHelpStepMapsTryAgain =>
       'لو الموقع ما اشتغلش: افتح خرائط Google واستنى النقطة الزرقا تثبت، وبعدين ارجع وجرّب تاني.';
+
+  @override
+  String attBranchOtherChain(String chain) {
+    return 'الفرع ده تبع سلسلة $chain. بدّل للسلسلة دي الأول وبعدين جرّب تاني.';
+  }
+
+  @override
+  String get attBranchNotYourChain =>
+      'الفرع ده مش تبع أي سلسلة من سلاسلك. امسح كود الفرع بتاعك.';
 }
