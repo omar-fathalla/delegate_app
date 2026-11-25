@@ -619,6 +619,18 @@ service cloud.firestore {
         && (n.size() < 8 || n[7].get('documentStatus', '').lower() != 'approved');
     }
 
+    // TAS-324: the scopeOk part of nestedDelegateCreateOk alone (same
+    // principals): global staff, the org admin of orgId, or company
+    // placeholder staff of compId. Used as the first gate of the nested
+    // delegates create.
+    function nestedDelegateCreateScopeOk(orgId, compId) {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      return r in superAdminRoleList() || r in techRoleList()
+        || (r in orgAdminRoleList() && u.get('organizationUID', '') == orgId)
+        || (r in companyPlaceholderCreateRoleList() && u.get('companyUID', '') == compId);
+    }
+
     // Single get() + scope gate for nested delegate placeholder creates.
     function nestedDelegateCreateOk(orgId, compId, delegateId) {
       let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
@@ -1508,14 +1520,41 @@ service cloud.firestore {
 
     // ==================== SHARED: ORGANIZATIONS AND COMPANIES ====================
 
+    // TAS-324: caller's chain / company with the same fallbacks as callerOrg()
+    // and callerCompany() (users doc first, then the orgId / companyId claim),
+    // from a users/{uid} map read once by the caller.
+    function orgOf(u) {
+      let o = u.get('organizationUID', '');
+      return o is string && o != '' ? o : claimString('orgId');
+    }
+    function companyOf(u) {
+      let c = u.get('companyUID', '');
+      return c is string && c != '' ? c : claimString('companyId');
+    }
+
+    // TAS-324: organizations/{orgId} update in one users/{uid} read. Same
+    // principals as isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId)
+    // || (callerOrg() == orgId && isStaffWriter() && admins += 1 only).
+    // The isStaffWriter role chain re-read users/{uid} per role, so another
+    // chain's update was denied by the expression budget, not by a rule.
+    function orgUpdateOk(orgId) {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let inOrg = orgOf(u) == orgId;
+      return r in superAdminRoleList()
+        || (inOrg && r in orgAdminRoleList())
+        || (inOrg && (r in staffRoleListGlobal() || r in staffRoleListOrg()
+            || r in staffRoleListCompany() || r == 'org-admin')
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['admins', 'updatedAt'])
+          && request.resource.data.admins == resource.data.admins + 1);
+    }
+
     match /organizations/{orgId} {
       allow read: if signedIn();
       allow create: if isSuperAdmin();
-      allow update: if isSuperAdmin()
-        || (isOrgAdmin() && callerOrg() == orgId)
-        || (signedIn() && callerOrg() == orgId && isStaffWriter()
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['admins', 'updatedAt'])
-            && request.resource.data.admins == resource.data.admins + 1);
+      // TAS-324: one users/{uid} read (orgUpdateOk) so another chain's deny
+      // is a rule, not the 1000-expression budget. Same principals as before.
+      allow update: if signedIn() && orgUpdateOk(orgId);
       allow delete: if isSuperAdmin();
 
       match /branches/{branchId} {
@@ -1565,10 +1604,15 @@ service cloud.firestore {
 
         match /delegates/{delegateId} {
           allow read: if signedIn() && canReadNestedDelegate(orgId, compId, delegateId);
-          allow create: if !delegateOwns(delegateId) && delegateCreateHasIdentity()
+          // TAS-324: the caller's scope (one users/{uid} read) is checked
+          // first in a ternary, so a sister company's create is denied by
+          // the scope rule before the identity / device / source / exists
+          // checks spend the 1000-expression budget. Same principals.
+          allow create: if nestedDelegateCreateScopeOk(orgId, compId) ? (
+            !delegateOwns(delegateId) && delegateCreateHasIdentity()
             && deviceBindingAbsent() && sourceStampKeysLocked()
             && exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId))
-            && nestedDelegateCreateOk(orgId, compId, delegateId);
+            && nestedDelegateCreateOk(orgId, compId, delegateId)) : false;
           // sourceStampKeysLocked is not on this allow: the 4-flip tech
           // approval is already at the 1000-expression budget. Delegate
           // self-updates are hasOnly-gated by delegateFieldsSafe. Staff
@@ -2032,7 +2076,8 @@ service cloud.firestore {
       // (no short-circuit) and the 4-flip tech approval is already at the
       // 1000-expression budget. Nested updates are locked via
       // staffDocsApproveOk / delegateFieldsSafe instead.
-      allow create: if !onNestedDelegate() && signedIn() && !delegateOwns(delegateId)
+      // TAS-324: a ternary so a nested path stops at onNestedDelegate().
+      allow create: if onNestedDelegate() ? false : (signedIn() && !delegateOwns(delegateId)
         && delegateCreateHasIdentity() && deviceBindingAbsent() && (
         isGlobalStaff() ||
         (isOrgScopedStaff() && incomingOrgScoped()) ||
@@ -2041,7 +2086,7 @@ service cloud.firestore {
           request.resource.data.get('organizationUID', ''),
           request.resource.data.get('companyUID', ''),
           delegateId)
-        && sourceStampKeysLocked();
+        && sourceStampKeysLocked());
       // r5 budget: a nested organizations/{o}/companies/{c}/delegates
       // update is decided by the nested match alone, for every role.
       allow update: if signedIn() && !onNestedDelegate()
@@ -2132,6 +2177,70 @@ service cloud.firestore {
 
     // ==================== WEB DASHBOARD ====================
 
+    // E1: no super-admin invites; org-admin invites only from a super-admin;
+    // expiresAt required and at most 7 days out; org must exist.
+    // H2: explicit invitable roles; an extra `role` key must equal
+    // roleToAssign (claimInvite reads roleToAssign only).
+    // TAS-324: the principal is checked first in a ternary, so a caller of
+    // another chain / company stops before the exists() reads.
+    function inviteCreateOk() {
+      let d = request.resource.data;
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let sa = r in superAdminRoleList();
+      let rta = d.get('roleToAssign', '');
+      let oid = d.get('organizationId', '');
+      let saOk = sa && rta in ['org-admin', 'company-admin'];
+      let coOk = rta == 'company-admin' && d.get('companyId', null) is string
+        && oid is string && oid == orgOf(u)
+        && (r in orgAdminRoleList()
+          || (r in ['company-admin', 'company_admin', 'companyadmin', 'admin',
+            'supervisor', 'company_supervisor'] && d.companyId == companyOf(u)));
+      return (saOk || coOk) ? (
+        // roleWriteAllowed() with the caller's role read above.
+        (!d.keys().hasAll(['role']) || (d.role is string && !legacySuperAdminSpelling(d.role)
+          && (d.role != 'super-admin' || sa)))
+        && !(rta in superAdminRoleList())
+        && !(d.get('role', '') in superAdminRoleList())
+        && d.get('status', '') == 'pending'
+        && d.get('expiresAt', null) is timestamp
+        && d.expiresAt <= request.time + duration.value(7, 'd') + duration.value(10, 'm')
+        && oid is string && oid != ''
+        && d.get('role', rta) == rta
+        && exists(/databases/$(database)/documents/organizations/$(oid))
+        && (saOk || exists(/databases/$(database)/documents/organizations/$(oid)/companies/$(d.companyId)))
+      ) : false;
+    }
+
+    function inviteUpdateOk() {
+      let d = request.resource.data;
+      let o = resource.data;
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let r = u.get('role', '');
+      let org = orgOf(u);
+      let co = companyOf(u);
+      let sameOrgRole = d.get('organizationId', '') == o.get('organizationId', '')
+        && d.get('roleToAssign', '') == o.get('roleToAssign', '');
+      let principalOk = r in superAdminRoleList()
+        || (r in orgAdminRoleList()
+          && (o.get('organizationId', '') == org || o.get('organizationUID', '') == org)
+          && sameOrgRole)
+        || (r in ['company-admin', 'company_admin', 'companyadmin', 'admin',
+            'supervisor', 'company_supervisor']
+          && co != '' && (o.get('companyUID', '') == co || o.get('companyId', '') == co)
+          && sameOrgRole
+          && d.get('companyId', '') == o.get('companyId', ''));
+      return principalOk ? (
+        o.get('status', '') == 'pending'
+        && !o.keys().hasAny(['claimedBy', 'claimedByUid', 'claimedAt'])
+        && d.get('status', '') != 'claimed'
+        && !changedKeys().hasAny(['claimedBy', 'claimedByUid', 'claimedByEmail', 'claimedAt', 'role', 'roleToAssign'])
+        && (!changedKeys().hasAny(['expiresAt']) || (
+          d.expiresAt is timestamp
+          && d.expiresAt <= request.time + duration.value(7, 'd') + duration.value(10, 'm')))
+      ) : false;
+    }
+
     match /invites/{inviteId} {
       // Signup still resolves one invite by its unguessable id.
       allow get: if true;
@@ -2145,53 +2254,16 @@ service cloud.firestore {
 
       // E1: no super-admin invites; org-admin invites only from a super-admin;
       // expiresAt required and at most 7 days out; org must exist.
-      allow create: if signedIn() && roleWriteAllowed()
-        && !(request.resource.data.get('roleToAssign', '') in superAdminRoleList())
-        && !(request.resource.data.get('role', '') in superAdminRoleList())
-        && request.resource.data.get('status', '') == 'pending'
-        && request.resource.data.get('expiresAt', null) is timestamp
-        && request.resource.data.expiresAt <= request.time + duration.value(7, 'd') + duration.value(10, 'm')
-        && request.resource.data.get('organizationId', '') is string
-        && request.resource.data.get('organizationId', '') != ''
-        && exists(/databases/$(database)/documents/organizations/$(request.resource.data.organizationId))
-        // H2: explicit invitable roles; an extra `role` key must equal
-        // roleToAssign (claimInvite reads roleToAssign only).
-        && request.resource.data.get('role', request.resource.data.get('roleToAssign', ''))
-          == request.resource.data.get('roleToAssign', '')
-        && (
-          (isSuperAdmin() && request.resource.data.get('roleToAssign', '') in ['org-admin', 'company-admin']) || (
-            request.resource.data.get('roleToAssign', '') == 'company-admin'
-            && request.resource.data.get('companyId', null) is string
-            && exists(/databases/$(database)/documents/organizations/$(request.resource.data.organizationId)/companies/$(request.resource.data.companyId))
-            && (
-              (isOrgAdmin() && request.resource.data.organizationId == callerOrg()) ||
-              (isStrictCompanyAdmin() && request.resource.data.organizationId == callerOrg()
-                && request.resource.data.companyId == callerCompany())
-            )
-          )
-        );
+      // TAS-324: create / update decided by inviteCreateOk / inviteUpdateOk
+      // (one users/{uid} read, caller role / chain / company computed once).
+      // Same principals and data constraints as before; another chain's
+      // invite is denied by a rule, not by the 1000-expression budget.
+      allow create: if signedIn() && inviteCreateOk();
 
       // Claiming is function-only (claimInvite). Clients cannot set claimed.
       // H3: only pending, never-claimed invites change; claimed (and any
       // other non-pending status) is terminal; the 7-day cap applies again.
-      allow update: if signedIn()
-        && resource.data.get('status', '') == 'pending'
-        && !resource.data.keys().hasAny(['claimedBy', 'claimedByUid', 'claimedAt'])
-        && request.resource.data.get('status', '') != 'claimed'
-        && !changedKeys().hasAny(['claimedBy', 'claimedByUid', 'claimedByEmail', 'claimedAt', 'role', 'roleToAssign'])
-        && (!changedKeys().hasAny(['expiresAt']) || (
-          request.resource.data.expiresAt is timestamp
-          && request.resource.data.expiresAt <= request.time + duration.value(7, 'd') + duration.value(10, 'm')))
-        && (
-          isSuperAdmin() ||
-          (isOrgAdmin() && (resource.data.get('organizationId', '') == callerOrg() || resource.data.get('organizationUID', '') == callerOrg())
-            && request.resource.data.get('organizationId', '') == resource.data.get('organizationId', '')
-            && request.resource.data.get('roleToAssign', '') == resource.data.get('roleToAssign', '')) ||
-          (isStrictCompanyAdmin() && companyScoped()
-            && request.resource.data.get('organizationId', '') == resource.data.get('organizationId', '')
-            && request.resource.data.get('companyId', '') == resource.data.get('companyId', '')
-            && request.resource.data.get('roleToAssign', '') == resource.data.get('roleToAssign', ''))
-        );
+      allow update: if signedIn() && inviteUpdateOk();
 
       allow delete: if isSuperAdmin();
     }
