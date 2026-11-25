@@ -19,6 +19,7 @@ import {
   isHoldOp,
   type HoldsCaller,
 } from "./holds";
+import {claimBackedCaller} from "./staff_claims";
 
 if (admin.apps.length === 0) admin.initializeApp();
 
@@ -38,7 +39,8 @@ async function loadCaller(ctx: functions.https.CallableContext): Promise<HoldsCa
   }
   const snap = await admin.firestore().collection("users").doc(ctx.auth.uid).get();
   if (!snap.exists) fail("permission-denied", "caller_not_staff");
-  const d = (snap.data() || {}) as Record<string, unknown>;
+  // TAS-23: role and scope from the token claims, not the users doc.
+  const d = claimBackedCaller(snap.data(), ctx.auth.token);
   return {
     uid: ctx.auth.uid,
     role: d.role,

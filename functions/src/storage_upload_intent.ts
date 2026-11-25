@@ -23,6 +23,7 @@ import {
 import {hasAnyHold, parseHolds} from "./holds";
 import {canWriteTaskProof} from "./task_proof_access_logic";
 import {callerDelegateId, callerSelfIds} from "./caller_delegate_id";
+import {claimBackedCaller} from "./staff_claims";
 
 if (admin.apps.length === 0) admin.initializeApp();
 
@@ -90,7 +91,8 @@ export const ensureStorageUploadIntent = functions
 
     const db = admin.firestore();
     const userSnap = await db.collection("users").doc(ctx.auth.uid).get();
-    let user = (userSnap.data() || {}) as Record<string, unknown>;
+    // TAS-23: role and scope from the token claims, not the users doc.
+    let user = claimBackedCaller(userSnap.data(), ctx.auth.token);
     if (!userSnap.exists) {
       if (!isTaskProofPurpose(purpose)) fail("permission-denied", "caller_not_staff");
       const orgHint = str(p.organizationId) || str(p.organizationUID);

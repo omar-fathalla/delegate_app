@@ -14,6 +14,7 @@ import {
 } from "./supervisor_delegate_doc_reupload_logic";
 import {validateDelegateDocumentObjectPath} from "./privileged_delegate_doc_reupload_logic";
 import {refFieldsForDocType} from "./delegate_doc_ref_fields";
+import {claimBackedCaller} from "./staff_claims";
 
 const opts = {timeoutSeconds: 60, memory: "256MB" as const};
 
@@ -21,10 +22,11 @@ function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
-async function loadCaller(uid: string) {
+async function loadCaller(uid: string, token: unknown) {
   const snap = await admin.firestore().collection("users").doc(uid).get();
   if (!snap.exists) throw new functions.https.HttpsError("permission-denied", "caller_not_staff");
-  const d = snap.data() || {};
+  // TAS-23: role and scope from the token claims, not the users doc.
+  const d = claimBackedCaller(snap.data(), token);
   return {
     uid,
     role: d.role,
@@ -58,7 +60,7 @@ export const supervisorReuploadDelegateDocument = functions
       throw new functions.https.HttpsError("invalid-argument", "unknown_doc_type");
     }
 
-    const caller = await loadCaller(ctx.auth.uid);
+    const caller = await loadCaller(ctx.auth.uid, ctx.auth.token);
     const callerOrg = str(caller.organizationUID);
     const callerCo = str(caller.companyUID);
     if (!callerOrg || !callerCo) {

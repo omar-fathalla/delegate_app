@@ -7,7 +7,13 @@ const assert = require("node:assert/strict");
 const admin = require("../../functions/node_modules/firebase-admin");
 
 let fn;
-const ctx = (uid) => ({auth: {uid, token: {firebase: {sign_in_provider: "password"}}}, rawRequest: {headers: {}}});
+// TAS-23: the callables read the caller role and scope from the token claims.
+const CLAIMS = {
+  tech: {role: "technical_support"},
+  sa: {role: "super-admin"},
+  sup: {role: "supervisor", orgId: "o1", companyId: "c1"},
+};
+const ctx = (uid) => ({auth: {uid, token: {firebase: {sign_in_provider: "password"}, ...(CLAIMS[uid] || {})}}, rawRequest: {headers: {}}});
 
 let db;
 let BUCKET;

@@ -23,6 +23,7 @@ import {
 import {CHECKOUT_IN_PROGRESS_SECONDS, isAwaitingPaymentExpired} from "./subscription_logic";
 import {verifyTransactionPostHmac} from "./paymob_hmac";
 import {notifyPaymobSupersededPaymentRefund, PaymobMessaging} from "./paymob_superseded_alert";
+import {claimBackedCaller} from "./staff_claims";
 
 if (admin.apps.length === 0) admin.initializeApp();
 
@@ -218,17 +219,20 @@ const RENEWAL_ROLES = new Set([
 async function assertCallerMayPay(
   db: admin.firestore.Firestore,
   uid: string,
+  token: unknown,
   request: Record<string, unknown>,
 ): Promise<void> {
   const snap = await db.collection("users").doc(uid).get();
   if (!snap.exists) fail("permission-denied", "caller_not_staff");
-  const role = str(snap.get("role"));
+  // TAS-23: role and scope from the token claims, not the users doc.
+  const c = claimBackedCaller(snap.data(), token);
+  const role = str(c.role);
   if (!RENEWAL_ROLES.has(role)) fail("permission-denied", "caller_not_allowed");
   if (role === "super-admin" || role === "super_admin" || role === "superadmin" || role === "superAdmin") {
     return;
   }
-  const callerOrg = str(snap.get("organizationUID") || snap.get("organizationId"));
-  const callerCompany = str(snap.get("companyUID") || snap.get("companyId"));
+  const callerOrg = str(c.organizationUID || c.organizationId);
+  const callerCompany = str(c.companyUID || c.companyId);
   const requestOrg = str(request.organizationUID || request.organizationId);
   const requestCompany = str(request.companyUID || request.companyId);
   if (!callerCompany || callerCompany !== requestCompany) {
@@ -351,7 +355,7 @@ export const createSubscriptionCheckout = functions
     const snap = await db.collection("delegate_requests").doc(requestId).get();
     if (!snap.exists) fail("not-found", "not_found", "طلب التجديد غير موجود.");
     const req = (snap.data() || {}) as Record<string, unknown>;
-    await assertCallerMayPay(db, context.auth!.uid, req);
+    await assertCallerMayPay(db, context.auth!.uid, context.auth!.token, req);
     const now = new Date();
     if (isCheckoutInProgress(req, now) && str(req.paymentStatus) === "pending") {
       fail("failed-precondition", "checkout_in_progress", quoteErrorMessage("checkout_in_progress"));
@@ -443,7 +447,7 @@ export const previewSubscriptionQuote = functions
     if (uids.length === 0) fail("invalid-argument", "no_delegates", "اختر مندوباً واحداً على الأقل.");
     const db = admin.firestore();
     // Authz against a synthetic request in the same company.
-    await assertCallerMayPay(db, context.auth.uid, {
+    await assertCallerMayPay(db, context.auth.uid, context.auth.token, {
       companyUID,
       organizationUID: str(body.organizationUID),
       supervisorUid: context.auth.uid,
@@ -478,7 +482,8 @@ export const reconcileSubscriptionPayments = functions
     }
     const db = admin.firestore();
     const snap = await db.collection("users").doc(context.auth.uid).get();
-    const role = str(snap.get("role"));
+    // TAS-23: role from the token claims, not the users doc.
+    const role = str(claimBackedCaller(snap.data(), context.auth.token).role);
     if (!RENEWAL_ROLES.has(role)) fail("permission-denied", "caller_not_allowed");
     const res = await expireAbandonedRenewals(db, new Date());
     return res;

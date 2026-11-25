@@ -33,6 +33,7 @@ import {
   reviewerIsSubmitter,
   nationalIdFieldsForApprovedReview,
 } from "./delegate_profile_edit_logic";
+import {claimBackedCaller} from "./staff_claims";
 
 function asUpdate(patch: Record<string, unknown>): FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData> {
   return patch as FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData>;
@@ -48,9 +49,10 @@ function requireAuth(context: functions.https.CallableContext): string {
   return context.auth.uid;
 }
 
-async function loadCaller(db: FirebaseFirestore.Firestore, uid: string) {
+async function loadCaller(db: FirebaseFirestore.Firestore, uid: string, token: unknown) {
   const snap = await db.collection("users").doc(uid).get();
-  const data = snap.data() || {};
+  // TAS-23: role and scope from the token claims, not the users doc.
+  const data = claimBackedCaller(snap.data(), token);
   return {
     uid,
     role: String(data.role || ""),
@@ -224,7 +226,7 @@ export const editDelegateProfile = functions
   .https.onCall(async (data: unknown, context) => {
     const uid = requireAuth(context);
     const db = admin.firestore();
-    const caller = await loadCaller(db, uid);
+    const caller = await loadCaller(db, uid, context.auth?.token);
     if (!canCallEditDelegateProfile(caller.role)) {
       throw new functions.https.HttpsError("permission-denied", "غير مسموح.");
     }
@@ -364,7 +366,7 @@ export const submitNationalIdUpdate = functions
   .https.onCall(async (data: unknown, context) => {
     const uid = requireAuth(context);
     const db = admin.firestore();
-    const caller = await loadCaller(db, uid);
+    const caller = await loadCaller(db, uid, context.auth?.token);
     if (!canCallEditDelegateProfile(caller.role)) {
       throw new functions.https.HttpsError("permission-denied", "غير مسموح.");
     }
@@ -504,7 +506,7 @@ export const reviewNationalIdUpdate = functions
   .https.onCall(async (data: unknown, context) => {
     const uid = requireAuth(context);
     const db = admin.firestore();
-    const caller = await loadCaller(db, uid);
+    const caller = await loadCaller(db, uid, context.auth?.token);
     if (!isReviewerRole(caller.role)) {
       throw new functions.https.HttpsError("permission-denied", "الاعتماد متاح للإدارة العليا والدعم الفني فقط.");
     }
