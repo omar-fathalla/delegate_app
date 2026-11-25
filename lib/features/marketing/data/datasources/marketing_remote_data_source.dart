@@ -387,12 +387,12 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
     controller.onListen = () async {
       final plan = await _branchAttendancePlan(branchNames);
       if (cancelled) return;
-      for (final chunk in plan.chunks) {
+      void listenChunk(Filter filter, Filter? fallback) {
         var first = true;
         subs.add(firestore
             .collection(kAttendanceCollection)
             .where('organizationId', isEqualTo: orgId)
-            .where(chunk.filter)
+            .where(filter)
             .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
             .where('timestamp', isLessThan: Timestamp.fromDate(end))
             .limit(2000)
@@ -407,7 +407,15 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
           if (!controller.isClosed) controller.add(null);
         }, onError: (Object e) {
           debugPrint('watchTodayAttendanceChanges: $e');
+          // branchId index not built yet: listen by name only.
+          if (fallback != null && !cancelled && isMissingIndexError(e)) {
+            listenChunk(fallback, null);
+          }
         }));
+      }
+
+      for (final chunk in plan.chunks) {
+        listenChunk(chunk.filter, chunk.branchIds.isEmpty ? null : chunk.namesOnlyFilter);
       }
     };
     controller.onCancel = () async {
@@ -452,16 +460,25 @@ class MarketingRemoteDataSourceImpl implements MarketingRemoteDataSource {
 
       final List<QueryDocumentSnapshot<Map<String, dynamic>>> todayDocs = [];
       final attSw = Stopwatch()..start();
+      Future<QuerySnapshot<Map<String, dynamic>>> runChunk(Filter filter) => firestore
+          .collection(kAttendanceCollection)
+          .where('organizationId', isEqualTo: queryOrgId)
+          .where(filter)
+          .where('timestamp', isGreaterThanOrEqualTo: todayStartTs)
+          .where('timestamp', isLessThan: todayEndTs)
+          .limit(todayAttendanceQueryLimit)
+          .getResilient(forceServer: true);
       for (final chunk in branchChunks) {
-        final snap = await firestore
-            .collection(kAttendanceCollection)
-            .where('organizationId', isEqualTo: queryOrgId)
-            .where(chunk.filter)
-            .where('timestamp', isGreaterThanOrEqualTo: todayStartTs)
-            .where('timestamp', isLessThan: todayEndTs)
-            .limit(todayAttendanceQueryLimit)
-            .getResilient(forceServer: true);
-        todayDocs.addAll(snap.docs);
+        try {
+          todayDocs.addAll((await runChunk(chunk.filter)).docs);
+        } on FirebaseException catch (e) {
+          // The branchId index isn't built yet (e.g. right after a release):
+          // keep the screen working with the name-only query.
+          final namesOnly = chunk.namesOnlyFilter;
+          if (!isMissingIndexError(e) || namesOnly == null) rethrow;
+          debugPrint('branch attendance: branchId index missing, names only');
+          todayDocs.addAll((await runChunk(namesOnly)).docs);
+        }
       }
       final uniqueDocs = dedupeAttendanceDocs(todayDocs);
       todayDocs

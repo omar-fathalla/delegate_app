@@ -1,7 +1,5 @@
 // TAS-335: the branches screen finds today's attendance by branchId OR by
 // name, so a log with a different spelling of the branch name is not missed.
-import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/constants.dart';
 import 'package:delegate_app/core/services/branches_session_cache.dart';
@@ -59,6 +57,39 @@ void main() {
       expect(plan.favoriteFor({'branchName': 'سموحه'}), 'سموحة');
       expect(
         plan.favoriteFor({'branchId': 'other', 'branchName': 'مكان تاني'}),
+        isNull,
+      );
+    });
+
+    test('missing-index errors fall back to the name-only filter', () {
+      expect(
+        isMissingIndexError(
+          FirebaseException(
+            plugin: 'cloud_firestore',
+            code: 'failed-precondition',
+          ),
+        ),
+        isTrue,
+      );
+      expect(
+        isMissingIndexError(
+          FirebaseException(
+            plugin: 'cloud_firestore',
+            code: 'permission-denied',
+          ),
+        ),
+        isFalse,
+      );
+      const chunk = BranchAttendanceChunk(
+        branchIds: ['id1'],
+        branchNames: ['n1'],
+      );
+      expect(chunk.namesOnlyFilter, isNotNull);
+      expect(
+        const BranchAttendanceChunk(
+          branchIds: ['id1'],
+          branchNames: [],
+        ).namesOnlyFilter,
         isNull,
       );
     });

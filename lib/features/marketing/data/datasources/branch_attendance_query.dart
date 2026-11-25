@@ -67,7 +67,16 @@ class BranchAttendanceChunk {
     if (byId != null && byName != null) return Filter.or(byId, byName);
     return byId ?? byName!;
   }
+
+  /// `branchName in names` only: used when the branchId index is missing.
+  /// Null when the chunk has no name terms.
+  Filter? get namesOnlyFilter =>
+      branchNames.isEmpty ? null : Filter('branchName', whereIn: branchNames);
 }
+
+/// True for Firestore's "query requires an index" error.
+bool isMissingIndexError(Object e) =>
+    e is FirebaseException && e.code == 'failed-precondition';
 
 /// Groups the favorites into chunks of at most [maxDisjunctions] values.
 /// A favorite's ids and name terms stay in the same chunk.
