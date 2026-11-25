@@ -4,13 +4,13 @@
   "delegate-source-lock.test.js": 19,
   "delegate-status-guards.test.js": 20,
   "docs-pending.test.js": 18,
-  "firestore.rules.test.js": 20,
+  "firestore.rules.test.js": 15,
   "hr-web-company-reads.test.js": 6,
   "m31-delegate-own-reads.test.js": 5,
   "qa-hold-reads.test.js": 2,
   "staff-privileged-doc-reupload.test.js": 4,
   "suspend-login-penalties.test.js": 10,
   "users-nationalid-client-lock.test.js": 7,
-  "users-p0.test.js": 20,
+  "users-p0.test.js": 11,
   "ut-nonblocking-fixes.test.js": 2
 }
