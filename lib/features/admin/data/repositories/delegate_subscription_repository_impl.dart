@@ -1399,7 +1399,38 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
           pendingWrites.add((b) => b.set(ref, fullData, SetOptions(merge: true)));
         }
       }
-      final chunks = approvalWriteChunks(pendingWrites.length);
+      // TAS-336: technical support, every bound doc already 'pending' (the
+      // usual new_delegate case): the request approval and the status-only
+      // activations run server-side in one transaction
+      // (approveDelegateDocuments). The same client batch was denied by the
+      // rules' 1000-expression limit at 5+ document flips on one doc. No
+      // fallback to the client batch: it fails the same way, and keeping
+      // one path lets the rules drop the tech flips later. Mixed requests
+      // (a doc to create, or one that is not pending) keep the batch below.
+      final useCallable = isTechSupportReviewer(reviewerRole) &&
+          activations.isNotEmpty &&
+          snaps.every((s) => s.exists && s.data()?['status'] == 'pending');
+      if (useCallable) {
+        try {
+          await _functions
+              .httpsCallable(CloudCallableNames.approveDelegateDocuments)
+              .call<dynamic>({
+            'requestId': request.id,
+            'organizationUIDs': [
+              for (final a in activations) a.$1.parent.parent!.parent.parent!.id,
+            ],
+            'reviewerName': reviewerName,
+          });
+        } on FirebaseFunctionsException catch (e) {
+          return Left(ServerFailure(approveDocumentsCallableMessage(e)));
+        }
+        for (final a in activations) {
+          followUps[a.$1] = profileMergeFields(a.$2);
+        }
+      }
+      final chunks = useCallable
+          ? const <(int, int)>[]
+          : approvalWriteChunks(pendingWrites.length);
       for (var c = 0; c < chunks.length - 1; c++) {
         final b = _firestore.batch();
         for (final w in pendingWrites.sublist(chunks[c].$1, chunks[c].$2)) {
@@ -1422,7 +1453,7 @@ class DelegateSubscriptionRepositoryImpl implements DelegateSubscriptionReposito
         }
       }
       try {
-        await batch.commit();
+        if (!useCallable) await batch.commit();
       } on FirebaseException catch (e) {
         // Atomic: nothing was written, the request is still pending.
         if (e.code == 'permission-denied') {
@@ -1911,6 +1942,28 @@ String _duplicateCheckErrorMessage(FirebaseFunctionsException e) {
 const approvalBatchDeniedMessage =
     'تعذّر اعتماد الطلب ولم يُحفظ أي تغيير. تأكد أن الطلب ما زال قيد المراجعة. '
     'إذا كان على المندوب مستندات كثيرة قيد المراجعة فيعتمده السوبر أدمن.';
+
+/// TAS-336: approveDelegateDocuments failed. Nothing was written (one
+/// server transaction). The server sends an Arabic message with a `reason`
+/// in details; without one (function not deployed, network) a generic text.
+String approveDocumentsCallableMessage(FirebaseFunctionsException e) {
+  final details = e.details;
+  final msg = e.message?.trim() ?? '';
+  if (details is Map && details['reason'] != null && msg.isNotEmpty) {
+    return msg;
+  }
+  if (e.code == 'not-found' || e.code == 'unimplemented') {
+    return 'خدمة اعتماد الطلبات غير متاحة حالياً، ولم يُحفظ أي تغيير. حاول لاحقاً.';
+  }
+  return 'تعذّر اعتماد الطلب ولم يُحفظ أي تغيير. حاول مرة أخرى.';
+}
+
+/// True for the technical-support role name the page passes
+/// (`UserRole.technicalSupport.name`) and its other spellings.
+bool isTechSupportReviewer(String? role) {
+  final k = (role ?? '').toLowerCase().replaceAll(RegExp('[^a-z]'), '');
+  return k == 'technicalsupport' || k == 'techsupport';
+}
 
 const addOrgStaleIdDeniedMessage =
     'تعذّر اعتماد طلب إضافة السلسلة لأن الرقم القومي على الطلب لا يطابق الرقم الحالي للمندوب. '

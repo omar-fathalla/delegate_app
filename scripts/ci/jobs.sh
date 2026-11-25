@@ -62,7 +62,8 @@ ci_rules_e2e_scripts() {
     test:e2e:subscriptions \
     test:e2e:delegate \
     test:e2e:supervisor-reupload \
-    test:e2e:privileged-reupload
+    test:e2e:privileged-reupload \
+    test:e2e:approve-docs
 }
 
 # --- job bodies --------------------------------------------------------------
