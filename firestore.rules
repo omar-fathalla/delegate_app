@@ -1564,6 +1564,16 @@ service cloud.firestore {
         allow write: if isGlobalStaff() || (isOrgAdmin() && callerOrg() == orgId);
       }
 
+      // TAS-87: delegate stats of the whole chain (governorates chart and
+      // financial summary). Written only by onDelegateStatsWrite and the
+      // backfill script (Admin SDK). Read by global staff and this chain's
+      // org-scoped staff (one users/{uid} read); company staff read their
+      // company's doc below, never the chain totals.
+      match /stats/{statId} {
+        allow read: if staffToken() && staffTargetOk(orgId, '', true);
+        allow write: if false;
+      }
+
       match /sent_notifications/{notificationId} {
         allow read: if isGlobalStaff() || (signedIn() && callerOrg() == orgId && (isOrgScopedStaff() || isCompanyScopedStaff()));
         allow create, update, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
@@ -1627,6 +1637,13 @@ service cloud.firestore {
           // branches marketing were denied before only because the old rule
           // ran out of the 1000-expression budget; that deny is now a condition.
           allow delete: if staffToken() ? nestedDelegateDeleteOk(orgId, compId) : false;
+        }
+
+        // TAS-87: this company's delegate stats (same writer as above).
+        // Global staff, this chain's org-scoped staff, or this company's staff.
+        match /stats/{statId} {
+          allow read: if staffToken() && staffTargetOk(orgId, compId, true);
+          allow write: if false;
         }
 
         match /requests/{requestId} {
