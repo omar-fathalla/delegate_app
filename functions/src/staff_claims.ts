@@ -14,6 +14,7 @@
  * normalizeRoleKey maps to a staff role).
  */
 import {isStaffRole, normalizeRoleKey} from "./staff_phone_lookup_logic";
+import {canonicalStaffRole, roleScope} from "./staff_claims_sync_logic";
 
 const GLOBAL = new Set([
   "super_admin", "superadmin",
@@ -35,14 +36,18 @@ export interface RoleClaims {
   companyId: string;
 }
 
-/** The staff claims to set for a users-doc role and scope (createStaffUser). */
+/**
+ * The staff claims to set for a users-doc role and scope (createStaffUser).
+ * The role is written in its canonical spelling (staff_claims_sync_logic.ts),
+ * the one the admin web guards and the sync trigger compare against.
+ */
 export function staffClaimsFor(role: string, organizationUID: string, companyUID: string): RoleClaims | null {
-  const key = normalizeRoleKey(role);
-  if (!isStaffRole(role)) return null;
-  const global = GLOBAL.has(key);
-  const org = global ? "" : str(organizationUID);
-  const co = global || ORG_LEVEL.has(key) ? "" : str(companyUID);
-  return {role: str(role), orgId: org, organizationId: org, companyId: co};
+  const canon = canonicalStaffRole(role);
+  if (!canon || !isStaffRole(canon)) return null;
+  const scope = roleScope(canon);
+  const org = scope === "global" ? "" : str(organizationUID);
+  const co = scope === "global" || scope === "org" ? "" : str(companyUID);
+  return {role: canon, orgId: org, organizationId: org, companyId: co};
 }
 
 /**
