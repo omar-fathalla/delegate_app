@@ -257,7 +257,7 @@ ci_jobs_for_paths() {
         add analyze test build-web ;;
       web/*) add build-web ;;
       functions/*) add functions p0-scripts rules ;;
-      firestore.rules | storage.rules | firestore.indexes.json | firestore/* | firebase.json)
+      firestore.rules | firestore.deploy.rules | scripts/build_firestore_rules.js | storage.rules | firestore.indexes.json | firestore/* | firebase.json)
         add rules ;;
       scripts/emulator* | scripts/generate_emulator_firebase_config.js)
         add emulator-ports p0-scripts functions rules ;;

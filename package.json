@@ -4,6 +4,7 @@
     "test:scripts:emulator-slots": "bash test/scripts/emulator_port_slots.test.sh",
     "test:scripts:android-dev-distribute-guard": "bash test/scripts/android_dev_distribute_guard.test.sh",
     "test:rules": "bash scripts/emulators_exec.sh --only firestore --project demo-tashil-rules \"node --test test/rules/firestore.rules.test.js\"",
+    "test:rules:deploy-build": "node --test test/rules/deploy-rules-build.test.js",
     "test:rules:interim": "bash scripts/emulators_exec.sh --only firestore --project demo-interim-base \"node --test test/rules/interim-prod-hardening.test.js\"",
     "test:e2e:staff": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only auth,firestore --project demo-tashil-staff \"node --test test/e2e/staff-accounts.e2e.test.js\"",
     "test:e2e:delegate": "npm --prefix functions run build && bash scripts/emulators_exec.sh --only auth,firestore --project demo-tashil-e2e \"node --test test/e2e/delegate-login.e2e.test.js\"",

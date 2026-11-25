@@ -21,8 +21,11 @@
     }
   },
   "firestore": {
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
+    "rules": "firestore.deploy.rules",
+    "indexes": "firestore.indexes.json",
+    "predeploy": [
+      "node \"$PROJECT_DIR/scripts/build_firestore_rules.js\" --check"
+    ]
   },
   "storage": {
     "rules": "storage.rules"
