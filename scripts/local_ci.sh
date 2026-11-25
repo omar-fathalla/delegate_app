@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Local mirror of .github/workflows/ci.yml for the Mac (tashil-delegate-mac
 # machine), used when GitHub Actions cannot schedule jobs (e.g. billing lock).
-# Flutter version: 3.44.5 (same as repo .fvmrc and CI flutter-version).
+# Flutter version: 3.50.1 (same as repo .fvmrc and CI flutter-version).
 # Does not talk to the runner service, release workflows, or tashil-ci / tashil-mac.
 #
 # Usage:
@@ -34,12 +34,12 @@ export LC_ALL=en_US.UTF-8
 export TZ=Africa/Cairo
 export PUB_ENVIRONMENT="${PUB_ENVIRONMENT:-flutter_bot}"
 
-FLUTTER_SDK="${LOCAL_CI_FLUTTER_SDK:-$HOME/toolchains/flutter-3.44.5}"
+FLUTTER_SDK="${LOCAL_CI_FLUTTER_SDK:-$HOME/toolchains/flutter-3.50.1}"
 NODE22_BIN="${LOCAL_CI_NODE22_BIN:-/Users/delegate-ci/actions-runner/_work/_tool/node/22.23.4/arm64/bin}"
 
 if [[ ! -x "$FLUTTER_SDK/bin/flutter" ]]; then
-  echo "local_ci: ERROR: Flutter 3.44.5 not found at $FLUTTER_SDK" >&2
-  echo "Set LOCAL_CI_FLUTTER_SDK to a 3.44.5 SDK." >&2
+  echo "local_ci: ERROR: Flutter 3.50.1 not found at $FLUTTER_SDK" >&2
+  echo "Set LOCAL_CI_FLUTTER_SDK to a 3.50.1 SDK." >&2
   exit 2
 fi
 if [[ ! -x "$NODE22_BIN/node" ]]; then
@@ -221,7 +221,7 @@ run_job() {
   (
     cd "$SRC" || exit 1
     # -c, not -lc: a login shell resets PATH and picks Homebrew Flutter
-    # 3.41.2 over the intended $FLUTTER_SDK (3.44.5), which breaks
+    # 3.41.2 over the intended $FLUTTER_SDK (3.50.1), which breaks
     # `flutter pub get --enforce-lockfile`.
     timeout --kill-after=30s "${minutes}m" bash -c "$*"
   ) >>"$log" 2>&1
