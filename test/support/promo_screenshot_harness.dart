@@ -4,13 +4,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+bool _promoFontsLoaded = false;
+
+/// Loads Cairo once per test file. Call it from `setUpAll` so the load (and
+/// the engine's `fontsChange` message) happens before any widget tree exists:
+/// since Flutter 3.50 a font change that lands during a test leaves a pending
+/// frame callback and fails it ("An animation is still running..."). A flag,
+/// not a cached Future, so a later call inside `testWidgets` (FakeAsync) never
+/// awaits a future from another zone.
 Future<void> loadPromoTestFonts() async {
   GoogleFonts.config.allowRuntimeFetching = false;
+  if (_promoFontsLoaded) return;
   final cairo = FontLoader('Cairo')
     ..addFont(rootBundle.load('assets/fonts/Cairo/Cairo-Regular.ttf'))
     ..addFont(rootBundle.load('assets/fonts/Cairo/Cairo-SemiBold.ttf'))
     ..addFont(rootBundle.load('assets/fonts/Cairo/Cairo-Bold.ttf'));
   await cairo.load();
+  _promoFontsLoaded = true;
 }
 
 Future<ThemeData> promoTestTheme() async {

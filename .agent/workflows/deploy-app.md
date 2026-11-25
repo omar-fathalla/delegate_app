@@ -44,14 +44,14 @@ flutter build ios --release --flavor dev --dart-define=ENV=dev
 
 ## 3. GitHub Actions CI/CD
 
-Primary pipelines live under `.github/workflows/` (`ci.yml`, `android-release.yml`, `pr-user-test-builds.yml`). They pin **Flutter 3.44.5** and pass `--flavor prod` for store artifacts.
+Primary pipelines live under `.github/workflows/` (`ci.yml`, `android-release.yml`, `pr-user-test-builds.yml`). They pin **Flutter 3.50.1** and pass `--flavor prod` for store artifacts.
 
 Example analyze/test job shape:
 
 ```yaml
 - uses: subosito/flutter-action@v2
   with:
-    flutter-version: '3.44.5'
+    flutter-version: '3.50.1'
 - run: flutter pub get --enforce-lockfile
 - run: flutter analyze
 - run: flutter test
@@ -65,7 +65,7 @@ Release Android (from `main` only, prod flavor):
 
 ## 4. Pre-deploy checklist
 
-- [ ] `flutter analyze` clean (Flutter **3.44.5**)
+- [ ] `flutter analyze` clean (Flutter **3.50.1**)
 - [ ] `flutter test` pass
 - [ ] Version bumped in `pubspec.yaml` when shipping
 - [ ] Android/iOS flavor matches `ENV` (`docs/DEV_WORKFLOW_RULES_AR.md`)

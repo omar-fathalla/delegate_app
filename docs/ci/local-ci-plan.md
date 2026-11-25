@@ -15,7 +15,7 @@ Goal: CI that runs entirely on our Mac (no GitHub-hosted minutes), stays the mer
 | Workflows still on **GitHub-hosted** runners: `deploy-ios.yml` (`macos-latest`), `android-release.yml`, `firestore-indexes.yml`, `actions-cleanup.yml` (`ubuntu-latest`). | `grep runs-on .github/workflows` |
 | `ci.yml` / `pr-user-test-builds.yml` call `~/mac-resources/ci_delegate_app_lock_*.sh`, which **do not exist** on the runner user. `build-web` would fail on first run. | `ls /Users/delegate-ci/mac-resources` |
 | Firebase emulator ports are fixed defaults (8080, 9099, 9199, 4400, ...). Two jobs running emulators at once collide. Override env exists (`scripts/emulator_ports.env.sh`, TA-39). | |
-| One Flutter SDK (3.44.5) shared by everything. Its startup lock is held only while the tool checks its cache, so parallel `flutter` commands in **different checkouts** are fine; one SDK is enough. | |
+| One Flutter SDK (3.50.1) shared by everything. Its startup lock is held only while the tool checks its cache, so parallel `flutter` commands in **different checkouts** are fine; one SDK is enough. | |
 | Mac: 14 cores, 24 GB RAM, ~375 GB free. | `sysctl`, `df` |
 
 ### Why the minutes ran out (billing, November 2026)

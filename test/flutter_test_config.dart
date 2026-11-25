@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart' show FontWeight;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// Max share of differing pixels a golden may have and still pass (TAS-195).
 ///
@@ -17,6 +19,7 @@ const double kGoldenDiffTolerance = 0.005;
 /// Runs before every test file in `test/`. Only affects `matchesGoldenFile`,
 /// i.e. the golden tests (tag `golden`, see dart_test.yaml).
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
+  await _preloadCairoFonts();
   final current = goldenFileComparator;
   if (current is LocalFileComparator) {
     goldenFileComparator = TolerantGoldenFileComparator(
@@ -26,6 +29,41 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
     );
   }
   await testMain();
+}
+
+/// Bundled Cairo weights (see `fonts:` in pubspec.yaml).
+const _bundledCairoWeights = <FontWeight>[
+  FontWeight.w200,
+  FontWeight.w300,
+  FontWeight.w400,
+  FontWeight.w500,
+  FontWeight.w600,
+  FontWeight.w700,
+  FontWeight.w900,
+];
+
+/// Loads the bundled Cairo fonts once per test file, before any widget tree.
+///
+/// GoogleFonts loads a font the first time a widget asks for it. When the load
+/// finishes the engine sends a `fontsChange` system message, and every
+/// attached text render object schedules a frame callback. Since Flutter 3.50
+/// `postTest` checks for pending frame callbacks only after the test's
+/// `addTearDown`s ran, so a load that finishes during teardown fails the
+/// first widget test of a file with "An animation is still running even after
+/// the widget tree was disposed". Loading the fonts here, while no render
+/// object exists, keeps that message out of the tests.
+Future<void> _preloadCairoFonts() async {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  for (final weight in _bundledCairoWeights) {
+    GoogleFonts.cairo(fontWeight: weight);
+  }
+  try {
+    await GoogleFonts.pendingFonts();
+  } catch (_) {
+    // A font that fails to load here fails the same way inside the test.
+  }
+  // Let the `fontsChange` message reach the binding before tests start.
+  await Future<void>.delayed(Duration.zero);
 }
 
 /// [LocalFileComparator] that accepts diffs up to [tolerance] (0..1) and keeps

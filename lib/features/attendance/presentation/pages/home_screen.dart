@@ -121,10 +121,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         if (position == null || !context.mounted) return;
 
                         if (isCheckedIn) {
-                          if (activeAttendance == null) return;
+                          final attendance = activeAttendance;
+                          if (attendance == null) return;
                           if (!await confirmEarlyCheckOutIfNeeded(
                             context,
-                            checkInTime: activeAttendance.checkInTime,
+                            checkInTime: attendance.checkInTime,
                             now: sl.isRegistered<TrustedTimeService>()
                                 ? sl<TrustedTimeService>().now
                                 : DateTime.now(),
@@ -134,7 +135,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           if (!context.mounted) return;
                           context.read<AttendanceBloc>().add(
                             CheckOutRequested(
-                              attendanceId: activeAttendance.id,
+                              attendanceId: attendance.id,
                               userId: widget.delegate.uid,
                               organizationId: widget.delegate.organizationUID,
                               lat: position.latitude,

@@ -56,7 +56,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.5'
+          flutter-version: '3.50.1'
           channel: stable
           # Self-hosted tashil-delegate-mac already has the SDK in the
           # runner tool cache. GitHub Actions cache upload of the Flutter
@@ -86,7 +86,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.5'
+          flutter-version: '3.50.1'
           channel: stable
           # Self-hosted tashil-delegate-mac already has the SDK in the
           # runner tool cache. GitHub Actions cache upload of the Flutter
@@ -175,7 +175,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.5'
+          flutter-version: '3.50.1'
           channel: stable
           # Self-hosted tashil-delegate-mac already has the SDK in the
           # runner tool cache. GitHub Actions cache upload of the Flutter

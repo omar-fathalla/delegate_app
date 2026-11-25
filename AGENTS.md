@@ -1,8 +1,8 @@
 # Project Rules and Policies
 
-## Flutter SDK (3.44.5)
-- **Pinned version:** Flutter **3.44.5** on app CI and local mirror — `.fvmrc`, `.github/workflows/ci.yml`, `pr-user-test-builds.yml` (`flutter-version: '3.44.5'`), and `scripts/local_ci.sh` (`LOCAL_CI_FLUTTER_SDK` defaults to a `flutter-3.44.5` toolchain). Release workflows (`android-release.yml`, `deploy-ios.yml`) intentionally leave Flutter on the action default channel or an older pinned iOS build version; do not “align” them to 3.44.5 unless a release PR explicitly bumps them.
-- **Local setup:** `fvm install && fvm use` (reads `.fvmrc`), or install Flutter 3.44.5 manually. `pubspec.yaml` requires Dart `^3.11.0` (bundled with this Flutter).
+## Flutter SDK (3.50.1)
+- **Pinned version:** Flutter **3.50.1** on app CI and local mirror — `.fvmrc`, `.github/workflows/ci.yml`, `pr-user-test-builds.yml` (`flutter-version: '3.50.1'`), and `scripts/local_ci.sh` (`LOCAL_CI_FLUTTER_SDK` defaults to a `flutter-3.50.1` toolchain). `deploy-ios.yml` is also pinned to 3.50.1 (since the 3.50.1 bump the lockfile needs Dart >=3.13, so the old 3.41.2 pin can no longer run `pub get`). `android-release.yml` still uses the action's latest `stable` channel (3.50.1 at the time of the bump); pin it in a release PR if stable moves past a version the lockfile accepts.
+- **Local setup:** `fvm install && fvm use` (reads `.fvmrc`), or install Flutter 3.50.1 manually. `pubspec.yaml` declares Dart `^3.11.0`, but the lockfile's dev tooling (freezed 4, test 1.32) needs Dart >=3.13; Flutter 3.50.1 bundles Dart 3.14.0.
 - **Validation:** Run `flutter pub get --enforce-lockfile` before analyze/test when checking lock compatibility; on Mac billing lock use `bash scripts/local_ci.sh <sha>`.
 - **Do not** change `pubspec.lock` unless the Flutter/Dart bump truly requires it — keep it byte-identical when only pinning docs/tooling.
 
