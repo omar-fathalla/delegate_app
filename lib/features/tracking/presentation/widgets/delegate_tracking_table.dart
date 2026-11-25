@@ -8,6 +8,7 @@ import '../../../../core/widgets/app_avatar.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../domain/entities/delegate_tracking_session.dart';
 import '../../domain/utils/tracking_geofence_status.dart';
+import 'tracking_mismatch_chip.dart';
 
 /// جدول بيانات تفصيلي لعرض تتبع نطاق المناديب (Live Tracking Table)
 /// يدعم العرض المتجاوب على سطح المكتب والموبايل مع التمرير الأفقي السلس
@@ -626,36 +627,47 @@ class _DelegateTableRowState extends State<_DelegateTableRow> {
               isNarrow: widget.isNarrow,
               child: Align(
                 alignment: AlignmentDirectional.centerStart,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusBgColor,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: statusColor.withValues(alpha: 0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(statusIcon, size: 13, color: statusColor),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          statusTitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: statusColor,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: statusBgColor,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: statusColor.withValues(alpha: 0.3),
+                            width: 1,
                           ),
                         ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(statusIcon, size: 13, color: statusColor),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                statusTitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: statusColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                    ),
+                    if (session.statusMismatch) ...[
+                      const SizedBox(width: 4),
+                      TrackingMismatchChip(session: session, compact: true),
                     ],
-                  ),
+                  ],
                 ),
               ),
             ),

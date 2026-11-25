@@ -50,7 +50,8 @@
     "test:rules:tas49": "bash scripts/emulators_exec.sh --only firestore --project demo-tas49 \"node --test test/rules/tas49-staff-contact.test.js\"",
     "test:rules:tas51-rest": "bash scripts/emulators_exec.sh --only firestore --project demo-tas51-rest \"node --test test/rules/tas51-notifications-rest.test.js\"",
     "test:rules:tas309-310": "bash scripts/emulators_exec.sh --only firestore --project demo-tas309 \"node --test test/rules/tas309-310-requests-wallets.test.js\"",
-    "test:rules:tas319": "bash scripts/emulators_exec.sh --only firestore --project demo-tas319 \"node --test test/rules/tas319-admin-web-writes.test.js\""
+    "test:rules:tas319": "bash scripts/emulators_exec.sh --only firestore --project demo-tas319 \"node --test test/rules/tas319-admin-web-writes.test.js\"",
+    "test:rules:tas48": "bash scripts/emulators_exec.sh --only firestore --project demo-tas48 \"node --test test/rules/tas48-tracking-verified.test.js\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",
