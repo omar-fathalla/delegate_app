@@ -13,7 +13,6 @@
  * Linear sub-issue id in the name, so CI stays green until they are fixed:
  *   TAS-321  org-admin invite email (addDoc mail) denied, /mail is super-admin only
  *   TAS-322  self email sync users/{uid}.email denied (TAS-49)
- *   TAS-324  four cross-org/company BLOCKs denied by the expression budget only
  *
  * Writes already moved to callables are not here: delegate status / suspend /
  * activate directly, billing reset, request changes on create (TAS-69),
@@ -204,7 +203,7 @@ describe("organization-admin pages", () => {
     }));
   });
 
-  test.skip("[TAS-324] BLOCK: organization.service.ts:120 on another organization", async () => {
+  test("BLOCK: organization.service.ts:120 on another organization", async () => {
     await assertDeniedByRule(updateDoc(doc(db("orgadmin-a"), `organizations/${ORG_B}`), {
       printingColor: "#000000", updatedAt: serverTimestamp(),
     }));
@@ -252,7 +251,7 @@ describe("organization-admin pages", () => {
     await assertSucceeds(setDoc(doc(db("orgadmin-a"), `invites/${id("inv")}`), inviteData("orgadmin-a")));
   });
 
-  test.skip("[TAS-324] BLOCK: invite.service.ts:96 company-admin invite for another organization", async () => {
+  test("BLOCK: invite.service.ts:96 company-admin invite for another organization", async () => {
     await assertDeniedByRule(setDoc(doc(db("orgadmin-a"), `invites/${id("inv")}`), inviteData("orgadmin-a", {
       organizationId: ORG_B, companyId: CO_B,
     })));
@@ -268,7 +267,7 @@ describe("organization-admin pages", () => {
     await assertSucceeds(updateDoc(doc(db("orgadmin-a"), `invites/${i}`), {status: "cancelled", updatedAt: serverTimestamp()}));
   });
 
-  test.skip("[TAS-324] BLOCK: cancel another organization's invite", async () => {
+  test("BLOCK: cancel another organization's invite", async () => {
     const i = id("inv");
     await seed(`invites/${i}`, {...inviteData("sa", {organizationId: ORG_B, companyId: CO_B}), createdAt: since, updatedAt: since});
     await assertDeniedByRule(updateDoc(doc(db("orgadmin-a"), `invites/${i}`), {status: "cancelled", updatedAt: serverTimestamp()}));
@@ -528,7 +527,7 @@ for (const ca of COMPANY_ADMINS) {
       await assertSucceeds(setDoc(doc(u, `${reqCol()}/${r}`), newRequest(ORG_A, CO_A, d, "create", {uid: r})));
     });
 
-    test.skip("[TAS-324] BLOCK: delegate-request.service.ts:365 new delegate in another company", async () => {
+    test("BLOCK: delegate-request.service.ts:365 new delegate in another company", async () => {
       const d = id("newdel");
       await assertDeniedByRule(setDoc(doc(db(ca), `${coPath(ORG_A, CO_A2)}/delegates/${d}`),
         newDelegate(ORG_A, CO_A2, d, "x")));
