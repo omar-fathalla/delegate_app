@@ -2611,13 +2611,6 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    match /attendance_logs_testing/{logId} {
-      allow read: if canReadAttendance();
-      allow create: if canCreateAttendance();
-      allow update: if canUpdateAttendance();
-      allow delete: if false;
-    }
-
     match /attendance/{attendanceId} {
       allow read: if canReadAttendance();
       allow create: if canCreateAttendance();
@@ -2628,12 +2621,6 @@ service cloud.firestore {
     match /attendance_adjustment_logs/{logId} {
       allow read: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped()));
       allow create: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && incomingCompanyScoped()) || (isOrgScopedStaff() && incomingOrgScoped()));
-      allow update, delete: if isGlobalStaff() || (isHR() && companyScoped());
-    }
-
-    match /attendance_adjustment_logs_testing/{logId} {
-      allow read: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped()));
-      allow create: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && incomingCompanyScoped()));
       allow update, delete: if isGlobalStaff() || (isHR() && companyScoped());
     }
 

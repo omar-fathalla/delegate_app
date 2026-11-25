@@ -1,21 +1,12 @@
 // lib/core/constants.dart
 
-/// Safe Toggle for Attendance System
-///
-/// When [isProduction] is true, attendance logs are written to the `attendance_logs` collection.
-/// When [isProduction] is false, they are written to `attendance_logs_testing` to avoid polluting production data.
-///
-/// IMPORTANT: This should only be set to true after full verification.
+/// Attendance logs collection. The old `attendance_logs_testing` switch was
+/// removed (TAS-339): it was always set to production since Feb 2026 and its
+/// rules were dropped to keep the ruleset under the compile-time limit.
+/// Kept for the debug banner in main.dart; the app always runs on production data.
 const bool isProduction = true;
 
-/// The name of the collection to store attendance logs.
-/// Switches based on [isProduction].
-const String kAttendanceCollection = isProduction
-    ? 'attendance_logs'
-    : 'attendance_logs_testing';
+const String kAttendanceCollection = 'attendance_logs';
 
-/// The name of the collection to store attendance adjustments audit logs.
-/// Switches based on [isProduction].
-const String kAttendanceAdjustmentLogsCollection = isProduction
-    ? 'attendance_adjustment_logs'
-    : 'attendance_adjustment_logs_testing';
+/// Attendance adjustments audit logs collection.
+const String kAttendanceAdjustmentLogsCollection = 'attendance_adjustment_logs';
