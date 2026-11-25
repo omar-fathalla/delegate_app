@@ -146,7 +146,7 @@ Future<String> uploadDelegateDocumentFile({
   try {
     final ref = (storage ?? FirebaseStorage.instance).ref(storagePath);
     final task = await ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
-    return task.ref.getDownloadURL();
+    return await task.ref.getDownloadURL();
   } on FirebaseException catch (e) {
     throw SupervisorDocReuploadException(storageUploadErrorMessage(e));
   }
