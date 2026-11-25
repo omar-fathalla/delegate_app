@@ -1,0 +1,2642 @@
+rules_version = '2';
+service cloud.firestore {
+match /databases/{database}/documents {
+function signedIn() {
+return request.auth != null
+&& request.auth.token.get('firebase', {}).get('sign_in_provider', '') != 'anonymous';
+}
+function knownIdentity() {
+return signedIn() && (
+request.auth.token.get('role', '') != ''
+|| !(userRole() in ['', 'delegate']));
+}
+function userExists() {
+return signedIn()
+&& exists(/databases/$(database)/documents/users/$(request.auth.uid));
+}
+function userDoc() {
+return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+}
+function userDataRaw() {
+return userDataAt(/databases/$(database)/documents/users/$(request.auth.uid));
+}
+function userDataAt(p) {
+return exists(p) ? get(p).data : {};
+}
+function userRole() {
+return signedIn() ? stringOr(userDataRaw().get('role', ''), '') : '';
+}
+function stringOr(v, fallback) {
+return v is string && v != '' ? v : fallback;
+}
+function roleIs(roles) {
+return userRole() in roles;
+}
+function isSuperAdmin() {
+return roleIs(superAdminRoleList());
+}
+function isTechnicalSupport() {
+return roleIs(techRoleList());
+}
+function isOrgAdmin() {
+return roleIs(orgAdminRoleList());
+}
+function isCompanyAdmin() {
+return roleIs(companyAdminRoles());
+}
+function isHR() {
+return roleIs(hrRoles());
+}
+function isMarketing() {
+return roleIs(marketingRoles());
+}
+function isBranchesMarketing() {
+return roleIs(branchesMarketingRoles());
+}
+function companyAdminRoles() {
+return ['company-admin', 'company_admin', 'companyadmin', 'admin',
+'supervisor', 'company_supervisor'];
+}
+function companyAdminHrRoles() {
+return ['company-admin', 'company_admin', 'companyadmin', 'admin',
+'supervisor', 'company_supervisor',
+'hr', 'company-hr', 'company_hr', 'human_resources'];
+}
+function orgAdminCoreRoles() {
+return ['organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin'];
+}
+function hrRoles() {
+return ['hr', 'company-hr', 'company_hr', 'human_resources'];
+}
+function marketingRoles() {
+return ['marketing', 'marketing_promotion', 'marketingpromotion',
+'marketingPromotion'];
+}
+function branchesMarketingRoles() {
+return ['branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+'branches-marketing-manager', 'branchesmarketingmanager',
+'branchesMarketingManager'];
+}
+function isAccountant() {
+return roleIs(['accountant', 'accounting', 'account_admin']);
+}
+function isGlobalStaff() {
+return roleIs(staffRoleListGlobal());
+}
+function isOrgScopedStaff() {
+return roleIs(orgAdminRoleList().concat(marketingRoles()));
+}
+function isCompanyScopedStaff() {
+return roleIs(staffRoleListCompany());
+}
+function isStaffWriter() {
+return roleIs(staffRoleListGlobal().concat(orgAdminRoleList()).concat(marketingRoles())
+.concat(staffRoleListCompany()));
+}
+function staffRoleListGlobal() {
+return ['super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN',
+'technical_support', 'technical-support', 'technicalSupport', 'technicalsupport',
+'tech_support', 'techsupport'];
+}
+function staffRoleListOrg() {
+return ['organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
+'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion'];
+}
+function staffRoleListCompany() {
+return ['company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
+'hr', 'company-hr', 'company_hr', 'human_resources',
+'accountant', 'accounting', 'account_admin',
+'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+'branches-marketing-manager', 'branchesmarketingmanager', 'branchesMarketingManager'];
+}
+function staffTargetOk(tOrg, tCo, allowOrgScoped) {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let org = u.get('organizationUID', '');
+let co = u.get('companyUID', '');
+return r in staffRoleListGlobal()
+|| (allowOrgScoped && org is string && org != '' && org == tOrg && r in staffRoleListOrg())
+|| (co is string && co != '' && co == tCo && r in staffRoleListCompany());
+}
+function claimString(key) {
+return signedIn() ? rawClaim(key) : '';
+}
+function claimListHas(key, value) {
+return signedIn() && rawClaimListHas(key, value);
+}
+function rawClaim(key) {
+return stringOr(request.auth.token.get(key, ''), '');
+}
+function rawClaimListHas(key, value) {
+return request.auth.token.get(key, '') is list && value in request.auth.token.get(key, []);
+}
+function delegateOtpOk() {
+return request.auth.token.get('otp_required', false) != true
+|| request.auth.token.get('otp_verified', false) == true;
+}
+function isDelegate() {
+return signedIn() && rawClaim('role') == 'delegate' && delegateOtpOk();
+}
+function ownsDelegateId(id) {
+return signedIn() && delegateOtpOk() && id is string && id != '' && (
+id == request.auth.uid ||
+rawClaim('delegateId') == id ||
+rawClaimListHas('delegateIds', id)
+);
+}
+function callerOrg() {
+return signedIn() ? stringOr(userDataRaw().get('organizationUID', ''), rawClaim('orgId')) : '';
+}
+function callerCompany() {
+return signedIn() ? stringOr(userDataRaw().get('companyUID', ''), rawClaim('companyId')) : '';
+}
+function delegateInOrg(orgId) {
+return isDelegate() && (rawClaim('orgId') == orgId || rawClaimListHas('orgIds', orgId));
+}
+function delegateInCompany(compId) {
+return isDelegate() && (rawClaim('companyId') == compId || rawClaimListHas('companyIds', compId));
+}
+function staffToken() {
+return request.auth != null && request.auth.token.get('role', '') != 'delegate';
+}
+function delegateOwns(id) {
+return isDelegate() && (
+id == request.auth.uid ||
+rawClaim('delegateId') == id ||
+rawClaimListHas('delegateIds', id)
+);
+}
+function myDelegateId() {
+return request.auth.token.get('delegateId', request.auth.uid);
+}
+function isSelfId(id) {
+return id == request.auth.uid || id == myDelegateId();
+}
+function companyScoped() {
+return scopedTo(callerCompany(), resource.data.get('companyUID', ''), resource.data.get('companyId', ''));
+}
+function orgScoped() {
+return scopedTo(callerOrg(), resource.data.get('organizationUID', ''), resource.data.get('organizationId', ''));
+}
+function incomingCompanyScoped() {
+return incomingScopedTo(callerCompany(), 'companyUID', 'companyId');
+}
+function incomingOrgScoped() {
+return incomingScopedTo(callerOrg(), 'organizationUID', 'organizationId');
+}
+function scopedTo(mine, a, b) {
+return mine != '' && (a == mine || b == mine);
+}
+function incomingScopedTo(mine, k1, k2) {
+return mine != '' && (request.resource.data[k1] == mine || request.resource.data[k2] == mine);
+}
+function delegateFieldsSafe(ids) {
+let ch = request.resource.data.diff(resource.data).affectedKeys();
+return ch.hasOnly([
+'updatedAt', 'requireReLogin', 'reLoginCompletedAt',
+'profileImageUrl', 'personalPhotoURL', 'photoURL',
+'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'
+])
+? (request.resource.data.get('requireReLogin', false) == false
+? (delegateDocsOk(ch, ids) ? delegateUrlsOnlyOk(ch, request.resource.data) : false)
+: false)
+: (ch.hasOnly([
+'updatedAt', 'requireReLogin', 'reLoginCompletedAt',
+'profileImageUrl', 'personalPhotoURL', 'photoURL',
+'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents',
+'profileImagePath', 'nationalIdFrontPath', 'nationalIdBackPath', 'receiptImagePath'
+])
+? (request.resource.data.get('requireReLogin', false) == false
+? (delegateDocsOk(ch, ids) ? delegateRefsOk(ch, request.resource.data) : false)
+: false)
+: false);
+}
+function delegatePathOk(v, ids) {
+return v == '' || (v is string && v.matches(
+'(delegate_documents|delegate_subscription_receipts|organizations/[^/.][^/]*/companies/[^/.][^/]*/delegates)/('
++ ids + ')(/(?:[^/.]|\\.[^/.]|\\.\\.[^/])[^/]*)+'));
+}
+function entryPathsOk(e, ids) {
+return !e.keys().hasAny(['documentPath', 'secondaryPath'])
+|| (delegatePathOk(e.get('documentPath', ''), ids) && delegatePathOk(e.get('secondaryPath', ''), ids));
+}
+function docIsApproved(e) {
+return e.get('documentStatus', '') is string
+&& e.get('documentStatus', '').lower() == 'approved';
+}
+function newDocEntryOk(n, o, i, ids) {
+return i >= n.size() || n[i] in o
+|| (n[i].get('documentStatus', '') is string && !docIsApproved(n[i])
+&& (ids == '' || entryPathsOk(n[i], ids)));
+}
+function delegateDocsOk(ch, ids) {
+let n = request.resource.data.get('documents', []);
+let o = resource.data.get('documents', []);
+return !ch.hasAny(['documents']) ? true
+: ((n is list && o is list && n.size() <= 8 && o.size() <= 8)
+? (newDocEntryOk(n, o, 0, ids) ? (newDocEntryOk(n, o, 1, ids) ? (newDocEntryOk(n, o, 2, ids)
+? (newDocEntryOk(n, o, 3, ids) ? (newDocEntryOk(n, o, 4, ids) ? (newDocEntryOk(n, o, 5, ids)
+? (newDocEntryOk(n, o, 6, ids) ? newDocEntryOk(n, o, 7, ids) : false)
+: false) : false) : false) : false) : false) : false)
+: false);
+}
+function pendingUrlAt(n, i, keys, field, url) {
+return i < n.size() && n[i].get(field, '') == url
+&& n[i].get('documentStatus', '') == 'pending'
+&& n[i].get('documentKey', '') in keys;
+}
+function urlBacked(keys, field, url) {
+let n = request.resource.data.get('documents', []);
+return n is list && (
+pendingUrlAt(n, 0, keys, field, url) || pendingUrlAt(n, 1, keys, field, url)
+|| pendingUrlAt(n, 2, keys, field, url) || pendingUrlAt(n, 3, keys, field, url)
+|| pendingUrlAt(n, 4, keys, field, url) || pendingUrlAt(n, 5, keys, field, url)
+|| pendingUrlAt(n, 6, keys, field, url) || pendingUrlAt(n, 7, keys, field, url));
+}
+function urlFieldOk(ch, d, f, keys) {
+let v = d.get(f, null);
+return (!ch.hasAny([f]) || v == null || v == '') ? true
+: (v is string && urlBacked(keys, 'documentURL', v));
+}
+function photoSame(ch, d, f, v) {
+let x = d.get(f, null);
+return !ch.hasAny([f]) || x == null || x == '' || x == v;
+}
+function photoV(ch, d) {
+return ch.hasAny(['profileImageUrl']) ? d.get('profileImageUrl', null)
+: (ch.hasAny(['personalPhotoURL']) ? d.get('personalPhotoURL', null) : d.get('photoURL', null));
+}
+function photoUrlsOk(ch, d, v) {
+return !ch.hasAny(['profileImageUrl', 'personalPhotoURL', 'photoURL']) ? true
+: ((photoSame(ch, d, 'profileImageUrl', v) && photoSame(ch, d, 'personalPhotoURL', v) && photoSame(ch, d, 'photoURL', v))
+? ((v == null || v == '') ? true : (v is string && urlBacked(['personalPhoto'], 'documentURL', v)))
+: false);
+}
+function idAt(n, i, ff, fv, bf, bv) {
+return i < n.size()
+&& (fv == null || n[i].get(ff, '') == fv)
+&& (bv == null || n[i].get(bf, '') == bv)
+&& n[i].get('documentStatus', '') == 'pending'
+&& n[i].get('documentKey', '') == 'nationalityId';
+}
+function idScan(n, ff, fv, bf, bv) {
+return idAt(n, 0, ff, fv, bf, bv) || idAt(n, 1, ff, fv, bf, bv)
+|| idAt(n, 2, ff, fv, bf, bv) || idAt(n, 3, ff, fv, bf, bv)
+|| idAt(n, 4, ff, fv, bf, bv) || idAt(n, 5, ff, fv, bf, bv)
+|| idAt(n, 6, ff, fv, bf, bv) || idAt(n, 7, ff, fv, bf, bv);
+}
+function setValue(ch, d, f) {
+return (ch.hasAny([f]) && d.get(f, null) != null && d.get(f, null) != '') ? d.get(f, null) : null;
+}
+function idUrlsOk(ch, d) {
+let fv = setValue(ch, d, 'nationalIdFrontUrl');
+let bv = setValue(ch, d, 'nationalIdBackUrl');
+let n = d.get('documents', []);
+return (fv == null && bv == null) ? true
+: ((n is list
+&& (n.size() <= 3 || !ch.hasAny(['profileImageUrl', 'personalPhotoURL', 'photoURL', 'profileImagePath'])))
+? idScan(n, 'documentURL', fv, 'secondaryURL', bv) : false);
+}
+function urlNamesPath(u, p) {
+return u is string && p is string
+&& u.matches('https?://[^/]+/v0/b/[^/]+/o/' + p.replace('/', '%2F') + '([?].*)?');
+}
+function refFieldOk(ch, d, f, pf, keys) {
+let p = setValue(ch, d, pf);
+let v = setValue(ch, d, f);
+return v != null ? ((p == null || urlNamesPath(v, p)) && v is string && urlBacked(keys, 'documentURL', v))
+: (p == null || (p is string && urlBacked(keys, 'documentPath', p)));
+}
+function photoRefsOk(ch, d, v) {
+let p = setValue(ch, d, 'profileImagePath');
+return p == null ? photoUrlsOk(ch, d, v)
+: ((photoSame(ch, d, 'profileImageUrl', v) && photoSame(ch, d, 'personalPhotoURL', v) && photoSame(ch, d, 'photoURL', v))
+? ((!ch.hasAny(['profileImageUrl', 'personalPhotoURL', 'photoURL']) || v == null || v == '')
+? (p is string && urlBacked(['personalPhoto'], 'documentPath', p))
+: (urlNamesPath(v, p) && urlBacked(['personalPhoto'], 'documentURL', v)))
+: false);
+}
+function idRefsOk(ch, d) {
+let fp = setValue(ch, d, 'nationalIdFrontPath');
+let bp = setValue(ch, d, 'nationalIdBackPath');
+let fv = setValue(ch, d, 'nationalIdFrontUrl');
+let bv = setValue(ch, d, 'nationalIdBackUrl');
+let n = d.get('documents', []);
+return (fp == null && bp == null) ? idUrlsOk(ch, d)
+: ((n is list
+&& (n.size() <= 3 || !ch.hasAny(['profileImageUrl', 'personalPhotoURL', 'photoURL', 'profileImagePath'])))
+? ((fv != null || bv != null)
+? (((fp == null || urlNamesPath(fv, fp)) && (bp == null || urlNamesPath(bv, bp)))
+? idScan(n, 'documentURL', fv, 'secondaryURL', bv) : false)
+: idScan(n, 'documentPath', fp, 'secondaryPath', bp))
+: false);
+}
+function delegateUrlsOnlyOk(ch, d) {
+return idUrlsOk(ch, d)
+? (photoUrlsOk(ch, d, photoV(ch, d))
+? urlFieldOk(ch, d, 'receiptImageUrl', ['paymentReceipt', 'electronicPaymentReceipt', 'electronic_payment_receipt'])
+: false)
+: false;
+}
+function delegateRefsOk(ch, d) {
+return (!ch.hasAny(['nationalIdFrontUrl', 'nationalIdBackUrl', 'nationalIdFrontPath', 'nationalIdBackPath'])
+|| idRefsOk(ch, d))
+? (photoRefsOk(ch, d, photoV(ch, d))
+? (!ch.hasAny(['receiptImageUrl', 'receiptImagePath']) || refFieldOk(ch, d, 'receiptImageUrl', 'receiptImagePath',
+['paymentReceipt', 'electronicPaymentReceipt', 'electronic_payment_receipt']))
+: false)
+: false;
+}
+function delegateStatusLower(st) {
+return st is string ? st.lower().trim() : '';
+}
+function techReqOk(orgId, compId, delegateId) {
+let d = request.resource.data;
+let rid = d.get('approvedRequestId', delegateId);
+let R = /databases/$(database)/documents/delegate_requests/$(rid);
+let a = getAfter(R).data;
+let ex = a.get('existingDelegateUid', null);
+let ty = a.get('requestType', 'new_delegate');
+return get(R).data.get('status', '') == 'pending'
+&& a.get('status', '') == 'approved'
+&& ty in ['new_delegate', 'add_organization']
+&& ((ty == 'add_organization' && ex is string && ex == delegateId)
+|| (ty == 'new_delegate' && rid == delegateId))
+&& compId == a.get('companyUID', '')
+&& d.get('companyUID', '') == compId
+&& d.get('organizationUID', '') == orgId
+&& (orgId == a.get('organizationUID', '')
+|| (ty == 'new_delegate'
+&& (orgId == get(/databases/$(database)/documents/users/$(a.get('supervisorUid', ''))).data.get('organizationUID', '')
+|| a.get('organizationUIDs', []).hasAny([orgId]))));
+}
+function reqAfter(delegateId) {
+return getAfter(/databases/$(database)/documents/delegate_requests/$(request.resource.data.get('approvedRequestId', delegateId))).data;
+}
+function flipAt(n, o, i, m) {
+return i >= n.size() || n[i] == o[i]
+|| (o[i].get('documentStatus', '') == 'pending'
+&& n[i].get('documentStatus', '') == 'approved'
+&& n[i].diff(o[i]).affectedKeys().hasOnly(['documentStatus', 'reviewedBy', 'reviewedAt'])
+&& m.get(n[i].get('documentKey', ''), null) == n[i].get('documentURL', '')
+&& (n[i].get('documentKey', '') != 'nationalityId' || n[i].get('secondaryURL', '') == m['#nidBack']));
+}
+function reqUrlMap(a) {
+return {
+'personalPhoto': a.get('profileImageUrl', ''),
+'nationalityId': a.get('nationalIdFrontUrl', ''),
+'#nidBack': a.get('nationalIdBackUrl', ''),
+'paymentReceipt': a.get('receiptImageUrl', ''),
+'electronicPaymentReceipt': a.get('receiptImageUrl', ''),
+'electronic_payment_receipt': a.get('receiptImageUrl', '')
+};
+}
+function techFlipOk(delegateId) {
+let n = request.resource.data.get('documents', []);
+let o = resource.data.get('documents', []);
+let m = reqUrlMap(reqAfter(delegateId));
+return changedKeys().hasOnly(['status', 'documents', 'updatedAt', 'reviewedBy', 'reviewedAt', 'approvedRequestId'])
+&& resource.data.get('statusReason', '') != 'delete'
+&& (!changedKeys().hasAny(['documents'])
+|| (n is list && o is list && n.size() == o.size() && n.size() <= 8
+&& flipAt(n, o, 0, m) && flipAt(n, o, 1, m) && flipAt(n, o, 2, m) && flipAt(n, o, 3, m)
+&& flipAt(n, o, 4, m) && flipAt(n, o, 5, m) && flipAt(n, o, 6, m) && flipAt(n, o, 7, m)));
+}
+function staffDocsApproveOk(o1, c1, c2, delegateId) {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let c = u.get('companyUID', '');
+let st0 = resource.data.get('status', null);
+let st1 = request.resource.data.get('status', null);
+let stCh = changedKeys().hasAny(['status']);
+let privGlobalStaffDocsServer = (r in superAdminRoleList() || r in techRoleList())
+&& !stCh
+&& changedKeys().hasAny(['documents']);
+let approver = request.auth.uid != delegateId && (
+r in superAdminRoleList()
+|| (c != '' && (c == c1 || c == c2) && r in companyAdminRoles()));
+let tech = r in techRoleList();
+let techSignup = tech && (st0 == 'pending' || st0 == 'Pending')
+&& (st1 == 'active' || st1 == 'Active');
+return (stCh && st1 == 'pending' && !approver) ? false
+: (privGlobalStaffDocsServer ? false
+: (techSignup
+? (techFlipOk(delegateId) ? techReqOk(o1, c1, delegateId) : false)
+: ((approver ? true : delegateDocsOk(changedKeys(), ''))
+? (staffDelegateAccountFieldsOk(r, approver) ? sourceStampKeysLocked() : false)
+: false)));
+}
+function cheapCreateDocsNotApproved(n) {
+return n is list && n.size() <= 8
+&& (n.size() < 1 || n[0].get('documentStatus', '').lower() != 'approved')
+&& (n.size() < 2 || n[1].get('documentStatus', '').lower() != 'approved')
+&& (n.size() < 3 || n[2].get('documentStatus', '').lower() != 'approved')
+&& (n.size() < 4 || n[3].get('documentStatus', '').lower() != 'approved')
+&& (n.size() < 5 || n[4].get('documentStatus', '').lower() != 'approved')
+&& (n.size() < 6 || n[5].get('documentStatus', '').lower() != 'approved')
+&& (n.size() < 7 || n[6].get('documentStatus', '').lower() != 'approved')
+&& (n.size() < 8 || n[7].get('documentStatus', '').lower() != 'approved');
+}
+function nestedDelegateCreateOk(orgId, compId, delegateId) {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let d = request.resource.data;
+let stl = d.get('status', '') is string ? d.get('status', '').lower().trim() : '';
+let n = d.get('documents', []);
+let sa = r in superAdminRoleList();
+let scopeOk = sa || r in techRoleList()
+|| (r in orgAdminRoleList() && u.get('organizationUID', '') == orgId)
+|| (r in companyPlaceholderCreateRoleList() && u.get('companyUID', '') == compId);
+let pendingOk = stl == 'pending' && cheapCreateDocsNotApproved(n);
+let pathDataOk = d.get('companyUID', '') == compId
+&& d.get('organizationUID', '') == orgId;
+return pathDataOk && scopeOk && (
+sa || ((r in companyPlaceholderCreateRoleList() || r in orgAdminRoleList()) && pendingOk)
+|| (r in techRoleList() && ((stl != 'active' && cheapCreateDocsNotApproved(n))
+|| (techCreateBound(delegateId) && techReqOk(orgId, compId, delegateId)))));
+}
+function techCreateBound(delegateId) {
+let d = request.resource.data;
+let n = d.get('documents', []);
+let a = reqAfter(delegateId);
+let m = reqUrlMap(a);
+return d.get('status', '') == 'active'
+&& [d.get('fullName', ''), d.get('nationalId', ''), d.get('profileImageUrl', ''),
+d.get('phoneNumber', ''), d.get('nationalIdFrontUrl', ''), d.get('nationalIdBackUrl', ''),
+d.get('receiptImageUrl', m['paymentReceipt']), d.get('personalPhotoURL', m['personalPhoto']),
+d.get('photoURL', m['personalPhoto'])]
+== [a.get('fullName', ''), a.get('nationalId', ''), m['personalPhoto'],
+a.get('phoneNumber', ''), m['nationalityId'], m['#nidBack'],
+m['paymentReceipt'], m['personalPhoto'], m['personalPhoto']]
+&& n is list && n.size() <= 8
+&& (n.size() <= 0 || entryOk(n[0], m)) && (n.size() <= 1 || entryOk(n[1], m))
+&& (n.size() <= 2 || entryOk(n[2], m)) && (n.size() <= 3 || entryOk(n[3], m))
+&& (n.size() <= 4 || entryOk(n[4], m)) && (n.size() <= 5 || entryOk(n[5], m))
+&& (n.size() <= 6 || entryOk(n[6], m)) && (n.size() <= 7 || entryOk(n[7], m));
+}
+function entryOk(e, m) {
+return !docIsApproved(e)
+|| (m.get(e.get('documentKey', ''), null) == e.get('documentURL', '')
+&& (e.get('documentKey', '') != 'nationalityId' || e.get('secondaryURL', '') == m['#nidBack']));
+}
+function profileEditKeys() {
+return ['fullName', 'firstName', 'secondName', 'thirdName', 'middleName', 'lastName',
+'phoneNumber', 'phone',
+'profileImageUrl', 'personalPhotoURL', 'personalPhotoUrl', 'photoURL',
+'nationalIdFrontUrl', 'nationalIdBackUrl',
+'profileImagePath', 'nationalIdFrontPath', 'nationalIdBackPath'];
+}
+function staffProfileFieldsOk(r) {
+return !changedKeys().hasAny(['nationalId', 'nationalityID'])
+&& !changedKeys().hasAny(profileEditKeys());
+}
+function staffManagesDelegate(orgId, compId, companyNeedsOrg) {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let o = u.get('organizationUID', '');
+let c = u.get('companyUID', '');
+return (r in staffRoleListGlobal())
+|| (o != '' && o in orgId && r in staffRoleListOrg()
+&& staffProfileFieldsOk(r))
+|| (c != '' && c in compId && (!companyNeedsOrg || o in orgId) && r in [
+'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
+'hr', 'company-hr', 'company_hr', 'human_resources',
+'accountant', 'accounting', 'account_admin',
+'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+'branches-marketing-manager', 'branchesmarketingmanager']
+&& staffProfileFieldsOk(r)
+&& !changedKeys().hasAny([
+'reviewedBy', 'reviewedAt', 'reviewedByName', 'rejectionReason',
+'approvedRequestId', 'approvedBy', 'approvedByName', 'approvedAt',
+'paymentStatus', 'paymentMethod', 'amountDue', 'amountPaid', 'paidAt',
+'organizationUID', 'organizationId', 'companyUID', 'companyId']));
+}
+function deviceBindingKeys() {
+return [
+'boundDeviceId', 'boundDeviceModel', 'boundDeviceBrand', 'boundDeviceOs',
+'deviceBoundAt', 'deviceLastSeenAt', 'isDeviceLocked', 'deviceResetAt', 'deviceResetBy'
+];
+}
+function deviceBindingUntouched() {
+return !request.resource.data.diff(resource.data).affectedKeys().hasAny(deviceBindingKeys());
+}
+function deviceBindingAbsent() {
+return !request.resource.data.keys().hasAny(deviceBindingKeys());
+}
+function delegateCreateHasIdentity() {
+let d = request.resource.data;
+return (d.get('fullName', '') is string && d.get('fullName', '') != '')
+|| (d.get('firstName', '') is string && d.get('firstName', '') != '')
+|| (d.get('name', '') is string && d.get('name', '') != '')
+|| (d.get('nationalityID', '') is string && d.get('nationalityID', '') != '')
+|| (d.get('nationalId', '') is string && d.get('nationalId', '') != '')
+|| (d.get('phoneNumber', '') is string && d.get('phoneNumber', '') != '');
+}
+function staffRequestScope() {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let org = u.get('organizationUID', '');
+let co = u.get('companyUID', '');
+return {
+'global': r in staffRoleListGlobal(),
+'org': (r in staffRoleListOrg() || r == 'org-admin')
+? (org is string && org != '' ? org : request.auth.token.get('orgId', ''))
+: '',
+'company': r in staffRoleListCompany()
+? (co is string && co != '' ? co : request.auth.token.get('companyId', ''))
+: ''
+};
+}
+function superAdminRoleList() {
+return ['super-admin', 'super_admin', 'superadmin', 'superAdmin', 'Super-Admin', 'SUPER_ADMIN'];
+}
+function orgAdminRoleList() {
+return ['organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin', 'org-admin'];
+}
+function changedKeys() {
+return request.resource.data.diff(resource.data).affectedKeys();
+}
+match /users/{userId} {
+function escalationKeys() {
+return [
+'role', 'status', 'organizationUID', 'companyUID', 'uid',
+'organizationId', 'companyId'
+];
+}
+function delegateDocsNoneApproved(n) {
+return n is list && n.size() <= 8
+&& (n.size() <= 0 || !docIsApproved(n[0])) && (n.size() <= 1 || !docIsApproved(n[1]))
+&& (n.size() <= 2 || !docIsApproved(n[2])) && (n.size() <= 3 || !docIsApproved(n[3]))
+&& (n.size() <= 4 || !docIsApproved(n[4])) && (n.size() <= 5 || !docIsApproved(n[5]))
+&& (n.size() <= 6 || !docIsApproved(n[6])) && (n.size() <= 7 || !docIsApproved(n[7]));
+}
+function fieldRoleList() {
+return ['delegate', 'promoter', ''];
+}
+function roleOf(d) {
+return d.get('role', '') is string ? d.get('role', '') : '';
+}
+function secretKeys() {
+return ['password', 'temporaryPassword', 'tempPassword'];
+}
+function privilegeKeys() {
+return ['permissions', 'isSuperAdmin', 'claims', 'customClaims'];
+}
+function noSecretsCreate() {
+return !request.resource.data.keys().hasAny(secretKeys());
+}
+function noSecretsUpdate() {
+return !changedKeys().hasAny(secretKeys());
+}
+function orgSegment(d) {
+return d.get('organizationUID', '') is string && d.get('organizationUID', '') != ''
+? d.get('organizationUID', '') : '_none';
+}
+function companyPinned(d) {
+return (!(d.get('companyUID', '') is string) || d.get('companyUID', '') == ''
+|| exists(/databases/$(database)/documents/organizations/$(orgSegment(d))/companies/$(d.get('companyUID', ''))))
+&& (!(d.get('companyId', '') is string) || d.get('companyId', '') == ''
+|| exists(/databases/$(database)/documents/organizations/$(orgSegment(d))/companies/$(d.get('companyId', ''))))
+&& (d.get('organizationId', '') == '' || d.get('organizationId', '') == d.get('organizationUID', ''));
+}
+function staffUsersListOk() {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let org = u.get('organizationUID', '') is string && u.get('organizationUID', '') != ''
+? u.get('organizationUID', '') : claimString('orgId');
+let co = u.get('companyUID', '') is string && u.get('companyUID', '') != ''
+? u.get('companyUID', '') : claimString('companyId');
+let d = resource.data;
+return r in superAdminRoleList()
+|| r in techRoleList()
+|| (org != '' && (d.get('organizationUID', '') == org || d.get('organizationId', '') == org)
+&& (r in staffRoleListOrg()
+|| (co == '' && r in branchesMarketingRoles())))
+|| (co != '' && (d.get('companyUID', '') == co || d.get('companyId', '') == co)
+&& r in staffRoleListCompany())
+|| (!(r in ['', 'delegate'])
+&& ((u.get('phoneNumber', '') != '' && d.get('phoneNumber', '') == u.get('phoneNumber', ''))
+|| (u.get('email', '') != '' && d.get('email', '') == u.get('email', ''))));
+}
+function companyStaffWriterRoleList() {
+return companyAdminHrRoles();
+}
+function companyCanGrant(r, nr) {
+return nr in ['delegate', 'promoter', '']
+|| (r in ['company-admin', 'company_admin', 'companyadmin', 'admin']
+&& nr in ['supervisor', 'company_supervisor', 'hr', 'company-hr', 'company_hr', 'human_resources']);
+}
+function normRoleStr(r) {
+return r is string ? r.lower().replace('[^a-z]', '') : '';
+}
+function isPrivilegedRoleStr(r) {
+return normRoleStr(r) in ['superadmin', 'technicalsupport', 'techsupport',
+'organizationadmin', 'orgadmin'];
+}
+function newRoleOk(r) {
+return r == 'super-admin' || normRoleStr(r) != 'superadmin';
+}
+function companyStaffUsersCreateFieldOk(d) {
+let nr = roleOf(d);
+let docs = d.get('documents', []);
+let st = d.get('status', '');
+return !(nr in fieldRoleList())
+|| ((!d.keys().hasAny(['isActive']) || d.get('isActive', false) != true)
+&& (!d.keys().hasAny(['status'])
+|| (st is string && st.lower().trim() == 'pending'
+&& (!(docs is list) || delegateDocsNoneApproved(docs)))));
+}
+function usersIdentityClientLocked(changed) {
+return !changed.hasAny(['nationalId', 'nationalityID']);
+}
+function usersCreateOk(r, org, co, d) {
+let nr = roleOf(d);
+let isSA = r in superAdminRoleList();
+let selfCreate = request.auth.uid == request.resource.id
+&& nr in ['delegate', '']
+&& d.get('uid', request.auth.uid) == request.auth.uid
+&& !d.keys().hasAny(['status', 'organizationUID', 'companyUID', 'organizationId', 'companyId', 'isActive',
+'phoneNumber', 'phone', 'email'])
+&& !d.keys().hasAny(privilegeKeys())
+&& !isPrivilegedRoleStr(nr);
+return usersIdentityClientLocked(d.keys())
+&& newRoleOk(nr) && (isSA || selfCreate || (
+!d.keys().hasAny(privilegeKeys())
+&& !isPrivilegedRoleStr(nr)
+&& companyPinned(d)
+&& (
+(r in techRoleList()) ||
+(r in orgAdminRoleList() && org != '' && d.get('organizationUID', '') == org
+&& companyStaffUsersCreateFieldOk(d)) ||
+(r in companyStaffWriterRoleList() && co != '' && org != ''
+&& d.get('organizationUID', '') == org && d.get('companyUID', '') == co
+&& companyCanGrant(r, nr)
+&& companyStaffUsersCreateFieldOk(d))
+)
+));
+}
+function staffMaySetIsActiveActive(d, old, changed, r) {
+return !changed.hasAny(['isActive'])
+|| r in superAdminRoleList()
+|| r in techRoleList()
+|| (!(roleOf(old) in fieldRoleList() || roleOf(d) in fieldRoleList())
+&& d.get('isActive', true) != true);
+}
+function staffMaySetUserStatus(d, old, changed, r) {
+return !changed.hasAny(['status'])
+|| r in superAdminRoleList()
+|| r in techRoleList()
+|| !(roleOf(old) in fieldRoleList() || roleOf(d) in fieldRoleList());
+}
+function usersUpdateOk(r, org, co, old, d, userId) {
+let changed = d.diff(old).affectedKeys();
+let nr = roleOf(d);
+let or = roleOf(old);
+return usersIdentityClientLocked(changed) && ((r in superAdminRoleList() && newRoleOk(nr)) || (
+newRoleOk(nr)
+&& !changed.hasAny(privilegeKeys())
+&& staffMaySetIsActiveActive(d, old, changed, r)
+&& staffMaySetUserStatus(d, old, changed, r)
+&& (!changed.hasAny(['role', 'organizationUID', 'companyUID', 'organizationId', 'companyId']) || companyPinned(d))
+&& (
+(request.auth.uid == userId
+&& !changed.hasAny(escalationKeys().concat(['isActive', 'phoneNumber', 'phone', 'email']))) ||
+(request.auth.uid != userId
+&& !isPrivilegedRoleStr(or) && !isPrivilegedRoleStr(nr)
+&& (
+(r in techRoleList()) ||
+(r in orgAdminRoleList() && org != ''
+&& old.get('organizationUID', '') == org && d.get('organizationUID', '') == org) ||
+(r in companyStaffWriterRoleList() && co != ''
+&& old.get('companyUID', '') == co && d.get('companyUID', '') == co
+&& old.get('organizationUID', '') == d.get('organizationUID', '')
+&& (!changed.hasAny(['role'])
+|| (!(or in fieldRoleList()) && !(nr in fieldRoleList())
+&& companyCanGrant(r, nr) && companyCanGrant(r, or))))
+))
+)
+));
+}
+function usersDeleteOk(r, org, co, old) {
+return r in superAdminRoleList() || (
+r in companyAdminRoles()
+&& co != '' && org != ''
+&& old.get('companyUID', '') == co && old.get('organizationUID', '') == org
+&& roleOf(old) in fieldRoleList()
+);
+}
+allow get: if signedIn() && (
+request.auth.uid == userId ||
+ownsDelegateId(userId) ||
+isGlobalStaff() ||
+(isOrgScopedStaff() && orgScoped()) ||
+(isCompanyScopedStaff() && companyScoped())
+);
+allow list: if signedIn() && (staffToken()
+? staffUsersListOk()
+: (
+isGlobalStaff() ||
+(isOrgScopedStaff() && orgScoped()) ||
+(isCompanyScopedStaff() && companyScoped()) ||
+(userExists()
+&& userDoc().keys().hasAll(['phoneNumber'])
+&& resource.data.phoneNumber == userDoc().phoneNumber) ||
+(userExists()
+&& userDoc().keys().hasAll(['email'])
+&& resource.data.email == userDoc().email)
+));
+allow create: if signedIn() && noSecretsCreate()
+&& usersCreateOk(userRole(), callerOrg(), callerCompany(), request.resource.data);
+allow update: if signedIn() && noSecretsUpdate()
+&& usersUpdateOk(userRole(), callerOrg(), callerCompany(), resource.data, request.resource.data, userId);
+allow delete: if signedIn() && request.auth.uid != userId
+&& usersDeleteOk(userRole(), callerOrg(), callerCompany(), resource.data);
+}
+function sourceStampKeys() {
+return ['delegateSource', 'chainOrigin', 'delegateSourceInferredBy',
+'delegateSourceAt', 'delegateSourceRunId', 'delegateSourceRevertRunId',
+'holds', 'statusVersion', 'holdsAuthorityAt', 'rejectionReason',
+'holdsBackfillRunId'];
+}
+function sourceStampKeysLocked() {
+return request.method == 'create'
+? !request.resource.data.keys().hasAny(sourceStampKeys())
+: !changedKeys().hasAny(sourceStampKeys());
+}
+function techRoleList() {
+return ['technical_support', 'technical-support', 'technicalSupport', 'technicalsupport', 'tech_support', 'techsupport'];
+}
+function companyPlaceholderCreateRoleList() {
+return companyAdminHrRoles();
+}
+function staffDelegateAccountFieldsOk(r, approver) {
+let ch = changedKeys();
+let stCh = ch.hasAny(['status']);
+let actCh = ch.hasAny(['isActive']);
+let globalStaff = r in superAdminRoleList() || r in techRoleList();
+let fromSuspended = delegateStatusLower(resource.data.get('status', '')) == 'suspended';
+let idClientLock = !ch.hasAny(['nationalId', 'nationalityID']);
+return idClientLock
+&& ((!stCh && !actCh) || (globalStaff && (stCh || actCh)));
+}
+function orgOf(u) {
+let o = u.get('organizationUID', '');
+return o is string && o != '' ? o : claimString('orgId');
+}
+match /organizations/{orgId} {
+function orgUpdateOk(orgId) {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let inOrg = orgOf(u) == orgId;
+return r in superAdminRoleList()
+|| (inOrg && r in orgAdminRoleList())
+|| (inOrg && (r in staffRoleListGlobal() || r in staffRoleListOrg()
+|| r in staffRoleListCompany() || r == 'org-admin')
+&& request.resource.data.diff(resource.data).affectedKeys().hasOnly(['admins', 'updatedAt'])
+&& request.resource.data.admins == resource.data.admins + 1);
+}
+allow read: if knownIdentity();
+allow create: if isSuperAdmin();
+allow update: if signedIn() && orgUpdateOk(orgId);
+allow delete: if isSuperAdmin();
+match /branches/{branchId} {
+allow read: if knownIdentity();
+allow write: if isGlobalStaff() || (isOrgAdmin() && callerOrg() == orgId);
+}
+match /stats/{statId} {
+allow read: if staffToken() && staffTargetOk(orgId, '', true);
+allow write: if false;
+}
+match /sent_notifications/{notificationId} {
+allow read: if isGlobalStaff() || (signedIn() && callerOrg() == orgId && (isOrgScopedStaff() || isCompanyScopedStaff()));
+allow create, update, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
+}
+match /members/{memberId} {
+allow read: if signedIn() && (request.auth.uid == memberId || isGlobalStaff() || callerOrg() == orgId);
+allow create, update, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
+}
+match /admins/{adminId} {
+allow read: if isGlobalStaff() || (signedIn() && callerOrg() == orgId && isStaffWriter());
+allow create, update, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
+}
+match /companies/{compId} {
+function canManageNestedDelegate(orgId, compId) {
+return isGlobalStaff()
+|| (isOrgScopedStaff() && callerOrg() == orgId)
+|| (isCompanyScopedStaff() && callerCompany() != '' && callerCompany() == compId);
+}
+function companyAdminEditOk() {
+let ch = request.resource.data.diff(resource.data).affectedKeys();
+return !ch.hasAny(['deferredPayment', 'hasDeferredPayment', 'totalApprovedDelegates',
+'delegates', 'delegatesCount', 'admins', 'organizationUID', 'organizationName',
+'organizationCode', 'companyCodeInOrg', 'companyCodeInOrgPending', 'registeredVia',
+'uid', 'id', 'delegatesForceLogoutAt', 'forceLogoutReason', 'forceLogoutBy'])
+&& (!ch.hasAny(['status'])
+|| request.resource.data.get('status', '') in ['Pending', 'Action Required']);
+}
+function companyDocWriteOk(orgId, compId) {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let org = u.get('organizationUID', '');
+return r in staffRoleListGlobal()
+|| (org == orgId && r in orgAdminRoleList())
+|| (request.method == 'update'
+&& org == orgId && u.get('companyUID', '') == compId
+&& r in companyAdminRoles()
+&& companyAdminEditOk());
+}
+allow read: if knownIdentity();
+allow create, update, delete: if staffToken() && companyDocWriteOk(orgId, compId);
+match /admins/{adminId} {
+allow read: if signedIn() && (
+isGlobalStaff() || callerOrg() == orgId || request.auth.uid == adminId
+);
+allow create, update, delete: if isSuperAdmin()
+|| (isOrgAdmin() && callerOrg() == orgId)
+|| (isCompanyAdmin() && callerOrg() == orgId && callerCompany() == compId && request.auth.uid == adminId);
+}
+match /members/{memberId} {
+allow read: if signedIn() && (
+request.auth.uid == memberId || isGlobalStaff() || canManageNestedDelegate(orgId, compId)
+);
+allow create, update, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
+}
+match /delegates/{delegateId} {
+function nestedDelegateCreateScopeOk(orgId, compId) {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+return r in superAdminRoleList() || r in techRoleList()
+|| (r in orgAdminRoleList() && u.get('organizationUID', '') == orgId)
+|| (r in companyPlaceholderCreateRoleList() && u.get('companyUID', '') == compId);
+}
+function staffRole() {
+return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+: '';
+}
+function nestedDelegateDeleteOk(orgId, compId) {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let org = u.get('organizationUID', '');
+let co = u.get('companyUID', '');
+return r in staffRoleListGlobal()
+|| (org is string && org != '' && org == orgId && r in staffRoleListOrg())
+|| (co is string && co != '' && co == compId && r in companyAdminHrRoles());
+}
+function delegateIsSupervisorIn(orgId, compId) {
+return get(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId)/delegates/$(myDelegateId()))
+.data.get('position', '') in ['supervisor', 'Supervisor', 'مشرف'];
+}
+function canReadNestedDelegate(orgId, compId, delegateId) {
+return signedIn() && (
+delegateId == request.auth.uid
+|| (request.auth.token.keys().hasAll(['delegateIds'])
+&& request.auth.token.delegateIds is list
+&& delegateId in request.auth.token.delegateIds)
+|| (delegateOtpOk()
+&& request.auth.token.keys().hasAll(['orgId'])
+&& request.auth.token.orgId == orgId
+&& request.auth.token.keys().hasAll(['companyId'])
+&& request.auth.token.companyId == compId
+&& delegateIsSupervisorIn(orgId, compId))
+|| (request.auth.token.get('role', '') == 'delegate'
+&& delegateOtpOk()
+&& delegateInOrg(orgId)
+&& delegateInCompany(compId)
+&& delegateIsSupervisorIn(orgId, compId))
+|| (staffToken() && (
+staffRole() in [
+'super-admin', 'super_admin', 'superadmin', 'superAdmin',
+'technical_support', 'technical-support', 'technicalSupport',
+'technicalsupport', 'tech_support', 'techsupport'
+]
+|| (callerCompany() != '' && callerCompany() == compId && staffRole() in [
+'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor', 'company_supervisor',
+'hr', 'company-hr', 'company_hr', 'human_resources',
+'accountant', 'accounting', 'account_admin', 'branches_marketing',
+'branches_marketing_manager', 'branchesMarketingManager',
+'branches-marketing', 'branches-marketing-manager', 'branchesmarketingmanager'
+])
+|| (callerOrg() == orgId && staffRole() in [
+'organization-admin', 'organization_admin', 'organizationAdmin', 'organizationadmin', 'org-admin',
+'marketing', 'marketing_promotion', 'marketingPromotion', 'marketingpromotion'
+])
+))
+);
+}
+allow read: if signedIn() && canReadNestedDelegate(orgId, compId, delegateId);
+allow create: if nestedDelegateCreateScopeOk(orgId, compId) ? (
+!delegateOwns(delegateId) && delegateCreateHasIdentity()
+&& deviceBindingAbsent() && sourceStampKeysLocked()
+&& exists(/databases/$(database)/documents/organizations/$(orgId)/companies/$(compId))
+&& nestedDelegateCreateOk(orgId, compId, delegateId)) : false;
+allow update: if delegateOwns(delegateId)
+? delegateFieldsSafe(delegateId + '|' + request.auth.uid)
+: (deviceBindingUntouched() && signedIn()
+&& staffManagesDelegate([orgId], [compId], false)
+&& staffDocsApproveOk(orgId, compId, compId, delegateId));
+allow delete: if staffToken() ? nestedDelegateDeleteOk(orgId, compId) : false;
+}
+match /stats/{statId} {
+allow read: if staffToken() && staffTargetOk(orgId, compId, true);
+allow write: if false;
+}
+match /requests/{requestId} {
+function staffRequestWriteOk(tOrg, tCo) {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let org = u.get('organizationUID', '');
+let co = u.get('companyUID', '');
+let orgOk = org is string && org != '' && org == tOrg;
+let approver = r in staffRoleListGlobal()
+|| (orgOk && r in orgAdminRoleList());
+let next = request.resource.data.get('status', '');
+let prev = request.method == 'create' ? '' : resource.data.get('status', '');
+let undecided = request.method == 'create'
+? next == 'pending'
+: (next == prev
+|| (next == 'cancelled' && prev in ['pending', 'action_required'])
+|| (next == 'pending' && prev in ['pending', 'action_required']));
+return approver
+|| (undecided && (
+(orgOk && r in staffRoleListOrg())
+|| (co is string && co != '' && co == tCo && r in staffRoleListCompany())));
+}
+function nestedRequestStaffReadOk(orgId, compId) {
+let s = staffRequestScope();
+return s.global
+|| (s.org != '' && s.org == orgId)
+|| (s.company != '' && s.company == compId);
+}
+allow read: if signedIn() && (
+staffToken() ? nestedRequestStaffReadOk(orgId, compId) : delegateInCompany(compId)
+);
+allow create, update: if staffToken() && staffRequestWriteOk(orgId, compId);
+allow delete: if staffToken() && staffTargetOk(orgId, compId, true);
+}
+match /notifications/{notificationId} {
+allow read: if signedIn() && (
+staffToken() ? staffTargetOk(orgId, compId, true) : delegateInCompany(compId)
+);
+allow create, delete: if isSuperAdmin() || (isOrgAdmin() && callerOrg() == orgId);
+allow update: if staffToken()
+&& request.resource.data.diff(resource.data).affectedKeys()
+.hasOnly(['read', 'isRead', 'readAt', 'readBy'])
+&& staffTargetOk(orgId, compId, true);
+}
+match /photo_permissions/{permissionId} {
+function photoScheduleKeysOnly() {
+return changedKeys().hasOnly([
+'startDate', 'endDate', 'branchIds', 'branchNames', 'updatedAt']);
+}
+function photoScheduleStaffRole(role) {
+return role in [
+'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion',
+'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
+'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+'branches-marketing-manager', 'branchesmarketingmanager',
+'branchesMarketingManager'
+];
+}
+function photoScheduleStaffFromUser(u, orgId, compId) {
+let role = u.keys().hasAll(['role']) && u.role is string ? u.role : '';
+let org = u.keys().hasAll(['organizationUID']) && u.organizationUID is string
+? u.organizationUID : '';
+let co = u.keys().hasAll(['companyUID']) && u.companyUID is string
+? u.companyUID : '';
+return photoScheduleStaffRole(role)
+&& org != '' && org == orgId
+&& (co == '' || co == compId);
+}
+function photoScheduleEditOnNested(orgId, compId) {
+return photoScheduleKeysOnly()
+&& exists(/databases/$(database)/documents/users/$(request.auth.uid))
+&& photoScheduleStaffFromUser(
+get(/databases/$(database)/documents/users/$(request.auth.uid)).data,
+orgId, compId);
+}
+function photoPromotionReviewerRole(role) {
+return role in [
+'marketing_promotion', 'marketingpromotion', 'marketingPromotion'
+];
+}
+function photoReviewKeysOnly() {
+return changedKeys().hasOnly([
+'status', 'isSupervisorEnabled', 'approvedBy', 'approvedAt',
+'rejectedBy', 'rejectedAt', 'reviewedBy', 'reviewedAt',
+'rejectionReason', 'approvedByName',
+'startDate', 'endDate', 'branchIds', 'branchNames', 'updatedAt']);
+}
+function photoPromotionReviewFromUser(u, orgId, compId) {
+let role = u.keys().hasAll(['role']) && u.role is string ? u.role : '';
+let org = u.keys().hasAll(['organizationUID']) && u.organizationUID is string
+? u.organizationUID : '';
+let co = u.keys().hasAll(['companyUID']) && u.companyUID is string
+? u.companyUID : '';
+return photoPromotionReviewerRole(role)
+&& org != '' && org == orgId
+&& (co == '' || co == compId);
+}
+function photoReviewStatusOk() {
+return !changedKeys().hasAny(['status'])
+|| request.resource.data.get('status', '') in ['approved', 'rejected'];
+}
+function photoPromotionReviewOnNested(orgId, compId) {
+return photoReviewKeysOnly()
+&& photoReviewStatusOk()
+&& exists(/databases/$(database)/documents/users/$(request.auth.uid))
+&& photoPromotionReviewFromUser(
+get(/databases/$(database)/documents/users/$(request.auth.uid)).data,
+orgId, compId);
+}
+function photoPromotionDeleteOnNested(orgId, compId) {
+return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+&& photoPromotionReviewFromUser(
+get(/databases/$(database)/documents/users/$(request.auth.uid)).data,
+orgId, compId);
+}
+allow read: if signedIn() && callerCompany() != '' && callerCompany() == compId;
+allow create: if signedIn() && (staffToken()
+? staffTargetOk(orgId, compId, true)
+: (delegateInOrg(orgId) && delegateInCompany(compId)));
+allow update: if signedIn() && (
+photoScheduleEditOnNested(orgId, compId)
+|| photoPromotionReviewOnNested(orgId, compId)
+|| isGlobalStaff()
+);
+allow delete: if isGlobalStaff() || photoPromotionDeleteOnNested(orgId, compId);
+match /captured_photos/{photoId} {
+allow create: if signedIn() && (staffToken()
+? staffTargetOk(orgId, compId, true)
+: (delegateInOrg(orgId) && delegateInCompany(compId)));
+allow update: if false;
+allow delete: if canManageNestedDelegate(orgId, compId);
+}
+}
+}
+match /companyRequests/{requestId} {
+allow read: if signedIn() && (isGlobalStaff() || callerOrg() == orgId);
+allow create: if isSuperAdmin()
+|| (isOrgAdmin() && callerOrg() == orgId)
+|| (isCompanyAdmin() && callerOrg() == orgId && callerCompany() != ''
+&& request.resource.data.get('targetCompanyId', '') == callerCompany());
+allow update: if isSuperAdmin()
+|| (isOrgAdmin() && callerOrg() == orgId)
+|| (isCompanyAdmin() && callerOrg() == orgId && callerCompany() != ''
+&& resource.data.get('targetCompanyId', '') == callerCompany()
+&& request.resource.data.get('targetCompanyId', '') == callerCompany());
+allow delete: if isSuperAdmin()
+|| (isOrgAdmin() && callerOrg() == orgId)
+|| (isCompanyAdmin() && callerOrg() == orgId && callerCompany() != ''
+&& resource.data.get('targetCompanyId', '') == callerCompany());
+}
+match /tasks/{taskId} {
+function taskStaffLevel(role) {
+return role in staffRoleListGlobal() ? 1
+: role in staffRoleListOrg() ? 2
+: role in ['company-admin', 'company_admin', 'companyadmin', 'admin',
+'supervisor', 'company_supervisor', 'hr', 'company-hr', 'company_hr',
+'human_resources', 'accountant', 'accounting', 'account_admin',
+'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+'branches-marketing-manager', 'branchesmarketingmanager'] ? 3
+: 0;
+}
+function taskEffectiveLevel(level, role, comp) {
+return level == 3 && comp == '' && role in ['branches_marketing',
+'branches-marketing', 'branches_marketing_manager',
+'branches-marketing-manager', 'branchesmarketingmanager'] ? 2 : level;
+}
+function taskUserData() {
+return signedIn()
+&& exists(/databases/$(database)/documents/users/$(request.auth.uid))
+? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+: {};
+}
+function taskOrgOf(ud) {
+return ud.get('organizationUID', '') is string && ud.get('organizationUID', '') != ''
+? ud.organizationUID : claimString('orgId');
+}
+function taskCompanyOf(ud) {
+return ud.get('companyUID', '') is string && ud.get('companyUID', '') != ''
+? ud.companyUID : claimString('companyId');
+}
+function taskStaffScope(taskCompany) {
+let ud = taskUserData();
+let role = ud.get('role', '') is string ? ud.get('role', '') : '';
+let comp = taskCompanyOf(ud);
+let level = taskEffectiveLevel(taskStaffLevel(role), role, comp);
+let org = taskOrgOf(ud);
+return level == 1 ? 1
+: level == 2 && org == orgId ? 2
+: level == 3 && org == orgId && comp != '' && comp == taskCompany ? 3
+: 0;
+}
+function taskSenderKeys() {
+return ['title', 'description', 'imageUrl', 'imagePath', 'imagePaths', 'editedAt'];
+}
+function taskTouchesSenderKeys() {
+return request.resource.data.diff(resource.data).affectedKeys().hasAny(taskSenderKeys());
+}
+function taskAssignerLevel(role) {
+let level = taskStaffLevel(role);
+return role in ['hr', 'company-hr', 'company_hr', 'human_resources',
+'accountant', 'accounting', 'account_admin'] ? 0 : level;
+}
+function taskAssignerScope(taskCompany) {
+let ud = taskUserData();
+let role = ud.get('role', '') is string ? ud.get('role', '') : '';
+let comp = taskCompanyOf(ud);
+let level = taskEffectiveLevel(taskAssignerLevel(role), role, comp);
+let org = taskOrgOf(ud);
+return level == 1 ? 1
+: level == 2 && org == orgId ? 2
+: level == 3 && org == orgId && comp != '' && comp == taskCompany ? 3
+: 0;
+}
+function taskAssignmentKeys() {
+return ['assignedTo', 'assignedToName', 'companyId', 'companyUID'];
+}
+function taskTouchesAssignmentKeys() {
+return request.resource.data.diff(resource.data).affectedKeys()
+.hasAny(taskAssignmentKeys());
+}
+function incomingTaskImagePathOk(path) {
+let pre = '^task_images/' + request.resource.data.get('companyId', '') + '/';
+let me = myDelegateId();
+return path is string
+&& (path.matches(pre + request.auth.uid + '/task_' + request.auth.uid + '_[^_]+$')
+|| (me != request.auth.uid
+&& path.matches(pre + me + '/task_' + me + '_[^_]+$')));
+}
+function incomingTaskImageListOk() {
+return !request.resource.data.keys().hasAny(['imagePaths'])
+|| (request.resource.data.imagePaths is list
+&& request.resource.data.imagePaths.size() <= 3
+&& (request.resource.data.imagePaths.size() == 0
+|| incomingTaskImagePathOk(request.resource.data.imagePaths[0]))
+&& (request.resource.data.imagePaths.size() < 2
+|| incomingTaskImagePathOk(request.resource.data.imagePaths[1]))
+&& (request.resource.data.imagePaths.size() < 3
+|| incomingTaskImagePathOk(request.resource.data.imagePaths[2])));
+}
+function incomingTaskImageOk() {
+let data = request.resource.data;
+let pathOk = !data.keys().hasAny(['imagePath'])
+|| incomingTaskImagePathOk(data.imagePath);
+let listOk = incomingTaskImageListOk();
+let consistent = !data.keys().hasAny(['imagePath'])
+|| !data.keys().hasAny(['imagePaths'])
+|| data.imagePaths.size() == 0
+|| data.imagePath == data.imagePaths[0];
+return pathOk && listOk && consistent;
+}
+function taskImageChangeOk() {
+return !request.resource.data.diff(resource.data).affectedKeys()
+.hasAny(['imagePath', 'imagePaths'])
+|| incomingTaskImageOk();
+}
+function taskDelegateTarget() {
+return delegateInOrg(orgId) && (
+ownsDelegateId(resource.data.assignedTo)
+|| ((resource.data.get('companyId', '') == claimString('companyId')
+|| claimListHas('companyIds', resource.data.get('companyId', '')))
+&& resource.data.assignedTo in ['all', 'all_marketing_promotion', 'all_branch_marketing'])
+|| ownsDelegateId(resource.data.createdBy)
+);
+}
+function taskKeepsSender() {
+return !request.resource.data.diff(resource.data).affectedKeys()
+.hasAny(['createdBy', 'createdByName']);
+}
+function taskDelegateCanUpdate() {
+return taskDelegateTarget()
+&& taskKeepsSender()
+&& request.resource.data.diff(resource.data).affectedKeys()
+.hasOnly(['status', 'notes', 'completedAt', 'completedBy']);
+}
+function taskStaffCanUpdate() {
+let scope = taskStaffScope(resource.data.get('companyId', ''));
+let isSender = resource.data.get('createdBy', '') == request.auth.uid;
+let canAssign = !taskTouchesAssignmentKeys()
+|| taskAssignerScope(resource.data.get('companyId', '')) > 0;
+return scope > 0
+&& (scope == 1 || (taskKeepsSender()
+&& (isSender || !taskTouchesSenderKeys())))
+&& taskImageChangeOk()
+&& canAssign;
+}
+function taskCanUpdate() {
+return claimString('role') == 'delegate'
+? taskDelegateCanUpdate()
+: taskStaffCanUpdate();
+}
+function taskCanDelete() {
+let scope = taskStaffScope(resource.data.get('companyId', ''));
+return (scope > 0 && (scope == 1 || resource.data.get('createdBy', '') == request.auth.uid))
+|| (delegateInOrg(orgId) && ownsDelegateId(resource.data.createdBy));
+}
+allow read: if signedIn() && (
+taskStaffScope(resource.data.get('companyId', '')) > 0
+|| (delegateInOrg(orgId) && (
+resource.data.companyId == claimString('companyId')
+|| claimListHas('companyIds', resource.data.companyId)
+))
+);
+allow create: if signedIn()
+&& taskStaffScope(request.resource.data.get('companyId', '')) > 0
+&& incomingTaskImageOk();
+allow update: if signedIn() && taskCanUpdate();
+allow delete: if signedIn() && taskCanDelete();
+match /proofs/{uploaderUid} {
+function proofTask() {
+return get(/databases/$(database)/documents/organizations/$(orgId)/tasks/$(taskId)).data;
+}
+function proofTaskCompany() {
+return proofTask().get('companyId', '');
+}
+function isProofSender() {
+return signedIn() && isSelfId(proofTask().get('createdBy', ''));
+}
+function isProofCompanySupervisor() {
+return signedIn()
+&& isCompanyAdmin()
+&& callerCompany() == proofTaskCompany();
+}
+function proofPathsOk(paths, pattern) {
+return paths is list
+&& paths.size() <= 3
+&& (paths.size() == 0 || (paths[0] is string && paths[0].matches(pattern)))
+&& (paths.size() < 2 || (paths[1] is string && paths[1].matches(pattern)))
+&& (paths.size() < 3 || (paths[2] is string && paths[2].matches(pattern)));
+}
+function proofNameOk(data) {
+return !data.keys().hasAny(['uploadedByName'])
+|| (resource != null
+&& resource.data.get('uploadedByName', null) == data.uploadedByName);
+}
+function proofCallerBlocked(taskCo, ud) {
+let delPath = /databases/$(database)/documents/organizations/$(orgId)/companies/$(taskCo)/delegates/$(myDelegateId());
+let data = ud.size() > 0 ? ud : (exists(delPath) ? get(delPath).data : {});
+let holds = data.get('holds', {});
+return (holds is map
+&& holds.keys().hasAny(['admin_suspend', 'subscription_expired', 'billing_cycle_reset']))
+|| data.get('isActive', true) == false
+|| data.get('status', 'active') in
+['pending', 'rejected', 'deleted', 'disabled', 'suspended', 'inactive'];
+}
+function proofDelegateIn(taskCo) {
+return claimString('role') == 'delegate'
+&& delegateOtpOk()
+&& (claimString('orgId') == orgId || claimListHas('orgIds', orgId))
+&& (claimString('companyId') == taskCo || claimListHas('companyIds', taskCo));
+}
+function proofStaffCoOk(taskCo, ud) {
+return taskOrgOf(ud) == orgId
+&& (taskCompanyOf(ud) == taskCo
+|| (ud.get('companyIds', []) is list && taskCo in ud.get('companyIds', [])));
+}
+function proofSectorCoOk(taskCo, ud) {
+return proofStaffCoOk(taskCo, ud)
+|| (taskOrgOf(ud) == orgId && taskCompanyOf(ud) == '');
+}
+function proofAssignedOk(assigned, taskCo, ud) {
+let role = ud.get('role', '');
+return !(assigned is string) || assigned == '' ? false
+: assigned == 'all' || assigned == 'الكل' ? proofDelegateIn(taskCo)
+: assigned == 'all_branch_marketing' ? (role in [
+'marketing', 'branches_marketing', 'branches-marketing',
+'branchesmarketing', 'branches_marketing_manager',
+'branches-marketing-manager', 'branchesmarketingmanager',
+'branchesMarketingManager']
+&& proofSectorCoOk(taskCo, ud))
+: assigned == 'all_marketing_promotion' ? (role in [
+'marketingPromotion', 'marketing_promotion',
+'marketing-promotion', 'marketingpromotion']
+&& proofSectorCoOk(taskCo, ud))
+: assigned == request.auth.uid && role in [
+'delegate', 'promoter', 'field_delegate', 'field-delegate',
+'marketing', 'marketingPromotion', 'marketing_promotion',
+'marketing-promotion', 'marketingpromotion',
+'branches_marketing_manager', 'branches-marketing-manager',
+'branches_marketing', 'branchesMarketingManager',
+'branches-marketing', 'branchesmarketingmanager']
+? proofStaffCoOk(taskCo, ud)
+: proofDelegateIn(taskCo) && ownsDelegateId(assigned);
+}
+function proofWriteOk() {
+let task = proofTask();
+let taskCo = task.get('companyId', '');
+let data = request.resource.data;
+let uid = uploaderUid;
+let ud = taskUserData();
+return task.get('status', '') != 'cancelled'
+&& taskCo is string && taskCo != ''
+&& data.keys().hasOnly(
+['uploadedBy', 'uploadedByName', 'companyUID', 'taskId', 'imagePaths'])
+&& data.get('uploadedBy', '') == uid
+&& data.get('companyUID', '') == taskCo
+&& data.get('taskId', taskId) == taskId
+&& proofNameOk(data)
+&& proofPathsOk(data.get('imagePaths', null),
+'^task_proof/' + taskCo + '/' + uid + '/proof_' + uid + '_[^_]+$')
+&& proofAssignedOk(task.get('assignedTo', ''), taskCo, ud)
+&& !proofCallerBlocked(taskCo, ud);
+}
+allow get: if signedIn() && (
+isSelfId(uploaderUid)
+|| isProofSender()
+|| isProofCompanySupervisor()
+);
+allow list: if signedIn() && (isProofSender() || isProofCompanySupervisor());
+allow create, update: if signedIn()
+&& isSelfId(uploaderUid)
+&& proofWriteOk();
+allow delete: if signedIn() && isSelfId(uploaderUid);
+}
+}
+match /attendance_logs/{logId} {
+allow read: if canReadAttendance();
+allow create: if canCreateAttendance();
+allow update: if canUpdateAttendance();
+allow delete: if false;
+}
+match /private_label_audits/{auditId} {
+allow read: if signedIn() && (isGlobalStaff() || callerOrg() == orgId || delegateInOrg(orgId));
+allow create: if signedIn() && (
+(isGlobalStaff() || (isStaffWriter() && callerOrg() == orgId))
+|| (delegateInOrg(orgId) && (
+request.resource.data.delegateUid == request.auth.uid
+|| delegateOwns(request.resource.data.delegateUid)
+))
+);
+allow update: if signedIn() && staffToken()
+&& (isGlobalStaff() || (isStaffWriter() && callerOrg() == orgId));
+allow delete: if isGlobalStaff() || ((isOrgAdmin() || isMarketing()) && callerOrg() == orgId);
+}
+match /private_label_days/{dayId} {
+allow read: if signedIn() && (isGlobalStaff() || callerOrg() == orgId || delegateInOrg(orgId));
+allow create: if signedIn() && (staffToken()
+? (isGlobalStaff() || (isStaffWriter() && callerOrg() == orgId))
+: (delegateInOrg(orgId) && delegateOwns(request.resource.data.get('delegateUid', ''))));
+allow update: if signedIn() && (staffToken()
+? (isGlobalStaff() || (isStaffWriter() && callerOrg() == orgId))
+: (delegateInOrg(orgId) && delegateOwns(resource.data.get('delegateUid', ''))
+&& request.resource.data.get('delegateUid', '') == resource.data.get('delegateUid', '')));
+allow delete: if isGlobalStaff() || ((isOrgAdmin() || isMarketing()) && callerOrg() == orgId);
+}
+match /private_label_products/{productId} {
+allow read: if signedIn() && (isGlobalStaff() || callerOrg() == orgId || delegateInOrg(orgId));
+allow create, update, delete: if isGlobalStaff()
+|| ((isOrgAdmin() || isMarketing() || isBranchesMarketing()) && callerOrg() == orgId);
+}
+}
+match /{path=**}/delegates/{delegateId} {
+function cgDelegateCreateDenied() {
+let d = request.resource.data;
+let r = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '');
+let stl = d.get('status', '') is string ? d.get('status', '').lower().trim() : '';
+return r in techRoleList()
+? (stl == 'active' ? true : !cheapCreateDocsNotApproved(d.get('documents', [])))
+: !(r in superAdminRoleList());
+}
+function canReadDelegate() {
+return signedIn() && (
+(request.auth.token.keys().hasAll(['phones'])
+&& request.auth.token.phones is list
+&& resource.data.phoneNumber in request.auth.token.phones)
+|| (request.auth.token.keys().hasAll(['phones'])
+&& request.auth.token.phones is list
+&& resource.data.phone in request.auth.token.phones)
+|| (request.auth.token.keys().hasAll(['delegateIds'])
+&& request.auth.token.delegateIds is list
+&& resource.id in request.auth.token.delegateIds)
+|| resource.id == request.auth.uid
+|| ownsDelegateId(resource.data.get('uid', ''))
+|| (staffToken() && cgDelegateStaffReadOk())
+);
+}
+function cgDelegateStaffReadOk() {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let uOrg = u.get('organizationUID', '');
+let uCo = u.get('companyUID', '');
+let org = uOrg is string && uOrg != '' ? uOrg : request.auth.token.get('orgId', '');
+let co = uCo is string && uCo != '' ? uCo : request.auth.token.get('companyId', '');
+let bm = ['branches_marketing', 'branches_marketing_manager', 'branchesMarketingManager',
+'branches-marketing', 'branches-marketing-manager', 'branchesmarketingmanager'];
+return r in staffRoleListGlobal()
+|| ((r in staffRoleListOrg() || r == 'org-admin')
+&& org != '' && resource.data.organizationUID == org)
+|| (r in bm && co == '' && org != '' && resource.data.organizationUID == org)
+|| (r in staffRoleListCompany() && co != '' && resource.data.companyUID == co);
+}
+function cgDelegateDeleteOk() {
+return onNestedDelegate() ? false : canManageDelegate();
+}
+function canManageDelegate() {
+return isGlobalStaff()
+|| (isOrgScopedStaff() && orgScoped())
+|| (isCompanyScopedStaff() && companyScoped());
+}
+function onNestedDelegate() {
+return request.path[3] == 'organizations' && request.path[5] == 'companies';
+}
+allow read: if signedIn() && canReadDelegate();
+allow create: if onNestedDelegate() ? false : cgDelegateCreateDenied() ? false : (signedIn() && !delegateOwns(delegateId)
+&& delegateCreateHasIdentity() && deviceBindingAbsent() && (
+isGlobalStaff() ||
+(isOrgScopedStaff() && incomingOrgScoped()) ||
+(isCompanyScopedStaff() && incomingCompanyScoped())
+) && nestedDelegateCreateOk(
+request.resource.data.get('organizationUID', ''),
+request.resource.data.get('companyUID', ''),
+delegateId)
+&& sourceStampKeysLocked());
+allow update: if signedIn() && !onNestedDelegate()
+&& (delegateOwns(delegateId)
+? delegateFieldsSafe(delegateId + '|' + request.auth.uid)
+: (deviceBindingUntouched() && staffManagesDelegate(
+[resource.data.get('organizationUID', ''), resource.data.get('organizationId', '')],
+[resource.data.get('companyUID', ''), resource.data.get('companyId', '')], false)
+&& staffDocsApproveOk(resource.data.get('organizationUID', ''), resource.data.get('companyUID', ''), resource.data.get('companyId', ''), delegateId)));
+allow delete: if signedIn() && cgDelegateDeleteOk();
+}
+match /{path=**}/companies/{companyId} {
+allow read: if knownIdentity();
+}
+match /{path=**}/photo_permissions/{permissionId} {
+allow read: if signedIn() && (
+request.auth.token.get('role', '') == 'delegate'
+? (claimString('orgId') == resource.data.get('organizationUID', '')
+|| claimListHas('orgIds', resource.data.get('organizationUID', ''))
+|| claimString('companyId') == resource.data.get('companyUID', '')
+|| claimListHas('companyIds', resource.data.get('companyUID', '')))
+: (companyScoped() || orgScoped() || isGlobalStaff())
+);
+allow create: if false;
+allow delete: if isGlobalStaff();
+}
+match /{path=**}/captured_photos/{photoId} {
+allow read: if signedIn()
+&& get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('companyUID', '') != ''
+&& resource.data.get('companyUID', '')
+== get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('companyUID', '');
+allow read: if signedIn() && (
+ownsDelegateId(resource.data.get('delegateUID', ''))
+|| delegateOwns(resource.data.get('delegateUID', ''))
+|| isGlobalStaff() || orgScoped() || companyScoped() || delegateInOrg(resource.data.organizationUID)
+);
+allow create: if false;
+allow update: if false;
+allow delete: if isGlobalStaff() || (isCompanyScopedStaff() && companyScoped());
+}
+match /{path=**}/requests/{requestId} {
+function cgRequestStaffReadOk() {
+let s = staffRequestScope();
+let d = resource.data;
+return s.global
+|| (s.org != '' && d.get('organizationUID', d.get('organizationId', '')) == s.org)
+|| (s.company != '' && d.get('companyUID', d.get('companyId', '')) == s.company);
+}
+allow read: if signedIn() && staffToken() && cgRequestStaffReadOk();
+}
+match /invites/{inviteId} {
+function legacySuperAdminSpelling(role) {
+return role in [
+'super_admin', 'superadmin', 'superAdmin', 'Super_Admin', 'SUPER_ADMIN'
+];
+}
+function companyOf(u) {
+let c = u.get('companyUID', '');
+return c is string && c != '' ? c : claimString('companyId');
+}
+function inviteCreateOk() {
+let d = request.resource.data;
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let sa = r in superAdminRoleList();
+let rta = d.get('roleToAssign', '');
+let oid = d.get('organizationId', '');
+let saOk = sa && rta in ['org-admin', 'company-admin'];
+let coOk = rta == 'company-admin' && d.get('companyId', null) is string
+&& oid is string && oid == orgOf(u)
+&& (r in orgAdminRoleList()
+|| (r in companyAdminRoles() && d.companyId == companyOf(u)));
+return (saOk || coOk) ? (
+(!d.keys().hasAll(['role']) || (d.role is string && !legacySuperAdminSpelling(d.role)
+&& (d.role != 'super-admin' || sa)))
+&& !(rta in superAdminRoleList())
+&& !(d.get('role', '') in superAdminRoleList())
+&& d.get('status', '') == 'pending'
+&& d.get('expiresAt', null) is timestamp
+&& d.expiresAt <= request.time + duration.value(7, 'd') + duration.value(10, 'm')
+&& oid is string && oid != ''
+&& d.get('role', rta) == rta
+&& exists(/databases/$(database)/documents/organizations/$(oid))
+&& (saOk || exists(/databases/$(database)/documents/organizations/$(oid)/companies/$(d.companyId)))
+) : false;
+}
+function inviteUpdateOk() {
+let d = request.resource.data;
+let o = resource.data;
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let org = orgOf(u);
+let co = companyOf(u);
+let sameOrgRole = d.get('organizationId', '') == o.get('organizationId', '')
+&& d.get('roleToAssign', '') == o.get('roleToAssign', '');
+let principalOk = r in superAdminRoleList()
+|| (r in orgAdminRoleList()
+&& (o.get('organizationId', '') == org || o.get('organizationUID', '') == org)
+&& sameOrgRole)
+|| (r in companyAdminRoles()
+&& co != '' && (o.get('companyUID', '') == co || o.get('companyId', '') == co)
+&& sameOrgRole
+&& d.get('companyId', '') == o.get('companyId', ''));
+return principalOk ? (
+o.get('status', '') == 'pending'
+&& !o.keys().hasAny(['claimedBy', 'claimedByUid', 'claimedAt'])
+&& d.get('status', '') != 'claimed'
+&& !changedKeys().hasAny(['claimedBy', 'claimedByUid', 'claimedByEmail', 'claimedAt', 'role', 'roleToAssign'])
+&& (!changedKeys().hasAny(['expiresAt']) || (
+d.expiresAt is timestamp
+&& d.expiresAt <= request.time + duration.value(7, 'd') + duration.value(10, 'm')))
+) : false;
+}
+allow get: if true;
+allow list: if signedIn() && (
+isGlobalStaff() ||
+((isOrgAdmin() || isCompanyAdmin() || isHR()) && (
+resource.data.organizationId == callerOrg() ||
+resource.data.organizationUID == callerOrg()
+))
+);
+allow create: if signedIn() && inviteCreateOk();
+allow update: if signedIn() && inviteUpdateOk();
+allow delete: if isSuperAdmin();
+}
+match /mail/{mailId} {
+allow read, update: if false;
+allow delete: if isSuperAdmin();
+allow create: if isSuperAdmin();
+}
+match /guide_videos/{videoId} {
+allow read: if knownIdentity();
+allow write: if isSuperAdmin();
+}
+match /app_updates/{updateId} {
+allow read: if knownIdentity();
+allow write: if isSuperAdmin();
+}
+function staffAttendanceTenantOk() {
+let d = resource.data;
+let r = userRole();
+let co = callerCompany();
+let org = callerOrg();
+let inCo = co != '' && (d.get('companyUID', '') == co || d.get('companyId', '') == co);
+let inOrg = org != '' && (d.get('organizationUID', '') == org || d.get('organizationId', '') == org);
+return r in superAdminRoleList()
+|| r in techRoleList()
+|| (inCo && r in staffRoleListCompany())
+|| (inOrg && r in staffRoleListOrg())
+|| (inOrg && co == '' && r in branchesMarketingRoles());
+}
+function canReadAttendance() {
+return signedIn() && (staffToken()
+? (staffAttendanceTenantOk()
+|| (delegateOtpOk() && (resource.data.get('delegateId', '') == request.auth.uid
+|| resource.data.get('userId', '') == request.auth.uid))
+|| (request.auth.token.keys().hasAny(['delegateId', 'delegateIds'])
+&& (ownsDelegateId(resource.data.delegateId)
+|| ownsDelegateId(resource.data.userId))))
+: (ownsDelegateId(resource.data.delegateId)
+|| ownsDelegateId(resource.data.userId)
+|| delegateOwns(resource.data.delegateId)
+|| delegateOwns(resource.data.userId)));
+}
+function canReadOrgAdminRequestInOwnOrg() {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let org = u.get('organizationUID', '');
+let co = u.get('companyUID', '');
+let d = resource.data;
+let docOrg = d.get('organizationUID', d.get('organizationId', ''));
+let docCo = d.get('companyUID', d.get('companyId', ''));
+return request.auth != null
+&& u.get('role', '') in orgAdminCoreRoles()
+&& org != ''
+&& docOrg == org
+&& (co == '' || docCo == co);
+}
+function attendanceOwnTimeOk(d) {
+return d.get('timestamp', null) == request.time
+|| (d.get('isAutoCheckOut', false) == true
+&& d.get('type', '') == 'check_out'
+&& d.get('timestamp', null) is timestamp
+&& d.timestamp < request.time);
+}
+function attendanceOwnCreateOk() {
+let d = request.resource.data;
+return attendanceOwnTimeOk(d)
+&& !d.keys().hasAny(['checkOutTime', 'isManuallyAdjusted', 'lastAdjustedBy',
+'lastAdjustedAt', 'adjustmentReason', 'adjustmentNotes']);
+}
+function attendanceOwnUpdateOk() {
+let d = request.resource.data;
+let ch = d.diff(resource.data).affectedKeys();
+return ch.hasOnly(['checkOutTime', 'checkOutLocation', 'checkOutDocId',
+'autoClosedDuplicate', 'isAutoCheckOut', 'autoCheckOutReason'])
+&& (!ch.hasAny(['checkOutTime'])
+|| d.checkOutTime == request.time
+|| (d.get('isAutoCheckOut', false) == true
+&& d.checkOutTime is timestamp
+&& d.checkOutTime < request.time));
+}
+function attendanceOwns(d) {
+return ownsDelegateId(d.get('delegateId', '')) || ownsDelegateId(d.get('userId', ''));
+}
+function attendanceOrgOf(d) {
+return d.get('organizationId', '') != '' ? d.get('organizationId', '') : d.get('organizationUID', '');
+}
+function attendanceCoOf(d) {
+return d.get('companyId', '') != '' ? d.get('companyId', '') : d.get('companyUID', '');
+}
+function canCreateAttendance() {
+let d = request.resource.data;
+return signedIn() && (attendanceOwns(d)
+? attendanceOwnCreateOk()
+&& (staffToken()
+? staffTargetOk(attendanceOrgOf(d), attendanceCoOf(d), true)
+: delegateInOrg(attendanceOrgOf(d))
+&& attendanceBranchOrgOk(d))
+: staffToken() && staffTargetOk(attendanceOrgOf(d), attendanceCoOf(d), true));
+}
+function attendanceBranchOrgOk(d) {
+return !d.keys().hasAny(['branchOrganizationUID'])
+|| delegateInOrg(d.branchOrganizationUID);
+}
+function canUpdateAttendance() {
+let d = request.resource.data;
+let old = resource.data;
+return signedIn() && (attendanceOwns(old)
+? attendanceOwnUpdateOk()
+: (staffToken()
+&& attendanceOrgOf(d) == attendanceOrgOf(old)
+&& attendanceCoOf(d) == attendanceCoOf(old)
+&& staffTargetOk(attendanceOrgOf(old), attendanceCoOf(old), true)));
+}
+match /attendance_logs/{logId} {
+function canReadOrgAdminAttendanceByOrgId() {
+return request.auth != null
+&& get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in orgAdminCoreRoles()
+&& get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationUID is string
+&& get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationUID != ''
+&& resource.data.organizationId
+== get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationUID;
+}
+allow read: if staffToken() && canReadOrgAdminAttendanceByOrgId();
+allow read: if canReadAttendance();
+allow create: if canCreateAttendance();
+allow update: if canUpdateAttendance();
+allow delete: if false;
+}
+match /attendance_logs_testing/{logId} {
+allow read: if canReadAttendance();
+allow create: if canCreateAttendance();
+allow update: if canUpdateAttendance();
+allow delete: if false;
+}
+match /attendance/{attendanceId} {
+allow read: if canReadAttendance();
+allow create: if canCreateAttendance();
+allow update: if canUpdateAttendance();
+allow delete: if false;
+}
+match /attendance_adjustment_logs/{logId} {
+allow read: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped()));
+allow create: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && incomingCompanyScoped()) || (isOrgScopedStaff() && incomingOrgScoped()));
+allow update, delete: if isGlobalStaff() || (isHR() && companyScoped());
+}
+match /attendance_adjustment_logs_testing/{logId} {
+allow read: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped()));
+allow create: if signedIn() && (isGlobalStaff() || (isCompanyScopedStaff() && incomingCompanyScoped()));
+allow update, delete: if isGlobalStaff() || (isHR() && companyScoped());
+}
+match /branches/{branchId} {
+allow read: if knownIdentity();
+allow create: if isGlobalStaff()
+|| (isOrgAdmin() && callerOrg() != ''
+&& request.resource.data.get('organizationUID', '') == callerOrg());
+allow update: if isGlobalStaff()
+|| (isOrgAdmin() && callerOrg() != ''
+&& resource.data.get('organizationUID', '') == callerOrg()
+&& request.resource.data.get('organizationUID', '') == callerOrg());
+allow delete: if isGlobalStaff()
+|| (isOrgAdmin() && callerOrg() != ''
+&& resource.data.get('organizationUID', '') == callerOrg());
+}
+match /counters/{counterId} {
+allow read: if isStaffWriter();
+allow create: if isStaffWriter()
+&& request.resource.data.keys().hasOnly(['count'])
+&& request.resource.data.count is int;
+allow update: if isStaffWriter()
+&& request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count'])
+&& request.resource.data.count == resource.data.get('count', 6232) + 1;
+allow delete: if false;
+}
+match /notifications/{notificationId} {
+function isPrivilegedStaffAlert() {
+return resource.data.get('type', '') in [
+'delegate_profile_edit',
+'delegate_national_id_request',
+'paymob_superseded_payment'
+];
+}
+function canReadOwnNotification() {
+return signedIn() && !isPrivilegedStaffAlert() && (
+ownsDelegateId(resource.data.get('delegateUid', ''))
+|| ownsDelegateId(resource.data.get('userId', ''))
+|| delegateOwns(resource.data.get('delegateUid', ''))
+|| (isDelegate() && claimListHas('phones', resource.data.get('phoneNumber', '')))
+|| (isDelegate() && claimListHas('phones', resource.data.get('delegateUid', '')))
+);
+}
+function roleBroadcastTargets() {
+return ['super-admin', 'super_admin', 'superAdmin', 'role_super_admin',
+'technicalSupport', 'technical-support', 'technical_support', 'role_technical_support',
+'organizationAdmin', 'organization-admin', 'organization_admin',
+'hr', 'company-hr', 'company_hr',
+'marketing', 'marketing_promotion', 'marketingPromotion',
+'branchesMarketingManager', 'branches_marketing', 'branches-marketing',
+'company-admin', 'admin', 'supervisor', 'company_admin'];
+}
+function canReadRoleBroadcastNotification(du) {
+let r = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '');
+return r in superAdminRoleList()
+|| r in techRoleList()
+|| (!isPrivilegedStaffAlert() && (
+(r in orgAdminCoreRoles()
+&& du in ['organizationAdmin', 'organization-admin', 'organization_admin'])
+|| (r in hrRoles()
+&& du in ['hr', 'company-hr', 'company_hr'])
+|| (r in marketingRoles()
+&& du in ['marketing', 'marketing_promotion', 'marketingPromotion'])
+|| (r in branchesMarketingRoles()
+&& du in ['branchesMarketingManager', 'branches_marketing', 'branches-marketing'])
+|| (r in companyAdminRoles()
+&& du in ['company-admin', 'admin', 'supervisor', 'company_admin'])));
+}
+function canReadNotification() {
+return signedIn() && (resource.data.get('delegateUid', '') in ['all', 'delegates']
+? (!isPrivilegedStaffAlert() || canReadNotificationGeneral())
+: resource.data.get('delegateUid', '') in roleBroadcastTargets()
+? canReadRoleBroadcastNotification(resource.data.get('delegateUid', ''))
+: canReadNotificationGeneral());
+}
+function canReadNotificationGeneral() {
+let co = callerCompany();
+let dlg = isDelegate();
+let cs = isCompanyScopedStaff();
+let csc = companyScoped();
+let r = userRole();
+return signedIn() && (
+isGlobalStaff()
+|| (
+!isPrivilegedStaffAlert() && (
+resource.data.get('delegateUid', '') == 'all'
+|| resource.data.get('delegateUid', '') == 'delegates'
+|| (dlg && resource.data.get('delegateUid', '') == 'delegates_' + co)
+|| (dlg && resource.data.get('delegateUid', '') == 'company_' + co)
+|| (cs && resource.data.delegateUid == 'company_' + co)
+|| (cs && resource.data.delegateUid == 'supervisor_' + co)
+|| (cs && resource.data.delegateUid == 'all_company_supervisors' && csc)
+|| (cs && csc)
+|| (isOrgScopedStaff() && orgScoped())
+|| (userExists() && userDoc().keys().hasAll(['phoneNumber']) && resource.data.phoneNumber == userDoc().phoneNumber)
+|| (r in superAdminRoleList() && resource.data.delegateUid in ['super-admin', 'super_admin', 'superAdmin', 'role_super_admin'])
+|| (r in techRoleList() && resource.data.delegateUid in ['technicalSupport', 'technical-support', 'technical_support', 'role_technical_support'])
+|| (r in orgAdminRoleList() && resource.data.delegateUid in ['organizationAdmin', 'organization-admin', 'organization_admin'])
+|| (r in hrRoles() && resource.data.delegateUid in ['hr', 'company-hr', 'company_hr'])
+|| (r in marketingRoles() && resource.data.delegateUid in ['marketing', 'marketing_promotion', 'marketingPromotion'])
+|| (r in branchesMarketingRoles() && resource.data.delegateUid in ['branchesMarketingManager', 'branches_marketing', 'branches-marketing'])
+|| (r in companyAdminRoles() && resource.data.delegateUid in ['company-admin', 'admin', 'supervisor', 'company_admin'])
+))
+);
+}
+function dataHasString(d, key) {
+return d.keys().hasAll([key]) && d[key] is string && d[key] != '';
+}
+function delegateNotifyTargetOk(t, co) {
+return t is string && t != '' && (
+t == 'supervisor_' + co
+|| (t.matches('^[A-Za-z0-9_-]{1,128}$')
+&& !t.matches('^(all|delegates|company_|supervisor_|role_).*')
+&& !(t in ['hr', 'admin', 'supervisor', 'delegate', 'accountant',
+'organizationAdmin', 'organization-admin', 'organization_admin',
+'super-admin', 'super_admin', 'superAdmin', 'technicalSupport',
+'technical-support', 'technical_support', 'company-hr', 'company_hr',
+'marketing', 'marketing_promotion', 'marketingPromotion',
+'branchesMarketingManager', 'branches_marketing', 'branches-marketing']))
+);
+}
+function canDelegateCreateNotification() {
+let d = request.resource.data;
+let co = dataHasString(d, 'companyUID') ? d.companyUID
+: (dataHasString(d, 'companyId') ? d.companyId : '');
+return isDelegate()
+&& dataHasString(d, 'createdBy')
+&& isSelfId(d.createdBy)
+&& co != ''
+&& delegateInCompany(co)
+&& delegateNotifyTargetOk(d.get('delegateUid', ''), co);
+}
+function staffCreateNotificationOk() {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let org = u.get('organizationUID', '') is string && u.get('organizationUID', '') != ''
+? u.get('organizationUID', '') : claimString('orgId');
+let co = u.get('companyUID', '') is string && u.get('companyUID', '') != ''
+? u.get('companyUID', '') : claimString('companyId');
+let d = request.resource.data;
+return r in superAdminRoleList()
+|| r in techRoleList()
+|| (r in [
+'organization-admin', 'organization_admin', 'organizationadmin', 'organizationAdmin',
+'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion',
+'company-admin', 'company_admin', 'companyadmin', 'admin',
+'supervisor', 'company_supervisor',
+'hr', 'company-hr', 'company_hr', 'human_resources',
+'accountant', 'accounting', 'account_admin',
+'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+'branches-marketing-manager', 'branchesmarketingmanager', 'branchesMarketingManager'
+]
+&& ((org != '' && (d.get('organizationUID', '') == org || d.get('organizationId', '') == org))
+|| (co != '' && (d.get('companyUID', '') == co || d.get('companyId', '') == co))));
+}
+function canCreateNotification() {
+return signedIn() && (staffToken()
+? staffCreateNotificationOk()
+: canDelegateCreateNotification());
+}
+function canReadOrgAdminRoleBroadcast() {
+return resource.data.get('delegateUid', '') in [
+'organizationAdmin', 'organization-admin', 'organization_admin'
+] && isOrgAdmin();
+}
+function canReadCompanySupervisorBroadcast() {
+return resource.data.get('delegateUid', '') is string
+&& resource.data.get('delegateUid', '').matches('supervisor_.+')
+&& isCompanyAdmin()
+&& callerCompany() != ''
+&& resource.data.delegateUid == 'supervisor_' + callerCompany();
+}
+function notifOwnTarget() {
+let t = resource.data.get('delegateUid', '');
+let u = resource.data.get('userId', '');
+return signedIn() && delegateOtpOk() && !isPrivilegedStaffAlert() && (
+(t is string && t != '' && (t == request.auth.uid || t == claimString('delegateId')
+|| claimListHas('delegateIds', t) || claimListHas('phones', t)))
+|| (u is string && u != '' && (u == request.auth.uid || u == claimString('delegateId')))
+|| claimListHas('phones', resource.data.get('phoneNumber', ''))
+);
+}
+function notifUpdateOk() {
+let keys = request.resource.data.diff(resource.data).affectedKeys();
+return keys.hasOnly(['isRead', 'readAt', 'read', 'readBy', 'deletedBy'])
+&& notifListAddsOnlySelf('readBy')
+&& notifListAddsOnlySelf('deletedBy')
+&& (keys.hasOnly(['readBy', 'deletedBy']) || notifOwnTarget());
+}
+function notifListAddsOnlySelf(key) {
+return !request.resource.data.diff(resource.data).affectedKeys().hasAny([key])
+|| (request.resource.data[key] is list
+&& (!resource.data.keys().hasAny([key]) || !(resource.data[key] is list)
+|| request.resource.data[key].hasAll(resource.data[key]))
+&& request.resource.data[key].removeAll(
+resource.data.keys().hasAny([key]) && resource.data[key] is list ? resource.data[key] : [])
+.hasOnly([request.auth.uid, claimString('delegateId')]));
+}
+allow read: if canReadOwnNotification();
+allow read: if canReadOrgAdminRoleBroadcast();
+allow read: if canReadCompanySupervisorBroadcast();
+allow read: if canReadNotification();
+allow create: if canCreateNotification();
+allow update: if signedIn() && resource != null && notifUpdateOk();
+allow delete: if isSuperAdmin();
+}
+match /sent_notifications/{docId} {
+allow read: if isGlobalStaff();
+allow read: if signedIn() && resource.data.get('senderUid', '') == request.auth.uid;
+allow create: if isGlobalStaff() || isOrgAdmin() || isCompanyAdmin() || isHR()
+|| (isBranchesMarketing() && request.resource.data.get('senderUid', '') == request.auth.uid);
+allow update, delete: if isSuperAdmin() || isOrgAdmin();
+}
+match /fcm_tokens/{tokenId} {
+allow read: if signedIn() && (
+ownsDelegateId(tokenId) || delegateOwns(tokenId) || isGlobalStaff()
+);
+allow create, update, delete: if signedIn() && (
+ownsDelegateId(tokenId) || delegateOwns(tokenId)
+);
+match /devices/{deviceId} {
+allow read, delete: if signedIn() && (
+ownsDelegateId(tokenId) || delegateOwns(tokenId)
+);
+allow create, update: if signedIn()
+&& deviceId.size() <= 128
+&& request.resource.data.keys().hasOnly(['token', 'platform', 'updatedAt'])
+&& request.resource.data.token is string
+&& request.resource.data.token.size() > 0
+&& request.resource.data.token.size() <= 4096
+&& (!('platform' in request.resource.data)
+|| request.resource.data.platform in ['android', 'ios'])
+&& (ownsDelegateId(tokenId) || delegateOwns(tokenId));
+}
+}
+match /feedbacks/{feedbackId} {
+allow read: if signedIn() && (
+isGlobalStaff()
+|| resource.data.userId == request.auth.uid
+|| delegateOwns(resource.data.userId)
+|| (isOrgAdmin() && orgScoped())
+|| (isCompanyScopedStaff() && companyScoped())
+);
+allow create: if signedIn() && (
+request.resource.data.userId == request.auth.uid
+|| delegateOwns(request.resource.data.userId)
+|| isGlobalStaff()
+);
+allow update, delete: if signedIn() && (
+isGlobalStaff()
+|| resource.data.userId == request.auth.uid
+|| delegateOwns(resource.data.userId)
+);
+}
+match /penalties/{penaltyId} {
+function canReadOrgAdminPenaltyByOrgId() {
+return isOrgAdmin()
+&& callerOrg() != ''
+&& resource.data.organizationId == callerOrg();
+}
+function delegatePenaltyTargetOk(targetId) {
+return targetId is string && targetId != '' && (
+targetId == request.auth.uid
+|| claimString('delegateId') == targetId
+|| claimListHas('delegateIds', targetId)
+);
+}
+function delegatePenaltySelfReadOk() {
+return claimString('role') == 'delegate' && delegateOtpOk() && (
+delegatePenaltyTargetOk(resource.data.get('targetDelegateId', ''))
+|| delegatePenaltyTargetOk(resource.data.get('delegateUid', ''))
+);
+}
+function delegatePenaltyListOk() {
+return delegateOtpOk()
+&& resource.data.get('targetDelegateId', '') != ''
+&& (resource.data.get('targetDelegateId', '') == request.auth.uid
+|| claimListHas('delegateIds', resource.data.get('targetDelegateId', '')));
+}
+function penaltyStaffReadOk() {
+let d = resource.data;
+let r = userRole();
+let co = callerCompany();
+let org = callerOrg();
+let inCo = co != '' && (d.get('companyUID', '') == co || d.get('companyId', '') == co);
+let inOrg = org != '' && (d.get('organizationUID', '') == org || d.get('organizationId', '') == org);
+return r in superAdminRoleList()
+|| r in techRoleList()
+|| (inCo && r in [
+'company-admin', 'company_admin', 'companyadmin', 'admin', 'supervisor',
+'company_supervisor',
+'hr', 'company-hr', 'company_hr', 'human_resources',
+'accountant', 'accounting', 'account_admin',
+'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+'branches-marketing-manager', 'branchesmarketingmanager',
+'branchesMarketingManager',
+'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion'
+])
+|| (inOrg && r in orgAdminCoreRoles())
+|| (inOrg && co == '' && r in [
+'marketing', 'marketing_promotion', 'marketingpromotion', 'marketingPromotion',
+'branches_marketing', 'branches-marketing', 'branches_marketing_manager',
+'branches-marketing-manager', 'branchesmarketingmanager',
+'branchesMarketingManager'
+]);
+}
+function penaltyStaffListOk() {
+return canReadOrgAdminPenaltyByOrgId() || penaltyStaffReadOk();
+}
+function penaltyStaffGetOk() {
+return canReadOrgAdminPenaltyByOrgId() || penaltyStaffReadOk();
+}
+function penaltyCreateOk() {
+let d = request.resource.data;
+let co = callerCompany();
+let org = callerOrg();
+return penaltyRoleTenantOk(userRole(), co, org,
+co != '' && (d.get('companyUID', '') == co || d.get('companyId', '') == co),
+org != '' && (d.get('organizationUID', '') == org || d.get('organizationId', '') == org));
+}
+function penaltyUpdateOk() {
+let d = request.resource.data;
+let old = resource.data;
+let co = callerCompany();
+let org = callerOrg();
+return penaltyRoleTenantOk(userRole(), co, org,
+co != '' && (old.get('companyUID', '') == co || old.get('companyId', '') == co)
+&& (d.get('companyUID', '') == co || d.get('companyId', '') == co),
+org != '' && (old.get('organizationUID', '') == org || old.get('organizationId', '') == org)
+&& (d.get('organizationUID', '') == org || d.get('organizationId', '') == org));
+}
+function penaltyRoleTenantOk(r, co, org, inCo, inOrg) {
+return r in superAdminRoleList()
+|| r in techRoleList()
+|| (inCo && r in staffRoleListCompany())
+|| (inOrg && r in staffRoleListOrg())
+|| (inOrg && co == '' && r in branchesMarketingRoles());
+}
+allow list: if signedIn() && (
+claimString('role') == 'delegate' ? delegatePenaltyListOk() : penaltyStaffListOk()
+);
+allow get: if signedIn() && (
+claimString('role') == 'delegate' ? delegatePenaltySelfReadOk() : penaltyStaffGetOk()
+);
+allow create: if signedIn() && penaltyCreateOk();
+allow update: if signedIn() && penaltyUpdateOk();
+allow delete: if isGlobalStaff() || (isCompanyAdmin() && companyScoped()) || (isOrgAdmin() && orgScoped());
+}
+match /penalty_rules/{ruleId} {
+allow read: if knownIdentity();
+allow create, update, delete: if staffToken() && isSuperAdmin();
+}
+match /task_image_grants/{grantId} {
+allow read, write: if false;
+}
+match /storage_upload_intents/{intentId} {
+function intentCompanyScoped() {
+return callerCompany() != '' && resource.data.companyUID == callerCompany();
+}
+allow read: if signedIn() && (
+isGlobalStaff()
+|| ((isCompanyAdmin() || isHR() || isOrgAdmin()) && resource != null && intentCompanyScoped())
+);
+allow create, update, delete: if false;
+}
+match /company_chain_requests/{requestId} {
+function ccrOrgOk(org) {
+return org is string && org != ''
+&& exists(/databases/$(database)/documents/organizations/$(org));
+}
+allow read: if signedIn() && (
+isGlobalStaff()
+|| (isOrgAdmin() && callerOrg() != '' && resource.data.get('organizationUID', '') == callerOrg())
+|| (isCompanyScopedStaff() && callerCompany() != '' && resource.data.get('companyUID', '') == callerCompany())
+);
+allow create: if signedIn() && isCompanyScopedStaff()
+&& request.resource.data.keys().hasOnly([
+'requestType', 'status', 'batchId', 'batchSize', 'companyUID', 'companyName',
+'organizationUID', 'organizationName', 'supervisorUid', 'supervisorName', 'createdAt'])
+&& request.resource.data.requestType == 'company_join_chain'
+&& request.resource.data.status == 'pending'
+&& callerCompany() != ''
+&& request.resource.data.companyUID == callerCompany()
+&& request.resource.data.supervisorUid == request.auth.uid
+&& request.resource.data.batchSize is int
+&& request.resource.data.batchSize >= 1 && request.resource.data.batchSize <= 100
+&& request.resource.data.createdAt == request.time
+&& ccrOrgOk(request.resource.data.organizationUID)
+&& !exists(/databases/$(database)/documents/organizations/$(request.resource.data.organizationUID)/companies/$(request.resource.data.companyUID));
+allow update: if signedIn()
+&& (isGlobalStaff()
+|| (isOrgAdmin() && callerOrg() != '' && resource.data.get('organizationUID', '') == callerOrg()))
+&& resource.data.status == 'pending'
+&& request.resource.data.status in ['approved', 'rejected']
+&& request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+'status', 'reviewedBy', 'reviewedByUid', 'reviewedAt', 'rejectionReason'])
+&& request.resource.data.reviewedByUid == request.auth.uid;
+allow delete: if false;
+}
+match /delegate_requests/{requestId} {
+function requestSelfUploadOk(requestId) {
+let ch = request.resource.data.diff(resource.data).affectedKeys();
+return ch.hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
+'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents'])
+? (delegateDocsOk(ch, requestId + '|' + request.auth.uid) ? delegateUrlsOnlyOk(ch, request.resource.data) : false)
+: (ch.hasOnly(['updatedAt', 'profileImageUrl', 'personalPhotoURL',
+'nationalIdFrontUrl', 'nationalIdBackUrl', 'receiptImageUrl', 'documents',
+'profileImagePath', 'nationalIdFrontPath', 'nationalIdBackPath', 'receiptImagePath'])
+? (delegateDocsOk(ch, requestId + '|' + request.auth.uid) ? delegateRefsOk(ch, request.resource.data) : false)
+: false);
+}
+function supervisorOnlyRole(r) {
+return r in ['supervisor', 'company_supervisor'];
+}
+function unpaidRequestCancelOk(u) {
+let st = request.resource.data.get('status', '');
+let cancelKeys = changedKeys().hasOnly(['status'])
+|| changedKeys().hasOnly(['status', 'updatedAt']);
+let pay = resource.data.get('paymentStatus', '');
+let paid = pay is string && pay.lower().trim() == 'paid';
+let cancelUnpaid = cancelKeys && st == 'cancelled' && !paid;
+let ty = resource.data.get('requestType', 'new_delegate');
+let r = u.get('role', '');
+return cancelUnpaid && (
+ty != 'new_delegate'
+|| r in superAdminRoleList()
+|| r in techRoleList()
+|| request.auth.uid == resource.data.get('createdBy', '')
+|| request.auth.uid == resource.data.get('supervisorUid', '')
+|| (supervisorOnlyRole(r)
+&& u.get('companyUID', '') != ''
+&& u.get('companyUID', '') == resource.data.get('companyUID', '')));
+}
+function staffDelegateRequestMetaOnly(u) {
+let metaKeys = changedKeys().hasOnly(['updatedAt'])
+|| changedKeys().hasOnly(['updatedAt', 'notes'])
+|| changedKeys().hasOnly(['notes']);
+return unpaidRequestCancelOk(u)
+|| (metaKeys && !changedKeys().hasAny(['status']));
+}
+function requestStaffUpdateOk(requestId) {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+return !signedIn() ? false
+: r in superAdminRoleList()
+? true
+: r in techRoleList()
+? techRequestReviewOk(requestId)
+: r in companyAdminHrRoles()
+? (u.get('companyUID', '') != ''
+&& u.get('companyUID', '') == resource.data.get('companyUID', '')
+&& staffDelegateRequestMetaOnly(u))
+: r in orgAdminCoreRoles()
+? (u.get('organizationUID', '') != ''
+&& u.get('organizationUID', '') == resource.data.get('organizationUID', '')
+&& !isBaseChainOrg(u.get('organizationUID', ''))
+&& staffDelegateRequestMetaOnly(u))
+: false;
+}
+function techRequestReviewOk(requestId) {
+let d = request.resource.data;
+let st = d.get('status', '');
+let ty = d.get('requestType', 'new_delegate');
+let created = getAfter(/databases/$(database)/documents/organizations/$(d.get('organizationUID', ''))/companies/$(d.get('companyUID', ''))/delegates/$(ty == 'add_organization' ? d.get('existingDelegateUid', '') : requestId));
+let reviewKeysOnly = changedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectionReason', 'updatedAt']);
+let addOrgLiveIdHeal = ty == 'add_organization'
+&& st == 'approved'
+&& changedKeys().hasOnly([
+'status', 'reviewedBy', 'reviewedAt', 'rejectionReason', 'updatedAt',
+'nationalId', 'nationalityID'])
+&& d.get('nationalId', '') != ''
+&& d.get('nationalId', '') == d.get('nationalityID', '')
+&& d.get('nationalId', '') == created.data.get('nationalId', '');
+return (reviewKeysOnly || addOrgLiveIdHeal)
+&& resource.data.get('supervisorUid', '') != request.auth.uid
+&& resource.data.get('createdBy', '') != request.auth.uid
+&& !(changedKeys().hasAny(['status']) && st == 'pending')
+&& !(st == 'approved' && resource.data.get('status', '') != 'pending')
+&& (st != 'approved' || !(ty in ['new_delegate', 'add_organization'])
+|| created.data.get('status', '') == 'active');
+}
+function orgCompanyCheckKeys() {
+return ['orgCompanyCheck', 'orgCompanyCheckReason',
+'orgCompanyCheckMissing', 'orgCompanyCheckAt'];
+}
+function orgCompanyCheckKeysLocked() {
+return request.method == 'create'
+? !request.resource.data.keys().hasAny(orgCompanyCheckKeys())
+: !changedKeys().hasAny(orgCompanyCheckKeys());
+}
+function requestApprovalOrgCheckOk() {
+return request.resource.data.get('status', '') != 'approved'
+|| resource.data.get('status', '') == 'approved'
+|| !(resource.data.get('requestType', 'new_delegate')
+in ['new_delegate', 'add_organization'])
+|| resource.data.get('orgCompanyCheck', '') == 'ok';
+}
+function subscriptionPaymentUntouched() {
+let incoming = request.resource.data;
+let before = resource == null ? {} : resource.data;
+let wasPaid = before.get('paymentStatus', '') == 'paid';
+return (incoming.get('paymentStatus', '') != 'paid' || wasPaid)
+&& incoming.get('paymob', null) == before.get('paymob', null)
+&& incoming.get('applyState', '') == before.get('applyState', '')
+&& incoming.get('paymentError', null) == before.get('paymentError', null)
+&& incoming.get('needsReview', false) == before.get('needsReview', false)
+&& incoming.get('quotedAt', null) == before.get('quotedAt', null)
+&& (!wasPaid || !incoming.diff(before).affectedKeys().hasAny([
+'paymentStatus', 'paymob', 'paidAt', 'amountPaid', 'amountDue',
+'coveredDelegateUids', 'items', 'periodCode', 'requestType', 'applyState',
+'paymentError', 'needsReview', 'paymentMethod', 'status', 'quotedAt'
+]))
+&& waivedWriteOk()
+&& newDelegateApprovalPaymentOk();
+}
+function subscriptionPaymentCreateOk() {
+let d = request.resource.data;
+return d.get('paymentStatus', '') != 'paid'
+&& d.get('paymob', null) == null
+&& d.get('applyState', '') == ''
+&& d.get('paymentError', null) == null
+&& d.get('needsReview', false) == false
+&& d.get('quotedAt', null) == null
+&& waivedWriteOk()
+&& d.get('amountPaid', 0) == 0
+&& (!d.keys().hasAll(['coveredDelegateUids'])
+|| (d.coveredDelegateUids is list
+&& d.coveredDelegateUids.size() >= 1
+&& d.coveredDelegateUids.size() <= 100));
+}
+function freePromotionEnded() {
+return request.time >= (timestamp.date(2026, 12, 31) + duration.value(22, 'h'));
+}
+function waivedWriteOk() {
+let incoming = request.resource.data.get('paymentStatus', '');
+let before = resource == null ? '' : resource.data.get('paymentStatus', '');
+return incoming != 'waived' || before == 'waived' || !freePromotionEnded();
+}
+function newDelegateApprovalPaymentOk() {
+let incoming = request.resource.data;
+let before = resource == null ? {} : resource.data;
+let ty = incoming.get('requestType', before.get('requestType', ''));
+let st = incoming.get('status', '');
+let method = incoming.get('paymentMethod', before.get('paymentMethod', ''));
+let pay = incoming.get('paymentStatus', before.get('paymentStatus', ''));
+return st != 'approved'
+|| (ty != 'new_delegate' && ty != 'renewal')
+|| method != 'paymob'
+|| pay == 'paid'
+|| pay == 'waived'
+|| pay == 'not_required';
+}
+function isBaseChainOrg(org) {
+let cfg = /databases/$(database)/documents/config/subscriptions;
+return exists(cfg) && org in get(cfg).data.get('freeChainOrgUids', []);
+}
+function delegateRequestReadOk() {
+let d = resource.data;
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let org = u.get('organizationUID', '');
+let co = u.get('companyUID', '');
+let docOrg = d.get('organizationUID', d.get('organizationId', ''));
+let docCo = d.get('companyUID', d.get('companyId', ''));
+return r in staffRoleListGlobal()
+|| (r in orgAdminCoreRoles()
+&& org != '' && docOrg == org && !isBaseChainOrg(org))
+|| (r in companyAdminHrRoles()
+&& co != '' && docCo == co)
+|| d.get('supervisorUid', '') == request.auth.uid
+|| isSelfId(d.get('delegateUid', ''))
+|| isSelfId(resource.id);
+}
+function requestOrganizationUIDsOk() {
+return !request.resource.data.keys().hasAll(['organizationUIDs'])
+|| (request.resource.data.organizationUIDs is list
+&& request.resource.data.organizationUIDs.size() >= 1
+&& request.resource.data.organizationUIDs.size() <= 100
+&& request.resource.data.organizationUIDs.hasAll([
+request.resource.data.get('organizationUID', '')
+]));
+}
+function requestPrimaryOrgExists() {
+let d = request.resource.data;
+let org = d.get('organizationUID', '');
+return !d.keys().hasAll(['organizationUIDs'])
+|| org == ''
+|| exists(/databases/$(database)/documents/organizations/$(org));
+}
+function createDelegateRequestOk() {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let org = u.get('organizationUID', '');
+let co = u.get('companyUID', '');
+let d = request.resource.data;
+let incomingOrg = d.get('organizationUID', '') != ''
+? d.get('organizationUID', '') : d.get('organizationId', '');
+let incomingCo = d.get('companyUID', '') != ''
+? d.get('companyUID', '') : d.get('companyId', '');
+let isSa = r in superAdminRoleList();
+let isOa = r in orgAdminCoreRoles()
+&& d.get('supervisorUid', '') == request.auth.uid
+&& org != '' && co != ''
+&& incomingOrg == org
+&& incomingCo == co;
+let isCoStaff = r in companyAdminHrRoles()
+&& d.get('supervisorUid', '') == request.auth.uid
+&& co != ''
+&& incomingCo == co;
+return signedIn() && (isSa || isOa || isCoStaff)
+&& d.get('requestType', '') != 'update_national_id'
+&& d.get('actionType', '') != 'update_national_id'
+&& subscriptionPaymentCreateOk()
+&& requestOrganizationUIDsOk()
+&& requestPrimaryOrgExists();
+}
+function orgAdminSecondaryOrgsOwnOnly() {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let org = u.get('organizationUID', '');
+return !(r in orgAdminCoreRoles())
+|| !request.resource.data.keys().hasAll(['organizationUIDs'])
+|| (org != ''
+&& request.resource.data.organizationUIDs is list
+&& request.resource.data.organizationUIDs.size() >= 1
+&& request.resource.data.organizationUIDs.hasOnly([org]));
+}
+function requestIdNotReservedByOtherCompany(id) {
+let intentPath = /databases/$(database)/documents/storage_upload_intents/$(id);
+let reservedCo = exists(intentPath)
+? get(intentPath).data.get('companyUID', '')
+: '';
+let requestCo = request.resource.data.get('companyUID', '') != ''
+? request.resource.data.get('companyUID', '')
+: request.resource.data.get('companyId', '');
+return reservedCo == '' || reservedCo == requestCo;
+}
+allow read: if signedIn() && delegateRequestReadOk();
+allow create: if createDelegateRequestOk()
+&& requestIdNotReservedByOtherCompany(requestId)
+&& orgAdminSecondaryOrgsOwnOnly()
+&& orgCompanyCheckKeysLocked();
+allow update: if (signedIn()
+&& (!changedKeys().hasAny(['status']) || newDelegateApprovalPaymentOk())
+&& !changedKeys().hasAny(['proposedNationalId'])
+&& (resource.data.get('requestType', '') == 'update_national_id'
+|| request.resource.data.get('requestType', '') != 'update_national_id')
+&& (resource.data.get('actionType', '') == 'update_national_id'
+|| request.resource.data.get('actionType', '') != 'update_national_id')
+&& resource.data.get('requestType', '') != 'update_national_id'
+&& resource.data.get('actionType', '') != 'update_national_id'
+&& orgCompanyCheckKeysLocked()
+&& requestApprovalOrgCheckOk())
+? ((!changedKeys().hasAny(['organizationUIDs', 'organizationUID', 'organizationId', 'companyUID', 'companyId'])
+|| (requestOrganizationUIDsOk() && requestPrimaryOrgExists()))
+? (isSelfId(requestId)
+? (requestSelfUploadOk(requestId)
+? true
+: (staffToken()
+? (subscriptionPaymentUntouched() ? requestStaffUpdateOk(requestId) : false)
+: false))
+: (subscriptionPaymentUntouched() ? requestStaffUpdateOk(requestId) : false))
+: false)
+: false;
+allow delete: if isSuperAdmin()
+|| (isOrgAdmin()
+&& (resource.data.get('organizationUID', '') == callerOrg()
+|| resource.data.get('organizationId', '') == callerOrg())
+&& !isBaseChainOrg(callerOrg()));
+match /paymob_checkout_attempts/{attemptId} {
+allow read, write: if false;
+}
+}
+match /used_receipt_codes/{code} {
+function receiptCodeStaffOk(d) {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let r = u.get('role', '');
+let co = u.get('companyUID', '');
+let org = u.get('organizationUID', '');
+return r in staffRoleListGlobal()
+|| (co is string && co != '' && d.get('companyUID', '') == co
+&& r in companyAdminHrRoles())
+|| (org is string && org != '' && d.get('organizationUID', '') == org
+&& r in orgAdminRoleList());
+}
+allow read: if signedIn() && (isStaffWriter() || isDelegate());
+allow create: if staffToken() && receiptCodeStaffOk(request.resource.data);
+allow update: if staffToken() && receiptCodeStaffOk(resource.data)
+&& receiptCodeStaffOk(request.resource.data);
+allow delete: if staffToken() && receiptCodeStaffOk(resource.data);
+}
+match /monthly_collections/{periodId} {
+allow read: if isGlobalStaff() || isAccountant() || isOrgAdmin();
+allow write: if isGlobalStaff();
+match /transactions/{transactionId} {
+allow read: if isGlobalStaff() || isAccountant() || isOrgAdmin();
+allow write: if isGlobalStaff();
+}
+match /allocations/{allocationId} {
+allow read: if isGlobalStaff() || isAccountant() || isOrgAdmin();
+allow write: if isGlobalStaff();
+}
+}
+match /user_wallets/{walletId} {
+function walletCompanyStaffReadOk() {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let co = u.get('companyUID', '');
+return co is string && co != ''
+&& resource.data.get('companyUID', '') == co
+&& u.get('role', '') in companyAdminHrRoles();
+}
+function walletPayrollKeys() {
+return ['monthlyAllocation', 'baseSalary', 'dailyShiftHours', 'customHourlyRate',
+'payrollCalculationMode', 'companyUID', 'companyName', 'userName', 'userPhone',
+'updatedAt', 'updatedBy'];
+}
+function walletPayrollWriteOk(isCreate) {
+let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+let co = u.get('companyUID', '');
+let d = request.resource.data;
+return co is string && co != ''
+&& u.get('role', '') in companyAdminHrRoles()
+&& d.get('companyUID', '') == co
+&& (isCreate
+? d.keys().hasOnly(walletPayrollKeys())
+: resource.data.get('companyUID', '') == co
+&& d.diff(resource.data).affectedKeys().hasOnly(walletPayrollKeys()));
+}
+allow read: if signedIn() && (
+walletId == request.auth.uid || delegateOwns(walletId) || isGlobalStaff() || isAccountant() || isOrgAdmin()
+);
+allow read: if signedIn() && walletCompanyStaffReadOk();
+allow create, update: if signedIn() && (
+isGlobalStaff() || isAccountant()
+);
+allow create: if signedIn() && walletPayrollWriteOk(true);
+allow update: if signedIn() && walletPayrollWriteOk(false);
+allow delete: if isGlobalStaff() || isAccountant();
+match /transactions/{transactionId} {
+allow read: if signedIn() && (
+walletId == request.auth.uid || delegateOwns(walletId) || isGlobalStaff() || isAccountant() || isOrgAdmin()
+);
+allow write: if signedIn() && (isGlobalStaff() || isAccountant());
+}
+}
+match /private_label_permissions/{userId} {
+allow get: if signedIn() && (
+userId == request.auth.uid || delegateOwns(userId) || isGlobalStaff() || isMarketing() || isOrgAdmin()
+);
+allow list: if isGlobalStaff() || isOrgAdmin();
+allow create, update, delete: if isGlobalStaff() || isOrgAdmin();
+}
+match /delegate_profile_audit_logs/{logId} {
+allow read: if signedIn() && (
+isGlobalStaff()
+|| (isCompanyScopedStaff()
+&& resource.data.get('companyUID', '') == callerCompany())
+);
+allow create, update, delete: if false;
+}
+match /security_audit_logs/{logId} {
+allow read: if signedIn() && (
+isGlobalStaff()
+|| (isCompanyScopedStaff() && companyScoped())
+|| (isOrgScopedStaff() && orgScoped())
+|| resource.data.delegateUid == request.auth.uid
+|| delegateOwns(resource.data.delegateUid)
+);
+allow create: if signedIn() && (
+(
+(request.resource.data.delegateUid == request.auth.uid || delegateOwns(request.resource.data.delegateUid))
+&& (delegateInOrg(request.resource.data.organizationUID) || incomingOrgScoped() || isDelegate())
+)
+|| (isCompanyScopedStaff() && incomingCompanyScoped())
+|| isGlobalStaff()
+);
+allow update, delete: if isGlobalStaff();
+}
+match /device_unbind_requests/{requestId} {
+allow read: if canReadOrgAdminRequestInOwnOrg();
+allow read: if signedIn() && (
+isGlobalStaff()
+|| (isCompanyScopedStaff() && companyScoped())
+|| (isOrgScopedStaff() && orgScoped())
+|| resource.data.delegateUid == request.auth.uid
+|| delegateOwns(resource.data.delegateUid)
+);
+allow create: if signedIn() && (
+(
+request.resource.data.status == 'pending'
+&& (request.resource.data.delegateUid == request.auth.uid || delegateOwns(request.resource.data.delegateUid))
+&& (delegateInOrg(request.resource.data.organizationUID) || incomingOrgScoped())
+)
+|| (
+request.resource.data.status == 'approved'
+&& (
+isGlobalStaff()
+|| (isOrgScopedStaff() && incomingOrgScoped())
+|| (isCompanyScopedStaff() && incomingCompanyScoped())
+)
+)
+);
+allow update: if (isGlobalStaff() || (isCompanyScopedStaff() && companyScoped()) || (isOrgScopedStaff() && orgScoped()))
+&& !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+'delegateUid', 'organizationUID', 'companyUID', 'id'
+]);
+allow delete: if false;
+}
+match /delegate_tracking/{delegateId} {
+function trackingServerKeysUntouched() {
+let ks = ['verifiedStatus', 'verifiedDistanceMeters', 'verifiedBranchLat',
+'verifiedBranchLng', 'verifiedBranchRadius', 'verifiedReason', 'verifiedAt',
+'statusMismatch', 'scopeMismatch'];
+return resource == null
+? !request.resource.data.keys().hasAny(ks)
+: !changedKeys().hasAny(ks);
+}
+allow read: if signedIn() && (
+delegateOwns(delegateId) || isGlobalStaff()
+|| (isCompanyScopedStaff() && (companyScoped() || resource.data.companyUID == callerCompany()))
+|| (isOrgScopedStaff() && orgScoped())
+);
+allow create, update: if signedIn() && (trackingServerKeysUntouched() ? (
+delegateOwns(delegateId) || isGlobalStaff() || (isHR() && incomingCompanyScoped()) || (isCompanyAdmin() && incomingCompanyScoped())
+) : false);
+allow delete: if isGlobalStaff();
+match /breadcrumbs/{breadcrumbId} {
+function breadcrumbStaffOk(delegateId) {
+let r = userRole();
+let co = callerCompany();
+let org = callerOrg();
+let t = get(/databases/$(database)/documents/delegate_tracking/$(delegateId)).data;
+let orgRoles = staffRoleListOrg();
+return r in superAdminRoleList()
+|| r in techRoleList()
+|| (co != '' && t.get('companyUID', '') == co && (r in orgRoles || r in staffRoleListCompany()))
+|| (org != '' && t.get('organizationUID', '') == org && r in orgRoles);
+}
+allow read, create: if signedIn() && (
+delegateOwns(delegateId) || breadcrumbStaffOk(delegateId)
+);
+allow update, delete: if isGlobalStaff();
+}
+}
+match /leave_requests/{requestId} {
+function leaveOwnerCreateOk() {
+let d = request.resource.data;
+return d.get('status', '') == 'pending'
+&& d.get('resolvedBy', null) == null
+&& d.get('resolvedAt', null) == null;
+}
+allow read: if staffToken() && canReadOrgAdminRequestInOwnOrg();
+allow read: if staffToken() && isGlobalStaff();
+allow read: if staffToken() && isCompanyScopedStaff() && companyScoped();
+allow read: if staffToken() && isOrgScopedStaff() && orgScoped();
+allow read: if signedIn() && (
+ownsDelegateId(resource.data.delegateUid)
+|| delegateOwns(resource.data.delegateUid)
+);
+allow create: if signedIn() && (
+(ownsDelegateId(request.resource.data.get('delegateUid', '')) && leaveOwnerCreateOk())
+|| (staffToken()
+&& staffTargetOk('', request.resource.data.get('companyUID', ''), false))
+);
+allow update: if staffToken()
+&& resource.data.get('companyUID', '') == request.resource.data.get('companyUID', '')
+&& staffTargetOk('', resource.data.get('companyUID', ''), false);
+allow delete: if isGlobalStaff()
+|| (isCompanyScopedStaff() && companyScoped())
+|| (ownsDelegateId(resource.data.delegateUid) && resource.data.status == 'pending')
+|| (delegateOwns(resource.data.delegateUid) && resource.data.status == 'pending');
+}
+match /floor_checks/{checkId} {
+allow read: if signedIn() && (isStaffWriter() || isDelegate());
+allow create, update: if isGlobalStaff() || isMarketing() || isBranchesMarketing() || isCompanyAdmin();
+allow delete: if isGlobalStaff() || isMarketing() || isBranchesMarketing() || isCompanyAdmin();
+}
+match /company_payroll_configs/{companyId} {
+allow read, write: if isGlobalStaff()
+|| (companyId == callerCompany() && (isHR() || isAccountant() || isCompanyAdmin() || isOrgAdmin()));
+}
+match /deviceBindings/{bindingId} {
+allow read, write: if false;
+}
+match /system_config/session_control {
+allow read: if knownIdentity();
+allow write: if isSuperAdmin();
+}
+match /config/subscriptions {
+allow read: if knownIdentity();
+allow write: if false;
+}
+match /config/{docId} {
+allow read, write: if false;
+}
+match /subscription_coverage/{id} {
+allow read, write: if false;
+}
+match /paymob_superseded_payments/{txId} {
+allow read: if isSuperAdmin() || isTechnicalSupport();
+allow create, update, delete: if false;
+}
+match /admin_alerts/{alertId} {
+allow read: if isSuperAdmin() || isTechnicalSupport();
+allow create, update, delete: if false;
+}
+match /_system_metadata/{docId} {
+allow get: if signedIn() && docId == 'time_probe';
+allow create, update: if signedIn()
+&& docId == 'time_probe'
+&& request.resource.data.keys().hasOnly(['probe'])
+&& request.resource.data.probe == request.time;
+allow delete: if false;
+}
+match /billing_cycles/{runId} {
+allow read, write: if false;
+}
+match /{document=**} {
+allow read, write: if false;
+}
+}
+}
