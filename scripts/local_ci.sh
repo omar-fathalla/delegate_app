@@ -34,14 +34,8 @@ export LC_ALL=en_US.UTF-8
 export TZ=Africa/Cairo
 export PUB_ENVIRONMENT="${PUB_ENVIRONMENT:-flutter_bot}"
 
-FLUTTER_SDK="${LOCAL_CI_FLUTTER_SDK:-$HOME/toolchains/flutter-3.50.1}"
 NODE22_BIN="${LOCAL_CI_NODE22_BIN:-/Users/delegate-ci/actions-runner/_work/_tool/node/22.23.4/arm64/bin}"
 
-if [[ ! -x "$FLUTTER_SDK/bin/flutter" ]]; then
-  echo "local_ci: ERROR: Flutter 3.50.1 not found at $FLUTTER_SDK" >&2
-  echo "Set LOCAL_CI_FLUTTER_SDK to a 3.50.1 SDK." >&2
-  exit 2
-fi
 if [[ ! -x "$NODE22_BIN/node" ]]; then
   echo "local_ci: ERROR: Node 22 not found at $NODE22_BIN" >&2
   echo "Set LOCAL_CI_NODE22_BIN." >&2
@@ -53,7 +47,8 @@ DEVICE_TOOLS=""
 for d in "$HOME/.maestro/bin" "$HOME/.pub-cache/bin" "$HOME/Library/Android/sdk/platform-tools"; do
   [[ -d "$d" ]] && DEVICE_TOOLS="$DEVICE_TOOLS:$d"
 done
-export PATH="$FLUTTER_SDK/bin:$NODE22_BIN${DEVICE_TOOLS}:$CLEAN_PATH"
+# PATH (Flutter first) is set after the SHA is known: the Flutter version comes
+# from that commit's .fvmrc (scripts/ci/flutter_sdk.sh, TAS-342).
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -91,6 +86,22 @@ if ! SHA="$(git rev-parse --verify "${1}^{commit}" 2>/dev/null)"; then
   git fetch origin "$1" --quiet || git fetch origin +"$1" --quiet || true
   SHA="$(git rev-parse --verify "${1}^{commit}")"
 fi
+
+# shellcheck source=ci/flutter_sdk.sh
+source "$SCRIPT_DIR/ci/flutter_sdk.sh"
+FLUTTER_VERSION="$(flutter_pinned_version "$SHA")"
+FLUTTER_SDK="$(flutter_sdk_for_sha "$SHA")" || exit 2
+if [[ ! -x "$FLUTTER_SDK/bin/flutter" ]]; then
+  echo "local_ci: ERROR: Flutter ${FLUTTER_VERSION:-?} (from .fvmrc at ${SHA:0:8}) not found at $FLUTTER_SDK" >&2
+  echo "Install it: git clone --depth 1 -b ${FLUTTER_VERSION:-<version>} https://github.com/flutter/flutter.git $FLUTTER_SDK" >&2
+  echo "or set LOCAL_CI_FLUTTER_SDK to an SDK of that version." >&2
+  exit 2
+fi
+if [[ -n "${LOCAL_CI_FLUTTER_SDK:-}" && -n "$FLUTTER_VERSION" ]] \
+  && ! "$FLUTTER_SDK/bin/flutter" --version 2>/dev/null | head -1 | grep -q "Flutter $FLUTTER_VERSION "; then
+  echo "local_ci: WARNING: LOCAL_CI_FLUTTER_SDK is not Flutter $FLUTTER_VERSION (pinned in .fvmrc)" >&2
+fi
+export PATH="$FLUTTER_SDK/bin:$NODE22_BIN${DEVICE_TOOLS}:$CLEAN_PATH"
 
 OUT="/tmp/local-ci.noindex/${SHA}"
 SRC="$OUT/src"

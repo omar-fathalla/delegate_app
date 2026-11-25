@@ -64,4 +64,26 @@ CI_LEASE_PID=$$ ci_lease_release slot "$a"
 # TAS-200: CDN warm-up script used after web deploys.
 bash test/scripts/warm_web_cdn.test.sh
 
+# TAS-342: local CI takes the Flutter version from the tested commit's .fvmrc.
+# shellcheck source=../../scripts/ci/flutter_sdk.sh
+source scripts/ci/flutter_sdk.sh
+fv_repo="$(mktemp -d)"
+(
+  cd "$fv_repo"
+  git init -q . && git config user.email t@t && git config user.name t
+  printf '{\n  "flutter": "3.44.5"\n}\n' > .fvmrc && git add .fvmrc && git commit -qm a
+  printf '{\n  "flutter": "3.50.1"\n}\n' > .fvmrc && git commit -qam b
+  echo x > other && git add other && git rm -q .fvmrc && git commit -qm c
+) >/dev/null
+fv_a="$(git -C "$fv_repo" rev-parse HEAD~2)"; fv_b="$(git -C "$fv_repo" rev-parse HEAD~1)"; fv_c="$(git -C "$fv_repo" rev-parse HEAD)"
+fv_got() { (cd "$fv_repo" && env -u LOCAL_CI_FLUTTER_SDK LOCAL_CI_TOOLCHAINS=/tc bash -c 'source "$0"; flutter_sdk_for_sha "$1"' "$ROOT/scripts/ci/flutter_sdk.sh" "$1" 2>/dev/null); }
+[[ "$(cd "$fv_repo" && flutter_pinned_version "$fv_a")" == "3.44.5" ]] || fail "pinned version of old commit"
+[[ "$(fv_got "$fv_b")" == "/tc/flutter-3.50.1" ]] || fail "SDK path follows .fvmrc of the tested commit"
+[[ "$(fv_got "$fv_a")" == "/tc/flutter-3.44.5" ]] || fail "SDK path for an older commit"
+fv_got "$fv_c" >/dev/null && fail "a commit without .fvmrc must stop with an error"
+[[ "$(cd "$fv_repo" && LOCAL_CI_FLUTTER_SDK=/x bash -c 'source "$0"; flutter_sdk_for_sha "$1"' "$ROOT/scripts/ci/flutter_sdk.sh" "$fv_b")" == "/x" ]] \
+  || fail "LOCAL_CI_FLUTTER_SDK overrides .fvmrc"
+grep -q 'flutter-3\.[0-9]' scripts/local_ci.sh && fail "scripts/local_ci.sh hard-codes a Flutter version again"
+rm -rf "$fv_repo"
+
 echo "OK test/scripts/ci_tooling_test.sh"
