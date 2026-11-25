@@ -12,6 +12,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/core/time/cairo_clock.dart';
 import 'package:delegate_app/core/services/app_bloc_observer.dart';
+import 'package:delegate_app/core/services/app_check_bootstrap.dart';
 import 'package:delegate_app/core/services/crashlytics_service.dart';
 import 'package:delegate_app/features/auth/domain/delegate_otp_config.dart';
 import 'package:delegate_app/core/services/app_version_gate.dart';
@@ -81,6 +82,8 @@ Future<void> main() async {
     Firebase.initializeApp(options: AppEnv.firebaseOptions),
     SharedPreferences.getInstance(),
   ]);
+  // TAS-16: same App Check activation as the app (monitoring only).
+  activateAppCheckMonitoring();
   final prefs = results[1] as SharedPreferences;
 
   final bootStart = DateTime.now().millisecondsSinceEpoch;

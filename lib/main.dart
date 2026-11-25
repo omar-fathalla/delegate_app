@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:delegate_app/core/providers/locale_provider.dart';
 import 'package:delegate_app/core/constants.dart';
+import 'package:delegate_app/core/services/app_check_bootstrap.dart';
 import 'package:delegate_app/core/services/crashlytics_service.dart';
 import 'package:delegate_app/core/services/app_bloc_observer.dart';
 import 'package:delegate_app/core/services/firestore_client_health.dart';
@@ -46,6 +47,8 @@ void callbackDispatcher() {
       return await Future.sync(() async {
         await Firebase.initializeApp(options: AppEnv.firebaseOptions)
             .timeout(const Duration(seconds: 8));
+        // TAS-16: App Check, monitoring only; never blocks the task.
+        activateAppCheckMonitoring();
         await di.initBackgroundSync();
 
         final syncManager = di.sl<SyncManager>();
@@ -97,6 +100,10 @@ Future<void> bootstrapDelegateAppForPatrol() async {
     Firebase.initializeApp(options: AppEnv.firebaseOptions),
     SharedPreferences.getInstance(),
   ]);
+
+  // TAS-16: App Check in monitoring mode (nothing enforced). Fire-and-forget;
+  // errors are swallowed so startup never waits on or fails because of it.
+  activateAppCheckMonitoring();
 
   if (AppEnv.isDev) {
     debugPrint('GIT_SHA=${AppEnv.gitSha}');
