@@ -3031,7 +3031,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get locHelpStepBattery =>
-      'طلّع تطبيق تسهيل من توفير البطارية وخليه «بلا قيود» (مهم في OPPO وRealme وXiaomi).';
+      'طلّع تطبيق تسهيل من توفير البطارية وخليه «بلا قيود» (مهم في موبايلات OPPO أو Realme أو Xiaomi).';
 
   @override
   String get locHelpStepMapsRetry =>
