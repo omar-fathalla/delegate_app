@@ -1334,6 +1334,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get logoutConfirm => 'Log out?\nYour local data will be saved first.';
 
   @override
+  String get logoutDialogTitle => 'Log out?';
+
+  @override
+  String get logoutDialogBody => 'Your local data is saved first';
+
+  @override
   String logoutFailed(Object error) {
     return 'Couldn\'t log out: $error';
   }

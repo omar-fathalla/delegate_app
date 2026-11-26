@@ -1491,6 +1491,8 @@
   "unknownOrganization": "Unknown organization",
   "alreadyInOrg": "You're already in this organization.",
   "logoutConfirm": "Log out?\nYour local data will be saved first.",
+  "logoutDialogTitle": "Log out?",
+  "logoutDialogBody": "Your local data is saved first",
   "logoutFailed": "Couldn't log out: {error}",
   "@logoutFailed": {
     "placeholders": {

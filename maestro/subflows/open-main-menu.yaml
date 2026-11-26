@@ -1,5 +1,7 @@
 appId: com.tashil.delegate.dev
 ---
+# TAS-350: delegates open a modal navigation rail whose items read
+# "الإعدادات" plus a tab position line; staff keep the popup menu.
 # Opens the header menu and waits for its items. Right after login (or a pop)
 # the app can still be settling, so a tap may land without opening the menu
 # (mac-gate c0bea88f: the tap "COMPLETED" but no menu). Retry the tap until an
@@ -9,10 +11,10 @@ appId: com.tashil.delegate.dev
     commands:
       - runFlow:
           when:
-            notVisible: "الإعدادات"
+            notVisible: "الإعدادات(\\n.*)?"
           commands:
             - tapOn:
                 id: "tashil_main_menu_button"
       - extendedWaitUntil:
-          visible: "الإعدادات"
+          visible: "الإعدادات(\\n.*)?"
           timeout: 8000

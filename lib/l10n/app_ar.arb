@@ -1376,6 +1376,8 @@
   "unknownOrganization": "مؤسسة غير محددة",
   "alreadyInOrg": "أنت تعمل ضمن هذه المنظمة بالفعل.",
   "logoutConfirm": "تسجيل الخروج؟\nستُحفظ بياناتك المحلية قبل الخروج.",
+  "logoutDialogTitle": "تسجيل الخروج؟",
+  "logoutDialogBody": "بياناتك المحلية هتتحفظ قبل الخروج",
   "logoutFailed": "تعذّر تسجيل الخروج: {error}",
   "backAction": "رجوع",
   "sendFeedback": "إرسال ملاحظات",

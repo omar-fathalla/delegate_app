@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:delegate_app/core/design/tokens.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:delegate_app/core/widgets/app_avatar.dart';
@@ -280,8 +281,8 @@ class UniversalAppHeader extends StatelessWidget
     final textTheme = Theme.of(context).textTheme;
 
     return AppBar(
-      backgroundColor: colorScheme.surfaceContainer,
-      surfaceTintColor: Colors.transparent,
+      // TAS-350 (C-21): colours from the theme's app bar (surface, and
+      // surfaceContainer when content scrolls under it); no own border.
       elevation: 0,
       scrolledUnderElevation: 2.0,
       automaticallyImplyLeading: false,
@@ -307,12 +308,7 @@ class UniversalAppHeader extends StatelessWidget
             )
           : null,
       titleSpacing: showBackButton || useDrawer ? 0 : null,
-      shape: Border(
-        bottom: BorderSide(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-          width: 0.8,
-        ),
-      ),
+
       title: customTitle != null
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -321,11 +317,8 @@ class UniversalAppHeader extends StatelessWidget
               children: [
                 Text(
                   customTitle!,
-                  style: TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.bold,
+                  style: textTheme.titleMedium?.copyWith(
                     color: colorScheme.onSurface,
-                    letterSpacing: -0.2,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -333,8 +326,7 @@ class UniversalAppHeader extends StatelessWidget
                 if (customSubtitle != null)
                   Text(
                     customSubtitle!,
-                    style: TextStyle(
-                      fontSize: 11,
+                    style: textTheme.labelSmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
                     maxLines: 1,
@@ -483,6 +475,12 @@ class _PulsingActiveOrgChip extends StatefulWidget {
 
 class _PulsingActiveOrgChipState extends State<_PulsingActiveOrgChip>
     with SingleTickerProviderStateMixin {
+  /// "Live" dot colour: the design system's success role (TAS-350), or
+  /// primary when a test theme has no TashilSemanticColors extension.
+  Color _live(BuildContext context) =>
+      Theme.of(context).extension<TashilSemanticColors>()?.success ??
+      Theme.of(context).colorScheme.primary;
+
   late final AnimationController _controller;
   late final Animation<double> _glowAnimation;
 
@@ -546,14 +544,10 @@ class _PulsingActiveOrgChipState extends State<_PulsingActiveOrgChip>
                 height: 6,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(
-                    0xFF10B981,
-                  ).withValues(alpha: 0.6 + 0.4 * progress),
+                  color: _live(context).withValues(alpha: 0.6 + 0.4 * progress),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(
-                        0xFF10B981,
-                      ).withValues(alpha: 0.5 * progress),
+                      color: _live(context).withValues(alpha: 0.5 * progress),
                       blurRadius: 4,
                     ),
                   ],
@@ -569,8 +563,7 @@ class _PulsingActiveOrgChipState extends State<_PulsingActiveOrgChip>
               Flexible(
                 child: Text(
                   widget.organizationName,
-                  style: TextStyle(
-                    fontSize: 10.5,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: colorScheme.onSurface,
                   ),
