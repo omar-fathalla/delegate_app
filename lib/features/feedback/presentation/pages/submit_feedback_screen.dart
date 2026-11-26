@@ -1,3 +1,6 @@
+import 'package:delegate_app/core/design/widgets/loading_indicator.dart';
+import 'package:delegate_app/core/design/widgets/snackbars.dart';
+import 'package:delegate_app/core/design/tokens.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'dart:io';
@@ -80,7 +83,6 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
     return Scaffold(
       appBar: widget.showAppBar
@@ -92,107 +94,88 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
       body: BlocListener<FeedbackBloc, FeedbackState>(
         listener: (context, state) {
           if (state is FeedbackSubmitted) {
-            _showSuccessDialog(context, isArabic);
+            _onSubmitted(context);
           } else if (state is FeedbackError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
-            );
+            showTashilSnackBar(context, state.message);
           }
         },
         child: BlocBuilder<FeedbackBloc, FeedbackState>(
           builder: (context, state) {
             if (state is FeedbackSubmitting) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: LoadingIndicator());
             }
 
             return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(TashilSpacing.page),
               child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // رسالة ترحيبية
-                    Card(
-                      color: theme.colorScheme.primaryContainer,
+                    // TAS-358: intro on a filled card with the card-icon
+                    // rule (primary + onPrimary).
+                    Card.filled(
+                      margin: EdgeInsets.zero,
                       child: Padding(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(TashilSpacing.lg),
                         child: Row(
                           children: [
-                            Icon(
-                              Icons.lightbulb_outline,
-                              size: 32,
-                              color: theme.colorScheme.primary,
+                            Container(
+                              padding: const EdgeInsets.all(TashilSpacing.sm),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.lightbulb_outline,
+                                color: theme.colorScheme.onPrimary,
+                              ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: TashilSpacing.md),
                             Expanded(
-                              child: Text(AppLocalizations.of(context)!.feedbackIntro,
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  fontWeight: FontWeight.w500,
-                                ),
+                              child: Text(
+                                AppLocalizations.of(context)!.feedbackIntro,
+                                style: theme.textTheme.bodyLarge,
                               ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: TashilSpacing.xl),
 
-                    // نوع المقترح
-                    Text(AppLocalizations.of(context)!.feedbackType,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    // TAS-358 (C-11): one type, single-select FilterChips.
+                    Text(
+                      AppLocalizations.of(context)!.feedbackType,
+                      style: theme.textTheme.titleSmall,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: TashilSpacing.sm),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: TashilSpacing.sm,
+                      runSpacing: TashilSpacing.sm,
                       children: FeedbackType.values.map((type) {
-                        final isSelected = _selectedType == type;
-                        return ChoiceChip(
-                          avatar: Icon(_feedbackIcon(type), size: 18),
+                        return FilterChip(
+                          key: ValueKey('feedback_type_${type.name}'),
+                          avatar: Icon(_feedbackIcon(type)),
                           label: Text(_feedbackLabel(context, type)),
-                          selected: isSelected,
-                          onSelected: (selected) {
-                            if (selected) {
-                              setState(() {
-                                _selectedType = type;
-                              });
-                            }
-                          },
-                          showCheckmark: false,
-                          labelStyle: TextStyle(
-                            color: isSelected
-                                ? theme.colorScheme.onSecondaryContainer
-                                : theme.colorScheme.onSurface,
-                          ),
+                          selected: _selectedType == type,
+                          onSelected: (_) =>
+                              setState(() => _selectedType = type),
                         );
                       }).toList(),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: TashilSpacing.xl),
 
-                    // محتوى الرسالة
-                    Text(AppLocalizations.of(context)!.yourMessage,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
+                    // TAS-358 (C-08): outlined from the theme, with a label.
                     TextFormField(
+                      key: const Key('feedback_message'),
                       controller: _contentController,
                       maxLines: 8,
                       maxLength: 1000,
                       decoration: InputDecoration(
+                        labelText: AppLocalizations.of(context)!.yourMessage,
                         hintText: AppLocalizations.of(context)!.feedbackHint,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        filled: true,
-                        fillColor: theme.colorScheme.surface,
+                        alignLabelWithHint: true,
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
@@ -204,20 +187,21 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: TashilSpacing.xl),
 
                     // إرفاق صورة
-                    Text(AppLocalizations.of(context)!.screenshotOptional,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Text(
+                      AppLocalizations.of(context)!.screenshotOptional,
+                      style: theme.textTheme.titleSmall,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: TashilSpacing.sm),
                     if (_selectedImage != null)
                       Stack(
                         children: [
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(
+                              TashilRadius.medium,
+                            ),
                             child: Image.file(
                               _selectedImage!,
                               height: 200,
@@ -225,16 +209,14 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
                               fit: BoxFit.cover,
                             ),
                           ),
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: IconButton(
+                          PositionedDirectional(
+                            top: TashilSpacing.sm,
+                            end: TashilSpacing.sm,
+                            child: IconButton.filledTonal(
+                              tooltip: MaterialLocalizations.of(context)
+                                  .deleteButtonTooltip,
                               onPressed: _removeImage,
                               icon: const Icon(Icons.close),
-                              style: IconButton.styleFrom(
-                                backgroundColor: Colors.black54,
-                                foregroundColor: Colors.white,
-                              ),
                             ),
                           ),
                         ],
@@ -244,31 +226,14 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
                         onPressed: _pickImage,
                         icon: const Icon(Icons.add_photo_alternate),
                         label: Text(AppLocalizations.of(context)!.chooseImage),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.all(16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
                       ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: TashilSpacing.xxl),
 
                     // زر الإرسال
                     FilledButton.icon(
                       onPressed: _submitFeedback,
                       icon: const Icon(Icons.send),
-                      label: Text(AppLocalizations.of(context)!.sendAction,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.all(16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
+                      label: Text(AppLocalizations.of(context)!.sendAction),
                     ),
                   ],
                 ),
@@ -280,46 +245,20 @@ class _SubmitFeedbackScreenState extends State<SubmitFeedbackScreen> {
     );
   }
 
-  void _showSuccessDialog(BuildContext context, bool isArabic) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 64),
-            const SizedBox(height: 16),
-            Text(AppLocalizations.of(context)!.thankYou,
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(AppLocalizations.of(context)!.feedbackReceived,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // إغلاق الـ Dialog
-              // Back to the previous page. In the web shell the page sits on
-              // the shell's inner navigator, not on the router.
-              if (widget.showAppBar) {
-                context.pop();
-              } else {
-                Navigator.of(this.context).pop();
-              }
-            },
-            child: Text(AppLocalizations.of(context)!.okAction),
-          ),
-        ],
-      ),
+  /// TAS-358 (C-30): a short result is a snackbar (no dialog, no «!»),
+  /// shown on the app's messenger so it stays after the page closes. The
+  /// two ways back are unchanged: the router on mobile, the shell's inner
+  /// navigator on the web.
+  void _onSubmitted(BuildContext context) {
+    showTashilSnackBar(
+      context,
+      AppLocalizations.of(context)!.feedbackReceived,
     );
+    if (widget.showAppBar) {
+      context.pop();
+    } else {
+      Navigator.of(this.context).pop();
+    }
   }
 
   IconData _feedbackIcon(FeedbackType t) => switch (t) {

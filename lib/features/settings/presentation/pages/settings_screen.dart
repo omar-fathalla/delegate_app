@@ -1,4 +1,6 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:delegate_app/core/design/tokens.dart';
+import 'package:delegate_app/core/design/widgets/button_group.dart';
 import 'package:delegate_app/core/services/review_service.dart';
 import 'package:delegate_app/core/widgets/app_logout_modal.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -33,21 +35,19 @@ class SettingsScreen extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final isArabic = localeProvider.isArabic;
 
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    // TAS-358: the field delegate logs out from the navigation menu (TAS-350),
+    // so the row is not repeated here. Every staff role that opens this
+    // screen (HR, admin, accountant, marketing, web shells) keeps it.
+    final showLogout = delegate.role != UserRole.delegate;
+    Widget divider() => const Divider(height: 1, indent: 56);
+
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: showAppBar
           ? AppBar(
-              title: Text(
-                l10n.settings,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
-              elevation: 0,
-              centerTitle: false,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back_rounded),
-                tooltip: AppLocalizations.of(context)!.backAction,
+              title: Text(l10n.settings),
+              leading: BackButton(
                 onPressed: () {
                   if (Navigator.of(context).canPop()) {
                     Navigator.of(context).pop();
@@ -59,260 +59,154 @@ class SettingsScreen extends StatelessWidget {
             )
           : null,
       body: SafeArea(
-        child: Column(
+        child: ListView(
+          padding: const EdgeInsetsDirectional.symmetric(
+            vertical: TashilSpacing.md,
+          ),
           children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest
-                            .withValues(alpha: 0.2),
-                      ),
-                      child: Column(
-                        children: [
-                          _buildSettingsTile(
-                            context: context,
-                            icon: Icons.translate_rounded,
-                            title: l10n.language,
-                            subtitle: isArabic ? l10n.arabic : l10n.english,
-                            onTap: () => _toggleLanguage(context),
-                            trailing: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                isArabic ? 'English' : 'العربية',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onPrimaryContainer,
-                                ),
-                              ),
-                            ),
-                          ),
-                          Divider(
-                            height: 1,
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                            indent: 64,
-                          ),
-                          _buildSettingsTile(
-                            context: context,
-                            icon: Symbols.dark_mode_rounded,
-                            title: l10n.themeModeTitle,
-                            subtitle: _themeModeLabel(
-                              l10n,
-                              context.watch<ThemeCubit>().state.themeMode,
-                            ),
-                            onTap: () => _showThemeModeSheet(context),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Section: Account
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _buildSectionHeader(context, l10n.settingsGeneral),
-                    ),
-                    const SizedBox(height: 12),
-
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest
-                            .withValues(alpha: 0.2),
-                      ),
-                      child: Column(
-                        children: [
-                          _buildSettingsTile(
-                            context: context,
-                            icon: Icons.privacy_tip_rounded,
-                            title: l10n.privacyPolicy,
-                            onTap: () => context.push('/privacy-policy'),
-                          ),
-                          // TAS-383: the m3-kit component playground, dev
-                          // builds only (never in a store build).
-                          if (AppEnv.isDev) ...[
-                            Divider(
-                              height: 1,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.outlineVariant,
-                              indent: 64,
-                            ),
-                            _buildSettingsTile(
-                              context: context,
-                              icon: Icons.widgets_outlined,
-                              title: 'مكونات التصميم (نسخة المطورين)',
-                              onTap: () => PlaygroundLauncher.open(context),
-                            ),
-                          ],
-                          Divider(
-                            height: 1,
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                            indent: 64,
-                          ),
-                          _buildSettingsTile(
-                            context: context,
-                            icon: Icons.feedback_rounded,
-                            title: AppLocalizations.of(context)!.sendFeedback,
-                            // Inner page inside the web HR shell (TAS-157).
-                            onTap: () => HrAccountPages.openSendFeedback(
-                              context,
-                              delegate,
-                            ),
-                          ),
-                          Divider(
-                            height: 1,
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                            indent: 64,
-                          ),
-                          // Store rating has no meaning in a browser (TAS-158).
-                          if (!WebRuntimePolicy.isWeb) ...[
-                            _buildSettingsTile(
-                              context: context,
-                              icon: Icons.star_rate_rounded,
-                              title: AppLocalizations.of(context)!.rateTheApp,
-                              onTap: () =>
-                                  sl<ReviewService>().requestManualReview(),
-                            ),
-                            Divider(
-                              height: 1,
-                              color:
-                                  Theme.of(context).colorScheme.outlineVariant,
-                              indent: 64,
-                            ),
-                          ],
-                          _buildSettingsTile(
-                            context: context,
-                            icon: Icons.history_rounded,
-                            title: delegate.role == UserRole.superAdmin
-                                ? AppLocalizations.of(context)!.manageFeedback
-                                : AppLocalizations.of(context)!.myFeedback,
-                            onTap: () {
-                              if (delegate.role == UserRole.superAdmin) {
-                                context.push('/admin/feedbacks');
-                              } else {
-                                context.push('/my-feedbacks', extra: delegate);
-                              }
-                            },
-                          ),
-                          Divider(
-                            height: 1,
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                            indent: 64,
-                          ),
-                          if (delegate.role == UserRole.delegate) ...[
-                            _buildSettingsTile(
-                              context: context,
-                              icon: Icons.camera_alt_rounded,
-                              title: AppLocalizations.of(context)!.photoPermissions2,
-                              onTap: () => context.push('/photo-permissions/delegate', extra: delegate),
-                            ),
-                            Divider(
-                              height: 1,
-                              color: Theme.of(context).colorScheme.outlineVariant,
-                              indent: 64,
-                            ),
-                          ],
-
-                          // Help center hidden: no destination exists yet
-                          // (was a dead `onTap: () {}`).
-                          _buildSettingsTile(
-                            context: context,
-                            icon: Icons.logout_rounded,
-                            title: l10n.logout,
-                            iconColor: Theme.of(context).colorScheme.error,
-                            titleColor: Theme.of(context).colorScheme.error,
-                            onTap: () => _showLogoutConfirmation(context),
-                            hideTrailingIcon: true,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest
-                            .withValues(alpha: 0.2),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(AppLocalizations.of(context)!.appColor,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              children: AppColorSchemes.seedColors
-                                  .map((c) => _buildColorOption(context, c))
-                                  .toList(),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 48),
-                    // Version Text
-                    FutureBuilder<PackageInfo>(
-                      future: PackageInfo.fromPlatform(),
-                      builder: (context, snapshot) {
-                        final version =
-                            snapshot.hasData ? snapshot.data!.version : '...';
-                        return Center(
-                          child: Text(
-                            // The web isn't the «مندوب تسهيل» app (TAS-158).
-                            WebRuntimePolicy.isWeb
-                                ? l10n.webVersion(version)
-                                : l10n.version(version),
-                            style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                              fontSize: 13,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-                ),
+            // TAS-358 (C-11): language is a connected ButtonGroup with both
+            // choices visible, not a chip that flips on tap.
+            ListTile(
+              leading: const Icon(Icons.translate_rounded),
+              title: Text(l10n.language),
+            ),
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                TashilSpacing.page,
+                0,
+                TashilSpacing.page,
+                TashilSpacing.sm,
+              ),
+              child: ButtonGroup<String>(
+                key: const Key('settings_language'),
+                variant: ButtonGroupVariant.connected,
+                expand: true,
+                selected: {isArabic ? 'ar' : 'en'},
+                onSelectionChanged: (v) {
+                  if ((v.first == 'ar') != isArabic) _toggleLanguage(context);
+                },
+                items: [
+                  ButtonGroupItem(value: 'ar', label: l10n.arabic),
+                  ButtonGroupItem(value: 'en', label: l10n.english),
+                ],
               ),
             ),
+            divider(),
+            _buildSettingsTile(
+              context: context,
+              icon: Symbols.dark_mode_rounded,
+              title: l10n.themeModeTitle,
+              subtitle: _themeModeLabel(
+                l10n,
+                context.watch<ThemeCubit>().state.themeMode,
+              ),
+              onTap: () => _showThemeModeSheet(context),
+            ),
+            const SizedBox(height: TashilSpacing.xl),
+            _buildSectionHeader(context, l10n.settingsGeneral),
+            _buildSettingsTile(
+              context: context,
+              icon: Icons.privacy_tip_rounded,
+              title: l10n.privacyPolicy,
+              onTap: () => context.push('/privacy-policy'),
+            ),
+            // TAS-383: the m3-kit component playground, dev builds only
+            // (never in a store build).
+            if (AppEnv.isDev) ...[
+              divider(),
+              _buildSettingsTile(
+                context: context,
+                icon: Icons.widgets_outlined,
+                title: 'مكونات التصميم (نسخة المطورين)',
+                onTap: () => PlaygroundLauncher.open(context),
+              ),
+            ],
+            divider(),
+            _buildSettingsTile(
+              context: context,
+              icon: Icons.feedback_rounded,
+              title: l10n.sendFeedback,
+              // Inner page inside the web HR shell (TAS-157).
+              onTap: () => HrAccountPages.openSendFeedback(context, delegate),
+            ),
+            // Store rating has no meaning in a browser (TAS-158).
+            if (!WebRuntimePolicy.isWeb) ...[
+              divider(),
+              _buildSettingsTile(
+                context: context,
+                icon: Icons.star_rate_rounded,
+                title: l10n.rateTheApp,
+                onTap: () => sl<ReviewService>().requestManualReview(),
+              ),
+            ],
+            divider(),
+            _buildSettingsTile(
+              context: context,
+              icon: Icons.history_rounded,
+              title: delegate.role == UserRole.superAdmin
+                  ? l10n.manageFeedback
+                  : l10n.myFeedback,
+              onTap: () {
+                if (delegate.role == UserRole.superAdmin) {
+                  context.push('/admin/feedbacks');
+                } else {
+                  context.push('/my-feedbacks', extra: delegate);
+                }
+              },
+            ),
+            if (delegate.role == UserRole.delegate) ...[
+              divider(),
+              _buildSettingsTile(
+                context: context,
+                icon: Icons.camera_alt_rounded,
+                title: l10n.photoPermissions2,
+                onTap: () => context.push(
+                  '/photo-permissions/delegate',
+                  extra: delegate,
+                ),
+              ),
+            ],
+            if (showLogout) ...[
+              divider(),
+              ListTile(
+                key: const Key('settings_logout'),
+                leading: Icon(Icons.logout_rounded, color: cs.error),
+                title: Text(l10n.logout, style: TextStyle(color: cs.error)),
+                onTap: () => _showLogoutConfirmation(context),
+              ),
+            ],
+            const SizedBox(height: TashilSpacing.xl),
+            _buildSectionHeader(context, l10n.appColor),
+            Padding(
+              padding: const EdgeInsetsDirectional.symmetric(
+                horizontal: TashilSpacing.page,
+                vertical: TashilSpacing.sm,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: AppColorSchemes.seedColors
+                    .map((c) => _buildColorOption(context, c))
+                    .toList(),
+              ),
+            ),
+            const SizedBox(height: TashilSpacing.xxl),
+            FutureBuilder<PackageInfo>(
+              future: PackageInfo.fromPlatform(),
+              builder: (context, snapshot) {
+                final version =
+                    snapshot.hasData ? snapshot.data!.version : '...';
+                return Center(
+                  child: Text(
+                    // The web isn't the «مندوب تسهيل» app (TAS-158).
+                    WebRuntimePolicy.isWeb
+                        ? l10n.webVersion(version)
+                        : l10n.version(version),
+                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: TashilSpacing.xl),
           ],
         ),
       ),
@@ -321,12 +215,15 @@ class SettingsScreen extends StatelessWidget {
 
   Widget _buildSectionHeader(BuildContext context, String title) {
     return Padding(
-      padding: const EdgeInsetsDirectional.only(start: 4),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        TashilSpacing.page,
+        TashilSpacing.sm,
+        TashilSpacing.page,
+        TashilSpacing.sm,
+      ),
       child: Text(
         title,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
           color: Theme.of(context).colorScheme.primary,
         ),
       ),
@@ -385,7 +282,12 @@ class SettingsScreen extends StatelessWidget {
           children: [
             if (showTitle)
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                  TashilSpacing.xl,
+                  0,
+                  TashilSpacing.xl,
+                  TashilSpacing.sm,
+                ),
                 child: Text(
                   l10n.themeModeTitle,
                   style: Theme.of(sheetContext).textTheme.titleLarge,
@@ -405,71 +307,27 @@ class SettingsScreen extends StatelessWidget {
                     ? Text(l10n.themeModeSystemHint)
                     : null,
               ),
-            if (showTitle) const SizedBox(height: 8),
+            if (showTitle) const SizedBox(height: TashilSpacing.sm),
           ],
         ),
       ),
     );
   }
 
+  /// TAS-358 (C-23): an official ListTile (was InkWell + Row).
   Widget _buildSettingsTile({
     required BuildContext context,
     required IconData icon,
     required String title,
     String? subtitle,
-    Widget? trailing,
-    Color? iconColor,
-    Color? titleColor,
     VoidCallback? onTap,
-    bool hideTrailingIcon = false,
   }) {
-    final theme = Theme.of(context);
-    final finalIconColor = iconColor ?? theme.colorScheme.onSurfaceVariant;
-    final finalTitleColor = titleColor ?? theme.colorScheme.onSurface;
-
-    return InkWell(
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(title),
+      subtitle: subtitle == null ? null : Text(subtitle),
+      trailing: const Icon(Icons.chevron_right_rounded),
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        child: Row(
-          children: [
-            Icon(icon, color: finalIconColor, size: 28),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w400,
-                      color: finalTitleColor,
-                    ),
-                  ),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            trailing ??
-                (!hideTrailingIcon
-                    ? Icon(
-                        Icons.chevron_right_rounded,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      )
-                    : const SizedBox.shrink()),
-          ],
-        ),
-      ),
     );
   }
 
@@ -492,13 +350,6 @@ class SettingsScreen extends StatelessWidget {
                   width: 3,
                 )
               : null,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: isSelected
             ? Icon(
