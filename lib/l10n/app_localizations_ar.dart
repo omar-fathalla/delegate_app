@@ -1187,14 +1187,17 @@ class AppLocalizationsAr extends AppLocalizations {
   String get homeCoreDuties => 'مهامك الأساسية';
 
   @override
-  String get homeDutyAttendance => 'سجّل حضورك وانصرافك من موقع الفرع.';
+  String get homeDutyAttendance => 'سجّل حضورك وانصرافك من موقع الفرع';
 
   @override
-  String get homeDutyTasks => 'نفّذ مهامك اليومية وتابِعها.';
+  String get homeDutyTasks => 'نفّذ مهامك اليومية وتابِعها';
 
   @override
   String get homeDutyPhotos =>
-      'صوّر العروض والعلامات التجارية في الهايبر ماركت والفروع.';
+      'صوّر العروض والعلامات التجارية في الهايبر ماركت والفروع';
+
+  @override
+  String get whatsapp => 'واتساب';
 
   @override
   String get companySupervisor => 'مشرف الشركة';
