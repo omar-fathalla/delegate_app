@@ -19,7 +19,7 @@ import 'package:delegate_app/features/admin/presentation/pages/edit_delegate_pro
 import 'package:delegate_app/features/admin/presentation/pages/super_admin_subscription_financial_report_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';

@@ -1,7 +1,8 @@
 import 'package:delegate_app/core/utils/google_maps_loader.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 void main() {
   var available = false;
@@ -21,7 +22,7 @@ void main() {
   Future<void> pumpGate(WidgetTester tester) => tester.pumpWidget(
         const MaterialApp(
           locale: Locale('ar'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: GoogleMapsReadyGate(

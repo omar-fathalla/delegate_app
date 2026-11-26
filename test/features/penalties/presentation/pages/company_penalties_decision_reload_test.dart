@@ -10,12 +10,13 @@ import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_state.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/company_penalties_settings_page.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 class _MockPenaltyBloc extends MockBloc<PenaltyEvent, PenaltyState>
     implements PenaltyBloc {}
@@ -88,7 +89,7 @@ void main() {
     whenListen(bloc, states.stream, initialState: loaded);
 
     await tester.pumpWidget(MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('ar'),
       home: BlocProvider<PenaltyBloc>.value(

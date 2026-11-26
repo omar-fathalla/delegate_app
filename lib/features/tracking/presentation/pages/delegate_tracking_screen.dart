@@ -4,7 +4,7 @@ import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:delegate_app/features/hr/presentation/hr_shell_nav.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_table.dart';
 import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:delegate_app/core/widgets/keyed_stream_builder.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/features/admin/domain/usecases/get_company_delegates.dart';

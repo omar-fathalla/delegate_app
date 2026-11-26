@@ -1,7 +1,7 @@
 import 'package:delegate_app/core/firestore/chunked_batch.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:delegate_app/features/penalties/data/models/penalty_rule_model.dart';
 import 'package:delegate_app/features/penalties/domain/entities/penalty_entity.dart';

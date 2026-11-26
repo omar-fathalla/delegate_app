@@ -3,8 +3,9 @@ import 'package:delegate_app/features/tracking/data/services/delegate_tracking_s
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:delegate_app/features/tracking/presentation/widgets/tracking_live_map_view.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 void main() {
   setUp(() {
@@ -21,7 +22,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('ar'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: TrackingLiveMapView(

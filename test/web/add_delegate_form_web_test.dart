@@ -20,11 +20,12 @@ import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
 import 'package:delegate_app/web/hr_system/hr_shell_link.dart';
 import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 const _shotsDir = String.fromEnvironment('ADD_DELEGATE_SHOTS');
 
@@ -116,7 +117,7 @@ Future<void> _pump(WidgetTester t, Size size) async {
           textTheme: theme.textTheme.apply(fontFamily: 'Cairo'),
         ),
         locale: const Locale('ar'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: AddDelegateFormScreen(
           supervisor: _supervisor(),
@@ -266,7 +267,7 @@ void main() {
           debugShowCheckedModeBanner: false,
           theme: theme.copyWith(textTheme: theme.textTheme.apply(fontFamily: 'Cairo')),
           locale: const Locale('ar'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Directionality(
             textDirection: TextDirection.rtl,

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Colors of a selected stat (KPI) card that works as a filter on HR web
 /// (TAS-154, TAS-185).

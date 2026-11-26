@@ -11,7 +11,7 @@ import 'package:delegate_app/web/hr_system/company_chain_requests_history.dart';
 import 'package:delegate_app/web/hr_system/delegate_subscription_requests_web.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _co = 'seed-fake-co';

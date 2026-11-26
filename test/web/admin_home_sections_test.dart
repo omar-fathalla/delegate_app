@@ -19,12 +19,13 @@ import 'package:firebase_core/firebase_core.dart';
 // Transitive test helper of firebase_core (fake Firebase app, no network).
 // ignore: depend_on_referenced_packages
 import 'package:firebase_core_platform_interface/test.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'web_golden.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 class FakeAdminDashboardBloc extends MockBloc<AdminDashboardEvent, AdminDashboardState>
     implements AdminDashboardBloc {}
@@ -66,7 +67,7 @@ Widget _app(Widget home, {bool dark = false}) {
   return MaterialApp(
     debugShowCheckedModeBanner: false,
     theme: t.copyWith(textTheme: t.textTheme.apply(fontFamily: 'Cairo')),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     locale: const Locale('ar'),
     home: Scaffold(body: home),

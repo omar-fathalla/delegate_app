@@ -5,7 +5,7 @@ import 'package:delegate_app/features/private_label/domain/entities/private_labe
 import 'package:delegate_app/features/private_label/presentation/bloc/private_label_report_bloc.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/private_label/data/datasources/private_label_permissions_remote_data_source.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_permissions.dart';

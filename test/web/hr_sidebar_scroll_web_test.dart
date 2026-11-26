@@ -12,9 +12,10 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 Delegate _delegate(UserRole role) => Delegate(
   uid: 'seed-fake-${role.name}',
@@ -112,7 +113,7 @@ Future<void> _pump(
   await tester.pumpWidget(
     MaterialApp(
       locale: const Locale('ar'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: _Host(
         delegate: delegate,

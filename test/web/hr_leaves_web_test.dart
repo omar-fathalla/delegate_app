@@ -11,7 +11,7 @@ import 'package:delegate_app/features/hr/presentation/pages/hr_leaves_and_excuse
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _co = 'seed-fake-co';

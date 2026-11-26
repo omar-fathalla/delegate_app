@@ -5,7 +5,7 @@ import 'dart:async';
 import 'package:delegate_app/core/config/app_env.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/auth/domain/role_home.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';

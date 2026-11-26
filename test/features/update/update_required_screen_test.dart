@@ -1,8 +1,11 @@
 import 'package:delegate_app/core/services/app_version_gate.dart';
 import 'package:delegate_app/features/update/presentation/pages/update_required_screen.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart'
+    show GlobalCupertinoLocalizations;
+import 'package:flutter_localizations/flutter_localizations.dart'
+    show GlobalWidgetsLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 
 Widget _app({required Widget home, Locale locale = const Locale('ar')}) {

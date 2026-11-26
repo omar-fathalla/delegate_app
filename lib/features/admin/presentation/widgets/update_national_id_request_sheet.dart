@@ -1,7 +1,7 @@
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
 import 'package:delegate_app/features/admin/data/repositories/delegate_profile_edit_repository.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
 /// Supervisor submits a national-ID change for super-admin / tech approval.

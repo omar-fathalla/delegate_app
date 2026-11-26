@@ -19,9 +19,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart' show appFlavor;
-import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -36,6 +35,7 @@ import 'package:delegate_app/features/auth/domain/delegate_otp_config.dart';
 import 'package:delegate_app/core/services/app_version_gate.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/core/services/sync_manager.dart';
+import 'l10n/app_localizations_delegates.dart';
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
@@ -318,12 +318,7 @@ class _MyAppState extends State<MyApp> {
             },
             locale: localeProvider.locale,
             supportedLocales: const [Locale('ar'), Locale('en')],
-            localizationsDelegates: const [
-              AppLocalizations.delegate,
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
+            localizationsDelegates: appLocalizationsDelegates,
           );
         },
       ),

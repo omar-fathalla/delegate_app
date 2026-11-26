@@ -6,10 +6,11 @@ import 'package:delegate_app/features/tasks/presentation/bloc/delegate_tasks_blo
 import 'package:delegate_app/features/tasks/presentation/bloc/delegate_tasks_state.dart';
 import 'package:delegate_app/features/tasks/presentation/pages/task_details_screen.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 class _MockAdminBloc extends Mock implements AdminTasksBloc {}
 
@@ -74,7 +75,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: TaskDetailsScreen(
           task: t,

@@ -27,13 +27,14 @@ import 'package:firebase_core/firebase_core.dart';
 // Transitive test helper of firebase_core (fake Firebase app, no network).
 // ignore: depend_on_referenced_packages
 import 'package:firebase_core_platform_interface/test.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 class _MockAuthBloc extends Mock implements AuthBloc {}
 
@@ -375,7 +376,7 @@ void main() {
           ],
           child: MaterialApp.router(
             routerConfig: router,
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             locale: const Locale('ar'),
           ),

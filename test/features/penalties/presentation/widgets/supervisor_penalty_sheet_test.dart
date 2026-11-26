@@ -1,6 +1,6 @@
 import 'package:delegate_app/features/penalties/presentation/widgets/supervisor_penalty_sheet.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Delegate _d({

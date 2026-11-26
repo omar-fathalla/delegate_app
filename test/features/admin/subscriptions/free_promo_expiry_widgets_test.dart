@@ -5,7 +5,7 @@ import 'package:delegate_app/features/admin/presentation/widgets/add_delegate_su
 import 'package:delegate_app/features/admin/presentation/widgets/company_exclusive_card_intro.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/subscription_request_status_widgets.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import '../../../support/promo_screenshot_harness.dart';

@@ -6,8 +6,9 @@ import 'package:delegate_app/features/tasks/data/services/task_image_storage.dar
 import 'package:delegate_app/features/tasks/domain/task_image_paths.dart';
 import 'package:delegate_app/features/tasks/presentation/widgets/task_image_widgets.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 class _DeniedFetcher extends TaskImageFetcher {
   @override
@@ -134,7 +135,7 @@ class _RecordingStorage extends TaskImageStorage {
 Widget _app(Widget home) {
   return MaterialApp(
     locale: const Locale('ar'),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(body: home),
   );
@@ -197,7 +198,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('ar'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: TaskImageThumbnail(

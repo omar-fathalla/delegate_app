@@ -2,7 +2,7 @@
 // in the Arabic layout, as the field's suffix). Egypt is the default.
 import 'package:delegate_app/features/auth/domain/phone_country.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class PhoneCountryPicker extends StatelessWidget {
   const PhoneCountryPicker({

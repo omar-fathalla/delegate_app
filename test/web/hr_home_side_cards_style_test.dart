@@ -11,11 +11,12 @@ import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/web/hr_system/hr_home_overview_web.dart';
 import 'package:delegate_app/web/hr_system/hr_home_side_cards_web.dart';
 import 'package:delegate_app/web/hr_system/hr_web_account_button.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 const _longChain = 'Fake Test Organization';
 
@@ -65,7 +66,7 @@ Future<void> _pumpSideColumn(WidgetTester t) async {
     MaterialApp(
       theme: _theme(Brightness.light),
       locale: const Locale('ar'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Directionality(
         textDirection: TextDirection.rtl,
@@ -206,7 +207,7 @@ void main() {
         child: MaterialApp(
           theme: _theme(b),
           locale: const Locale('ar'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Directionality(
             textDirection: TextDirection.rtl,

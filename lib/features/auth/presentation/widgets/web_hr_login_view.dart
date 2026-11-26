@@ -4,7 +4,7 @@ import 'package:delegate_app/features/auth/domain/delegate_login_validator.dart'
 import 'package:delegate_app/features/auth/presentation/widgets/tashil_m3.dart';
 import 'package:delegate_app/features/auth/presentation/widgets/web_hr_login_map.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
 

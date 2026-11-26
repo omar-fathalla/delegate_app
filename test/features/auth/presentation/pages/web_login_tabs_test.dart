@@ -9,11 +9,12 @@ import 'package:delegate_app/features/hr/presentation/pages/hr_login_screen.dart
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 class MockAuthBloc extends Mock implements AuthBloc {}
 
@@ -69,7 +70,7 @@ void main() {
   Widget app(Widget home, {Locale locale = const Locale('ar')}) {
     return MaterialApp(
       locale: locale,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: BlocProvider<AuthBloc>.value(value: authBloc, child: home),
     );

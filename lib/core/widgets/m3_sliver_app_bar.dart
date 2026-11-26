@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A scalable Material Design 3 (M3) SliverAppBar.
 /// Designed for a Clean Architecture approach: pure UI widget, unaware of business logic.

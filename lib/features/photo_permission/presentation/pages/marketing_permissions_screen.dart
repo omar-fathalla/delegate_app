@@ -2,7 +2,7 @@ import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'supervisor_permissions_screen.dart';
 import '../widgets/company_name_with_code.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';

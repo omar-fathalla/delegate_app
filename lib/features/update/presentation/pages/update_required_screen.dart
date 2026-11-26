@@ -1,7 +1,7 @@
 import 'package:delegate_app/core/services/app_version_gate.dart';
 import 'package:delegate_app/features/auth/presentation/widgets/tashil_m3.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Blocking "update required" page (TAS-66). Shown instead of the splash

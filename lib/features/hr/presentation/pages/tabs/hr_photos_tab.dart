@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Body of the "select organization" bottom sheet shown at login when a
 /// person is registered in more than one organization (TAS-296).

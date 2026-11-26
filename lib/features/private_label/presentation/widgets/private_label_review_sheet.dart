@@ -5,7 +5,7 @@ import 'package:delegate_app/features/private_label/presentation/widgets/private
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_labels.dart';
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_photo_pair.dart';
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_sheet.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Decision returned by [showPrivateLabelReviewSheet].
 class PrivateLabelReviewDecision {

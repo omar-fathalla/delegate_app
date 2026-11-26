@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Centralized SnackBar helper for consistent error/success messages across all screens,
 /// strictly utilizing official Google Material icons and removing raw Unicode emojis.

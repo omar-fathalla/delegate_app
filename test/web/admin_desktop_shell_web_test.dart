@@ -5,10 +5,11 @@ import 'package:delegate_app/config/theme/app_theme.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/web/admin_desktop/admin_desktop_shell_web.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'web_golden.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 Delegate _mk({UserRole role = UserRole.admin, String companyUID = 'c'}) => Delegate(
   uid: 'test_sup', firstName: 'مشرف', middleName: '', lastName: 'تجريبي',
@@ -53,7 +54,7 @@ Future<void> _pump(WidgetTester t, Size size, ThemeData theme, {String? initialP
   await t.pumpWidget(MaterialApp(
     debugShowCheckedModeBanner: false,
     theme: theme.copyWith(textTheme: theme.textTheme.apply(fontFamily: 'Cairo')),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     locale: const Locale('ar'),
     home: AdminDesktopShellWeb(

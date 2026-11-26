@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// One status filter on the «طلبات الاشتراك» web page.
 @immutable

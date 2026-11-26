@@ -1,8 +1,9 @@
 import 'package:delegate_app/config/theme/app_theme.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 bool _promoFontsLoaded = false;
 
@@ -37,7 +38,7 @@ Widget promoTestApp({
     theme: theme,
     locale: const Locale('ar'),
     supportedLocales: AppLocalizations.supportedLocales,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     debugShowCheckedModeBanner: false,
     home: wrapScaffold
         ? Scaffold(

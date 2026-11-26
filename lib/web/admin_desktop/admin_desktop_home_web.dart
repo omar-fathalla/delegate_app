@@ -1,7 +1,7 @@
 // WEB-ONLY: Material 3 desktop grid for the supervisor home tab.
 // Reuses AdminHomeScreen (same bloc provider + initial loads) through its
 // layoutBuilder hook, and composes the public section widgets into a grid.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_home_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';

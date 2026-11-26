@@ -7,7 +7,7 @@ import 'package:delegate_app/features/profile/data/phone_change/delegate_phone_c
 import 'package:delegate_app/features/profile/data/phone_change/phone_change_otp_client.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
 /// Abstracts the OTP step so widget tests do not need Firebase Auth.

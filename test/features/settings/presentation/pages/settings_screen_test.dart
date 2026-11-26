@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -11,6 +11,7 @@ import 'package:delegate_app/features/settings/presentation/pages/settings_scree
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 final tDelegate = Delegate(
   uid: '1',
@@ -64,7 +65,7 @@ Widget buildSettingsScreen() {
   return BlocProvider<ThemeCubit>.value(
     value: sl<ThemeCubit>(),
     child: MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('en'),
       home: SettingsScreen(delegate: tDelegate),

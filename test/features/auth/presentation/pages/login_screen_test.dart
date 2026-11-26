@@ -1,5 +1,5 @@
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:delegate_app/features/auth/presentation/pages/login_screen.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -12,6 +12,7 @@ import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
 import 'package:delegate_app/core/services/push_notification_service.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 class MockAuthBloc extends Mock implements AuthBloc {}
 class MockPushNotificationService extends Mock implements PushNotificationService {}
@@ -61,7 +62,7 @@ void main() {
 
   Widget createWidgetUnderTest() {
     return MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('en'),
       home: BlocProvider<AuthBloc>.value(

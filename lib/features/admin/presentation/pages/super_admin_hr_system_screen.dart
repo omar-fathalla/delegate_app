@@ -7,7 +7,7 @@ import 'package:delegate_app/features/hr/presentation/pages/hr_leaves_and_excuse
 import 'package:delegate_app/features/hr/presentation/pages/hr_monthly_payroll_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/tracking/presentation/pages/delegate_tracking_screen.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// شاشة نظام الموارد البشرية (HR System) المخصصة للسوبر أدمن.
 /// تجمع كافة أدوات الموارد البشرية الخمسة في واجهة مركزية موحدة:

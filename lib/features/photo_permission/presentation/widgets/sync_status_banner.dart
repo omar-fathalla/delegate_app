@@ -1,5 +1,5 @@
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:delegate_app/core/services/sync_manager.dart';
 import 'package:delegate_app/core/widgets/app_loading_indicator.dart';
 import 'package:delegate_app/injection_container.dart' as di;

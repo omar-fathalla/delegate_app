@@ -1,6 +1,6 @@
 import 'package:delegate_app/features/admin/presentation/pages/edit_delegate_profile_screen.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Delegate _sup() => Delegate(

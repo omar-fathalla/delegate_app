@@ -2,9 +2,10 @@ import 'dart:io';
 
 import 'package:delegate_app/features/photo_permission/presentation/widgets/captured_photo_full_screen_viewer.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 /// TAS-302: full-screen check of a stamped photo before sending.
 void main() {
@@ -24,7 +25,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('ar'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
           builder: (context) => TextButton(

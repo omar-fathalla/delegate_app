@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:delegate_app/features/admin/presentation/utils/admin_privileged_staff_menu.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/admin_header.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 void main() {
   group('privilegedStaffMenuIncludesManageDelegates', () {
@@ -27,7 +28,7 @@ void main() {
   testWidgets('header popup shows المناديب — تعديل وإيقاف when included in menu', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           appBar: AdminHeader(

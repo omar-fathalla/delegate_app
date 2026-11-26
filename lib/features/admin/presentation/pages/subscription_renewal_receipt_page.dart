@@ -1,7 +1,7 @@
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/admin/domain/entities/subscription_renewal.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// One receipt for one renewal request (one Paymob payment, list of delegates).
 class SubscriptionRenewalReceiptPage extends StatelessWidget {

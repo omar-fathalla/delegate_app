@@ -9,9 +9,10 @@ import 'package:delegate_app/features/hr/presentation/pages/tabs/hr_attendance_t
 import 'package:delegate_app/features/hr/presentation/widgets/hr_selected_card_colors.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 Delegate _supervisor() => Delegate(
   uid: 'fake-sup',
@@ -56,7 +57,7 @@ Future<ColorScheme> _pumpTab(WidgetTester t, {required bool web}) async {
   await t.pumpWidget(
     MaterialApp(
       theme: theme,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('ar'),
       home: Scaffold(body: HRAttendanceTab(hrDelegate: _supervisor())),

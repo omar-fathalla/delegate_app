@@ -6,7 +6,7 @@ import 'package:delegate_app/features/notifications/presentation/bloc/notificati
 import 'package:delegate_app/features/notifications/presentation/widgets/notification_list_item.dart';
 import 'package:delegate_app/features/notifications/presentation/pages/send_notification_screen.dart';
 import 'package:delegate_app/injection_container.dart' as di;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 

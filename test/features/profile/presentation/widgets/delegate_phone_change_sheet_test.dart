@@ -3,8 +3,9 @@ import 'package:delegate_app/features/profile/data/phone_change/delegate_phone_c
 import 'package:delegate_app/features/profile/presentation/widgets/delegate_phone_change_sheet.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 class _FakeOtp implements PhoneChangeOtp {
   String? sentTo;
@@ -29,7 +30,7 @@ class _FakeOtp implements PhoneChangeOtp {
 
 Widget _host(Widget sheet, void Function(Object?) onResult) => MaterialApp(
       locale: const Locale('ar'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Builder(
         builder: (context) => Scaffold(

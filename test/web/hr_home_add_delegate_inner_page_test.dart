@@ -16,9 +16,10 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
 import 'package:delegate_app/web/hr_system/hr_shell_link.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 Delegate _supervisor() => Delegate(
   uid: 'seed-fake-supervisor',
@@ -104,7 +105,7 @@ Future<void> _pump(WidgetTester t, Widget home) async {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme(const Color(0xFF6750A4)),
       locale: const Locale('ar'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Directionality(textDirection: TextDirection.rtl, child: home),
     ),
