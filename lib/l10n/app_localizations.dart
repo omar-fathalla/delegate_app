@@ -2528,6 +2528,18 @@ abstract class AppLocalizations {
   /// **'Log out?\nYour local data will be saved first.'**
   String get logoutConfirm;
 
+  /// No description provided for @logoutDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out?'**
+  String get logoutDialogTitle;
+
+  /// No description provided for @logoutDialogBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your local data is saved first'**
+  String get logoutDialogBody;
+
   /// No description provided for @logoutFailed.
   ///
   /// In en, this message translates to:

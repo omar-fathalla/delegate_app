@@ -1335,6 +1335,12 @@ class AppLocalizationsAr extends AppLocalizations {
       'تسجيل الخروج؟\nستُحفظ بياناتك المحلية قبل الخروج.';
 
   @override
+  String get logoutDialogTitle => 'تسجيل الخروج؟';
+
+  @override
+  String get logoutDialogBody => 'بياناتك المحلية هتتحفظ قبل الخروج';
+
+  @override
   String logoutFailed(Object error) {
     return 'تعذّر تسجيل الخروج: $error';
   }

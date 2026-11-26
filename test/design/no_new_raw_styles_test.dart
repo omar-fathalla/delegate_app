@@ -10,8 +10,8 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// Counted in `lib/` outside `lib/core/design/` (the design system itself)
 /// and generated files.
-const _fontSizeBaseline = 1988;
-const _hexColorBaseline = 443;
+const _fontSizeBaseline = 1981; // TAS-350: header + logout dialog
+const _hexColorBaseline = 441; // TAS-350: header live dot
 
 void main() {
   final fontSize = RegExp(r'\bfontSize\s*:');

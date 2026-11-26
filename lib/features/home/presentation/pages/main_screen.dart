@@ -29,7 +29,7 @@ import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/core/widgets/universal_app_header.dart';
 import 'package:delegate_app/core/widgets/app_logout_modal.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
+import 'package:delegate_app/core/design/widgets/navigation.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 class MainScreen extends StatefulWidget {
@@ -43,6 +43,9 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+
+  /// Scroll direction for the hiding navigation bar (TAS-350).
+  final _bar = HideOnScroll();
 
   /// Tracks which tabs have been visited so we only build them once.
   final Set<int> _initializedTabs = {0}; // Tab 0 (Attendance) loads first
@@ -85,6 +88,7 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   void dispose() {
+    _bar.dispose();
     super.dispose();
   }
 
@@ -247,34 +251,22 @@ class _MainScreenState extends State<MainScreen> {
         menuItems: const [],
       ),
       drawer: _buildDrawer(context, delegate, l10n, onMenu),
-          body: Column(
-            children: [
-              OfflineBanner(onRetry: () => setState(() {})),
-              Expanded(child: _buildBody(delegate)),
-            ],
+          body: _bar.listener(
+            child: Column(
+              children: [
+                OfflineBanner(onRetry: () => setState(() {})),
+                Expanded(child: _buildBody(delegate)),
+              ],
+            ),
           ),
-          bottomNavigationBar: M3NavBar(
+          // TAS-350 (C-17): M3 navigation bar that hides while the content
+          // scrolls down and comes back on scroll up (never with a screen
+          // reader on).
+          bottomNavigationBar: HidingNavigationBar(
+            visible: _bar,
+            destinations: _tabs(l10n),
             selectedIndex: _currentIndex,
-            onSelected: (index) {
-              setState(() {
-                _currentIndex = index;
-                _initializedTabs.add(index); // Mark tab as visited
-              });
-              if (index == 3) PhotoReportsRefresh.request();
-            },
-            destinations: [
-              M3NavDestination(icon: Symbols.home_rounded, label: l10n.home),
-              M3NavDestination(
-                  icon: Symbols.schedule_rounded, label: l10n.attendance),
-              M3NavDestination(
-                icon: Symbols.event_note_rounded,
-                label: l10n.navRequests,
-              ),
-              M3NavDestination(
-                icon: Symbols.photo_library_rounded,
-                label: l10n.navPhotoReports,
-              ),
-            ],
+            onDestinationSelected: _selectTab,
           ),
         );
   }
@@ -525,88 +517,88 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  /// The four bottom-bar destinations (C-17).
+  List<TashilDestination> _tabs(AppLocalizations l10n) => [
+    TashilDestination(
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home_rounded,
+      label: l10n.home,
+    ),
+    TashilDestination(
+      icon: Icons.schedule_outlined,
+      selectedIcon: Icons.watch_later_rounded,
+      label: l10n.attendance,
+    ),
+    TashilDestination(
+      icon: Icons.event_note_outlined,
+      selectedIcon: Icons.event_note_rounded,
+      label: l10n.navRequests,
+    ),
+    TashilDestination(
+      icon: Icons.photo_library_outlined,
+      selectedIcon: Icons.photo_library_rounded,
+      label: l10n.navPhotoReports,
+    ),
+  ];
+
+  void _selectTab(int index) {
+    setState(() {
+      _currentIndex = index;
+      _initializedTabs.add(index); // Mark tab as visited
+    });
+    _bar.value = true;
+    if (index == 3) PhotoReportsRefresh.request();
+  }
+
+  /// TAS-350 (C-18): secondary destinations in the M3 modal navigation rail
+  /// (replaces the navigation drawer, which M3 no longer recommends). The
+  /// rail lists the four tabs first, then the menu entries in the same order
+  /// as before (AGENTS.md menu ordering), with logout last.
   Widget _buildDrawer(
     BuildContext context,
     Delegate delegate,
     AppLocalizations l10n,
     void Function(String) onMenu,
   ) {
-    final cs = Theme.of(context).colorScheme;
     final role = delegate.role;
-    final entries = <(String, IconData, String)>[
-      ('profile', Symbols.person_rounded, l10n.profile),
-      ('tasks', Symbols.task_alt_rounded, l10n.tasks),
-      ('penalty_rules_catalog', Symbols.menu_book_rounded, l10n.violationsPolicy),
-      ('penalties', Symbols.gavel_rounded, l10n.myViolations),
+    final entries = <(String, IconData, IconData, String)>[
+      ('profile', Icons.person_outline_rounded, Icons.person_rounded,
+          l10n.profile),
+      ('tasks', Icons.task_alt_outlined, Icons.task_alt_rounded, l10n.tasks),
+      ('penalty_rules_catalog', Icons.menu_book_outlined,
+          Icons.menu_book_rounded, l10n.violationsPolicy),
+      ('penalties', Icons.gavel_outlined, Icons.gavel_rounded,
+          l10n.myViolations),
       if (role == UserRole.superAdmin)
-        ('manage_organizations', Symbols.corporate_fare_rounded,
-            l10n.manageOrganizationsChains),
+        ('manage_organizations', Icons.corporate_fare_outlined,
+            Icons.corporate_fare_rounded, l10n.manageOrganizationsChains),
       if (role == UserRole.superAdmin ||
           role == UserRole.technicalSupport ||
           role == UserRole.organizationAdmin)
-        ('delegate_subscriptions', Symbols.how_to_reg_rounded,
-            l10n.delegateSubscriptionsMenu),
+        ('delegate_subscriptions', Icons.how_to_reg_outlined,
+            Icons.how_to_reg_rounded, l10n.delegateSubscriptionsMenu),
       if (_allDelegates.length > 1)
-        ('org_switch', Symbols.swap_horiz_rounded, l10n.switchOrganization),
-      ('settings', Symbols.settings_rounded, l10n.settings),
+        ('org_switch', Icons.swap_horiz_rounded, Icons.swap_horiz_rounded,
+            l10n.switchOrganization),
+      ('settings', Icons.settings_outlined, Icons.settings_rounded,
+          l10n.settings),
+      ('logout', Icons.logout_rounded, Icons.logout_rounded, l10n.logout),
     ];
-    final name = delegate.fullName.trim().isEmpty
-        ? l10n.defaultUserName
-        : delegate.fullName.trim();
-
-    return NavigationDrawer(
-      selectedIndex: null,
+    final tabs = _tabs(l10n);
+    return ModalNavigationRail(
+      primary: tabs,
+      secondary: [
+        for (final e in entries)
+          TashilDestination(icon: e.$2, selectedIcon: e.$3, label: e.$4),
+      ],
+      selectedIndex: _currentIndex,
       onDestinationSelected: (i) {
-        Navigator.of(context).pop();
-        if (i < entries.length) {
-          onMenu(entries[i].$1);
+        if (i < tabs.length) {
+          _selectTab(i);
         } else {
-          onMenu('logout');
+          onMenu(entries[i - tabs.length].$1);
         }
       },
-      children: [
-        Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(28, 16, 16, 16),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: cs.primaryContainer,
-                foregroundColor: cs.onPrimaryContainer,
-                child: Text(name.characters.first),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 28),
-          child: Divider(),
-        ),
-        for (final e in entries.take(entries.length - 1))
-          NavigationDrawerDestination(icon: Icon(e.$2), label: Text(e.$3)),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 28, vertical: 8),
-          child: Divider(),
-        ),
-        NavigationDrawerDestination(
-          icon: Icon(entries.last.$2),
-          label: Text(entries.last.$3),
-        ),
-        // Red is reserved for the one destructive action.
-        NavigationDrawerDestination(
-          icon: Icon(Symbols.logout_rounded, color: cs.error),
-          label: Text(l10n.logout, style: TextStyle(color: cs.error)),
-        ),
-      ],
     );
   }
 }
