@@ -643,12 +643,12 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: colorScheme.primaryContainer,
+                                color: colorScheme.primary,
                                 borderRadius: BorderRadius.circular(TashilRadius.medium),
                               ),
                               child: Icon(
                                 Symbols.business_rounded,
-                                color: colorScheme.primary,
+                                color: colorScheme.onPrimary,
                                 size: 20,
                               ),
                             ),
@@ -1030,10 +1030,10 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
+              color: colorScheme.primary,
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: colorScheme.primary, size: 16),
+            child: Icon(icon, color: colorScheme.onPrimary, size: 16),
           ),
           const SizedBox(height: 6),
           Text(
@@ -1159,10 +1159,10 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
           leading: Container(
             padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
+              color: colorScheme.primary,
               borderRadius: BorderRadius.circular(TashilRadius.medium),
             ),
-            child: Icon(icon, color: colorScheme.primary, size: 18),
+            child: Icon(icon, color: colorScheme.onPrimary, size: 18),
           ),
           title: Text(
             title,
