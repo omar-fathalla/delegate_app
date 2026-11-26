@@ -1,8 +1,9 @@
 import 'dart:async';
-import 'dart:io' show Platform;
+import 'dart:io' show File, Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart' show FontWeight;
+import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -54,6 +55,17 @@ const _bundledCairoWeights = <FontWeight>[
 /// object exists, keeps that message out of the tests.
 Future<void> _preloadCairoFonts() async {
   TestWidgetsFlutterBinding.ensureInitialized();
+  // TAS-348: the theme uses the bundled Cairo variable font as family
+  // 'Cairo' (pubspec `fonts:`). Tests do not load pubspec fonts by
+  // themselves, so without this every theme text falls back to the wide test
+  // font and layouts overflow only in tests.
+  final cairo = File('assets/fonts/cairo-variable/Cairo-Variable.ttf');
+  if (cairo.existsSync()) {
+    final bytes = cairo.readAsBytesSync();
+    final loader = FontLoader('Cairo')
+      ..addFont(Future.value(ByteData.sublistView(bytes)));
+    await loader.load();
+  }
   for (final weight in _bundledCairoWeights) {
     GoogleFonts.cairo(fontWeight: weight);
   }

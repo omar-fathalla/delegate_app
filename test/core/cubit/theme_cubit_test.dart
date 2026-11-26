@@ -25,13 +25,22 @@ void main() {
     expect(ThemeCubit(prefs).state.themeMode, ThemeMode.dark);
   });
 
-  test('dark scheme uses the approved M3 values', () {
-    final s = AppTheme.darkTheme(const Color(0xFF6750A4)).colorScheme;
-    expect(s.primary, const Color(0xFFCFBCFF));
-    expect(s.primaryContainer, const Color(0xFF4F378A));
-    expect(s.surface, const Color(0xFF141313));
-    expect(s.surfaceContainer, const Color(0xFF201F20));
-    expect(s.surfaceContainerHigh, const Color(0xFF2B2A2A));
-    expect(s.error, const Color(0xFFFFB4AB));
+  // TAS-348 (user decision 2026-11-26): the dark scheme is generated from the
+  // seed like every other role (m3-kit design-system.md, Colour: "never
+  // hand-pick tones"). The pinned values of 47d05fb0 are gone.
+  test('dark scheme is generated from the seed', () {
+    const seed = Color(0xFF6750A4);
+    final s = AppTheme.darkTheme(seed).colorScheme;
+    final generated = ColorScheme.fromSeed(
+      seedColor: seed,
+      brightness: Brightness.dark,
+    );
+    expect(s.brightness, Brightness.dark);
+    expect(s.primary, generated.primary);
+    expect(s.primaryContainer, generated.primaryContainer);
+    expect(s.surface, generated.surface);
+    expect(s.surfaceContainer, generated.surfaceContainer);
+    expect(s.surfaceContainerHigh, generated.surfaceContainerHigh);
+    expect(s.error, generated.error);
   });
 }
