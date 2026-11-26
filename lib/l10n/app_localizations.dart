@@ -1484,6 +1484,12 @@ abstract class AppLocalizations {
   /// **'Are you sure you want to delete this task? This action cannot be undone.'**
   String get deleteTaskConfirmation;
 
+  /// No description provided for @notesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add notes here...'**
+  String get notesHint;
+
   /// Label for task notes
   ///
   /// In en, this message translates to:

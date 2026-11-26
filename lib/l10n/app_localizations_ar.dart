@@ -747,6 +747,9 @@ class AppLocalizationsAr extends AppLocalizations {
       'هل أنت متأكد من رغبتك في حذف هذه المهمة؟ لا يمكن التراجع عن هذا الإجراء.';
 
   @override
+  String get notesHint => 'اكتب ملاحظاتك هنا';
+
+  @override
   String get notes => 'الملاحظات';
 
   @override

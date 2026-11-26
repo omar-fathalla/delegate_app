@@ -1002,6 +1002,7 @@
   "@deleteTaskConfirmation": {
     "description": "Confirmation message for deleting a task"
   },
+  "notesHint": "Add notes here...",
   "notes": "Notes",
   "@notes": {
     "description": "Label for task notes"
