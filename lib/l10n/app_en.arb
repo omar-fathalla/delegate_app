@@ -1411,7 +1411,7 @@
   "assignedCompanySupervisor": "Assigned company supervisor",
   "callAction": "Call",
   "offerPhotosTitle": "Offer photos",
-  "offerPhotosSubtitle": "Take and upload approved offer photos in the hypermarket",
+  "offerPhotosSubtitle": "Photograph offers inside the hypermarket",
   "homeAttendanceSummary": "Attendance – {monthName}",
   "@homeAttendanceSummary": {
     "placeholders": {

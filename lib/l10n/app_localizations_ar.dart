@@ -1217,8 +1217,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get offerPhotosTitle => 'تصوير العروض';
 
   @override
-  String get offerPhotosSubtitle =>
-      'صوّر العروض المعتمدة وارفعها من داخل الهايبر ماركت';
+  String get offerPhotosSubtitle => 'صوّر العروض من داخل الهايبر ماركت';
 
   @override
   String homeAttendanceSummary(Object monthName) {

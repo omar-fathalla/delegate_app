@@ -1,5 +1,6 @@
 import 'package:delegate_app/core/l10n/display_names.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/core/design/bidi.dart';
 import 'package:delegate_app/core/design/tokens.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
@@ -13,7 +14,7 @@ import 'package:delegate_app/core/services/firestore_session_subscriptions.dart'
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:intl/intl.dart' hide TextDirection;
+import 'package:intl/intl.dart' hide Bidi, TextDirection;
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
@@ -781,14 +782,16 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
   }
 
   Widget _buildDutyItem({required IconData icon, required String text}) {
+    // TAS-384: every duty on one line, cut with an ellipsis.
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 18, color: _heroOn(context)),
         const SizedBox(width: TashilSpacing.sm),
         Expanded(
           child: Text(
             text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: _heroOn(context),
                 ),
@@ -979,9 +982,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         padding: const EdgeInsets.all(TashilSpacing.lg),
         child: Row(
           children: [
+            // TAS-384: primary fill, readable on the filled card.
             CircleAvatar(
-              backgroundColor: colorScheme.primaryContainer,
-              foregroundColor: colorScheme.onPrimaryContainer,
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
               child: const Icon(Symbols.person_rounded),
             ),
             const SizedBox(width: TashilSpacing.md),
@@ -1064,12 +1068,12 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   Container(
                     padding: const EdgeInsets.all(TashilSpacing.md),
                     decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
+                      color: colorScheme.primary,
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       Symbols.photo_camera_rounded,
-                      color: colorScheme.onPrimaryContainer,
+                      color: colorScheme.onPrimary,
                       size: 24,
                     ),
                   ),
@@ -1086,6 +1090,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                         ),
                         const SizedBox(height: TashilSpacing.xs),
                         Text(AppLocalizations.of(context)!.offerPhotosSubtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
@@ -1096,42 +1102,21 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 ],
               ),
               const SizedBox(height: TashilSpacing.lg),
-              Container(
+              // TAS-384: the screen's one main action, a real FilledButton.
+              SizedBox(
                 width: double.infinity,
-                constraints: const BoxConstraints(minHeight: 48),
-                padding: const EdgeInsets.symmetric(
-                  vertical: TashilSpacing.sm,
-                  horizontal: TashilSpacing.lg,
-                ),
-                decoration: BoxDecoration(
-                  color: colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(TashilRadius.full),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Symbols.touch_app_rounded,
-                      size: 18,
-                      color: colorScheme.onSecondaryContainer,
-                    ),
-                    const SizedBox(width: TashilSpacing.sm),
-                    Flexible(
-                      child: Text(
-                      AppLocalizations.of(context)!.startPhotosCta,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: colorScheme.onSecondaryContainer,
-                      ),
-                    ),
-                    ),
-                    const SizedBox(width: TashilSpacing.xs),
-                    Icon(Symbols.arrow_forward_rounded,
-                      size: 16,
-                      color: colorScheme.onSecondaryContainer,
-                    ),
-                  ],
+                child: FilledButton.icon(
+                  key: const Key('home_start_photos_button'),
+                  onPressed: () => context.push(
+                    '/photo-permissions/delegate',
+                    extra: widget.delegate,
+                  ),
+                  icon: const Icon(Symbols.photo_camera_rounded),
+                  label: Text(
+                    AppLocalizations.of(context)!.startPhotosCta,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
             ],
@@ -1316,8 +1301,9 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     child: _buildAttendanceStatPill(
                       context,
                       title: AppLocalizations.of(context)!.statAttended,
-                      value: AppLocalizations.of(context)!.daysCount(_attendedDays),
-                      icon: Symbols.check_circle_rounded,
+                      // TAS-384: number only, HR web icons.
+                      value: '$_attendedDays',
+                      icon: Symbols.how_to_reg_rounded,
                       containerColor: colorScheme.surface,
                       iconColor: colorScheme.onSurfaceVariant,
                       textColor: colorScheme.onSurface,
@@ -1331,8 +1317,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     child: _buildAttendanceStatPill(
                       context,
                       title: AppLocalizations.of(context)!.statAbsent,
-                      value: AppLocalizations.of(context)!.daysCount(_absentDays),
-                      icon: Symbols.cancel_rounded,
+                      value: '$_absentDays',
+                      icon: Symbols.person_off_rounded,
                       containerColor: colorScheme.surface,
                       iconColor: colorScheme.onSurfaceVariant,
                       textColor: colorScheme.onSurface,
@@ -1345,7 +1331,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     child: _buildAttendanceStatPill(
                       context,
                       title: AppLocalizations.of(context)!.statDaysOff,
-                      value: AppLocalizations.of(context)!.leavesOfFour(_approvedLeavesThisMonth),
+                      value: Bidi.ltr('$_approvedLeavesThisMonth/4'),
                       icon: Symbols.event_available_rounded,
                       containerColor: colorScheme.surface,
                       iconColor: colorScheme.onSurfaceVariant,
@@ -1742,11 +1728,11 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       ),
       child: Column(
         children: [
-          Icon(icon, size: 20, color: iconColor),
+          Icon(icon, size: 24, color: iconColor),
           const SizedBox(height: TashilSpacing.xs),
           Text(
             value,
-            style: tt.titleMedium?.copyWith(
+            style: tt.headlineSmall?.copyWith(
               fontWeight: FontWeight.w700,
               color: textColor,
             ),
@@ -1798,13 +1784,13 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   Container(
                     padding: const EdgeInsets.all(TashilSpacing.md),
                     decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
+                      color: colorScheme.primary,
                       borderRadius: BorderRadius.circular(TashilRadius.medium),
                     ),
                     child: Icon(
                       Symbols.event_note_rounded,
                       size: 26,
-                      color: colorScheme.onPrimaryContainer,
+                      color: colorScheme.onPrimary,
                     ),
                   ),
                   const SizedBox(width: TashilSpacing.md),

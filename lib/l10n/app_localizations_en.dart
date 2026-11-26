@@ -1219,8 +1219,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get offerPhotosTitle => 'Offer photos';
 
   @override
-  String get offerPhotosSubtitle =>
-      'Take and upload approved offer photos in the hypermarket';
+  String get offerPhotosSubtitle => 'Photograph offers inside the hypermarket';
 
   @override
   String homeAttendanceSummary(Object monthName) {
