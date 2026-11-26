@@ -1,3 +1,8 @@
+import 'package:delegate_app/core/design/tokens.dart';
+import 'package:delegate_app/core/design/widgets/button_group.dart';
+import 'package:delegate_app/core/design/widgets/date_time_fields.dart';
+import 'package:delegate_app/core/design/widgets/dialogs.dart';
+import 'package:delegate_app/core/design/widgets/snackbars.dart';
 import 'package:delegate_app/features/tasks/data/services/task_image_storage.dart';
 import 'package:delegate_app/features/tasks/data/datasources/task_remote_data_source.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_proof.dart';
@@ -265,12 +270,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       final ok = await _saveProofs();
       if (!ok) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                AppLocalizations.of(context)!.taskImageUploadFailed,
-              ),
-            ),
+          showTashilSnackBar(
+            context,
+            AppLocalizations.of(context)!.taskImageUploadFailed,
           );
         }
         return;
@@ -328,10 +330,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       _sessionUploads.clear();
       _imageViewEpoch++;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppLocalizations.of(context)!.taskUpdatedSuccessfully),
-      ),
+    showTashilSnackBar(
+      context,
+      AppLocalizations.of(context)!.taskUpdatedSuccessfully,
     );
   }
 
@@ -405,7 +406,14 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
               ],
             ),
             body: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsetsDirectional.symmetric(
+                horizontal: TashilSpacing.page,
+                vertical: TashilSpacing.sm,
+              ),
+              // TAS-356: outlined fields, read-only values on Card.filled,
+              // priority and status as kit ButtonGroups (C-06), the main
+              // action a plain FilledButton (primary), delete a text-button
+              // kit dialog. Who can change what is unchanged.
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -414,43 +422,18 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                     child: _isEditing
                         ? TextFormField(
                             controller: _titleController,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
                             decoration: InputDecoration(
-                              filled: true,
-                              fillColor: theme
-                                  .colorScheme
-                                  .surfaceContainerHighest
-                                  .withValues(alpha: 0.3),
+                              border: const OutlineInputBorder(),
                               prefixIcon: const Icon(Icons.title_rounded),
                               hintText: l10n.taskTitle,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(
-                                  color: theme.colorScheme.primary,
-                                  width: 2,
-                                ),
-                              ),
                             ),
                             keyboardType: TextInputType.text,
                           )
-                        : Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primaryContainer
-                                  .withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Text(
+                        : _readOnly(
+                            theme,
+                            Text(
                               _task.title,
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
+                              style: theme.textTheme.titleLarge?.copyWith(
                                 color: theme.colorScheme.onSurface,
                               ),
                               textDirection: Bidi.hasAnyRtl(_task.title)
@@ -459,7 +442,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                             ),
                           ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: TashilSpacing.md),
                   _buildField(
                     label: l10n.taskDescription,
                     child: _isEditing
@@ -468,45 +451,14 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                             minLines: 3,
                             maxLines: null,
                             decoration: InputDecoration(
-                              filled: true,
-                              fillColor: theme
-                                  .colorScheme
-                                  .surfaceContainerHighest
-                                  .withValues(alpha: 0.3),
-                              prefixIcon: const Column(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Padding(
-                                    padding: EdgeInsets.only(top: 16),
-                                    child: Icon(Icons.description_outlined),
-                                  ),
-                                ],
-                              ),
+                              border: const OutlineInputBorder(),
                               hintText: l10n.taskDescription,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(
-                                  color: theme.colorScheme.primary,
-                                  width: 2,
-                                ),
-                              ),
                             ),
                             keyboardType: TextInputType.multiline,
                           )
-                        : Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainerHighest
-                                  .withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Text(
+                        : _readOnly(
+                            theme,
+                            Text(
                               _task.description,
                               style: theme.textTheme.bodyLarge,
                               textDirection: Bidi.hasAnyRtl(_task.description)
@@ -516,7 +468,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                           ),
                   ),
                   if (_isEditing && _isSender) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: TashilSpacing.md),
                     TaskImagePickerList(
                       organizationId: widget.organizationId,
                       companyId: _task.companyId,
@@ -552,7 +504,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                           setState(() => _imageUploading = v),
                     ),
                   ] else if (_task.hasImage) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: TashilSpacing.md),
                     TaskImageGallery(
                       key: ValueKey(
                         'view-$_imageViewEpoch-${_task.resolvedImagePaths.join(",")}',
@@ -563,252 +515,134 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                     ),
                   ],
                   if (_task.isEdited && !_isEditing) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: TashilSpacing.sm),
                     const TaskEditedLabel(),
                   ],
                   ..._buildProofSection(l10n, theme),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: TashilSpacing.md),
                   _buildField(
                     label: l10n.taskPriority,
                     child: _isEditing
-                        ? Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: TaskPriority.values.map((p) {
-                              final isSelected = _currentPriority == p;
-                              final color = _getPriorityColor(p);
-                              return ChoiceChip(
-                                avatar: isSelected
-                                    ? null
-                                    : _getPriorityIcon(p, color: color),
-                                label: Text(_getPriorityName(l10n, p)),
-                                selected: isSelected,
-                                onSelected: (selected) {
-                                  if (selected) {
-                                    setState(() => _currentPriority = p);
-                                  }
-                                },
-                                showCheckmark: true,
-                                selectedColor: color.withValues(alpha: 0.2),
-                                labelStyle: TextStyle(
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                  color: isSelected ? color : null,
+                        ? ButtonGroup<TaskPriority>(
+                            key: const Key('taskPriorityGroup'),
+                            variant: ButtonGroupVariant.connected,
+                            expand: true,
+                            selected: {_currentPriority},
+                            onSelectionChanged: (v) =>
+                                setState(() => _currentPriority = v.first),
+                            items: [
+                              for (final p in TaskPriority.values)
+                                ButtonGroupItem(
+                                  value: p,
+                                  label: _getPriorityName(l10n, p),
                                 ),
-                              );
-                            }).toList(),
+                            ],
                           )
-                        : Card(
-                            elevation: 0,
-                            color: _getPriorityColor(
-                              _currentPriority,
-                            ).withValues(alpha: 0.1),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(
-                                color: _getPriorityColor(
+                        : _readOnly(
+                            theme,
+                            Row(
+                              children: [
+                                _getPriorityIcon(
                                   _currentPriority,
-                                ).withValues(alpha: 0.5),
-                              ),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 6,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _getPriorityIcon(
-                                    _currentPriority,
-                                    color: _getPriorityColor(_currentPriority),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    _getPriorityName(l10n, _currentPriority),
-                                    style: theme.textTheme.titleMedium
-                                        ?.copyWith(
-                                          color: _getPriorityColor(
-                                            _currentPriority,
-                                          ),
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                ],
-                              ),
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: TashilSpacing.md),
+                                Text(
+                                  _getPriorityName(l10n, _currentPriority),
+                                  style: theme.textTheme.titleMedium,
+                                ),
+                              ],
                             ),
                           ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: TashilSpacing.md),
                   _buildField(
                     label: l10n.taskStatus,
                     child: _isEditing || !widget.isAdmin
-                        ? Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: TaskStatus.values.map((s) {
-                              final isSelected = _currentStatus == s;
-                              final color = _getStatusColor(s, theme);
-                              return ChoiceChip(
-                                avatar: isSelected
-                                    ? null
-                                    : _getStatusIcon(s, color: color),
-                                label: Text(_getStatusName(l10n, s)),
-                                selected: isSelected,
-                                onSelected: (selected) {
-                                  if (selected) {
-                                    setState(() => _currentStatus = s);
-                                  }
-                                },
-                                showCheckmark: true,
-                                selectedColor: color.withValues(alpha: 0.2),
-                                labelStyle: TextStyle(
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                  color: isSelected ? color : null,
+                        ? ButtonGroup<TaskStatus>(
+                            key: const Key('taskStatusGroup'),
+                            variant: ButtonGroupVariant.connected,
+                            expand: true,
+                            selected: {_currentStatus},
+                            onSelectionChanged: (v) =>
+                                setState(() => _currentStatus = v.first),
+                            items: [
+                              for (final st in TaskStatus.values)
+                                ButtonGroupItem(
+                                  value: st,
+                                  label: _getStatusName(l10n, st),
                                 ),
-                              );
-                            }).toList(),
+                            ],
                           )
-                        : Card(
-                            elevation: 0,
-                            color: theme.colorScheme.primaryContainer
-                                .withValues(alpha: 0.2),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(
-                                color: theme.colorScheme.primary.withValues(
-                                  alpha: 0.5,
+                        : _readOnly(
+                            theme,
+                            Row(
+                              children: [
+                                _getStatusIcon(
+                                  _currentStatus,
+                                  color: theme.colorScheme.onSurfaceVariant,
                                 ),
-                              ),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 6,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _getStatusIcon(
-                                    _currentStatus,
-                                    color: theme.colorScheme.primary,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    _getStatusName(l10n, _currentStatus),
-                                    style: theme.textTheme.titleMedium
-                                        ?.copyWith(
-                                          color: theme.colorScheme.primary,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                ],
-                              ),
+                                const SizedBox(width: TashilSpacing.md),
+                                Text(
+                                  _getStatusName(l10n, _currentStatus),
+                                  style: theme.textTheme.titleMedium,
+                                ),
+                              ],
                             ),
                           ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: TashilSpacing.md),
                   _buildField(
                     label: l10n.taskDueDate,
-                    child: InkWell(
-                      onTap: _isEditing ? () => _selectDate(context) : null,
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest
-                              .withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(16),
-                          border: _isEditing
-                              ? Border.all(
-                                  color: theme.colorScheme.outline.withValues(
-                                    alpha: 0.5,
-                                  ),
-                                )
-                              : null,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.calendar_month_rounded,
-                              color: theme.colorScheme.primary,
+                    child: _isEditing
+                        ? DateField(
+                            key: const Key('taskDueDateField'),
+                            label: l10n.taskDueDate,
+                            value: _dueDate,
+                            firstDate: DateUtils.dateOnly(DateTime.now()),
+                            lastDate: DateTime(2101),
+                            onChanged: (d) {
+                              if (d != null) setState(() => _dueDate = d);
+                            },
+                          )
+                        : _readOnly(
+                            theme,
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.calendar_month_rounded,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: TashilSpacing.md),
+                                Text(
+                                  DateFormat.yMMMMd(
+                                    Localizations.localeOf(context)
+                                        .toLanguageTag(),
+                                  ).format(_dueDate),
+                                  style: theme.textTheme.bodyLarge,
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 16),
-                            Text(
-                              DateFormat.yMMMMd(Localizations.localeOf(context).toLanguageTag()).format(_dueDate),
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const Spacer(),
-                            if (_isEditing)
-                              Icon(
-                                Icons.edit_calendar_rounded,
-                                color: theme.colorScheme.outline,
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
+                          ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: TashilSpacing.md),
                   _buildField(
-                    label: "Notes",
+                    label: l10n.notes,
                     child: _isEditing || !widget.isAdmin
                         ? TextFormField(
                             controller: _notesController,
                             minLines: 2,
                             maxLines: null,
                             decoration: InputDecoration(
-                              filled: true,
-                              fillColor: theme
-                                  .colorScheme
-                                  .surfaceContainerHighest
-                                  .withValues(alpha: 0.3),
-                              prefixIcon: const Column(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Padding(
-                                    padding: EdgeInsets.only(top: 16),
-                                    child: Icon(Icons.note_alt_outlined),
-                                  ),
-                                ],
-                              ),
-                              hintText: "Add notes here...",
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(
-                                  color: theme.colorScheme.primary,
-                                  width: 2,
-                                ),
-                              ),
+                              border: const OutlineInputBorder(),
+                              hintText: l10n.notesHint,
                             ),
                             keyboardType: TextInputType.multiline,
                           )
                         : _task.notes != null && _task.notes!.isNotEmpty
-                        ? Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainerHighest
-                                  .withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Text(
+                        ? _readOnly(
+                            theme,
+                            Text(
                               _task.notes!,
                               textDirection: Bidi.hasAnyRtl(_task.notes!)
                                   ? TextDirection.rtl
@@ -817,49 +651,36 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                           )
                         : const SizedBox.shrink(),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: TashilSpacing.lg),
                   if (!widget.isAdmin)
                     if (_currentStatus != _task.status)
-                      FilledButton(
-                        onPressed: () => _saveChanges(context),
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 56),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: Text(
-                          l10n.saveChanges,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: () => _saveChanges(context),
+                          child: Text(l10n.saveChanges),
                         ),
                       )
                     else if (_currentStatus != TaskStatus.completed &&
                         _currentStatus != TaskStatus.cancelled)
-                      FilledButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _currentStatus = TaskStatus.completed;
-                          });
-                          _saveChanges(context);
-                        },
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 56),
-                          backgroundColor: Colors.green.shade600,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        icon: const Icon(Icons.check_circle_outline_rounded),
-                        label: Text(
-                          l10n.complete,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          key: const Key('taskCompleteButton'),
+                          onPressed: () {
+                            setState(() {
+                              _currentStatus = TaskStatus.completed;
+                            });
+                            _saveChanges(context);
+                          },
+                          icon: const Icon(Icons.check_circle_outline_rounded),
+                          label: Text(l10n.complete),
                         ),
                       ),
                   if (_canEditOwnProofs &&
                       _proofsChanged &&
                       !_proofUploading) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: TashilSpacing.md),
                     FilledButton.tonalIcon(
                       onPressed: () => _saveChanges(context),
                       icon: const Icon(Icons.photo_library_outlined),
@@ -867,22 +688,13 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                     ),
                   ],
                   if (_isSender && !_isEditing) ...[
-                    const SizedBox(height: 16),
-                    FilledButton.tonalIcon(
-                      onPressed: () => _confirmDelete(context),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 56),
-                        backgroundColor: theme.colorScheme.errorContainer
-                            .withValues(alpha: 0.5),
-                        foregroundColor: theme.colorScheme.error,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      icon: const Icon(Icons.delete_outline_rounded),
-                      label: Text(
-                        l10n.deleteTask,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                    const SizedBox(height: TashilSpacing.lg),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _confirmDelete(context),
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        label: Text(l10n.deleteTask),
                       ),
                     ),
                   ],
@@ -895,19 +707,29 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     );
   }
 
+  /// A read-only value on the screen's one card style (TAS-356).
+  Widget _readOnly(ThemeData theme, Widget child) => Card.filled(
+    margin: EdgeInsets.zero,
+    child: Padding(
+      padding: const EdgeInsets.all(TashilSpacing.lg),
+      child: SizedBox(width: double.infinity, child: child),
+    ),
+  );
+
   Widget _buildField({required String label, required Widget child}) {
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsetsDirectional.only(start: 4, bottom: 4),
+          padding: const EdgeInsetsDirectional.only(
+            start: TashilSpacing.xs,
+            bottom: TashilSpacing.xs,
+          ),
           child: Text(
             label,
             style: theme.textTheme.labelLarge?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.1,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ),
@@ -1050,308 +872,80 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     }
   }
 
-  Color _getPriorityColor(TaskPriority priority) {
-    switch (priority) {
-      case TaskPriority.high:
-        return Colors.red.shade700;
-      case TaskPriority.medium:
-        return Colors.orange.shade700;
-      case TaskPriority.low:
-        return Colors.green.shade700;
-    }
-  }
-
-  Color _getStatusColor(TaskStatus status, ThemeData theme) {
-    switch (status) {
-      case TaskStatus.pending:
-        return Colors.amber.shade800;
-      case TaskStatus.inProgress:
-        return theme.colorScheme.primary;
-      case TaskStatus.completed:
-        return Colors.green.shade700;
-      case TaskStatus.cancelled:
-        return theme.colorScheme.error;
-    }
-  }
-
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _dueDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime(2101),
-    );
-    if (picked != null && picked != _dueDate) {
-      setState(() => _dueDate = picked);
-    }
-  }
-
+  // TAS-356 (C-27): one kit dialog on every width, text buttons, the
+  // confirm says what happens; the delete itself is unchanged.
   Future<void> _confirmDelete(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isMobile = MediaQuery.of(context).size.width <= 768;
+    bool isDeleting = false;
 
-    Widget buildSheetContent(
-      BuildContext modalContext,
-      StateSetter setModalState,
-      bool isDeleting,
-    ) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (isMobile)
-              Center(
-                child: Container(
-                  width: 38,
-                  height: 4.5,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
+    await showTashilDialog<void>(
+      context: context,
+      builder: (modalContext) => StatefulBuilder(
+        builder: (ctx, setModalState) => AlertDialog(
+          key: const Key('deleteTaskDialog'),
+          title: Text(l10n.deleteTask),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _task.title,
+                style: Theme.of(ctx).textTheme.titleSmall,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: colorScheme.errorContainer.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.delete_outline_rounded,
-                    color: colorScheme.error,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l10n.deleteTask,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _task.title,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              const SizedBox(height: TashilSpacing.sm),
+              Text(l10n.deleteTaskConfirmation),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isDeleting ? null : () => Navigator.pop(modalContext),
+              child: Text(l10n.cancel),
             ),
-            const SizedBox(height: 16),
-            Text(
-              l10n.deleteTaskConfirmation,
-              style: TextStyle(
-                fontSize: 13,
-                color: colorScheme.onSurfaceVariant,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Connected Dual Action Button Group
-            Container(
-              height: 48,
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                  width: 1.2,
-                ),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Row(
-                children: [
-                  // Cancel Button (إلغاء)
-                  Expanded(
-                    flex: 2,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: isDeleting
-                            ? null
-                            : () => Navigator.pop(modalContext),
-                        child: Center(
-                          child: Text(
-                            l10n.cancel,
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Divider
-                  VerticalDivider(
-                    width: 1,
-                    thickness: 1,
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                  ),
-
-                  // Confirm Delete Button (حذف)
-                  Expanded(
-                    flex: 3,
-                    child: Material(
-                      color: colorScheme.error,
-                      child: InkWell(
-                        onTap: isDeleting
-                            ? null
-                            : () async {
-                                setModalState(() => isDeleting = true);
-                                try {
-                                  final deleteTaskUseCase = di.sl<DeleteTask>();
-                                  final result = await deleteTaskUseCase(
-                                    widget.organizationId,
-                                    _task.uid,
-                                  );
-
-                                  if (!modalContext.mounted) return;
-
-                                  result.fold(
-                                    (failure) {
-                                      setModalState(() => isDeleting = false);
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(failure.message),
-                                          backgroundColor: colorScheme.error,
-                                        ),
-                                      );
-                                    },
-                                    (_) {
-                                      Navigator.pop(modalContext);
-                                      Navigator.pop(context, true);
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            AppLocalizations.of(
-                                              context,
-                                            )!.taskDeleted,
-                                          ),
-                                          backgroundColor:
-                                              Colors.green.shade700,
-                                        ),
-                                      );
-                                    },
-                                  );
-                                } catch (e) {
-                                  if (modalContext.mounted) {
-                                    setModalState(() => isDeleting = false);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          AppLocalizations.of(
-                                            context,
-                                          )!.taskDeleteFailed(e),
-                                        ),
-                                        backgroundColor: colorScheme.error,
-                                      ),
-                                    );
-                                  }
-                                }
-                              },
-                        child: Center(
-                          child: isDeleting
-                              ? SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: colorScheme.onError,
-                                  ),
-                                )
-                              : Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.delete_forever_rounded,
-                                      size: 18,
-                                      color: colorScheme.onError,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      l10n.delete,
-                                      style: TextStyle(
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: colorScheme.onError,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            TextButton(
+              onPressed: isDeleting
+                  ? null
+                  : () async {
+                      setModalState(() => isDeleting = true);
+                      try {
+                        final deleteTaskUseCase = di.sl<DeleteTask>();
+                        final result = await deleteTaskUseCase(
+                          widget.organizationId,
+                          _task.uid,
+                        );
+                        if (!modalContext.mounted) return;
+                        result.fold(
+                          (failure) {
+                            setModalState(() => isDeleting = false);
+                            showTashilSnackBar(context, failure.message);
+                          },
+                          (_) {
+                            Navigator.pop(modalContext);
+                            Navigator.pop(context, true);
+                            showTashilSnackBar(context, l10n.taskDeleted);
+                          },
+                        );
+                      } catch (e) {
+                        if (modalContext.mounted) {
+                          setModalState(() => isDeleting = false);
+                          showTashilSnackBar(
+                            context,
+                            l10n.taskDeleteFailed(e),
+                          );
+                        }
+                      }
+                    },
+              child: isDeleting
+                  ? const SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(l10n.delete),
             ),
           ],
         ),
-      );
-    }
-
-    if (isMobile) {
-      await showModalBottomSheet<void>(
-        context: context,
-        backgroundColor: colorScheme.surface,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        builder: (modalCtx) {
-          bool isDeleting = false;
-          return StatefulBuilder(
-            builder: (ctx, setModalState) =>
-                buildSheetContent(modalCtx, setModalState, isDeleting),
-          );
-        },
-      );
-    } else {
-      await showDialog<void>(
-        context: context,
-        builder: (modalCtx) {
-          bool isDeleting = false;
-          return Dialog(
-            backgroundColor: colorScheme.surface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: StatefulBuilder(
-                builder: (ctx, setModalState) =>
-                    buildSheetContent(modalCtx, setModalState, isDeleting),
-              ),
-            ),
-          );
-        },
-      );
-    }
+      ),
+    );
   }
 }

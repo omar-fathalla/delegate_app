@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/design/widgets/loading_indicator.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/core/services/app_version_gate.dart';
@@ -11,7 +12,6 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/auth/presentation/widgets/tashil_m3.dart';
-import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -156,8 +156,7 @@ class _SplashScreenState extends State<SplashScreen>
                                         fontWeight: FontWeight.w700)),
                                 Text('تطبيق الموظفين',
                                     style: text.bodyLarge?.copyWith(
-                                        color: brand.onPrimary
-                                            .withValues(alpha: 0.85))),
+                                        color: brand.onPrimary)),
                               ],
                             ),
                           ),
@@ -172,9 +171,13 @@ class _SplashScreenState extends State<SplashScreen>
                       end: 0,
                       bottom: 120,
                       child: Center(
-                        child: M3DelayedLoading(
-                          delay: const Duration(seconds: 1),
-                          child: M3LoadingIndicator(color: brand.onPrimary),
+                        // TAS-349 (C-31): the kit indicator, contained so it
+                        // reads on the primary splash (reduced motion
+                        // handled inside the kit widget).
+                        child: const DelayedLoadingIndicator(
+                          key: Key('splash_loading_indicator'),
+                          delay: Duration(seconds: 1),
+                          contained: true,
                         ),
                       ),
                     ),
@@ -183,7 +186,7 @@ class _SplashScreenState extends State<SplashScreen>
                       end: 0,
                       bottom: 32,
                       child: TashilVersionText(
-                        color: brand.onPrimary.withValues(alpha: 0.7),
+                        color: brand.onPrimary,
                       ),
                     ),
                   ],

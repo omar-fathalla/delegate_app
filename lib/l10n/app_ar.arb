@@ -1002,6 +1002,7 @@
   "@deleteTaskConfirmation": {
     "description": "Confirmation message for deleting a task"
   },
+  "notesHint": "اكتب ملاحظاتك هنا",
   "notes": "الملاحظات",
   "@notes": {
     "description": "Label for task notes"
@@ -1650,6 +1651,7 @@
   "messageTooShort": "الرسالة قصيرة جدًا (10 أحرف على الأقل)",
   "screenshotOptional": "لقطة شاشة (اختياري)",
   "chooseImage": "اختر صورة",
+  "sendRequestAction": "إرسال الطلب",
   "sendAction": "إرسال",
   "thankYou": "شكرًا لك!",
   "feedbackReceived": "استلمنا ملاحظتك وسنراجعها قريبًا.",

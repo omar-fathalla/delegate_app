@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/design/widgets/button_group.dart';
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -185,5 +186,32 @@ void main() {
     expect(captured.phoneNumber, '01234567890');
     expect(captured.password, '29712200201981');
     expect(captured.mode, LoginMode.delegate);
+  });
+
+  // TAS-349 (C-06, C-08): the mode switch is the kit's connected ButtonGroup
+  // (keys kept for tests and patrol), and limited fields show a counter.
+  testWidgets('mode switch is a connected ButtonGroup with its keys', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createWidgetUnderTest());
+    await tester.pumpAndSettle();
+    final group = tester.widget<ButtonGroup<LoginMode>>(
+      find.byKey(const ValueKey('login_mode_switch')),
+    );
+    expect(group.variant, ButtonGroupVariant.connected);
+    expect(find.byKey(ValueKey('group_item_${LoginMode.delegate}')), findsOneWidget);
+    expect(find.byKey(ValueKey('group_item_${LoginMode.staff}')), findsOneWidget);
+  });
+
+  testWidgets('phone and national ID show a character counter', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(createWidgetUnderTest());
+    await tester.pumpAndSettle();
+    expect(find.text('0/11'), findsOneWidget);
+    expect(find.text('0/14'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('login_national_id')), '2971');
+    await tester.pump();
+    expect(find.text('4/14'), findsOneWidget);
   });
 }

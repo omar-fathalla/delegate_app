@@ -128,17 +128,18 @@ void main() {
     });
   });
 
-  test('leaves filter uses the shared colors on web only', () {
+  // TAS-353: the leaves filter is no longer a row of stat cards but one row
+  // of official FilterChips, so its selected colour comes from the theme on
+  // web and mobile alike (TAS-185's stat-card colours do not apply to it).
+  test('leaves filter is a row of FilterChips', () {
     final source = File(
       'lib/features/hr/presentation/pages/delegate_leaves_and_requests_screen.dart',
     ).readAsStringSync();
-    final start = source.indexOf('Widget _buildFilterSegment(');
+    final start = source.indexOf('Widget _buildFilterButtonGroup(');
     expect(start, isNonNegative);
-    final body = source.substring(start, source.indexOf('// ── Request Card', start));
-    expect(body, contains('WebRuntimePolicy.isWeb ? HrSelectedCardColors.of(colorScheme)'));
-    expect(body, contains('isSelected ? selectedBg'));
-    // Mobile keeps its secondary container as the fallback.
-    expect(body, contains('web?.background ?? colorScheme.secondaryContainer'));
+    final body = source.substring(start, source.indexOf('Widget _buildRequestCard(', start));
+    expect(body, contains('FilterChip('));
+    expect(body, isNot(contains('HrSelectedCardColors')));
   });
 
   test('device unbind cards use the same shared colors', () {

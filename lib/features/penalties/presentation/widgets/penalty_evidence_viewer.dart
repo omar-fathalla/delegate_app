@@ -1,3 +1,6 @@
+import 'package:delegate_app/core/design/widgets/snackbars.dart';
+import 'package:delegate_app/core/design/tokens.dart';
+import 'package:delegate_app/config/theme/app_theme.dart';
 import 'package:delegate_app/core/storage/storage_media.dart';
 import 'package:delegate_app/core/widgets/storage_resolved_image.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -15,9 +18,7 @@ class PenaltyEvidenceViewer {
     required PenaltyEntity penalty,
   }) {
     if (penalty.evidenceFiles.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.noViolationDocs)),
-      );
+      showTashilSnackBar(context, AppLocalizations.of(context)!.noViolationDocs);
       return;
     }
 
@@ -53,9 +54,9 @@ class PenaltyEvidenceViewer {
     String? subtitle,
     String? fileName,
   }) {
-    showDialog(
+    showDialog<void>(
       context: context,
-      barrierColor: Colors.black87,
+      barrierColor: _overlay.scrim.withValues(alpha: 0.87),
       builder: (ctx) {
         return Dialog(
           backgroundColor: Colors.transparent,
@@ -67,7 +68,7 @@ class PenaltyEvidenceViewer {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.8),
+                  color: _overlay.scrim.withValues(alpha: 0.8),
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                 ),
                 child: Row(
@@ -78,21 +79,14 @@ class PenaltyEvidenceViewer {
                         children: [
                           Text(
                             title ?? AppLocalizations.of(context)!.violationReceipt,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                            ),
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(color: _overlay.onSurface, fontWeight: FontWeight.bold),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                           if (subtitle != null && subtitle.isNotEmpty)
                             Text(
                               subtitle,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.75),
-                                fontSize: 12,
-                              ),
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: _overlay.onSurfaceVariant),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -100,7 +94,7 @@ class PenaltyEvidenceViewer {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Colors.white),
+                      icon: Icon(Icons.close_rounded, color: _overlay.onSurface),
                       tooltip: AppLocalizations.of(context)!.closeAction,
                       onPressed: () => Navigator.pop(ctx),
                     ),
@@ -112,7 +106,7 @@ class PenaltyEvidenceViewer {
                 child: ClipRRect(
                   borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
                   child: Container(
-                    color: Colors.black,
+                    color: _overlay.scrim,
                     constraints: BoxConstraints(
                       maxHeight: MediaQuery.of(context).size.height * 0.7,
                       maxWidth: double.infinity,
@@ -123,10 +117,10 @@ class PenaltyEvidenceViewer {
                       child: StorageResolvedImage(pathOrUrl: imageUrl, builder: (_, resolved) => CachedNetworkImage(
                         imageUrl: resolved,
                         fit: BoxFit.contain,
-                        placeholder: (context, url) => const Center(
+                        placeholder: (context, url) => Center(
                           child: Padding(
                             padding: EdgeInsets.all(40),
-                            child: CircularProgressIndicator(color: Colors.white),
+                            child: CircularProgressIndicator(color: _overlay.onSurface),
                           ),
                         ),
                         errorWidget: (context, url, error) => Center(
@@ -135,12 +129,12 @@ class PenaltyEvidenceViewer {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.broken_image_rounded,
-                                    color: Colors.white54, size: 48),
+                                Icon(Icons.broken_image_rounded,
+                                    color: _overlay.onSurfaceVariant, size: 48),
                                 const SizedBox(height: 12),
                                 Text(
                                   AppLocalizations.of(context)!.imageLoadFailed,
-                                  style: TextStyle(color: Colors.white70),
+                                  style: TextStyle(color: _overlay.onSurfaceVariant),
                                 ),
                                 const SizedBox(height: 8),
                                 TextButton.icon(
@@ -177,9 +171,9 @@ class PenaltyEvidenceViewer {
     required File file,
   }) {
     final fileName = file.path.split('/').last.split('\\').last;
-    showDialog(
+    showDialog<void>(
       context: context,
-      barrierColor: Colors.black87,
+      barrierColor: _overlay.scrim.withValues(alpha: 0.87),
       builder: (ctx) {
         return Dialog(
           backgroundColor: Colors.transparent,
@@ -190,7 +184,7 @@ class PenaltyEvidenceViewer {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.8),
+                  color: _overlay.scrim.withValues(alpha: 0.8),
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                 ),
                 child: Row(
@@ -198,17 +192,13 @@ class PenaltyEvidenceViewer {
                     Expanded(
                       child: Text(
                         fileName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(color: _overlay.onSurface, fontWeight: FontWeight.bold),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Colors.white),
+                      icon: Icon(Icons.close_rounded, color: _overlay.onSurface),
                       onPressed: () => Navigator.pop(ctx),
                     ),
                   ],
@@ -218,7 +208,7 @@ class PenaltyEvidenceViewer {
                 child: ClipRRect(
                   borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
                   child: Container(
-                    color: Colors.black,
+                    color: _overlay.scrim,
                     constraints: BoxConstraints(
                       maxHeight: MediaQuery.of(context).size.height * 0.7,
                       maxWidth: double.infinity,
@@ -296,7 +286,7 @@ class _EvidenceListBottomSheet extends StatelessWidget {
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(TashilRadius.medium),
                 ),
                 child: Icon(
                   Icons.receipt_long_rounded,
@@ -363,21 +353,21 @@ class _EvidenceListBottomSheet extends StatelessWidget {
                       _openFile(file.fileUrl);
                     }
                   },
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(TashilRadius.large),
                   child: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(16),
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(TashilRadius.large),
                       border: Border.all(
-                        color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                        color: colorScheme.outlineVariant,
                       ),
                     ),
                     child: Row(
                       children: [
                         // Thumbnail Preview
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(TashilRadius.medium),
                           child: Container(
                             width: 60,
                             height: 60,
@@ -417,10 +407,7 @@ class _EvidenceListBottomSheet extends StatelessWidget {
                                 file.fileName.isNotEmpty
                                     ? file.fileName
                                     : AppLocalizations.of(context)!.receiptNumber(index + 1),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -434,26 +421,19 @@ class _EvidenceListBottomSheet extends StatelessWidget {
                                       color: isImage
                                           ? colorScheme.primaryContainer
                                           : colorScheme.tertiaryContainer,
-                                      borderRadius: BorderRadius.circular(6),
+                                      borderRadius: BorderRadius.circular(TashilRadius.small),
                                     ),
                                     child: Text(
                                       isImage ? AppLocalizations.of(context)!.photoReceipt : file.fileType,
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: isImage
+                                      style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: isImage
                                             ? colorScheme.onPrimaryContainer
-                                            : colorScheme.onTertiaryContainer,
-                                      ),
+                                            : colorScheme.onTertiaryContainer),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
                                     isImage ? AppLocalizations.of(context)!.tapToPreview : AppLocalizations.of(context)!.tapToOpen,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
+                                    style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
                                   ),
                                 ],
                               ),
@@ -504,3 +484,7 @@ class _EvidenceListBottomSheet extends StatelessWidget {
     }
   }
 }
+
+/// The viewer sits over photos: dark theme roles, not Colors.black / white
+/// (TAS-357).
+final ColorScheme _overlay = AppTheme.darkTheme().colorScheme;
