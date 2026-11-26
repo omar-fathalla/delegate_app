@@ -17,8 +17,9 @@ import 'package:delegate_app/features/tracking/presentation/widgets/tracking_liv
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 const _co = 'seed-fake-co';
 const _org = 'seed-fake-org';
@@ -100,7 +101,7 @@ Widget _app(Widget child, {HrWebHeaderBridge? bridge}) {
       : HrWebHeaderBridgeScope(bridge: bridge, child: child);
   return MaterialApp(
     locale: const Locale('ar'),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: body,
   );

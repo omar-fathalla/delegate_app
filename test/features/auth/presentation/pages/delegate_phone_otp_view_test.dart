@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -7,6 +7,7 @@ import 'package:delegate_app/features/auth/domain/phone_otp.dart';
 import 'package:delegate_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:delegate_app/features/auth/presentation/pages/delegate_phone_otp_view.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 class MockAuthBloc extends Mock implements AuthBloc {}
 
@@ -100,7 +101,7 @@ void main() {
     return MaterialApp(
       locale: locale,
       supportedLocales: AppLocalizations.supportedLocales,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       home: BlocProvider<AuthBloc>.value(
         value: bloc,
         child: DelegatePhoneOtpView(

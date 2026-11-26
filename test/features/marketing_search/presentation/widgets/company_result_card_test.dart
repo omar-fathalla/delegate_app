@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:delegate_app/features/marketing_search/presentation/widgets/company_result_card.dart';
 import 'package:delegate_app/features/admin/domain/entities/company.dart';

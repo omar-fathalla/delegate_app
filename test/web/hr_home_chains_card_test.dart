@@ -1,6 +1,6 @@
 // HR home «سلاسل مناديبك» card: «إضافة سلسلة», pending requests and the
 // empty state (TAS-117). Fake data only.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:delegate_app/web/hr_system/hr_home_side_cards_web.dart';

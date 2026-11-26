@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/admin_header.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 void main() {
   testWidgets('AdminHeader should render title and actions correctly', (WidgetTester tester) async {
@@ -10,7 +11,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           appBar: AdminHeader(

@@ -1,7 +1,7 @@
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:delegate_app/features/feedback/domain/entities/feedback_entity.dart';

@@ -1,5 +1,5 @@
 import 'package:delegate_app/config/theme/app_motion.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Extension for M3 Dynamic Primary-Derived Hover Engine
 extension M3HoverColorScheme on ColorScheme {

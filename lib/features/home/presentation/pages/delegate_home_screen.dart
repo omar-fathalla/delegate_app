@@ -4,7 +4,7 @@ import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/photo_permission/presentation/widgets/sync_status_banner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';

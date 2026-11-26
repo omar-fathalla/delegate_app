@@ -5,7 +5,7 @@ import 'package:delegate_app/features/penalties/presentation/bloc/penalty_event.
 import 'package:delegate_app/features/penalties/presentation/bloc/penalty_state.dart';
 import 'package:delegate_app/features/penalties/presentation/pages/admin_penalties_list_page.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';

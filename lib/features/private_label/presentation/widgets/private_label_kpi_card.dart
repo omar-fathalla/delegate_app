@@ -1,7 +1,7 @@
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_kpi.dart';
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_sheet.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Monthly KPI card.
 ///

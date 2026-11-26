@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
 

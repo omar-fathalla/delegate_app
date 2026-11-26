@@ -17,7 +17,7 @@ import 'package:delegate_app/features/admin/presentation/widgets/company_exclusi
 import 'package:delegate_app/features/admin/presentation/widgets/subscription_request_status_widgets.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:dartz/dartz.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../../../support/promo_screenshot_harness.dart';
 

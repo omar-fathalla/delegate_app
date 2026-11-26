@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:delegate_app/features/tasks/data/services/task_image_storage.dart';
 import 'package:delegate_app/features/tasks/domain/task_image_paths.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:material_symbols_icons/symbols.dart';
 

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:delegate_app/features/auth/presentation/pages/login_screen.dart';
 import 'package:delegate_app/features/auth/presentation/pages/splash_screen.dart';
 import 'package:delegate_app/core/services/app_version_gate.dart';

@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// What the user chose in [CapturedPhotoFullScreenViewer].
 enum CapturedPhotoViewerAction { retake, delete }

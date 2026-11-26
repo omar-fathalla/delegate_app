@@ -1,5 +1,5 @@
 import 'package:delegate_app/features/photo_permission/data/datasources/photo_permission_remote_datasource.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';

@@ -21,12 +21,13 @@ import 'package:delegate_app/main.dart';
 import 'package:delegate_app/web/hr_system/web_hr_system_redirect_web.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 class _MockAuthBloc extends Mock implements AuthBloc {}
 
@@ -325,7 +326,7 @@ void main() {
           value: bloc,
           child: MaterialApp.router(
             routerConfig: router,
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             locale: const Locale('ar'),
           ),

@@ -6,7 +6,7 @@ import 'package:delegate_app/features/private_label/presentation/widgets/private
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_rest_day_sheet.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 /// Compact Private Label KPI card for the marketer home dashboard.

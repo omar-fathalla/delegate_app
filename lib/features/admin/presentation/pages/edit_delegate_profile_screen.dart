@@ -5,7 +5,7 @@ import 'package:delegate_app/features/admin/data/repositories/delegate_profile_e
 import 'package:delegate_app/features/admin/domain/entities/delegate_subscription_request.dart';
 import 'package:delegate_app/features/admin/presentation/widgets/update_national_id_request_sheet.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 

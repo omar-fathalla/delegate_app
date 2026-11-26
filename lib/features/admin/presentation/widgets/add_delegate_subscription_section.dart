@@ -1,5 +1,5 @@
 import 'package:delegate_app/core/utils/subscription_cycle_helper.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 /// Subscription cycle banner, payment cards, and submit CTA used by

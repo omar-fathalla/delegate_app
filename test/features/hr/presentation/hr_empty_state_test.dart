@@ -1,5 +1,5 @@
 import 'package:delegate_app/features/hr/presentation/widgets/hr_empty_state.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Widget _host(Widget child) => MaterialApp(

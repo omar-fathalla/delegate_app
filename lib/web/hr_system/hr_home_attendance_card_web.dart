@@ -1,6 +1,6 @@
 // WEB-ONLY: «حضور النهاردة» card of the HR overview. Pure view over the
 // attendance tab's records; filtering, sorting and paging happen here.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';

@@ -25,13 +25,14 @@ import 'package:firebase_core/firebase_core.dart';
 // Transitive test helper of firebase_core (fake Firebase app, no network).
 // ignore: depend_on_referenced_packages
 import 'package:firebase_core_platform_interface/test.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'web_golden.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 DateTime _at(int h, int m) => DateTime(2026, 11, 16, h, m);
 var _clockNow = _at(13, 40);
@@ -190,7 +191,7 @@ ThemeData _theme() {
 Widget _app(Widget home) => MaterialApp(
   debugShowCheckedModeBanner: false,
   theme: _theme(),
-  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  localizationsDelegates: appLocalizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   locale: const Locale('ar'),
   home: home,

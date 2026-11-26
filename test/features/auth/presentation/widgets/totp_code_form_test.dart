@@ -2,7 +2,7 @@
 // with two-step verification.
 import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/auth/presentation/widgets/totp_code_form.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Widget _host(Widget child) => MaterialApp(home: child);

@@ -1,7 +1,7 @@
 // Web-only desktop attendance tab (>= 840dp): existing filters on top, then a
 // table. Reads the shared HRAttendanceTab state through its viewBuilder hook;
 // no query or filter logic lives here.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:delegate_app/features/hr/presentation/pages/tabs/hr_attendance_tab.dart';

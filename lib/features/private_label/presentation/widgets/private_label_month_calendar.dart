@@ -2,7 +2,7 @@ import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_dates.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_day.dart';
 import 'package:delegate_app/features/private_label/presentation/widgets/private_label_labels.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 enum _CellState { achieved, rest, missed, today, future, pendingSync }
 

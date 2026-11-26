@@ -16,8 +16,9 @@ import 'package:delegate_app/features/attendance/presentation/pages/attendance_s
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart'; // Import Delegate
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 class MockAttendanceRepository implements AttendanceRepository {
   @override
@@ -235,7 +236,7 @@ void main() {
     // Pass delegate instead of user
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: AttendanceScreen(delegate: tDelegate),
       ),
@@ -333,7 +334,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('ar'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: AttendanceScreen(
             delegate: multiChainDelegate,
@@ -442,7 +443,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('ar'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: AttendanceScreen(
             delegate: multiChainDelegate,
@@ -526,7 +527,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: AttendanceScreen(delegate: oldDelegate, viewOnly: true),
         ),

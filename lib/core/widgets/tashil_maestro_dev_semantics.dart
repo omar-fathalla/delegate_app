@@ -1,5 +1,5 @@
 import 'package:delegate_app/core/config/app_env.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Exposes stable [Semantics.identifier] values for Maestro on ENV=dev only.
 Widget tashilMaestroDevSemantics({

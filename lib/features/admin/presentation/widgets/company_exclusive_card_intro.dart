@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Badge row, title, and body of the company multi-org card on admin home.
 class CompanyExclusiveCardIntro extends StatelessWidget {

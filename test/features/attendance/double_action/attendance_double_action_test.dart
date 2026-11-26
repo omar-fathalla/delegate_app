@@ -20,9 +20,10 @@ import 'package:delegate_app/features/attendance/presentation/widgets/early_chec
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 class MockCheckIn extends Mock implements CheckIn {}
 
@@ -87,7 +88,7 @@ Future<AttendanceModel> doCheckIn(AttendanceRemoteDataSourceImpl ds) =>
 
 Widget localized(Widget child) => MaterialApp(
   locale: const Locale('ar'),
-  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  localizationsDelegates: appLocalizationsDelegates,
   supportedLocales: AppLocalizations.supportedLocales,
   home: Scaffold(body: child),
 );

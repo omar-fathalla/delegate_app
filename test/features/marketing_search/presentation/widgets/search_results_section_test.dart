@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:delegate_app/features/marketing_search/presentation/widgets/search_results_section.dart';
 import 'package:delegate_app/features/marketing_search/presentation/bloc/marketing_search_state.dart';

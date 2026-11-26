@@ -5,7 +5,7 @@ import 'package:delegate_app/core/services/branches_session_cache.dart';
 import 'package:delegate_app/core/services/firestore_client_health.dart';
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 

@@ -5,11 +5,12 @@ import 'package:delegate_app/features/hr/presentation/pages/tabs/hr_attendance_t
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/web/admin_desktop/admin_desktop_attendance_web.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'web_golden.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 Delegate _d(String uid, String name) => Delegate(
       uid: uid, firstName: name, middleName: '', lastName: '',
@@ -69,7 +70,7 @@ Future<void> _pump(WidgetTester t, Size size, ThemeData theme, Widget home) asyn
   await t.pumpWidget(MaterialApp(
     debugShowCheckedModeBanner: false,
     theme: theme.copyWith(textTheme: theme.textTheme.apply(fontFamily: 'Cairo')),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     locale: const Locale('ar'),
     home: Scaffold(body: home),

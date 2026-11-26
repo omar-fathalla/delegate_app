@@ -1,5 +1,5 @@
 import 'package:delegate_app/core/widgets/organization_selector_sheet.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // TAS-296: a smotchi delegate is linked to 39 chains. The login sheet used a

@@ -3,7 +3,7 @@
 // AdminDesktopShellWeb.shouldUse). Mobile and narrow web keep AdminMainScreen.
 // Composes the existing shared tab screens without modifying them.
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';

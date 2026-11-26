@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class AppColorSchemes {
   // Available Seed Colors for Material Design 3 Single-Seed Dynamic Palette Generation

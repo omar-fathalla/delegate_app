@@ -1,7 +1,7 @@
 // Attendance table on the shared HR table widgets (TAS-115).
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:delegate_app/features/hr/presentation/pages/tabs/hr_attendance_tab.dart';

@@ -1,7 +1,7 @@
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/widgets/app_photo_image.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Displays a network URL or a local captured image (web-safe: `blob:` URLs).
 class PrivateLabelImage extends StatelessWidget {

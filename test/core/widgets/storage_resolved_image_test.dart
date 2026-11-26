@@ -3,7 +3,7 @@ import 'package:delegate_app/core/storage/storage_media.dart';
 import 'package:delegate_app/core/widgets/app_photo_image.dart';
 import 'package:delegate_app/core/widgets/storage_resolved_image.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// TAS-42: a stored Storage path is shown through a URL resolved at read

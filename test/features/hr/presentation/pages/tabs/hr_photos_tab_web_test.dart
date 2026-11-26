@@ -21,9 +21,10 @@ import 'package:delegate_app/features/photo_permission/presentation/pages/monthl
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/injection_container.dart' as di;
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 class _MockPhotoBloc extends MockBloc<PhotoPermissionEvent, PhotoPermissionState>
     implements PhotoPermissionBloc {}
@@ -145,7 +146,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('ar'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: body,
       ),

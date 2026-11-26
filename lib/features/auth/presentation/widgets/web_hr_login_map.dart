@@ -3,7 +3,7 @@ import 'dart:math' as math;
 
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 /// Brand map for the HR web login hero (TAS-188).

@@ -31,12 +31,13 @@ import 'package:delegate_app/main.dart';
 import 'package:delegate_app/web/hr_system/hr_web_account_button.dart';
 import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 const _shotsDir = String.fromEnvironment('HR_DELEGATES_SHOTS');
 const _co = 'seed-fake-co';
@@ -289,7 +290,7 @@ Future<void> _pump(
             textTheme: theme.textTheme.apply(fontFamily: 'Cairo'),
           ),
           locale: const Locale('ar'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Directionality(
             textDirection: TextDirection.rtl,

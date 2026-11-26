@@ -1,5 +1,5 @@
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'google_maps_loader_stub.dart'
     if (dart.library.js_interop) 'google_maps_loader_web.dart' as loader;

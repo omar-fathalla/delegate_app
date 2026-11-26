@@ -1,5 +1,5 @@
 import 'package:delegate_app/features/auth/domain/usecases/login.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// M3 [LoginScreen] keys from [login_screen.dart] (Patrol / widget tests).

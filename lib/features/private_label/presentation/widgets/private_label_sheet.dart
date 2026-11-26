@@ -1,5 +1,5 @@
 import 'package:delegate_app/config/theme/app_motion.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Viewport width above which sheets become centered dialogs (web/desktop).
 const double kPrivateLabelDesktopBreakpoint = 768;

@@ -1,6 +1,6 @@
 import 'package:delegate_app/config/theme/app_theme.dart';
 import 'package:delegate_app/core/cubit/theme_cubit.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';

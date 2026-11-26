@@ -1,6 +1,6 @@
 import 'package:delegate_app/features/private_label/domain/entities/private_label_audit.dart';
 import 'package:delegate_app/features/private_label/domain/entities/private_label_dates.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Arabic labels, Google icons and seed-derived colors for the Private Label UI.
 abstract final class PrivateLabelLabels {

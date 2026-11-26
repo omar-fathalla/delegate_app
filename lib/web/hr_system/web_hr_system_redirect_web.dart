@@ -2,7 +2,7 @@
 // mobile-style home route (/admin/home, /home) to the HR desktop system.
 // go_router drops `extra` on redirects, so the move happens after the first
 // frame with the signed-in delegate attached.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/auth/domain/role_home.dart';

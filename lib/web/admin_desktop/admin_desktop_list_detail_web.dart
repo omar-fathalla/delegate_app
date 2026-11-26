@@ -1,7 +1,7 @@
 // Web-only desktop list-detail layouts for the supervisor delegates and
 // requests tabs. They reuse the shared screens via their optional selection
 // hooks; mobile never builds these widgets.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:delegate_app/features/admin/presentation/pages/admin_delegates_screen.dart';
 import 'package:delegate_app/features/hr/presentation/pages/hr_leaves_and_excuses_screen.dart';

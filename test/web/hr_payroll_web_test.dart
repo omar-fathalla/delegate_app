@@ -17,8 +17,9 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/web/hr_system/hr_web_header_bridge.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
 const _co = 'seed-fake-co';
 
@@ -119,7 +120,7 @@ Future<void> _pump(WidgetTester t, {HrWebHeaderBridge? bridge}) async {
       debugShowCheckedModeBanner: false,
       theme: theme,
       locale: const Locale('ar'),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Directionality(
         textDirection: TextDirection.rtl,
@@ -384,7 +385,7 @@ void main() {
         MaterialApp(
           theme: theme,
           locale: const Locale('ar'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Directionality(
             textDirection: TextDirection.rtl,

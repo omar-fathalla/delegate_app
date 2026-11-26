@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Clear Arabic error + retry for Live Tracking stream failures.
 class LiveTrackingLoadError extends StatelessWidget {

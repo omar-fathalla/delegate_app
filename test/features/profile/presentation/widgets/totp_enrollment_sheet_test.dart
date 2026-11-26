@@ -4,7 +4,7 @@ import 'package:delegate_app/core/error/failures.dart';
 import 'package:delegate_app/features/auth/data/datasources/totp_mfa.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/profile/presentation/widgets/totp_enrollment_sheet.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 

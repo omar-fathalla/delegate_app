@@ -1,5 +1,5 @@
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class TrackingStatsOverview extends StatelessWidget {
   final int totalCount;

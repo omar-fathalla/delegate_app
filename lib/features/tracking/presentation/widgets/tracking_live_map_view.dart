@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
 import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'dart:ui' as ui;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';

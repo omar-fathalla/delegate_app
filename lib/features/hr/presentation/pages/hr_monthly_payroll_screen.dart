@@ -1,6 +1,6 @@
 import 'package:delegate_app/features/hr/domain/payroll_penalty_policy.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 

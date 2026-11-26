@@ -5,7 +5,7 @@ import 'package:delegate_app/features/tasks/domain/task_proof_paths.dart';
 
 import 'package:delegate_app/features/tasks/presentation/widgets/task_image_widgets.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_entity.dart';
 import 'package:delegate_app/features/tasks/domain/usecases/delete_task.dart';
