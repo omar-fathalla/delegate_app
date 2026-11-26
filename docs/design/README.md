@@ -5,6 +5,7 @@
 | الملف | فيه إيه |
 | --- | --- |
 | [`m3-catalog.md`](m3-catalog.md) | الفهرس: كل بند من M3 برقم ثابت (F الأساسيات، C المكونات، P مكونات خاصة)، ومكان الكود والتيست، وخطوات مراجعة أي صفحة من m3.material.io |
+| [`GUIDE_AR.md`](GUIDE_AR.md) | **الدليل بالعربي** للقراءة والمشاركة: الأسس والمكونات والكتالوج وقواعد الكتابة، بالجداول (نسخة المستخدم، 26 نوفمبر 2026) |
 | [`design-system.md`](design-system.md) | القواعد نفسها: الألوان، والخطوط، والمسافات، والمكونات، والحركة، والوصول، والـ RTL |
 | `lib/core/design/` | الكود: tokens، وtypography، وmotion، وbidi، وmoney، وlayout، وwidgets الـ M3 Expressive |
 | `test/design/` | تيستات نظام الديزاين، ومعاها `no_new_raw_styles_test.dart` (ratchet) |
