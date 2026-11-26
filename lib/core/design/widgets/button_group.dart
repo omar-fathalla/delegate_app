@@ -63,7 +63,12 @@ class ButtonGroupItem<T> {
     this.label,
     this.icon,
     this.tooltip,
+    this.key,
   }) : assert(label != null || icon != null);
+
+  /// Optional key on the button, so tests and drivers can find one item
+  /// (TAS-349: the login keeps its `group_item_<mode>` keys).
+  final Key? key;
 
   final T value;
   final String? label;
@@ -241,6 +246,9 @@ class _ButtonGroupState<T> extends State<ButtonGroup<T>> {
           constraints: const BoxConstraints(minHeight: 48),
           child: Center(child: button),
         );
+      }
+      if (item.key != null) {
+        button = KeyedSubtree(key: item.key, child: button);
       }
       if (i > 0) children.add(SizedBox(width: gap));
       children.add(widget.expand ? Expanded(child: button) : button);

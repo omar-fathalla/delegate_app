@@ -1,3 +1,7 @@
+import 'package:delegate_app/core/design/widgets/snackbars.dart';
+import 'package:delegate_app/core/design/widgets/loading_indicator.dart';
+import 'package:delegate_app/core/design/tokens.dart';
+import 'package:delegate_app/core/design/widgets/dialogs.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:delegate_app/core/services/device_binding_service.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -28,7 +32,8 @@ class DeviceLockDialog extends StatefulWidget {
     Delegate? delegate,
     bool requestAlreadyFiled = false,
   }) {
-    return showDialog<void>(
+    // TAS-349 (C-27): kit dialog transition.
+    return showTashilDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => DeviceLockDialog(
@@ -85,37 +90,12 @@ class _DeviceLockDialogState extends State<DeviceLockDialog> {
 
   void _closeWithSubmittedMessage() {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final primaryColor = Theme.of(context).colorScheme.primary;
     final message = _l10n.deviceLockRequestSent;
     Navigator.of(context).pop();
-    scaffoldMessenger.showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 22),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: primaryColor,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
-        duration: const Duration(seconds: 5),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      ),
-    );
+    // TAS-349 (C-30): text only, styled by the theme like showTashilSnackBar
+    // (the dialog context is gone after pop, so the messenger is used).
+    scaffoldMessenger.removeCurrentSnackBar();
+    scaffoldMessenger.showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _handleSendUnbindRequest() async {
@@ -145,16 +125,7 @@ class _DeviceLockDialogState extends State<DeviceLockDialog> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_l10n.deviceLockSendError('$e')),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-      );
+      showTashilSnackBar(context, _l10n.deviceLockSendError('$e'));
     }
   }
 
@@ -166,148 +137,107 @@ class _DeviceLockDialogState extends State<DeviceLockDialog> {
         ? widget.boundDeviceModel!
         : 'جهاز معتمد سابق';
 
+    final tt = theme.textTheme;
+    final sem = theme.extension<TashilSemanticColors>();
+    // TAS-349: kit dialog shape and colours from the theme; the lock is a
+    // warning (not an error); text from the textTheme; theme buttons.
+    Widget deviceRow(IconData icon, Color iconColor, String label, String value) =>
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: iconColor, size: 18),
+                const SizedBox(width: TashilSpacing.sm),
+                Text(label, style: tt.labelLarge),
+              ],
+            ),
+            const SizedBox(height: TashilSpacing.xs),
+            Padding(
+              padding: const EdgeInsetsDirectional.only(start: 26),
+              child: Text(
+                value,
+                style: tt.bodyMedium?.copyWith(color: colorScheme.onSurface),
+              ),
+            ),
+          ],
+        );
+
     return PopScope(
       canPop: false,
       child: Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        elevation: 0,
-        backgroundColor: colorScheme.surfaceContainerHigh,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
+          padding: const EdgeInsets.all(TashilSpacing.xl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 1. Header Shield / Lock Icon
               Container(
-                width: 72,
-                height: 72,
+                padding: const EdgeInsets.all(TashilSpacing.lg),
                 decoration: BoxDecoration(
-                  color: colorScheme.errorContainer.withValues(alpha: 0.7),
+                  color: sem?.warningContainer ?? colorScheme.tertiaryContainer,
                   shape: BoxShape.circle,
-                  border: Border.all(color: colorScheme.error.withValues(alpha: 0.3), width: 1.5),
                 ),
                 child: Icon(
                   Icons.phonelink_lock_rounded,
-                  color: colorScheme.error,
-                  size: 38,
+                  color: sem?.onWarningContainer ??
+                      colorScheme.onTertiaryContainer,
+                  size: 36,
                 ),
               ),
-              const SizedBox(height: 18),
-
-              // 2. Title
+              const SizedBox(height: TashilSpacing.lg),
               Text(
                 _l10n.deviceLockTitle,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
+                style: tt.headlineSmall?.copyWith(color: colorScheme.onSurface),
               ),
-              const SizedBox(height: 10),
-
-              // 3. Explanation
+              const SizedBox(height: TashilSpacing.sm),
               Text(
                 'عزيزي المندوب، هذا الحساب مصرح له بالعمل فقط من خلال جهازك المعتمد المسجل مسبقاً لدى النظام.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13.5,
-                  color: colorScheme.onSurfaceVariant,
-                  height: 1.4,
-                ),
+                style: tt.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
               ),
-              const SizedBox(height: 14),
-
-              // 4. Device Info Card
+              const SizedBox(height: TashilSpacing.md),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(TashilSpacing.md),
                 decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(TashilRadius.medium),
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Icon(Icons.check_circle_rounded, color: colorScheme.primary, size: 18),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'الجهاز المعتمد للحساب:',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                        ),
-                      ],
+                    deviceRow(
+                      Icons.check_circle_rounded,
+                      colorScheme.primary,
+                      'الجهاز المعتمد للحساب:',
+                      boundModel,
                     ),
-                    const SizedBox(height: 4),
-                    Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: Padding(
-                        padding: const EdgeInsetsDirectional.only(start: 26),
-                        child: Text(
-                          boundModel,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.primary,
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (widget.currentDeviceModel != null && widget.currentDeviceModel!.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Divider(height: 1, color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(Icons.cancel_rounded, color: colorScheme.error, size: 18),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'الجهاز الحالي المستخدم:',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: Padding(
-                          padding: const EdgeInsetsDirectional.only(start: 26),
-                          child: Text(
-                            widget.currentDeviceModel!,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.error,
-                            ),
-                          ),
-                        ),
+                    if (widget.currentDeviceModel != null &&
+                        widget.currentDeviceModel!.isNotEmpty) ...[
+                      const Divider(height: TashilSpacing.lg),
+                      deviceRow(
+                        Icons.cancel_rounded,
+                        colorScheme.onSurfaceVariant,
+                        'الجهاز الحالي المستخدم:',
+                        widget.currentDeviceModel!,
                       ),
                     ],
                   ],
                 ),
               ),
-
-              const SizedBox(height: 14),
-
+              const SizedBox(height: TashilSpacing.md),
               Text(
                 'إذا قمت بتغيير هاتفك أو استبداله، يمكنك إرسال طلب لفك ارتباط جهازك القديم ليتم اعتماده من قِبل الإدارة.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: colorScheme.onSurfaceVariant,
-                  height: 1.4,
-                ),
+                style: tt.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
               ),
-
-              const SizedBox(height: 18),
-
-              // 5. Mandatory unbind-request button (not dismissible).
+              const SizedBox(height: TashilSpacing.lg),
+              // Mandatory unbind-request button (not dismissible).
               if (_isChecking)
                 const SizedBox(
                   height: 48,
-                  child: Center(child: CircularProgressIndicator.adaptive()),
+                  child: Center(child: LoadingIndicator(size: 32)),
                 )
               else
                 SizedBox(
@@ -315,16 +245,14 @@ class _DeviceLockDialogState extends State<DeviceLockDialog> {
                   child: FilledButton.icon(
                     onPressed: _isSubmitting ? null : _handleSendUnbindRequest,
                     icon: _isSubmitting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : Icon(
                             _isPending
                                 ? Icons.hourglass_top_rounded
                                 : Icons.phonelink_erase_rounded,
-                            size: 20,
                           ),
                     label: Text(
                       _isSubmitting
@@ -332,11 +260,6 @@ class _DeviceLockDialogState extends State<DeviceLockDialog> {
                           : (_isPending
                               ? _l10n.deviceLockPendingUnbindButton
                               : _l10n.deviceLockSendUnbindButton),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                   ),
                 ),
