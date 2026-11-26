@@ -8,13 +8,16 @@ playground** shows every rule live, with the real theme, light and dark, RTL.
 
 | How | Command / action |
 | --- | --- |
-| Standalone (no database) | `flutter run -t lib/main_playground.dart` |
-| In a browser | `flutter run -d chrome -t lib/main_playground.dart`, or the GitHub Pages site once Pages is enabled (Settings > Pages > Source: GitHub Actions); it redeploys on every push to `main` |
-| Inside the app (debug builds only) | Home screen, widgets icon in the app bar |
-| Screenshots of every tab, light + dark, at SUNMI V3 size | `flutter test tool/screenshots --update-goldens` (PNGs land in `build/playground_shots/`) |
+| Standalone (no database, no login) | `flutter run -t lib/main_playground.dart` |
+| In a browser | `flutter run -d chrome -t lib/main_playground.dart` |
+| Inside the app (dev flavor only, `AppEnv.isDev`) | Settings, "مكونات التصميم (نسخة المطورين)" (`PlaygroundLauncher`, TAS-383). Never in a store build |
+| Overflow check of every tab at 360dp, light + dark | `flutter test test/design/playground_test.dart` |
 
-The app bar of the playground toggles dark mode, RTL/LTR and large text (1.3x)
-so you can check any component under each condition.
+The app bar of the playground toggles dark mode, RTL/LTR, large text (1.3x)
+and the three contrast levels, so you can check any component under each
+condition. The ERP's POS tab is not included in delegate_app; the demos that
+need sample products use `lib/features/playground/sample_widgets.dart`
+(playground only).
 
 ## Sources of truth
 

@@ -15,6 +15,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/features/hr/presentation/widgets/hr_adaptive_sheet.dart';
 import 'package:delegate_app/features/hr/presentation/hr_account_pages.dart';
+import 'package:delegate_app/core/config/app_env.dart';
+import 'package:delegate_app/features/playground/playground_launcher.dart';
 
 class SettingsScreen extends StatelessWidget {
   final Delegate delegate;
@@ -145,6 +147,23 @@ class SettingsScreen extends StatelessWidget {
                             title: l10n.privacyPolicy,
                             onTap: () => context.push('/privacy-policy'),
                           ),
+                          // TAS-383: the m3-kit component playground, dev
+                          // builds only (never in a store build).
+                          if (AppEnv.isDev) ...[
+                            Divider(
+                              height: 1,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.outlineVariant,
+                              indent: 64,
+                            ),
+                            _buildSettingsTile(
+                              context: context,
+                              icon: Icons.widgets_outlined,
+                              title: 'مكونات التصميم (نسخة المطورين)',
+                              onTap: () => PlaygroundLauncher.open(context),
+                            ),
+                          ],
                           Divider(
                             height: 1,
                             color: Theme.of(context).colorScheme.outlineVariant,
