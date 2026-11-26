@@ -4,7 +4,7 @@
 - **Pinned version:** Flutter **3.50.1** on app CI and local mirror — `.fvmrc`, `.github/workflows/ci.yml`, `pr-user-test-builds.yml` (`flutter-version: '3.50.1'`), and `scripts/local_ci.sh`, which reads the version from the tested commit's `.fvmrc` and uses `~/toolchains/flutter-<version>` (`scripts/ci/flutter_sdk.sh`, TAS-342; `LOCAL_CI_FLUTTER_SDK` still overrides). Bumping Flutter = change `.fvmrc` + the workflow pins + install the new toolchain on the Mac; local CI follows by itself. `deploy-ios.yml` is also pinned to 3.50.1 (since the 3.50.1 bump the lockfile needs Dart >=3.13, so the old 3.41.2 pin can no longer run `pub get`). `android-release.yml` still uses the action's latest `stable` channel (3.50.1 at the time of the bump); pin it in a release PR if stable moves past a version the lockfile accepts.
 - **Local setup:** `fvm install && fvm use` (reads `.fvmrc`), or install Flutter 3.50.1 manually. `pubspec.yaml` declares Dart `^3.11.0`, but the lockfile's dev tooling (freezed 4, test 1.32) needs Dart >=3.13; Flutter 3.50.1 bundles Dart 3.14.0.
 - **Validation:** Run `flutter pub get --enforce-lockfile` before analyze/test when checking lock compatibility; on Mac billing lock use `bash scripts/local_ci.sh <sha>`.
-- **Do not** change `pubspec.lock` unless the Flutter/Dart bump truly requires it — keep it byte-identical when only pinning docs/tooling.
+- **Do not** change `pubspec.lock` as a side effect — keep it byte-identical when only pinning docs/tooling. It changes on purpose in a Flutter/Dart bump or a dependency upgrade done as its own Linear ticket and branch (user decision 2026-11-26: prefer the newest packages, especially for design, instead of building on old versions; e.g. TAS-374 moved the app to `material_ui` / `cupertino_ui`). Check `flutter pub get --enforce-lockfile` and the minimum Flutter version the lock needs against CI and the release workflows.
 
 ## Binary Builds & Compilation
 - **Do NOT execute `flutter build apk` (or any build variant like `flutter build appbundle`, `flutter build ipa`) automatically or proactively.**
@@ -35,8 +35,9 @@
   - Attendance check-in and anti-fraud geo-verification must remain strictly verified with live server time.
 
 ## Material Design 3 (M3) Motion System Standard
-- All animations, transitions, and micro-interactions across the entire app must strictly comply with `.agent/skills/material_design_3_motion/SKILL.md`:
-  - **No Arbitrary Durations or Curves**: Use ONLY tokens from `AppMotionDurations` and `AppMotionCurves`. `Curves.linear` is strictly prohibited for visible UI animations.
+- All animations, transitions, and micro-interactions follow `docs/design/design-system.md` (Motion) and `.agent/skills/material_design_3_motion/SKILL.md`:
+  - **No Arbitrary Durations or Curves**: Use ONLY tokens: `TashilSpring` / `TashilEasing` (`lib/core/design/motion.dart`) for new work, `AppMotionDurations` / `AppMotionCurves` (`lib/config/theme/app_motion.dart`) where existing code already uses them. `Curves.linear` is strictly prohibited for visible UI animations. Wrap durations so the system "remove animations" setting turns motion off.
+  - **One transition per kind of navigation**: every route uses `M3PageTransitionsBuilder` / `AppMotionPage` (same shared axis).
   - **Exit < Enter Ratio**: Exiting/dismissing transitions must be ~50% faster than entering transitions.
   - **Zero Overshoot for Effects**: Opacity, surface tint, and color transitions must be strictly monotonic (no bounce/overshoot). Overshoot is reserved exclusively for spatial movements in the Expressive scheme.
   - **RTL-Aware Shared Axis**: In Arabic mode (`TextDirection.rtl`), horizontal directional motion (Shared Axis X) must be dynamically inverted.
@@ -72,49 +73,16 @@
   - **Global Roles Exemption**:
     - Only `UserRole.superAdmin` and `UserRole.technicalSupport` (and Organization Admins operating at the organization root with an empty companyUID) have cross-company visibility.
 
-## Web-First Enterprise Tables, Toolbars, & Single-Seed Theme Standard (HR System & Backoffice)
-- **Web-First Desktop Application Mindset (تطبيق ويب ابليكيشن وليس مجرد شاشة موبايل)**:
-  - The system is primarily accessed and operated from Desktop Web browsers.
-  - **No Full-Width Button Stretching**: Action buttons (such as "إيقاف التتبع لجميع الحاضرين" / bulk actions / export) MUST NEVER stretch across the entire screen width (no 1600px banner buttons). They must always be natural, content-sized buttons (`MainAxisSize.min`, standard height 44dp, padding horizontal 16dp).
-  - **Single-Row Filter Toolbar (صف أفقي واحد)**: On desktop viewports (`maxWidth >= 768px`), the Search bar, Status filter dropdown, Branch filter dropdown, and Primary/Bulk action buttons must sit on **ONE single horizontal line** (`Row`) at the exact same vertical level.
-- **Material Design 3 Dropdown Menus & Google Icons Only**:
-  - **Google Icons Exclusively**: Only official Flutter Google Material Icons (`Icons.*_rounded` or `Icons.*_outlined`) may be used throughout the UI.
-  - **M3 Dropdown Specification**: All filter dropdowns must use M3 standards via `PopupMenuButton`:
-    - Menu container: `colorScheme.surfaceContainerHigh`, elevation `3`, rounded corners `14px`, border `colorScheme.outlineVariant.withValues(alpha: 0.5)`.
-    - Menu items: Leading Google icon, item label, optional count pill/badge, and trailing `Icons.check_rounded` for the active selection.
-    - Trigger button: Height `44px`, background `colorScheme.surfaceContainerLow`, border `colorScheme.outlineVariant`, leading Google icon, label in bold, and trailing `Icons.expand_more_rounded`.
-- **Single-Seed Theme Harmony & Contrast (تناسق الألوان واشتقاقها من سيمز النظام)**:
-  - The entire design must derive organically from the primary seed theme (`colorScheme.primary`, `colorScheme.surface`, `colorScheme.surfaceContainerLow`, `colorScheme.outlineVariant`).
-  - **Forbidden**: Do NOT tint entire cards or card outer borders with intense status colors (e.g. green background/border for all present delegates). Status colors (green, amber, grey) are strictly confined to:
-    1. A subtle 3.5px start border line on the card.
-    2. A compact status pill/chip (`Container` with 12px radius, icon, and text).
-  - The card itself must always have `colorScheme.surface` background, `colorScheme.outlineVariant` border, and smooth hover state highlighting (`colorScheme.primary.withValues(alpha: 0.05)`).
-
-## Mobile-First Modal Bottom Sheets & Connected Action Button Groups Standard (حظر النوافذ المنبثقة العائمة على الموبايل - No Dialog Bubbles on Mobile)
-- **Strict Prohibition of Floating Dialog Bubbles on Mobile (حظر البابلز العائمة)**:
-  - All detail cards, action forms, and editing modals on mobile viewports (`maxWidth <= 768px`) MUST NEVER appear as floating center dialog bubbles (`AlertDialog` floating in the middle of the screen).
-  - Instead, they MUST ALWAYS be implemented as **Material 3 Modal Bottom Sheets** (`showModalBottomSheet`):
-    1. **Smooth Bottom Slide-Up Motion**: Slides up smoothly from the screen bottom, filling ~75% - 85% of screen height (`MediaQuery.size.height * 0.80`).
-    2. **Top Drag Handle Pill**: Width `38px`, height `4.5px`, rounded radius `3px`, centered at the top with `colorScheme.outlineVariant.withValues(alpha: 0.6)`.
-    3. **Top Rounded Corners**: `BorderRadius.vertical(top: Radius.circular(28))`.
-    4. **Keyboard Avoidance**: Always handle soft keyboard insets (`padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom)`).
-    5. **Connected Action Button Group**: Action buttons (e.g. Close / Save / Edit / Cancel) must NEVER be plain detached buttons. They must use a unified, connected dual-button group container (`height: 48`, `borderRadius: 24`, outline border, vertical divider).
-- **Responsive Multiplatform Adaptation**:
-  - On Desktop/Web viewports (`maxWidth > 768px`), the exact same component adapts into a centered Material 3 `Dialog` (max width `520px` - `560px`, `borderRadius: 24px`).
-
-## Enterprise Mobile & Web UI/UX Standards: Connected Groups, Card Contrast, & Input Refinements
-- **Connected Button Groups (Full-Width on Mobile)**:
-  - On mobile viewports (`maxWidth <= 768px`), view-mode switcher or toggle button groups (`TashilConnectedButtonGroup`) MUST span the entire screen width (`width: double.infinity`).
-  - Items must be equally distributed (`Expanded`), with height `46-48px`, and generous internal padding (`horizontal: 14-16px`) so icons and labels never crowd each other.
-- **Card Contrast & Curvature Consistency (حظر تطابق لون الكروت مع الخلفية وحظر بروز الحدود الحادة)**:
-  - Cards MUST NEVER share the exact identical background color as the scaffold (`cs.surface` on `cs.surface` is forbidden).
-  - Cards must use `colorScheme.surfaceContainerLow` (or soft mauve tint derived from `colorScheme.primaryContainer`) against `colorScheme.surface` scaffold background to establish clear visual depth and avoid eye fatigue ("تشوش وتضارب في العين").
-  - Any start status border line (e.g. 3.5px line) MUST be clipped via `clipBehavior: Clip.antiAlias` on the card container so it seamlessly conforms to the card's 16px corner curvature.
-  - Zero/uninitiated activity (`0%`) must use NEUTRAL styling (`colorScheme.outlineVariant` or `colorScheme.onSurfaceVariant`), NEVER harsh red. Red is strictly reserved for critical violations.
-- **Search Fields & Dropdown Trigger Specifications**:
-  - **Search Inputs**: Must have standard non-bold typography (`fontSize: 13-14sp`, `fontWeight: FontWeight.normal`), subtle opacity for placeholder text, height `44px`, and corner radius `14px`. Never use large bold placeholder text.
-  - **Dropdown Triggers**: Height `44px`, corner radius `14px`, background `colorScheme.surfaceContainerLow`, outline border `colorScheme.outlineVariant`. In RTL: leading Google icon on the right, label in the center (`Expanded`), and `Icons.expand_more_rounded` on the far left.
-  - **No Unicode Emojis or Non-Material Symbols**: Never embed unicode symbols like `⬇`, `⬆`, or custom glyphs in labels; use official Google Material rounded icons (`Icons.*_rounded`) exclusively.
-
-
-
+## Design System: Material 3 (m3-kit) — single source of truth (TAS-345, user decision 2026-11-26)
+The design references live in `docs/design/` (start with `docs/design/README.md`): `m3-catalog.md` gives every M3 item a fixed ID (F foundations, C components) and the review steps; `design-system.md` holds the rules. Code: `lib/core/design/` (tokens, typography, motion, bidi, money, layout, M3 Expressive widgets) wired through `lib/config/theme/app_theme.dart`. Review procedure: `.claude/skills/m3-review/`. Any older design rule elsewhere that disagrees is superseded.
+- **Colour (F-01..F-04):** every role is generated from one seed (`TashilColors.seed`, the app purple; the user may pick another in settings). Never hand-pick tones, never write a hex colour or `Colors.*` in a screen. Use `Theme.of(context).colorScheme` roles in their pairs (fill with its `on` colour) and `TashilSemanticColors.of(context)` for success / warning. `error` is for errors only: absence counts, penalties amounts, out-of-range states are not errors. Status colours never tint a whole card: a compact status label or pill only. Zero / not-started values are neutral (`onSurfaceVariant`).
+- **Surfaces:** body `surface`; navigation areas `surfaceContainer`; cards and groups use the container roles for hierarchy (one card style per screen, from the theme, no alpha borders).
+- **Type (F-05):** text styles only from `Theme.of(context).textTheme` (Cairo variable, M3 scale with Arabic line height). No hand-written `fontSize`. `test/design/no_new_raw_styles_test.dart` is a ratchet: the count of `fontSize:` and hex colours in `lib/` may only go down; lower its baselines in the same change when you clean a screen.
+- **Shape and spacing (F-06, F-11, F-13):** `TashilRadius` and `TashilSpacing` only; `EdgeInsetsDirectional` / `AlignmentDirectional` always; phone numbers, codes and dates inside Arabic go through `Bidi.ltr()`.
+- **Components (C-xx):** official Flutter widget first (`material_ui` / `cupertino_ui`), then `lib/core/design/widgets/`, hand-built only when neither exists (record it in the catalog). The component table in `design-system.md` decides which one: e.g. 2-5 exclusive options → connected `ButtonGroup` (not `SegmentedButton`, not hand-made pills); filters → `FilterChip` (never `ChoiceChip`); one value in a form → `DropdownMenu`; actions on an item → `MenuAnchor` menu; icon-only buttons always have a `tooltip`.
+- **Dialogs and sheets (C-27, C-28):** confirm an irreversible action with `showTashilDialog` (`AlertDialog`, text buttons, confirm at the end = left in Arabic, named after its result). A create/edit form is a `FormDialog` (full screen on compact, basic dialog from 600dp). A modal bottom sheet is for lists of actions or options; it opens at content height, never above 50%, and can be pulled to full screen. Side sheets from 840dp (`showAdaptiveSheet`). Short results → `showTashilSnackBar` (text only, one action).
+- **Buttons (C-01):** one `FilledButton` (main action) per screen, `FilledButton.tonal` / `OutlinedButton` for secondary, `TextButton` for low emphasis. No `ElevatedButton` for actions. 48dp minimum targets (theme).
+- **Navigation (C-17, C-18):** `NavigationBar` with 3-5 labelled destinations on compact, rail from 600dp, never both. Secondary destinations in a modal navigation rail, not a drawer.
+- **Icons:** official Material icons only (`Icons.*_rounded` / `*_outlined`); no emoji or unicode glyphs in labels.
+- **HR web layout (kept):** desktop action buttons are content-sized, never stretched across the window; on desktop (>= 840dp) search, filters and the primary action sit on one toolbar row.
+- **Every design change:** update the catalog row (Code, Test, Reviewed), before/after screenshots on the Linear issue, tests, and goldens checked by eye.
