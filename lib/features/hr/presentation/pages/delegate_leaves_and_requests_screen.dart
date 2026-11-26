@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/design/widgets/button_group.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/design/widgets/snackbars.dart';
 import 'package:delegate_app/core/design/widgets/date_time_fields.dart';
@@ -971,6 +972,7 @@ class _DelegateLeavesAndRequestsScreenState
     bool isSubmitting = false;
     String? submittedLeaveId;
     bool touched = false;
+    bool editingTo = false;
 
     await showTashilDialog<void>(
       context: context,
@@ -1241,17 +1243,41 @@ class _DelegateLeavesAndRequestsScreenState
                       });
                     },
                   ),
-                  sectionLabel(l10n.fromField),
-                  ScrollTimePicker(
-                    key: const Key('newRequestFromTime'),
-                    value: fromTime,
-                    onChanged: (t) => edit(() => fromTime = t),
+                  // TAS-386: one time wheel at a time. Two stacked wheels
+                  // covered most of the form and took the drag meant to
+                  // scroll it. «من | إلى» picks which time the wheel edits.
+                  const SizedBox(height: TashilSpacing.lg),
+                  ButtonGroup<bool>(
+                    key: const Key('newRequestTimeSide'),
+                    variant: ButtonGroupVariant.connected,
+                    expand: true,
+                    selected: {editingTo},
+                    onSelectionChanged: (v) =>
+                        setDlgState(() => editingTo = v.first),
+                    items: [
+                      ButtonGroupItem(
+                        value: false,
+                        label: '${l10n.fromField} ${fromTime.format(context)}',
+                      ),
+                      ButtonGroupItem(
+                        value: true,
+                        label: '${l10n.toField} ${toTime.format(context)}',
+                      ),
+                    ],
                   ),
-                  sectionLabel(l10n.toField),
+                  const SizedBox(height: TashilSpacing.sm),
                   ScrollTimePicker(
-                    key: const Key('newRequestToTime'),
-                    value: toTime,
-                    onChanged: (t) => edit(() => toTime = t),
+                    key: ValueKey(
+                      editingTo ? 'newRequestToTime' : 'newRequestFromTime',
+                    ),
+                    value: editingTo ? toTime : fromTime,
+                    onChanged: (t) => edit(() {
+                      if (editingTo) {
+                        toTime = t;
+                      } else {
+                        fromTime = t;
+                      }
+                    }),
                   ),
                 ] else ...[
                   const SizedBox(height: TashilSpacing.lg),
