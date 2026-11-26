@@ -2309,6 +2309,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chooseImage => 'اختر صورة';
 
   @override
+  String get sendRequestAction => 'إرسال الطلب';
+
+  @override
   String get sendAction => 'إرسال';
 
   @override

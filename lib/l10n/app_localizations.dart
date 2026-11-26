@@ -4140,6 +4140,12 @@ abstract class AppLocalizations {
   /// **'Choose photo'**
   String get chooseImage;
 
+  /// No description provided for @sendRequestAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Send request'**
+  String get sendRequestAction;
+
   /// No description provided for @sendAction.
   ///
   /// In en, this message translates to:

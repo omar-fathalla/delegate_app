@@ -2063,6 +2063,7 @@
   "messageTooShort": "Message is too short (at least 10 characters)",
   "screenshotOptional": "Screenshot (optional)",
   "chooseImage": "Choose photo",
+  "sendRequestAction": "Send request",
   "sendAction": "Send",
   "thankYou": "Thank you!",
   "feedbackReceived": "We've received your feedback and will review it soon.",
