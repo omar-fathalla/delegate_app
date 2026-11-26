@@ -9,6 +9,8 @@ This skill provides complete architectural guidelines, token specifications, cub
 
 All animation, transition, and micro-interaction code in `delegate_app` MUST strictly adhere to these specifications.
 
+> **Design system (TAS-345, 2026-11-26):** the app's design references are now `docs/design/` (m3-kit). For new work use the motion tokens in `lib/core/design/motion.dart` (`TashilSpring` for movement inside a screen, `TashilEasing` for transitions, `TashilTransitions`), described in `docs/design/design-system.md` (Motion). The `AppMotion*` tokens below stay valid where existing code uses them, and every route keeps one transition (`M3PageTransitionsBuilder` / `AppMotionPage`). Both follow the same M3 values.
+
 ---
 
 ## 1. Core Principles of Material 3 Motion
