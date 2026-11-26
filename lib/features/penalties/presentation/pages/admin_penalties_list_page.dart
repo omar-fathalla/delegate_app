@@ -1152,7 +1152,8 @@ class _AdminPenaltiesListPageState extends State<AdminPenaltiesListPage> {
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 16),
-                          ElevatedButton.icon(
+                          // TAS-357 (C-01): retry is tonal, not Elevated.
+                          FilledButton.tonalIcon(
                             onPressed: _loadData,
                             icon: const Icon(Icons.refresh_rounded),
                             label: const Text('إعادة المحاولة'),
