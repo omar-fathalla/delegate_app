@@ -144,4 +144,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(sent?['newPhone'], '0501234567');
   });
+
+  // TAS-355: the form step's secondary button says «إلغاء» (l10n.cancel),
+  // not MaterialLocalizations' «الإلغاء».
+  testWidgets('the cancel button says إلغاء', (tester) async {
+    final api = DelegatePhoneChangeApi(call: (name, data) async => {});
+    await tester.pumpWidget(_host(
+      DelegatePhoneChangeSheet(
+        api: api,
+        otp: _FakeOtp(),
+        refreshToken: () async {},
+      ),
+      (_) {},
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    expect(find.text('إلغاء'), findsOneWidget);
+    expect(find.text('الإلغاء'), findsNothing);
+  });
 }

@@ -53,10 +53,6 @@ Future<String?> showDelegatePhoneChangeSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    showDragHandle: false,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-    ),
     builder: (_) => DelegatePhoneChangeSheet(api: api, otp: otp),
   );
 }
@@ -216,17 +212,7 @@ class _DelegatePhoneChangeSheetState extends State<DelegatePhoneChangeSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Center(
-              child: Container(
-                width: 38,
-                height: 4.5,
-                decoration: BoxDecoration(
-                  color: cs.outlineVariant.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
+            // TAS-355 (C-28): the drag handle comes from the theme.
             Text(l10n.phoneChangeTitle,
                 style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
@@ -293,7 +279,8 @@ class _DelegatePhoneChangeSheetState extends State<DelegatePhoneChangeSheet> {
             const SizedBox(height: 20),
             _ActionPair(
               secondaryLabel: _step == _Step.form
-                  ? MaterialLocalizations.of(context).cancelButtonLabel
+                  // TAS-355: «إلغاء» like the rest of the app, not «الإلغاء».
+                  ? l10n.cancel
                   : l10n.phoneChangeResend,
               onSecondary: _busy
                   ? null
