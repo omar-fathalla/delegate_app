@@ -1018,11 +1018,10 @@ class _CompanyPenaltiesSettingsPageState
                                         ? Icons.warning_amber_rounded
                                         : Icons.verified_user_rounded)
                                     : Icons.warning_amber_rounded,
-                                color: isDelegate
-                                    ? (filteredTotalFines > 0
-                                        ? colorScheme.error
-                                        : _kSuccess(context))
-                                    : colorScheme.error,
+                                // F-04: penalties are not errors.
+                                color: isDelegate && filteredTotalFines == 0
+                                    ? _kSuccess(context)
+                                    : colorScheme.onSurfaceVariant,
                                 size: 28,
                               ),
                               const SizedBox(width: 10),
@@ -1037,7 +1036,7 @@ class _CompanyPenaltiesSettingsPageState
                                               : AppLocalizations.of(context)!.finesSummary)),
                                   style: theme.textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.bold,
-                                    color: colorScheme.onErrorContainer,
+                                    color: colorScheme.onSurface,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -1064,7 +1063,7 @@ class _CompanyPenaltiesSettingsPageState
                                       style: theme.textTheme.titleLarge?.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: filteredTotalFines > 0
-                                            ? colorScheme.error
+                                            ? colorScheme.onSurface
                                             : _kSuccess(context),
                                       ),
                                     ),
@@ -1268,10 +1267,11 @@ class _CompanyPenaltiesSettingsPageState
                                 color: colorScheme.primary,
                                 shape: BoxShape.circle,
                               ),
+                              // TAS-357: was primary on primary (invisible).
                               child: Icon(
                                 Icons.verified_user_rounded,
                                 size: 56,
-                                color: colorScheme.primary,
+                                color: colorScheme.onPrimary,
                               ),
                             ),
                             const SizedBox(height: 16),
