@@ -1,3 +1,8 @@
+import 'package:delegate_app/core/design/widgets/snackbars.dart';
+import 'package:delegate_app/config/theme/app_theme.dart';
+import 'package:delegate_app/core/design/widgets/dialogs.dart';
+import 'package:delegate_app/core/design/money.dart';
+import 'package:delegate_app/core/design/tokens.dart';
 import 'package:delegate_app/core/widgets/storage_resolved_image.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:material_ui/material_ui.dart';
@@ -115,12 +120,7 @@ class _CompanyPenaltiesSettingsPageState
 
   Future<void> _togglePinCurrentBranches() async {
     if (_selectedBranchIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context)!.penSelectBranchesFirst),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showTashilSnackBar(context, AppLocalizations.of(context)!.penSelectBranchesFirst);
       return;
     }
 
@@ -136,12 +136,7 @@ class _CompanyPenaltiesSettingsPageState
       setState(() {
         _pinnedBranchIds.clear();
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context)!.penDefaultUnpinned),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showTashilSnackBar(context, AppLocalizations.of(context)!.penDefaultUnpinned);
     } else {
       // Pin
       final listToSave = _selectedBranchIds.toList();
@@ -159,13 +154,7 @@ class _CompanyPenaltiesSettingsPageState
           ? AppLocalizations.of(context)!.penBranchPinned
           : AppLocalizations.of(context)!.penBranchesPinned(count);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showTashilSnackBar(context, msg);
     }
   }
 
@@ -207,7 +196,7 @@ class _CompanyPenaltiesSettingsPageState
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.8),
+                      color: colorScheme.outlineVariant,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -223,19 +212,13 @@ class _CompanyPenaltiesSettingsPageState
                             children: [
                               Text(
                                 AppLocalizations.of(context)!.penSelectDisplayBranches,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                               ),
                               Text(
                                 selectedCount == 0
                                     ? AppLocalizations.of(context)!.penShowingAllBranches
                                     : AppLocalizations.of(context)!.penBranchesSelected(selectedCount),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                               ),
                             ],
                           ),
@@ -261,7 +244,7 @@ class _CompanyPenaltiesSettingsPageState
                         TextField(
                           controller: searchController,
                           onChanged: (_) => setSheetState(() {}),
-                          style: const TextStyle(fontSize: 13),
+                          style: Theme.of(context).textTheme.bodyMedium,
                           decoration: InputDecoration(
                             hintText: AppLocalizations.of(context)!.searchBranchName,
                             prefixIcon: const Icon(Icons.search_rounded, size: 20),
@@ -276,11 +259,11 @@ class _CompanyPenaltiesSettingsPageState
                                 : null,
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             filled: true,
-                            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                            fillColor: colorScheme.surfaceContainerHighest,
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(TashilRadius.medium),
                               borderSide: BorderSide(
-                                  color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                                  color: colorScheme.outlineVariant),
                             ),
                           ),
                         ),
@@ -295,7 +278,7 @@ class _CompanyPenaltiesSettingsPageState
                                 size: 16,
                                 color: isAllSelected ? colorScheme.primary : null,
                               ),
-                              label: Text(AppLocalizations.of(context)!.allBranchesAll, style: TextStyle(fontSize: 12)),
+                              label: Text(AppLocalizations.of(context)!.allBranchesAll, style: Theme.of(context).textTheme.bodySmall),
                               backgroundColor: isAllSelected
                                   ? colorScheme.primaryContainer
                                   : colorScheme.surfaceContainerHigh,
@@ -308,7 +291,7 @@ class _CompanyPenaltiesSettingsPageState
                             const SizedBox(width: 8),
                             ActionChip(
                               avatar: const Icon(Icons.select_all_rounded, size: 16),
-                              label: Text(AppLocalizations.of(context)!.selectAll, style: TextStyle(fontSize: 12)),
+                              label: Text(AppLocalizations.of(context)!.selectAll, style: Theme.of(context).textTheme.bodySmall),
                               onPressed: () {
                                 setSheetState(() {
                                   tempSelection.clear();
@@ -348,11 +331,8 @@ class _CompanyPenaltiesSettingsPageState
                                     Expanded(
                                       child: Text(
                                         branchName,
-                                        style: TextStyle(
-                                          fontSize: 13.5,
-                                          fontWeight:
-                                              isChecked ? FontWeight.bold : FontWeight.normal,
-                                        ),
+                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight:
+                                              isChecked ? FontWeight.bold : FontWeight.normal),
                                       ),
                                     ),
                                     if (isPinned)
@@ -360,26 +340,19 @@ class _CompanyPenaltiesSettingsPageState
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: colorScheme.primary.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(6),
+                                          color: colorScheme.primary,
+                                          borderRadius: BorderRadius.circular(TashilRadius.small),
                                         ),
                                         child: Text(
                                           AppLocalizations.of(context)!.inDefault,
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: colorScheme.primary,
-                                          ),
+                                          style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.primary),
                                         ),
                                       ),
                                   ],
                                 ),
                                 subtitle: Text(
                                   AppLocalizations.of(context)!.codeLabel(branchId),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                                  ),
+                                  style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
                                 ),
                                 onChanged: (val) {
                                   setSheetState(() {
@@ -400,7 +373,7 @@ class _CompanyPenaltiesSettingsPageState
                       color: colorScheme.surfaceContainerLow,
                       border: Border(
                         top: BorderSide(
-                          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                          color: colorScheme.outlineVariant,
                         ),
                       ),
                     ),
@@ -411,7 +384,7 @@ class _CompanyPenaltiesSettingsPageState
                             style: FilledButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(24),
+                                borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
                               ),
                             ),
                             onPressed: () {
@@ -532,7 +505,7 @@ class _CompanyPenaltiesSettingsPageState
                 elevation: 0,
                 shape: Border(
                   bottom: BorderSide(
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                    color: colorScheme.outlineVariant,
                     width: 1,
                   ),
                 ),
@@ -544,7 +517,7 @@ class _CompanyPenaltiesSettingsPageState
             child: Text(
               AppLocalizations.of(context)!.promoNoFinesAccess,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
           ),
         ),
@@ -568,7 +541,7 @@ class _CompanyPenaltiesSettingsPageState
               elevation: 0,
               shape: Border(
                 bottom: BorderSide(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                  color: colorScheme.outlineVariant,
                   width: 1,
                 ),
               ),
@@ -652,12 +625,7 @@ class _CompanyPenaltiesSettingsPageState
         listenWhen: (_, state) => state is PenaltyActionSuccessState,
         listener: (context, state) {
           if (state is PenaltyActionSuccessState) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+            showTashilSnackBar(context, state.message);
             _loadData();
           }
         },
@@ -681,7 +649,8 @@ class _CompanyPenaltiesSettingsPageState
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
-                  ElevatedButton.icon(
+                  // TAS-357 (C-01): retry is a tonal button, not Elevated.
+                  FilledButton.tonalIcon(
                     onPressed: _loadData,
                     icon: const Icon(Icons.refresh_rounded),
                     label: Text(AppLocalizations.of(context)!.retry),
@@ -779,14 +748,14 @@ class _CompanyPenaltiesSettingsPageState
                             ),
                           );
                         },
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(TashilRadius.large),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer.withValues(alpha: 0.25),
-                            borderRadius: BorderRadius.circular(16),
+                            color: colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(TashilRadius.large),
                             border: Border.all(
-                              color: colorScheme.primary.withValues(alpha: 0.22),
+                              color: colorScheme.primary,
                             ),
                           ),
                           child: Row(
@@ -819,7 +788,6 @@ class _CompanyPenaltiesSettingsPageState
                                       AppLocalizations.of(context)!.finesPolicyCardSubtitle,
                                       style: theme.textTheme.bodySmall?.copyWith(
                                         color: colorScheme.onSurfaceVariant,
-                                        fontSize: 11,
                                       ),
                                     ),
                                   ],
@@ -844,12 +812,12 @@ class _CompanyPenaltiesSettingsPageState
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(16),
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(TashilRadius.large),
                           border: Border.all(
                             color: isPinned
-                                ? Colors.teal.shade600
-                                : colorScheme.outlineVariant.withValues(alpha: 0.5),
+                                ? _kSuccess(context)
+                                : colorScheme.outlineVariant,
                           ),
                         ),
                         child: Column(
@@ -859,7 +827,7 @@ class _CompanyPenaltiesSettingsPageState
                               children: [
                                 Icon(
                                   Icons.storefront_rounded,
-                                  color: isPinned ? Colors.teal.shade700 : colorScheme.primary,
+                                  color: isPinned ? _kSuccess(context) : colorScheme.primary,
                                   size: 20,
                                 ),
                                 const SizedBox(width: 8),
@@ -884,7 +852,7 @@ class _CompanyPenaltiesSettingsPageState
                                         : colorScheme.onSurfaceVariant,
                                     visualDensity: VisualDensity.compact,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(TashilRadius.small),
                                       side: BorderSide(
                                         color: isPinned
                                             ? colorScheme.tertiary
@@ -907,7 +875,7 @@ class _CompanyPenaltiesSettingsPageState
                                     foregroundColor: colorScheme.primary,
                                     visualDensity: VisualDensity.compact,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(TashilRadius.small),
                                       side: BorderSide(
                                         color: colorScheme.outlineVariant,
                                       ),
@@ -917,13 +885,7 @@ class _CompanyPenaltiesSettingsPageState
                                   onPressed: () {
                                     _loadData();
                                     _loadBranchesAndPinned();
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(AppLocalizations.of(context)!.finesDataRefreshed),
-                                        duration: Duration(seconds: 1),
-                                        behavior: SnackBarBehavior.floating,
-                                      ),
-                                    );
+                                    showTashilSnackBar(context, AppLocalizations.of(context)!.finesDataRefreshed);
                                   },
                                 ),
                               ],
@@ -933,7 +895,7 @@ class _CompanyPenaltiesSettingsPageState
                               ? const LinearProgressIndicator()
                               : InkWell(
                                   onTap: _openMultiBranchPickerSheet,
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(TashilRadius.medium),
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 12,
@@ -941,11 +903,11 @@ class _CompanyPenaltiesSettingsPageState
                                     ),
                                     decoration: BoxDecoration(
                                       color: colorScheme.surface,
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(TashilRadius.medium),
                                       border: Border.all(
                                         color: isPinned
                                             ? colorScheme.primary
-                                            : colorScheme.outlineVariant.withValues(alpha: 0.7),
+                                            : colorScheme.outlineVariant,
                                       ),
                                     ),
                                     child: Row(
@@ -957,19 +919,12 @@ class _CompanyPenaltiesSettingsPageState
                                             children: [
                                               Text(
                                                 branchLabel,
-                                                style: const TextStyle(
-                                                  fontSize: 13.5,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
+                                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                                               ),
                                               if (isPinned)
                                                 Text(
                                                   AppLocalizations.of(context)!.pinnedDefaultGroup,
-                                                  style: TextStyle(
-                                                    fontSize: 10.5,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: colorScheme.primary,
-                                                  ),
+                                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.primary),
                                                 ),
                                             ],
                                           ),
@@ -1000,8 +955,7 @@ class _CompanyPenaltiesSettingsPageState
                                             size: 13, color: colorScheme.primary),
                                         label: Text(
                                           bObj['name'] ?? branchId,
-                                          style: const TextStyle(
-                                              fontSize: 11, fontWeight: FontWeight.bold),
+                                          style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold),
                                         ),
                                         deleteIcon: const Icon(Icons.close_rounded, size: 14),
                                         onDeleted: () {
@@ -1019,7 +973,7 @@ class _CompanyPenaltiesSettingsPageState
                                   Padding(
                                     padding: const EdgeInsetsDirectional.only(start: 6),
                                     child: ActionChip(
-                                      label: Text(AppLocalizations.of(context)!.showAll, style: TextStyle(fontSize: 11)),
+                                      label: Text(AppLocalizations.of(context)!.showAll, style: Theme.of(context).textTheme.labelMedium),
                                       visualDensity: VisualDensity.compact,
                                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                       onPressed: () {
@@ -1045,26 +999,12 @@ class _CompanyPenaltiesSettingsPageState
                     padding: const EdgeInsets.all(16.0),
                     child: Container(
                       padding: const EdgeInsets.all(20),
+                      // TAS-357 (F-04): the summary is a filled surface card,
+                      // not an error gradient; totals are not errors.
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          // Dark: no large errorContainer fill (M3 dark
-                          // guidance); light is unchanged.
-                          colors: Theme.of(context).brightness ==
-                                  Brightness.dark
-                              ? [
-                                  colorScheme.surfaceContainer,
-                                  colorScheme.surfaceContainerHigh,
-                                ]
-                              : [
-                                  colorScheme.errorContainer,
-                                  colorScheme.surfaceContainerHighest,
-                                ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: colorScheme.error.withValues(alpha: 0.2),
+                        color: colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(
+                          TashilRadius.extraLarge,
                         ),
                       ),
                       child: Column(
@@ -1078,11 +1018,10 @@ class _CompanyPenaltiesSettingsPageState
                                         ? Icons.warning_amber_rounded
                                         : Icons.verified_user_rounded)
                                     : Icons.warning_amber_rounded,
-                                color: isDelegate
-                                    ? (filteredTotalFines > 0
-                                        ? colorScheme.error
-                                        : Colors.teal.shade700)
-                                    : colorScheme.error,
+                                // F-04: penalties are not errors.
+                                color: isDelegate && filteredTotalFines == 0
+                                    ? _kSuccess(context)
+                                    : colorScheme.onSurfaceVariant,
                                 size: 28,
                               ),
                               const SizedBox(width: 10),
@@ -1097,7 +1036,7 @@ class _CompanyPenaltiesSettingsPageState
                                               : AppLocalizations.of(context)!.finesSummary)),
                                   style: theme.textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.bold,
-                                    color: colorScheme.onErrorContainer,
+                                    color: colorScheme.onSurface,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -1120,12 +1059,12 @@ class _CompanyPenaltiesSettingsPageState
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      AppLocalizations.of(context)!.amountEgp(filteredTotalFines.toStringAsFixed(2)),
+                                      Money.formatEgp(filteredTotalFines),
                                       style: theme.textTheme.titleLarge?.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: filteredTotalFines > 0
-                                            ? colorScheme.error
-                                            : Colors.teal.shade700,
+                                            ? colorScheme.onSurface
+                                            : _kSuccess(context),
                                       ),
                                     ),
                                   ],
@@ -1149,10 +1088,10 @@ class _CompanyPenaltiesSettingsPageState
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      AppLocalizations.of(context)!.amountEgp(filteredDeducted.toStringAsFixed(2)),
+                                      Money.formatEgp(filteredDeducted),
                                       style: theme.textTheme.titleLarge?.copyWith(
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.green.shade700,
+                                        color: _kOnSuccessContainer(context),
                                       ),
                                     ),
                                   ],
@@ -1325,13 +1264,14 @@ class _CompanyPenaltiesSettingsPageState
                             Container(
                               padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
-                                color: colorScheme.primary.withValues(alpha: 0.1),
+                                color: colorScheme.primary,
                                 shape: BoxShape.circle,
                               ),
+                              // TAS-357: was primary on primary (invisible).
                               child: Icon(
                                 Icons.verified_user_rounded,
                                 size: 56,
-                                color: colorScheme.primary,
+                                color: colorScheme.onPrimary,
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -1434,32 +1374,35 @@ class _PenaltyCardState extends State<_PenaltyCard> {
     _isExpanded = requiresAction;
   }
 
+  /// TAS-357: status colours from the scheme / TashilSemanticColors.
+  /// Only a rejection is an error; pending is a warning, issued and
+  /// deducted are success, the rest neutral or tertiary.
   Color _getStatusColor(PenaltyStatus status) {
+    final cs = Theme.of(context).colorScheme;
+    final sem = Theme.of(context).extension<TashilSemanticColors>();
     switch (status) {
       case PenaltyStatus.pendingBranchesMarketing:
-        return Colors.orange.shade800;
-      case PenaltyStatus.rejectedByBranchesMarketing:
-        return Colors.red.shade800;
       case PenaltyStatus.pendingGeneralManager:
-        return Colors.amber.shade900;
+        return sem?.warning ?? cs.tertiary;
+      case PenaltyStatus.rejectedByBranchesMarketing:
       case PenaltyStatus.rejectedByGeneralManager:
-        return Colors.red.shade900;
+        return cs.error;
       case PenaltyStatus.issued:
-        return Colors.green.shade700;
-      case PenaltyStatus.acknowledged:
-        return Colors.blue.shade700;
       case PenaltyStatus.deducted:
-        return Colors.teal.shade700;
+        return sem?.success ?? cs.primary;
+      case PenaltyStatus.acknowledged:
+        return cs.primary;
       case PenaltyStatus.disputed:
-        return Colors.purple.shade700;
+        return cs.tertiary;
       case PenaltyStatus.cancelled:
-        return Colors.grey.shade600;
+        return cs.onSurfaceVariant;
     }
   }
 
   void _showRejectionDialog(BuildContext context, PenaltyStatus nextStatus) {
     final controller = TextEditingController();
-    showDialog(
+    // TAS-357 (C-27): kit dialog, text buttons, confirm last.
+    showTashilDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(AppLocalizations.of(context)!.rejectionReason),
@@ -1468,7 +1411,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
           maxLines: 3,
           decoration: InputDecoration(
             hintText: AppLocalizations.of(context)!.rejectionReasonHint,
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
@@ -1476,11 +1419,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
             onPressed: () => Navigator.pop(ctx),
             child: Text(AppLocalizations.of(context)!.cancel),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
+          TextButton(
             onPressed: () {
               Navigator.pop(ctx);
               context.read<PenaltyBloc>().add(
@@ -1513,18 +1452,18 @@ class _PenaltyCardState extends State<_PenaltyCard> {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       elevation: 0,
-      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+      color: colorScheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(TashilRadius.large),
         side: BorderSide(
           color: _isExpanded
-              ? colorScheme.primary.withValues(alpha: 0.5)
-              : colorScheme.outlineVariant.withValues(alpha: 0.4),
+              ? colorScheme.primary
+              : colorScheme.outlineVariant,
         ),
       ),
       child: InkWell(
         onTap: () => setState(() => _isExpanded = !_isExpanded),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(TashilRadius.large),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Column(
@@ -1534,19 +1473,18 @@ class _PenaltyCardState extends State<_PenaltyCard> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    // TAS-357: compact status label, no tint or border.
+                    padding: const EdgeInsetsDirectional.symmetric(
+                      horizontal: TashilSpacing.sm,
+                      vertical: TashilSpacing.xs / 2,
+                    ),
                     decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(TashilRadius.small),
                     ),
                     child: Text(
                       widget.penalty.status.displayName,
-                      style: TextStyle(
-                        color: statusColor,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(color: statusColor, fontWeight: FontWeight.bold),
                     ),
                   ),
                   if (widget.penalty.isRepeated) ...[
@@ -1555,39 +1493,40 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: colorScheme.errorContainer,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: colorScheme.error.withValues(alpha: 0.5)),
+                        borderRadius: BorderRadius.circular(TashilRadius.medium),
+                        border: Border.all(color: colorScheme.error),
                       ),
                       child: Text(
                         AppLocalizations.of(context)!.repeatedViolation,
-                        style: TextStyle(
-                          color: colorScheme.onErrorContainer,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.onErrorContainer, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
                   if (widget.penalty.isConfidential) ...[
                     const SizedBox(width: 6),
+                    // TAS-357: compact label in the tertiary pair.
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsetsDirectional.symmetric(
+                        horizontal: TashilSpacing.sm,
+                        vertical: TashilSpacing.xs / 2,
+                      ),
                       decoration: BoxDecoration(
-                        color: Colors.purple.shade900.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.purple.shade400.withValues(alpha: 0.4)),
+                        color: colorScheme.tertiaryContainer,
+                        borderRadius: BorderRadius.circular(TashilRadius.small),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.lock_rounded, size: 12, color: Colors.purple.shade700),
-                          const SizedBox(width: 3),
+                          Icon(
+                            Icons.lock_rounded,
+                            size: 12,
+                            color: colorScheme.onTertiaryContainer,
+                          ),
+                          const SizedBox(width: TashilSpacing.xs),
                           Text(
                             AppLocalizations.of(context)!.confidential,
-                            style: TextStyle(
-                              color: Colors.purple.shade700,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colorScheme.onTertiaryContainer,
                             ),
                           ),
                         ],
@@ -1596,10 +1535,11 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                   ],
                   const Spacer(),
                   Text(
-                    widget.penalty.fineAmount.toStringAsFixed(2),
+                    Money.formatEgp(widget.penalty.fineAmount),
+                    // TAS-357 (F-04): an amount is not an error.
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: colorScheme.error,
+                      color: colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(width: 4),
@@ -1621,12 +1561,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                 widget.penalty.title,
                 maxLines: _isExpanded ? null : 2,
                 overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurface,
-                  height: 1.35,
-                ),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.onSurface),
               ),
               const SizedBox(height: 4),
 
@@ -1650,7 +1585,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                       ),
                       decoration: BoxDecoration(
                         color: colorScheme.secondaryContainer,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(TashilRadius.small),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1663,11 +1598,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                           const SizedBox(width: 3),
                           Text(
                             widget.penalty.branchName!,
-                            style: TextStyle(
-                              color: colorScheme.onSecondaryContainer,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.onSecondaryContainer, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -1725,17 +1656,13 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                     padding: const EdgeInsets.all(8),
                     margin: const EdgeInsets.only(bottom: 8),
                     decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.red.shade200),
+                      color: Theme.of(context).colorScheme.errorContainer,
+                      borderRadius: BorderRadius.circular(TashilRadius.small),
+                      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
                     ),
                     child: Text(
                       AppLocalizations.of(context)!.rejectReasonLabel(widget.penalty.rejectionReason ?? ''),
-                      style: TextStyle(
-                        color: Colors.red.shade800,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onErrorContainer, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -1745,7 +1672,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                   Text(
                     AppLocalizations.of(context)!.branchesMarketingApproval(widget.penalty.branchesMarketingApprovedBy ?? ''),
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: Colors.green.shade800,
+                      color: _kOnSuccessContainer(context),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -1754,7 +1681,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                   Text(
                     AppLocalizations.of(context)!.generalManagerApproval(widget.penalty.generalManagerApprovedBy ?? ''),
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: Colors.green.shade900,
+                      color: _kOnSuccessContainer(context),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -1767,10 +1694,10 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(12),
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(TashilRadius.medium),
                       border: Border.all(
-                        color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                        color: colorScheme.outlineVariant,
                       ),
                     ),
                     child: Column(
@@ -1786,19 +1713,12 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                             const SizedBox(width: 4),
                             Text(
                               AppLocalizations.of(context)!.attachmentsCount(widget.penalty.evidenceFiles.length),
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                              ),
+                              style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.primary),
                             ),
                             const Spacer(),
                             Text(
                               AppLocalizations.of(context)!.tapToPreview2,
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
                             ),
                           ],
                         ),
@@ -1831,22 +1751,22 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                                   _showEvidenceSheet(context, widget.penalty);
                                 }
                               },
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(TashilRadius.medium),
                               child: Container(
                                 width: 68,
                                 height: 68,
                                 decoration: BoxDecoration(
                                   color: colorScheme.surface,
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(TashilRadius.medium),
                                   border: Border.all(
-                                    color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                    color: colorScheme.outlineVariant,
                                   ),
                                 ),
                                 child: Stack(
                                   children: [
                                     Positioned.fill(
                                       child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(10),
+                                        borderRadius: BorderRadius.circular(TashilRadius.medium),
                                         child: isImage
                                             ? StorageResolvedImage(pathOrUrl: file.fileUrl, builder: (_, resolved) => CachedNetworkImage(
                                                 imageUrl: resolved,
@@ -1883,11 +1803,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                                                     const SizedBox(height: 2),
                                                     Text(
                                                       file.fileType,
-                                                      style: TextStyle(
-                                                        fontSize: 9,
-                                                        fontWeight: FontWeight.bold,
-                                                        color: colorScheme.primary,
-                                                      ),
+                                                      style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.primary),
                                                     ),
                                                   ],
                                                 ),
@@ -1901,13 +1817,13 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                                         child: Container(
                                           padding: const EdgeInsets.all(2),
                                           decoration: BoxDecoration(
-                                            color: Colors.black.withValues(alpha: 0.55),
+                                            color: _kOverlay.scrim.withValues(alpha: 0.55),
                                             shape: BoxShape.circle,
                                           ),
-                                          child: const Icon(
+                                          child: Icon(
                                             Icons.zoom_in_rounded,
                                             size: 13,
-                                            color: Colors.white,
+                                            color: _kOverlay.onSurface,
                                           ),
                                         ),
                                       ),
@@ -1926,23 +1842,20 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(TashilRadius.small),
                     ),
                     child: Row(
                       children: [
                         Icon(
                           Icons.attach_file_rounded,
                           size: 13,
-                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                          color: colorScheme.onSurfaceVariant,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           AppLocalizations.of(context)!.noViolationDocs,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                          ),
+                          style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
                         ),
                       ],
                     ),
@@ -1959,35 +1872,28 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                         child: Text(
                           AppLocalizations.of(context)!.editorName(widget.penalty.createdByName),
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                          style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
                         ),
                       ),
                       const SizedBox(width: 6),
                       InkWell(
                         onTap: () => _callCreator(context, widget.penalty),
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(TashilRadius.small),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: Colors.green.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.green.withValues(alpha: 0.35)),
+                            color: _kSuccessContainer(context),
+                            borderRadius: BorderRadius.circular(TashilRadius.small),
+                            border: Border.all(color: _kSuccessContainer(context)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.phone_in_talk_rounded, size: 11, color: Colors.green.shade700),
+                              Icon(Icons.phone_in_talk_rounded, size: 11, color: _kOnSuccessContainer(context)),
                               const SizedBox(width: 3),
                               Text(
                                 AppLocalizations.of(context)!.callAction,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.green.shade700,
-                                ),
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: _kOnSuccessContainer(context)),
                               ),
                             ],
                           ),
@@ -2002,7 +1908,6 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                       dateStr,
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
-                        fontSize: 11,
                       ),
                     ),
                     if (widget.penalty.createdByName.isEmpty) const Spacer(),
@@ -2014,14 +1919,14 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(TashilRadius.medium),
                           ),
                         ),
                         onPressed: () => _showEvidenceSheet(context, widget.penalty),
                         icon: const Icon(Icons.attach_file_rounded, size: 15),
                         label: Text(
                           AppLocalizations.of(context)!.documentsCount(widget.penalty.evidenceFiles.length),
-                          style: const TextStyle(fontSize: 11.5),
+                          style: Theme.of(context).textTheme.labelMedium,
                         ),
                       ),
                     ],
@@ -2038,9 +1943,9 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
                         color: colorScheme.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(28),
+                        borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
                         border: Border.all(
-                          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                          color: colorScheme.outlineVariant,
                         ),
                       ),
                       child: Row(
@@ -2052,7 +1957,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                                 foregroundColor: colorScheme.onPrimary,
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(24),
+                                  borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
                                 ),
                                 elevation: 0,
                               ),
@@ -2077,8 +1982,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                               ),
                               label: Text(
                                 AppLocalizations.of(context)!.approveAction,
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 13),
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                               ),
                             ),
                           ),
@@ -2090,7 +1994,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                                 foregroundColor: colorScheme.onErrorContainer,
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(24),
+                                  borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
                                 ),
                                 elevation: 0,
                               ),
@@ -2101,8 +2005,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                               icon: const Icon(Icons.cancel_rounded, size: 18),
                               label: Text(
                                 AppLocalizations.of(context)!.rejectAction,
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 13),
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                               ),
                             ),
                           ),
@@ -2122,9 +2025,9 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
                         color: colorScheme.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(28),
+                        borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
                         border: Border.all(
-                          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                          color: colorScheme.outlineVariant,
                         ),
                       ),
                       child: Row(
@@ -2136,7 +2039,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                                 foregroundColor: colorScheme.onPrimary,
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(24),
+                                  borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
                                 ),
                                 elevation: 0,
                               ),
@@ -2152,8 +2055,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                               icon: const Icon(Icons.verified_rounded, size: 18),
                               label: Text(
                                 AppLocalizations.of(context)!.approveAction,
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 13),
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                               ),
                             ),
                           ),
@@ -2165,7 +2067,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                                 foregroundColor: colorScheme.onErrorContainer,
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(24),
+                                  borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
                                 ),
                                 elevation: 0,
                               ),
@@ -2176,8 +2078,7 @@ class _PenaltyCardState extends State<_PenaltyCard> {
                               icon: const Icon(Icons.cancel_rounded, size: 18),
                               label: Text(
                                 AppLocalizations.of(context)!.rejectAction,
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 13),
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                               ),
                             ),
                           ),
@@ -2258,9 +2159,9 @@ class _CompanyPenaltiesGroupCardState
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
         side: BorderSide(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+          color: colorScheme.outlineVariant,
         ),
       ),
       child: Theme(
@@ -2270,8 +2171,8 @@ class _CompanyPenaltiesGroupCardState
           leading: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: colorScheme.errorContainer.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(14),
+              color: colorScheme.errorContainer,
+              borderRadius: BorderRadius.circular(TashilRadius.large),
             ),
             child: Icon(
               Icons.business_rounded,
@@ -2296,7 +2197,7 @@ class _CompanyPenaltiesGroupCardState
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(TashilRadius.medium),
                   ),
                   child: Text(
                     AppLocalizations.of(context)!.violationsWithCount(widget.penalties.length),
@@ -2310,11 +2211,11 @@ class _CompanyPenaltiesGroupCardState
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: colorScheme.errorContainer.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(12),
+                    color: colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(TashilRadius.medium),
                   ),
                   child: Text(
-                    AppLocalizations.of(context)!.totalWithValue(totalFine.toStringAsFixed(2)),
+                    AppLocalizations.of(context)!.totalWithValue(Money.formatEgp(totalFine)),
                     style: theme.textTheme.labelMedium?.copyWith(
                       color: colorScheme.error,
                       fontWeight: FontWeight.bold,
@@ -2326,13 +2227,13 @@ class _CompanyPenaltiesGroupCardState
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      borderRadius: BorderRadius.circular(12),
+                      color: _kSuccessContainer(context),
+                      borderRadius: BorderRadius.circular(TashilRadius.medium),
                     ),
                     child: Text(
-                      AppLocalizations.of(context)!.deductedWithValue(totalDeducted.toStringAsFixed(2)),
+                      AppLocalizations.of(context)!.deductedWithValue(Money.formatEgp(totalDeducted)),
                       style: theme.textTheme.labelMedium?.copyWith(
-                        color: Colors.green.shade700,
+                        color: _kOnSuccessContainer(context),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -2359,3 +2260,19 @@ class _CompanyPenaltiesGroupCardState
     );
   }
 }
+
+
+// TAS-357: semantic colours with a fallback when a test theme has no
+// TashilSemanticColors extension.
+Color _kSuccess(BuildContext context) =>
+    Theme.of(context).extension<TashilSemanticColors>()?.success ??
+    Theme.of(context).colorScheme.primary;
+Color _kSuccessContainer(BuildContext context) =>
+    Theme.of(context).extension<TashilSemanticColors>()?.successContainer ??
+    Theme.of(context).colorScheme.primaryContainer;
+Color _kOnSuccessContainer(BuildContext context) =>
+    Theme.of(context).extension<TashilSemanticColors>()?.onSuccessContainer ??
+    Theme.of(context).colorScheme.onPrimaryContainer;
+
+/// Content drawn over a photo: the dark theme's roles (TAS-357).
+final ColorScheme _kOverlay = AppTheme.darkTheme().colorScheme;

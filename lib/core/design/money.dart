@@ -21,6 +21,11 @@ abstract final class Money {
   /// `125050` -> `1,250.50 ج.م`
   static String format(int piastres) => '${amount(piastres)} $currency';
 
+  /// Display only (TAS-357): amounts that are still stored as a double in
+  /// pounds (penalties). Rounded to piastres once, after any sums, then
+  /// shown like [format]. Never write the result back.
+  static String formatEgp(double egp) => format((egp * 100).round());
+
   /// Quantities are reals (weighed goods). Drop a trailing `.0`.
   static String qty(double q) => q == q.roundToDouble()
       ? q.toInt().toString()

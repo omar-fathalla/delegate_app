@@ -1,3 +1,5 @@
+import 'package:delegate_app/core/design/money.dart';
+import 'package:delegate_app/core/design/tokens.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -221,7 +223,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
         elevation: 0,
         shape: Border(
           bottom: BorderSide(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+            color: colorScheme.outlineVariant,
             width: 1,
           ),
         ),
@@ -232,17 +234,13 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
           children: [
             Text(
               AppLocalizations.of(context)!.violationsPolicy,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14.5,
-                letterSpacing: -0.2,
-              ),
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             Text(
               AppLocalizations.of(context)!.policyOfficialSubtitle,
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.normal),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -356,10 +354,10 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.primaryContainer.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(20),
+        color: colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
         border: Border.all(
-          color: colorScheme.primary.withValues(alpha: 0.2),
+          color: colorScheme.primary,
           width: 1,
         ),
       ),
@@ -405,40 +403,26 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
     );
   }
 
+  // TAS-357 (C-09): the official M3 SearchBar filters the list in place
+  // (no hand-made filled pill field).
   Widget _buildSearchBar(ColorScheme colorScheme) {
-    return TextField(
+    return SearchBar(
+      key: const Key('penalty_rules_search'),
       controller: _searchController,
+      hintText: AppLocalizations.of(context)!.searchPolicy,
+      leading: const Icon(Icons.search_rounded),
       onChanged: (val) => setState(() => _searchQuery = val.trim()),
-      decoration: InputDecoration(
-        hintText: AppLocalizations.of(context)!.searchPolicy,
-        prefixIcon: const Icon(Icons.search_rounded),
-        suffixIcon: _searchQuery.isNotEmpty
-            ? IconButton(
-                icon: const Icon(Icons.clear_rounded),
-                onPressed: () {
-                  _searchController.clear();
-                  setState(() => _searchQuery = '');
-                },
-              )
-            : null,
-        filled: true,
-        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: colorScheme.outlineVariant),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+      trailing: [
+        if (_searchQuery.isNotEmpty)
+          IconButton(
+            tooltip: MaterialLocalizations.of(context).deleteButtonTooltip,
+            icon: const Icon(Icons.clear_rounded),
+            onPressed: () {
+              _searchController.clear();
+              setState(() => _searchQuery = '');
+            },
           ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
-        ),
-      ),
+      ],
     );
   }
 
@@ -477,17 +461,13 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
               },
               backgroundColor: colorScheme.surfaceContainer,
               selectedColor: colorScheme.primary,
-              labelStyle: TextStyle(
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
-                fontSize: 13,
-              ),
+              labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
                 side: BorderSide(
                   color: isSelected
                       ? colorScheme.primary
-                      : colorScheme.outlineVariant.withValues(alpha: 0.6),
+                      : colorScheme.outlineVariant,
                 ),
               ),
               showCheckmark: false,
@@ -509,20 +489,11 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
+      // TAS-357: the filled card look (surfaceContainerHighest), no border
+      // or shadow.
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(TashilRadius.large),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -536,8 +507,8 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(8),
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(TashilRadius.small),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -560,7 +531,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: colorScheme.tertiaryContainer,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(TashilRadius.small),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -595,16 +566,12 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
                   height: 24,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: colorScheme.primary.withValues(alpha: 0.12),
+                    color: colorScheme.primary,
                     shape: BoxShape.circle,
                   ),
                   child: Text(
                     '${item.displayIndex}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.primary,
-                    ),
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.primary),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -631,10 +598,10 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(12),
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(TashilRadius.medium),
                       border: Border.all(
-                        color: colorScheme.primary.withValues(alpha: 0.25),
+                        color: colorScheme.primary,
                       ),
                     ),
                     child: Row(
@@ -653,11 +620,10 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
                                 AppLocalizations.of(context)!.firstTime,
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
-                                  fontSize: 10,
                                 ),
                               ),
                               Text(
-                                AppLocalizations.of(context)!.amountEgp(item.defaultFine.toStringAsFixed(0)),
+                                Money.formatEgp(item.defaultFine),
                                 style: theme.textTheme.titleSmall?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: colorScheme.primary,
@@ -678,24 +644,16 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     decoration: BoxDecoration(
-                      color: hasRepeated
-                          ? colorScheme.errorContainer.withValues(alpha: 0.3)
-                          : colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: hasRepeated
-                            ? colorScheme.error.withValues(alpha: 0.3)
-                            : colorScheme.outlineVariant.withValues(alpha: 0.5),
-                      ),
+                      // TAS-357 (F-04): a repeat fine is not an error.
+                      color: colorScheme.surface,
+                      borderRadius: BorderRadius.circular(TashilRadius.medium),
                     ),
                     child: Row(
                       children: [
                         Icon(
                           Icons.replay_rounded,
                           size: 18,
-                          color: hasRepeated
-                              ? colorScheme.error
-                              : colorScheme.onSurfaceVariant,
+                          color: colorScheme.onSurfaceVariant,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -706,17 +664,16 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
                                 AppLocalizations.of(context)!.whenRepeated,
                                 style: theme.textTheme.labelSmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant,
-                                  fontSize: 10,
                                 ),
                               ),
                               Text(
                                 hasRepeated
-                                    ? AppLocalizations.of(context)!.amountEgp(item.repeatedFine!.toStringAsFixed(0))
+                                    ? Money.formatEgp(item.repeatedFine!)
                                     : AppLocalizations.of(context)!.perManagementDecision,
                                 style: theme.textTheme.titleSmall?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: hasRepeated
-                                      ? colorScheme.error
+                                      ? colorScheme.onSurface
                                       : colorScheme.onSurfaceVariant,
                                 ),
                               ),
@@ -739,8 +696,8 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(10),
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(TashilRadius.medium),
                 ),
                 child: Row(
                   children: [
@@ -755,7 +712,6 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
                         AppLocalizations.of(context)!.plannedAction(item.action1 ?? ''),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
-                          fontSize: 11,
                         ),
                       ),
                     ),
@@ -779,7 +735,7 @@ class _PenaltyRulesCatalogPageState extends State<PenaltyRulesCatalogPage> {
             Icon(
               Icons.search_off_rounded,
               size: 54,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+              color: colorScheme.onSurfaceVariant,
             ),
             const SizedBox(height: 14),
             Text(
