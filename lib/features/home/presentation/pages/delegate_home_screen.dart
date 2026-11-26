@@ -1,5 +1,6 @@
 import 'package:delegate_app/core/l10n/display_names.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/core/design/tokens.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -550,29 +551,33 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          padding: const EdgeInsets.all(TashilSpacing.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SyncStatusBanner(),
               M3StaggeredItem(index: 0, child: _buildWelcomeHeroCard(context)),
-              const SizedBox(height: 16),
+              const SizedBox(height: TashilSpacing.lg),
               M3StaggeredItem(
                   index: 1, child: _buildMonthlyAttendanceSummaryCard(context)),
-              if (_recentSessions.isNotEmpty) const SizedBox(height: 16),
+              if (_recentSessions.isNotEmpty)
+                const SizedBox(height: TashilSpacing.lg),
               M3StaggeredItem(
                   index: 2, child: _buildRecentActivityBriefCard(context)),
-              const SizedBox(height: 16),
+              const SizedBox(height: TashilSpacing.lg),
               M3StaggeredItem(
                   index: 3, child: _buildLeavesAndRequestsCard(context)),
-              const SizedBox(height: 24),
+              const SizedBox(height: TashilSpacing.xl),
               M3StaggeredItem(
                 index: 4,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Padding(
-                      padding: const EdgeInsetsDirectional.only(start: 4, bottom: 8),
+                      padding: const EdgeInsetsDirectional.only(
+                        start: TashilSpacing.xs,
+                        bottom: TashilSpacing.sm,
+                      ),
                       child: Text(AppLocalizations.of(context)!.homeSupervisorsTitle,
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.w700,
@@ -584,9 +589,9 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: TashilSpacing.lg),
               M3StaggeredItem(index: 4, child: _buildPhotoCaptureCard(context)),
-              const SizedBox(height: 24),
+              const SizedBox(height: TashilSpacing.xl),
             ],
           ),
         ),
@@ -597,12 +602,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
   /// Foreground for the home hero. Uses the screen's [context] theme
   /// directly so it is correct in both modes: onPrimary on the light
   /// primary hero, onPrimaryContainer on the dark primaryContainer hero.
-  Color _heroOn(BuildContext context, [double? light, double? dark]) {
+  Color _heroOn(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final base = isDark ? cs.onPrimaryContainer : cs.onPrimary;
-    final a = isDark ? dark : light;
-    return a == null ? base : base.withValues(alpha: a);
+    return isDark ? cs.onPrimaryContainer : cs.onPrimary;
   }
 
   Widget _buildWelcomeHeroCard(BuildContext context) {
@@ -611,13 +614,13 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(TashilSpacing.xl),
       decoration: BoxDecoration(
         // Dark: primaryContainer (no glare); light unchanged.
         color: theme.brightness == Brightness.dark
             ? colorScheme.primaryContainer
             : colorScheme.primary,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -636,7 +639,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                         color: _heroOn(context),
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: TashilSpacing.sm),
                     Builder(
                       builder: (context) {
                         final userData = _userDoc?.data();
@@ -679,8 +682,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
                         if (orgsList.length <= 1) {
                           return Wrap(
-                            spacing: 8,
-                            runSpacing: 6,
+                            spacing: TashilSpacing.sm,
+                            runSpacing: TashilSpacing.xs,
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               _buildPositionChip(positionLabel),
@@ -698,10 +701,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _buildPositionChip(positionLabel),
-                            const SizedBox(height: 6),
+                            const SizedBox(height: TashilSpacing.xs),
                             Wrap(
-                              spacing: 8,
-                              runSpacing: 6,
+                              spacing: TashilSpacing.sm,
+                              runSpacing: TashilSpacing.xs,
                               crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 for (final org in orgsList)
@@ -730,27 +733,21 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                           ?.displayUrl) ??
                       FirebaseAuth.instance.currentUser?.photoURL;
 
-                  return Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-
-                    ),
-                    child: AppAvatar(
-                      imageUrl: photoUrl,
-                      fallbackText: widget.delegate.firstName,
-                      radius: 26,
-                      backgroundColor: _heroOn(context, 0.12, 0.15),
-                      foregroundColor: _heroOn(context),
-                      fallbackIcon: Symbols.person_pin_rounded,
-                    ),
+                  return AppAvatar(
+                    imageUrl: photoUrl,
+                    fallbackText: widget.delegate.firstName,
+                    radius: 26,
+                    backgroundColor: colorScheme.secondaryContainer,
+                    foregroundColor: colorScheme.onSecondaryContainer,
+                    fallbackIcon: Symbols.person_pin_rounded,
                   );
                 },
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Divider(color: _heroOn(context, 0.16, 0.2), height: 1),
-          const SizedBox(height: 16),
+          const SizedBox(height: TashilSpacing.lg),
+          Divider(color: colorScheme.outlineVariant, height: 1),
+          const SizedBox(height: TashilSpacing.lg),
 
           // Core Duties Summary
           Text(AppLocalizations.of(context)!.homeCoreDuties,
@@ -759,20 +756,20 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               color: _heroOn(context),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: TashilSpacing.sm),
 
           _buildDutyItem(
             icon: Symbols.location_on_rounded,
             text:
                 AppLocalizations.of(context)!.homeDutyAttendance,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: TashilSpacing.sm),
           _buildDutyItem(
             icon: Symbols.assignment_turned_in_rounded,
             text:
                 AppLocalizations.of(context)!.homeDutyTasks,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: TashilSpacing.sm),
           _buildDutyItem(
             icon: Symbols.camera_alt_rounded,
             text:
@@ -787,52 +784,60 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: _heroOn(context, 0.8, 0.8)),
-        const SizedBox(width: 8),
+        Icon(icon, size: 18, color: _heroOn(context)),
+        const SizedBox(width: TashilSpacing.sm),
         Expanded(
           child: Text(
             text,
-            style: TextStyle(
-              fontSize: 13,
-              color: _heroOn(context),
-              height: 1.45,
-            ),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: _heroOn(context),
+                ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildPositionChip(String label) {
+  /// Chip on the hero: secondaryContainer with its on colour, no border.
+  Widget _buildHeroChip({
+    required IconData icon,
+    required String label,
+    FontWeight? fontWeight,
+    Widget? trailing,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 3,
+        horizontal: TashilSpacing.sm,
+        vertical: TashilSpacing.xs,
       ),
       decoration: BoxDecoration(
-        color: _heroOn(context, 0.12, 0.12),
-        borderRadius: BorderRadius.circular(8),
+        color: colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(TashilRadius.small),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Symbols.badge_rounded,
-            size: 16,
-            color: _heroOn(context),
-          ),
-          const SizedBox(width: 6),
+          Icon(icon, size: 16, color: colorScheme.onSecondaryContainer),
+          const SizedBox(width: TashilSpacing.xs),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: _heroOn(context),
-            ),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: fontWeight,
+                  color: colorScheme.onSecondaryContainer,
+                ),
           ),
+          if (trailing != null) ...[
+            const SizedBox(width: TashilSpacing.xs),
+            trailing,
+          ],
         ],
       ),
     );
+  }
+
+  Widget _buildPositionChip(String label) {
+    return _buildHeroChip(icon: Symbols.badge_rounded, label: label);
   }
 
   Widget _buildWelcomeOrgChip({
@@ -840,79 +845,24 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     required bool isActive,
     required bool isArabic,
   }) {
+    final label = localizeChainName(orgName, AppLocalizations.of(context));
     if (isActive) {
-      return Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 10,
-          vertical: 3,
-        ),
-        decoration: BoxDecoration(
-          color: _heroOn(context, 0.12, 0.12),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: _heroOn(context, 0.24, 0.4),
+      return _buildHeroChip(
+        icon: Symbols.domain_rounded,
+        label: label,
+        fontWeight: FontWeight.w700,
+        trailing: Container(
+          width: 5.5,
+          height: 5.5,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Theme.of(context).colorScheme.onSecondaryContainer,
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Symbols.domain_rounded,
-              size: 16,
-              color: _heroOn(context),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              localizeChainName(orgName, AppLocalizations.of(context)),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: _heroOn(context),
-              ),
-            ),
-            const SizedBox(width: 6),
-            Container(
-              width: 5.5,
-              height: 5.5,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _heroOn(context),
-              ),
-            ),
-          ],
         ),
       );
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 3,
-      ),
-      decoration: BoxDecoration(
-        color: _heroOn(context, 0.12, 0.12),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Symbols.storefront_rounded,
-            size: 14,
-            color: _heroOn(context),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            localizeChainName(orgName, AppLocalizations.of(context)),
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: _heroOn(context),
-            ),
-          ),
-        ],
-      ),
-    );
+    return _buildHeroChip(icon: Symbols.storefront_rounded, label: label);
   }
 
   List<Widget> _buildSupervisorsList(BuildContext context) {
@@ -923,13 +873,13 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           child: Row(
             children: const [
               M3Skeleton(height: 40, width: 40, radius: 20),
-              SizedBox(width: 16),
+              SizedBox(width: TashilSpacing.lg),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     M3Skeleton(height: 14, width: 140),
-                    SizedBox(height: 8),
+                    SizedBox(height: TashilSpacing.sm),
                     M3Skeleton(height: 12, width: 100),
                   ],
                 ),
@@ -951,49 +901,41 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
   Widget _buildEmptySupervisorCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final l10n = AppLocalizations.of(context)!;
     final companyName = widget.delegate.companyName.trim();
     final supervisorTitle = companyName.isEmpty
         ? l10n.companySupervisor
         : l10n.companySupervisorWithName(companyName);
 
-    return Card(
-      elevation: 0,
-      color: colorScheme.surfaceContainer,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      margin: const EdgeInsets.only(bottom: 8),
+    return Card.filled(
+      margin: const EdgeInsetsDirectional.only(bottom: TashilSpacing.sm),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(TashilSpacing.lg),
         child: Row(
           children: [
             CircleAvatar(
-              backgroundColor: colorScheme.surfaceContainerHigh,
+              backgroundColor: colorScheme.surface,
               foregroundColor: colorScheme.onSurfaceVariant,
               child: const Icon(Symbols.person_off_rounded),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: TashilSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     supervisorTitle,
-                    style: TextStyle(
-                      fontSize: 10,
+                    style: textTheme.labelSmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: TashilSpacing.xs),
                   Text(
                     _supervisorError != null
                         ? AppLocalizations.of(context)!.errorWithMessage(_supervisorError ?? '')
                         : AppLocalizations.of(context)!.noSupervisorForCompany,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                    style: textTheme.bodySmall?.copyWith(
                       color:
                           _supervisorError != null
                               ? colorScheme.error
@@ -1014,6 +956,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     Map<String, dynamic> supervisorData,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final rawName = (supervisorData['displayName'] as String?)?.trim() ??
         (supervisorData['fullName'] as String?)?.trim() ??
         (supervisorData['name'] as String?)?.trim() ??
@@ -1030,15 +973,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         ? AppLocalizations.of(context)!.supervisorOfCompany(companyName)
         : AppLocalizations.of(context)!.assignedCompanySupervisor;
 
-    return Card(
-      elevation: 0,
-      color: colorScheme.surfaceContainer,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      margin: const EdgeInsets.only(bottom: 8),
+    return Card.filled(
+      margin: const EdgeInsetsDirectional.only(bottom: TashilSpacing.sm),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(TashilSpacing.lg),
         child: Row(
           children: [
             CircleAvatar(
@@ -1046,34 +984,29 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               foregroundColor: colorScheme.onPrimaryContainer,
               child: const Icon(Symbols.person_rounded),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: TashilSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     displayName,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
+                    style: textTheme.titleSmall?.copyWith(
                       color: colorScheme.onSurface,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: TashilSpacing.xs),
                   Text(
                     subtitleText,
-                    style: TextStyle(
-                      fontSize: 11,
+                    style: textTheme.labelSmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   if (phone.isNotEmpty) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(height: TashilSpacing.xs),
                     Text(
                       phone,
-                      style: TextStyle(
-                        fontSize: 12,
+                      style: textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
                       textDirection: TextDirection.ltr,
@@ -1093,11 +1026,11 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   foregroundColor: colorScheme.onSecondaryContainer,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: TashilSpacing.sm),
               IconButton(
                 onPressed: () => _openWhatsApp(phone),
                 icon: const Icon(Symbols.chat_rounded),
-                tooltip: 'WhatsApp',
+                tooltip: AppLocalizations.of(context)!.whatsapp,
                 style: IconButton.styleFrom(
                   backgroundColor: colorScheme.secondaryContainer,
                   foregroundColor: colorScheme.onSecondaryContainer,
@@ -1114,28 +1047,22 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return M3PressScale(scale: 0.98, child: Card(
-      elevation: 0,
-      color: colorScheme.surfaceContainer,
+    return M3PressScale(scale: 0.98, child: Card.filled(
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
           context.push('/photo-permissions/delegate', extra: widget.delegate);
         },
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-
+        child: Padding(
+          padding: const EdgeInsets.all(TashilSpacing.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(TashilSpacing.md),
                     decoration: BoxDecoration(
                       color: colorScheme.primaryContainer,
                       shape: BoxShape.circle,
@@ -1146,7 +1073,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       size: 24,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: TashilSpacing.lg),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1157,11 +1084,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                             color: colorScheme.onSurface,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: TashilSpacing.xs),
                         Text(AppLocalizations.of(context)!.offerPhotosSubtitle,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
-                            fontSize: 12,
                           ),
                         ),
                       ],
@@ -1169,17 +1095,17 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: TashilSpacing.lg),
               Container(
                 width: double.infinity,
                 constraints: const BoxConstraints(minHeight: 48),
                 padding: const EdgeInsets.symmetric(
-                  vertical: 8,
-                  horizontal: 16,
+                  vertical: TashilSpacing.sm,
+                  horizontal: TashilSpacing.lg,
                 ),
                 decoration: BoxDecoration(
                   color: colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(TashilRadius.full),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -1189,21 +1115,18 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       size: 18,
                       color: colorScheme.onSecondaryContainer,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: TashilSpacing.sm),
                     Flexible(
                       child: Text(
                       AppLocalizations.of(context)!.startPhotosCta,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.4,
-                        fontWeight: FontWeight.w600,
+                      style: theme.textTheme.labelLarge?.copyWith(
                         color: colorScheme.onSecondaryContainer,
                       ),
                     ),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: TashilSpacing.xs),
                     Icon(Symbols.arrow_forward_rounded,
                       size: 16,
                       color: colorScheme.onSecondaryContainer,
@@ -1332,144 +1255,138 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
   Widget _buildMonthlyAttendanceSummaryCard(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final trustedNow = _getTrustedNow();
     final monthName =
         DateFormat('MMMM yyyy', isArabic ? 'ar' : 'en').format(trustedNow);
 
-    return InkWell(
-      onTap: widget.onNavigateToAttendance,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainer,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Header Row: Title & Link to Attendance Tab
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Symbols.insights_rounded,
-                      size: 20,
-                      color: colorScheme.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(AppLocalizations.of(context)!.homeAttendanceSummary(monthName),
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                  ],
-                ),
-                if (widget.onNavigateToAttendance != null)
+    return Card.filled(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: widget.onNavigateToAttendance,
+        child: Padding(
+          padding: const EdgeInsets.all(TashilSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header Row: Title & Link to Attendance Tab
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
                   Row(
                     children: [
-                      Text(AppLocalizations.of(context)!.detailsAction,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colorScheme.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Icon(Symbols.chevron_right_rounded,
+                      Icon(
+                        Symbols.insights_rounded,
                         size: 20,
                         color: colorScheme.primary,
                       ),
+                      const SizedBox(width: TashilSpacing.sm),
+                      Text(AppLocalizations.of(context)!.homeAttendanceSummary(monthName),
+                        style: textTheme.titleSmall?.copyWith(
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
                     ],
                   ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // 3 Stat Badges: Attendance, Absence, Off Days
-            Row(
-              children: [
-                // 1. أيام الحضور
-                Expanded(
-                  child: _buildAttendanceStatPill(
-                    context,
-                    title: AppLocalizations.of(context)!.statAttended,
-                    value: AppLocalizations.of(context)!.daysCount(_attendedDays),
-                    icon: Symbols.check_circle_rounded,
-                    containerColor: colorScheme.surfaceContainer,
-                    iconColor: colorScheme.onSurfaceVariant,
-                    textColor: colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(width: 8),
-
-                // 2. أيام الغياب
-                Expanded(
-                  child: _buildAttendanceStatPill(
-                    context,
-                    title: AppLocalizations.of(context)!.statAbsent,
-                    value: AppLocalizations.of(context)!.daysCount(_absentDays),
-                    icon: Symbols.cancel_rounded,
-                    containerColor: colorScheme.surfaceContainer,
-                    iconColor: _absentDays > 0
-                        ? colorScheme.error
-                        : colorScheme.onSurfaceVariant,
-                    textColor: _absentDays > 0
-                        ? colorScheme.error
-                        : colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(width: 8),
-
-                // 3. أيام الإجازة
-                Expanded(
-                  child: _buildAttendanceStatPill(
-                    context,
-                    title: AppLocalizations.of(context)!.statDaysOff,
-                    value: AppLocalizations.of(context)!.leavesOfFour(_approvedLeavesThisMonth),
-                    icon: Symbols.event_available_rounded,
-                    containerColor: colorScheme.surfaceContainer,
-                    iconColor: colorScheme.onSurfaceVariant,
-                    textColor: colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            // Clarification Note
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(8),
+                  if (widget.onNavigateToAttendance != null)
+                    Row(
+                      children: [
+                        Text(AppLocalizations.of(context)!.detailsAction,
+                          style: textTheme.labelMedium?.copyWith(
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                        Icon(Symbols.chevron_right_rounded,
+                          size: 20,
+                          color: colorScheme.primary,
+                        ),
+                      ],
+                    ),
+                ],
               ),
-              child: Row(
+              const SizedBox(height: TashilSpacing.lg),
+
+              // 3 Stat Badges: Attendance, Absence, Off Days
+              Row(
                 children: [
-                  Icon(
-                    Symbols.info_rounded,
-                    size: 13,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 6),
+                  // 1. أيام الحضور
                   Expanded(
-                    child: Text(AppLocalizations.of(context)!.workPolicyNote,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    child: _buildAttendanceStatPill(
+                      context,
+                      title: AppLocalizations.of(context)!.statAttended,
+                      value: AppLocalizations.of(context)!.daysCount(_attendedDays),
+                      icon: Symbols.check_circle_rounded,
+                      containerColor: colorScheme.surface,
+                      iconColor: colorScheme.onSurfaceVariant,
+                      textColor: colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(width: TashilSpacing.sm),
+
+                  // 2. أيام الغياب: neutral, absence is not an error
+                  // (F-04, TAS-174: "not recorded" is grey).
+                  Expanded(
+                    child: _buildAttendanceStatPill(
+                      context,
+                      title: AppLocalizations.of(context)!.statAbsent,
+                      value: AppLocalizations.of(context)!.daysCount(_absentDays),
+                      icon: Symbols.cancel_rounded,
+                      containerColor: colorScheme.surface,
+                      iconColor: colorScheme.onSurfaceVariant,
+                      textColor: colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(width: TashilSpacing.sm),
+
+                  // 3. أيام الإجازة
+                  Expanded(
+                    child: _buildAttendanceStatPill(
+                      context,
+                      title: AppLocalizations.of(context)!.statDaysOff,
+                      value: AppLocalizations.of(context)!.leavesOfFour(_approvedLeavesThisMonth),
+                      icon: Symbols.event_available_rounded,
+                      containerColor: colorScheme.surface,
+                      iconColor: colorScheme.onSurfaceVariant,
+                      textColor: colorScheme.onSurface,
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
+
+              const SizedBox(height: TashilSpacing.md),
+
+              // Clarification Note
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: TashilSpacing.md,
+                  vertical: TashilSpacing.sm,
+                ),
+                decoration: BoxDecoration(
+                  color: colorScheme.surface,
+                  borderRadius: BorderRadius.circular(TashilRadius.small),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Symbols.info_rounded,
+                      size: 16,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: TashilSpacing.sm),
+                    Expanded(
+                      child: Text(AppLocalizations.of(context)!.workPolicyNote,
+                        style: textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1542,336 +1459,262 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     return cleaned.isNotEmpty ? cleaned : trimmed;
   }
 
-  (Color bg, Color fg, Color border) _getChainBadgeColors(
-    BuildContext context,
-    String chainName,
-  ) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final lower = chainName.toLowerCase().trim();
-
-    if (lower.contains('جملة') ||
-        lower.contains('جمله') ||
-        lower.contains('gomla') ||
-        lower.contains('jomla')) {
-      return isDark
-          ? (
-              const Color(0xFF143823),
-              const Color(0xFF81C784),
-              const Color(0xFF2E7D32),
-            )
-          : (
-              const Color(0xFFE8F5E9),
-              const Color(0xFF1B5E20),
-              const Color(0xFF81C784),
-            );
-    }
-
-    if (lower.contains('فتح الله') || lower.contains('fathalla')) {
-      return isDark
-          ? (
-              const Color(0xFF102844),
-              const Color(0xFF90CAF9),
-              const Color(0xFF1976D2),
-            )
-          : (
-              const Color(0xFFE3F2FD),
-              const Color(0xFF0D47A1),
-              const Color(0xFF64B5F6),
-            );
-    }
-
-    if (lower.contains('زهران') || lower.contains('zahran')) {
-      return isDark
-          ? (
-              const Color(0xFF3E240D),
-              const Color(0xFFFFB74D),
-              const Color(0xFFF57C00),
-            )
-          : (
-              const Color(0xFFFFF3E0),
-              const Color(0xFFE65100),
-              const Color(0xFFFFB74D),
-            );
-    }
-
-    final cs = theme.colorScheme;
-    return (
-      cs.secondaryContainer.withValues(alpha: 0.6),
-      cs.onSecondaryContainer,
-      cs.secondary.withValues(alpha: 0.35),
-    );
-  }
-
   Widget _buildRecentActivityBriefCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
     if (_recentSessions.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Symbols.history_toggle_off_rounded,
-                    size: 20,
-                    color: colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(AppLocalizations.of(context)!.recentBranchActivity,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
+    return Card.filled(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(TashilSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Symbols.history_toggle_off_rounded,
+                      size: 20,
+                      color: colorScheme.primary,
                     ),
-                  ),
-                ],
-              ),
-              if (widget.onNavigateToAttendance != null)
-                InkWell(
-                  onTap: widget.onNavigateToAttendance,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(AppLocalizations.of(context)!.viewLog,
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Icon(Symbols.chevron_right_rounded,
-                          size: 16,
-                          color: colorScheme.primary,
-                        ),
-                      ],
+                    const SizedBox(width: TashilSpacing.sm),
+                    Text(AppLocalizations.of(context)!.recentBranchActivity,
+                      style: textTheme.titleSmall?.copyWith(
+                        color: colorScheme.onSurface,
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Session Items (latest 2-3 sessions)
-          ..._recentSessions.take(3).map((session) {
-            final rawBranchName = session.branchName ??
-                AppLocalizations.of(context)!.unknownBranch;
-            final cleanBranchName = _cleanBranchName(rawBranchName);
-            final orgName = _resolveOrgLabel(
-              session.organizationId,
-              branchName: session.branchName,
-              isArabic: isArabic,
-            );
-            final (chipBg, chipFg, chipBorder) = _getChainBadgeColors(
-              context,
-              orgName,
-            );
-            final checkInStr =
-                DateFormat('hh:mm a', isArabic ? 'ar' : 'en').format(session.checkInTime);
-            final checkOutStr = session.checkOutTime != null
-                ? DateFormat('hh:mm a', isArabic ? 'ar' : 'en').format(session.checkOutTime!)
-                : AppLocalizations.of(context)!.onShift;
-
-            // Format date relative (اليوم، أمس، أو التاريخ)
-            final now = _getTrustedNow();
-            final isToday = session.checkInTime.year == now.year &&
-                session.checkInTime.month == now.month &&
-                session.checkInTime.day == now.day;
-            final isYesterday = session.checkInTime.year == now.year &&
-                session.checkInTime.month == now.month &&
-                session.checkInTime.day == now.day - 1;
-
-            final dateLabel = isToday
-                ? AppLocalizations.of(context)!.today
-                : isYesterday
-                    ? AppLocalizations.of(context)!.yesterday
-                    : DateFormat('EEE، d MMM', isArabic ? 'ar' : 'en').format(session.checkInTime);
-
-            // Compute Duration
-            String durationLabel = '';
-            if (session.checkOutTime != null) {
-              final diff = session.checkOutTime!.difference(session.checkInTime);
-              final hours = diff.inHours;
-              final minutes = diff.inMinutes % 60;
-              durationLabel = AppLocalizations.of(context)!.durationHm(hours, minutes);
-            }
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Row 1: Chain Chip + Clean Branch Name
-                  Row(
-                    children: [
-                      if (orgName.isNotEmpty) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: chipBg,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: chipBorder,
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Symbols.storefront_rounded,
-                                size: 12,
-                                color: chipFg,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                orgName,
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: chipFg,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                      Icon(
-                        Symbols.location_on_rounded,
-                        size: 15,
-                        color: colorScheme.primary,
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(AppLocalizations.of(context)!.branchLabel(cleanBranchName),
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurface,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-
-                  // Row 2: Date + In/Out Times + Duration
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 4,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      // Date pill
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          dateLabel,
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      // Check-in
-                      Row(
+                if (widget.onNavigateToAttendance != null)
+                  InkWell(
+                    onTap: widget.onNavigateToAttendance,
+                    borderRadius: BorderRadius.circular(TashilRadius.small),
+                    child: Padding(
+                      padding: const EdgeInsets.all(TashilSpacing.xs),
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Symbols.login_rounded,
-                            size: 12,
+                          Text(AppLocalizations.of(context)!.viewLog,
+                            style: textTheme.labelMedium?.copyWith(
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                          Icon(Symbols.chevron_right_rounded,
+                            size: 16,
                             color: colorScheme.primary,
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            checkInStr,
-                            style: TextStyle(
-                              fontSize: 11,
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: TashilSpacing.md),
+
+            // Session Items (latest 2-3 sessions)
+            ..._recentSessions.take(3).map((session) {
+              final rawBranchName = session.branchName ??
+                  AppLocalizations.of(context)!.unknownBranch;
+              final cleanBranchName = _cleanBranchName(rawBranchName);
+              final orgName = _resolveOrgLabel(
+                session.organizationId,
+                branchName: session.branchName,
+                isArabic: isArabic,
+              );
+              final checkInStr =
+                  DateFormat('hh:mm a', isArabic ? 'ar' : 'en').format(session.checkInTime);
+              final checkOutStr = session.checkOutTime != null
+                  ? DateFormat('hh:mm a', isArabic ? 'ar' : 'en').format(session.checkOutTime!)
+                  : AppLocalizations.of(context)!.onShift;
+
+              // Format date relative (اليوم، أمس، أو التاريخ)
+              final now = _getTrustedNow();
+              final isToday = session.checkInTime.year == now.year &&
+                  session.checkInTime.month == now.month &&
+                  session.checkInTime.day == now.day;
+              final isYesterday = session.checkInTime.year == now.year &&
+                  session.checkInTime.month == now.month &&
+                  session.checkInTime.day == now.day - 1;
+
+              final dateLabel = isToday
+                  ? AppLocalizations.of(context)!.today
+                  : isYesterday
+                      ? AppLocalizations.of(context)!.yesterday
+                      : DateFormat('EEE، d MMM', isArabic ? 'ar' : 'en').format(session.checkInTime);
+
+              // Compute Duration
+              String durationLabel = '';
+              if (session.checkOutTime != null) {
+                final diff = session.checkOutTime!.difference(session.checkInTime);
+                final hours = diff.inHours;
+                final minutes = diff.inMinutes % 60;
+                durationLabel = AppLocalizations.of(context)!.durationHm(hours, minutes);
+              }
+
+              return Container(
+                margin: const EdgeInsetsDirectional.only(bottom: TashilSpacing.sm),
+                padding: const EdgeInsets.all(TashilSpacing.md),
+                decoration: BoxDecoration(
+                  color: colorScheme.surface,
+                  borderRadius: BorderRadius.circular(TashilRadius.medium),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Row 1: Chain Chip + Clean Branch Name
+                    Row(
+                      children: [
+                        if (orgName.isNotEmpty) ...[
+                          // F-01: one tonal pair for every chain, no
+                          // per-chain hand-picked colours.
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: TashilSpacing.sm,
+                              vertical: TashilSpacing.xs,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorScheme.secondaryContainer,
+                              borderRadius: BorderRadius.circular(TashilRadius.small),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Symbols.storefront_rounded,
+                                  size: 12,
+                                  color: colorScheme.onSecondaryContainer,
+                                ),
+                                const SizedBox(width: TashilSpacing.xs),
+                                Text(
+                                  orgName,
+                                  style: textTheme.labelMedium?.copyWith(
+                                    color: colorScheme.onSecondaryContainer,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: TashilSpacing.sm),
+                        ],
+                        Icon(
+                          Symbols.location_on_rounded,
+                          size: 15,
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(width: TashilSpacing.xs),
+                        Expanded(
+                          child: Text(AppLocalizations.of(context)!.branchLabel(cleanBranchName),
+                            style: textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSurface,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: TashilSpacing.sm),
+
+                    // Row 2: Date + In/Out Times + Duration
+                    Wrap(
+                      spacing: TashilSpacing.sm,
+                      runSpacing: TashilSpacing.xs,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        // Date pill
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: TashilSpacing.sm,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHigh,
+                            borderRadius: BorderRadius.circular(TashilRadius.extraSmall),
+                          ),
+                          child: Text(
+                            dateLabel,
+                            style: textTheme.labelMedium?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                             ),
                           ),
-                        ],
-                      ),
-                      // Check-out
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Symbols.logout_rounded,
-                            size: 12,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            checkOutStr,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: session.checkOutTime == null
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                              color: session.checkOutTime != null
-                                  ? colorScheme.onSurfaceVariant
-                                  : colorScheme.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      // Duration
-                      if (durationLabel.isNotEmpty)
+                        ),
+                        // Check-in
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Symbols.timelapse_rounded,
+                              Symbols.login_rounded,
                               size: 12,
-                              color: colorScheme.onSurfaceVariant,
+                              color: colorScheme.primary,
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: TashilSpacing.xs),
                             Text(
-                              durationLabel,
-                              style: TextStyle(
-                                fontSize: 10.5,
+                              checkInStr,
+                              style: textTheme.labelSmall?.copyWith(
                                 color: colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],
                         ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
+                        // Check-out
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Symbols.logout_rounded,
+                              size: 12,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: TashilSpacing.xs),
+                            Text(
+                              checkOutStr,
+                              style: textTheme.labelSmall?.copyWith(
+                                fontWeight: session.checkOutTime == null
+                                    ? FontWeight.bold
+                                    : null,
+                                color: session.checkOutTime != null
+                                    ? colorScheme.onSurfaceVariant
+                                    : colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        // Duration
+                        if (durationLabel.isNotEmpty)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Symbols.timelapse_rounded,
+                                size: 12,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: TashilSpacing.xs),
+                              Text(
+                                durationLabel,
+                                style: textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
       ),
     );
   }
@@ -1889,15 +1732,18 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     final tt = Theme.of(context).textTheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      padding: const EdgeInsets.symmetric(
+        vertical: TashilSpacing.md,
+        horizontal: TashilSpacing.sm,
+      ),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(12),
+        color: containerColor,
+        borderRadius: BorderRadius.circular(TashilRadius.medium),
       ),
       child: Column(
         children: [
           Icon(icon, size: 20, color: iconColor),
-          const SizedBox(height: 4),
+          const SizedBox(height: TashilSpacing.xs),
           Text(
             value,
             style: tt.titleMedium?.copyWith(
@@ -1908,7 +1754,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: TashilSpacing.xs),
           Text(
             title,
             style: tt.labelMedium?.copyWith(
@@ -1928,15 +1774,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     final colorScheme = theme.colorScheme;
 
     final pendingCount = _pendingLeaveCount;
-    return Card(
-          elevation: 0,
+    return Card.filled(
           margin: EdgeInsets.zero,
-          color: colorScheme.surfaceContainer,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          clipBehavior: Clip.antiAlias,
           child: InkWell(
-            borderRadius: BorderRadius.circular(16),
             onTap: () {
               if (widget.onNavigateToLeaves != null) {
                 widget.onNavigateToLeaves!();
@@ -1951,22 +1792,22 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               }
             },
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(TashilSpacing.lg),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(TashilSpacing.md),
                     decoration: BoxDecoration(
-                      color: colorScheme.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(14),
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(TashilRadius.medium),
                     ),
                     child: Icon(
                       Symbols.event_note_rounded,
                       size: 26,
-                      color: colorScheme.primary,
+                      color: colorScheme.onPrimaryContainer,
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: TashilSpacing.md),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1976,25 +1817,21 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                             Text(AppLocalizations.of(context)!.reqTitle,
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
-                                fontSize: 15,
                               ),
                             ),
                             if (pendingCount > 0) ...[
-                              const SizedBox(width: 8),
+                              const SizedBox(width: TashilSpacing.sm),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
+                                  horizontal: TashilSpacing.sm,
                                 ),
                                 decoration: BoxDecoration(
                                   color: colorScheme.tertiaryContainer,
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(TashilRadius.full),
                                 ),
                                 child: Text(
                                   AppLocalizations.of(context)!.pendingCountBadge(pendingCount),
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.bold,
+                                  style: theme.textTheme.labelMedium?.copyWith(
                                     color: colorScheme.onTertiaryContainer,
                                   ),
                                 ),
@@ -2002,19 +1839,18 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                             ],
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: TashilSpacing.xs),
                         Text(AppLocalizations.of(context)!.homeRequestsSubtitle,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
-                            fontSize: 12,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: TashilSpacing.sm),
                   Icon(Symbols.chevron_right_rounded,
-                    color: colorScheme.outline,
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ],
               ),

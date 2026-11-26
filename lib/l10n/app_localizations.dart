@@ -2303,20 +2303,26 @@ abstract class AppLocalizations {
   /// No description provided for @homeDutyAttendance.
   ///
   /// In en, this message translates to:
-  /// **'Check in and out from the branch location.'**
+  /// **'Check in and out from the branch location'**
   String get homeDutyAttendance;
 
   /// No description provided for @homeDutyTasks.
   ///
   /// In en, this message translates to:
-  /// **'Complete and track your daily tasks.'**
+  /// **'Complete and track your daily tasks'**
   String get homeDutyTasks;
 
   /// No description provided for @homeDutyPhotos.
   ///
   /// In en, this message translates to:
-  /// **'Photograph offers and brands in hypermarkets and branches.'**
+  /// **'Photograph offers and brands in hypermarkets and branches'**
   String get homeDutyPhotos;
+
+  /// No description provided for @whatsapp.
+  ///
+  /// In en, this message translates to:
+  /// **'WhatsApp'**
+  String get whatsapp;
 
   /// No description provided for @companySupervisor.
   ///

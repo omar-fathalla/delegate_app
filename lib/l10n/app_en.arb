@@ -1397,9 +1397,10 @@
   },
   "roleFieldSupervisor": "Field supervisor",
   "homeCoreDuties": "Your core duties",
-  "homeDutyAttendance": "Check in and out from the branch location.",
-  "homeDutyTasks": "Complete and track your daily tasks.",
-  "homeDutyPhotos": "Photograph offers and brands in hypermarkets and branches.",
+  "homeDutyAttendance": "Check in and out from the branch location",
+  "homeDutyTasks": "Complete and track your daily tasks",
+  "homeDutyPhotos": "Photograph offers and brands in hypermarkets and branches",
+  "whatsapp": "WhatsApp",
   "companySupervisor": "Company supervisor",
   "supervisorOfCompany": "Supervisor · {companyName}",
   "@supervisorOfCompany": {

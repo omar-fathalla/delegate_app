@@ -1189,14 +1189,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeCoreDuties => 'Your core duties';
 
   @override
-  String get homeDutyAttendance => 'Check in and out from the branch location.';
+  String get homeDutyAttendance => 'Check in and out from the branch location';
 
   @override
-  String get homeDutyTasks => 'Complete and track your daily tasks.';
+  String get homeDutyTasks => 'Complete and track your daily tasks';
 
   @override
   String get homeDutyPhotos =>
-      'Photograph offers and brands in hypermarkets and branches.';
+      'Photograph offers and brands in hypermarkets and branches';
+
+  @override
+  String get whatsapp => 'WhatsApp';
 
   @override
   String get companySupervisor => 'Company supervisor';
