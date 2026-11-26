@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
+import 'package:delegate_app/core/design/tokens.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -101,11 +102,11 @@ class LocationHelpCard extends StatelessWidget {
     return Container(
       key: const Key('locationHelpCard'),
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      // TAS-352: a surface panel with the kit radius, no alpha or border.
+      padding: const EdgeInsets.all(TashilSpacing.md),
       decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colorScheme.outlineVariant),
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(TashilRadius.medium),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
