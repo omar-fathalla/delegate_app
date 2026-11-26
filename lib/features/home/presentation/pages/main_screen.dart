@@ -323,12 +323,6 @@ class _MainScreenState extends State<MainScreen> {
               _initializedTabs.add(1);
             });
           },
-          onNavigateToLeaves: () {
-            setState(() {
-              _currentIndex = 2;
-              _initializedTabs.add(2);
-            });
-          },
         ),
 
         // Tab 1: Attendance
