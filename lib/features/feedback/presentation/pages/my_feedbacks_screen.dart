@@ -1,3 +1,5 @@
+import 'package:delegate_app/core/design/widgets/loading_indicator.dart';
+import 'package:delegate_app/core/design/tokens.dart';
 import 'package:delegate_app/core/widgets/app_photo_image.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:material_ui/material_ui.dart';
@@ -40,7 +42,7 @@ class _MyFeedbacksScreenState extends State<MyFeedbacksScreen> {
       body: BlocBuilder<FeedbackBloc, FeedbackState>(
         builder: (context, state) {
           if (state is FeedbackLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: LoadingIndicator());
           }
 
           if (state is FeedbackError) {
@@ -53,13 +55,13 @@ class _MyFeedbacksScreenState extends State<MyFeedbacksScreen> {
                     size: 64,
                     color: theme.colorScheme.error,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: TashilSpacing.lg),
                   Text(
                     state.message,
                     style: theme.textTheme.bodyLarge,
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: TashilSpacing.lg),
                   FilledButton.icon(
                     onPressed: () {
                       context.read<FeedbackBloc>().add(
@@ -83,18 +85,16 @@ class _MyFeedbacksScreenState extends State<MyFeedbacksScreen> {
                     Icon(
                       Icons.feedback_outlined,
                       size: 64,
-                      color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: TashilSpacing.lg),
                     Text(AppLocalizations.of(context)!.noFeedbackYet,
                       style: theme.textTheme.titleMedium,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: TashilSpacing.sm),
                     Text(AppLocalizations.of(context)!.sendFirstFeedback,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.6,
-                        ),
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -109,7 +109,7 @@ class _MyFeedbacksScreenState extends State<MyFeedbacksScreen> {
                 );
               },
               child: ListView.builder(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(TashilSpacing.page),
                 itemCount: state.feedbacks.length,
                 itemBuilder: (context, index) {
                   final feedback = state.feedbacks[index];
@@ -132,19 +132,28 @@ class _FeedbackCard extends StatelessWidget {
 
   const _FeedbackCard({required this.feedback, required this.isArabic});
 
-  Color _getStatusColor(FeedbackStatus status) {
-    switch (status) {
-      case FeedbackStatus.pending:
-        return Colors.orange;
-      case FeedbackStatus.reviewed:
-        return Colors.blue;
-      case FeedbackStatus.inProgress:
-        return Colors.purple;
-      case FeedbackStatus.resolved:
-        return Colors.green;
-      case FeedbackStatus.rejected:
-        return Colors.red;
-    }
+  /// TAS-358 (F-04): status as a compact label with a container role and
+  /// its on colour. Resolved = success, pending = warning, rejected = error,
+  /// the rest neutral (was hand-picked orange/blue/purple/green/red).
+  (Color, Color) _statusColors(BuildContext context, FeedbackStatus status) {
+    final cs = Theme.of(context).colorScheme;
+    final sem = Theme.of(context).extension<TashilSemanticColors>();
+    return switch (status) {
+      FeedbackStatus.resolved => (
+        sem?.successContainer ?? cs.primaryContainer,
+        sem?.onSuccessContainer ?? cs.onPrimaryContainer,
+      ),
+      FeedbackStatus.pending => (
+        sem?.warningContainer ?? cs.tertiaryContainer,
+        sem?.onWarningContainer ?? cs.onTertiaryContainer,
+      ),
+      FeedbackStatus.rejected => (cs.errorContainer, cs.onErrorContainer),
+      FeedbackStatus.reviewed ||
+      FeedbackStatus.inProgress => (
+        cs.secondaryContainer,
+        cs.onSecondaryContainer,
+      ),
+    };
   }
 
   IconData _getTypeIcon(FeedbackType type) {
@@ -167,57 +176,58 @@ class _FeedbackCard extends StatelessWidget {
     final theme = Theme.of(context);
     final dateFormat = DateFormat('dd/MM/yyyy - HH:mm');
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
+    final (statusBg, statusFg) = _statusColors(context, feedback.status);
+    final cs = theme.colorScheme;
+
+    return Card.filled(
+      margin: const EdgeInsetsDirectional.only(bottom: TashilSpacing.md),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(TashilSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header: النوع والحالة
             Row(
               children: [
-                Icon(
-                  _getTypeIcon(feedback.type),
-                  color: theme.colorScheme.primary,
-                  size: 20,
+                Container(
+                  padding: const EdgeInsets.all(TashilSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: cs.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _getTypeIcon(feedback.type),
+                    color: cs.onPrimary,
+                    size: 20,
+                  ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: TashilSpacing.md),
                 Expanded(
                   child: Text(
                     feedback.type.getLabel(isArabic),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: theme.textTheme.titleSmall,
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
+                  key: ValueKey('feedback_status_${feedback.status.name}'),
+                  padding: const EdgeInsetsDirectional.symmetric(
+                    horizontal: TashilSpacing.sm,
+                    vertical: TashilSpacing.xs / 2,
                   ),
                   decoration: BoxDecoration(
-                    color: _getStatusColor(
-                      feedback.status,
-                    ).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _getStatusColor(feedback.status),
-                      width: 1,
-                    ),
+                    color: statusBg,
+                    borderRadius: BorderRadius.circular(TashilRadius.small),
                   ),
                   child: Text(
                     feedback.status.getLabel(isArabic),
-                    style: TextStyle(
-                      color: _getStatusColor(feedback.status),
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: statusFg,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: TashilSpacing.md),
 
             // المحتوى
             Text(
@@ -226,12 +236,12 @@ class _FeedbackCard extends StatelessWidget {
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: TashilSpacing.md),
 
             // الصورة إذا كانت موجودة
             if (feedback.screenshotUrl != null) ...[
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(TashilRadius.medium),
                 child: AppPhotoImage(
                   photoUrl: feedback.screenshotUrl!,
                   height: 120,
@@ -244,21 +254,16 @@ class _FeedbackCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: TashilSpacing.md),
             ],
 
             // رد الإدارة إذا كان موجوداً
             if (feedback.adminResponse != null) ...[
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(TashilSpacing.md),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withValues(
-                    alpha: 0.3,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                  ),
+                  color: cs.surface,
+                  borderRadius: BorderRadius.circular(TashilRadius.medium),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -270,7 +275,7 @@ class _FeedbackCard extends StatelessWidget {
                           size: 16,
                           color: theme.colorScheme.primary,
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: TashilSpacing.xs),
                         Text(AppLocalizations.of(context)!.adminResponse,
                           style: theme.textTheme.labelSmall?.copyWith(
                             fontWeight: FontWeight.bold,
@@ -279,7 +284,7 @@ class _FeedbackCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: TashilSpacing.xs),
                     Text(
                       feedback.adminResponse!,
                       style: theme.textTheme.bodySmall,
@@ -287,7 +292,7 @@ class _FeedbackCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: TashilSpacing.md),
             ],
 
             // التاريخ
@@ -296,13 +301,13 @@ class _FeedbackCard extends StatelessWidget {
                 Icon(
                   Icons.access_time,
                   size: 14,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: TashilSpacing.xs),
                 Text(
                   dateFormat.format(feedback.createdAt),
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],

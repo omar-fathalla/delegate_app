@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:delegate_app/core/design/tokens.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -10,247 +11,116 @@ class PrivacyPolicyScreen extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      appBar: AppBar(
-        backgroundColor: theme.colorScheme.surface,
-        surfaceTintColor: theme.colorScheme.surfaceTint,
-        centerTitle: true,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: theme.colorScheme.onSurface),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          l10n.privacyPolicy,
-          style: TextStyle(
-            color: theme.colorScheme.onSurface,
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-            letterSpacing: -0.2,
-          ),
-        ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Main Description Card
-              _buildMainDescriptionCard(context, l10n),
-              const SizedBox(height: 16),
-
-              // Location Data Section
-              _buildPolicySection(
-                context,
-                icon: Icons.location_on,
-                title: l10n.locationData,
-                description: l10n.locationDataDesc,
-              ),
-              const SizedBox(height: 16),
-
-              // Camera Access Section
-              _buildPolicySection(
-                context,
-                icon: Icons.camera_alt,
-                title: l10n.cameraAccess,
-                description: l10n.cameraAccessDesc,
-              ),
-              const SizedBox(height: 16),
-
-              // Data Security Section
-              _buildPolicySection(
-                context,
-                icon: Icons.security,
-                title: l10n.dataSecurity,
-                description: l10n.dataSecurityDesc,
-              ),
-              const SizedBox(height: 24),
-
-              // Contact Us Section Header
-              Text(
-                l10n.contactUs,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Contact Us Card
-              Container(
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: theme.colorScheme.outlineVariant),
-                ),
-                child: Column(
+    // TAS-358 (F-18): the official BackButton (named for screen readers),
+    // Card.filled sections, text from the textTheme, contact rows as
+    // ListTiles with the card-icon rule (primary + onPrimary).
+    final tt = theme.textTheme;
+    final cs = theme.colorScheme;
+    Widget section(IconData icon, String title, String description) =>
+        Card.filled(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(TashilSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    _buildContactRow(
-                      context,
-                      icon: Icons.language,
-                      title: l10n.website,
-                      value: l10n.swPointWebsite,
-                      hasTrailingLink: true,
-                      onTap: () => _launchURL(l10n.swPointWebsite),
-                    ),
-                    Divider(height: 1, color: theme.colorScheme.outlineVariant),
-                    _buildContactRow(
-                      context,
-                      icon: Icons.email,
-                      title: l10n.emailAddress,
-                      value: l10n.swPointEmail,
-                    ),
-                    Divider(height: 1, color: theme.colorScheme.outlineVariant),
-                    _buildContactRow(
-                      context,
-                      icon: Icons.location_city,
-                      title: l10n.egyptOffice,
-                      value: l10n.swPointEgyptPhone,
-                    ),
-                    Divider(height: 1, color: theme.colorScheme.outlineVariant),
-                    _buildContactRow(
-                      context,
-                      icon: Icons.chat_bubble,
-                      title: l10n.uaeOffice,
-                      value: l10n.swPointUaePhone,
+                    Icon(icon, color: cs.primary, size: 20),
+                    const SizedBox(width: TashilSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: tt.titleSmall?.copyWith(color: cs.primary),
+                      ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 24),
-            ],
+                const SizedBox(height: TashilSpacing.md),
+                Text(
+                  description,
+                  style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
           ),
-        ),
-      ),
-    );
-  }
+        );
 
-  Widget _buildMainDescriptionCard(
-    BuildContext context,
-    AppLocalizations l10n,
-  ) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+    Widget contact(
+      IconData icon,
+      String title,
+      String value, {
+      VoidCallback? onTap,
+    }) => ListTile(
+      onTap: onTap,
+      leading: Container(
+        padding: const EdgeInsets.all(TashilSpacing.sm),
+        decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
+        child: Icon(icon, color: cs.onPrimary, size: 20),
       ),
-      child: Text(
-        l10n.privacyPolicyDesc,
-        style: TextStyle(
-          fontSize: 14,
-          height: 1.5,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
+      title: Text(title),
+      // URL / e-mail / phone are LTR runs (bidi fix in RTL).
+      subtitle: Text(value, textDirection: TextDirection.ltr),
+      trailing: onTap == null ? null : const Icon(Icons.open_in_new),
     );
-  }
 
-  Widget _buildPolicySection(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String description,
-  }) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+    return Scaffold(
+      appBar: AppBar(
+        centerTitle: true,
+        leading: const BackButton(),
+        title: Text(l10n.privacyPolicy),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: theme.colorScheme.primary, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                  color: theme.colorScheme.primary,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsetsDirectional.symmetric(
+            horizontal: TashilSpacing.page,
+            vertical: TashilSpacing.lg,
+          ),
+          children: [
+            Card.filled(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(TashilSpacing.lg),
+                child: Text(
+                  l10n.privacyPolicyDesc,
+                  style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            description,
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.5,
-              color: theme.colorScheme.onSurfaceVariant,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContactRow(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String value,
-    bool hasTrailingLink = false,
-    VoidCallback? onTap,
-  }) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: theme.colorScheme.primary, size: 20),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
+            const SizedBox(height: TashilSpacing.lg),
+            section(Icons.location_on, l10n.locationData, l10n.locationDataDesc),
+            const SizedBox(height: TashilSpacing.lg),
+            section(Icons.camera_alt, l10n.cameraAccess, l10n.cameraAccessDesc),
+            const SizedBox(height: TashilSpacing.lg),
+            section(Icons.security, l10n.dataSecurity, l10n.dataSecurityDesc),
+            const SizedBox(height: TashilSpacing.xl),
+            Text(l10n.contactUs, style: tt.titleMedium),
+            const SizedBox(height: TashilSpacing.md),
+            Card.filled(
+              margin: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                  contact(
+                    Icons.language,
+                    l10n.website,
+                    l10n.swPointWebsite,
+                    onTap: () => _launchURL(l10n.swPointWebsite),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    value,
-                    // URL / e-mail / phone are LTR runs (bidi fix in RTL).
-                    textDirection: TextDirection.ltr,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: theme.colorScheme.onSurface,
-                    ),
+                  const Divider(height: 1),
+                  contact(Icons.email, l10n.emailAddress, l10n.swPointEmail),
+                  const Divider(height: 1),
+                  contact(
+                    Icons.location_city,
+                    l10n.egyptOffice,
+                    l10n.swPointEgyptPhone,
                   ),
+                  const Divider(height: 1),
+                  contact(Icons.chat_bubble, l10n.uaeOffice, l10n.swPointUaePhone),
                 ],
               ),
             ),
-            if (hasTrailingLink)
-              Icon(
-                Icons.open_in_new,
-                color: theme.colorScheme.onSurfaceVariant,
-                size: 20,
-              ),
+            const SizedBox(height: TashilSpacing.xl),
           ],
         ),
       ),

@@ -13,7 +13,7 @@ import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/main.dart';
 import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 
-final tDelegate = Delegate(
+Delegate _user(UserRole role) => Delegate(
   uid: '1',
   firstName: 'Ahmed',
   middleName: 'Ali',
@@ -43,7 +43,10 @@ final tDelegate = Delegate(
   paymentAmount: 0,
   version: 1,
   documents: const [],
+  role: role,
 );
+
+final tDelegate = _user(UserRole.delegate);
 
 Future<void> setupDI() async {
   sl.allowReassignment = true;
@@ -61,14 +64,18 @@ Future<void> setupDI() async {
   }
 }
 
-Widget buildSettingsScreen() {
+/// TAS-358: the logout row stays for staff roles; the field delegate logs
+/// out from the navigation menu instead. Tests that use the row run as HR.
+final tStaff = _user(UserRole.hr);
+
+Widget buildSettingsScreen({Delegate? who}) {
   return BlocProvider<ThemeCubit>.value(
     value: sl<ThemeCubit>(),
     child: MaterialApp(
       localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       locale: const Locale('en'),
-      home: SettingsScreen(delegate: tDelegate),
+      home: SettingsScreen(delegate: who ?? tStaff),
     ),
   );
 }
@@ -100,7 +107,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AppBar), findsOneWidget);
-      expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
+      // TAS-358 (F-18): the official BackButton (named for screen readers).
+      expect(find.byType(BackButton), findsOneWidget);
     });
 
     testWidgets('appearance sheet sets System/Light/Dark', (
@@ -226,6 +234,41 @@ void main() {
 
       // Color option circles should be present
       expect(find.byType(GestureDetector), findsWidgets);
+    });
+
+    testWidgets('TAS-358: no logout row for the field delegate', (
+      tester,
+    ) async {
+      await tester.pumpWidget(buildSettingsScreen(who: tDelegate));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('settings_logout')), findsNothing);
+      expect(find.byIcon(Icons.logout_rounded), findsNothing);
+    });
+
+    testWidgets('TAS-358: staff roles keep the logout row', (tester) async {
+      for (final role in [
+        UserRole.hr,
+        UserRole.admin,
+        UserRole.accountant,
+        UserRole.marketing,
+        UserRole.superAdmin,
+      ]) {
+        await tester.pumpWidget(buildSettingsScreen(who: _user(role)));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('settings_logout')),
+          findsOneWidget,
+          reason: '$role',
+        );
+      }
+    });
+
+    testWidgets('TAS-358: language is a connected ButtonGroup and rows are '
+        'ListTiles', (tester) async {
+      await tester.pumpWidget(buildSettingsScreen());
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('settings_language')), findsOneWidget);
+      expect(find.byType(ListTile), findsWidgets);
     });
   });
 }
