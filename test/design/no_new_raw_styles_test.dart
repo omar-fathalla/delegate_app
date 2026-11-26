@@ -11,7 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// Counted in `lib/` outside `lib/core/design/` (the design system itself),
 /// `lib/features/playground/` (dev-only demos: the content-colour demo needs
 /// fixed sample image colours; TAS-383) and generated files.
-const _fontSizeBaseline = 1956; // TAS-351: home screen
+const _fontSizeBaseline = 1950; // TAS-355: profile screen
 const _hexColorBaseline = 423; // TAS-351: home screen
 
 void main() {
