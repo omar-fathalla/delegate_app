@@ -15,8 +15,10 @@ appId: com.tashil.delegate.dev
     visible:
       id: "tashil_main_menu_button"
     timeout: 120000
+# TAS-350: the M3 NavigationBar adds "tab 1 of 4" to the label, so match
+# the name plus an optional second line (same as the menu taps below).
 - extendedWaitUntil:
-    visible: "الرئيسية"
+    visible: "الرئيسية(\\n.*)?"
     timeout: 60000
 
 - tapOn:
