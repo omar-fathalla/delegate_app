@@ -1,3 +1,6 @@
+import 'package:delegate_app/core/design/tokens.dart';
+import 'package:delegate_app/core/design/widgets/loading_indicator.dart';
+import 'package:delegate_app/core/design/widgets/snackbars.dart';
 import 'package:delegate_app/features/tasks/presentation/widgets/task_image_widgets.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
@@ -86,7 +89,8 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
         actions: [
           IconButton(
             icon: const Icon(Symbols.refresh_rounded),
-            tooltip: AppLocalizations.of(context)!.retry,
+            // TAS-356 (C-02): the button refreshes, so its tooltip says so.
+            tooltip: AppLocalizations.of(context)!.refreshAction,
             onPressed: _loadTasks,
           ),
         ],
@@ -94,37 +98,24 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
       body: BlocConsumer<DelegateTasksBloc, DelegateTasksState>(
         listener: (context, state) {
           if (state is TaskStatusUpdateSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  state.newStatus == TaskStatus.completed
-                      ? AppLocalizations.of(context)!.taskCompletedConfirmed
-                      : AppLocalizations.of(context)!.taskStarted,
-                ),
-                backgroundColor: state.newStatus == TaskStatus.completed
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.secondary,
-                behavior: SnackBarBehavior.floating,
-              ),
+            showTashilSnackBar(
+              context,
+              state.newStatus == TaskStatus.completed
+                  ? AppLocalizations.of(context)!.taskCompletedConfirmed
+                  : AppLocalizations.of(context)!.taskStarted,
             );
             _loadTasks();
           } else if (state is DelegateTasksError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: theme.colorScheme.error,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+            showTashilSnackBar(context, state.message);
           }
         },
         builder: (context, state) {
           if (state is DelegateTasksInitial) {
             _loadTasks();
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: LoadingIndicator());
           }
           if (state is DelegateTasksLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: LoadingIndicator());
           }
           if (state is DelegateTasksError) {
             return Center(
@@ -133,10 +124,12 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
                 children: [
                   Text(
                     state.message,
-                    style: TextStyle(color: theme.colorScheme.error),
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
+                  const SizedBox(height: TashilSpacing.lg),
+                  FilledButton.tonal(
                     onPressed: _loadTasks,
                     child: Text(l10n.retry),
                   ),
@@ -148,18 +141,16 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
             if (state.tasks.isEmpty) {
               return Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(32.0),
+                  padding: const EdgeInsets.all(TashilSpacing.xxl),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
                         Icons.task_alt_rounded,
                         size: 72,
-                        color: theme.colorScheme.onSurfaceVariant.withValues(
-                          alpha: 0.3,
-                        ),
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: TashilSpacing.lg),
                       Text(
                         AppLocalizations.of(context)!.noTasksNow,
                         style: theme.textTheme.titleMedium?.copyWith(
@@ -167,7 +158,7 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
                           color: theme.colorScheme.onSurface,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: TashilSpacing.sm),
                       Text(
                         AppLocalizations.of(context)!.tasksAppearHere,
                         style: theme.textTheme.bodyMedium?.copyWith(
@@ -183,7 +174,10 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
 
             return ListView.builder(
               controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsetsDirectional.symmetric(
+                horizontal: TashilSpacing.page,
+                vertical: TashilSpacing.sm,
+              ),
               itemCount: state.hasReachedMax
                   ? state.tasks.length
                   : state.tasks.length + 1,
@@ -191,8 +185,8 @@ class _DelegateTasksScreenState extends State<DelegateTasksScreen> {
                 if (index >= state.tasks.length) {
                   return const Center(
                     child: Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      padding: EdgeInsets.all(TashilSpacing.lg),
+                      child: LoadingIndicator(),
                     ),
                   );
                 }
@@ -259,13 +253,15 @@ class _FilterBarDelegate extends StatelessWidget {
         final currentFilter = state.statusFilter;
 
         return Container(
-          padding: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsetsDirectional.only(bottom: TashilSpacing.sm),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsetsDirectional.symmetric(
+                  horizontal: TashilSpacing.page,
+                ),
                 child: Row(
                   children: [
                     FilterChip(
@@ -273,7 +269,7 @@ class _FilterBarDelegate extends StatelessWidget {
                       selected: currentFilter == null,
                       onSelected: (_) => _updateFilter(context, null),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: TashilSpacing.sm),
                     FilterChip(
                       label: Text(l10n.taskCancelled),
                       selected: currentFilter == TaskStatus.cancelled,
@@ -283,10 +279,12 @@ class _FilterBarDelegate extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: TashilSpacing.xs),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsetsDirectional.symmetric(
+                  horizontal: TashilSpacing.page,
+                ),
                 child: Row(
                   children: [
                     FilterChip(
@@ -295,14 +293,14 @@ class _FilterBarDelegate extends StatelessWidget {
                       onSelected: (_) =>
                           _updateFilter(context, TaskStatus.pending),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: TashilSpacing.sm),
                     FilterChip(
                       label: Text(l10n.taskInProgress),
                       selected: currentFilter == TaskStatus.inProgress,
                       onSelected: (_) =>
                           _updateFilter(context, TaskStatus.inProgress),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: TashilSpacing.sm),
                     FilterChip(
                       label: Text(l10n.taskCompleted),
                       selected: currentFilter == TaskStatus.completed,
@@ -357,7 +355,12 @@ class _DateHeader extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        TashilSpacing.xs,
+        TashilSpacing.lg,
+        TashilSpacing.xs,
+        TashilSpacing.sm,
+      ),
       child: Text(
         text,
         style: theme.textTheme.labelLarge?.copyWith(
@@ -369,6 +372,10 @@ class _DateHeader extends StatelessWidget {
   }
 }
 
+/// TAS-356: one Card.filled per task, the task icon on primary + onPrimary
+/// (TAS-384 rule), status and high priority as compact labels, and the
+/// quick «إكمال» as a 48dp IconButton.filled with a tooltip (was a 22dp
+/// GestureDetector without a name).
 class _TaskCard extends StatelessWidget {
   final TaskEntity task;
   final Delegate delegate;
@@ -383,17 +390,14 @@ class _TaskCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final open = task.status == TaskStatus.pending ||
+        task.status == TaskStatus.inProgress;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      elevation: 0,
+    return Card.filled(
+      margin: const EdgeInsetsDirectional.only(bottom: TashilSpacing.sm),
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-        ),
-      ),
       child: InkWell(
         onTap: () async {
           await context.push(
@@ -419,20 +423,19 @@ class _TaskCard extends StatelessWidget {
             );
           }
         },
-        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.all(TashilSpacing.md),
           child: Row(
             children: [
               Container(
-                width: 4,
-                height: 40,
+                padding: const EdgeInsets.all(TashilSpacing.sm),
                 decoration: BoxDecoration(
-                  color: _getPriorityColor(theme, task.priority),
-                  borderRadius: BorderRadius.circular(2),
+                  color: cs.primary,
+                  shape: BoxShape.circle,
                 ),
+                child: Icon(Icons.task_alt_rounded, size: 20, color: cs.onPrimary),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: TashilSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -442,20 +445,33 @@ class _TaskCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
                         decoration: task.status == TaskStatus.completed
                             ? TextDecoration.lineThrough
                             : null,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: TashilSpacing.xs / 2),
                     Text(
                       task.description,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.outline,
+                        color: cs.onSurfaceVariant,
                       ),
+                    ),
+                    const SizedBox(height: TashilSpacing.xs),
+                    Wrap(
+                      spacing: TashilSpacing.xs,
+                      runSpacing: TashilSpacing.xs,
+                      children: [
+                        _StatusSmallChip(status: task.status),
+                        if (task.priority == TaskPriority.high)
+                          _TaskLabel(
+                            text: l10n.high,
+                            container: cs.tertiaryContainer,
+                            onContainer: cs.onTertiaryContainer,
+                          ),
+                      ],
                     ),
                     TaskCardMeta(
                       hasImage: task.hasImage,
@@ -464,38 +480,21 @@ class _TaskCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  _StatusSmallChip(status: task.status),
-                  const SizedBox(height: 4),
-                  if (task.status == TaskStatus.pending ||
-                      task.status == TaskStatus.inProgress)
-                    GestureDetector(
-                      onTap: () => _updateStatus(context, TaskStatus.completed),
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primaryContainer,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.check_rounded,
-                          size: 14,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    )
-                  else
-                    Text(
-                      DateFormat.Hm().format(task.createdAt),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.outline,
-                      ),
-                    ),
-                ],
-              ),
+              const SizedBox(width: TashilSpacing.sm),
+              if (open)
+                IconButton.filled(
+                  key: ValueKey('task_quick_complete_${task.uid}'),
+                  tooltip: l10n.complete,
+                  onPressed: () => _updateStatus(context, TaskStatus.completed),
+                  icon: const Icon(Icons.check_rounded),
+                )
+              else
+                Text(
+                  DateFormat.Hm().format(task.createdAt),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
             ],
           ),
         ),
@@ -512,19 +511,54 @@ class _TaskCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  Color _getPriorityColor(ThemeData theme, TaskPriority priority) {
-    switch (priority) {
-      case TaskPriority.high:
-        return theme.colorScheme.error;
-      case TaskPriority.medium:
-        return theme.colorScheme.tertiary;
-      case TaskPriority.low:
-        return theme.colorScheme.primary;
-    }
+/// Compact read-only label: a container role with its on colour.
+class _TaskLabel extends StatelessWidget {
+  const _TaskLabel({
+    required this.text,
+    required this.container,
+    required this.onContainer,
+    this.icon,
+  });
+  final String text;
+  final Color container;
+  final Color onContainer;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: TashilSpacing.sm,
+        vertical: TashilSpacing.xs / 2,
+      ),
+      decoration: BoxDecoration(
+        color: container,
+        borderRadius: BorderRadius.circular(TashilRadius.small),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 14, color: onContainer),
+            const SizedBox(width: TashilSpacing.xs),
+          ],
+          Text(
+            text,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: onContainer,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
+/// Task status as a compact label. Completed is success, in progress the
+/// secondary container, pending and cancelled neutral (cancelled is not an
+/// error).
 class _StatusSmallChip extends StatelessWidget {
   final TaskStatus status;
 
@@ -532,51 +566,35 @@ class _StatusSmallChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    Color color;
-    IconData icon;
-
-    switch (status) {
-      case TaskStatus.pending:
-        color = theme.colorScheme.outline;
-        icon = Icons.access_time_rounded;
-        break;
-      case TaskStatus.inProgress:
-        color = theme.colorScheme.primary;
-        icon = Icons.sync_rounded;
-        break;
-      case TaskStatus.completed:
-        color = theme.colorScheme.primary;
-        icon = Icons.check_circle_rounded;
-        break;
-      case TaskStatus.cancelled:
-        color = theme.colorScheme.error;
-        icon = Icons.block_rounded;
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(4),
+    final cs = Theme.of(context).colorScheme;
+    final sem = Theme.of(context).extension<TashilSemanticColors>();
+    final (Color bg, Color fg, IconData icon) = switch (status) {
+      TaskStatus.pending => (
+        cs.surfaceContainerHighest,
+        cs.onSurfaceVariant,
+        Icons.access_time_rounded,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 10, color: color),
-          const SizedBox(width: 2),
-          Text(
-            _getStatusLabel(context, status),
-            style: TextStyle(
-              color: color,
-              fontSize: 9,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
+      TaskStatus.inProgress => (
+        cs.secondaryContainer,
+        cs.onSecondaryContainer,
+        Icons.sync_rounded,
       ),
+      TaskStatus.completed => (
+        sem?.successContainer ?? cs.primaryContainer,
+        sem?.onSuccessContainer ?? cs.onPrimaryContainer,
+        Icons.check_circle_rounded,
+      ),
+      TaskStatus.cancelled => (
+        cs.surfaceContainerHighest,
+        cs.onSurfaceVariant,
+        Icons.block_rounded,
+      ),
+    };
+    return _TaskLabel(
+      text: _getStatusLabel(context, status),
+      container: bg,
+      onContainer: fg,
+      icon: icon,
     );
   }
 
