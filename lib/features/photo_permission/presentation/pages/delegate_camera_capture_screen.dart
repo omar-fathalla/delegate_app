@@ -1,3 +1,6 @@
+import 'package:delegate_app/config/theme/app_theme.dart';
+import 'package:delegate_app/core/design/tokens.dart';
+import 'package:delegate_app/core/design/widgets/snackbars.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'dart:io';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
@@ -221,19 +224,17 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
   }
 
   void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    // TAS-354 (C-30): kit snackbar, text only.
+    showTashilSnackBar(context, message);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    // TAS-354: content drawn over the photo uses the dark theme's roles
+    // (scrim, onSurface), never Colors.black / white.
+    final overlay = AppTheme.darkTheme().colorScheme;
     final isSupervisor = widget.delegate.role == UserRole.admin;
 
     return Scaffold(
@@ -248,29 +249,10 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
           if (state is PhotoBatchUploadSuccess) {
             final isOffline = state.isOffline;
             final count = state.uploadedCount;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    Icon(
-                      isOffline ? Icons.cloud_off_rounded : Icons.cloud_done_rounded,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        isOffline
-                            ? AppLocalizations.of(context)!.photosSavedOffline(count)
-                            : AppLocalizations.of(context)!.photosUploaded(count),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-                backgroundColor: isOffline ? Colors.orange.shade800 : Colors.green.shade700,
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 4),
-              ),
+            // TAS-354 (C-30): kit snackbar, text only (no green/orange fill).
+            showTashilSnackBar(
+              context,
+              isOffline ? AppLocalizations.of(context)!.photosSavedOffline(count) : AppLocalizations.of(context)!.photosUploaded(count),
             );
             setState(() {
               _shots.clear();
@@ -280,29 +262,10 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
             _loadOngoingPermissions();
           } else if (state is PhotoUploadSuccess) {
             final isOffline = state.isOffline;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    Icon(
-                      isOffline ? Icons.cloud_off_rounded : Icons.cloud_done_rounded,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        isOffline
-                            ? AppLocalizations.of(context)!.photoSavedOffline
-                            : AppLocalizations.of(context)!.photoUploaded,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-                backgroundColor: isOffline ? Colors.orange.shade800 : Colors.green.shade700,
-                behavior: SnackBarBehavior.floating,
-                duration: const Duration(seconds: 4),
-              ),
+            // TAS-354 (C-30): kit snackbar, text only (no green/orange fill).
+            showTashilSnackBar(
+              context,
+              isOffline ? AppLocalizations.of(context)!.photoSavedOffline : AppLocalizations.of(context)!.photoUploaded,
             );
             setState(() {
               _shots.clear();
@@ -355,25 +318,32 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                   const SyncStatusBanner(),
                   // Multiple Permissions Selector (if more than 1 active permission exists)
                   if (availablePermissions.length > 1) ...[
-                    DropdownButtonFormField<PhotoPermission>(
-                      initialValue: _selectedPermission ?? availablePermissions.first,
-                      decoration: InputDecoration(
-                        labelText: AppLocalizations.of(context)!.choosePhotoPermission,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        prefixIcon: const Icon(Icons.assignment_turned_in_rounded),
-                        filled: true,
-                        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                    // TAS-354 (C-10): one value in a form is a DropdownMenu.
+                    DropdownMenu<PhotoPermission>(
+                      key: const Key('photo_permission_menu'),
+                      initialSelection:
+                          _selectedPermission ?? availablePermissions.first,
+                      expandedInsets: EdgeInsets.zero,
+                      requestFocusOnTap: false,
+                      label: Text(
+                        AppLocalizations.of(context)!.choosePhotoPermission,
                       ),
-                      items: availablePermissions.map((p) {
-                        final dept = (p.department != null && p.department!.trim().isNotEmpty)
-                            ? ' (${p.department})'
-                            : '';
-                        return DropdownMenuItem<PhotoPermission>(
-                          value: p,
-                          child: Text(AppLocalizations.of(context)!.permissionOption(p.companyName, dept, p.branchNames.length)),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
+                      leadingIcon: const Icon(Icons.assignment_turned_in_rounded),
+                      dropdownMenuEntries: [
+                        for (final p in availablePermissions)
+                          DropdownMenuEntry<PhotoPermission>(
+                            value: p,
+                            label: AppLocalizations.of(context)!.permissionOption(
+                              p.companyName,
+                              (p.department != null &&
+                                      p.department!.trim().isNotEmpty)
+                                  ? ' (${p.department})'
+                                  : '',
+                              p.branchNames.length,
+                            ),
+                          ),
+                      ],
+                      onSelected: (val) {
                         if (val != null) {
                           setState(() {
                             _selectedPermission = val;
@@ -444,9 +414,9 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
+                          color: colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(TashilRadius.large),
+                          border: Border.all(color: colorScheme.primary),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -458,11 +428,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                 Expanded(
                                   child: Text(
                                     AppLocalizations.of(context)!.offerPhotoPermissionOf(activePermission.companyName),
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: colorScheme.onSurface,
-                                    ),
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurface),
                                   ),
                                 ),
                               ],
@@ -470,29 +436,19 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                             const SizedBox(height: 8),
                             Text(
                               AppLocalizations.of(context)!.companyLabel2(activePermission.companyName),
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
                             ),
                             if (activePermission.department != null && activePermission.department!.isNotEmpty) ...[
                               const SizedBox(height: 4),
                               Text(
                                 AppLocalizations.of(context)!.departmentLabel(activePermission.department ?? ''),
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.primary,
-                                ),
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.primary),
                               ),
                             ],
                             const SizedBox(height: 4),
                             Text(
                               'تاريخ الإذن: من ${activePermission.startDate.toString().split(' ').first} إلى ${activePermission.endDate.toString().split(' ').first}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                             ),
                           ],
                         ),
@@ -501,52 +457,69 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
 
                       // Branch selector dropdown or empty branch warning
                       if (sortedBranches.isEmpty)
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.shade50,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.amber.shade300),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.warning_amber_rounded, color: Colors.amber.shade800, size: 22),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  widget.delegate.organizationName.isNotEmpty
-                                      ? AppLocalizations.of(context)!.noBranchesInPermissionFor(widget.delegate.organizationName)
-                                      : AppLocalizations.of(context)!.noBranchesInPermission,
-                                  style: TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.amber.shade900,
-                                  ),
+                        // TAS-354 (F-04): a warning container, not amber.
+                        Builder(
+                          builder: (context) {
+                            final sem = Theme.of(context)
+                                .extension<TashilSemanticColors>();
+                            final bg = sem?.warningContainer ??
+                                colorScheme.tertiaryContainer;
+                            final fg = sem?.onWarningContainer ??
+                                colorScheme.onTertiaryContainer;
+                            return Container(
+                              padding: const EdgeInsets.all(TashilSpacing.md),
+                              decoration: BoxDecoration(
+                                color: bg,
+                                borderRadius: BorderRadius.circular(
+                                  TashilRadius.medium,
                                 ),
                               ),
-                            ],
-                          ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.warning_amber_rounded, color: fg),
+                                  const SizedBox(width: TashilSpacing.sm),
+                                  Expanded(
+                                    child: Text(
+                                      widget.delegate.organizationName.isNotEmpty
+                                          ? AppLocalizations.of(context)!
+                                                .noBranchesInPermissionFor(
+                                                  widget.delegate
+                                                      .organizationName,
+                                                )
+                                          : AppLocalizations.of(context)!
+                                                .noBranchesInPermission,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(color: fg),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         )
                       else
-                        DropdownButtonFormField<String>(
+                        DropdownMenu<String>(
                           key: ValueKey('branch_dropdown_${activePermission.uid}_${sortedBranches.length}'),
-                          initialValue: effectiveBranchId,
-                          decoration: InputDecoration(
-                            labelText: widget.delegate.organizationName.isNotEmpty
+                          initialSelection: effectiveBranchId,
+                          expandedInsets: EdgeInsets.zero,
+                          requestFocusOnTap: false,
+                          label: Text(
+                            widget.delegate.organizationName.isNotEmpty
                                 ? AppLocalizations.of(context)!.chooseBranchOf(widget.delegate.organizationName)
                                 : AppLocalizations.of(context)!.chooseBranchRequired,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            prefixIcon: const Icon(Icons.store_rounded),
-                            filled: true,
-                            fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
                           ),
-                          items: sortedBranches.map((entry) {
-                            return DropdownMenuItem<String>(
-                              value: entry.key,
-                              child: Text(BranchDisplayCache.instance.displayName(entry.value)),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
+                          leadingIcon: const Icon(Icons.store_rounded),
+                          dropdownMenuEntries: [
+                            for (final entry in sortedBranches)
+                              DropdownMenuEntry<String>(
+                                value: entry.key,
+                                label: BranchDisplayCache.instance
+                                    .displayName(entry.value),
+                              ),
+                          ],
+                          onSelected: (value) {
                             if (value == null) return;
                             final name = uniqueBranches[value] ?? value;
                             setState(() {
@@ -564,12 +537,12 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                         if (_capturedPhotos.isEmpty)
                           InkWell(
                             onTap: () => _capturePhoto(isAddingMore: true, branchName: effectiveBranchName!),
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
                             child: Container(
                               height: 230,
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
-                                borderRadius: BorderRadius.circular(20),
+                                color: colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
                                 border: Border.all(
                                   color: colorScheme.outlineVariant,
                                   width: 1.5,
@@ -582,7 +555,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                   Container(
                                     padding: const EdgeInsets.all(16),
                                     decoration: BoxDecoration(
-                                      color: colorScheme.primaryContainer.withValues(alpha: 0.45),
+                                      color: colorScheme.primaryContainer,
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
@@ -594,19 +567,12 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                   const SizedBox(height: 14),
                                   Text(
                                     AppLocalizations.of(context)!.takeOfferPhotos,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: colorScheme.onSurface,
-                                    ),
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurface),
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
                                     AppLocalizations.of(context)!.multiPhotoHint,
-                                    style: TextStyle(
-                                      fontSize: 12.5,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                                   ),
                                   const SizedBox(height: 12),
                                   FilledButton.tonalIcon(
@@ -624,9 +590,9 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                             decoration: BoxDecoration(
                               color: colorScheme.surfaceContainerLow,
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(TashilRadius.large),
                               border: Border.all(
-                                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                                color: colorScheme.outlineVariant,
                               ),
                             ),
                             child: Row(
@@ -634,8 +600,8 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: colorScheme.primaryContainer.withValues(alpha: 0.45),
-                                    borderRadius: BorderRadius.circular(10),
+                                    color: colorScheme.primaryContainer,
+                                    borderRadius: BorderRadius.circular(TashilRadius.medium),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -644,11 +610,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                       const SizedBox(width: 6),
                                       Text(
                                         '${_selectedPhotoIndex + 1} / ${_capturedPhotos.length}',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                          color: colorScheme.primary,
-                                        ),
+                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.primary),
                                       ),
                                     ],
                                   ),
@@ -657,11 +619,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                 Expanded(
                                   child: Text(
                                     AppLocalizations.of(context)!.visitGallery,
-                                    style: TextStyle(
-                                      fontSize: 13.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: colorScheme.onSurface,
-                                    ),
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.onSurface),
                                   ),
                                 ),
                                 FilledButton.tonalIcon(
@@ -681,13 +639,13 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                           // TAS-302: the whole photo (uncropped) so the branch/date strip
                           // is visible before sending. Tap opens it on the full screen.
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
                             child: Container(
                               height: 340,
                               width: double.infinity,
                               decoration: BoxDecoration(
-                                color: Colors.black,
-                                borderRadius: BorderRadius.circular(20),
+                                color: overlay.scrim,
+                                borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
                                 border: Border.all(color: colorScheme.outlineVariant),
                               ),
                               child: Stack(
@@ -723,17 +681,13 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                       decoration: BoxDecoration(
-                                        color: Colors.black.withValues(alpha: 0.65),
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                                        color: overlay.scrim.withValues(alpha: 0.65),
+                                        borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
+                                        border: Border.all(color: overlay.outline),
                                       ),
                                       child: Text(
                                         AppLocalizations.of(context)!.photoNumber(_selectedPhotoIndex + 1),
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: overlay.onSurface, fontWeight: FontWeight.bold),
                                       ),
                                     ),
                                   ),
@@ -747,8 +701,8 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                       icon: const Icon(Icons.fullscreen_rounded),
                                       tooltip: AppLocalizations.of(context)!.viewPhotoFullScreen,
                                       style: IconButton.styleFrom(
-                                        backgroundColor: Colors.black.withValues(alpha: 0.55),
-                                        foregroundColor: Colors.white,
+                                        backgroundColor: overlay.scrim.withValues(alpha: 0.55),
+                                        foregroundColor: overlay.onSurface,
                                       ),
                                     ),
                                   ),
@@ -775,8 +729,8 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                 onPressed: () => _removePhotoAt(_selectedPhotoIndex),
                                 icon: const Icon(Icons.delete_outline_rounded, size: 20),
                                 style: IconButton.styleFrom(
-                                  backgroundColor: Colors.red.withValues(alpha: 0.8),
-                                  foregroundColor: Colors.white,
+                                  backgroundColor: colorScheme.error,
+                                  foregroundColor: colorScheme.onError,
                                   visualDensity: VisualDensity.compact,
                                 ),
                                 tooltip: AppLocalizations.of(context)!.deletePhoto,
@@ -797,15 +751,15 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                   // Add photo thumbnail card
                                   return InkWell(
                                     onTap: () => _capturePhoto(isAddingMore: true, branchName: effectiveBranchName!),
-                                    borderRadius: BorderRadius.circular(14),
+                                    borderRadius: BorderRadius.circular(TashilRadius.large),
                                     child: Container(
                                       width: 70,
                                       height: 74,
                                       decoration: BoxDecoration(
                                         color: colorScheme.surfaceContainerLow,
-                                        borderRadius: BorderRadius.circular(14),
+                                        borderRadius: BorderRadius.circular(TashilRadius.large),
                                         border: Border.all(
-                                          color: colorScheme.primary.withValues(alpha: 0.5),
+                                          color: colorScheme.primary,
                                           width: 1.5,
                                         ),
                                       ),
@@ -816,11 +770,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                           const SizedBox(height: 4),
                                           Text(
                                             AppLocalizations.of(context)!.addAction,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: colorScheme.primary,
-                                            ),
+                                            style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.primary),
                                           ),
                                         ],
                                       ),
@@ -841,17 +791,17 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                     width: 70,
                                     height: 74,
                                     decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(14),
+                                      borderRadius: BorderRadius.circular(TashilRadius.large),
                                       border: Border.all(
                                         color: isSelected
                                             ? colorScheme.primary
-                                            : colorScheme.outlineVariant.withValues(alpha: 0.5),
+                                            : colorScheme.outlineVariant,
                                         width: isSelected ? 2.5 : 1,
                                       ),
                                       boxShadow: isSelected
                                           ? [
                                               BoxShadow(
-                                                color: colorScheme.primary.withValues(alpha: 0.25),
+                                                color: colorScheme.primary,
                                                 blurRadius: 6,
                                                 offset: const Offset(0, 2),
                                               ),
@@ -861,7 +811,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                     child: Stack(
                                       children: [
                                         ClipRRect(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(TashilRadius.medium),
                                           child: Image.file(
                                             _capturedPhotos[index],
                                             fit: BoxFit.cover,
@@ -877,16 +827,12 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                             decoration: BoxDecoration(
                                               color: isSelected
                                                   ? colorScheme.primary
-                                                  : Colors.black.withValues(alpha: 0.6),
-                                              borderRadius: BorderRadius.circular(6),
+                                                  : overlay.scrim.withValues(alpha: 0.6),
+                                              borderRadius: BorderRadius.circular(TashilRadius.small),
                                             ),
                                             child: Text(
                                               '${index + 1}',
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.bold,
-                                              ),
+                                              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: overlay.onSurface, fontWeight: FontWeight.bold),
                                             ),
                                           ),
                                         ),
@@ -905,7 +851,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                             maxLines: 3,
                             decoration: InputDecoration(
                               labelText: AppLocalizations.of(context)!.visitNotesLabel(_capturedPhotos.length),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(TashilRadius.medium)),
                               hintText: AppLocalizations.of(context)!.visitNotesHint,
                               prefixIcon: const Icon(Icons.comment_outlined),
                             ),
@@ -917,9 +863,9 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                             Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
+                                color: colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(TashilRadius.large),
+                                border: Border.all(color: colorScheme.primary),
                               ),
                               child: Column(
                                 children: [
@@ -934,21 +880,17 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                       const SizedBox(width: 12),
                                       Text(
                                         AppLocalizations.of(context)!.uploadingPhotoXofY(state.current, state.total),
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: colorScheme.primary,
-                                          fontSize: 14.5,
-                                        ),
+                                        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.primary),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 12),
                                   ClipRRect(
-                                    borderRadius: BorderRadius.circular(6),
+                                    borderRadius: BorderRadius.circular(TashilRadius.small),
                                     child: LinearProgressIndicator(
                                       value: state.total > 0 ? (state.current / state.total) : null,
                                       minHeight: 6,
-                                      backgroundColor: colorScheme.primary.withValues(alpha: 0.15),
+                                      backgroundColor: colorScheme.primary,
                                       color: colorScheme.primary,
                                     ),
                                   ),
@@ -959,9 +901,9 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                             Container(
                               padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                               decoration: BoxDecoration(
-                                color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
+                                color: colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(TashilRadius.medium),
+                                border: Border.all(color: colorScheme.primary),
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -974,17 +916,15 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                   const SizedBox(width: 12),
                                   Text(
                                     AppLocalizations.of(context)!.uploadingPhotosReport,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.primary,
-                                      fontSize: 14,
-                                    ),
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.primary),
                                   ),
                                 ],
                               ),
                             )
                           else
-                            ElevatedButton.icon(
+                            // TAS-354 (C-01): the screen's main action.
+                            FilledButton.icon(
+                              key: const Key('photo_submit_button'),
                               onPressed: _isStamping ? null : () async {
                                 final currentPerm = _selectedPermission ?? availablePermissions.first;
                                 final orgUID = currentPerm.organizationUID.isNotEmpty
@@ -1037,15 +977,8 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                                     );
                               },
                               icon: const Icon(Icons.cloud_upload_rounded),
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
                               label: Text(
                                 AppLocalizations.of(context)!.submitReportCount(_capturedPhotos.length),
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                               ),
                             ),
                         ],
@@ -1055,9 +988,9 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                           padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
                           decoration: BoxDecoration(
                             color: colorScheme.surfaceContainerLow,
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(TashilRadius.large),
                             border: Border.all(
-                              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                              color: colorScheme.outlineVariant,
                             ),
                           ),
                           child: Column(
@@ -1066,7 +999,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                               Container(
                                 padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
-                                  color: colorScheme.primaryContainer.withValues(alpha: 0.35),
+                                  color: colorScheme.primaryContainer,
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
@@ -1078,21 +1011,13 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
                               const SizedBox(height: 14),
                               Text(
                                 AppLocalizations.of(context)!.chooseBranchToStart,
-                                style: TextStyle(
-                                  fontSize: 15.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onSurface,
-                                ),
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurface),
                               ),
                               const SizedBox(height: 6),
                               Text(
                                 AppLocalizations.of(context)!.chooseBranchHint,
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: colorScheme.onSurfaceVariant,
-                                  height: 1.4,
-                                ),
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
                               ),
                             ],
                           ),
@@ -1119,7 +1044,7 @@ class _DelegateCameraCaptureScreenState extends State<DelegateCameraCaptureScree
           Icon(
             Icons.lock_rounded,
             size: 80,
-            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+            color: theme.colorScheme.onSurfaceVariant,
           ),
           const SizedBox(height: 16),
           Text(

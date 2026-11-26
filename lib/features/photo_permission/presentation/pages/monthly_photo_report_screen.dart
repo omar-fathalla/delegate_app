@@ -1,3 +1,6 @@
+import 'package:delegate_app/core/design/widgets/dialogs.dart';
+import 'package:delegate_app/core/design/widgets/button_group.dart';
+import 'package:delegate_app/core/design/tokens.dart';
 import 'package:delegate_app/features/photo_permission/data/datasources/photo_permission_remote_datasource.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
@@ -104,15 +107,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
     super.initState();
     _selectedMonth = _now;
 
-    final isGeneralManagerOrAdmin =
-        widget.delegate.role == UserRole.admin ||
-        widget.delegate.position == DelegatePosition.supervisor ||
-        widget.delegate.role == UserRole.organizationAdmin ||
-        widget.delegate.role == UserRole.superAdmin ||
-        widget.delegate.role == UserRole.marketing ||
-        widget.delegate.role == UserRole.marketingPromotion ||
-        widget.delegate.role == UserRole.branchesMarketingManager ||
-        widget.delegate.role == UserRole.hr;
+    final isGeneralManagerOrAdmin = _isManagerView;
 
     if (isGeneralManagerOrAdmin) {
       _currentGroupMode = GroupMode.byBranch;
@@ -134,6 +129,21 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
     super.dispose();
   }
 
+  /// Supervisors, admins, HR and marketing see the whole company's photos
+  /// (TAS-354: one list, was repeated in initState and _loadPhotos). The
+  /// field delegate sees only their own, so the «active delegates» count and
+  /// the «by delegate» grouping are hidden for them [UI only: the data is
+  /// already their own photos].
+  bool get _isManagerView =>
+      widget.delegate.role == UserRole.admin ||
+      widget.delegate.position == DelegatePosition.supervisor ||
+      widget.delegate.role == UserRole.organizationAdmin ||
+      widget.delegate.role == UserRole.superAdmin ||
+      widget.delegate.role == UserRole.marketing ||
+      widget.delegate.role == UserRole.marketingPromotion ||
+      widget.delegate.role == UserRole.branchesMarketingManager ||
+      widget.delegate.role == UserRole.hr;
+
   bool get _canDeletePhoto {
     final r = widget.delegate.role;
     final pos = widget.delegate.position;
@@ -141,15 +151,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
   }
 
   void _loadPhotos() {
-    final isGeneralManagerOrAdmin =
-        widget.delegate.role == UserRole.admin ||
-        widget.delegate.position == DelegatePosition.supervisor ||
-        widget.delegate.role == UserRole.organizationAdmin ||
-        widget.delegate.role == UserRole.superAdmin ||
-        widget.delegate.role == UserRole.marketing ||
-        widget.delegate.role == UserRole.marketingPromotion ||
-        widget.delegate.role == UserRole.branchesMarketingManager ||
-        widget.delegate.role == UserRole.hr;
+    final isGeneralManagerOrAdmin = _isManagerView;
 
     if (isGeneralManagerOrAdmin) {
       context.read<PhotoPermissionBloc>().add(
@@ -192,7 +194,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                   width: 38,
                   height: 4.5,
                   decoration: BoxDecoration(
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                    color: colorScheme.outlineVariant,
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
@@ -206,7 +208,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                 Expanded(
                   child: Text(
                     AppLocalizations.of(context)!.confirmDeletePhoto,
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -214,15 +216,15 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
             const SizedBox(height: 12),
             Text(
               AppLocalizations.of(context)!.deletePhotoFromConfirm(photo.delegateName, BranchDisplayCache.instance.displayName(photo.branchName)),
-              style: const TextStyle(fontSize: 14),
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: colorScheme.error.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: colorScheme.error.withValues(alpha: 0.3)),
+                color: colorScheme.error,
+                borderRadius: BorderRadius.circular(TashilRadius.medium),
+                border: Border.all(color: colorScheme.error),
               ),
               child: Row(
                 children: [
@@ -231,7 +233,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                   Expanded(
                     child: Text(
                       AppLocalizations.of(context)!.photoDeletePermanentNote,
-                      style: TextStyle(fontSize: 12, color: colorScheme.error),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: colorScheme.error),
                     ),
                   ),
                 ],
@@ -242,7 +244,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
               height: 48,
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
               ),
               clipBehavior: Clip.antiAlias,
               child: Row(
@@ -256,11 +258,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                         child: Center(
                           child: Text(
                             'إلغاء',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurfaceVariant),
                           ),
                         ),
                       ),
@@ -269,11 +267,11 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                   VerticalDivider(
                     width: 1,
                     thickness: 1,
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.8),
+                    color: colorScheme.outlineVariant,
                   ),
                   Expanded(
                     child: Material(
-                      color: colorScheme.error.withValues(alpha: 0.12),
+                      color: colorScheme.error,
                       child: InkWell(
                         onTap: () => Navigator.pop(modalContext, true),
                         child: Center(
@@ -287,11 +285,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                 child: Text(
                                   AppLocalizations.of(context)!.deletePermanently,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    color: colorScheme.error,
-                                  ),
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.error),
                                 ),
                               ),
                             ],
@@ -311,10 +305,10 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
     if (!mounted) return;
     final bool? confirmed;
     if (isDesktop) {
-      confirmed = await showDialog<bool>(
+      confirmed = await showTashilDialog<bool>(
         context: context,
         builder: (dialogContext) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TashilRadius.extraLarge)),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: buildConfirmContent(dialogContext),
@@ -434,7 +428,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                       const SizedBox(width: 8),
                       Text(
                         AppLocalizations.of(context)!.chooseMonth,
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
@@ -463,15 +457,15 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Material(
                         color: isSelected
-                            ? colorScheme.primaryContainer.withValues(alpha: 0.5)
+                            ? colorScheme.primaryContainer
                             : colorScheme.surfaceContainer,
                         clipBehavior: Clip.antiAlias,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(TashilRadius.medium),
                           side: BorderSide(
                             color: isSelected
                                 ? colorScheme.primary
-                                : colorScheme.outlineVariant.withValues(alpha: 0.4),
+                                : colorScheme.outlineVariant,
                           ),
                         ),
                         child: ListTile(
@@ -493,28 +487,20 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                         subtitle: isCurrent
                             ? Text(
                                 AppLocalizations.of(context)!.currentMonth,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: colorScheme.secondary,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.secondary, fontWeight: FontWeight.bold),
                               )
                             : null,
                         trailing: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: count > 0
-                                ? colorScheme.primary.withValues(alpha: 0.12)
+                                ? colorScheme.primary
                                 : colorScheme.surfaceContainerHigh,
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(TashilRadius.small),
                           ),
                           child: Text(
                             AppLocalizations.of(context)!.photosCount(count),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: count > 0 ? colorScheme.primary : colorScheme.onSurfaceVariant,
-                            ),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, color: count > 0 ? colorScheme.primary : colorScheme.onSurfaceVariant),
                           ),
                         ),
                       ),
@@ -542,11 +528,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
           ? AppBar(
               title: Text(
                 AppLocalizations.of(context)!.photoReportsTitle,
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.2,
-                ),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               centerTitle: true,
               elevation: 0,
@@ -654,15 +636,15 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainer,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(TashilRadius.large),
                         ),
                         child: Row(
                           children: [
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(10),
+                                color: colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(TashilRadius.medium),
                               ),
                               child: Icon(
                                 Symbols.business_rounded,
@@ -680,19 +662,12 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                     companyUID: widget.delegate.companyUID,
                                     companyName: widget.delegate.companyName,
                                     companyCode: null,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.onSurface,
-                                    ),
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurface),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     AppLocalizations.of(context)!.photosArchiveNote,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
+                                    style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
                                   ),
                                 ],
                               ),
@@ -710,8 +685,8 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainer.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(16),
+                          color: colorScheme.surfaceContainer,
+                          borderRadius: BorderRadius.circular(TashilRadius.large),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -736,7 +711,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                             // Animated Month Title + Picker trigger
                             InkWell(
                               onTap: () => _showMonthPickerSheet(context, allPhotos),
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(TashilRadius.medium),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                 child: Column(
@@ -767,11 +742,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                           children: [
                                             Text(
                                               _getMonthNameArabic(_selectedMonth),
-                                              style: TextStyle(
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.bold,
-                                                color: colorScheme.primary,
-                                              ),
+                                              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.primary),
                                             ),
                                             const SizedBox(width: 4),
                                             Icon(
@@ -787,7 +758,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                       const SizedBox(height: 2),
                                       InkWell(
                                         onTap: _resetToCurrentMonth,
-                                        borderRadius: BorderRadius.circular(6),
+                                        borderRadius: BorderRadius.circular(TashilRadius.small),
                                         child: Padding(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                                           child: Row(
@@ -801,11 +772,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                               const SizedBox(width: 4),
                                               Text(
                                                 AppLocalizations.of(context)!.currentMonth,
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: colorScheme.secondary,
-                                                ),
+                                                style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.secondary),
                                               ),
                                             ],
                                           ),
@@ -839,67 +806,43 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                     ),
                   ),
 
-                  // Quick Historical Months Chips (if more than 1 month has data)
+                  // TAS-354 (C-11): months with photos as single-select
+                  // FilterChips «month · count» in one scrolling row.
                   if (sortedAvailableKeys.isNotEmpty)
                     SliverToBoxAdapter(
-                      child: Container(
-                        height: 38,
-                        margin: const EdgeInsets.only(top: 2, bottom: 6),
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: sortedAvailableKeys.length,
-                          itemBuilder: (context, index) {
-                            final k = sortedAvailableKeys[index];
-                            final parts = k.split('-');
-                            final y = int.parse(parts[0]);
-                            final m = int.parse(parts[1]);
-                            final chipDate = DateTime(y, m);
-                            final isSelected = _selectedMonth.year == y && _selectedMonth.month == m;
-                            final count = availableMonthsMap[k] ?? 0;
-
-                            return Padding(
-                              padding: const EdgeInsets.only(left: 8),
-                              child: ChoiceChip(
-                                label: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(_getMonthNameArabic(chipDate)),
-                                    const SizedBox(width: 4),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                      decoration: BoxDecoration(
-                                        color: isSelected
-                                            ? colorScheme.onPrimary.withValues(alpha: 0.2)
-                                            : colorScheme.primary.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        '$count',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: isSelected ? colorScheme.onPrimary : colorScheme.primary,
-                                        ),
-                                      ),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsetsDirectional.symmetric(
+                          horizontal: TashilSpacing.page,
+                          vertical: TashilSpacing.xs,
+                        ),
+                        child: Row(
+                          children: [
+                            for (final k in sortedAvailableKeys) ...[
+                              Builder(
+                                builder: (context) {
+                                  final parts = k.split('-');
+                                  final y = int.parse(parts[0]);
+                                  final m = int.parse(parts[1]);
+                                  final chipDate = DateTime(y, m);
+                                  return Padding(
+                                    padding: const EdgeInsetsDirectional.only(
+                                      end: TashilSpacing.sm,
                                     ),
-                                  ],
-                                ),
-                                selected: isSelected,
-                                selectedColor: colorScheme.primary,
-                                labelStyle: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                  color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
-                                ),
-                                onSelected: (selected) {
-                                  if (selected) {
-                                    _selectMonth(chipDate);
-                                  }
+                                    child: FilterChip(
+                                      key: ValueKey('photo_month_$k'),
+                                      selected: _selectedMonth.year == y &&
+                                          _selectedMonth.month == m,
+                                      label: Text(
+                                        '${_getMonthNameArabic(chipDate)} · ${availableMonthsMap[k] ?? 0}',
+                                      ),
+                                      onSelected: (_) => _selectMonth(chipDate),
+                                    ),
+                                  );
                                 },
                               ),
-                            );
-                          },
+                            ],
+                          ],
                         ),
                       ),
                     ),
@@ -918,7 +861,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                               theme: theme,
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: TashilSpacing.sm),
                           Expanded(
                             child: _buildMetricCard(
                               title: AppLocalizations.of(context)!.branchesVisited,
@@ -927,61 +870,64 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                               theme: theme,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildMetricCard(
-                              title: AppLocalizations.of(context)!.activeDelegates,
-                              value: '$uniqueDelegates',
-                              icon: Symbols.group_rounded,
-                              theme: theme,
+                          if (_isManagerView) ...[
+                            const SizedBox(width: TashilSpacing.sm),
+                            Expanded(
+                              child: _buildMetricCard(
+                                title: AppLocalizations.of(context)!
+                                    .activeDelegates,
+                                value: '$uniqueDelegates',
+                                icon: Symbols.group_rounded,
+                                theme: theme,
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
                   ),
 
-                  // 3 Grouping Segment Modes: By Date / By Branch / By Delegate
+                  // TAS-354 (C-06): grouping is a connected ButtonGroup
+                  // (2-3 exclusive options). «By delegate» only for the
+                  // manager view.
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
-                      child: Container(
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainer.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _buildSegmentButton(
-                                title: AppLocalizations.of(context)!.byDate,
-                                icon: Symbols.calendar_month_rounded,
-                                isSelected: _currentGroupMode == GroupMode.byDate,
-                                onTap: () => setState(() => _currentGroupMode = GroupMode.byDate),
-                                colorScheme: colorScheme,
-                              ),
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                        TashilSpacing.page,
+                        TashilSpacing.xs,
+                        TashilSpacing.page,
+                        TashilSpacing.sm,
+                      ),
+                      child: ButtonGroup<GroupMode>(
+                        key: const Key('photo_group_mode'),
+                        variant: ButtonGroupVariant.connected,
+                        expand: true,
+                        selected: {
+                          !_isManagerView &&
+                                  _currentGroupMode == GroupMode.byDelegate
+                              ? GroupMode.byDate
+                              : _currentGroupMode,
+                        },
+                        onSelectionChanged: (v) =>
+                            setState(() => _currentGroupMode = v.first),
+                        items: [
+                          ButtonGroupItem(
+                            value: GroupMode.byDate,
+                            label: AppLocalizations.of(context)!.byDate,
+                            icon: Symbols.calendar_month_rounded,
+                          ),
+                          ButtonGroupItem(
+                            value: GroupMode.byBranch,
+                            label: AppLocalizations.of(context)!.byBranch,
+                            icon: Symbols.store_rounded,
+                          ),
+                          if (_isManagerView)
+                            ButtonGroupItem(
+                              value: GroupMode.byDelegate,
+                              label: AppLocalizations.of(context)!.byDelegate,
+                              icon: Symbols.person_rounded,
                             ),
-                            Expanded(
-                              child: _buildSegmentButton(
-                                title: AppLocalizations.of(context)!.byBranch,
-                                icon: Symbols.store_rounded,
-                                isSelected: _currentGroupMode == GroupMode.byBranch,
-                                onTap: () => setState(() => _currentGroupMode = GroupMode.byBranch),
-                                colorScheme: colorScheme,
-                              ),
-                            ),
-                            Expanded(
-                              child: _buildSegmentButton(
-                                title: AppLocalizations.of(context)!.byDelegate,
-                                icon: Symbols.person_rounded,
-                                isSelected: _currentGroupMode == GroupMode.byDelegate,
-                                onTap: () => setState(() => _currentGroupMode = GroupMode.byDelegate),
-                                colorScheme: colorScheme,
-                              ),
-                            ),
-                          ],
-                        ),
+                        ],
                       ),
                     ),
                   ),
@@ -1066,56 +1012,6 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
     );
   }
 
-  Widget _buildSegmentButton({
-    required String title,
-    required IconData icon,
-    required bool isSelected,
-    required VoidCallback onTap,
-    required ColorScheme colorScheme,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.all(3),
-        decoration: BoxDecoration(
-          color: isSelected ? colorScheme.secondaryContainer : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Colors.transparent,
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
-        ),
-        child: Center(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 15,
-                color: isSelected ? colorScheme.onSecondaryContainer : colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected ? colorScheme.onSecondaryContainer : colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildMetricCard({
     required String title,
     required String value,
@@ -1127,14 +1023,14 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(TashilRadius.large),
       ),
       child: Column(
         children: [
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withValues(alpha: 0.4),
+              color: colorScheme.primaryContainer,
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: colorScheme.primary, size: 16),
@@ -1142,21 +1038,12 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
           const SizedBox(height: 6),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
-              letterSpacing: -0.5,
-            ),
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurface),
           ),
           const SizedBox(height: 2),
           Text(
             title,
-            style: TextStyle(
-              fontSize: 11,
-              color: colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
-            ),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -1258,7 +1145,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(TashilRadius.large),
       ),
       clipBehavior: Clip.antiAlias,
       child: Theme(
@@ -1272,17 +1159,14 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
           leading: Container(
             padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(10),
+              color: colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(TashilRadius.medium),
             ),
             child: Icon(icon, color: colorScheme.primary, size: 18),
           ),
           title: Text(
             title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
@@ -1291,15 +1175,11 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: colorScheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(TashilRadius.small),
                 ),
                 child: Text(
                   AppLocalizations.of(context)!.photosCount(photos.length),
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurfaceVariant),
                 ),
               ),
               const SizedBox(width: 4),
@@ -1321,18 +1201,18 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
       margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(TashilRadius.medium),
         border: Border.all(
           color: isPending
               ? Theme.of(context).colorScheme.tertiary
-              : colorScheme.outlineVariant.withValues(alpha: 0.3),
+              : colorScheme.outlineVariant,
         ),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _showPhotoDetails(context, photo),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(TashilRadius.medium),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             child: Row(
@@ -1343,7 +1223,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                   width: 54,
                   height: 54,
                   isThumbnail: true,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(TashilRadius.medium),
                   fit: BoxFit.cover,
                 ),
                 const SizedBox(width: 12),
@@ -1362,10 +1242,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                   : photo.delegateName.isNotEmpty
                                       ? photo.delegateName
                                       : BranchDisplayCache.instance.displayName(photo.branchName),
-                              style: const TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w700,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -1373,11 +1250,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                           if (_currentGroupMode == GroupMode.byDelegate) ...[
                             Text(
                               photo.delegateName,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: colorScheme.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.primary, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ],
@@ -1387,11 +1260,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                         _currentGroupMode == GroupMode.byDate
                             ? '${BranchDisplayCache.instance.displayName(photo.branchName)} • $dateStr'
                             : dateStr,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w500),
                       ),
                       const SizedBox(height: 4),
                       Row(
@@ -1401,7 +1270,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                               decoration: BoxDecoration(
                                 color: Theme.of(context).colorScheme.tertiaryContainer,
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.circular(TashilRadius.small),
                                 border: Border.all(color: Theme.of(context).colorScheme.tertiary, width: 0.8),
                               ),
                               child: Row(
@@ -1411,11 +1280,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                   const SizedBox(width: 3),
                                   Text(
                                     AppLocalizations.of(context)!.pendingOnPhone,
-                                    style: TextStyle(
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: Theme.of(context).colorScheme.onTertiaryContainer,
-                                    ),
+                                    style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onTertiaryContainer),
                                   ),
                                 ],
                               ),
@@ -1425,7 +1290,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                               decoration: BoxDecoration(
                                 color: Theme.of(context).colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.circular(TashilRadius.small),
                                 border: Border.all(color: Theme.of(context).colorScheme.primary, width: 0.8),
                               ),
                               child: Row(
@@ -1435,11 +1300,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                   const SizedBox(width: 3),
                                   Text(
                                     AppLocalizations.of(context)!.uploadedToServer,
-                                    style: TextStyle(
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                    ),
+                                    style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onPrimaryContainer),
                                   ),
                                 ],
                               ),
@@ -1452,11 +1313,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                             Expanded(
                               child: Text(
                                 photo.comment.trim(),
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  color: colorScheme.onSurfaceVariant,
-                                  fontStyle: FontStyle.italic,
-                                ),
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant, fontStyle: FontStyle.italic),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -1471,7 +1328,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                 // Trailing action
                 Icon(
                   Symbols.chevron_right_rounded,
-                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                  color: colorScheme.onSurfaceVariant,
                   size: 20,
                 ),
               ],
@@ -1492,31 +1349,24 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainer.withValues(alpha: 0.5),
+                color: colorScheme.surfaceContainer,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Symbols.photo_library_rounded,
                 size: 56,
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 16),
             Text(
               AppLocalizations.of(context)!.noPhotosInMonth(_getMonthNameArabic(_selectedMonth)),
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
-              ),
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurface),
             ),
             const SizedBox(height: 6),
             Text(
               AppLocalizations.of(context)!.useArrowsForMonths,
-              style: TextStyle(
-                fontSize: 12,
-                color: colorScheme.onSurfaceVariant,
-              ),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
           ],
@@ -1581,7 +1431,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                           children: [
                             Text(
                               AppLocalizations.of(context)!.photoDetails,
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             Row(
                               mainAxisSize: MainAxisSize.min,
@@ -1589,7 +1439,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                 if (_canDeletePhoto)
                                   IconButton(
                                     tooltip: AppLocalizations.of(context)!.deletePhotoPermanently,
-                                    icon: Icon(Symbols.delete_outline_rounded, size: 22, color: Colors.red.shade700),
+                                    icon: Icon(Symbols.delete_outline_rounded, size: 22, color: Theme.of(context).colorScheme.error),
                                     onPressed: () {
                                       Navigator.pop(modalContext);
                                       _confirmDeletePhoto(photo);
@@ -1615,7 +1465,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                             Container(
                               height: 340,
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(TashilRadius.large),
                               ),
                               clipBehavior: Clip.antiAlias,
                               child: InteractiveViewer(
@@ -1632,7 +1482,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                             Center(
                               child: Text(
                                 AppLocalizations.of(context)!.pinchToZoom,
-                                style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
+                                style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -1649,12 +1499,12 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                     icon: Icon(Symbols.delete_rounded, color: colorScheme.error, size: 18),
                                     label: Text(
                                       AppLocalizations.of(context)!.deletePhoto,
-                                      style: TextStyle(color: colorScheme.error, fontWeight: FontWeight.bold, fontSize: 13),
+                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colorScheme.error, fontWeight: FontWeight.bold),
                                     ),
                                     style: OutlinedButton.styleFrom(
                                       side: BorderSide(color: colorScheme.error),
                                       padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 14),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TashilRadius.medium)),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -1698,7 +1548,6 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                             height: 18,
                                             child: CircularProgressIndicator(
                                               strokeWidth: 2,
-                                              color: Colors.white,
                                             ),
                                           )
                                         : Icon(
@@ -1711,12 +1560,12 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                           : saveSuccess
                                               ? AppLocalizations.of(context)!.savedToPhone
                                               : AppLocalizations.of(context)!.savePhoto,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                                     ),
                                     style: FilledButton.styleFrom(
                                       backgroundColor: saveSuccess ? colorScheme.primary : null,
                                       padding: const EdgeInsets.symmetric(vertical: 13),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(TashilRadius.medium)),
                                     ),
                                   ),
                                 ),
@@ -1730,7 +1579,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                 decoration: BoxDecoration(
                                   color: saveSuccess ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.tertiaryContainer,
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(TashilRadius.medium),
                                   border: Border.all(
                                     color: saveSuccess ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.tertiary,
                                   ),
@@ -1746,11 +1595,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                                     Expanded(
                                       child: Text(
                                         statusText!,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          color: saveSuccess ? Theme.of(context).colorScheme.onPrimaryContainer : Theme.of(context).colorScheme.onTertiaryContainer,
-                                        ),
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, color: saveSuccess ? Theme.of(context).colorScheme.onPrimaryContainer : Theme.of(context).colorScheme.onTertiaryContainer),
                                       ),
                                     ),
                                   ],
@@ -1764,7 +1609,7 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
                                 color: colorScheme.surfaceContainer,
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(TashilRadius.large),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1844,16 +1689,12 @@ class _MonthlyPhotoReportContentState extends State<_MonthlyPhotoReportContent> 
             children: [
               Text(
                 title,
-                style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
               ),
               const SizedBox(height: 2),
               Text(
                 value,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  fontStyle: isComment ? FontStyle.italic : FontStyle.normal,
-                ),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, fontStyle: isComment ? FontStyle.italic : FontStyle.normal),
               ),
             ],
           ),
