@@ -32,6 +32,27 @@ import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/design/widgets/navigation.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+/// The copy of [current] in [latest] whose organization or company name
+/// differs from the cached one, or null when nothing changed.
+Delegate? freshProfileFor(Delegate current, List<Delegate> latest) {
+  for (final d in latest) {
+    if (d.uid != current.uid ||
+        d.organizationUID != current.organizationUID ||
+        d.companyUID != current.companyUID) {
+      continue;
+    }
+    final org = d.organizationName.trim();
+    final co = d.companyName.trim();
+    if ((org.isNotEmpty && org != current.organizationName.trim()) ||
+        (co.isNotEmpty && co != current.companyName.trim())) {
+      return d;
+    }
+    return null;
+  }
+  return null;
+}
+
+
 class MainScreen extends StatefulWidget {
   final Delegate delegate;
 
@@ -77,6 +98,7 @@ class _MainScreenState extends State<MainScreen> {
         oldWidget.delegate.uid != widget.delegate.uid) {
       final keep = ChainAutoSwitchSession.takePendingTab();
       setState(() {
+        _fresh = null;
         _currentIndex = keep ?? 0;
         _initializedTabs.clear();
         _initializedTabs.add(0);
@@ -119,12 +141,27 @@ class _MainScreenState extends State<MainScreen> {
       remoteResult.fold((_) {}, (latestDelegates) {
         if (latestDelegates.isNotEmpty) {
           di.sl<AuthRepository>().cacheAllDelegates(latestDelegates);
+          _adoptFreshNames(latestDelegates);
           if (mounted) {
             setState(() => _allDelegates = _filterDelegatesForContext(latestDelegates));
           }
         }
       });
     }
+  }
+
+  /// The server copy of the profile in use, when its organization or company
+  /// name changed since the cached one (TAS-384). The header and the home
+  /// card read these names; without this they stayed as they were at sign in
+  /// (empty, or an old name) until the next login.
+  Delegate? _fresh;
+
+  void _adoptFreshNames(List<Delegate> latest) {
+    final current = widget.delegate;
+    final match = freshProfileFor(current, latest);
+    if (match == null || !mounted) return;
+    setState(() => _fresh = match);
+    di.sl<CacheDelegate>()(match);
   }
 
   void _showLogoutDialog(BuildContext context) {
@@ -134,7 +171,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final delegate = widget.delegate;
+    final delegate = _fresh ?? widget.delegate;
     final colorScheme = Theme.of(context).colorScheme;
 
     void onMenu(String value) {
@@ -284,12 +321,6 @@ class _MainScreenState extends State<MainScreen> {
             setState(() {
               _currentIndex = 1;
               _initializedTabs.add(1);
-            });
-          },
-          onNavigateToLeaves: () {
-            setState(() {
-              _currentIndex = 2;
-              _initializedTabs.add(2);
             });
           },
         ),

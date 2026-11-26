@@ -2357,7 +2357,7 @@ abstract class AppLocalizations {
   /// No description provided for @offerPhotosSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Take and upload approved offer photos in the hypermarket'**
+  /// **'Photograph offers inside the hypermarket'**
   String get offerPhotosSubtitle;
 
   /// No description provided for @homeAttendanceSummary.

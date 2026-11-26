@@ -22,6 +22,12 @@ class AppAvatar extends StatelessWidget {
   /// first-character fallback, including every mobile avatar.
   final bool verbatimFallback;
 
+  /// Share of the letter size an Arabic initial is lifted by (TAS-384).
+  @visibleForTesting
+  static const double arabicLift = 0.18;
+
+  static final RegExp _arabic = RegExp(r'[\u0600-\u06FF]');
+
   const AppAvatar({
     super.key,
     this.imageUrl,
@@ -69,6 +75,8 @@ class AppAvatar extends StatelessWidget {
         ? (trimmed.isNotEmpty ? trimmed : '؟')
         : (trimmed.isNotEmpty ? trimmed[0].toUpperCase() : '؟');
 
+    final letterSize = verbatimFallback ? radius * 0.7 : radius * 0.85;
+
     Widget fallbackWidget() {
       return Container(
         width: size,
@@ -81,12 +89,25 @@ class AppAvatar extends StatelessWidget {
                 color: fg,
                 size: radius * 1.15,
               )
-            : Text(
-                initial,
-                style: TextStyle(
-                  color: fg,
-                  fontWeight: FontWeight.bold,
-                  fontSize: verbatimFallback ? radius * 0.7 : radius * 0.85,
+            // TAS-384: Cairo puts the baseline low (large descent), so an
+            // Arabic letter sat under the centre. Height 1 with even leading
+            // centres the line box; Arabic initials are then lifted by a
+            // share of the font size so the letter itself looks centred.
+            : Transform.translate(
+                offset: Offset(
+                  0,
+                  _arabic.hasMatch(initial) ? -letterSize * arabicLift : 0,
+                ),
+                child: Text(
+                  initial,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: fg,
+                    fontWeight: FontWeight.bold,
+                    fontSize: letterSize,
+                    height: 1,
+                    leadingDistribution: TextLeadingDistribution.even,
+                  ),
                 ),
               ),
       );

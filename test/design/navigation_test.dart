@@ -128,4 +128,42 @@ void main() {
       isTrue,
     );
   });
+
+  // TAS-384: the menu button of the modal rail sits in the icon column of
+  // the destinations, not centred alone at the top of the panel.
+  for (final dir in [TextDirection.rtl, TextDirection.ltr]) {
+    testWidgets('modal rail menu button lines up with the icons ($dir)', (
+      t,
+    ) async {
+      t.view.physicalSize = const Size(400, 800);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      final key = GlobalKey<ScaffoldState>();
+      await t.pumpWidget(
+        MaterialApp(
+          theme: TashilTheme.light(),
+          home: Directionality(
+            textDirection: dir,
+            child: Scaffold(
+              key: key,
+              drawer: ModalNavigationRail(
+                primary: _primary,
+                secondary: _secondary,
+                selectedIndex: 0,
+                onDestinationSelected: (_) {},
+              ),
+              body: const SizedBox(),
+            ),
+          ),
+        ),
+      );
+      key.currentState!.openDrawer();
+      await t.pumpAndSettle();
+      final menu = t.getCenter(find.byIcon(Icons.menu_open));
+      final first = t.getCenter(find.byIcon(Icons.point_of_sale));
+      final last = t.getCenter(find.byIcon(Icons.people_outline));
+      expect(menu.dx, moreOrLessEquals(first.dx, epsilon: 1));
+      expect(menu.dx, moreOrLessEquals(last.dx, epsilon: 1));
+    });
+  }
 }

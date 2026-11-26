@@ -1,5 +1,7 @@
 import 'package:delegate_app/core/l10n/display_names.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
+import 'package:delegate_app/core/design/bidi.dart';
+import 'package:delegate_app/features/hr/presentation/hr_account_pages.dart';
 import 'package:delegate_app/core/design/tokens.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
@@ -13,7 +15,7 @@ import 'package:delegate_app/core/services/firestore_session_subscriptions.dart'
 import 'package:delegate_app/core/services/firestore_resilience_helper.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:intl/intl.dart' hide TextDirection;
+import 'package:intl/intl.dart' hide Bidi, TextDirection;
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
@@ -25,18 +27,15 @@ import 'package:delegate_app/core/services/trusted_time_service.dart';
 import 'package:delegate_app/core/widgets/app_avatar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:delegate_app/features/home/data/supervisor_cards_api.dart';
-import 'package:delegate_app/features/hr/presentation/pages/delegate_leaves_and_requests_screen.dart';
 
 class DelegateHomeScreen extends StatefulWidget {
   final Delegate delegate;
   final VoidCallback? onNavigateToAttendance;
-  final VoidCallback? onNavigateToLeaves;
 
   const DelegateHomeScreen({
     super.key,
     required this.delegate,
     this.onNavigateToAttendance,
-    this.onNavigateToLeaves,
   });
 
   @override
@@ -59,9 +58,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
 
   List<Attendance> _recentSessions = [];
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userSub;
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _leaveSub;
   DocumentSnapshot<Map<String, dynamic>>? _userDoc;
-  int _pendingLeaveCount = 0;
   static final Map<String, String> _orgNamesCache = {
     'PiioBFgxaHAeuRdjlDgj': 'فتح الله ماركت',
     '5DE6702w6hFwycJfZyqM': 'جملة ماركت',
@@ -82,11 +79,9 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     _loadAttendanceData();
     _loadRecentActivity();
     _listenToUserDoc();
-    _listenToLeaveRequests();
   }
 
   String get _userSubKey => 'home.users.${widget.delegate.uid}';
-  String get _leaveSubKey => 'home.leave_requests.${widget.delegate.uid}';
 
   void _listenToUserDoc() {
     _userSub?.cancel();
@@ -101,27 +96,9 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     FirestoreSessionSubscriptions.instance.register(_userSubKey, _userSub!);
   }
 
-  void _listenToLeaveRequests() {
-    _leaveSub?.cancel();
-    _leaveSub = FirebaseFirestore.instance
-        .collection('leave_requests')
-        .where('companyUID', isEqualTo: widget.delegate.companyUID)
-        .where('delegateUid', isEqualTo: widget.delegate.uid)
-        // TAS-90: only pending requests are counted, so only they are
-        // streamed (was every leave request of the delegate, ever).
-        .where('status', isEqualTo: 'pending')
-        .snapshots()
-        .listen((snap) {
-      if (!mounted) return;
-      setState(() => _pendingLeaveCount = snap.docs.length);
-    });
-    FirestoreSessionSubscriptions.instance.register(_leaveSubKey, _leaveSub!);
-  }
-
   @override
   void dispose() {
     _userSub?.cancel();
-    _leaveSub?.cancel();
     super.dispose();
   }
 
@@ -566,7 +543,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   index: 2, child: _buildRecentActivityBriefCard(context)),
               const SizedBox(height: TashilSpacing.lg),
               M3StaggeredItem(
-                  index: 3, child: _buildLeavesAndRequestsCard(context)),
+                  index: 3, child: _buildFeedbackCard(context)),
               const SizedBox(height: TashilSpacing.xl),
               M3StaggeredItem(
                 index: 4,
@@ -781,14 +758,16 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
   }
 
   Widget _buildDutyItem({required IconData icon, required String text}) {
+    // TAS-384: every duty on one line, cut with an ellipsis.
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 18, color: _heroOn(context)),
         const SizedBox(width: TashilSpacing.sm),
         Expanded(
           child: Text(
             text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: _heroOn(context),
                 ),
@@ -979,9 +958,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         padding: const EdgeInsets.all(TashilSpacing.lg),
         child: Row(
           children: [
+            // TAS-384: primary fill, readable on the filled card.
             CircleAvatar(
-              backgroundColor: colorScheme.primaryContainer,
-              foregroundColor: colorScheme.onPrimaryContainer,
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
               child: const Icon(Symbols.person_rounded),
             ),
             const SizedBox(width: TashilSpacing.md),
@@ -1017,24 +997,18 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               ),
             ),
             if (phone.isNotEmpty) ...[
-              IconButton(
+              // TAS-384: icons on cards are primary with onPrimary.
+              IconButton.filled(
                 onPressed: () => _callNumber(phone),
                 icon: const Icon(Symbols.phone_rounded),
                 tooltip: AppLocalizations.of(context)!.callAction,
-                style: IconButton.styleFrom(
-                  backgroundColor: colorScheme.secondaryContainer,
-                  foregroundColor: colorScheme.onSecondaryContainer,
-                ),
               ),
               const SizedBox(width: TashilSpacing.sm),
-              IconButton(
+              // TAS-384: icons on cards are primary with onPrimary.
+              IconButton.filled(
                 onPressed: () => _openWhatsApp(phone),
                 icon: const Icon(Symbols.chat_rounded),
                 tooltip: AppLocalizations.of(context)!.whatsapp,
-                style: IconButton.styleFrom(
-                  backgroundColor: colorScheme.secondaryContainer,
-                  foregroundColor: colorScheme.onSecondaryContainer,
-                ),
               ),
             ],
           ],
@@ -1064,12 +1038,12 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                   Container(
                     padding: const EdgeInsets.all(TashilSpacing.md),
                     decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
+                      color: colorScheme.primary,
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       Symbols.photo_camera_rounded,
-                      color: colorScheme.onPrimaryContainer,
+                      color: colorScheme.onPrimary,
                       size: 24,
                     ),
                   ),
@@ -1086,6 +1060,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                         ),
                         const SizedBox(height: TashilSpacing.xs),
                         Text(AppLocalizations.of(context)!.offerPhotosSubtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
@@ -1096,42 +1072,21 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 ],
               ),
               const SizedBox(height: TashilSpacing.lg),
-              Container(
+              // TAS-384: the screen's one main action, a real FilledButton.
+              SizedBox(
                 width: double.infinity,
-                constraints: const BoxConstraints(minHeight: 48),
-                padding: const EdgeInsets.symmetric(
-                  vertical: TashilSpacing.sm,
-                  horizontal: TashilSpacing.lg,
-                ),
-                decoration: BoxDecoration(
-                  color: colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(TashilRadius.full),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Symbols.touch_app_rounded,
-                      size: 18,
-                      color: colorScheme.onSecondaryContainer,
-                    ),
-                    const SizedBox(width: TashilSpacing.sm),
-                    Flexible(
-                      child: Text(
-                      AppLocalizations.of(context)!.startPhotosCta,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: colorScheme.onSecondaryContainer,
-                      ),
-                    ),
-                    ),
-                    const SizedBox(width: TashilSpacing.xs),
-                    Icon(Symbols.arrow_forward_rounded,
-                      size: 16,
-                      color: colorScheme.onSecondaryContainer,
-                    ),
-                  ],
+                child: FilledButton.icon(
+                  key: const Key('home_start_photos_button'),
+                  onPressed: () => context.push(
+                    '/photo-permissions/delegate',
+                    extra: widget.delegate,
+                  ),
+                  icon: const Icon(Symbols.photo_camera_rounded),
+                  label: Text(
+                    AppLocalizations.of(context)!.startPhotosCta,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
             ],
@@ -1316,8 +1271,9 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     child: _buildAttendanceStatPill(
                       context,
                       title: AppLocalizations.of(context)!.statAttended,
-                      value: AppLocalizations.of(context)!.daysCount(_attendedDays),
-                      icon: Symbols.check_circle_rounded,
+                      // TAS-384: number only, HR web icons.
+                      value: '$_attendedDays',
+                      icon: Symbols.how_to_reg_rounded,
                       containerColor: colorScheme.surface,
                       iconColor: colorScheme.onSurfaceVariant,
                       textColor: colorScheme.onSurface,
@@ -1331,8 +1287,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     child: _buildAttendanceStatPill(
                       context,
                       title: AppLocalizations.of(context)!.statAbsent,
-                      value: AppLocalizations.of(context)!.daysCount(_absentDays),
-                      icon: Symbols.cancel_rounded,
+                      value: '$_absentDays',
+                      icon: Symbols.person_off_rounded,
                       containerColor: colorScheme.surface,
                       iconColor: colorScheme.onSurfaceVariant,
                       textColor: colorScheme.onSurface,
@@ -1345,7 +1301,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     child: _buildAttendanceStatPill(
                       context,
                       title: AppLocalizations.of(context)!.statDaysOff,
-                      value: AppLocalizations.of(context)!.leavesOfFour(_approvedLeavesThisMonth),
+                      value: Bidi.ltr('$_approvedLeavesThisMonth/4'),
                       icon: Symbols.event_available_rounded,
                       containerColor: colorScheme.surface,
                       iconColor: colorScheme.onSurfaceVariant,
@@ -1742,11 +1698,11 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       ),
       child: Column(
         children: [
-          Icon(icon, size: 20, color: iconColor),
+          Icon(icon, size: 24, color: iconColor),
           const SizedBox(height: TashilSpacing.xs),
           Text(
             value,
-            style: tt.titleMedium?.copyWith(
+            style: tt.headlineSmall?.copyWith(
               fontWeight: FontWeight.w700,
               color: textColor,
             ),
@@ -1769,93 +1725,68 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     );
   }
 
-  Widget _buildLeavesAndRequestsCard(BuildContext context) {
+  /// TAS-384: «طلباتي» is already in the navigation bar, so the home card
+  /// sends feedback instead (the same page as in settings).
+  Widget _buildFeedbackCard(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
 
-    final pendingCount = _pendingLeaveCount;
     return Card.filled(
-          margin: EdgeInsets.zero,
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () {
-              if (widget.onNavigateToLeaves != null) {
-                widget.onNavigateToLeaves!();
-              } else {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => DelegateLeavesAndRequestsScreen(
-                      delegate: widget.delegate,
-                    ),
-                  ),
-                );
-              }
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(TashilSpacing.lg),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(TashilSpacing.md),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(TashilRadius.medium),
-                    ),
-                    child: Icon(
-                      Symbols.event_note_rounded,
-                      size: 26,
-                      color: colorScheme.onPrimaryContainer,
-                    ),
-                  ),
-                  const SizedBox(width: TashilSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(AppLocalizations.of(context)!.reqTitle,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            if (pendingCount > 0) ...[
-                              const SizedBox(width: TashilSpacing.sm),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: TashilSpacing.sm,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.tertiaryContainer,
-                                  borderRadius: BorderRadius.circular(TashilRadius.full),
-                                ),
-                                child: Text(
-                                  AppLocalizations.of(context)!.pendingCountBadge(pendingCount),
-                                  style: theme.textTheme.labelMedium?.copyWith(
-                                    color: colorScheme.onTertiaryContainer,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: TashilSpacing.xs),
-                        Text(AppLocalizations.of(context)!.homeRequestsSubtitle,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: TashilSpacing.sm),
-                  Icon(Symbols.chevron_right_rounded,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ],
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: const Key('home_send_feedback_card'),
+        onTap: () => HrAccountPages.openSendFeedback(context, widget.delegate),
+        child: Padding(
+          padding: const EdgeInsets.all(TashilSpacing.lg),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(TashilSpacing.md),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Symbols.feedback_rounded,
+                  size: 24,
+                  color: colorScheme.onPrimary,
+                ),
               ),
-            ),
+              const SizedBox(width: TashilSpacing.lg),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.sendFeedback,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: TashilSpacing.xs),
+                    Text(
+                      l10n.feedbackIntro,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: TashilSpacing.sm),
+              Icon(
+                Symbols.chevron_right_rounded,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ],
           ),
-        );
+        ),
+      ),
+    );
   }
 }

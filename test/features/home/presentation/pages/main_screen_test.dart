@@ -45,4 +45,61 @@ void main() {
     final widget = MainScreen(delegate: tDelegate);
     expect(widget.delegate, equals(tDelegate));
   });
+
+  group('freshProfileFor (TAS-384)', () {
+    Delegate copy(Delegate d, {String? org, String? co, String? orgUid}) =>
+        Delegate(
+          uid: d.uid,
+          firstName: d.firstName,
+          middleName: d.middleName,
+          lastName: d.lastName,
+          fullName: d.fullName,
+          nationalityID: d.nationalityID,
+          motherName: d.motherName,
+          city: d.city,
+          phoneNumber: d.phoneNumber,
+          gender: d.gender,
+          position: d.position,
+          birthDate: d.birthDate,
+          organizationUID: orgUid ?? d.organizationUID,
+          companyUID: d.companyUID,
+          organizationName: org ?? d.organizationName,
+          companyName: co ?? d.companyName,
+          status: d.status,
+          delegatePublicId: d.delegatePublicId,
+          allReceiptCodes: d.allReceiptCodes,
+          createdAt: d.createdAt,
+          createdBy: d.createdBy,
+          hasPendingUpdate: d.hasPendingUpdate,
+          isDeductedFromCompany: d.isDeductedFromCompany,
+          isPrinted: d.isPrinted,
+          isProfileComplete: d.isProfileComplete,
+          numberOfDocuments: d.numberOfDocuments,
+          paymentAmount: d.paymentAmount,
+          version: d.version,
+          documents: d.documents,
+          role: d.role,
+        );
+
+    test('takes the server copy when the cached names were empty', () {
+      final cached = copy(tDelegate, org: '', co: '');
+      final server = copy(tDelegate, org: 'Org', co: 'Co');
+      expect(freshProfileFor(cached, [server]), same(server));
+    });
+
+    test('nothing when the names are the same', () {
+      expect(freshProfileFor(tDelegate, [copy(tDelegate)]),
+          isNull);
+    });
+
+    test('ignores copies in another organization', () {
+      final other = copy(tDelegate, orgUid: 'org2', org: 'Other');
+      expect(freshProfileFor(tDelegate, [other]), isNull);
+    });
+
+    test('an empty server name never clears a cached one', () {
+      final server = copy(tDelegate, org: '', co: '');
+      expect(freshProfileFor(tDelegate, [server]), isNull);
+    });
+  });
 }

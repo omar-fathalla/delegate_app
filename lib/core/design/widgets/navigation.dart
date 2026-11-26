@@ -191,17 +191,26 @@ class TashilNavigationRail extends StatelessWidget {
               leading: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // TAS-384: the menu button sits in the icon column of
+                  // the destinations (centre at collapsedWidth / 2), in
+                  // the expanded rail too, not centred in the panel.
                   if (onMenu != null)
-                    Padding(
-                      padding: EdgeInsetsDirectional.only(
-                        start: expanded ? TashilSpacing.lg : 0,
-                      ),
-                      child: IconButton(
-                        tooltip: expanded
-                            ? l.closeButtonTooltip
-                            : l.openAppDrawerTooltip,
-                        icon: Icon(expanded ? Icons.menu_open : Icons.menu),
-                        onPressed: onMenu,
+                    SizedBox(
+                      width: expanded ? expandedWidth : collapsedWidth,
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Padding(
+                          padding: const EdgeInsetsDirectional.only(
+                            start: (collapsedWidth - 48) / 2,
+                          ),
+                          child: IconButton(
+                            tooltip: expanded
+                                ? l.closeButtonTooltip
+                                : l.openAppDrawerTooltip,
+                            icon: Icon(expanded ? Icons.menu_open : Icons.menu),
+                            onPressed: onMenu,
+                          ),
+                        ),
                       ),
                     ),
                   if (f != null) ...[
