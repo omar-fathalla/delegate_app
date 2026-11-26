@@ -260,6 +260,12 @@ class _MyAppState extends State<MyApp> {
             title: 'Tashil Employee',
             theme: AppTheme.lightTheme(themeState.seedColor),
             darkTheme: AppTheme.darkTheme(themeState.seedColor),
+            highContrastTheme: AppTheme.highContrastLightTheme(
+              themeState.seedColor,
+            ),
+            highContrastDarkTheme: AppTheme.highContrastDarkTheme(
+              themeState.seedColor,
+            ),
             themeMode: themeState.themeMode,
             routerConfig: appRouter,
             debugShowCheckedModeBanner: false,

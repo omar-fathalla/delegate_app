@@ -1,306 +1,58 @@
-// ignore: unnecessary_import
-import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:delegate_app/config/theme/app_motion.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import 'color_schemes.dart';
+import '../../core/design/app_theme.dart';
+import '../../core/design/tokens.dart';
+import 'app_motion.dart';
 
+/// App entry point for the Material 3 theme (TAS-348).
+///
+/// Everything comes from the Tashil design system in `lib/core/design/`
+/// (copied from m3-kit): every colour role generated from one seed (no
+/// hand-picked tones; user decision 2026-11-26, replacing the pinned
+/// "approved" values of 47d05fb0), the Cairo variable font with the M3 type
+/// scale, semantic success/warning colours, shapes, spacing and motion.
+/// Screens must read colours from `Theme.of(context).colorScheme` (or
+/// `TashilSemanticColors.of(context)`) and text from `textTheme`, never hex
+/// values or hand-written font sizes.
+///
+/// The seed stays the delegate app's purple by default; the person can pick
+/// another one in settings ([ThemeCubit]), and the roles follow it.
 class AppTheme {
-  // Base configuration to prevent code duplication (Clean Code)
-  static ThemeData _baseTheme(
-    ColorScheme colorScheme,
-    TextTheme baseTextTheme,
-  ) {
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: colorScheme,
-      textTheme: baseTextTheme,
-      materialTapTargetSize: MaterialTapTargetSize.padded,
+  static ThemeData lightTheme([Color? seedColor]) =>
+      _app(TashilTheme.light(seed: seedColor ?? TashilColors.seed));
 
-      // Snackbars: floating, inverse surface (M3), lifted above FAB by Scaffold.
-      snackBarTheme: SnackBarThemeData(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: colorScheme.inverseSurface,
-        contentTextStyle: baseTextTheme.bodyMedium
-            ?.copyWith(color: colorScheme.onInverseSurface),
-        actionTextColor: colorScheme.inversePrimary,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-      ),
+  static ThemeData darkTheme([Color? seedColor]) =>
+      _app(TashilTheme.dark(seed: seedColor ?? TashilColors.seed));
 
-      // Selected segments/chips use secondaryContainer (not primary/red).
-      segmentedButtonTheme: SegmentedButtonThemeData(
-        style: ButtonStyle(
-          backgroundColor: WidgetStateProperty.resolveWith((s) =>
-              s.contains(WidgetState.selected)
-                  ? colorScheme.secondaryContainer
-                  : null),
-          foregroundColor: WidgetStateProperty.resolveWith((s) =>
-              s.contains(WidgetState.selected)
-                  ? colorScheme.onSecondaryContainer
-                  : colorScheme.onSurface),
-          minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
-        ),
-      ),
-      chipTheme: ChipThemeData(
-        selectedColor: colorScheme.secondaryContainer,
-        checkmarkColor: colorScheme.onSecondaryContainer,
-        secondaryLabelStyle:
-            TextStyle(color: colorScheme.onSecondaryContainer),
-      ),
+  /// Used by `MaterialApp.highContrastTheme`, so the system "high contrast"
+  /// setting switches every role to about 7:1 text contrast.
+  static ThemeData highContrastLightTheme([Color? seedColor]) => _app(
+    TashilTheme.light(
+      seed: seedColor ?? TashilColors.seed,
+      contrast: TashilContrast.high,
+    ),
+  );
 
-      bottomSheetTheme: BottomSheetThemeData(
-        showDragHandle: true,
-        backgroundColor: colorScheme.surfaceContainerLow,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-      ),
-      navigationDrawerTheme: NavigationDrawerThemeData(
-        backgroundColor: colorScheme.surfaceContainerLow,
-        indicatorColor: colorScheme.secondaryContainer,
-        tileHeight: 56,
-      ),
+  static ThemeData highContrastDarkTheme([Color? seedColor]) => _app(
+    TashilTheme.dark(
+      seed: seedColor ?? TashilColors.seed,
+      contrast: TashilContrast.high,
+    ),
+  );
 
-      // Inputs (Spacing & White Space)
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
-      ),
-
-      // Buttons (Typography & Touch Targets)
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          textStyle: baseTextTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        ),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      ),
-
-      // Navigation (Micro-interactions & State Management)
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: colorScheme.surfaceContainer,
-        elevation: 0,
-        indicatorColor: colorScheme.secondaryContainer,
-        labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return baseTextTheme.labelSmall!.copyWith(
-              color: colorScheme.primary,
-              fontWeight: FontWeight.bold,
-            );
-          }
-          return baseTextTheme.labelSmall!.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          );
-        }),
-        iconTheme: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return IconThemeData(color: colorScheme.onSecondaryContainer);
-          }
-          return IconThemeData(color: colorScheme.onSurfaceVariant);
-        }),
-      ),
-
-      // App Bar
-      appBarTheme: AppBarTheme(
-        backgroundColor: colorScheme.surfaceContainer,
-        foregroundColor: colorScheme.onSurface,
-        elevation: 0,
-        scrolledUnderElevation: 2,
-        centerTitle: false,
-        titleTextStyle: baseTextTheme.titleMedium?.copyWith(
-          color: colorScheme.onSurface,
-          fontSize: 15,
-          fontWeight: FontWeight.bold,
-          letterSpacing: -0.2,
-        ),
-        shape: Border(
-          bottom: BorderSide(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-            width: 0.8,
-          ),
-        ),
-      ),
-
-      // Scaffold Background
-      scaffoldBackgroundColor: colorScheme.surfaceContainerLowest,
-
-      // Dialogs & Cards
-      cardTheme: CardThemeData(
-        color: colorScheme.surfaceContainerLow,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-      ),
-      dialogTheme: DialogThemeData(
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(28)),
-        ),
-        elevation: 3,
-        backgroundColor: colorScheme.surfaceContainer,
-      ),
-
-      // Tooltips (Material Design 3 Rounded Style)
-      tooltipTheme: TooltipThemeData(
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        textStyle: baseTextTheme.bodySmall?.copyWith(
-          color: colorScheme.onSurface,
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      ),
-
-      // Material Design 3 Motion Page Transitions
-      // One transition for every route (go_router pages use the same
-      // AppMotionTransitions.sharedAxisX), so nothing overlaps mid-push.
-      pageTransitionsTheme: const PageTransitionsTheme(
-        builders: {
-          TargetPlatform.android: M3PageTransitionsBuilder(),
-          TargetPlatform.iOS: M3PageTransitionsBuilder(),
-          TargetPlatform.macOS: M3PageTransitionsBuilder(),
-        },
-      ),
-    );
-  }
-
-  static ThemeData lightTheme([Color? seedColor]) {
-    final color = seedColor ?? AppColorSchemes.seedColors[0];
-    var colorScheme = ColorScheme.fromSeed(
-      seedColor: color,
-      brightness: Brightness.light,
-    );
-    // Approved neutral light surfaces (home_v2n). Applied to every seed;
-    // brand roles are pinned only for the default #6750A4 seed.
-    colorScheme = colorScheme.copyWith(
-      surface: const Color(0xFFFDF8F8),
-      surfaceBright: const Color(0xFFFDF8F8),
-      onSurface: const Color(0xFF1C1B1C),
-      surfaceDim: const Color(0xFFDDD9D9),
-      surfaceContainerLowest: const Color(0xFFFFFFFF),
-      surfaceContainerLow: const Color(0xFFF7F3F2),
-      surfaceContainer: const Color(0xFFF1EDED),
-      surfaceContainerHigh: const Color(0xFFEBE7E7),
-      surfaceContainerHighest: const Color(0xFFE6E1E1),
-      onSurfaceVariant: const Color(0xFF48464B),
-      // ignore: deprecated_member_use
-      surfaceVariant: const Color(0xFFE6E1E7),
-      outline: const Color(0xFF79767B),
-      outlineVariant: const Color(0xFFCAC5CB),
-      inverseSurface: const Color(0xFF313030),
-      onInverseSurface: const Color(0xFFF4F0F0),
-    );
-    if (color.toARGB32() == 0xFF6750A4) {
-      colorScheme = colorScheme.copyWith(
-        primary: const Color(0xFF6750A4),
-        onPrimary: const Color(0xFFFFFFFF),
-        primaryContainer: const Color(0xFFE9DDFF),
-        onPrimaryContainer: const Color(0xFF22005D),
-        inversePrimary: const Color(0xFFD0BCFF),
-        secondary: const Color(0xFF625B70),
-        secondaryContainer: const Color(0xFFE8DEF8),
-        onSecondaryContainer: const Color(0xFF1E192B),
-        tertiary: const Color(0xFF7E5260),
-        tertiaryContainer: const Color(0xFFFFD9E3),
-        onTertiaryContainer: const Color(0xFF31101D),
-        error: const Color(0xFFBA1A1A),
-        errorContainer: const Color(0xFFFFDAD6),
-        onErrorContainer: const Color(0xFF410002),
-      );
-    }
-    final baseTextTheme = GoogleFonts.cairoTextTheme();
-
-    return _baseTheme(colorScheme, baseTextTheme);
-  }
-
-  static ThemeData darkTheme([Color? seedColor]) {
-    final color = seedColor ?? AppColorSchemes.seedColors[0];
-    var colorScheme = ColorScheme.fromSeed(
-      seedColor: color,
-      brightness: Brightness.dark,
-    );
-    // Approved M3 dark values (Material Design 3 review, HCT tones fitted
-    // from the light palette). fromSeed alone drops primary chroma, so pin
-    // every role explicitly. Neutral surfaces apply to every seed.
-    colorScheme = colorScheme.copyWith(
-      surface: const Color(0xFF141313),
-      surfaceDim: const Color(0xFF141313),
-      surfaceBright: const Color(0xFF3A3939),
-      surfaceContainerLowest: const Color(0xFF0F0E0E),
-      surfaceContainerLow: const Color(0xFF1C1B1C),
-      surfaceContainer: const Color(0xFF201F20),
-      surfaceContainerHigh: const Color(0xFF2B2A2A),
-      surfaceContainerHighest: const Color(0xFF363435),
-      onSurface: const Color(0xFFE6E1E1),
-      onSurfaceVariant: const Color(0xFFCAC5CB),
-      // ignore: deprecated_member_use
-      surfaceVariant: const Color(0xFF48464B),
-      outline: const Color(0xFF938F95),
-      outlineVariant: const Color(0xFF48464B),
-      inverseSurface: const Color(0xFFE6E1E1),
-      onInverseSurface: const Color(0xFF313030),
-      error: const Color(0xFFFFB4AB),
-      onError: const Color(0xFF690005),
-      errorContainer: const Color(0xFF93000A),
-      onErrorContainer: const Color(0xFFFFDAD6),
-    );
-    if (color.toARGB32() == 0xFF6750A4) {
-      colorScheme = colorScheme.copyWith(
-        primary: const Color(0xFFCFBCFF),
-        onPrimary: const Color(0xFF381E72),
-        primaryContainer: const Color(0xFF4F378A),
-        onPrimaryContainer: const Color(0xFFE9DDFF),
-        inversePrimary: const Color(0xFF6750A4),
-        secondaryContainer: const Color(0xFF4A4458),
-        onSecondaryContainer: const Color(0xFFE8DEF8),
-      );
-    }
-    final baseTextTheme = GoogleFonts.cairoTextTheme().apply(
-      bodyColor: colorScheme.onSurface,
-      displayColor: colorScheme.onSurface,
-    );
-
-    return _baseTheme(colorScheme, baseTextTheme);
-  }
+  /// Two app-wide choices kept from before the design system:
+  /// * one page transition for every route, the same one the go_router pages
+  ///   use ([AppMotionPage]), so a push never mixes two transitions;
+  /// * sheets show the M3 drag handle from the theme (51 screens open sheets
+  ///   and rely on it).
+  static ThemeData _app(ThemeData theme) => theme.copyWith(
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: M3PageTransitionsBuilder(),
+        TargetPlatform.iOS: M3PageTransitionsBuilder(),
+        TargetPlatform.macOS: M3PageTransitionsBuilder(),
+      },
+    ),
+    bottomSheetTheme: theme.bottomSheetTheme.copyWith(showDragHandle: true),
+  );
 }
