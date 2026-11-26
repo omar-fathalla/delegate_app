@@ -1,3 +1,6 @@
+import 'package:delegate_app/core/design/widgets/snackbars.dart';
+import 'package:delegate_app/core/design/widgets/loading_indicator.dart';
+import 'package:delegate_app/core/design/tokens.dart';
 import 'package:delegate_app/core/widgets/storage_resolved_image.dart';
 import 'package:delegate_app/core/storage/storage_media.dart';
 import 'dart:io';
@@ -227,7 +230,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.error_outline, size: 64, color: colorScheme.error),
-              const SizedBox(height: 16),
+              const SizedBox(height: TashilSpacing.lg),
               Text(
                 AppLocalizations.of(context)!.userNotFound,
                 style: theme.textTheme.titleMedium?.copyWith(
@@ -245,10 +248,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       appBar: widget.showAppBar
           ? AppBar(
               title: Text(l10n.profile),
-              backgroundColor: colorScheme.surface,
-              surfaceTintColor: Colors.transparent,
-              elevation: 0,
-              scrolledUnderElevation: 1,
             )
           : null,
       body: BlocBuilder<AuthBloc, AuthState>(
@@ -260,19 +259,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           final effectiveDelegate = _delegate ?? blocDelegate;
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(TashilSpacing.page),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Profile Header
                 _buildProfileHeader(colorScheme, theme, effectiveDelegate),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: TashilSpacing.xl),
 
                 // Personal Information Card
                 _buildPersonalInfoCard(colorScheme, theme, l10n, effectiveDelegate),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: TashilSpacing.lg),
 
                 // Security Card
                 _buildSecurityCard(colorScheme, theme, l10n, effectiveDelegate),
@@ -560,33 +559,24 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         _currentUser?.photoURL;
     final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
 
+    // TAS-355 (C-28): one drag handle (the theme's), shape from the theme;
+    // neutral icons, the destructive "remove" in error.
+    final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsetsDirectional.only(bottom: TashilSpacing.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
               Text(
                 AppLocalizations.of(context)!.profilePhoto,
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: Theme.of(context).textTheme.titleMedium,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: TashilSpacing.md),
               ListTile(
-                leading: const Icon(Icons.camera_alt_rounded, color: Colors.blue),
+                leading: Icon(Icons.camera_alt_rounded, color: cs.onSurfaceVariant),
                 title: Text(AppLocalizations.of(context)!.takePhotoCamera),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -594,7 +584,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.photo_library_rounded, color: Colors.purple),
+                leading: Icon(Icons.photo_library_rounded, color: cs.onSurfaceVariant),
                 title: Text(AppLocalizations.of(context)!.chooseFromGallery),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -603,8 +593,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               ),
               if (hasPhoto)
                 ListTile(
-                  leading: const Icon(Icons.delete_outline_rounded, color: Colors.red),
-                  title: Text(AppLocalizations.of(context)!.removeCurrentPhoto, style: TextStyle(color: Colors.red)),
+                  leading: Icon(Icons.delete_outline_rounded, color: cs.error),
+                  title: Text(
+                    AppLocalizations.of(context)!.removeCurrentPhoto,
+                    style: TextStyle(color: cs.error),
+                  ),
                   onTap: () {
                     Navigator.pop(ctx);
                     _removePhoto(delegate);
@@ -670,12 +663,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         _currentUser?.photoURL;
     final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
 
-    return Card(
-      elevation: 0,
-      color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    // TAS-355: Card.filled like the rest of the app, no alpha tint.
+    return Card.filled(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(TashilSpacing.xl),
         child: Column(
           children: [
             // Avatar with edit/camera button
@@ -683,7 +674,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               clipBehavior: Clip.none,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(TashilSpacing.xs),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(color: colorScheme.primary, width: 3),
@@ -741,50 +732,27 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 ),
                 if (_isUploadingPhoto)
                   Positioned.fill(
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        color: Colors.black54,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: SizedBox(
-                          width: 28,
-                          height: 28,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 3,
-                          ),
-                        ),
-                      ),
+                    // Contained loading indicator over the photo (no scrim).
+                    child: const Center(
+                      child: LoadingIndicator(size: 40, contained: true),
                     ),
                   ),
                 PositionedDirectional(
                   bottom: 0,
                   end: 0,
-                  child: Material(
-                    color: colorScheme.primary,
-                    shape: const CircleBorder(),
-                    elevation: 3,
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: _isUploadingPhoto
-                          ? null
-                          : () => _showPhotoOptionsSheet(context, delegate),
-                      child: const Padding(
-                        padding: EdgeInsets.all(7),
-                        child: Icon(
-                          Icons.camera_alt_rounded,
-                          size: 17,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
+                  // TAS-355: card-icon rule, IconButton.filled with tooltip.
+                  child: IconButton.filled(
+                    tooltip: AppLocalizations.of(context)!.profilePhoto,
+                    onPressed: _isUploadingPhoto
+                        ? null
+                        : () => _showPhotoOptionsSheet(context, delegate),
+                    icon: const Icon(Icons.camera_alt_rounded),
                   ),
                 ),
               ],
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: TashilSpacing.lg),
 
             // Display Name
             Text(
@@ -796,29 +764,28 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               textAlign: TextAlign.center,
             ),
 
-            const SizedBox(height: 6),
+            const SizedBox(height: TashilSpacing.xs),
 
             // Role Badge
+            // Read-only role: compact label, container role + on colour.
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              padding: const EdgeInsetsDirectional.symmetric(
+                horizontal: TashilSpacing.md,
+                vertical: TashilSpacing.xs,
+              ),
               decoration: BoxDecoration(
-                color: colorScheme.primary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: colorScheme.primary.withValues(alpha: 0.3),
-                  width: 1,
-                ),
+                color: colorScheme.secondaryContainer,
+                borderRadius: BorderRadius.circular(TashilRadius.small),
               ),
               child: Text(
                 _getRoleDisplayName(delegate, _firestoreUserData),
                 style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.primary,
+                  color: colorScheme.onSecondaryContainer,
                 ),
               ),
             ),
 
-            const SizedBox(height: 6),
+            const SizedBox(height: TashilSpacing.xs),
 
             // Email
             if (email.isNotEmpty)
@@ -869,33 +836,29 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     // with OTP come with TAS-112.
     final canEditIdentity = profileIdentityEditable(delegate?.role);
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant),
-      ),
+    return Card.filled(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(TashilSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Section Title
             Row(
               children: [
+                // TAS-384 rule: card icon on primary + onPrimary.
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(TashilSpacing.sm),
                   decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(10),
+                    color: colorScheme.primary,
+                    shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.person_outline_rounded,
-                    color: colorScheme.primary,
+                    color: colorScheme.onPrimary,
                     size: 22,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: TashilSpacing.md),
                 Text(
                   AppLocalizations.of(context)!.personalInfo,
                   style: theme.textTheme.titleMedium?.copyWith(
@@ -906,7 +869,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               ],
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: TashilSpacing.lg),
 
             // Display Name
             _buildInfoRow(
@@ -965,12 +928,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               showDivider: false,
             ),
             if (!canEditIdentity) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: TashilSpacing.md),
               Row(
                 children: [
                   Icon(Icons.info_outline_rounded,
                       size: 18, color: colorScheme.onSurfaceVariant),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: TashilSpacing.sm),
                   Expanded(
                     child: Text(
                       AppLocalizations.of(context)!.profileIdentityEditViaSupervisor,
@@ -996,33 +959,29 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     AppLocalizations l10n,
     Delegate? delegate,
   ) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant),
-      ),
+    return Card.filled(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(TashilSpacing.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Section Title
             Row(
               children: [
+                // TAS-384 rule: card icon on primary + onPrimary.
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(TashilSpacing.sm),
                   decoration: BoxDecoration(
-                    color: colorScheme.secondaryContainer,
-                    borderRadius: BorderRadius.circular(10),
+                    color: colorScheme.primary,
+                    shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.security_rounded,
-                    color: colorScheme.secondary,
+                    color: colorScheme.onPrimary,
                     size: 22,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: TashilSpacing.md),
                 Text(
                   AppLocalizations.of(context)!.securitySection,
                   style: theme.textTheme.titleMedium?.copyWith(
@@ -1033,30 +992,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               ],
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: TashilSpacing.lg),
 
-            // Change Password Button
+            // TAS-355 (C-01): secondary action is tonal, theme shape.
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
+              child: FilledButton.tonalIcon(
+                key: const Key('profileChangePasswordButton'),
                 onPressed: () => _showChangePasswordSheet(context, delegate),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.secondaryContainer,
-                  foregroundColor: colorScheme.onSecondaryContainer,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 16,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
                 icon: const Icon(Icons.lock_reset_rounded),
-                label: Text(
-                  AppLocalizations.of(context)!.changePassword,
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
+                label: Text(AppLocalizations.of(context)!.changePassword),
               ),
             ),
             // TAS-207: TOTP enrollment, super admin only.
@@ -1108,19 +1053,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsetsDirectional.symmetric(
+            vertical: TashilSpacing.md,
+          ),
           child: Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: colorScheme.primary, size: 20),
-              ),
-              const SizedBox(width: 14),
+              // List-item leading icon (not a card icon): plain, neutral.
+              Icon(icon, color: colorScheme.onSurfaceVariant, size: 24),
+              const SizedBox(width: TashilSpacing.lg),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1132,7 +1072,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: TashilSpacing.xs),
                     _buildInfoValueText(
                       value: value,
                       theme: theme,
@@ -1171,7 +1111,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Colors.transparent,
       builder: (context) => _EditInfoBottomSheet(
         fieldType: fieldType,
         initialValue: initialValue,
@@ -1409,34 +1348,20 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isName
+        showTashilSnackBar(context, isName
                   ? AppLocalizations.of(context)!.nameUpdated
                   : (isEmail
                       ? AppLocalizations.of(context)!.emailUpdated
-                      : AppLocalizations.of(context)!.phoneUpdated),
-            ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+                      : AppLocalizations.of(context)!.phoneUpdated));
 
         // Trigger auth reload
         context.read<AuthBloc>().add(CheckAutoLoginRequested());
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e is FirebaseFunctionsException
+        showTashilSnackBar(context, e is FirebaseFunctionsException
                 ? staffContactErrorMessage(e)
-                : '❌ حدث خطأ أثناء التحديث: ${e.toString().replaceAll('Exception: ', '')}'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+                : 'حدث خطأ أثناء التحديث: ${e.toString().replaceAll('Exception: ', '')}');
       }
     } finally {
       if (mounted) {
@@ -1462,12 +1387,15 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
         ? Icons.badge_outlined
         : (isEmail ? Icons.email_outlined : Icons.phone_outlined);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+    // TAS-355 (C-28): the sheet's colour, shape and drag handle come from
+    // the theme; no second hand-drawn handle.
+    return Padding(
+      padding: EdgeInsetsDirectional.fromSTEB(
+        TashilSpacing.xl,
+        0,
+        TashilSpacing.xl,
+        TashilSpacing.xl + bottomInset,
       ),
-      padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + bottomInset),
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -1475,54 +1403,25 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colorScheme.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(icon, size: 28, color: colorScheme.primary),
-                  const SizedBox(width: 12),
-                  Text(
-                    title,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
+                  const SizedBox(width: TashilSpacing.md),
+                  Text(title, style: theme.textTheme.headlineSmall),
                 ],
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: TashilSpacing.xl),
               TextFormField(
                 controller: _controller,
                 keyboardType: isName
                     ? TextInputType.name
                     : (isEmail ? TextInputType.emailAddress : TextInputType.phone),
+                // TAS-355 (C-08): outlined like every other field.
                 decoration: InputDecoration(
-                  labelText: label,
-                  filled: true,
-                  fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  prefixIcon: Icon(icon, color: colorScheme.onSurfaceVariant),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: colorScheme.outlineVariant, width: 1),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: colorScheme.primary, width: 2),
-                  ),
+                  labelText: '$label *',
+                  prefixIcon: Icon(icon),
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
@@ -1541,41 +1440,25 @@ class _EditInfoBottomSheetState extends State<_EditInfoBottomSheet> {
                   return null;
                 },
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: TashilSpacing.xl),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
                       onPressed: _isLoading ? null : () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Text('إلغاء', style: TextStyle(fontSize: 16)),
+                      child: Text(AppLocalizations.of(context)!.cancel),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: TashilSpacing.lg),
                   Expanded(
                     child: FilledButton(
                       onPressed: _isLoading ? null : _updateInfo,
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
                       child: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
+                          ? const SizedBox.square(
+                              dimension: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(AppLocalizations.of(context)!.saveAction, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          : Text(AppLocalizations.of(context)!.saveAction),
                     ),
                   ),
                 ],
@@ -1615,7 +1498,6 @@ void showUserChangePasswordSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    backgroundColor: Colors.transparent,
     builder: (context) => _ChangePasswordBottomSheet(
       delegate: delegate,
       firestoreData: firestoreData,
@@ -1775,23 +1657,11 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context)!.passwordChanged),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showTashilSnackBar(context, AppLocalizations.of(context)!.passwordChanged);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ ${e.toString().replaceAll('Exception: ', '')}'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showTashilSnackBar(context, '${e.toString().replaceAll('Exception: ', '')}');
       }
     } finally {
       if (mounted) {
@@ -1837,30 +1707,20 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
+      // TAS-355 (C-08): outlined; the eye button has a tooltip.
       decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        prefixIcon: Icon(Icons.lock_outline, color: colorScheme.onSurfaceVariant),
+        labelText: '$label *',
+        prefixIcon: const Icon(Icons.lock_outline),
         suffixIcon: IconButton(
+          tooltip: obscureText
+              ? AppLocalizations.of(context)!.showAction
+              : AppLocalizations.of(context)!.hideAction,
           icon: Icon(
             obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-            color: colorScheme.onSurfaceVariant,
           ),
           onPressed: onToggleVisibility,
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: colorScheme.outlineVariant, width: 1),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: colorScheme.primary, width: 2),
-        ),
+        border: const OutlineInputBorder(),
       ),
       validator: validator,
     );
@@ -1886,7 +1746,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
         },
       ),
 
-      const SizedBox(height: 16),
+      const SizedBox(height: TashilSpacing.lg),
 
       // New Password
       _buildTextField(
@@ -1908,7 +1768,7 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
         },
       ),
 
-      const SizedBox(height: 16),
+      const SizedBox(height: TashilSpacing.lg),
 
       // Confirm Password
       _buildTextField(
@@ -1948,12 +1808,15 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
     }
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+    // TAS-355 (C-28): the sheet's colour, shape and drag handle come from
+    // the theme; no second hand-drawn handle.
+    return Padding(
+      padding: EdgeInsetsDirectional.fromSTEB(
+        TashilSpacing.xl,
+        0,
+        TashilSpacing.xl,
+        TashilSpacing.xl + bottomInset,
       ),
-      padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + bottomInset),
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -1961,39 +1824,24 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Drag Handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colorScheme.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
               
               // Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.lock_reset_rounded, size: 28, color: colorScheme.primary),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: TashilSpacing.md),
                   Text(
                     AppLocalizations.of(context)!.changePassword,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
-                    ),
+                    style: theme.textTheme.headlineSmall,
                   ),
                 ],
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: TashilSpacing.xl),
 
               ..._buildFields(context, colorScheme),
 
-              const SizedBox(height: 32),
+              const SizedBox(height: TashilSpacing.xl),
 
               // Action Buttons
               Row(
@@ -2001,32 +1849,19 @@ class _ChangePasswordBottomSheetState extends State<_ChangePasswordBottomSheet> 
                   Expanded(
                     child: OutlinedButton(
                       onPressed: _isLoading ? null : () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Text('إلغاء', style: TextStyle(fontSize: 16)),
+                      child: Text(AppLocalizations.of(context)!.cancel),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: TashilSpacing.lg),
                   Expanded(
                     child: FilledButton(
                       onPressed: _isLoading ? null : _changePassword,
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
                       child: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          ? const SizedBox.square(
+                              dimension: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(AppLocalizations.of(context)!.saveAction, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          : Text(AppLocalizations.of(context)!.saveAction),
                     ),
                   ),
                 ],

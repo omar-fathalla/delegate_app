@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/design/tokens.dart';
 import 'package:delegate_app/core/widgets/organization_selector_sheet.dart';
 import 'package:delegate_app/core/services/firestore_cache_reset.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -26,6 +27,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/semantics.dart';
 import 'package:delegate_app/features/auth/presentation/widgets/tashil_m3.dart';
+import 'package:delegate_app/core/design/widgets/button_group.dart';
 import 'package:delegate_app/features/auth/presentation/widgets/web_hr_login_view.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -556,9 +558,7 @@ class _LoginScreenState extends State<LoginScreen>
                       foregroundColor: brand.onPrimary,
                       minimumSize: const Size(0, 40),
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      side: BorderSide(
-                        color: brand.onPrimary.withValues(alpha: 0.6),
-                      ),
+                      side: BorderSide(color: brand.onPrimary),
                       shape: const StadiumBorder(),
                     ),
                   ),
@@ -609,19 +609,29 @@ class _LoginScreenState extends State<LoginScreen>
       ),
       _row(
         i++,
-        M3ButtonGroup<LoginMode>(
+        // TAS-349 (C-06): 2 exclusive options = connected ButtonGroup from
+        // the kit. The `group_item_<mode>` keys stay for tests and patrol.
+        ButtonGroup<LoginMode>(
           key: const ValueKey('login_mode_switch'),
-          values: const [LoginMode.delegate, LoginMode.staff],
-          labels: [
-            AppLocalizations.of(context)!.roleDelegate,
-            AppLocalizations.of(context)!.staffLabel,
+          variant: ButtonGroupVariant.connected,
+          size: ButtonGroupSize.m,
+          expand: true,
+          selected: {_mode},
+          onSelectionChanged: loading ? null : (v) => _setMode(v.first),
+          items: [
+            ButtonGroupItem(
+              key: ValueKey('group_item_${LoginMode.delegate}'),
+              value: LoginMode.delegate,
+              label: AppLocalizations.of(context)!.roleDelegate,
+              icon: Icons.badge_outlined,
+            ),
+            ButtonGroupItem(
+              key: ValueKey('group_item_${LoginMode.staff}'),
+              value: LoginMode.staff,
+              label: AppLocalizations.of(context)!.staffLabel,
+              icon: Icons.admin_panel_settings_outlined,
+            ),
           ],
-          icons: const [
-            Icons.badge_outlined,
-            Icons.admin_panel_settings_outlined,
-          ],
-          selected: _mode,
-          onChanged: loading ? null : _setMode,
         ),
       ),
       _row(
@@ -707,8 +717,7 @@ class _LoginScreenState extends State<LoginScreen>
     bool loading,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
-    final fieldStyle = TextStyle(
-      fontSize: 16,
+    final fieldStyle = Theme.of(context).textTheme.bodyLarge?.copyWith(
       color: colorScheme.onSurface,
       letterSpacing: 1,
     );
@@ -722,6 +731,8 @@ class _LoginScreenState extends State<LoginScreen>
           FilteringTextInputFormatter.allow(RegExp(r'[0-9٠-٩۰-۹]')),
           LengthLimitingTextInputFormatter(11),
         ],
+        // TAS-349 (C-08): a character counter whenever there is a limit.
+        maxLength: 11,
         textInputAction: TextInputAction.next,
         autocorrect: false,
         enableSuggestions: false,
@@ -756,6 +767,7 @@ class _LoginScreenState extends State<LoginScreen>
             FilteringTextInputFormatter.allow(RegExp(r'[0-9٠-٩۰-۹]')),
             LengthLimitingTextInputFormatter(14),
           ],
+          maxLength: 14,
           textInputAction: TextInputAction.done,
           autocorrect: false,
           enableSuggestions: false,
@@ -864,11 +876,7 @@ class _LoginScreenState extends State<LoginScreen>
                 foregroundColor: colorScheme.onPrimary,
                 backgroundColor: colorScheme.primary,
                 shape: const StadiumBorder(),
-                textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  height: 1.4,
-                ),
+                textStyle: Theme.of(context).textTheme.titleSmall,
               ),
               child: IgnorePointer(
                 ignoring: loading,
@@ -918,8 +926,6 @@ class _LoginScreenState extends State<LoginScreen>
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
-              fontSize: 10,
-              height: 1.2,
             ),
           ),
         ),
@@ -1230,7 +1236,6 @@ class _LoginScreenState extends State<LoginScreen>
       focusedErrorBorder: OutlineInputBorder(
         borderSide: BorderSide(color: colorScheme.error, width: 2),
       ),
-      counterText: '',
       suffixIcon: suffixIcon,
     );
   }
@@ -1269,27 +1274,20 @@ class _LoginScreenState extends State<LoginScreen>
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
+                  color: colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(TashilRadius.full),
                 ),
               ),
             ),
             const SizedBox(height: 20),
             Text(
               AppLocalizations.of(context)!.selectOrganization,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
-              ),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(color: colorScheme.onSurface),
             ),
             const SizedBox(height: 8),
             Text(
               AppLocalizations.of(context)!.multipleOrgsChoose,
-              style: TextStyle(
-                fontSize: 14,
-                color: colorScheme.onSurfaceVariant,
-              ),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
           ],
@@ -1343,19 +1341,12 @@ class _LoginScreenState extends State<LoginScreen>
                   children: [
                     Text(
                       delegate.organizationName,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurface,
-                      ),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.onSurface),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       delegate.companyName,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
                     ),
                   ],
                 ),

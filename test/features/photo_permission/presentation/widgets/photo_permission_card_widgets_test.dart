@@ -23,7 +23,11 @@ void main() {
       expect(find.text('كود: 5579'), findsOneWidget);
 
       final codeWidget = tester.widget<Text>(find.text('كود: 5579'));
-      expect(codeWidget.style?.fontSize, 10.5);
+      // TAS-354: the code style comes from the theme (labelSmall), not 10.5.
+      expect(
+        codeWidget.style?.fontSize,
+        Theme.of(tester.element(find.text('كود: 5579'))).textTheme.labelSmall?.fontSize,
+      );
       expect(codeWidget.maxLines, 1);
       expect(codeWidget.overflow, TextOverflow.ellipsis);
     });

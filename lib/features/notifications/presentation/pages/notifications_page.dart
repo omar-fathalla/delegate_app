@@ -1,3 +1,6 @@
+import 'package:delegate_app/core/design/tokens.dart';
+import 'package:delegate_app/core/design/widgets/dialogs.dart';
+import 'package:delegate_app/core/design/widgets/snackbars.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:delegate_app/core/network/connectivity_status.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
@@ -15,39 +18,24 @@ class NotificationsPage extends StatelessWidget {
 
   const NotificationsPage({super.key, required this.delegate});
 
+  // TAS-356 (C-27): kit dialog, text buttons, the confirm says what
+  // happens; the result is a text-only snackbar.
   void _confirmDeleteAll(BuildContext context, List<NotificationEntity> notifications) {
     final bloc = context.read<NotificationBloc>();
-    final messenger = ScaffoldMessenger.of(context);
-    final colorScheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
 
-    showDialog(
+    showTashilDialog<void>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
-          children: [
-            Icon(Icons.delete_sweep_rounded, color: colorScheme.error),
-            const SizedBox(width: 8),
-            Text(
-              AppLocalizations.of(context)!.deleteAllNotifications,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
-            ),
-          ],
-        ),
-        content: Text(
-          AppLocalizations.of(context)!.deleteAllNotificationsConfirm,
-          style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
-        ),
+        key: const Key('deleteAllNotificationsDialog'),
+        title: Text(l10n.deleteAllNotifications),
+        content: Text(l10n.deleteAllNotificationsConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogCtx).pop(),
-            child: Text('إلغاء', style: TextStyle(color: colorScheme.primary)),
+            child: Text(l10n.cancel),
           ),
-          FilledButton.tonal(
-            style: FilledButton.styleFrom(
-              backgroundColor: colorScheme.errorContainer,
-              foregroundColor: colorScheme.onErrorContainer,
-            ),
+          TextButton(
             onPressed: () {
               Navigator.of(dialogCtx).pop();
               final notificationIds = notifications.map((n) => n.id).toList();
@@ -59,17 +47,11 @@ class NotificationsPage extends StatelessWidget {
                   notificationIds: notificationIds,
                 ),
               );
-              messenger.showSnackBar(
-                SnackBar(
-                  content: Text(AppLocalizations.of(context)!.allNotificationsDeleted),
-                  backgroundColor: colorScheme.inverseSurface,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
+              if (context.mounted) {
+                showTashilSnackBar(context, l10n.allNotificationsDeleted);
+              }
             },
-            child: Text(AppLocalizations.of(context)!.deleteAll),
+            child: Text(l10n.deleteAll),
           ),
         ],
       ),
@@ -115,32 +97,14 @@ class NotificationsPage extends StatelessWidget {
                 },
                 backgroundColor: colorScheme.primaryContainer,
                 foregroundColor: colorScheme.onPrimaryContainer,
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 icon: const Icon(Icons.send_rounded),
                 label: Text(AppLocalizations.of(context)!.sendNewNotification),
               )
             : null,
+        // TAS-356 (C-21): the app bar takes its colour and scrolled state
+        // from the theme, like every inner page.
         appBar: AppBar(
-          backgroundColor: colorScheme.surfaceContainer,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(1.0),
-            child: Container(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-              height: 1.0,
-            ),
-          ),
-          title: Text(
-            AppLocalizations.of(context)!.notifications,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-              letterSpacing: -0.2,
-              color: colorScheme.onSurface,
-            ),
-          ),
+          title: Text(AppLocalizations.of(context)!.notifications),
           actions: [
             BlocBuilder<NotificationBloc, NotificationState>(
               builder: (context, state) {
@@ -159,19 +123,12 @@ class NotificationsPage extends StatelessWidget {
                               ),
                             );
                           },
-                          icon: Icon(Icons.check_circle_rounded, size: 18, color: colorScheme.primary),
-                          label: Text(
-                            AppLocalizations.of(context)!.markAllRead,
-                            style: TextStyle(fontSize: 12, color: colorScheme.primary, fontWeight: FontWeight.w600),
-                          ),
-                          style: TextButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.symmetric(horizontal: 6),
-                          ),
+                          icon: const Icon(Icons.done_all_rounded),
+                          label: Text(AppLocalizations.of(context)!.markAllRead),
                         ),
                       IconButton(
                         tooltip: AppLocalizations.of(context)!.deleteAllNotifications,
-                        icon: Icon(Icons.delete_sweep_rounded, color: colorScheme.error),
+                        icon: const Icon(Icons.delete_sweep_rounded),
                         onPressed: () => _confirmDeleteAll(context, state.notifications),
                       ),
                     ],
@@ -198,7 +155,7 @@ class NotificationsPage extends StatelessWidget {
                       size: 64,
                       color: Theme.of(context).colorScheme.error,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: TashilSpacing.lg),
                     Text(
                       state.message,
                       style: Theme.of(context).textTheme.bodyLarge,
@@ -215,18 +172,18 @@ class NotificationsPage extends StatelessWidget {
                 final cs = Theme.of(context).colorScheme;
                 return Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(32),
+                    padding: const EdgeInsets.all(TashilSpacing.xxl),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.cloud_off_rounded, size: 64, color: cs.outline),
-                        const SizedBox(height: 16),
+                        Icon(Icons.cloud_off_rounded, size: 64, color: cs.onSurfaceVariant),
+                        const SizedBox(height: TashilSpacing.lg),
                         Text(
                           AppLocalizations.of(context)!.offlineNotifications,
                           style: Theme.of(context).textTheme.bodyLarge,
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: TashilSpacing.lg),
                         FilledButton.tonal(
                           onPressed: () async {
                             final bloc = context.read<NotificationBloc>();
@@ -255,9 +212,9 @@ class NotificationsPage extends StatelessWidget {
                       Icon(
                         Icons.notifications_none_rounded,
                         size: 64,
-                        color: Theme.of(context).colorScheme.outline,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: TashilSpacing.lg),
                       Text(
                         AppLocalizations.of(context)!.noNotifications,
                         style: Theme.of(context).textTheme.bodyLarge,

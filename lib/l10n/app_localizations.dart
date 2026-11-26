@@ -1484,6 +1484,12 @@ abstract class AppLocalizations {
   /// **'Are you sure you want to delete this task? This action cannot be undone.'**
   String get deleteTaskConfirmation;
 
+  /// No description provided for @notesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add notes here...'**
+  String get notesHint;
+
   /// Label for task notes
   ///
   /// In en, this message translates to:
@@ -4133,6 +4139,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Choose photo'**
   String get chooseImage;
+
+  /// No description provided for @sendRequestAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Send request'**
+  String get sendRequestAction;
 
   /// No description provided for @sendAction.
   ///
