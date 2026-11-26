@@ -8,8 +8,9 @@ import 'package:flutter_test/flutter_test.dart';
 /// the number from growing. When a screen is cleaned up (TAS-349..TAS-358),
 /// lower the baseline to the new count in the same change.
 ///
-/// Counted in `lib/` outside `lib/core/design/` (the design system itself)
-/// and generated files.
+/// Counted in `lib/` outside `lib/core/design/` (the design system itself),
+/// `lib/features/playground/` (dev-only demos: the content-colour demo needs
+/// fixed sample image colours; TAS-383) and generated files.
 const _fontSizeBaseline = 1981; // TAS-350: header + logout dialog
 const _hexColorBaseline = 441; // TAS-350: header live dot
 
@@ -28,6 +29,7 @@ void main() {
         .whereType<File>()
         .where((f) => f.path.endsWith('.dart'))
         .where((f) => !f.path.contains('lib/core/design/'))
+        .where((f) => !f.path.contains('lib/features/playground/'))
         .where((f) => !f.path.contains('/generated/'))
         .where((f) => !f.path.startsWith('lib/l10n'))
         .where((f) => !f.path.endsWith('.g.dart'))

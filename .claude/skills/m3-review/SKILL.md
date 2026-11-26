@@ -9,7 +9,7 @@ Talk to the user in Egyptian Arabic. Keep technical terms, file names and code i
 
 The catalog (`docs/design/m3-catalog.md`) is the index and its "How to review an
 M3 page" section is the full procedure. `docs/design/README.md` says how this app
-differs from the original m3-kit (purple seed, no POS items, no playground,
+differs from the original m3-kit (purple seed, no POS items, playground without the POS tab,
 `material_ui`).
 
 ## Reviewing an app screen (TAS-345 pages)
@@ -17,7 +17,10 @@ differs from the original m3-kit (purple seed, no POS items, no playground,
    simulator, every state the screen has. Save them next to the Linear issue.
 2. List every element on the screen and match it to a catalog ID (F / C). Mark
    each: matches / differs / missing / does not apply.
-3. Fix in place, official Flutter/Google widget first, then
+3. Start from the matching example in the playground
+   (`lib/features/playground/sections/`, open it on the device from Settings in
+   a dev build) and copy its setup, so the screen matches what the design
+   system shows. Fix in place, official Flutter/Google widget first, then
    `lib/core/design/widgets/`. Colours from roles or `TashilSemanticColors`,
    text from `textTheme`, spacing from `TashilSpacing`, shapes from
    `TashilRadius`, `EdgeInsetsDirectional`.
