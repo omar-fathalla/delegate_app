@@ -29,11 +29,7 @@ class CompanyNameWithCode extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     String codeLabel(String c) => l10n?.codeLabel(c) ?? 'كود: $c';
     final effectiveCodeStyle = codeStyle ??
-        TextStyle(
-          fontSize: 10.5,
-          fontWeight: FontWeight.w500,
-          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
-        );
+        Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w500, color: theme.colorScheme.onSurfaceVariant);
 
     Widget buildTwoLines(String? code) {
       return Column(
@@ -65,6 +61,17 @@ class CompanyNameWithCode extends StatelessWidget {
       }
       return Text(
         '$companyName - ${codeLabel(companyCode.toString())}',
+        style: style,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    // No company to look up: the name alone, no Firestore read (TAS-354).
+    if (companyUID.isEmpty || organizationUID.isEmpty) {
+      if (twoLines) return buildTwoLines(null);
+      return Text(
+        companyName,
         style: style,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
