@@ -18,6 +18,7 @@ import 'package:delegate_app/core/design/bidi.dart';
 import 'package:delegate_app/core/design/tokens.dart';
 import 'package:delegate_app/core/design/widgets/dialogs.dart';
 import 'package:delegate_app/core/design/widgets/loading_indicator.dart';
+import 'package:delegate_app/core/design/widgets/summary_card.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/features/attendance/domain/monthly_attendance_stats.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/get_history_for_month.dart';
@@ -1721,173 +1722,58 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     durationStr = l10n.inProgress;
                   }
 
-                  // TAS-387: the session card fills its width: where (branch,
-                  // chain) on the start side and the duration large on the
-                  // end side, then check-in and check-out as two equal
-                  // columns (label over value) across the whole card.
-                  final tt = Theme.of(context).textTheme;
+                  // TAS-387: the session as a SummaryCard (P-07): branch and
+                  // chain, the duration large on the end side, then check-in
+                  // and check-out across the card.
                   final warn = Theme.of(context)
                       .extension<TashilSemanticColors>();
-                  Widget timeColumn(IconData icon, String label, String value) {
-                    return Expanded(
-                      child: Row(
-                        children: [
-                          Icon(icon, size: 20, color: colorScheme.primary),
-                          const SizedBox(width: TashilSpacing.sm),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                label,
-                                style: tt.labelSmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              Text(value, style: tt.titleSmall),
-                            ],
+                  return SummaryCard(
+                    icon: Symbols.storefront_rounded,
+                    title: cleanBranchName,
+                    subtitle: chainName,
+                    trailingValue: durationStr,
+                    trailingCaption: l10n.attDurationLabel,
+                    trailingIcon: Symbols.timer_rounded,
+                    trailingMuted: effectiveOut == null,
+                    labels: [
+                      if (item.isActive)
+                        SummaryLabel(
+                          l10n.active,
+                          container: colorScheme.tertiaryContainer,
+                          onContainer: colorScheme.onTertiaryContainer,
+                        ),
+                      if (item.isEffectiveAutoCheckOut)
+                        Tooltip(
+                          message: l10n.attAutoClosedNote,
+                          child: SummaryLabel(
+                            l10n.autoClosedAuto,
+                            container: colorScheme.tertiaryContainer,
+                            onContainer: colorScheme.onTertiaryContainer,
                           ),
-                        ],
+                        ),
+                      if (!item.isSynced)
+                        SummaryLabel(
+                          l10n.pendingSync,
+                          container: warn?.warningContainer ??
+                              colorScheme.surfaceContainerHighest,
+                          onContainer: warn?.onWarningContainer ??
+                              colorScheme.onSurfaceVariant,
+                        ),
+                    ],
+                    facts: [
+                      SummaryFact(
+                        icon: Symbols.login_rounded,
+                        label: l10n.attCheckInLabel,
+                        value: inTime,
                       ),
-                    );
-                  }
-
-                  return Card.filled(
-                    margin: const EdgeInsetsDirectional.only(
-                      bottom: TashilSpacing.sm,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(TashilSpacing.lg),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(TashilSpacing.sm),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.primary,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Symbols.storefront_rounded,
-                                  size: 20,
-                                  color: colorScheme.onPrimary,
-                                ),
-                              ),
-                              const SizedBox(width: TashilSpacing.md),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      cleanBranchName,
-                                      style: tt.titleMedium,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    if (chainName.isNotEmpty)
-                                      Text(
-                                        chainName,
-                                        style: tt.bodySmall?.copyWith(
-                                          color: colorScheme.onSurfaceVariant,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    if (item.isActive ||
-                                        item.isEffectiveAutoCheckOut ||
-                                        !item.isSynced) ...[
-                                      const SizedBox(height: TashilSpacing.xs),
-                                      Wrap(
-                                        spacing: TashilSpacing.sm,
-                                        children: [
-                                          if (item.isActive)
-                                            _statusLabel(
-                                              context,
-                                              l10n.active,
-                                              colorScheme.tertiaryContainer,
-                                              colorScheme.onTertiaryContainer,
-                                            ),
-                                          if (item.isEffectiveAutoCheckOut)
-                                            Tooltip(
-                                              message: l10n.attAutoClosedNote,
-                                              child: _statusLabel(
-                                                context,
-                                                l10n.autoClosedAuto,
-                                                colorScheme.tertiaryContainer,
-                                                colorScheme.onTertiaryContainer,
-                                              ),
-                                            ),
-                                          if (!item.isSynced)
-                                            _statusLabel(
-                                              context,
-                                              l10n.pendingSync,
-                                              warn?.warningContainer ??
-                                                  colorScheme.surfaceContainerHighest,
-                                              warn?.onWarningContainer ??
-                                                  colorScheme.onSurfaceVariant,
-                                            ),
-                                        ],
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: TashilSpacing.md),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    durationStr,
-                                    style: tt.headlineSmall?.copyWith(
-                                      color: effectiveOut != null
-                                          ? colorScheme.primary
-                                          : colorScheme.onSurfaceVariant,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Symbols.timer_rounded,
-                                        size: 14,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                      const SizedBox(width: TashilSpacing.xs),
-                                      Text(
-                                        l10n.attDurationLabel,
-                                        style: tt.labelSmall?.copyWith(
-                                          color: colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const Divider(height: TashilSpacing.xl),
-                          Row(
-                            children: [
-                              timeColumn(
-                                Symbols.login_rounded,
-                                l10n.attCheckInLabel,
-                                inTime,
-                              ),
-                              timeColumn(
-                                item.isEffectiveAutoCheckOut
-                                    ? Symbols.auto_mode_rounded
-                                    : Symbols.logout_rounded,
-                                l10n.attCheckOutLabel,
-                                outTime,
-                              ),
-                            ],
-                          ),
-                        ],
+                      SummaryFact(
+                        icon: item.isEffectiveAutoCheckOut
+                            ? Symbols.auto_mode_rounded
+                            : Symbols.logout_rounded,
+                        label: l10n.attCheckOutLabel,
+                        value: outTime,
                       ),
-                    ),
+                    ],
                   );
                 }),
                 if (dayIndex < _dayKeys.length - 1) const Divider(height: 24),

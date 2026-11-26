@@ -377,6 +377,7 @@ spacing, density) and styles/spacing.
 | Text input | `TashilTextField` (official `TextField`, outlined from the theme) inside a `FormColumn` | Label always; required `*` + one `RequiredFieldsNote`; error replaces supporting text, with an error icon; numeric keyboard for numbers |
 | Search in a view (products, suppliers) | `TashilSearch` (official `SearchAnchor` + `SearchBar`) | Bar over the content it searches; full screen on compact, docked from 600dp; recent before typing, grouped results + filter chips while typing |
 | Search as a secondary action | `TashilSearch(asIconButton: true)` in the app bar | |
+| A record scanned in a list (attendance session, request, task, penalty) | `SummaryCard` (P-07) | Icon on `primary`, headline + subhead, one prominent value on the end side, label-over-value facts filling the width. Not for a single value (use a plain card) |
 | Contextual action (print receipt, share) | `ActionChip` with icon (assist) | Starts with a verb; below the main content; `.elevated` only over an image |
 | Filtering lists | `FilterChip` | One set is single- or multi-select, never both. `ChoiceChip` is not an M3 variant: do not use it |
 | Filter that opens options (category ▾) | `MenuFilterChip` | The whole chip opens the menu |
