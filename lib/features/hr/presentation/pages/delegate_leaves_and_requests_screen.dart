@@ -1,3 +1,8 @@
+import 'package:delegate_app/config/theme/app_motion.dart';
+import 'package:delegate_app/core/design/widgets/snackbars.dart';
+import 'package:delegate_app/core/design/widgets/date_time_fields.dart';
+import 'package:delegate_app/core/design/widgets/dialogs.dart';
+import 'package:delegate_app/core/design/tokens.dart';
 import 'package:delegate_app/core/storage/storage_media.dart';
 import 'package:delegate_app/core/widgets/storage_resolved_image.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
@@ -14,8 +19,6 @@ import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/hr/domain/services/leave_notification_target.dart';
 import 'package:delegate_app/features/hr/domain/services/payroll_day_rules.dart';
 import 'package:delegate_app/features/hr/presentation/hr_design_tokens.dart';
-import 'package:delegate_app/features/hr/presentation/widgets/hr_selected_card_colors.dart';
-import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 
 class DelegateLeavesAndRequestsScreen extends StatefulWidget {
   final Delegate delegate;
@@ -33,7 +36,8 @@ class DelegateLeavesAndRequestsScreen extends StatefulWidget {
 }
 
 class _DelegateLeavesAndRequestsScreenState
-    extends State<DelegateLeavesAndRequestsScreen> {
+    extends State<DelegateLeavesAndRequestsScreen>
+    with ExtendedFabScroll {
   String _selectedStatusFilter = 'all'; // all, pending, approved, rejected
   bool _isAnnualLeaveEnabled = false;
   int _annualLeaveQuota = 21; // الرصيد السنوي (21 يوم)
@@ -124,11 +128,7 @@ class _DelegateLeavesAndRequestsScreenState
                 children: [
                   Text(
                     AppLocalizations.of(context)!.reqTitle,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: HrFont.body,
-                      letterSpacing: -0.2,
-                    ),
+                    style: Theme.of(context).textTheme.titleMedium,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -136,8 +136,7 @@ class _DelegateLeavesAndRequestsScreenState
                     widget.delegate.companyName.isNotEmpty
                         ? widget.delegate.companyName
                         : widget.delegate.organizationName,
-                    style: TextStyle(
-                      fontSize: HrFont.labelSmall,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
                     maxLines: 1,
@@ -158,12 +157,17 @@ class _DelegateLeavesAndRequestsScreenState
               ],
             )
           : null,
+      // TAS-353 (C-04): shrinks to an icon while the list scrolls down.
       floatingActionButton: M3ExtendedFab(
+        key: const Key('newRequestFab'),
         onPressed: () => _showCreateRequestDialog(context),
         icon: Symbols.add_rounded,
         label: AppLocalizations.of(context)!.newRequest,
+        extended: fabExtended,
       ),
-      body: Builder(
+      body: NotificationListener<UserScrollNotification>(
+        onNotification: onFabScroll,
+        child: Builder(
         builder: (context) {
           if (!_leaveLoaded) {
             return const Center(child: M3DelayedLoading());
@@ -245,15 +249,6 @@ class _DelegateLeavesAndRequestsScreenState
                           theme: theme,
                           isArabic: isArabic,
                         ),
-                      const SizedBox(height: 12),
-                      // كروت الإحصائيات الأفقية
-                      _buildKpiRow(
-                        totalCount: allLeaves.length,
-                        pendingCount: pendingCount,
-                        approvedCount: approvedCount,
-                        rejectedCount: rejectedCount,
-                        colorScheme: colorScheme,
-                      ),
                     ],
                   ),
                 ),
@@ -262,7 +257,9 @@ class _DelegateLeavesAndRequestsScreenState
               // ── 2. Filter Button Group (مجموعة أزرار متصلة بدون سكرول) ──
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  padding: const EdgeInsetsDirectional.symmetric(
+                    vertical: TashilSpacing.xs,
+                  ),
                   child: _buildFilterButtonGroup(
                     totalCount: allLeaves.length,
                     pendingCount: pendingCount,
@@ -281,20 +278,12 @@ class _DelegateLeavesAndRequestsScreenState
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHigh
-                                .withValues(alpha: 0.4),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Symbols.event_busy_rounded,
-                            size: 54,
-                            color: colorScheme.outline,
-                          ),
+                        Icon(
+                          Symbols.event_busy_rounded,
+                          size: 56,
+                          color: colorScheme.onSurfaceVariant,
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: TashilSpacing.lg),
                         Text(
                           _selectedStatusFilter == 'all'
                               ? AppLocalizations.of(context)!.reqEmptyAll
@@ -307,9 +296,8 @@ class _DelegateLeavesAndRequestsScreenState
                         const SizedBox(height: 8),
                         Text(
                           AppLocalizations.of(context)!.reqEmptyHint,
-                          style: TextStyle(
-                            fontSize: HrFont.labelMedium,
-                            color: colorScheme.outline,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -318,7 +306,12 @@ class _DelegateLeavesAndRequestsScreenState
                 )
               else
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
+                  padding: const EdgeInsetsDirectional.fromSTEB(
+                    TashilSpacing.page,
+                    TashilSpacing.xs,
+                    TashilSpacing.page,
+                    96,
+                  ),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
@@ -338,10 +331,13 @@ class _DelegateLeavesAndRequestsScreenState
           );
         },
       ),
+      ),
     );
   }
 
   // ── Annual Balance Card ──
+  // TAS-353: Card.filled, the card icon on primary + onPrimary, text from
+  // the textTheme. A low balance is a warning label, never an error colour.
   Widget _buildAnnualBalanceCard({
     required int usedDays,
     required int remainingDays,
@@ -349,116 +345,102 @@ class _DelegateLeavesAndRequestsScreenState
     required ColorScheme colorScheme,
   }) {
     final progress = (usedDays / totalQuota).clamp(0.0, 1.0);
+    final tt = Theme.of(context).textTheme;
+    final semantic = Theme.of(context).extension<TashilSemanticColors>();
+    final low = remainingDays <= 3;
+    final l10n = AppLocalizations.of(context)!;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(HrRadius.card),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(HrRadius.chip),
-                ),
-                child: Icon(
-                  Symbols.account_balance_wallet_rounded,
-                  size: 20,
-                  color: colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      AppLocalizations.of(context)!.annualLeaveBalance,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: HrFont.body,
+    return Card.filled(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(TashilSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _cardIcon(Symbols.account_balance_wallet_rounded, colorScheme),
+                const SizedBox(width: TashilSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l10n.annualLeaveBalance, style: tt.titleSmall),
+                      Text(
+                        l10n.forYear(DateTime.now().year),
+                        style: tt.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
-                    Text(
-                      AppLocalizations.of(context)!.forYear(DateTime.now().year),
-                      style: TextStyle(
-                        fontSize: HrFont.labelSmall,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: remainingDays > 3
-                      ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)
-                      : colorScheme.error.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(HrRadius.card),
-                ),
-                child: Text(
-                  AppLocalizations.of(context)!.remainingDays(remainingDays),
-                  style: TextStyle(
-                    fontSize: HrFont.labelMedium,
-                    fontWeight: FontWeight.bold,
-                    color: remainingDays > 3
-                        ? Theme.of(context).colorScheme.primary
-                        : colorScheme.error,
+                    ],
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 7,
-              backgroundColor: colorScheme.surfaceContainerHigh,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                progress > 0.85 ? colorScheme.error : colorScheme.primary,
-              ),
+                _label(
+                  l10n.remainingDays(remainingDays),
+                  low
+                      ? (semantic?.warningContainer ??
+                            colorScheme.tertiaryContainer)
+                      : colorScheme.secondaryContainer,
+                  low
+                      ? (semantic?.onWarningContainer ??
+                            colorScheme.onTertiaryContainer)
+                      : colorScheme.onSecondaryContainer,
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                AppLocalizations.of(context)!.usedDays(usedDays),
-                style: TextStyle(
-                  fontSize: HrFont.labelSmall,
-                  color: colorScheme.onSurfaceVariant,
+            const SizedBox(height: TashilSpacing.md),
+            LinearProgressIndicator(value: progress),
+            const SizedBox(height: TashilSpacing.sm),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  l10n.usedDays(usedDays),
+                  style: tt.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
-              Text(
-                AppLocalizations.of(context)!.totalQuotaDays(totalQuota),
-                style: TextStyle(
-                  fontSize: HrFont.labelSmall,
-                  color: colorScheme.onSurfaceVariant,
+                Text(
+                  l10n.totalQuotaDays(totalQuota),
+                  style: tt.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
+
+  /// Icon on a card (TAS-384 rule): primary circle, onPrimary icon.
+  Widget _cardIcon(IconData icon, ColorScheme colorScheme) => Container(
+    padding: const EdgeInsets.all(TashilSpacing.sm),
+    decoration: BoxDecoration(
+      color: colorScheme.primary,
+      shape: BoxShape.circle,
+    ),
+    child: Icon(icon, size: 20, color: colorScheme.onPrimary),
+  );
+
+  /// Compact read-only label: a container role with its on colour.
+  Widget _label(String text, Color container, Color onContainer) => Container(
+    padding: const EdgeInsetsDirectional.symmetric(
+      horizontal: TashilSpacing.sm,
+      vertical: TashilSpacing.xs / 2,
+    ),
+    decoration: BoxDecoration(
+      color: container,
+      borderRadius: BorderRadius.circular(TashilRadius.small),
+    ),
+    child: Text(
+      text,
+      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+        color: onContainer,
+      ),
+    ),
+  );
 
   // ── Probation Weekly Leaves Card (نظام الإجازات الأسبوعية فقط) ──
   Widget _buildProbationWeeklyLeavesCard({
@@ -466,118 +448,83 @@ class _DelegateLeavesAndRequestsScreenState
     required ThemeData theme,
     required bool isArabic,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(HrRadius.card),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.tertiaryContainer,
-                  borderRadius: BorderRadius.circular(HrRadius.chip),
+    final tt = theme.textTheme;
+    final l10n = AppLocalizations.of(context)!;
+    return Card.filled(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(TashilSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _cardIcon(Symbols.event_repeat_rounded, colorScheme),
+                const SizedBox(width: TashilSpacing.md),
+                Expanded(
+                  child: Text(l10n.weeklyOffPlan, style: tt.titleSmall),
                 ),
-                child: Icon(
-                  Symbols.event_repeat_rounded,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.onTertiaryContainer,
+                _label(
+                  l10n.daysOffPerMonth,
+                  colorScheme.secondaryContainer,
+                  colorScheme.onSecondaryContainer,
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  AppLocalizations.of(context)!.weeklyOffPlan,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: HrFont.body,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.tertiaryContainer,
-                  borderRadius: BorderRadius.circular(HrRadius.card),
-                ),
-                child: Text(
-                  AppLocalizations.of(context)!.daysOffPerMonth,
-                  style: TextStyle(
-                    fontSize: HrFont.labelSmall,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onTertiaryContainer,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(HrRadius.chip),
+              ],
             ),
-            child: Row(
+            const SizedBox(height: TashilSpacing.md),
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
                   Symbols.info_rounded,
                   size: 16,
-                  color: colorScheme.primary,
+                  color: colorScheme.onSurfaceVariant,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: TashilSpacing.sm),
                 Expanded(
                   child: Text(
-                    AppLocalizations.of(context)!.weeklyPlanNote,
-                    style: TextStyle(
-                      fontSize: HrFont.labelSmall,
+                    l10n.weeklyPlanNote,
+                    style: tt.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
-                      height: 1.4,
                     ),
                   ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _buildLeaveFeaturePill(
-                  icon: Symbols.calendar_today_rounded,
-                  label: AppLocalizations.of(context)!.weeklyDayOff,
-                  sublabel: AppLocalizations.of(context)!.oneDayEvery7,
-                  colorScheme: colorScheme,
+            const SizedBox(height: TashilSpacing.md),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildLeaveFeaturePill(
+                    icon: Symbols.calendar_today_rounded,
+                    label: l10n.weeklyDayOff,
+                    sublabel: l10n.oneDayEvery7,
+                    colorScheme: colorScheme,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildLeaveFeaturePill(
-                  icon: Symbols.schedule_rounded,
-                  label: AppLocalizations.of(context)!.hourlyPermission,
-                  sublabel: AppLocalizations.of(context)!.availableLabel,
-                  colorScheme: colorScheme,
+                const SizedBox(width: TashilSpacing.sm),
+                Expanded(
+                  child: _buildLeaveFeaturePill(
+                    icon: Symbols.schedule_rounded,
+                    label: l10n.hourlyPermission,
+                    sublabel: l10n.availableLabel,
+                    colorScheme: colorScheme,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildLeaveFeaturePill(
-                  icon: Symbols.lock_clock_rounded,
-                  label: AppLocalizations.of(context)!.annualBalance21,
-                  sublabel: AppLocalizations.of(context)!.onceActivated,
-                  colorScheme: colorScheme,
-                  isMuted: true,
+                const SizedBox(width: TashilSpacing.sm),
+                Expanded(
+                  child: _buildLeaveFeaturePill(
+                    icon: Symbols.lock_clock_rounded,
+                    label: l10n.annualBalance21,
+                    sublabel: l10n.onceActivated,
+                    colorScheme: colorScheme,
+                    isMuted: true,
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -589,38 +536,34 @@ class _DelegateLeavesAndRequestsScreenState
     required ColorScheme colorScheme,
     bool isMuted = false,
   }) {
+    final tt = Theme.of(context).textTheme;
+    final fg = isMuted ? colorScheme.onSurfaceVariant : colorScheme.onSurface;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: TashilSpacing.sm,
+        vertical: TashilSpacing.sm,
+      ),
       decoration: BoxDecoration(
-        color: isMuted
-            ? colorScheme.surfaceContainer
-            : colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(HrRadius.chip),
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(TashilRadius.medium),
       ),
       child: Column(
         children: [
           Icon(
             icon,
-            size: 15,
-            color: isMuted ? colorScheme.outline : colorScheme.primary,
+            size: 18,
+            color: isMuted ? colorScheme.onSurfaceVariant : colorScheme.primary,
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: TashilSpacing.xs),
           Text(
             label,
-            style: TextStyle(
-              fontSize: HrFont.labelSmall,
-              fontWeight: FontWeight.bold,
-              color: isMuted ? colorScheme.outline : colorScheme.onSurface,
-            ),
+            style: tt.labelMedium?.copyWith(color: fg),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
           Text(
             sublabel,
-            style: TextStyle(
-              fontSize: HrFont.labelSmall,
-              color: isMuted ? colorScheme.outline : colorScheme.onSurfaceVariant,
-            ),
+            style: tt.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -629,127 +572,9 @@ class _DelegateLeavesAndRequestsScreenState
     );
   }
 
-  // ── KPI Row (مدمجة في صف واحد متجاوب بدون سكرول أفقي) ──
-  Widget _buildKpiRow({
-    required int totalCount,
-    required int pendingCount,
-    required int approvedCount,
-    required int rejectedCount,
-    required ColorScheme colorScheme,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(HrRadius.card),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.03),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildMiniKpi(
-              title: AppLocalizations.of(context)!.filterAll,
-              value: '$totalCount',
-              icon: Symbols.event_note_rounded,
-              color: colorScheme.primary,
-              colorScheme: colorScheme,
-            ),
-          ),
-          _buildKpiDivider(colorScheme),
-          Expanded(
-            child: _buildMiniKpi(
-              title: AppLocalizations.of(context)!.statusPendingReview,
-              value: '$pendingCount',
-              icon: Symbols.hourglass_top_rounded,
-              color: Theme.of(context).colorScheme.onTertiaryContainer,
-              colorScheme: colorScheme,
-            ),
-          ),
-          _buildKpiDivider(colorScheme),
-          Expanded(
-            child: _buildMiniKpi(
-              title: AppLocalizations.of(context)!.statusApprovedPl,
-              value: '$approvedCount',
-              icon: Symbols.check_circle_rounded,
-              color: Theme.of(context).colorScheme.primary,
-              colorScheme: colorScheme,
-            ),
-          ),
-          _buildKpiDivider(colorScheme),
-          Expanded(
-            child: _buildMiniKpi(
-              title: AppLocalizations.of(context)!.statusRejectedPl,
-              value: '$rejectedCount',
-              icon: Symbols.cancel_rounded,
-              color: colorScheme.error,
-              colorScheme: colorScheme,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildKpiDivider(ColorScheme colorScheme) {
-    return Container(
-      width: 1,
-      height: 30,
-      color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-    );
-  }
-
-  Widget _buildMiniKpi({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color color,
-    required ColorScheme colorScheme,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 12.5, color: color),
-              const SizedBox(width: 3),
-              Flexible(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: HrFont.labelSmall,
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: HrFont.titleMedium,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Filter Button Group (مجموعة أزرار متصلة للفلترة) ──
+  /// TAS-353 (C-06): the status filter is one row of single-select
+  /// FilterChips «label · count» (the separate KPI row with the same
+  /// numbers is gone).
   Widget _buildFilterButtonGroup({
     required int totalCount,
     required int pendingCount,
@@ -757,128 +582,35 @@ class _DelegateLeavesAndRequestsScreenState
     required int rejectedCount,
     required ColorScheme colorScheme,
   }) {
-    return Container(
-      height: 38,
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(HrRadius.chip),
+    final l10n = AppLocalizations.of(context)!;
+    final options = [
+      ('all', l10n.filterAll, totalCount),
+      ('pending', l10n.statusPendingReview, pendingCount),
+      ('approved', l10n.statusApprovedPl, approvedCount),
+      ('rejected', l10n.statusRejectedPl, rejectedCount),
+    ];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: TashilSpacing.page,
       ),
-      padding: const EdgeInsets.all(2.5),
       child: Row(
         children: [
-          _buildFilterSegment(
-            label: AppLocalizations.of(context)!.filterAll,
-            count: totalCount,
-            value: 'all',
-            colorScheme: colorScheme,
-          ),
-          _buildFilterSegment(
-            label: AppLocalizations.of(context)!.statusPendingReview,
-            count: pendingCount,
-            value: 'pending',
-            activeColor: Theme.of(context).colorScheme.onTertiaryContainer,
-            colorScheme: colorScheme,
-          ),
-          _buildFilterSegment(
-            label: AppLocalizations.of(context)!.statusApprovedPl,
-            count: approvedCount,
-            value: 'approved',
-            activeColor: Theme.of(context).colorScheme.primary,
-            colorScheme: colorScheme,
-          ),
-          _buildFilterSegment(
-            label: AppLocalizations.of(context)!.statusRejectedPl,
-            count: rejectedCount,
-            value: 'rejected',
-            activeColor: colorScheme.error,
-            colorScheme: colorScheme,
-          ),
+          for (final (key, label, count) in options) ...[
+            if (key != 'all') const SizedBox(width: TashilSpacing.sm),
+            FilterChip(
+              key: ValueKey('requests_filter_$key'),
+              selected: _selectedStatusFilter == key,
+              label: Text('$label · $count'),
+              onSelected: (_) =>
+                  setState(() => _selectedStatusFilter = key),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildFilterSegment({
-    required String label,
-    required int count,
-    required String value,
-    Color? activeColor,
-    required ColorScheme colorScheme,
-  }) {
-    final isSelected = _selectedStatusFilter == value;
-    // Web (TAS-185): the selected filter uses the primary container like
-    // every HR web page. Mobile keeps the secondary container.
-    final web =
-        WebRuntimePolicy.isWeb ? HrSelectedCardColors.of(colorScheme) : null;
-    final selectedBg = web?.background ?? colorScheme.secondaryContainer;
-    final selectedFg = web?.foreground ?? colorScheme.onSecondaryContainer;
-
-    return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _selectedStatusFilter = value),
-        borderRadius: BorderRadius.circular(HrRadius.chip),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          decoration: BoxDecoration(
-            color: isSelected ? selectedBg : Colors.transparent,
-            borderRadius: BorderRadius.circular(HrRadius.chip),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: Colors.transparent,
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ]
-                : null,
-          ),
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: HrFont.labelSmall,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                    color: isSelected
-                        ? selectedFg
-                        : colorScheme.onSurfaceVariant,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 3),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? selectedFg.withValues(alpha: 0.12)
-                      : colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(HrRadius.chip),
-                ),
-                child: Text(
-                  '$count',
-                  style: TextStyle(
-                    fontSize: HrFont.labelSmall,
-                    fontWeight: FontWeight.bold,
-                    color: isSelected
-                        ? selectedFg
-                        : colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Request Card (كارت مدمج قابل للتوسيع عند الضغط) ──
   Widget _buildRequestCard({
     required Map<String, dynamic> req,
     required ColorScheme colorScheme,
@@ -967,42 +699,37 @@ class _DelegateLeavesAndRequestsScreenState
         break;
     }
 
-    // Status styling
-    Color statusColor;
-    String statusLabel;
-    IconData statusIcon;
-    switch (status) {
-      case 'approved':
-        statusColor = Theme.of(context).colorScheme.primary;
-        statusLabel = AppLocalizations.of(context)!.statusApproved;
-        statusIcon = Symbols.check_circle_rounded;
-        break;
-      case 'rejected':
-        statusColor = colorScheme.error;
-        statusLabel = AppLocalizations.of(context)!.statusRejected;
-        statusIcon = Symbols.cancel_rounded;
-        break;
-      default:
-        statusColor = Theme.of(context).colorScheme.onTertiaryContainer;
-        statusLabel = AppLocalizations.of(context)!.statusPending;
-        statusIcon = Symbols.hourglass_top_rounded;
-        break;
-    }
-
-    final durationText = isHourly ? AppLocalizations.of(context)!.hoursCount(hoursCount) : AppLocalizations.of(context)!.daysCount(daysCount);
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      elevation: 0,
-      color: colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(HrRadius.card),
-        side: BorderSide(
-          color: isExpanded
-              ? colorScheme.primary.withValues(alpha: 0.5)
-              : colorScheme.outlineVariant.withValues(alpha: 0.45),
-        ),
+    // TAS-353: status is a compact label (container role + on colour);
+    // rejected is the only error, pending is neutral, approved is success.
+    final semantic = Theme.of(context).extension<TashilSemanticColors>();
+    final l10n = AppLocalizations.of(context)!;
+    final tt = theme.textTheme;
+    final (Color statusBg, Color statusFg, String statusLabel) =
+        switch (status) {
+      'approved' => (
+        semantic?.successContainer ?? colorScheme.primaryContainer,
+        semantic?.onSuccessContainer ?? colorScheme.onPrimaryContainer,
+        l10n.statusApproved,
       ),
+      'rejected' => (
+        colorScheme.errorContainer,
+        colorScheme.onErrorContainer,
+        l10n.statusRejected,
+      ),
+      _ => (
+        colorScheme.surfaceContainerHighest,
+        colorScheme.onSurfaceVariant,
+        l10n.statusPending,
+      ),
+    };
+
+    final durationText = isHourly
+        ? l10n.hoursCount(hoursCount)
+        : l10n.daysCount(daysCount);
+
+    return Card.filled(
+      key: ValueKey('request_card_$docId'),
+      margin: const EdgeInsetsDirectional.only(bottom: TashilSpacing.sm),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
@@ -1014,285 +741,103 @@ class _DelegateLeavesAndRequestsScreenState
             }
           });
         },
-        child: Stack(
-          children: [
-            // Subtle 3.5px start border line (Right in RTL)
-            Positioned(
-              top: 0,
-              bottom: 0,
-              right: 0,
-              width: 3.5,
-              child: Container(
-                color: statusColor,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 10, 14, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+        child: Padding(
+          padding: const EdgeInsets.all(TashilSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
                 children: [
-                  // Row الرئيسي المدمج دائماً (Collapsed View)
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(HrRadius.chip),
+                  _cardIcon(typeIcon, colorScheme),
+                  const SizedBox(width: TashilSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '$typeLabel · $durationText',
+                          style: tt.titleSmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        child: Icon(typeIcon, size: 16, color: colorScheme.primary),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  typeLabel,
-                                  style: const TextStyle(
-                                    fontSize: HrFont.body,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 1.5,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.primaryContainer.withValues(alpha: 0.35),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    durationText,
-                                    style: TextStyle(
-                                      fontSize: HrFont.labelSmall,
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.primary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                Icon(
-                                  Symbols.calendar_today_rounded,
-                                  size: 11,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    periodStr,
-                                    style: TextStyle(
-                                      fontSize: HrFont.labelSmall,
-                                      color: colorScheme.onSurfaceVariant,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      // Status Pill
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(HrRadius.chip),
-                          border: Border.all(
-                            color: statusColor.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(statusIcon, size: 11, color: statusColor),
-                            const SizedBox(width: 3),
-                            Text(
-                              statusLabel,
-                              style: TextStyle(
-                                fontSize: HrFont.labelSmall,
-                                fontWeight: FontWeight.bold,
-                                color: statusColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      // Animated Expand Chevron
-                      AnimatedRotation(
-                        turns: isExpanded ? 0.5 : 0.0,
-                        duration: const Duration(milliseconds: 200),
-                        child: Icon(
-                          Symbols.expand_more_rounded,
-                          size: 18,
-                          color: colorScheme.outline,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // التفاصيل الموسعة فقط عند الضغط (Expanded View)
-                  if (isExpanded) ...[
-                    const SizedBox(height: 8),
-                    Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.25),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // السبب
-                    if (reason.isNotEmpty)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
-                          borderRadius: BorderRadius.circular(HrRadius.chip),
-                        ),
-                        child: Text(
-                          AppLocalizations.of(context)!.reasonLabel(reason),
-                          style: TextStyle(
-                            fontSize: HrFont.labelSmall,
+                        const SizedBox(height: TashilSpacing.xs / 2),
+                        Text(
+                          periodStr,
+                          style: tt.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-
-                    // سبب الرفض (إن وجد)
-                    if (status == 'rejected' && rejectReason.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: colorScheme.errorContainer.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(HrRadius.chip),
-                          border: Border.all(
-                            color: colorScheme.error.withValues(alpha: 0.35),
-                          ),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              Symbols.info_rounded,
-                              size: 14,
-                              color: colorScheme.error,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                AppLocalizations.of(context)!.rejectReasonLabel(rejectReason),
-                                style: TextStyle(
-                                  fontSize: HrFont.labelSmall,
-                                  color: colorScheme.error,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    // الاعتماد (إن وجد)
-                    if (status == 'approved' && resolvedByName.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(
-                            Symbols.verified_user_rounded,
-                            size: 13,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            AppLocalizations.of(context)!.approvedBy(resolvedByName),
-                            style: TextStyle(
-                              fontSize: HrFont.labelSmall,
-                              fontWeight: FontWeight.w600,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                          if (resolvedAt != null) ...[
-                            const SizedBox(width: 4),
-                            Text(
-                              '(${DateFormat('yyyy/MM/dd').format(resolvedAt)})',
-                              style: TextStyle(
-                                fontSize: HrFont.labelSmall,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-
-                    // أزرار العمليات (معاينة المرفق / إلغاء الطلب)
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        if (attachmentUrl.isNotEmpty)
-                          SizedBox(
-                            height: 32,
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(HrRadius.chip),
-                                ),
-                              ),
-                              icon: const Icon(Symbols.attachment_rounded, size: 14),
-                              label: Text(
-                                AppLocalizations.of(context)!.previewAttachment,
-                                style: TextStyle(fontSize: HrFont.labelSmall),
-                              ),
-                              onPressed: () => _viewAttachment(context, attachmentUrl),
-                            ),
-                          )
-                        else
-                          const SizedBox.shrink(),
-
-                        if (status == 'pending')
-                          SizedBox(
-                            height: 32,
-                            child: TextButton.icon(
-                              style: TextButton.styleFrom(
-                                foregroundColor: colorScheme.error,
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
-                              ),
-                              icon: const Icon(Symbols.delete_outline_rounded, size: 15),
-                              label: Text(
-                                AppLocalizations.of(context)!.cancelRequest,
-                                style: TextStyle(fontSize: HrFont.labelSmall),
-                              ),
-                              onPressed: () =>
-                                  _cancelPendingRequest(context, req['docId']),
-                            ),
-                          ),
                       ],
                     ),
-                  ],
+                  ),
+                  const SizedBox(width: TashilSpacing.sm),
+                  _label(statusLabel, statusBg, statusFg),
+                  AnimatedRotation(
+                    turns: isExpanded ? 0.5 : 0.0,
+                    duration: AppMotionDurations.short4,
+                    child: Icon(
+                      Symbols.expand_more_rounded,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 ],
               ),
-            ),
-          ],
+              if (isExpanded) ...[
+                const Divider(height: TashilSpacing.xl),
+                if (reason.isNotEmpty)
+                  Text(
+                    l10n.reasonLabel(reason),
+                    style: tt.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                if (status == 'rejected' && rejectReason.isNotEmpty) ...[
+                  const SizedBox(height: TashilSpacing.sm),
+                  Text(
+                    l10n.rejectReasonLabel(rejectReason),
+                    style: tt.bodyMedium?.copyWith(color: colorScheme.error),
+                  ),
+                ],
+                if (status == 'approved' && resolvedByName.isNotEmpty) ...[
+                  const SizedBox(height: TashilSpacing.sm),
+                  Text(
+                    resolvedAt != null
+                        ? '${l10n.approvedBy(resolvedByName)} (${DateFormat('yyyy/MM/dd').format(resolvedAt)})'
+                        : l10n.approvedBy(resolvedByName),
+                    style: tt.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                if (attachmentUrl.isNotEmpty || status == 'pending') ...[
+                  const SizedBox(height: TashilSpacing.sm),
+                  Row(
+                    children: [
+                      if (attachmentUrl.isNotEmpty)
+                        OutlinedButton.icon(
+                          icon: const Icon(Symbols.attachment_rounded),
+                          label: Text(l10n.previewAttachment),
+                          onPressed: () =>
+                              _viewAttachment(context, attachmentUrl),
+                        ),
+                      const Spacer(),
+                      if (status == 'pending')
+                        TextButton.icon(
+                          icon: const Icon(Symbols.delete_outline_rounded),
+                          label: Text(l10n.cancelRequest),
+                          onPressed: () =>
+                              _cancelPendingRequest(context, req['docId']),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -1302,22 +847,20 @@ class _DelegateLeavesAndRequestsScreenState
   Future<void> _cancelPendingRequest(BuildContext context, String docId) async {
     final messenger = ScaffoldMessenger.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final confirm = await showDialog<bool>(
+    // TAS-353 (C-27): kit dialog, text buttons, confirm last.
+    final confirm = await showTashilDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(AppLocalizations.of(context)!.cancelRequest),
-        content: Text(AppLocalizations.of(context)!.cancelRequestConfirm),
+        title: Text(l10n.cancelRequest),
+        content: Text(l10n.cancelRequestConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text(AppLocalizations.of(context)!.keepRequest),
+            child: Text(l10n.keepRequest),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
+          TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(AppLocalizations.of(context)!.yesCancel),
+            child: Text(l10n.yesCancel),
           ),
         ],
       ),
@@ -1343,7 +886,7 @@ class _DelegateLeavesAndRequestsScreenState
 
   // ── معاينة المرفق بدقة عالية ──
   void _viewAttachment(BuildContext context, String url) {
-    showDialog(
+    showTashilDialog<void>(
       context: context,
       builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HrRadius.card)),
@@ -1358,9 +901,10 @@ class _DelegateLeavesAndRequestsScreenState
                 children: [
                   Text(
                     AppLocalizations.of(context)!.requestAttachment,
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: HrFont.titleMedium),
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
                   IconButton(
+                    tooltip: MaterialLocalizations.of(ctx).closeButtonTooltip,
                     icon: const Icon(Symbols.close_rounded),
                     onPressed: () => Navigator.pop(ctx),
                   ),
@@ -1402,18 +946,23 @@ class _DelegateLeavesAndRequestsScreenState
     );
   }
 
-  // ── تسجيل إجازة / عذر جديد (المقترحات 1 إلى 5) ──
+  // ── تسجيل إجازة / عذر جديد ──
+  // TAS-353 (C-27): a FormDialog (full screen on compact, basic dialog from
+  // 600dp). ✕ is the only way out and asks before dropping edits; the save
+  // action is named after its result. Fields are outlined: DateField (C-14)
+  // and the inline ScrollTimePicker (C-15). The submit logic is unchanged.
   Future<void> _showCreateRequestDialog(BuildContext context) async {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
 
     String selectedType = _isAnnualLeaveEnabled ? 'annual' : 'delay';
-    DateTime startDate = DateTime.now();
-    DateTime endDate = DateTime.now();
+    final initialType = selectedType;
+    final today = DateTime.now();
+    DateTime startDate = DateTime(today.year, today.month, today.day);
+    DateTime endDate = startDate;
 
-    // المقترح 4: حقول العذر الساعي
-    bool isHourly = !_isAnnualLeaveEnabled; // افتراضياً ساعي إذا لم تكن الإجازة السنوية مفعلة
-    double hoursCount = 2.0;
+    bool isHourly = !_isAnnualLeaveEnabled;
+    const double hoursCount = 2.0;
     TimeOfDay fromTime = const TimeOfDay(hour: 9, minute: 0);
     TimeOfDay toTime = const TimeOfDay(hour: 11, minute: 0);
 
@@ -1421,1038 +970,395 @@ class _DelegateLeavesAndRequestsScreenState
     XFile? pickedAttachment;
     bool isSubmitting = false;
     String? submittedLeaveId;
+    bool touched = false;
 
-    await showModalBottomSheet(
+    await showTashilDialog<void>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
+      barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDlgState) {
+          final theme = Theme.of(context);
+          final colorScheme = theme.colorScheme;
+          final textTheme = theme.textTheme;
+          final semantic = theme.extension<TashilSemanticColors>();
           final isLeaveType = selectedType == 'annual' ||
               selectedType == 'sick' ||
               selectedType == 'emergency' ||
               selectedType == 'unpaid';
-
-          // التحديث التلقائي لنمط الساعات عند اختيار عذر تأخير أو إذن مبكر
           if (selectedType == 'delay' || selectedType == 'early_leave') {
             isHourly = true;
           }
-
           final calculatedDays = endDate.difference(startDate).inDays + 1;
+          final dirty = touched ||
+              selectedType != initialType ||
+              reasonCtrl.text.trim().isNotEmpty ||
+              pickedAttachment != null;
 
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.viewInsetsOf(context).bottom,
-            ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Dialog Header
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(7),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(HrRadius.chip),
-                          ),
-                          child: Icon(
-                            Symbols.edit_calendar_rounded,
-                            size: 18,
-                            color: colorScheme.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            AppLocalizations.of(context)!.newRequest,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: HrFont.titleMedium,
-                            ),
-                          ),
-                        ),
-                        InkWell(
-                          onTap: isSubmitting ? null : () => Navigator.pop(ctx),
-                          borderRadius: BorderRadius.circular(HrRadius.button),
-                          child: Padding(
-                            padding: const EdgeInsets.all(4),
-                            child: Icon(
-                              Symbols.close_rounded,
-                              size: 20,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
+          void edit(VoidCallback change) => setDlgState(() {
+                touched = true;
+                change();
+              });
+
+          Future<void> submit() async {
+            final reason = reasonCtrl.text.trim();
+            if (reason.isEmpty) {
+              showTashilSnackBar(context, l10n.enterLeaveReason);
+              return;
+            }
+            if (!_isAnnualLeaveEnabled && selectedType == 'annual') {
+              showTashilSnackBar(context, l10n.annualNotActive);
+              return;
+            }
+            final String? fromTimeFormatted =
+                isHourly ? fromTime.format(context) : null;
+            final String? toTimeFormatted =
+                isHourly ? toTime.format(context) : null;
+
+            setDlgState(() => isSubmitting = true);
+            try {
+              String? attachmentPath;
+              String? attachmentUrl;
+              // Upload the attachment (skipped on retry once the leave exists).
+              if (submittedLeaveId == null && pickedAttachment != null) {
+                final bytes = await pickedAttachment!.readAsBytes();
+                final fileName =
+                    '${DateTime.now().millisecondsSinceEpoch}_${pickedAttachment!.name}';
+                final storageRef = FirebaseStorage.instance.ref().child(
+                      'leave_attachments/${widget.delegate.companyUID}/${widget.delegate.uid}/$fileName',
+                    );
+                final metadata = SettableMetadata(
+                  contentType: 'image/jpeg',
+                  customMetadata: {
+                    'companyUID': widget.delegate.companyUID,
+                    'delegateUid': widget.delegate.uid,
+                  },
+                );
+                final uploadTask = await storageRef.putData(bytes, metadata);
+                // TAS-42: store the path; the URL only for old app versions.
+                attachmentPath = uploadTask.ref.fullPath;
+                attachmentUrl = await LegacyStorageUrls.urlFor(uploadTask.ref);
+              }
+
+              if (submittedLeaveId == null) {
+                final docRef = FirebaseFirestore.instance
+                    .collection('leave_requests')
+                    .doc();
+                final int finalDays = isHourly
+                    ? 0
+                    : (endDate.difference(startDate).inDays + 1);
+                await docRef.set({
+                  'id': docRef.id,
+                  'delegateUid': widget.delegate.uid,
+                  'delegateName': widget.delegate.fullName,
+                  'delegatePhone': widget.delegate.phoneNumber,
+                  'companyUID': widget.delegate.companyUID,
+                  'organizationUID': widget.delegate.organizationUID,
+                  'type': selectedType,
+                  'isHourly': isHourly,
+                  'hoursCount': isHourly ? hoursCount : null,
+                  'fromTime': fromTimeFormatted,
+                  'toTime': toTimeFormatted,
+                  'startDate': Timestamp.fromDate(startDate),
+                  'endDate': Timestamp.fromDate(endDate),
+                  'daysCount': finalDays,
+                  'reason': reason,
+                  'attachmentUrl': attachmentUrl,
+                  'attachmentPath': ?attachmentPath,
+                  'status': 'pending',
+                  'createdAt': FieldValue.serverTimestamp(),
+                  'resolvedAt': null,
+                  'resolvedBy': null,
+                  'resolvedByName': null,
+                  'rejectReason': null,
+                });
+                submittedLeaveId = docRef.id;
+              }
+
+              // Notify the supervisor; a refused notification never fails
+              // the request itself.
+              String notifTitle;
+              switch (selectedType) {
+                case 'delay':
+                  notifTitle = 'عذر تأخير جديد قيد المراجعة';
+                  break;
+                case 'sick':
+                  notifTitle = 'طلب إجازة مرضية جديدة';
+                  break;
+                default:
+                  notifTitle = 'طلب إجازة جديد قيد المراجعة';
+                  break;
+              }
+              try {
+                final notifUid = leaveNotificationDelegateUid(
+                  supervisorUid: widget.delegate.supervisorUid,
+                  companyUID: widget.delegate.companyUID,
+                );
+                if (notifUid != null) {
+                  await FirebaseFirestore.instance
+                      .collection('notifications')
+                      .add({
+                    'delegateUid': notifUid,
+                    'companyUID': widget.delegate.companyUID,
+                    'organizationUID': widget.delegate.organizationUID,
+                    'title': notifTitle,
+                    'body':
+                        'قدم المندوب ${widget.delegate.fullName} طلباً جديداً يحتاج إلى مراجعتك واعتمادك.',
+                    'type': 'leave_request_submitted',
+                    'targetRole': 'supervisor',
+                    'isRead': false,
+                    'createdAt': FieldValue.serverTimestamp(),
+                    'createdBy': widget.delegate.uid,
+                    'senderName': widget.delegate.fullName,
+                  });
+                }
+              } catch (_) {}
+
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (messenger.mounted) {
+                messenger.removeCurrentSnackBar();
+                messenger.showSnackBar(
+                  SnackBar(content: Text(l10n.requestSent)),
+                );
+              }
+            } catch (e) {
+              setDlgState(() => isSubmitting = false);
+              if (context.mounted) {
+                showTashilSnackBar(context, l10n.sendRequestFailed(e));
+              }
+            }
+          }
+
+          Widget sectionLabel(String text) => Padding(
+                padding: const EdgeInsetsDirectional.only(
+                  top: TashilSpacing.lg,
+                  bottom: TashilSpacing.sm,
+                ),
+                child: Text(
+                  text,
+                  style: textTheme.titleSmall?.copyWith(
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              );
+
+          Widget note(String text) => Container(
+                padding: const EdgeInsets.all(TashilSpacing.md),
+                decoration: BoxDecoration(
+                  color: semantic?.warningContainer ??
+                      colorScheme.tertiaryContainer,
+                  borderRadius: BorderRadius.circular(TashilRadius.medium),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Symbols.info_rounded,
+                      size: 18,
+                      color: semantic?.onWarningContainer ??
+                          colorScheme.onTertiaryContainer,
                     ),
-                  ),
-                  Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.25),
-                  ),
-
-                  // Dialog Body
-                  Flexible(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (!_isAnnualLeaveEnabled) ...[
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              margin: const EdgeInsets.only(bottom: 12),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(HrRadius.chip),
-                                border: Border.all(
-                                  color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.35),
-                                ),
-                              ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(
-                                    Symbols.info_rounded,
-                                    size: 16,
-                                    color: Theme.of(context).colorScheme.onTertiaryContainer,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      AppLocalizations.of(context)!.weeklyPlanAvailableInfo,
-                                      style: TextStyle(
-                                        fontSize: HrFont.labelSmall,
-                                        color: Theme.of(context).colorScheme.onTertiaryContainer,
-                                        fontWeight: FontWeight.w600,
-                                        height: 1.35,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-
-                          // نوع الطلب
-                          Text(
-                            AppLocalizations.of(context)!.requestType,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: HrFont.labelMedium,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          DropdownMenu<String>(
-                            initialSelection: selectedType,
-                            expandedInsets: EdgeInsets.zero,
-                            requestFocusOnTap: false,
-                            textStyle: TextStyle(
-                              fontSize: HrFont.body,
-                              color: colorScheme.onSurface,
-                            ),
-                            dropdownMenuEntries: [
-                              DropdownMenuEntry(
-                                value: 'annual',
-                                enabled: _isAnnualLeaveEnabled,
-                                label: _isAnnualLeaveEnabled
-                                    ? AppLocalizations.of(context)!.annualLeaveFromBalance
-                                    : AppLocalizations.of(context)!.annualLeaveUnavailable,
-                              ),
-                              DropdownMenuEntry(
-                                  value: 'sick', label: AppLocalizations.of(context)!.leaveSick),
-                              DropdownMenuEntry(
-                                  value: 'emergency', label: AppLocalizations.of(context)!.leaveEmergency),
-                              DropdownMenuEntry(
-                                  value: 'unpaid',
-                                  label: AppLocalizations.of(context)!.leaveUnpaid),
-                              DropdownMenuEntry(
-                                  value: 'delay',
-                                  label: AppLocalizations.of(context)!.lateArrivalHourly),
-                              DropdownMenuEntry(
-                                  value: 'early_leave',
-                                  label: AppLocalizations.of(context)!.earlyLeaveHourly),
-                              DropdownMenuEntry(
-                                  value: 'absence',
-                                  label: AppLocalizations.of(context)!.excusedAbsenceFullDay),
-                            ],
-                            onSelected: (val) {
-                              if (val != null) {
-                                setDlgState(() {
-                                  selectedType = val;
-                                  isHourly = (val == 'delay' || val == 'early_leave');
-                                });
-                              }
-                            },
-                          ),
-
-                          const SizedBox(height: 12),
-
-                          // المقترح 4: التمييز بين الإجازة بالأيام والعذر بالساعات
-                          if (isHourly) ...[
-                            // اختيار يوم العذر
-                            Text(
-                              AppLocalizations.of(context)!.dateField,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: HrFont.labelMedium,
-                                color: colorScheme.onSurface,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            InkWell(
-                              onTap: () async {
-                                final picked = await showDatePicker(
-                                  context: context,
-                                  initialDate: startDate,
-                                  firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                                  lastDate: DateTime.now().add(const Duration(days: 60)),
-                                );
-                                if (picked != null) {
-                                  setDlgState(() {
-                                    startDate = picked;
-                                    endDate = picked;
-                                  });
-                                }
-                              },
-                              borderRadius: BorderRadius.circular(HrRadius.chip),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.surfaceContainer,
-                                  borderRadius: BorderRadius.circular(HrRadius.chip),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Symbols.calendar_today_rounded,
-                                      size: 15,
-                                      color: colorScheme.primary,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      DateFormat('yyyy-MM-dd (EEEE)', 'ar').format(startDate),
-                                      style: const TextStyle(
-                                        fontSize: HrFont.labelMedium,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    Icon(
-                                      Symbols.edit_calendar_rounded,
-                                      size: 15,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            // ساعات الاستئذان أو التأخير (Button Group موحد ومتصل)
-                            Text(
-                              AppLocalizations.of(context)!.timeField,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: HrFont.labelMedium,
-                                color: colorScheme.onSurface,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainer,
-                                borderRadius: BorderRadius.circular(HrRadius.chip),
-                              ),
-                              child: Row(
-                                children: [
-                                  // من الساعة
-                                  Expanded(
-                                    child: InkWell(
-                                      onTap: () async {
-                                        final picked = await showTimePicker(
-                                          context: context,
-                                          initialTime: fromTime,
-                                        );
-                                        if (picked != null) {
-                                          setDlgState(() => fromTime = picked);
-                                        }
-                                      },
-                                      borderRadius: const BorderRadius.horizontal(
-                                        right: Radius.circular(9),
-                                      ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 8,
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              Symbols.schedule_rounded,
-                                              size: 15,
-                                              color: colorScheme.primary,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Text(
-                                                    AppLocalizations.of(context)!.fromField,
-                                                    style: TextStyle(
-                                                      fontSize: HrFont.labelSmall,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: colorScheme.onSurfaceVariant,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 1),
-                                                  Text(
-                                                    fromTime.format(context),
-                                                    style: const TextStyle(
-                                                      fontSize: HrFont.labelMedium,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Container(
-                                    width: 1,
-                                    height: 28,
-                                    color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                                  ),
-                                  // إلى الساعة
-                                  Expanded(
-                                    child: InkWell(
-                                      onTap: () async {
-                                        final picked = await showTimePicker(
-                                          context: context,
-                                          initialTime: toTime,
-                                        );
-                                        if (picked != null) {
-                                          setDlgState(() => toTime = picked);
-                                        }
-                                      },
-                                      borderRadius: const BorderRadius.horizontal(
-                                        left: Radius.circular(9),
-                                      ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 8,
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              Symbols.schedule_rounded,
-                                              size: 15,
-                                              color: colorScheme.primary,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Text(
-                                                    AppLocalizations.of(context)!.toField,
-                                                    style: TextStyle(
-                                                      fontSize: HrFont.labelSmall,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: colorScheme.onSurfaceVariant,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 1),
-                                                  Text(
-                                                    toTime.format(context),
-                                                    style: const TextStyle(
-                                                      fontSize: HrFont.labelMedium,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ] else ...[
-                            // اختيار الفترة بالأيام (Button Group موحد ومتصل)
-                            Row(
-                              children: [
-                                Text(
-                                  AppLocalizations.of(context)!.periodField,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: HrFont.labelMedium,
-                                    color: colorScheme.onSurface,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.primary.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    AppLocalizations.of(context)!.durationLabel(AppLocalizations.of(context)!.daysCount(calculatedDays)),
-                                    style: TextStyle(
-                                      fontSize: HrFont.labelSmall,
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.primary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainer,
-                                borderRadius: BorderRadius.circular(HrRadius.chip),
-                              ),
-                              child: Row(
-                                children: [
-                                  // من تاريخ
-                                  Expanded(
-                                    child: InkWell(
-                                      onTap: () async {
-                                        final picked = await showDatePicker(
-                                          context: context,
-                                          initialDate: startDate,
-                                          firstDate: DateTime(2024),
-                                          lastDate: DateTime(2030),
-                                        );
-                                        if (picked != null) {
-                                          setDlgState(() {
-                                            startDate = picked;
-                                            if (endDate.isBefore(startDate)) {
-                                              endDate = startDate;
-                                            }
-                                          });
-                                        }
-                                      },
-                                      borderRadius: const BorderRadius.horizontal(
-                                        right: Radius.circular(9),
-                                      ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 8,
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              Symbols.calendar_today_rounded,
-                                              size: 15,
-                                              color: colorScheme.primary,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Text(
-                                                    AppLocalizations.of(context)!.fromField,
-                                                    style: TextStyle(
-                                                      fontSize: HrFont.labelSmall,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: colorScheme.onSurfaceVariant,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 1),
-                                                  Text(
-                                                    DateFormat('dd-MM-yyyy').format(startDate),
-                                                    style: const TextStyle(
-                                                      fontSize: HrFont.labelMedium,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Container(
-                                    width: 1,
-                                    height: 28,
-                                    color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                                  ),
-                                  // إلى تاريخ
-                                  Expanded(
-                                    child: InkWell(
-                                      onTap: () async {
-                                        final picked = await showDatePicker(
-                                          context: context,
-                                          initialDate: endDate,
-                                          firstDate: startDate,
-                                          lastDate: DateTime(2030),
-                                        );
-                                        if (picked != null) {
-                                          setDlgState(() => endDate = picked);
-                                        }
-                                      },
-                                      borderRadius: const BorderRadius.horizontal(
-                                        left: Radius.circular(9),
-                                      ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 8,
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              Symbols.event_available_rounded,
-                                              size: 15,
-                                              color: colorScheme.primary,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Text(
-                                                    AppLocalizations.of(context)!.toField,
-                                                    style: TextStyle(
-                                                      fontSize: HrFont.labelSmall,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: colorScheme.onSurfaceVariant,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 1),
-                                                  Text(
-                                                    DateFormat('dd-MM-yyyy').format(endDate),
-                                                    style: const TextStyle(
-                                                      fontSize: HrFont.labelMedium,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (isLeaveType && calculatedDays > _currentRemainingBalance) ...[
-                              const SizedBox(height: 6),
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(HrRadius.chip),
-                                  border: Border.all(color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.4)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Symbols.warning_amber_rounded,
-                                      size: 15,
-                                      color: Theme.of(context).colorScheme.onTertiaryContainer,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        AppLocalizations.of(context)!.daysExceedBalance(calculatedDays, _currentRemainingBalance),
-                                        style: TextStyle(
-                                          fontSize: HrFont.labelSmall,
-                                          color: Theme.of(context).colorScheme.onTertiaryContainer,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
-
-                          const SizedBox(height: 12),
-
-                          // سبب الطلب (بفونت وارتفاع أصغر وكتابة مختصرة)
-                          Text(
-                            AppLocalizations.of(context)!.reasonField,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: HrFont.labelMedium,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          TextField(
-                            controller: reasonCtrl,
-                            style: const TextStyle(fontSize: HrFont.labelMedium),
-                            decoration: InputDecoration(
-                              hintText: AppLocalizations.of(context)!.reasonHint,
-                              hintStyle: TextStyle(
-                                fontSize: HrFont.labelSmall,
-                                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(HrRadius.chip),
-                                borderSide: BorderSide(
-                                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(HrRadius.chip),
-                                borderSide: BorderSide(
-                                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(HrRadius.chip),
-                                borderSide: BorderSide(
-                                  color: colorScheme.primary,
-                                  width: 1.5,
-                                ),
-                              ),
-                            ),
-                            maxLines: 2,
-                          ),
-
-                          const SizedBox(height: 12),
-
-                          // المقترح 3: إرفاق صورة / تقرير طبي (Buttons Group: الكاميرا والمعرض)
-                          Text(
-                            AppLocalizations.of(context)!.attachmentOptional,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: HrFont.labelMedium,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          if (pickedAttachment != null)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainer,
-                                borderRadius: BorderRadius.circular(HrRadius.chip),
-                                border: Border.all(
-                                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Symbols.check_circle_rounded,
-                                    color: Theme.of(context).colorScheme.primary,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      pickedAttachment!.name,
-                                      style: const TextStyle(
-                                        fontSize: HrFont.labelSmall,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  InkWell(
-                                    onTap: () => setDlgState(() => pickedAttachment = null),
-                                    borderRadius: BorderRadius.circular(HrRadius.button),
-                                    child: Padding(
-                                      padding: EdgeInsets.all(4),
-                                      child: Icon(Symbols.close_rounded, size: 16, color: HrStatusColors.of(context).danger),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          else
-                            Container(
-                              height: 38,
-                              decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainer,
-                                borderRadius: BorderRadius.circular(HrRadius.chip),
-                              ),
-                              child: Row(
-                                children: [
-                                  // الكاميرا
-                                  Expanded(
-                                    child: InkWell(
-                                      onTap: () async {
-                                        final picker = ImagePicker();
-                                        final img = await picker.pickImage(
-                                          source: ImageSource.camera,
-                                          imageQuality: 80,
-                                        );
-                                        if (img != null) {
-                                          setDlgState(() => pickedAttachment = img);
-                                        }
-                                      },
-                                      borderRadius: const BorderRadius.horizontal(
-                                        right: Radius.circular(9),
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Symbols.camera_alt_rounded,
-                                            size: 15,
-                                            color: colorScheme.primary,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            AppLocalizations.of(context)!.cameraLabel,
-                                            style: TextStyle(
-                                              fontSize: HrFont.labelMedium,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  Container(
-                                    width: 1,
-                                    height: 20,
-                                    color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                                  ),
-                                  // المعرض
-                                  Expanded(
-                                    child: InkWell(
-                                      onTap: () async {
-                                        final picker = ImagePicker();
-                                        final img = await picker.pickImage(
-                                          source: ImageSource.gallery,
-                                          imageQuality: 80,
-                                        );
-                                        if (img != null) {
-                                          setDlgState(() => pickedAttachment = img);
-                                        }
-                                      },
-                                      borderRadius: const BorderRadius.horizontal(
-                                        left: Radius.circular(9),
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Symbols.photo_library_rounded,
-                                            size: 15,
-                                            color: colorScheme.primary,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            AppLocalizations.of(context)!.galleryLabel,
-                                            style: TextStyle(
-                                              fontSize: HrFont.labelMedium,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                          if (isSubmitting) ...[
-                            const SizedBox(height: 12),
-                            Center(
-                              child: Column(
-                                children: [
-                                  SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  ),
-                                  SizedBox(height: 6),
-                                  Text(
-                                    AppLocalizations.of(context)!.sendingRequest,
-                                    style: TextStyle(fontSize: HrFont.labelSmall),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
+                    const SizedBox(width: TashilSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        text,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: semantic?.onWarningContainer ??
+                              colorScheme.onTertiaryContainer,
+                        ),
                       ),
                     ),
+                  ],
+                ),
+              );
+
+          return FormDialog(
+            title: l10n.newRequest,
+            saveLabel: l10n.sendRequestAction,
+            onSave: isSubmitting ? () {} : submit,
+            saving: isSubmitting,
+            dirty: dirty && !isSubmitting,
+            child: Column(
+              key: const Key('newRequestForm'),
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (!_isAnnualLeaveEnabled) note(l10n.weeklyPlanAvailableInfo),
+                const SizedBox(height: TashilSpacing.sm),
+                DropdownMenu<String>(
+                  key: const Key('newRequestType'),
+                  initialSelection: selectedType,
+                  expandedInsets: EdgeInsets.zero,
+                  requestFocusOnTap: false,
+                  label: Text('${l10n.requestType} *'),
+                  dropdownMenuEntries: [
+                    DropdownMenuEntry(
+                      value: 'annual',
+                      enabled: _isAnnualLeaveEnabled,
+                      label: _isAnnualLeaveEnabled
+                          ? l10n.annualLeaveFromBalance
+                          : l10n.annualLeaveUnavailable,
+                    ),
+                    DropdownMenuEntry(value: 'sick', label: l10n.leaveSick),
+                    DropdownMenuEntry(
+                      value: 'emergency',
+                      label: l10n.leaveEmergency,
+                    ),
+                    DropdownMenuEntry(value: 'unpaid', label: l10n.leaveUnpaid),
+                    DropdownMenuEntry(
+                      value: 'delay',
+                      label: l10n.lateArrivalHourly,
+                    ),
+                    DropdownMenuEntry(
+                      value: 'early_leave',
+                      label: l10n.earlyLeaveHourly,
+                    ),
+                    DropdownMenuEntry(
+                      value: 'absence',
+                      label: l10n.excusedAbsenceFullDay,
+                    ),
+                  ],
+                  onSelected: (val) {
+                    if (val == null) return;
+                    edit(() {
+                      selectedType = val;
+                      isHourly = (val == 'delay' || val == 'early_leave');
+                    });
+                  },
+                ),
+                if (isHourly) ...[
+                  const SizedBox(height: TashilSpacing.lg),
+                  DateField(
+                    key: const Key('newRequestDate'),
+                    label: '${l10n.dateField} *',
+                    value: startDate,
+                    firstDate: today.subtract(const Duration(days: 30)),
+                    lastDate: today.add(const Duration(days: 60)),
+                    onChanged: (d) {
+                      if (d == null) return;
+                      edit(() {
+                        startDate = d;
+                        endDate = d;
+                      });
+                    },
                   ),
-
-                  // Dialog Footer: Buttons Group (إلغاء وإرسال الطلب)
-                  Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.25),
+                  sectionLabel(l10n.fromField),
+                  ScrollTimePicker(
+                    key: const Key('newRequestFromTime'),
+                    value: fromTime,
+                    onChanged: (t) => edit(() => fromTime = t),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-                    child: Row(
-                      children: [
-                        // زر الإلغاء
-                        Expanded(
-                          flex: 1,
-                          child: SizedBox(
-                            height: 42,
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(HrRadius.chip),
-                                ),
-                                foregroundColor: colorScheme.onSurfaceVariant,
-                                padding: EdgeInsets.zero,
-                              ),
-                              onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
-                              icon: const Icon(Symbols.close_rounded, size: 16),
-                              label: Text(
-                                AppLocalizations.of(context)!.cancel,
-                                style: TextStyle(
-                                  fontSize: HrFont.labelMedium,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // زر إرسال الطلب
-                        Expanded(
-                          flex: 2,
-                          child: SizedBox(
-                            height: 42,
-                            child: FilledButton.icon(
-                              style: FilledButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(HrRadius.chip),
-                                ),
-                                padding: EdgeInsets.zero,
-                              ),
-                              onPressed: isSubmitting
-                                  ? null
-                                  : () async {
-                                    final l10n = AppLocalizations.of(context)!;
-                                      final reason = reasonCtrl.text.trim();
-                                      final messenger = ScaffoldMessenger.of(context);
-                                      final successColor = Theme.of(context).colorScheme.primary;
-                                      if (reason.isEmpty) {
-                                        messenger.showSnackBar(
-                                          SnackBar(
-                                            content: Text(AppLocalizations.of(context)!.enterLeaveReason),
-                                          ),
-                                        );
-                                        return;
-                                      }
-
-                                      if (!_isAnnualLeaveEnabled && selectedType == 'annual') {
-                                        messenger.showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              AppLocalizations.of(context)!.annualNotActive,
-                                            ),
-                                          ),
-                                        );
-                                        return;
-                                      }
-
-                                      final String? fromTimeFormatted =
-                                          isHourly ? fromTime.format(context) : null;
-                                      final String? toTimeFormatted =
-                                          isHourly ? toTime.format(context) : null;
-
-                                      setDlgState(() => isSubmitting = true);
-
-                                      try {
-                                        String? attachmentPath;
-                                        String? attachmentUrl;
-
-                                        // رفع المرفق إلى Firebase Storage (skip on retry if leave already written)
-                                        if (submittedLeaveId == null && pickedAttachment != null) {
-                                          final bytes = await pickedAttachment!.readAsBytes();
-                                          final fileName =
-                                              '${DateTime.now().millisecondsSinceEpoch}_${pickedAttachment!.name}';
-                                          final storageRef = FirebaseStorage.instance.ref().child(
-                                                'leave_attachments/${widget.delegate.companyUID}/${widget.delegate.uid}/$fileName',
-                                              );
-
-                                          final metadata = SettableMetadata(
-                                            contentType: 'image/jpeg',
-                                            customMetadata: {
-                                              'companyUID': widget.delegate.companyUID,
-                                              'delegateUid': widget.delegate.uid,
-                                            },
-                                          );
-
-                                          final uploadTask =
-                                              await storageRef.putData(bytes, metadata);
-                                          // TAS-42: store the path; the URL only for old app versions.
-                                          attachmentPath = uploadTask.ref.fullPath;
-                                          attachmentUrl = await LegacyStorageUrls.urlFor(uploadTask.ref);
-                                        }
-
-                                        if (submittedLeaveId == null) {
-                                          // تسجيل الطلب في Firestore
-                                          final docRef = FirebaseFirestore.instance
-                                              .collection('leave_requests')
-                                              .doc();
-
-                                          final int finalDays = isHourly
-                                              ? 0
-                                              : (endDate.difference(startDate).inDays + 1);
-
-                                          await docRef.set({
-                                            'id': docRef.id,
-                                            'delegateUid': widget.delegate.uid,
-                                            'delegateName': widget.delegate.fullName,
-                                            'delegatePhone': widget.delegate.phoneNumber,
-                                            'companyUID': widget.delegate.companyUID,
-                                            'organizationUID': widget.delegate.organizationUID,
-                                            'type': selectedType,
-                                            'isHourly': isHourly,
-                                            'hoursCount': isHourly ? hoursCount : null,
-                                            'fromTime': fromTimeFormatted,
-                                            'toTime': toTimeFormatted,
-                                            'startDate': Timestamp.fromDate(startDate),
-                                            'endDate': Timestamp.fromDate(endDate),
-                                            'daysCount': finalDays,
-                                            'reason': reason,
-                                            'attachmentUrl': attachmentUrl,
-                                            'attachmentPath': ?attachmentPath,
-                                            'status': 'pending', // يبدأ دائماً بقيد المراجعة للمندوب
-                                            'createdAt': FieldValue.serverTimestamp(),
-                                            'resolvedAt': null,
-                                            'resolvedBy': null,
-                                            'resolvedByName': null,
-                                            'rejectReason': null,
-                                          });
-                                          submittedLeaveId = docRef.id;
-                                        }
-
-                                        // إشعار المشرف: لا يفشل إرسال الطلب إذا رُفض الإشعار
-                                        String notifTitle;
-                                        switch (selectedType) {
-                                          case 'delay':
-                                            notifTitle = 'عذر تأخير جديد قيد المراجعة';
-                                            break;
-                                          case 'sick':
-                                            notifTitle = 'طلب إجازة مرضية جديدة';
-                                            break;
-                                          default:
-                                            notifTitle = 'طلب إجازة جديد قيد المراجعة';
-                                            break;
-                                        }
-
-                                        try {
-                                          final notifUid = leaveNotificationDelegateUid(
-                                            supervisorUid: widget.delegate.supervisorUid,
-                                            companyUID: widget.delegate.companyUID,
-                                          );
-                                          if (notifUid != null) {
-                                            await FirebaseFirestore.instance
-                                                .collection('notifications')
-                                                .add({
-                                              'delegateUid': notifUid,
-                                              'companyUID': widget.delegate.companyUID,
-                                              'organizationUID': widget.delegate.organizationUID,
-                                              'title': notifTitle,
-                                              'body':
-                                                  'قدم المندوب ${widget.delegate.fullName} طلباً جديداً يحتاج إلى مراجعتك واعتمادك.',
-                                              'type': 'leave_request_submitted',
-                                              'targetRole': 'supervisor',
-                                              'isRead': false,
-                                              'createdAt': FieldValue.serverTimestamp(),
-                                              'createdBy': widget.delegate.uid,
-                                              'senderName': widget.delegate.fullName,
-                                            });
-                                          }
-                                        } catch (_) {}
-
-                                        if (ctx.mounted) Navigator.pop(ctx);
-                                        messenger.showSnackBar(
-                                          SnackBar(
-                                            content: Row(
-                                              children: [
-                                                M3AnimatedCheck(size: 28),
-                                                SizedBox(width: 12),
-                                                Expanded(
-                                                  child: Text(
-                                                    l10n.requestSent,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            backgroundColor: successColor,
-                                          ),
-                                        );
-                                      } catch (e) {
-                                        setDlgState(() => isSubmitting = false);
-                                        messenger.showSnackBar(
-                                          SnackBar(
-                                            content: Text(l10n.sendRequestFailed(e)),
-                                          ),
-                                        );
-                                      }
-                                    },
-                              icon: isSubmitting
-                                  ? const SizedBox(
-                                      width: 15,
-                                      height: 15,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Icon(Symbols.send_rounded, size: 16),
-                              label: Text(
-                                isSubmitting ? AppLocalizations.of(context)!.sendingEllipsis : AppLocalizations.of(context)!.sendAction,
-                                style: const TextStyle(
-                                  fontSize: HrFont.labelMedium,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                  sectionLabel(l10n.toField),
+                  ScrollTimePicker(
+                    key: const Key('newRequestToTime'),
+                    value: toTime,
+                    onChanged: (t) => edit(() => toTime = t),
+                  ),
+                ] else ...[
+                  const SizedBox(height: TashilSpacing.lg),
+                  DateField(
+                    key: const Key('newRequestStart'),
+                    label: '${l10n.fromField} *',
+                    value: startDate,
+                    firstDate: DateTime(2024),
+                    lastDate: DateTime(2030),
+                    onChanged: (d) {
+                      if (d == null) return;
+                      edit(() {
+                        startDate = d;
+                        if (endDate.isBefore(startDate)) endDate = startDate;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: TashilSpacing.lg),
+                  DateField(
+                    key: const Key('newRequestEnd'),
+                    label: '${l10n.toField} *',
+                    value: endDate,
+                    firstDate: startDate,
+                    lastDate: DateTime(2030),
+                    onChanged: (d) {
+                      if (d == null) return;
+                      edit(() => endDate = d);
+                    },
+                  ),
+                  const SizedBox(height: TashilSpacing.sm),
+                  Text(
+                    l10n.durationLabel(l10n.daysCount(calculatedDays)),
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
+                  if (isLeaveType &&
+                      calculatedDays > _currentRemainingBalance) ...[
+                    const SizedBox(height: TashilSpacing.sm),
+                    note(
+                      l10n.daysExceedBalance(
+                        calculatedDays,
+                        _currentRemainingBalance,
+                      ),
+                    ),
+                  ],
                 ],
-              ),
+                const SizedBox(height: TashilSpacing.lg),
+                TextField(
+                  key: const Key('newRequestReason'),
+                  controller: reasonCtrl,
+                  maxLines: 3,
+                  minLines: 2,
+                  onChanged: (_) => setDlgState(() {}),
+                  decoration: InputDecoration(
+                    labelText: '${l10n.reasonField} *',
+                    hintText: l10n.reasonHint,
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                sectionLabel(l10n.attachmentOptional),
+                if (pickedAttachment != null)
+                  InputChip(
+                    avatar: const Icon(Symbols.image_rounded),
+                    label: Text(
+                      pickedAttachment!.name,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onDeleted: () => edit(() => pickedAttachment = null),
+                  )
+                else
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final img = await ImagePicker().pickImage(
+                              source: ImageSource.camera,
+                              imageQuality: 80,
+                            );
+                            if (img != null) {
+                              edit(() => pickedAttachment = img);
+                            }
+                          },
+                          icon: const Icon(Symbols.photo_camera_rounded),
+                          label: Text(l10n.cameraLabel),
+                        ),
+                      ),
+                      const SizedBox(width: TashilSpacing.sm),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final img = await ImagePicker().pickImage(
+                              source: ImageSource.gallery,
+                              imageQuality: 80,
+                            );
+                            if (img != null) {
+                              edit(() => pickedAttachment = img);
+                            }
+                          },
+                          icon: const Icon(Symbols.photo_library_rounded),
+                          label: Text(l10n.galleryLabel),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
             ),
           );
         },

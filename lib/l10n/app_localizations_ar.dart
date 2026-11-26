@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -2304,6 +2305,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get chooseImage => 'اختر صورة';
+
+  @override
+  String get sendRequestAction => 'إرسال الطلب';
 
   @override
   String get sendAction => 'إرسال';
