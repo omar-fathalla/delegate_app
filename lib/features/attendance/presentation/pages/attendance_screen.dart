@@ -14,6 +14,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/config/theme/app_theme.dart';
+import 'package:delegate_app/core/design/bidi.dart';
 import 'package:delegate_app/core/design/tokens.dart';
 import 'package:delegate_app/core/design/widgets/dialogs.dart';
 import 'package:delegate_app/core/design/widgets/loading_indicator.dart';
@@ -39,7 +40,7 @@ import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/platform/web_runtime_policy.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
-import 'package:intl/intl.dart' hide TextDirection;
+import 'package:intl/intl.dart' hide Bidi, TextDirection;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -92,6 +93,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   Map<String, List<Attendance>> _groupedByDay = {};
   List<String> _dayKeys = [];
   String _chainFilter = 'all'; // 'all' or normalized chain name
+  // TAS-387: second level of the filter (branch inside the chosen chain).
+  String _branchFilter = 'all';
+  List<String> _availableBranches = [];
   int _allAttendedDaysCount = 0;
 
   /// All sessions of [_monthSessionsFor] (whole month, not the loaded page).
@@ -593,6 +597,23 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       return itemChain == _chainFilter;
     }).toList();
 
+    // TAS-387: branches seen in the chosen chain this month, then the
+    // branch filter on top of the chain filter.
+    final branches = <String>[];
+    for (final a in _filteredHistory) {
+      final b = _cleanBranchName(a.branchName ?? '');
+      if (b.isNotEmpty && !branches.contains(b)) branches.add(b);
+    }
+    _availableBranches = branches;
+    if (_branchFilter != 'all' && !branches.contains(_branchFilter)) {
+      _branchFilter = 'all';
+    }
+    if (_branchFilter != 'all') {
+      _filteredHistory = _filteredHistory
+          .where((a) => _cleanBranchName(a.branchName ?? '') == _branchFilter)
+          .toList();
+    }
+
     _filteredHistory.sort((a, b) => b.checkInTime.compareTo(a.checkInTime));
 
     _groupedByDay = {};
@@ -948,12 +969,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             )
           : AppLocalizations.of(context)!.attInsideZone;
     } else {
-      statusColor = semantic?.warning ?? colorScheme.tertiary;
-      onStatusColor = semantic?.onWarning ?? colorScheme.onTertiary;
-      statusContainer =
-          semantic?.warningContainer ?? colorScheme.tertiaryContainer;
-      onStatusContainer =
-          semantic?.onWarningContainer ?? colorScheme.onTertiaryContainer;
+      // TAS-387: outside the zone blocks check-in, so it is an error state
+      // (user decision 27 Nov; F-04 updated: a state that blocks an action).
+      statusColor = colorScheme.error;
+      onStatusColor = colorScheme.onError;
+      statusContainer = colorScheme.errorContainer;
+      onStatusContainer = colorScheme.onErrorContainer;
       headerIcon = Symbols.wrong_location_rounded;
       statusTitle = AppLocalizations.of(context)!.attOutsideZone;
       statusSubtitle = activeBranch != null
@@ -983,7 +1004,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               : 150)
         : null;
 
-    final rtl = Directionality.of(context) == TextDirection.rtl;
     void goToMonth(DateTime month) {
       setState(() {
         _selectedMonth = month;
@@ -1068,11 +1088,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   onPressed: () => goToMonth(
                     DateTime(_selectedMonth.year, _selectedMonth.month - 1),
                   ),
-                  icon: Icon(
-                    rtl
-                        ? Symbols.chevron_right_rounded
-                        : Symbols.chevron_left_rounded,
-                  ),
+                  // TAS-387: Symbols chevrons mirror by themselves in RTL; the
+                  // extra swap here pointed both arrows inward.
+                  icon: const Icon(Symbols.chevron_left_rounded),
                 ),
                 Expanded(
                   child: Column(
@@ -1106,11 +1124,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   onPressed: () => goToMonth(
                     DateTime(_selectedMonth.year, _selectedMonth.month + 1),
                   ),
-                  icon: Icon(
-                    rtl
-                        ? Symbols.chevron_left_rounded
-                        : Symbols.chevron_right_rounded,
-                  ),
+                  icon: const Icon(Symbols.chevron_right_rounded),
                 ),
               ],
             ),
@@ -1135,6 +1149,45 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   AppLocalizations.of(context)!.statAbsent,
                 ),
               ],
+            ),
+            // TAS-387 (playground: progress indicators): how far into the
+            // month's work days the delegate is.
+            const SizedBox(height: TashilSpacing.md),
+            Semantics(
+              label: AppLocalizations.of(context)!.attMonthProgress(
+                attendedDays,
+                MonthlyAttendanceStats.workDaysPerMonth,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          AppLocalizations.of(context)!.attMonthProgressTitle,
+                          style: textTheme.labelLarge,
+                        ),
+                      ),
+                      Text(
+                        Bidi.ltr(
+                          '$attendedDays / ${MonthlyAttendanceStats.workDaysPerMonth}',
+                        ),
+                        style: textTheme.labelLarge?.copyWith(
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: TashilSpacing.xs),
+                  LinearProgressIndicator(
+                    key: const Key('attendance_month_progress'),
+                    value: (attendedDays /
+                            MonthlyAttendanceStats.workDaysPerMonth)
+                        .clamp(0.0, 1.0),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: TashilSpacing.sm),
             infoLabel(
@@ -1230,9 +1283,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       ],
                     ),
                     const SizedBox(height: TashilSpacing.sm),
-                    Align(
-                      alignment: AlignmentDirectional.centerEnd,
-                      child: OutlinedButton.icon(
+                    // TAS-387: an action, so a full-width tonal button.
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.tonalIcon(
+                        key: const Key('attendance_recheck_button'),
                         onPressed: isBusy
                             ? null
                             : () => _detectNearestBranch(
@@ -1300,53 +1355,73 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             ),
           ];
 
-    // TAS-352 (C-06): filtering a list is a single-select set of official
-    // FilterChips in one scrolling row (docs/design/design-system.md >
-    // Chips), the same for one chain or many; no hand-drawn pills, shadows
-    // or per-chain colours.
-    Widget chip({
-      required String filterKey,
-      required String label,
-      required int count,
-    }) {
-      final selected = _chainFilter == filterKey;
-      return FilterChip(
-        key: ValueKey('attendance_chain_filter_$filterKey'),
-        selected: selected,
-        showCheckmark: true,
-        label: Text('$label · $count'),
-        onSelected: (_) {
-          if (_chainFilter != filterKey) {
-            setState(() {
-              _chainFilter = filterKey;
-              _recomputeFilteredHistory();
-            });
-          }
-        },
-      );
+    // TAS-387: chain then branch, as two DropdownMenus (the chain one can be
+    // typed into to search). A delegate can work in many chains, so a row of
+    // chips did not scale. Hidden when there is nothing to choose.
+    final l10n = AppLocalizations.of(context)!;
+    if (chains.length <= 1 && _availableBranches.length <= 1) {
+      return const SizedBox(height: TashilSpacing.sm);
     }
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return Padding(
       padding: const EdgeInsetsDirectional.symmetric(
-        horizontal: TashilSpacing.xs,
         vertical: TashilSpacing.sm,
       ),
       child: Row(
         children: [
-          chip(
-            filterKey: 'all',
-            label: AppLocalizations.of(context)!.allChains,
-            count: _allAttendedDaysCount,
-          ),
-          for (final chainKey in chains) ...[
-            const SizedBox(width: TashilSpacing.sm),
-            chip(
-              filterKey: chainKey,
-              label: _formatChainName(chainKey, isArabic: isArabic),
-              count: _chainDaysCount[chainKey] ?? 0,
+          Expanded(
+            child: DropdownMenu<String>(
+              key: const Key('attendance_chain_menu'),
+              initialSelection: _chainFilter,
+              expandedInsets: EdgeInsets.zero,
+              enableFilter: true,
+              requestFocusOnTap: chains.length > 6,
+              leadingIcon: const Icon(Symbols.storefront_rounded),
+              label: Text(l10n.attChainLabel),
+              dropdownMenuEntries: [
+                DropdownMenuEntry(
+                  value: 'all',
+                  label: '${l10n.allChains} · $_allAttendedDaysCount',
+                ),
+                for (final c in chains)
+                  DropdownMenuEntry(
+                    value: c,
+                    label:
+                        '${_formatChainName(c, isArabic: isArabic)} · ${_chainDaysCount[c] ?? 0}',
+                  ),
+              ],
+              onSelected: (v) {
+                if (v == null || v == _chainFilter) return;
+                setState(() {
+                  _chainFilter = v;
+                  _branchFilter = 'all';
+                  _recomputeFilteredHistory();
+                });
+              },
             ),
-          ],
+          ),
+          const SizedBox(width: TashilSpacing.sm),
+          Expanded(
+            child: DropdownMenu<String>(
+              key: ValueKey('attendance_branch_menu_$_chainFilter'),
+              initialSelection: _branchFilter,
+              expandedInsets: EdgeInsets.zero,
+              requestFocusOnTap: false,
+              leadingIcon: const Icon(Symbols.location_on_rounded),
+              label: Text(l10n.attBranchLabel),
+              dropdownMenuEntries: [
+                DropdownMenuEntry(value: 'all', label: l10n.attAllBranches),
+                for (final b in _availableBranches)
+                  DropdownMenuEntry(value: b, label: b),
+              ],
+              onSelected: (v) {
+                if (v == null || v == _branchFilter) return;
+                setState(() {
+                  _branchFilter = v;
+                  _recomputeFilteredHistory();
+                });
+              },
+            ),
+          ),
         ],
       ),
     );
@@ -1638,164 +1713,131 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     final diff = effectiveOut.difference(item.checkInTime);
                     final hours = diff.inHours;
                     final minutes = diff.inMinutes.remainder(60);
-                    durationStr = l10n.duration('$hours', '$minutes');
+                    // TAS-387: hh:mm, digits only, kept LTR in Arabic.
+                    durationStr = Bidi.ltr(
+                      '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}',
+                    );
                   } else {
                     durationStr = l10n.inProgress;
                   }
 
-                  // TAS-352: one Card.filled per session, text from the
-                  // textTheme, one neutral chain label (no per-chain
-                  // colours), check-out is not an error colour.
+                  // TAS-387: a compact two-line session card: where (branch
+                  // and chain) then when (in, out, duration) with icons.
                   final tt = Theme.of(context).textTheme;
                   final warn = Theme.of(context)
                       .extension<TashilSemanticColors>();
+                  Widget fact(IconData icon, String text, {Color? color}) {
+                    final c = color ?? colorScheme.onSurfaceVariant;
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(icon, size: 16, color: c),
+                        const SizedBox(width: TashilSpacing.xs),
+                        Text(text, style: tt.labelLarge?.copyWith(color: c)),
+                      ],
+                    );
+                  }
+
                   return Card.filled(
                     margin: const EdgeInsetsDirectional.only(
-                      bottom: TashilSpacing.md,
+                      bottom: TashilSpacing.sm,
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(TashilSpacing.lg),
-                      child: Row(
+                      padding: const EdgeInsetsDirectional.symmetric(
+                        horizontal: TashilSpacing.lg,
+                        vertical: TashilSpacing.md,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Symbols.location_on_rounded,
-                                      size: 16,
-                                      color: colorScheme.primary,
-                                    ),
-                                    const SizedBox(width: TashilSpacing.xs),
-                                    Expanded(
-                                      child: Text(
-                                        AppLocalizations.of(context)!
-                                            .branchLabel(cleanBranchName),
-                                        style: tt.titleSmall?.copyWith(
-                                          color: colorScheme.onSurface,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
+                          Row(
+                            children: [
+                              Icon(
+                                Symbols.location_on_rounded,
+                                size: 18,
+                                color: colorScheme.primary,
+                              ),
+                              const SizedBox(width: TashilSpacing.xs),
+                              Flexible(
+                                child: Text(
+                                  cleanBranchName,
+                                  style: tt.titleSmall,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                if (chainName.isNotEmpty) ...[
-                                  const SizedBox(height: TashilSpacing.xs),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Symbols.storefront_rounded,
-                                        size: 14,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                      const SizedBox(width: TashilSpacing.xs),
-                                      Flexible(
-                                        child: Text(
-                                          chainName,
-                                          style: tt.labelMedium?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
+                              ),
+                              if (chainName.isNotEmpty) ...[
+                                const SizedBox(width: TashilSpacing.sm),
+                                Flexible(
+                                  child: Text(
+                                    '· $chainName',
+                                    style: tt.labelMedium?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                ],
-                                const SizedBox(height: TashilSpacing.sm),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Symbols.login_rounded,
-                                      size: 16,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                    const SizedBox(width: TashilSpacing.xs),
-                                    Text(
-                                      l10n.inLabel(inTime),
-                                      style: tt.bodyMedium,
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: TashilSpacing.xs),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      item.isEffectiveAutoCheckOut
-                                          ? Symbols.auto_mode_rounded
-                                          : Symbols.logout_rounded,
-                                      size: 16,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                    const SizedBox(width: TashilSpacing.xs),
-                                    Text(
-                                      l10n.outLabel(outTime),
-                                      style: tt.bodyMedium,
-                                    ),
-                                    if (item.isEffectiveAutoCheckOut) ...[
-                                      const SizedBox(width: TashilSpacing.sm),
-                                      Tooltip(
-                                        message: AppLocalizations.of(context)!
-                                            .attAutoClosedNote,
-                                        child: _statusLabel(
-                                          context,
-                                          AppLocalizations.of(context)!
-                                              .autoClosedAuto,
-                                          colorScheme.tertiaryContainer,
-                                          colorScheme.onTertiaryContainer,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                const SizedBox(height: TashilSpacing.sm),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Symbols.timer_rounded,
-                                      size: 14,
-                                      color: effectiveOut != null
-                                          ? colorScheme.primary
-                                          : colorScheme.onSurfaceVariant,
-                                    ),
-                                    const SizedBox(width: TashilSpacing.xs),
-                                    Text(
-                                      durationStr,
-                                      style: tt.labelLarge?.copyWith(
-                                        color: effectiveOut != null
-                                            ? colorScheme.primary
-                                            : colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
                                 ),
                               ],
-                            ),
+                              const Spacer(),
+                              if (!item.isSynced)
+                                Tooltip(
+                                  message: l10n.pendingSync,
+                                  child: Icon(
+                                    Symbols.cloud_off_rounded,
+                                    size: 18,
+                                    color: warn?.warning ??
+                                        colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              if (item.isActive)
+                                _statusLabel(
+                                  context,
+                                  l10n.active,
+                                  colorScheme.tertiaryContainer,
+                                  colorScheme.onTertiaryContainer,
+                                ),
+                              if (item.isEffectiveAutoCheckOut)
+                                Tooltip(
+                                  message: AppLocalizations.of(context)!
+                                      .attAutoClosedNote,
+                                  child: _statusLabel(
+                                    context,
+                                    AppLocalizations.of(context)!
+                                        .autoClosedAuto,
+                                    colorScheme.tertiaryContainer,
+                                    colorScheme.onTertiaryContainer,
+                                  ),
+                                ),
+                            ],
                           ),
-                          if (!item.isSynced)
-                            Padding(
-                              padding: const EdgeInsetsDirectional.only(
-                                end: TashilSpacing.sm,
+                          const SizedBox(height: TashilSpacing.sm),
+                          Wrap(
+                            spacing: TashilSpacing.lg,
+                            runSpacing: TashilSpacing.xs,
+                            children: [
+                              Tooltip(
+                                message: l10n.inLabel(inTime),
+                                child: fact(Symbols.login_rounded, inTime),
                               ),
-                              child: Tooltip(
-                                message: l10n.pendingSync,
-                                child: Icon(
-                                  Symbols.cloud_off_rounded,
-                                  color: warn?.warning ??
-                                      colorScheme.onSurfaceVariant,
-                                  size: 20,
+                              Tooltip(
+                                message: l10n.outLabel(outTime),
+                                child: fact(
+                                  item.isEffectiveAutoCheckOut
+                                      ? Symbols.auto_mode_rounded
+                                      : Symbols.logout_rounded,
+                                  outTime,
                                 ),
                               ),
-                            ),
-                          if (item.isActive)
-                            _statusLabel(
-                              context,
-                              l10n.active,
-                              colorScheme.tertiaryContainer,
-                              colorScheme.onTertiaryContainer,
-                            ),
+                              fact(
+                                Symbols.timer_rounded,
+                                durationStr,
+                                color: effectiveOut != null
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurfaceVariant,
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),

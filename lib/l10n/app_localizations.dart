@@ -2696,6 +2696,36 @@ abstract class AppLocalizations {
   /// **'Current chain'**
   String get activeChain;
 
+  /// No description provided for @attChainLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Chain'**
+  String get attChainLabel;
+
+  /// No description provided for @attBranchLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch'**
+  String get attBranchLabel;
+
+  /// No description provided for @attAllBranches.
+  ///
+  /// In en, this message translates to:
+  /// **'All branches'**
+  String get attAllBranches;
+
+  /// No description provided for @attMonthProgressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Days attended of work days'**
+  String get attMonthProgressTitle;
+
+  /// No description provided for @attMonthProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Attended {count} of {total} work days'**
+  String attMonthProgress(int count, int total);
+
   /// No description provided for @allChains.
   ///
   /// In en, this message translates to:

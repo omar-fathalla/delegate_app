@@ -1430,6 +1430,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get activeChain => 'Current chain';
 
   @override
+  String get attChainLabel => 'Chain';
+
+  @override
+  String get attBranchLabel => 'Branch';
+
+  @override
+  String get attAllBranches => 'All branches';
+
+  @override
+  String get attMonthProgressTitle => 'Days attended of work days';
+
+  @override
+  String attMonthProgress(int count, int total) {
+    return 'Attended $count of $total work days';
+  }
+
+  @override
   String get allChains => 'All chains';
 
   @override

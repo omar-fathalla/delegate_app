@@ -103,6 +103,10 @@ contrast button in the app bar cycles the three levels).
   lightness as the card and the circle fades. The only inverse case is a
   card that is itself `primary` (the home welcome card): its icon circle is
   the light container.
+- **Error colour (TAS-387, user decision 2026-11-27):** `error` /
+  `errorContainer` mark real errors and a state that blocks the person's
+  next action (outside the attendance zone blocks check-in). Values that
+  only inform (absence days, penalty totals) stay neutral.
 - **Read-only labels are not chips:** a value the user cannot act on (the
   active organization next to the role, a status) is an icon + text label,
   never a chip, border, glow or pulsing animation.

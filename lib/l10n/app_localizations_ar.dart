@@ -1430,6 +1430,23 @@ class AppLocalizationsAr extends AppLocalizations {
   String get activeChain => 'السلسلة الحالية';
 
   @override
+  String get attChainLabel => 'السلسلة';
+
+  @override
+  String get attBranchLabel => 'الفرع';
+
+  @override
+  String get attAllBranches => 'كل الفروع';
+
+  @override
+  String get attMonthProgressTitle => 'أيام الحضور من أيام الشغل';
+
+  @override
+  String attMonthProgress(int count, int total) {
+    return 'حضرت $count من $total يوم شغل';
+  }
+
+  @override
   String get allChains => 'كل السلاسل';
 
   @override
