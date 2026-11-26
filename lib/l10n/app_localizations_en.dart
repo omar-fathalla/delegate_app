@@ -1447,6 +1447,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get attDurationLabel => 'Duration';
+
+  @override
+  String get attCheckInLabel => 'Check-in';
+
+  @override
+  String get attCheckOutLabel => 'Check-out';
+
+  @override
   String get allChains => 'All chains';
 
   @override

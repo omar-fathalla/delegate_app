@@ -1721,20 +1721,33 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     durationStr = l10n.inProgress;
                   }
 
-                  // TAS-387: a compact two-line session card: where (branch
-                  // and chain) then when (in, out, duration) with icons.
+                  // TAS-387: the session card fills its width: where (branch,
+                  // chain) on the start side and the duration large on the
+                  // end side, then check-in and check-out as two equal
+                  // columns (label over value) across the whole card.
                   final tt = Theme.of(context).textTheme;
                   final warn = Theme.of(context)
                       .extension<TashilSemanticColors>();
-                  Widget fact(IconData icon, String text, {Color? color}) {
-                    final c = color ?? colorScheme.onSurfaceVariant;
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(icon, size: 16, color: c),
-                        const SizedBox(width: TashilSpacing.xs),
-                        Text(text, style: tt.labelLarge?.copyWith(color: c)),
-                      ],
+                  Widget timeColumn(IconData icon, String label, String value) {
+                    return Expanded(
+                      child: Row(
+                        children: [
+                          Icon(icon, size: 20, color: colorScheme.primary),
+                          const SizedBox(width: TashilSpacing.sm),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                label,
+                                style: tt.labelSmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              Text(value, style: tt.titleSmall),
+                            ],
+                          ),
+                        ],
+                      ),
                     );
                   }
 
@@ -1743,98 +1756,132 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       bottom: TashilSpacing.sm,
                     ),
                     child: Padding(
-                      padding: const EdgeInsetsDirectional.symmetric(
-                        horizontal: TashilSpacing.lg,
-                        vertical: TashilSpacing.md,
-                      ),
+                      padding: const EdgeInsets.all(TashilSpacing.lg),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(
-                                Symbols.location_on_rounded,
-                                size: 18,
-                                color: colorScheme.primary,
-                              ),
-                              const SizedBox(width: TashilSpacing.xs),
-                              Flexible(
-                                child: Text(
-                                  cleanBranchName,
-                                  style: tt.titleSmall,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                              Container(
+                                padding: const EdgeInsets.all(TashilSpacing.sm),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Symbols.storefront_rounded,
+                                  size: 20,
+                                  color: colorScheme.onPrimary,
                                 ),
                               ),
-                              if (chainName.isNotEmpty) ...[
-                                const SizedBox(width: TashilSpacing.sm),
-                                Flexible(
-                                  child: Text(
-                                    '· $chainName',
-                                    style: tt.labelMedium?.copyWith(
-                                      color: colorScheme.onSurfaceVariant,
+                              const SizedBox(width: TashilSpacing.md),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      cleanBranchName,
+                                      style: tt.titleMedium,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                    if (chainName.isNotEmpty)
+                                      Text(
+                                        chainName,
+                                        style: tt.bodySmall?.copyWith(
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    if (item.isActive ||
+                                        item.isEffectiveAutoCheckOut ||
+                                        !item.isSynced) ...[
+                                      const SizedBox(height: TashilSpacing.xs),
+                                      Wrap(
+                                        spacing: TashilSpacing.sm,
+                                        children: [
+                                          if (item.isActive)
+                                            _statusLabel(
+                                              context,
+                                              l10n.active,
+                                              colorScheme.tertiaryContainer,
+                                              colorScheme.onTertiaryContainer,
+                                            ),
+                                          if (item.isEffectiveAutoCheckOut)
+                                            Tooltip(
+                                              message: l10n.attAutoClosedNote,
+                                              child: _statusLabel(
+                                                context,
+                                                l10n.autoClosedAuto,
+                                                colorScheme.tertiaryContainer,
+                                                colorScheme.onTertiaryContainer,
+                                              ),
+                                            ),
+                                          if (!item.isSynced)
+                                            _statusLabel(
+                                              context,
+                                              l10n.pendingSync,
+                                              warn?.warningContainer ??
+                                                  colorScheme.surfaceContainerHighest,
+                                              warn?.onWarningContainer ??
+                                                  colorScheme.onSurfaceVariant,
+                                            ),
+                                        ],
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: TashilSpacing.md),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    durationStr,
+                                    style: tt.headlineSmall?.copyWith(
+                                      color: effectiveOut != null
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
-                                ),
-                              ],
-                              const Spacer(),
-                              if (!item.isSynced)
-                                Tooltip(
-                                  message: l10n.pendingSync,
-                                  child: Icon(
-                                    Symbols.cloud_off_rounded,
-                                    size: 18,
-                                    color: warn?.warning ??
-                                        colorScheme.onSurfaceVariant,
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Symbols.timer_rounded,
+                                        size: 14,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                      const SizedBox(width: TashilSpacing.xs),
+                                      Text(
+                                        l10n.attDurationLabel,
+                                        style: tt.labelSmall?.copyWith(
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                              if (item.isActive)
-                                _statusLabel(
-                                  context,
-                                  l10n.active,
-                                  colorScheme.tertiaryContainer,
-                                  colorScheme.onTertiaryContainer,
-                                ),
-                              if (item.isEffectiveAutoCheckOut)
-                                Tooltip(
-                                  message: AppLocalizations.of(context)!
-                                      .attAutoClosedNote,
-                                  child: _statusLabel(
-                                    context,
-                                    AppLocalizations.of(context)!
-                                        .autoClosedAuto,
-                                    colorScheme.tertiaryContainer,
-                                    colorScheme.onTertiaryContainer,
-                                  ),
-                                ),
+                                ],
+                              ),
                             ],
                           ),
-                          const SizedBox(height: TashilSpacing.sm),
-                          Wrap(
-                            spacing: TashilSpacing.lg,
-                            runSpacing: TashilSpacing.xs,
+                          const Divider(height: TashilSpacing.xl),
+                          Row(
                             children: [
-                              Tooltip(
-                                message: l10n.inLabel(inTime),
-                                child: fact(Symbols.login_rounded, inTime),
+                              timeColumn(
+                                Symbols.login_rounded,
+                                l10n.attCheckInLabel,
+                                inTime,
                               ),
-                              Tooltip(
-                                message: l10n.outLabel(outTime),
-                                child: fact(
-                                  item.isEffectiveAutoCheckOut
-                                      ? Symbols.auto_mode_rounded
-                                      : Symbols.logout_rounded,
-                                  outTime,
-                                ),
-                              ),
-                              fact(
-                                Symbols.timer_rounded,
-                                durationStr,
-                                color: effectiveOut != null
-                                    ? colorScheme.primary
-                                    : colorScheme.onSurfaceVariant,
+                              timeColumn(
+                                item.isEffectiveAutoCheckOut
+                                    ? Symbols.auto_mode_rounded
+                                    : Symbols.logout_rounded,
+                                l10n.attCheckOutLabel,
+                                outTime,
                               ),
                             ],
                           ),

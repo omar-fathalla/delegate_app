@@ -1447,6 +1447,15 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get attDurationLabel => 'المدة';
+
+  @override
+  String get attCheckInLabel => 'الدخول';
+
+  @override
+  String get attCheckOutLabel => 'الخروج';
+
+  @override
   String get allChains => 'كل السلاسل';
 
   @override

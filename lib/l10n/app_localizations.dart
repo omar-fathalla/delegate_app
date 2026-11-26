@@ -2726,6 +2726,24 @@ abstract class AppLocalizations {
   /// **'Attended {count} of {total} work days'**
   String attMonthProgress(int count, int total);
 
+  /// No description provided for @attDurationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get attDurationLabel;
+
+  /// No description provided for @attCheckInLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Check-in'**
+  String get attCheckInLabel;
+
+  /// No description provided for @attCheckOutLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Check-out'**
+  String get attCheckOutLabel;
+
   /// No description provided for @allChains.
   ///
   /// In en, this message translates to:

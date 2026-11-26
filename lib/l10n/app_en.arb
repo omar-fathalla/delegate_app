@@ -1556,6 +1556,9 @@
   "attMonthProgressTitle": "Days attended of work days",
   "attMonthProgress": "Attended {count} of {total} work days",
   "@attMonthProgress": {"placeholders": {"count": {"type": "int"}, "total": {"type": "int"}}},
+  "attDurationLabel": "Duration",
+  "attCheckInLabel": "Check-in",
+  "attCheckOutLabel": "Check-out",
   "allChains": "All chains",
   "attNoSessionsInChain": "No attendance records for {chain} this month",
   "@attNoSessionsInChain": {
