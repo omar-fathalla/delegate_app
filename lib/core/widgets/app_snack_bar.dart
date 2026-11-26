@@ -1,12 +1,19 @@
 import 'package:material_ui/material_ui.dart';
 
-/// Centralized SnackBar helper for consistent error/success messages across all screens,
-/// strictly utilizing official Google Material icons and removing raw Unicode emojis.
+import '../design/widgets/snackbars.dart';
+
+/// App-wide short messages. Since TAS-352 every call goes through the
+/// design system's [showTashilSnackBar] (m3-kit C-30): text only, no icon,
+/// no error / primary fill, one at a time, gone after 4 seconds. The three
+/// names stay so the 150+ call sites keep working; they no longer look
+/// different, because M3 snackbars carry no status colour (an error that
+/// needs attention belongs in the screen or a dialog, not a red snackbar).
 class AppSnackBar {
   AppSnackBar._();
 
   static String _clean(String message) {
-    // Strip common Unicode emojis (such as ✅, ❌, ⚠️, ↩, etc.) so only clean text is displayed.
+    // Strip common Unicode emojis (such as ✅, ❌, ⚠️, ↩, etc.) so only clean
+    // text is displayed.
     return message
         .replaceAll(
           RegExp(
@@ -18,103 +25,17 @@ class AppSnackBar {
         .trim();
   }
 
-  static void showError(BuildContext context, String message) {
+  static void _show(BuildContext context, String message) {
     if (!context.mounted) return;
-    final text = _clean(message);
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              Icons.error_outline_rounded,
-              color: Theme.of(context).colorScheme.onError,
-              size: 20,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                text,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onError,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13.5,
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: Theme.of(context).colorScheme.error,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
-    );
+    showTashilSnackBar(context, _clean(message));
   }
 
-  static void showSuccess(BuildContext context, String message) {
-    if (!context.mounted) return;
-    final text = _clean(message);
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              Icons.check_circle_rounded,
-              color: Theme.of(context).colorScheme.onPrimary,
-              size: 20,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                text,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13.5,
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
-    );
-  }
+  static void showError(BuildContext context, String message) =>
+      _show(context, message);
 
-  static void showInfo(BuildContext context, String message) {
-    if (!context.mounted) return;
-    final text = _clean(message);
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              Icons.info_outline_rounded,
-              color: Theme.of(context).colorScheme.onSurface,
-              size: 20,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                text,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13.5,
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
-    );
-  }
+  static void showSuccess(BuildContext context, String message) =>
+      _show(context, message);
+
+  static void showInfo(BuildContext context, String message) =>
+      _show(context, message);
 }
-

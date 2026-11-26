@@ -13,6 +13,10 @@ import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
+import 'package:delegate_app/config/theme/app_theme.dart';
+import 'package:delegate_app/core/design/tokens.dart';
+import 'package:delegate_app/core/design/widgets/dialogs.dart';
+import 'package:delegate_app/core/design/widgets/loading_indicator.dart';
 import 'package:delegate_app/features/attendance/domain/entities/attendance.dart';
 import 'package:delegate_app/features/attendance/domain/monthly_attendance_stats.dart';
 import 'package:delegate_app/features/attendance/domain/usecases/get_history_for_month.dart';
@@ -41,6 +45,7 @@ import 'package:geolocator/geolocator.dart';
 
 import 'dart:io';
 
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/services.dart';
 import 'package:delegate_app/core/services/trusted_time_service.dart';
 import 'package:delegate_app/core/services/security_audit_service.dart';
@@ -143,85 +148,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     return cleaned.isNotEmpty ? cleaned : trimmed;
   }
 
-  static (Color bg, Color fg, Color border) _getChainBadgeColors(
-    BuildContext context,
-    String chainName,
-  ) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final lower = chainName.toLowerCase().trim();
-
-    // Gomla Market (Emerald Green)
-    if (lower.contains('جملة') ||
-        lower.contains('جمله') ||
-        lower.contains('gomla') ||
-        lower.contains('jomla')) {
-      return isDark
-          ? (
-              const Color(0xFF143823),
-              const Color(0xFF81C784),
-              Theme.of(context).colorScheme.primary,
-            )
-          : (
-              const Color(0xFFE8F5E9),
-              const Color(0xFF1B5E20),
-              const Color(0xFF81C784),
-            );
-    }
-
-    // Fathalla Market (Royal Blue)
-    if (lower.contains('فتح الله') || lower.contains('fathalla')) {
-      return isDark
-          ? (
-              const Color(0xFF102844),
-              const Color(0xFF90CAF9),
-              const Color(0xFF1976D2),
-            )
-          : (
-              const Color(0xFFE3F2FD),
-              const Color(0xFF0D47A1),
-              const Color(0xFF64B5F6),
-            );
-    }
-
-    // Zahran Market (Warm Amber / Orange)
-    if (lower.contains('زهران') || lower.contains('zahran')) {
-      return isDark
-          ? (
-              const Color(0xFF3E240D),
-              const Color(0xFFFFB74D),
-              const Color(0xFFF57C00),
-            )
-          : (
-              const Color(0xFFFFF3E0),
-              const Color(0xFFE65100),
-              const Color(0xFFFFB74D),
-            );
-    }
-
-    // Carrefour (Sky Blue)
-    if (lower.contains('كارفور') || lower.contains('carrefour')) {
-      return isDark
-          ? (
-              const Color(0xFF0C2D48),
-              const Color(0xFF38BDF8),
-              const Color(0xFF0284C7),
-            )
-          : (
-              const Color(0xFFE0F2FE),
-              const Color(0xFF0369A1),
-              const Color(0xFF7DD3FC),
-            );
-    }
-
-    final cs = theme.colorScheme;
-    return (
-      cs.secondaryContainer.withValues(alpha: 0.6),
-      cs.onSecondaryContainer,
-      cs.secondary.withValues(alpha: 0.35),
-    );
-  }
-
   String _resolveOrgName(
     String orgId, {
     String? branchName,
@@ -320,6 +246,20 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   }
 
   final ScrollController _scrollController = ScrollController();
+
+  /// TAS-352: the check-in FAB is extended at rest and while scrolling up,
+  /// an icon-only FAB while the list scrolls down.
+  bool _fabExtended = true;
+
+  bool _onFabScroll(UserScrollNotification n) {
+    // Only the page's vertical list; the chain chips scroll sideways.
+    if (n.metrics.axis != Axis.vertical) return false;
+    // Idle (the scroll stopped) keeps the last state.
+    if (n.direction == ScrollDirection.idle) return false;
+    final extend = n.direction == ScrollDirection.forward;
+    if (extend != _fabExtended) setState(() => _fabExtended = extend);
+    return false;
+  }
 
   // --- Geofencing & Motion State ---
   late final AnimationController _radarController;
@@ -811,139 +751,104 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   )
                 : null,
             body: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: _buildBody(context, state),
+              child: NotificationListener<UserScrollNotification>(
+                onNotification: _onFabScroll,
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.symmetric(
+                    horizontal: TashilSpacing.page,
+                  ),
+                  child: _buildBody(context, state),
+                ),
               ),
             ),
+            // TAS-352 (C-04): the extended FAB shrinks to an icon while the
+            // list scrolls down and comes back on scroll up. Colours are
+            // the container roles with their on colours; shape, elevation
+            // and press feedback come from the theme.
             floatingActionButton: widget.viewOnly
                 ? null
-                : M3PressScale(
-                    child: FloatingActionButton.extended(
-                      elevation: 3,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      extendedPadding: const EdgeInsetsDirectional.only(
-                        start: 16,
-                        end: 20,
-                      ),
-                      onPressed:
-                          (_actionLock.isBusy ||
-                              state is AttendanceLoading ||
-                              isSyncing)
-                          ? null
-                          : () {
-                              _actionLock.run(
-                                bloc: _attendanceBloc,
-                                onChanged: () {
-                                  if (mounted) setState(() {});
-                                },
-                                action: () {
-                                  if (!WebRuntimePolicy.checkInEnabled) {
-                                    AppSnackBar.showInfo(
-                                      context,
-                                      WebRuntimePolicy.checkInWebMessage,
-                                    );
-                                    return Future<void>.value();
-                                  }
-                                  return _isGeofenceMode
-                                      ? _handleGeofenceAction(
-                                          isCheckedIn: isCheckedIn,
-                                          activeAttendance: activeAttendance,
-                                        )
-                                      : _showQRScanner(
-                                          context,
-                                          isCheckedIn,
-                                          activeAttendance,
-                                        );
-                                },
-                              );
-                            },
-                      backgroundColor: isCheckedIn
-                          ? Theme.of(context).colorScheme.primaryContainer
-                          : (_isGeofenceMode
-                                ? (_isInsideGeofence
-                                      ? Theme.of(context)
-                                            .colorScheme
-                                            .primaryContainer
-                                      : Theme.of(context)
-                                            .colorScheme
-                                            .secondaryContainer)
-                                : Theme.of(context)
-                                      .colorScheme
-                                      .primaryContainer),
-                      icon: _actionLock.isBusy
-                          ? SizedBox.square(
-                              key: const Key('attendanceFabBusy'),
-                              dimension: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color:
-                                    isCheckedIn ||
-                                        !_isGeofenceMode ||
-                                        _isInsideGeofence
-                                    ? Theme.of(context)
-                                          .colorScheme
-                                          .onPrimaryContainer
-                                    : Theme.of(context)
-                                          .colorScheme
-                                          .onSecondaryContainer,
+                : Builder(
+                    builder: (context) {
+                      final cs = Theme.of(context).colorScheme;
+                      final secondary =
+                          !isCheckedIn && _isGeofenceMode && !_isInsideGeofence;
+                      final fabBg = secondary
+                          ? cs.secondaryContainer
+                          : cs.primaryContainer;
+                      final fabFg = secondary
+                          ? cs.onSecondaryContainer
+                          : cs.onPrimaryContainer;
+                      final label = _actionLock.isBusy
+                          ? l10n.attLocatingShort
+                          : _buildFabLabel(
+                              context,
+                              isCheckedIn: isCheckedIn,
+                              activeAttendance: activeAttendance,
+                              l10n: l10n,
+                            );
+                      return FloatingActionButton.extended(
+                        key: const Key('attendanceFab'),
+                        isExtended: _fabExtended,
+                        tooltip: label,
+                        backgroundColor: fabBg,
+                        foregroundColor: fabFg,
+                        onPressed:
+                            (_actionLock.isBusy ||
+                                state is AttendanceLoading ||
+                                isSyncing)
+                            ? null
+                            : () {
+                                _actionLock.run(
+                                  bloc: _attendanceBloc,
+                                  onChanged: () {
+                                    if (mounted) setState(() {});
+                                  },
+                                  action: () {
+                                    if (!WebRuntimePolicy.checkInEnabled) {
+                                      AppSnackBar.showInfo(
+                                        context,
+                                        WebRuntimePolicy.checkInWebMessage,
+                                      );
+                                      return Future<void>.value();
+                                    }
+                                    return _isGeofenceMode
+                                        ? _handleGeofenceAction(
+                                            isCheckedIn: isCheckedIn,
+                                            activeAttendance: activeAttendance,
+                                          )
+                                        : _showQRScanner(
+                                            context,
+                                            isCheckedIn,
+                                            activeAttendance,
+                                          );
+                                  },
+                                );
+                              },
+                        icon: _actionLock.isBusy
+                            ? SizedBox.square(
+                                key: const Key('attendanceFabBusy'),
+                                dimension: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: fabFg,
+                                ),
+                              )
+                            : Icon(
+                                isCheckedIn
+                                    ? Symbols.logout_rounded
+                                    : (_isGeofenceMode
+                                          ? (_isCheckingLocation
+                                                ? Symbols.radar_rounded
+                                                : (_isInsideGeofence
+                                                      ? Symbols
+                                                            .how_to_reg_rounded
+                                                      : Symbols
+                                                            .location_searching_rounded))
+                                          : Symbols.qr_code_scanner_rounded),
                               ),
-                            )
-                          : Icon(
-                              isCheckedIn
-                                  ? Symbols.logout_rounded
-                                  : (_isGeofenceMode
-                                        ? (_isCheckingLocation
-                                              ? Symbols.radar_rounded
-                                              : (_isInsideGeofence
-                                                    ? Symbols.how_to_reg_rounded
-                                                    : Symbols
-                                                          .location_searching_rounded))
-                                        : Symbols.qr_code_scanner_rounded),
-                              color: isCheckedIn
-                                  ? Theme.of(context)
-                                        .colorScheme
-                                        .onPrimaryContainer
-                                  : (_isGeofenceMode
-                                        ? (_isInsideGeofence
-                                              ? Theme.of(context)
-                                                    .colorScheme
-                                                    .onPrimaryContainer
-                                              : Theme.of(context)
-                                                    .colorScheme
-                                                    .onSecondaryContainer)
-                                        : Theme.of(context)
-                                              .colorScheme
-                                              .onPrimaryContainer),
-                            ),
-                      label: Text(
-                        _actionLock.isBusy
-                            ? l10n.attLocatingShort
-                            : _buildFabLabel(
-                                context,
-                                isCheckedIn: isCheckedIn,
-                                activeAttendance: activeAttendance,
-                                l10n: l10n,
-                              ),
-                        style: m3ButtonLabel(context).copyWith(
-                          color: isCheckedIn
-                              ? Theme.of(context).colorScheme.onPrimaryContainer
-                              : (_isGeofenceMode
-                                    ? (_isInsideGeofence
-                                          ? Theme.of(context)
-                                                .colorScheme
-                                                .onPrimaryContainer
-                                          : Theme.of(context)
-                                                .colorScheme
-                                                .onSecondaryContainer)
-                                    : Theme.of(context)
-                                          .colorScheme
-                                          .onPrimaryContainer),
-                        ),
-                      ),
-                    ),
+                        label: Text(label),
+                      );
+                    },
                   ),
             floatingActionButtonLocation:
                 FloatingActionButtonLocation.centerFloat,
@@ -1014,13 +919,27 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     final String statusSubtitle;
     final activeBranch = _matchedBranch ?? _nearestBranch;
 
+    // TAS-352 (F-04): outside the zone is a warning, not an error; inside
+    // is success. Pairs come from TashilSemanticColors, never an alpha tint.
+    final semantic = theme.extension<TashilSemanticColors>();
+    final Color onStatusColor;
+    final Color statusContainer;
+    final Color onStatusContainer;
     if (isBusy) {
       statusColor = colorScheme.primary;
+      onStatusColor = colorScheme.onPrimary;
+      statusContainer = colorScheme.surfaceContainerHighest;
+      onStatusContainer = colorScheme.onSurface;
       headerIcon = Symbols.radar_rounded;
       statusTitle = AppLocalizations.of(context)!.attCheckingZone;
       statusSubtitle = AppLocalizations.of(context)!.attVerifyingCoords;
     } else if (_isInsideGeofence) {
-      statusColor = Theme.of(context).colorScheme.primary; // Emerald M3 Success
+      statusColor = semantic?.success ?? colorScheme.primary;
+      onStatusColor = semantic?.onSuccess ?? colorScheme.onPrimary;
+      statusContainer =
+          semantic?.successContainer ?? colorScheme.primaryContainer;
+      onStatusContainer =
+          semantic?.onSuccessContainer ?? colorScheme.onPrimaryContainer;
       headerIcon = Symbols.verified_rounded;
       statusTitle = AppLocalizations.of(context)!.attInsideZone;
       statusSubtitle = activeBranch != null
@@ -1029,7 +948,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             )
           : AppLocalizations.of(context)!.attInsideZone;
     } else {
-      statusColor = colorScheme.error;
+      statusColor = semantic?.warning ?? colorScheme.tertiary;
+      onStatusColor = semantic?.onWarning ?? colorScheme.onTertiary;
+      statusContainer =
+          semantic?.warningContainer ?? colorScheme.tertiaryContainer;
+      onStatusContainer =
+          semantic?.onWarningContainer ?? colorScheme.onTertiaryContainer;
       headerIcon = Symbols.wrong_location_rounded;
       statusTitle = AppLocalizations.of(context)!.attOutsideZone;
       statusSubtitle = activeBranch != null
@@ -1059,43 +983,95 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               : 150)
         : null;
 
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsetsDirectional.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      color: colorScheme.surfaceContainerHigh,
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    void goToMonth(DateTime month) {
+      setState(() {
+        _selectedMonth = month;
+        _recomputeFilteredHistory();
+        _loadApprovedLeaves();
+      });
+    }
+
+    // TAS-352: same stat style as the home card (TAS-384): HR web icon, the
+    // number, one word under it. Absence is neutral (F-04).
+    Widget stat(IconData icon, int value, String label) {
+      return Expanded(
+        child: Container(
+          padding: const EdgeInsetsDirectional.symmetric(
+            vertical: TashilSpacing.md,
+            horizontal: TashilSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(TashilRadius.medium),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, size: 24, color: colorScheme.onSurfaceVariant),
+              const SizedBox(height: TashilSpacing.xs),
+              AnimatedSwitcher(
+                duration: AppMotionDurations.short4,
+                child: Text(
+                  '$value',
+                  key: ValueKey(value),
+                  style: textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              Text(
+                label,
+                style: textTheme.labelMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // A compact read-only label (icon + text) on the zone section.
+    Widget infoLabel(IconData icon, String text, {Color? color}) {
+      final fg = color ?? colorScheme.onSurfaceVariant;
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: fg),
+          const SizedBox(width: TashilSpacing.xs),
+          Flexible(
+            child: Text(
+              text,
+              style: textTheme.labelMedium?.copyWith(color: fg),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Card.filled(
+      margin: const EdgeInsetsDirectional.only(bottom: TashilSpacing.md),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(TashilSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ================= 1. MONTH SELECTOR =================
+            // 1. Month selector
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                IconButton.filledTonal(
-                  style: IconButton.styleFrom(
-                    backgroundColor: colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.6),
-                    foregroundColor: colorScheme.onSurface,
-                  ),
-                  iconSize: 22,
+                IconButton.filled(
                   tooltip: AppLocalizations.of(context)!.previousMonth,
-                  onPressed: () {
-                    setState(() {
-                      _selectedMonth = DateTime(
-                        _selectedMonth.year,
-                        _selectedMonth.month - 1,
-                      );
-                      _recomputeFilteredHistory();
-                      _loadApprovedLeaves();
-                    });
-                  },
+                  onPressed: () => goToMonth(
+                    DateTime(_selectedMonth.year, _selectedMonth.month - 1),
+                  ),
                   icon: Icon(
-                    Directionality.of(context) == TextDirection.rtl
+                    rtl
                         ? Symbols.chevron_right_rounded
                         : Symbols.chevron_left_rounded,
-                    textDirection: TextDirection.ltr,
                   ),
                 ),
                 Expanded(
@@ -1104,283 +1080,92 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       AnimatedSwitcher(
                         duration: AppMotionDurations.medium2,
                         child: Text(
-                          DateFormat(
-                            'MMMM yyyy',
-                            locale,
-                          ).format(_selectedMonth),
+                          DateFormat('MMMM yyyy', locale)
+                              .format(_selectedMonth),
                           key: ValueKey(_selectedMonth),
                           style: textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: colorScheme.onSurface,
                           ),
                           textAlign: TextAlign.center,
                         ),
                       ),
-                      if (!isCurrentMonth) ...[
-                        const SizedBox(height: 4),
-                        InkWell(
-                          onTap: () {
-                            setState(() {
-                              _selectedMonth = trustedNow;
-                              _recomputeFilteredHistory();
-                              _loadApprovedLeaves();
-                            });
-                          },
-                          borderRadius: BorderRadius.circular(12),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Symbols.restore_rounded,
-                                  size: 12,
-                                  color: colorScheme.primary,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  AppLocalizations.of(context)!.currentMonth,
-                                  style: textTheme.labelSmall?.copyWith(
-                                    color: colorScheme.primary,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
+                      if (!isCurrentMonth)
+                        TextButton.icon(
+                          onPressed: () => goToMonth(trustedNow),
+                          icon: const Icon(Symbols.restore_rounded),
+                          label: Text(
+                            AppLocalizations.of(context)!.currentMonth,
                           ),
                         ),
-                      ],
                     ],
                   ),
                 ),
-                IconButton.filledTonal(
-                  style: IconButton.styleFrom(
-                    backgroundColor: colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.6),
-                    foregroundColor: colorScheme.onSurface,
-                  ),
-                  iconSize: 22,
+                IconButton.filled(
                   tooltip: AppLocalizations.of(context)!.nextMonth,
-                  onPressed: () {
-                    setState(() {
-                      _selectedMonth = DateTime(
-                        _selectedMonth.year,
-                        _selectedMonth.month + 1,
-                      );
-                      _recomputeFilteredHistory();
-                      _loadApprovedLeaves();
-                    });
-                  },
+                  onPressed: () => goToMonth(
+                    DateTime(_selectedMonth.year, _selectedMonth.month + 1),
+                  ),
                   icon: Icon(
-                    Directionality.of(context) == TextDirection.rtl
+                    rtl
                         ? Symbols.chevron_left_rounded
                         : Symbols.chevron_right_rounded,
-                    textDirection: TextDirection.ltr,
                   ),
                 ),
               ],
             ),
             if (_isOffline) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: TashilSpacing.sm),
               _buildConnectivityBadge(context, l10n),
             ],
+            const SizedBox(height: TashilSpacing.md),
 
-            const SizedBox(height: 12),
-            Divider(
-              height: 1,
-              thickness: 0.8,
-              color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-            ),
-            const SizedBox(height: 12),
-
-            // ================= 2. ATTENDANCE & ABSENCE STATS =================
+            // 2. Attendance and absence
             Row(
               children: [
-                // Attendance Stat (Condensed with Google Icon)
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(
-                        alpha: 0.35,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary
-                                .withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Symbols.check_circle_rounded,
-                            size: 18,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                AppLocalizations.of(context)!.statAttended,
-                                style: textTheme.labelSmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              AnimatedSwitcher(
-                                duration: AppMotionDurations.short4,
-                                child: Text(
-                                  AppLocalizations.of(context)!
-                                      .daysCount(attendedDays),
-                                  key: ValueKey(attendedDays),
-                                  style: textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.onSurface,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                stat(
+                  Symbols.how_to_reg_rounded,
+                  attendedDays,
+                  AppLocalizations.of(context)!.statAttended,
                 ),
-                const SizedBox(width: 10),
-                // Absence Stat (Condensed with Google Icon)
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(
-                        alpha: 0.35,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: colorScheme.error.withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Symbols.event_busy_rounded,
-                            size: 18,
-                            color: colorScheme.error,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                AppLocalizations.of(context)!.statAbsent,
-                                style: textTheme.labelSmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              AnimatedSwitcher(
-                                duration: AppMotionDurations.short4,
-                                child: Text(
-                                  AppLocalizations.of(context)!
-                                      .daysCount(absentDays),
-                                  key: ValueKey(absentDays),
-                                  style: textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: absentDays > 0
-                                        ? colorScheme.error
-                                        : colorScheme.onSurface,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                const SizedBox(width: TashilSpacing.sm),
+                stat(
+                  Symbols.person_off_rounded,
+                  absentDays,
+                  AppLocalizations.of(context)!.statAbsent,
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            // Work days policy badge (condensed)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Symbols.info_rounded,
-                  size: 13,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  AppLocalizations.of(context)!.attWorkPolicyNote,
-                  style: textTheme.labelSmall?.copyWith(
-                    fontSize: 10.5,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+            const SizedBox(height: TashilSpacing.sm),
+            infoLabel(
+              Symbols.info_rounded,
+              AppLocalizations.of(context)!.attWorkPolicyNote,
             ),
 
-            // ================= 3. GEOFENCE ZONE STATUS =================
+            // 3. Geofence zone status
             if (_isGeofenceMode) ...[
-              const SizedBox(height: 12),
-              Divider(
-                height: 1,
-                thickness: 0.8,
-                color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-              ),
-              const SizedBox(height: 12),
-
+              const SizedBox(height: TashilSpacing.md),
               AnimatedContainer(
                 duration: AppMotionDurations.medium3,
                 curve: AppMotionCurves.emphasized,
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(TashilSpacing.md),
                 decoration: BoxDecoration(
-                  color: _isInsideGeofence
-                      ? Theme.of(context).colorScheme.primary
-                            .withValues(alpha: 0.08)
-                      : (isBusy
-                            ? colorScheme.surfaceContainerHighest.withValues(
-                                alpha: 0.3,
-                              )
-                            : colorScheme.error.withValues(alpha: 0.08)),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: statusColor.withValues(alpha: 0.25),
-                    width: 1.0,
-                  ),
+                  color: statusContainer,
+                  borderRadius: BorderRadius.circular(TashilRadius.large),
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         _GeofenceRadarWidget(
                           animation: _radarAnimation,
                           isInside: _isInsideGeofence,
                           isChecking: isBusy,
                           statusColor: statusColor,
+                          onStatusColor: onStatusColor,
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: TashilSpacing.md),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1390,27 +1175,24 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                   Icon(
                                     headerIcon,
                                     size: 18,
-                                    color: statusColor,
+                                    color: onStatusContainer,
                                   ),
-                                  const SizedBox(width: 6),
+                                  const SizedBox(width: TashilSpacing.xs),
                                   Expanded(
                                     child: Text(
                                       statusTitle,
                                       style: textTheme.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: statusColor,
+                                        color: onStatusContainer,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 3),
+                              const SizedBox(height: TashilSpacing.xs),
                               Text(
                                 _locationStatusMessage ?? statusSubtitle,
                                 style: textTheme.bodySmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                  fontSize: 11.5,
-                                  height: 1.3,
+                                  color: onStatusContainer,
                                 ),
                               ),
                             ],
@@ -1418,167 +1200,62 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         ),
                       ],
                     ),
-                    // 1. Distance Chip (Top, if available)
-                    if (formattedDistance != null) ...[
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: statusColor.withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _isInsideGeofence
-                                    ? Symbols.near_me_rounded
-                                    : Symbols.straighten_rounded,
-                                size: 14,
-                                color: statusColor,
-                              ),
-                              const SizedBox(width: 5),
-                              Text(
-                                AppLocalizations.of(context)!
-                                    .distanceLabel(formattedDistance),
-                                style: textTheme.labelSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: statusColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-
-                    // 2. Branch Name Chip (Under Distance)
-                    if (activeBranch != null) ...[
-                      const SizedBox(height: 6),
-                      Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surface.withValues(alpha: 0.8),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Symbols.storefront_rounded,
-                                size: 14,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 5),
-                              Text(
-                                activeBranch.branchName,
-                                style: textTheme.labelSmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: colorScheme.onSurface,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-
-                    // 3. Allowed Radius & Recheck Location on the same row
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    const SizedBox(height: TashilSpacing.sm),
+                    Wrap(
+                      spacing: TashilSpacing.lg,
+                      runSpacing: TashilSpacing.xs,
                       children: [
+                        if (formattedDistance != null)
+                          infoLabel(
+                            _isInsideGeofence
+                                ? Symbols.near_me_rounded
+                                : Symbols.straighten_rounded,
+                            AppLocalizations.of(context)!
+                                .distanceLabel(formattedDistance),
+                            color: onStatusContainer,
+                          ),
+                        if (activeBranch != null)
+                          infoLabel(
+                            Symbols.storefront_rounded,
+                            activeBranch.branchName,
+                            color: onStatusContainer,
+                          ),
                         if (allowedRadius != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colorScheme.surface.withValues(alpha: 0.8),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Symbols.radar_rounded,
-                                  size: 14,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  AppLocalizations.of(context)!
-                                      .radiusLabel(allowedRadius),
-                                  style: textTheme.labelSmall?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        else
-                          const SizedBox.shrink(),
-                        OutlinedButton.icon(
-                          onPressed: isBusy
-                              ? null
-                              : () => _detectNearestBranch(
-                                  showSnackBar: true,
-                                  silent: false,
-                                ),
-                          style: OutlinedButton.styleFrom(
-                            shape: const StadiumBorder(),
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 4,
-                            ),
-                            backgroundColor: colorScheme.surface.withValues(
-                              alpha: 0.7,
-                            ),
+                          infoLabel(
+                            Symbols.radar_rounded,
+                            AppLocalizations.of(context)!
+                                .radiusLabel(allowedRadius),
+                            color: onStatusContainer,
                           ),
-                          icon: isBusy
-                              ? SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: colorScheme.primary,
-                                  ),
-                                )
-                              : Icon(
-                                  Symbols.refresh_rounded,
-                                  size: 16,
-                                  color: colorScheme.primary,
-                                ),
-                          label: Text(
-                            AppLocalizations.of(context)!.recheckLocation,
-                            style: textTheme.labelSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: isBusy
-                                  ? colorScheme.onSurfaceVariant
-                                  : colorScheme.primary,
-                            ),
-                          ),
-                        ),
                       ],
                     ),
-                    // 4. Open-settings help when the location check failed (TAS-283)
+                    const SizedBox(height: TashilSpacing.sm),
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: OutlinedButton.icon(
+                        onPressed: isBusy
+                            ? null
+                            : () => _detectNearestBranch(
+                                showSnackBar: true,
+                                silent: false,
+                              ),
+                        icon: isBusy
+                            ? const SizedBox.square(
+                                dimension: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Symbols.refresh_rounded),
+                        label: Text(
+                          AppLocalizations.of(context)!.recheckLocation,
+                        ),
+                      ),
+                    ),
+                    // Open-settings help when the location check failed
+                    // (TAS-283).
                     if (_locationFailure != null && !isBusy) ...[
-                      const SizedBox(height: 10),
+                      const SizedBox(height: TashilSpacing.sm),
                       LocationHelpCard(
                         kind: _locationFailure!,
                         onRetry: () => _detectNearestBranch(
@@ -1600,38 +1277,16 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   Widget _buildConnectivityBadge(BuildContext context, AppLocalizations l10n) {
     final colorScheme = Theme.of(context).colorScheme;
     if (!_isOffline) return const SizedBox.shrink();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: colorScheme.errorContainer,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Symbols.cloud_off_rounded,
-            color: colorScheme.onErrorContainer,
-            size: 18,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            l10n.networkStatusOffline,
-            style: TextStyle(
-              color: colorScheme.onErrorContainer,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
+    // Offline is a state, not an error: a compact neutral label.
+    return _statusLabel(
+      context,
+      l10n.networkStatusOffline,
+      colorScheme.surfaceContainerHighest,
+      colorScheme.onSurfaceVariant,
     );
   }
 
   Widget _buildChainFilterBar(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final isArabic = Localizations.localeOf(context).languageCode
         .startsWith('ar');
     final chains = _availableChains.isNotEmpty
@@ -1645,20 +1300,22 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             ),
           ];
 
-    Widget buildTab({
+    // TAS-352 (C-06): filtering a list is a single-select set of official
+    // FilterChips in one scrolling row (docs/design/design-system.md >
+    // Chips), the same for one chain or many; no hand-drawn pills, shadows
+    // or per-chain colours.
+    Widget chip({
       required String filterKey,
       required String label,
       required int count,
-      required IconData icon,
-      Color? accentFg,
-      Color? accentBg,
     }) {
-      final isSelected = _chainFilter == filterKey;
-      final activeFg = accentFg ?? colorScheme.primary;
-      final activeBg = accentBg ?? colorScheme.primaryContainer;
-
-      return InkWell(
-        onTap: () {
+      final selected = _chainFilter == filterKey;
+      return FilterChip(
+        key: ValueKey('attendance_chain_filter_$filterKey'),
+        selected: selected,
+        showCheckmark: true,
+        label: Text('$label · $count'),
+        onSelected: (_) {
           if (_chainFilter != filterKey) {
             setState(() {
               _chainFilter = filterKey;
@@ -1666,140 +1323,38 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             });
           }
         },
-        borderRadius: BorderRadius.circular(10),
-        child: AnimatedContainer(
-          duration: AppMotionDurations.short4,
-          curve: AppMotionCurves.standard,
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 5),
-          decoration: BoxDecoration(
-            color: isSelected ? colorScheme.surface : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: isSelected && accentFg != null
-                ? Border.all(color: accentFg.withValues(alpha: 0.35), width: 1)
-                : null,
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 14,
-                color: isSelected
-                    ? activeFg
-                    : (accentFg?.withValues(alpha: 0.8) ??
-                          colorScheme.onSurfaceVariant),
-              ),
-              const SizedBox(width: 4),
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.w600,
-                      color: isSelected
-                          ? activeFg
-                          : colorScheme.onSurfaceVariant,
-                    ),
-                    maxLines: 1,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 5.5,
-                  vertical: 1.5,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? activeBg
-                      : colorScheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '$count',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.bold,
-                    color: isSelected ? activeFg : colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       );
     }
 
-    final allTab = buildTab(
-      filterKey: 'all',
-      label: AppLocalizations.of(context)!.allChains,
-      count: _allAttendedDaysCount,
-      icon: Symbols.hub_rounded,
-    );
-
-    final chainTabs = chains.map((chainKey) {
-      final displayLabel = _formatChainName(chainKey, isArabic: isArabic);
-      final (bg, fg, _) = _getChainBadgeColors(context, chainKey);
-      final count = _chainDaysCount[chainKey] ?? 0;
-      return buildTab(
-        filterKey: chainKey,
-        label: displayLabel,
-        count: count,
-        icon: Symbols.storefront_rounded,
-        accentFg: fg,
-        accentBg: bg,
-      );
-    }).toList();
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(14),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: TashilSpacing.xs,
+        vertical: TashilSpacing.sm,
       ),
-      child: chains.length <= 2
-          ? Row(
-              children: [
-                Expanded(child: allTab),
-                for (final tab in chainTabs) ...[
-                  const SizedBox(width: 4),
-                  Expanded(child: tab),
-                ],
-              ],
-            )
-          : SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  allTab,
-                  for (final tab in chainTabs) ...[
-                    const SizedBox(width: 4),
-                    tab,
-                  ],
-                ],
-              ),
+      child: Row(
+        children: [
+          chip(
+            filterKey: 'all',
+            label: AppLocalizations.of(context)!.allChains,
+            count: _allAttendedDaysCount,
+          ),
+          for (final chainKey in chains) ...[
+            const SizedBox(width: TashilSpacing.sm),
+            chip(
+              filterKey: chainKey,
+              label: _formatChainName(chainKey, isArabic: isArabic),
+              count: _chainDaysCount[chainKey] ?? 0,
             ),
+          ],
+        ],
+      ),
     );
   }
 
   Widget _buildBody(BuildContext context, AttendanceState state) {
     final l10n = AppLocalizations.of(context)!;
+    final textTheme = Theme.of(context).textTheme;
     final locale = Localizations.localeOf(context).languageCode;
 
     if (state is AttendanceLoading ||
@@ -1818,13 +1373,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               size: 64,
               color: colorScheme.error,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: TashilSpacing.lg),
             Text(
               state.message,
               style: TextStyle(color: colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: TashilSpacing.lg),
             FilledButton(
               onPressed: () {
                 _attendanceBloc.add(
@@ -1873,118 +1428,86 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           },
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsetsDirectional.only(top: 12, bottom: 80),
+            padding: const EdgeInsetsDirectional.only(
+              top: TashilSpacing.md,
+              bottom: 80,
+            ),
             child: Column(
               children: [
                 _buildUnifiedAttendanceCard(context),
                 _buildChainFilterBar(context),
-                const SizedBox(height: 24),
+                const SizedBox(height: TashilSpacing.xl),
+                // TAS-352: empty states use the text roles and one tonal
+                // button, no tinted panels or hand-sized text.
                 if (_chainFilter != 'all' && _allAttendedDaysCount > 0) ...[
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 20),
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(
-                        alpha: 0.4,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
+                  Icon(
+                    Symbols.storefront_rounded,
+                    size: 48,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(height: TashilSpacing.md),
+                  Text(
+                    AppLocalizations.of(context)!
+                        .attNoSessionsInChain(selectedChainLabel),
+                    textAlign: TextAlign.center,
+                    style: textTheme.titleSmall?.copyWith(
+                      color: colorScheme.onSurface,
                     ),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Symbols.storefront_rounded,
-                          size: 44,
-                          color: colorScheme.outline,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          AppLocalizations.of(context)!
-                              .attNoSessionsInChain(selectedChainLabel),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          AppLocalizations.of(context)!
-                              .attDaysInOtherChains(_allAttendedDaysCount),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        FilledButton.tonalIcon(
-                          onPressed: () {
-                            setState(() {
-                              _chainFilter = 'all';
-                              _recomputeFilteredHistory();
-                            });
-                          },
-                          icon: const Icon(Symbols.hub_rounded, size: 18),
-                          label: Text(
-                            AppLocalizations.of(context)!.allChains,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
+                  ),
+                  const SizedBox(height: TashilSpacing.sm),
+                  Text(
+                    AppLocalizations.of(context)!
+                        .attDaysInOtherChains(_allAttendedDaysCount),
+                    textAlign: TextAlign.center,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
+                  ),
+                  const SizedBox(height: TashilSpacing.lg),
+                  FilledButton.tonalIcon(
+                    onPressed: () {
+                      setState(() {
+                        _chainFilter = 'all';
+                        _recomputeFilteredHistory();
+                      });
+                    },
+                    icon: const Icon(Symbols.hub_rounded),
+                    label: Text(AppLocalizations.of(context)!.allChains),
                   ),
                 ] else ...[
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHigh,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Symbols.verified_user_rounded,
-                      size: 56,
-                      color: colorScheme.primary,
-                    ),
+                  Icon(
+                    Symbols.event_note_rounded,
+                    size: 56,
+                    color: colorScheme.onSurfaceVariant,
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: TashilSpacing.lg),
                   Text(
                     l10n.noHistoryAvailable,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.primary,
+                    style: textTheme.titleMedium?.copyWith(
+                      color: colorScheme.onSurface,
                     ),
                   ),
                 ],
-                const SizedBox(height: 12),
+                const SizedBox(height: TashilSpacing.md),
                 if (!_isGeofenceMode)
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 24),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(16),
+                  Padding(
+                    padding: const EdgeInsetsDirectional.symmetric(
+                      horizontal: TashilSpacing.xl,
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
                           Symbols.qr_code_scanner_rounded,
-                          color: colorScheme.primary,
-                          size: 22,
+                          color: colorScheme.onSurfaceVariant,
+                          size: 20,
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: TashilSpacing.sm),
                         Flexible(
                           child: Text(
                             l10n.scanQrInstruction,
-                            style: TextStyle(
-                              color: colorScheme.onSurface,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -2016,7 +1539,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         },
         child: ListView.builder(
           controller: _scrollController,
-          padding: const EdgeInsetsDirectional.only(top: 12, bottom: 80),
+          padding: const EdgeInsetsDirectional.only(
+            top: TashilSpacing.md,
+            bottom: 80,
+          ),
           itemCount: _dayKeys.length + 2 + (state.hasReachedMax ? 0 : 1),
           itemBuilder: (context, index) {
             if (index == 0) {
@@ -2029,8 +1555,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             if (dayIndex >= _dayKeys.length) {
               return state.isLoadingMore
                   ? const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 32),
-                      child: Center(child: CircularProgressIndicator()),
+                      padding: EdgeInsetsDirectional.symmetric(
+                        vertical: TashilSpacing.xxl,
+                      ),
+                      child: Center(child: LoadingIndicator()),
                     )
                   : const SizedBox(height: 100);
             }
@@ -2047,49 +1575,42 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // TAS-352: day header. The icon on the page follows the
+                // card-icon rule (primary + onPrimary), the date is a title,
+                // the count a compact label.
                 Padding(
-                  padding: const EdgeInsetsDirectional.only(bottom: 8, top: 8),
+                  padding: const EdgeInsetsDirectional.symmetric(
+                    vertical: TashilSpacing.sm,
+                  ),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.all(TashilSpacing.xs + 2),
                         decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(8),
+                          color: colorScheme.primary,
+                          shape: BoxShape.circle,
                         ),
                         child: Icon(
                           Symbols.calendar_today_rounded,
                           size: 18,
-                          color: colorScheme.onPrimaryContainer,
+                          color: colorScheme.onPrimary,
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: TashilSpacing.sm),
                       Expanded(
                         child: Text(
                           fullDateStr,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.primary,
-                          ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleSmall
+                              ?.copyWith(color: colorScheme.onSurface),
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${records.length}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onPrimaryContainer,
-                          ),
-                        ),
+                      _statusLabel(
+                        context,
+                        '${records.length}',
+                        colorScheme.secondaryContainer,
+                        colorScheme.onSecondaryContainer,
                       ),
                     ],
                   ),
@@ -2112,11 +1633,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     branchName: item.branchName,
                     isArabic: isArabic,
                   );
-                  final (chipBg, chipFg, chipBorder) = _getChainBadgeColors(
-                    context,
-                    chainName,
-                  );
-
                   String durationStr;
                   if (effectiveOut != null) {
                     final diff = effectiveOut.difference(item.checkInTime);
@@ -2127,10 +1643,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     durationStr = l10n.inProgress;
                   }
 
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
+                  // TAS-352: one Card.filled per session, text from the
+                  // textTheme, one neutral chain label (no per-chain
+                  // colours), check-out is not an error colour.
+                  final tt = Theme.of(context).textTheme;
+                  final warn = Theme.of(context)
+                      .extension<TashilSemanticColors>();
+                  return Card.filled(
+                    margin: const EdgeInsetsDirectional.only(
+                      bottom: TashilSpacing.md,
+                    ),
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(TashilSpacing.lg),
                       child: Row(
                         children: [
                           Expanded(
@@ -2139,57 +1663,17 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                               children: [
                                 Row(
                                   children: [
-                                    if (chainName.isNotEmpty) ...[
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 3.5,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: chipBg,
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          border: Border.all(
-                                            color: chipBorder,
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              Symbols.storefront_rounded,
-                                              size: 13,
-                                              color: chipFg,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              chainName,
-                                              style: TextStyle(
-                                                fontSize: 11.5,
-                                                fontWeight: FontWeight.bold,
-                                                color: chipFg,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                    ],
                                     Icon(
                                       Symbols.location_on_rounded,
-                                      size: 15,
+                                      size: 16,
                                       color: colorScheme.primary,
                                     ),
-                                    const SizedBox(width: 4),
+                                    const SizedBox(width: TashilSpacing.xs),
                                     Expanded(
                                       child: Text(
                                         AppLocalizations.of(context)!
                                             .branchLabel(cleanBranchName),
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
+                                        style: tt.titleSmall?.copyWith(
                                           color: colorScheme.onSurface,
                                         ),
                                         overflow: TextOverflow.ellipsis,
@@ -2197,24 +1681,45 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 8),
+                                if (chainName.isNotEmpty) ...[
+                                  const SizedBox(height: TashilSpacing.xs),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Symbols.storefront_rounded,
+                                        size: 14,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                      const SizedBox(width: TashilSpacing.xs),
+                                      Flexible(
+                                        child: Text(
+                                          chainName,
+                                          style: tt.labelMedium?.copyWith(
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                                const SizedBox(height: TashilSpacing.sm),
                                 Row(
                                   children: [
                                     Icon(
                                       Symbols.login_rounded,
                                       size: 16,
-                                      color: colorScheme.tertiary,
+                                      color: colorScheme.onSurfaceVariant,
                                     ),
-                                    const SizedBox(width: 4),
+                                    const SizedBox(width: TashilSpacing.xs),
                                     Text(
                                       l10n.inLabel(inTime),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                                      style: tt.bodyMedium,
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: TashilSpacing.xs),
                                 Row(
                                   children: [
                                     Icon(
@@ -2222,66 +1727,30 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                           ? Symbols.auto_mode_rounded
                                           : Symbols.logout_rounded,
                                       size: 16,
-                                      color: item.isEffectiveAutoCheckOut
-                                          ? Theme.of(context)
-                                                .colorScheme
-                                                .onTertiaryContainer
-                                          : colorScheme.error,
+                                      color: colorScheme.onSurfaceVariant,
                                     ),
-                                    const SizedBox(width: 4),
+                                    const SizedBox(width: TashilSpacing.xs),
                                     Text(
                                       l10n.outLabel(outTime),
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                        color: item.isEffectiveAutoCheckOut
-                                            ? Theme.of(context)
-                                                  .colorScheme
-                                                  .onTertiaryContainer
-                                            : null,
-                                      ),
+                                      style: tt.bodyMedium,
                                     ),
                                     if (item.isEffectiveAutoCheckOut) ...[
-                                      const SizedBox(width: 6),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .tertiary
-                                              .withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
-                                          border: Border.all(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .tertiary
-                                                .withValues(alpha: 0.5),
-                                          ),
-                                        ),
-                                        child: Tooltip(
-                                          message: AppLocalizations.of(context)!
-                                              .attAutoClosedNote,
-                                          child: Text(
-                                            AppLocalizations.of(context)!
-                                                .autoClosedAuto,
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onTertiaryContainer,
-                                            ),
-                                          ),
+                                      const SizedBox(width: TashilSpacing.sm),
+                                      Tooltip(
+                                        message: AppLocalizations.of(context)!
+                                            .attAutoClosedNote,
+                                        child: _statusLabel(
+                                          context,
+                                          AppLocalizations.of(context)!
+                                              .autoClosedAuto,
+                                          colorScheme.tertiaryContainer,
+                                          colorScheme.onTertiaryContainer,
                                         ),
                                       ),
                                     ],
                                   ],
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: TashilSpacing.sm),
                                 Row(
                                   children: [
                                     Icon(
@@ -2289,17 +1758,15 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                       size: 14,
                                       color: effectiveOut != null
                                           ? colorScheme.primary
-                                          : colorScheme.outlineVariant,
+                                          : colorScheme.onSurfaceVariant,
                                     ),
-                                    const SizedBox(width: 4),
+                                    const SizedBox(width: TashilSpacing.xs),
                                     Text(
                                       durationStr,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
+                                      style: tt.labelLarge?.copyWith(
                                         color: effectiveOut != null
                                             ? colorScheme.primary
-                                            : colorScheme.outlineVariant,
+                                            : colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                   ],
@@ -2310,35 +1777,24 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           if (!item.isSynced)
                             Padding(
                               padding: const EdgeInsetsDirectional.only(
-                                end: 8.0,
+                                end: TashilSpacing.sm,
                               ),
                               child: Tooltip(
                                 message: l10n.pendingSync,
                                 child: Icon(
                                   Symbols.cloud_off_rounded,
-                                  color: colorScheme.error,
+                                  color: warn?.warning ??
+                                      colorScheme.onSurfaceVariant,
                                   size: 20,
                                 ),
                               ),
                             ),
                           if (item.isActive)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colorScheme.tertiaryContainer,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                l10n.active,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: colorScheme.onTertiaryContainer,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                            _statusLabel(
+                              context,
+                              l10n.active,
+                              colorScheme.tertiaryContainer,
+                              colorScheme.onTertiaryContainer,
                             ),
                         ],
                       ),
@@ -2353,6 +1809,32 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       );
     }
     return Center(child: Text(l10n.somethingWentWrong));
+  }
+
+  /// Compact status label (TAS-352): a container role with its `on`
+  /// colour, never a tinted card or an alpha border.
+  Widget _statusLabel(
+    BuildContext context,
+    String text,
+    Color container,
+    Color onContainer,
+  ) {
+    return Container(
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: TashilSpacing.sm,
+        vertical: TashilSpacing.xs / 2,
+      ),
+      decoration: BoxDecoration(
+        color: container,
+        borderRadius: BorderRadius.circular(TashilRadius.small),
+      ),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: onContainer,
+        ),
+      ),
+    );
   }
 
   String _buildFabLabel(
@@ -2752,7 +2234,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                TashilSpacing.xl,
+                0,
+                TashilSpacing.xl,
+                TashilSpacing.md,
+              ),
               child: Text(
                 title,
                 style: Theme.of(sheetContext).textTheme.titleMedium,
@@ -2766,7 +2253,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 ),
                 onTap: () => Navigator.of(sheetContext).pop(d),
               ),
-            const SizedBox(height: 12),
+            const SizedBox(height: TashilSpacing.md),
           ],
         ),
       ),
@@ -3175,25 +2662,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       sheetAnimationStyle: m3SheetAnimation,
       isScrollControlled: true,
       useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
+      // TAS-352: shape and drag handle come from the theme (C-28).
       builder: (sheetContext) {
-        final colorScheme = Theme.of(sheetContext).colorScheme;
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          padding: const EdgeInsetsDirectional.fromSTEB(
+            TashilSpacing.lg,
+            0,
+            TashilSpacing.lg,
+            TashilSpacing.xl,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 38,
-                height: 4.5,
-                decoration: BoxDecoration(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-              const SizedBox(height: 16),
               LocationHelpCard(kind: kind),
             ],
           ),
@@ -3245,7 +2725,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     AttendanceBloc bloc,
     AppLocalizations l10n,
   ) {
-    showM3Dialog(
+    // TAS-352 (C-27): kit dialog, text buttons, confirm last.
+    showTashilDialog(
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -3261,7 +2742,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               onPressed: () => Navigator.pop(ctx),
               child: Text(l10n.cancel),
             ),
-            FilledButton(
+            TextButton(
               onPressed: () async {
                 Navigator.pop(ctx);
                 final deviceInfo = await _getDeviceInfo();
@@ -3306,7 +2787,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     AttendanceBloc bloc,
     AppLocalizations l10n,
   ) {
-    showM3Dialog(
+    // TAS-352 (C-27): kit dialog, text buttons, confirm last.
+    showTashilDialog(
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -3322,7 +2804,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               onPressed: () => Navigator.pop(ctx),
               child: Text(l10n.cancel),
             ),
-            FilledButton(
+            TextButton(
               onPressed: () async {
                 Navigator.pop(ctx);
                 final deviceInfo = await _getDeviceInfo();
@@ -3371,7 +2853,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       itemCount: 5,
       itemBuilder: (context, index) {
         return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsetsDirectional.only(bottom: TashilSpacing.md),
           child: _ShimmerCard(),
         );
       },
@@ -3417,11 +2899,11 @@ class _ShimmerCardState extends State<_ShimmerCard>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildShimmerBar(width: 120, height: 12),
-                const SizedBox(height: 12),
+                const SizedBox(height: TashilSpacing.md),
                 _buildShimmerBar(width: 180, height: 14),
-                const SizedBox(height: 8),
+                const SizedBox(height: TashilSpacing.sm),
                 _buildShimmerBar(width: 160, height: 14),
-                const SizedBox(height: 8),
+                const SizedBox(height: TashilSpacing.sm),
                 _buildShimmerBar(width: 100, height: 12),
               ],
             ),
@@ -3443,7 +2925,7 @@ class _ShimmerCardState extends State<_ShimmerCard>
           width: width,
           height: height,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(TashilRadius.small),
             gradient: LinearGradient(
               colors: [baseColor, highlightColor, baseColor],
               stops: [
@@ -3523,14 +3005,25 @@ class _ScannerModalState extends State<_ScannerModal>
 
   @override
   Widget build(BuildContext context) {
+    // TAS-352: the scanner sits over the camera, so it always uses the dark
+    // theme's roles (scrim, onSurface) instead of Colors.black / white.
+    final base = Theme.of(context);
+    final dark = base.brightness == Brightness.dark
+        ? base
+        : AppTheme.darkTheme();
+    return Theme(data: dark, child: Builder(builder: _buildScanner));
+  }
+
+  Widget _buildScanner(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final l10n = AppLocalizations.of(context)!;
     final isCheckedIn = widget.action == l10n.checkOut;
     final color = isCheckedIn ? colorScheme.secondary : colorScheme.primary;
     final locale = Localizations.localeOf(context).languageCode;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: colorScheme.scrim,
       body: Stack(
         children: [
           // TAS-290: tap the preview to focus there.
@@ -3606,10 +3099,12 @@ class _ScannerModalState extends State<_ScannerModal>
                   Container(
                     decoration: BoxDecoration(
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.35),
+                        color: colorScheme.outline,
                         width: 1.5,
                       ),
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(
+                        TashilRadius.extraLarge,
+                      ),
                     ),
                   ),
                   // Animated Scanner Laser Line
@@ -3623,20 +3118,10 @@ class _ScannerModalState extends State<_ScannerModal>
                         child: Container(
                           height: 3,
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                color.withValues(alpha: 0.1),
-                                color,
-                                color.withValues(alpha: 0.1),
-                              ],
+                            color: color,
+                            borderRadius: BorderRadius.circular(
+                              TashilRadius.full,
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: color.withValues(alpha: 0.8),
-                                blurRadius: 10,
-                                spreadRadius: 2,
-                              ),
-                            ],
                           ),
                         ),
                       );
@@ -3653,42 +3138,37 @@ class _ScannerModalState extends State<_ScannerModal>
             left: 0,
             right: 0,
             child: Container(
-              padding: const EdgeInsets.fromLTRB(20, 50, 20, 24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.black87, Colors.transparent],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                TashilSpacing.xl,
+                TashilSpacing.xxl + TashilSpacing.lg,
+                TashilSpacing.xl,
+                TashilSpacing.xl,
               ),
+              color: colorScheme.scrim,
               child: Column(
                 children: [
                   Text(
                     l10n.scanForAction(widget.action),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
+                    style: textTheme.titleLarge?.copyWith(
+                      color: colorScheme.onSurface,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: TashilSpacing.xs),
                   Text(
                     l10n.pointCameraToQR(widget.action),
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 13,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: TashilSpacing.xs),
                   // TAS-290: hint for phones that cannot focus very close.
                   Text(
                     locale == 'ar'
                         ? 'لو الصورة مش واضحة، بعّد الموبايل شوية أو المس الكود'
                         : 'If the image is blurry, move the phone back a little or tap the code',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.7),
-                      fontSize: 12,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -3702,20 +3182,17 @@ class _ScannerModalState extends State<_ScannerModal>
             left: 0,
             right: 0,
             child: Container(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                TashilSpacing.xl,
+                TashilSpacing.xl,
+                TashilSpacing.xl,
+                TashilSpacing.xxl,
+              ),
               decoration: BoxDecoration(
-                color: colorScheme.surface,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(32),
-                  topRight: Radius.circular(32),
+                color: colorScheme.surfaceContainer,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(TashilRadius.extraLarge),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    blurRadius: 20,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
               ),
               child: StreamBuilder<DateTime>(
                 stream: _timeService.liveClockStream,
@@ -3734,13 +3211,11 @@ class _ScannerModalState extends State<_ScannerModal>
                               'EEEE، d MMMM yyyy',
                               locale,
                             ).format(currentTime),
-                            style: TextStyle(
+                            style: textTheme.labelLarge?.copyWith(
                               color: colorScheme.onSurfaceVariant,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: TashilSpacing.xs / 2),
                           Row(
                             children: [
                               Text(
@@ -3748,34 +3223,40 @@ class _ScannerModalState extends State<_ScannerModal>
                                   'hh:mm:ss a',
                                   locale,
                                 ).format(currentTime),
-                                style: TextStyle(
+                                style: textTheme.headlineSmall?.copyWith(
                                   color: colorScheme.onSurface,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: -0.5,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                               if (_timeService.isSynced) ...[
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    AppLocalizations.of(context)!.trustedTime,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primary,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                  const SizedBox(width: TashilSpacing.sm),
+                                Builder(
+                                  builder: (context) {
+                                    final sem = Theme.of(context)
+                                        .extension<TashilSemanticColors>();
+                                    return Container(
+                                      padding:
+                                          const EdgeInsetsDirectional.symmetric(
+                                            horizontal: TashilSpacing.sm,
+                                            vertical: 2,
+                                          ),
+                                      decoration: BoxDecoration(
+                                        color: sem?.successContainer ??
+                                            colorScheme.primaryContainer,
+                                        borderRadius: BorderRadius.circular(
+                                          TashilRadius.small,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        AppLocalizations.of(context)!
+                                            .trustedTime,
+                                        style: textTheme.labelSmall?.copyWith(
+                                          color: sem?.onSuccessContainer ??
+                                              colorScheme.onPrimaryContainer,
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 ),
                               ],
                             ],
@@ -3783,17 +3264,17 @@ class _ScannerModalState extends State<_ScannerModal>
                         ],
                       ),
                       Container(
-                        padding: const EdgeInsets.all(14),
+                        padding: const EdgeInsets.all(TashilSpacing.md),
                         decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.15),
+                          color: colorScheme.primary,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           isCheckedIn
                               ? Symbols.logout_rounded
                               : Symbols.login_rounded,
-                          color: color,
-                          size: 30,
+                          color: colorScheme.onPrimary,
+                          size: 28,
                         ),
                       ),
                     ],
@@ -3804,18 +3285,13 @@ class _ScannerModalState extends State<_ScannerModal>
           ),
 
           // Close Button
-          Positioned(
-            top: 45,
-            left: 20,
-            child: CircleAvatar(
-              backgroundColor: Colors.black45,
-              child: IconButton(
-                tooltip: 'Close Scanner',
-                icon: const Icon(Symbols.close_rounded, color: Colors.white),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-              ),
+          PositionedDirectional(
+            top: TashilSpacing.xxl + TashilSpacing.md,
+            end: TashilSpacing.lg,
+            child: IconButton.filledTonal(
+              tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+              icon: const Icon(Symbols.close_rounded),
+              onPressed: () => Navigator.pop(context),
             ),
           ),
         ],
@@ -3833,11 +3309,15 @@ class _GeofenceRadarWidget extends StatelessWidget {
   final bool isChecking;
   final Color statusColor;
 
+  /// The `on` colour paired with [statusColor] (TAS-352: was Colors.white).
+  final Color onStatusColor;
+
   const _GeofenceRadarWidget({
     required this.animation,
     required this.isInside,
     required this.isChecking,
     required this.statusColor,
+    required this.onStatusColor,
   });
 
   @override
@@ -3906,14 +3386,6 @@ class _GeofenceRadarWidget extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: statusColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: statusColor.withValues(alpha: 0.35),
-                      blurRadius: 10,
-                      spreadRadius: 1,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
                 ),
                 child: AnimatedSwitcher(
                   duration: AppMotionDurations.short4,
@@ -3926,7 +3398,7 @@ class _GeofenceRadarWidget extends StatelessWidget {
                               ? Symbols.check_rounded
                               : Symbols.location_off_rounded),
                     key: ValueKey('${isChecking}_$isInside'),
-                    color: Colors.white,
+                    color: onStatusColor,
                     size: 20,
                   ),
                 ),

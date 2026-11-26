@@ -31,6 +31,8 @@ ScaffoldFeatureController<SnackBar, SnackBarClosedReason> showTashilSnackBar(
   if (replace) messenger.removeCurrentSnackBar();
   final width = MediaQuery.sizeOf(context).width;
   final hasAction = actionLabel != null;
+  final floating =
+      Theme.of(context).snackBarTheme.behavior == SnackBarBehavior.floating;
   return messenger.showSnackBar(
     SnackBar(
       content: Text(message, maxLines: 2, overflow: TextOverflow.ellipsis),
@@ -40,7 +42,9 @@ ScaffoldFeatureController<SnackBar, SnackBarClosedReason> showTashilSnackBar(
       // M3: with an action it stays until acted on or closed.
       persist: hasAction,
       showCloseIcon: hasAction,
-      width: width < TashilSizes.compactMax
+      // `width` only works on a floating snackbar (TAS-352: a screen built
+      // without the app theme gets a fixed one, and the width would assert).
+      width: width < TashilSizes.compactMax || !floating
           ? null
           : (width - 2 * TashilSpacing.xl).clamp(0, 560),
     ),
