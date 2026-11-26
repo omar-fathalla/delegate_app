@@ -1,3 +1,4 @@
+import 'package:flutter/rendering.dart' show ScrollDirection;
 // M3 Expressive building blocks for the delegate home and tabs (home_v2).
 // Spec: M3_Design_System.md §37–39 and tashil-loading-spec.md.
 import 'dart:async';
@@ -442,34 +443,54 @@ TextStyle m3ButtonLabel(BuildContext c) => Theme.of(c)
     .copyWith(fontWeight: FontWeight.w600, fontSize: 14, height: 1.4);
 
 /// Extended FAB: primaryContainer, 56dp, 16dp radius, press-scale.
+/// Extended FAB for a screen's main create action (C-04).
+///
+/// TAS-353: shape, elevation and press feedback come from the theme (no
+/// hand-made shape or press scale). [extended] lets the screen shrink it to
+/// an icon while its list scrolls down (see [ExtendedFabScroll]).
 class M3ExtendedFab extends StatelessWidget {
-  const M3ExtendedFab(
-      {super.key,
-      required this.icon,
-      required this.label,
-      required this.onPressed,
-      this.heroTag});
+  const M3ExtendedFab({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    this.heroTag,
+    this.extended = true,
+  });
   final IconData icon;
   final String label;
   final VoidCallback? onPressed;
   final Object? heroTag;
+  final bool extended;
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return M3PressScale(
-      child: FloatingActionButton.extended(
-        heroTag: heroTag,
-        onPressed: onPressed,
-        elevation: 3,
-        backgroundColor: cs.primaryContainer,
-        foregroundColor: cs.onPrimaryContainer,
-        extendedPadding: const EdgeInsetsDirectional.only(start: 16, end: 20),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        icon: Icon(icon, size: 24),
-        label: Text(label,
-            style: m3ButtonLabel(context).copyWith(color: cs.onPrimaryContainer)),
-      ),
+    return FloatingActionButton.extended(
+      heroTag: heroTag,
+      onPressed: onPressed,
+      isExtended: extended,
+      tooltip: label,
+      backgroundColor: cs.primaryContainer,
+      foregroundColor: cs.onPrimaryContainer,
+      icon: Icon(icon),
+      label: Text(label),
     );
+  }
+}
+
+/// Mixin for a screen whose extended FAB shrinks while its list scrolls
+/// down and comes back on scroll up (TAS-352 / TAS-353). Wrap the body in
+/// `NotificationListener<UserScrollNotification>(onNotification:
+/// onFabScroll, ...)` and pass [fabExtended] to the FAB.
+mixin ExtendedFabScroll<T extends StatefulWidget> on State<T> {
+  bool fabExtended = true;
+
+  bool onFabScroll(UserScrollNotification n) {
+    if (n.metrics.axis != Axis.vertical) return false;
+    if (n.direction == ScrollDirection.idle) return false;
+    final extend = n.direction == ScrollDirection.forward;
+    if (extend != fabExtended) setState(() => fabExtended = extend);
+    return false;
   }
 }
 
