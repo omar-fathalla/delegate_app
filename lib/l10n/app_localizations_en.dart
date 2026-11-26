@@ -748,6 +748,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Are you sure you want to delete this task? This action cannot be undone.';
 
   @override
+  String get notesHint => 'Add notes here...';
+
+  @override
   String get notes => 'Notes';
 
   @override
@@ -2297,6 +2300,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chooseImage => 'Choose photo';
+
+  @override
+  String get sendRequestAction => 'Send request';
 
   @override
   String get sendAction => 'Send';
