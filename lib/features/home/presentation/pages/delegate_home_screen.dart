@@ -1021,24 +1021,18 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               ),
             ),
             if (phone.isNotEmpty) ...[
-              IconButton(
+              // TAS-384: icons on cards are primary with onPrimary.
+              IconButton.filled(
                 onPressed: () => _callNumber(phone),
                 icon: const Icon(Symbols.phone_rounded),
                 tooltip: AppLocalizations.of(context)!.callAction,
-                style: IconButton.styleFrom(
-                  backgroundColor: colorScheme.secondaryContainer,
-                  foregroundColor: colorScheme.onSecondaryContainer,
-                ),
               ),
               const SizedBox(width: TashilSpacing.sm),
-              IconButton(
+              // TAS-384: icons on cards are primary with onPrimary.
+              IconButton.filled(
                 onPressed: () => _openWhatsApp(phone),
                 icon: const Icon(Symbols.chat_rounded),
                 tooltip: AppLocalizations.of(context)!.whatsapp,
-                style: IconButton.styleFrom(
-                  backgroundColor: colorScheme.secondaryContainer,
-                  foregroundColor: colorScheme.onSecondaryContainer,
-                ),
               ),
             ],
           ],

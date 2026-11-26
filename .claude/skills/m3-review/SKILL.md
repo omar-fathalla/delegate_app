@@ -24,6 +24,9 @@ differs from the original m3-kit (purple seed, no POS items, playground without 
    `lib/core/design/widgets/`. Colours from roles or `TashilSemanticColors`,
    text from `textTheme`, spacing from `TashilSpacing`, shapes from
    `TashilRadius`, `EdgeInsetsDirectional`.
+   Icons on cards: `primary` fill + `onPrimary` icon, `IconButton.filled`
+   for icon buttons, never `primaryContainer` / `secondaryContainer`
+   (TAS-384). Read-only values are icon + text labels, not chips.
 4. Lower the baselines in `test/design/no_new_raw_styles_test.dart` to the new
    counts in the same change.
 5. Tests for every behaviour changed, `dart analyze` clean, goldens updated and

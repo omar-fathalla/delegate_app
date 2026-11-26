@@ -94,6 +94,18 @@ contrast button in the app bar cycles the three levels).
   color_test.dart` checks every pair at every level.
 - Stock: green = available, orange = at or below minimum, red (`error`)
   = out.
+- **Icons on cards (Tashil rule, user decision 2026-11-26, TAS-384):**
+  every icon set in a circle or rounded square on a surface card (a card's
+  leading icon, call / WhatsApp / action icon buttons) uses `primary` fill
+  with an `onPrimary` icon, on every screen with no exceptions per page.
+  Icon buttons are `IconButton.filled`. Never `primaryContainer` or
+  `secondaryContainer` there: on a `Card.filled` they are almost the same
+  lightness as the card and the circle fades. The only inverse case is a
+  card that is itself `primary` (the home welcome card): its icon circle is
+  the light container.
+- **Read-only labels are not chips:** a value the user cannot act on (the
+  active organization next to the role, a status) is an icon + text label,
+  never a chip, border, glow or pulsing animation.
 
 ### Colour schemes
 Sources: **m3.material.io/styles/color/choosing-a-scheme**, **/static/

@@ -375,16 +375,19 @@ class UniversalAppHeader extends StatelessWidget
                       ),
                       const SizedBox(width: 12),
                     ],
+                    // TAS-384: the name and role open the profile; the
+                    // organization next to them is information only, so a
+                    // tap on it no longer opens the profile.
                     Expanded(
-                      child: GestureDetector(
-                        onTap: () =>
-                            context.push('/user-profile', extra: delegate),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          GestureDetector(
+                            onTap: () =>
+                                context.push('/user-profile', extra: delegate),
+                            child: Text(
                               displayName,
                               style: textTheme.titleSmall?.copyWith(
                                 color: colorScheme.onSurface,
@@ -393,10 +396,16 @@ class UniversalAppHeader extends StatelessWidget
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Flexible(
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: GestureDetector(
+                                  onTap: () => context.push(
+                                    '/user-profile',
+                                    extra: delegate,
+                                  ),
                                   child: Text(
                                     roleLabel,
                                     style: textTheme.labelSmall?.copyWith(
@@ -406,36 +415,30 @@ class UniversalAppHeader extends StatelessWidget
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                if (activeOrgName.isNotEmpty) ...[
-                                  const SizedBox(width: 6),
-                                  Flexible(
-                                    child: _PulsingActiveOrgChip(
-                                      organizationName: activeOrgName,
-                                    ),
+                              ),
+                              if (activeOrgName.isNotEmpty) ...[
+                                const SizedBox(width: TashilSpacing.sm),
+                                Flexible(
+                                  child: ActiveOrganizationLabel(
+                                    organizationName: activeOrgName,
                                   ),
-                                ],
+                                ),
                               ],
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 );
               },
             ),
+      // TAS-384: the delegate header keeps only the notifications; the
+      // profile stays one tap away from the name and the menu.
       actions: useDrawer
           ? [
               ...?extraActions,
-              Padding(
-                padding: const EdgeInsetsDirectional.only(end: 8),
-                child: IconButton(
-                  tooltip: AppLocalizations.of(context)?.profile,
-                  onPressed: () =>
-                      context.push('/user-profile', extra: delegate),
-                  icon: _HeaderAvatar(delegate: delegate, header: this),
-                ),
-              ),
+              const SizedBox(width: TashilSpacing.sm),
             ]
           : [
               ...?extraActions,
@@ -463,144 +466,39 @@ class UniversalAppHeader extends StatelessWidget
   }
 }
 
-/// شريحة المنظمة النشطة المضيئة مع أنيميشن إضاءة متوهجة ناعمة تظهر وتختفي (Pulsing Glow)
-class _PulsingActiveOrgChip extends StatefulWidget {
+/// The active organization next to the role (TAS-384). Read-only, so it is
+/// a label and not a chip (M3 chips are always interactive, see
+/// docs/design/design-system.md): store icon in primary, name in
+/// onSurfaceVariant, no border, glow or animation.
+class ActiveOrganizationLabel extends StatelessWidget {
+  const ActiveOrganizationLabel({super.key, required this.organizationName});
+
   final String organizationName;
-
-  const _PulsingActiveOrgChip({required this.organizationName});
-
-  @override
-  State<_PulsingActiveOrgChip> createState() => _PulsingActiveOrgChipState();
-}
-
-class _PulsingActiveOrgChipState extends State<_PulsingActiveOrgChip>
-    with SingleTickerProviderStateMixin {
-  /// "Live" dot colour: the design system's success role (TAS-350), or
-  /// primary when a test theme has no TashilSemanticColors extension.
-  Color _live(BuildContext context) =>
-      Theme.of(context).extension<TashilSemanticColors>()?.success ??
-      Theme.of(context).colorScheme.primary;
-
-  late final AnimationController _controller;
-  late final Animation<double> _glowAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
-
-    _glowAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-
-    return AnimatedBuilder(
-      animation: _glowAnimation,
-      builder: (context, child) {
-        final progress = _glowAnimation.value;
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHigh.withValues(
-              alpha: 0.75 + 0.25 * progress,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Symbols.storefront_rounded,
+          size: 14,
+          color: colorScheme.primary,
+        ),
+        const SizedBox(width: TashilSpacing.xs),
+        Flexible(
+          child: Text(
+            organizationName,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: colorScheme.primary.withValues(
-                alpha: 0.35 + 0.45 * progress,
-              ),
-              width: 1.0,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.primary.withValues(
-                  alpha: 0.12 + 0.22 * progress,
-                ),
-                blurRadius: 4.0 + 4.0 * progress,
-                spreadRadius: 0.5 * progress,
-              ),
-            ],
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // نقطة إضاءة خضراء حية نابضة
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: _live(context).withValues(alpha: 0.6 + 0.4 * progress),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _live(context).withValues(alpha: 0.5 * progress),
-                      blurRadius: 4,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 4.5),
-              Icon(
-                Symbols.storefront_rounded,
-                size: 12,
-                color: colorScheme.primary,
-              ),
-              const SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  widget.organizationName,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+        ),
+      ],
     );
   }
 }
 
-/// Avatar shown in the app bar actions in drawer mode (live photo from the
-/// user document, initial as fallback).
-class _HeaderAvatar extends StatelessWidget {
-  const _HeaderAvatar({required this.delegate, required this.header});
-  final Delegate delegate;
-  final UniversalAppHeader header;
-
-  @override
-  Widget build(BuildContext context) {
-    return SessionUserDocBuilder(
-      uid: delegate.uid,
-      subscriptionKey: 'header.avatar.users.${delegate.uid}',
-      firestore: header.firestore,
-      builder: (context, snapshot) {
-        final userData = snapshot?.data();
-        final name = UniversalAppHeader.resolveDisplayName(delegate, userData);
-        return AppAvatar(
-          imageUrl: header._resolvePhotoUrl(delegate, userData),
-          fallbackText: name.characters.first,
-          radius: 16,
-        );
-      },
-    );
-  }
-}
