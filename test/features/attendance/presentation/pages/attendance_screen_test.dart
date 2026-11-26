@@ -354,12 +354,28 @@ void main() {
       expect(find.text('الفرع: سان ستيفانو'), findsOneWidget);
       expect(find.text('الفرع: City Square'), findsOneWidget);
 
+      // TAS-352 (C-06): the chain filter is a row of official FilterChips:
+      // «كل السلاسل» + one per chain, «كل السلاسل» selected first.
+      expect(find.byType(FilterChip), findsNWidgets(3));
+      expect(
+        tester
+            .widget<FilterChip>(find.byKey(const ValueKey('attendance_chain_filter_all')))
+            .selected,
+        isTrue,
+      );
+
       // Normalized Arabic chain chips ('فتح الله ماركت' and 'جملة ماركت')
       expect(find.text('فتح الله ماركت'), findsWidgets);
       expect(find.text('جملة ماركت'), findsWidgets);
 
       // Tap 'فتح الله ماركت' filter tab in the chain filter bar
-      await tester.tap(find.text('فتح الله ماركت').first);
+      // TAS-352: the chain filter is a row of FilterChips «name · count».
+      await tester.tap(
+        find.descendant(
+          of: find.byType(FilterChip),
+          matching: find.textContaining('فتح الله ماركت'),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('الفرع: City Square'), findsOneWidget);
@@ -367,7 +383,13 @@ void main() {
       expect(find.text('الفرع: سان ستيفانو'), findsNothing);
 
       // Tap 'جملة ماركت' filter tab in the chain filter bar
-      await tester.tap(find.text('جملة ماركت').first);
+      // TAS-352: the chain filter is a row of FilterChips «name · count».
+      await tester.tap(
+        find.descendant(
+          of: find.byType(FilterChip),
+          matching: find.textContaining('جملة ماركت'),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('الفرع: جناكليس'), findsOneWidget);
@@ -375,12 +397,34 @@ void main() {
       expect(find.text('الفرع: City Square'), findsNothing);
 
       // Tap 'كل السلاسل' to show all chains again
-      await tester.tap(find.text('كل السلاسل').first);
+      // TAS-352: the chain filter is a row of FilterChips «name · count».
+      await tester.tap(
+        find.descendant(
+          of: find.byType(FilterChip),
+          matching: find.textContaining('كل السلاسل'),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('الفرع: جناكليس'), findsOneWidget);
       expect(find.text('الفرع: سان ستيفانو'), findsOneWidget);
       expect(find.text('الفرع: City Square'), findsOneWidget);
+
+      // TAS-352 (C-04): the check-in FAB shrinks while the list scrolls down
+      // and comes back on scroll up.
+      bool extended() => tester
+          .widget<FloatingActionButton>(find.byKey(const Key('attendanceFab')))
+          .isExtended;
+      await tester.binding.setSurfaceSize(const Size(400, 600));
+      await tester.pumpAndSettle();
+      expect(extended(), isTrue);
+      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      await tester.pump();
+      expect(extended(), isFalse);
+      await tester.drag(find.byType(ListView), const Offset(0, 200));
+      await tester.pump();
+      expect(extended(), isTrue);
+      await tester.pumpAndSettle();
     },
   );
 
