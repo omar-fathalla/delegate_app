@@ -1,7 +1,9 @@
 import 'package:material_ui/material_ui.dart';
 
-/// قسم البحث عن الشركات
-/// Company search section widget
+import 'package:delegate_app/core/design/tokens.dart';
+
+/// قسم البحث عن الشركات (TAS-392: theme text field + one FilledButton).
+/// Company search section widget.
 class CompanySearchSection extends StatelessWidget {
   final TextEditingController controller;
   final VoidCallback onSearch;
@@ -14,113 +16,37 @@ class CompanySearchSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // العنوان مع الأيقونة
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.business_rounded,
-                color: colorScheme.onPrimaryContainer,
-                size: 20,
-              ),
+        ListenableBuilder(
+          listenable: controller,
+          builder: (context, _) => TextField(
+            key: const Key('company_search_code'),
+            controller: controller,
+            keyboardType: TextInputType.number,
+            textDirection: TextDirection.ltr, // Codes are LTR.
+            decoration: InputDecoration(
+              labelText: 'كود الشركة',
+              hintText: 'مثال: 4818',
+              prefixIcon: const Icon(Icons.business_rounded),
+              suffixIcon: controller.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear_rounded),
+                      tooltip: 'مسح',
+                      onPressed: controller.clear,
+                    )
+                  : null,
             ),
-            const SizedBox(width: 12),
-            Text(
-              'البحث عن شركة',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 16),
-
-        // حقل إدخال كود الشركة
-        TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          textDirection: TextDirection.ltr, // Codes are usually LTR
-          decoration: InputDecoration(
-            labelText: 'كود الشركة',
-            hintText: 'أدخل كود الشركة (مثال: 4818)',
-            hintStyle: TextStyle(color: colorScheme.outline),
-            prefixIcon: Icon(
-              Icons.business_rounded,
-              color: colorScheme.primary,
-            ),
-            suffixIcon: controller.text.isNotEmpty
-                ? IconButton(
-                    icon: Icon(Icons.clear_rounded, color: colorScheme.outline),
-                    onPressed: () {
-                      controller.clear();
-                    },
-                  )
-                : null,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: colorScheme.outline),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: colorScheme.outline),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: colorScheme.primary, width: 2),
-            ),
-            filled: true,
-            fillColor: colorScheme.surface,
+            onSubmitted: (_) => onSearch(),
           ),
-          onSubmitted: (_) => onSearch(),
         ),
-
-        const SizedBox(height: 16),
-
-        // زر البحث
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton(
-            onPressed: onSearch,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colorScheme.primary,
-              foregroundColor: colorScheme.onPrimary,
-              elevation: 2,
-              shadowColor: colorScheme.primary.withValues(alpha: 0.3),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.search_rounded, size: 22),
-                const SizedBox(width: 12),
-                Text(
-                  'بحث عن الشركة',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
+        const SizedBox(height: TashilSpacing.lg),
+        FilledButton.icon(
+          key: const Key('company_search_button'),
+          onPressed: onSearch,
+          icon: const Icon(Icons.search_rounded),
+          label: const Text('بحث عن الشركة'),
         ),
       ],
     );

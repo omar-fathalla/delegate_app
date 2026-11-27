@@ -21,19 +21,17 @@ void main() {
     );
 
     // Verify UI elements
-    expect(find.text('البحث عن شركة'), findsOneWidget);
     expect(find.text('كود الشركة'), findsOneWidget);
-    expect(find.text('أدخل كود الشركة (مثال: 4818)'), findsOneWidget);
     expect(find.text('بحث عن الشركة'), findsOneWidget);
     expect(find.byType(TextField), findsOneWidget);
-    expect(find.byType(ElevatedButton), findsOneWidget);
+    expect(find.byType(FilledButton), findsOneWidget);
 
     // Enter text
     await tester.enterText(find.byType(TextField), 'COMP123');
     expect(controller.text, 'COMP123');
 
     // Tap search button
-    await tester.tap(find.byType(ElevatedButton));
+    await tester.tap(find.byType(FilledButton));
     await tester.pump();
 
     // Verify callback

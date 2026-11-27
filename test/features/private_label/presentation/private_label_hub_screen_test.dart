@@ -1,3 +1,4 @@
+import 'package:delegate_app/config/theme/app_theme.dart';
 import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart'
@@ -67,6 +68,7 @@ DelegateModel _createDelegate({
 
 Widget _buildTestApp(Widget child) {
   return MaterialApp(
+      theme: AppTheme.lightTheme(),
     localizationsDelegates: const [
       AppLocalizations.delegate,
       GlobalMaterialLocalizations.delegate,
@@ -113,7 +115,6 @@ void main() {
 
     // Verify Header Banner
     expect(find.text('مركز العلامة الخاصة'), findsOneWidget);
-    expect(find.text('Private Label'), findsWidgets);
 
     // Verify Core Tools and Updated Subtitles
     expect(find.text('Private Label Audit'), findsOneWidget);

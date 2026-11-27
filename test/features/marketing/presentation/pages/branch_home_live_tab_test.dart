@@ -1,3 +1,4 @@
+import 'package:delegate_app/config/theme/app_theme.dart';
 // TAS-231 (from PR #188): the branch tab's live listener only runs while
 // the tab is selected.
 import 'dart:async';
@@ -71,6 +72,7 @@ DelegateModel _createDelegate({
 
 Widget _buildTestApp(Widget child) {
   return MaterialApp(
+      theme: AppTheme.lightTheme(),
     localizationsDelegates: const [
       AppLocalizations.delegate,
       GlobalMaterialLocalizations.delegate,

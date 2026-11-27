@@ -190,7 +190,8 @@ class MarketingSearchBloc
     emit(currentState.copyWith(isLoadingMore: true));
 
     final dynamic result;
-    if (_currentDelegateName != null && _currentDelegateName!.trim().isNotEmpty) {
+    if (_currentDelegateName != null &&
+        _currentDelegateName!.trim().isNotEmpty) {
       result = await searchDelegateByName(
         SearchDelegateByNameParams(
           organizationUID: _currentOrganizationUID!,

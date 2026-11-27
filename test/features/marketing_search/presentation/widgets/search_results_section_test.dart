@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/design/widgets/loading_indicator.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:delegate_app/features/marketing_search/presentation/widgets/search_results_section.dart';
@@ -44,7 +45,7 @@ void main() {
     setDisplaySize(tester);
     await tester.pumpWidget(createWidgetUnderTest(const MarketingSearchLoading(searchType: 'company')));
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(LoadingIndicator), findsOneWidget);
     expect(find.text('جاري البحث...'), findsOneWidget);
   });
 

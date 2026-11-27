@@ -1,3 +1,4 @@
+import 'package:delegate_app/config/theme/app_theme.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart'
     show GlobalCupertinoLocalizations;
@@ -63,6 +64,7 @@ DelegateModel _createDelegate({
 
 Widget _buildTestApp(Widget child) {
   return MaterialApp(
+      theme: AppTheme.lightTheme(),
     localizationsDelegates: const [
       AppLocalizations.delegate,
       GlobalMaterialLocalizations.delegate,
@@ -159,7 +161,10 @@ void main() {
       );
       await tester.pump();
 
-      final exportButton = find.byTooltip('تصدير كشف الفرع إلى Excel');
+      // TAS-392: branch actions live in the ⋮ menu of the branch header.
+      await tester.tap(find.byTooltip('خيارات الفرع'));
+      await tester.pumpAndSettle();
+      final exportButton = find.text('تصدير كشف الفرع (Excel)');
       expect(exportButton, findsOneWidget);
       expect(find.byIcon(Icons.table_chart_rounded), findsOneWidget);
 

@@ -50,9 +50,17 @@ void main() {
     await tester.pump();
 
     expect(find.text('البحث'), findsWidgets);
+    // TAS-392: one search at a time, picked with the ButtonGroup.
     expect(find.byType(CompanySearchSection), findsOneWidget);
-    expect(find.byType(DelegateSearchSection), findsOneWidget);
+    expect(find.byType(DelegateSearchSection), findsNothing);
     expect(find.byType(SearchResultsSection), findsOneWidget);
+    expect(find.byType(FilledButton), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('marketing_search_mode_delegate')));
+    await tester.pumpAndSettle();
+    expect(find.byType(DelegateSearchSection), findsOneWidget);
+    expect(find.byType(CompanySearchSection), findsNothing);
+    expect(find.byType(FilledButton), findsOneWidget);
   });
 
   testWidgets('renders properly with organizationUID from AuthLocalDataSource if not provided', (tester) async {

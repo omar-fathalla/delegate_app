@@ -47,10 +47,10 @@ class SearchDelegateByNameParams extends Equatable {
 
   @override
   List<Object?> get props => [
-        organizationUID,
-        name,
-        phoneNumber,
-        limit,
-        startAfterDoc,
-      ];
+    organizationUID,
+    name,
+    phoneNumber,
+    limit,
+    startAfterDoc,
+  ];
 }

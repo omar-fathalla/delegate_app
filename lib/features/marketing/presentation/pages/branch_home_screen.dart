@@ -1,3 +1,5 @@
+import 'package:delegate_app/core/design/widgets/snackbars.dart';
+import 'package:delegate_app/core/design/tokens.dart';
 import 'dart:async';
 import 'package:delegate_app/core/l10n/display_names.dart';
 import 'package:delegate_app/core/services/branches_session_cache.dart';
@@ -6,7 +8,9 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart' hide TextDirection;
+import 'package:intl/intl.dart' hide Bidi, TextDirection;
+import 'package:delegate_app/core/design/bidi.dart';
+import 'package:delegate_app/core/design/widgets/pull_to_refresh.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -121,7 +125,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     try {
       _floorService = di.sl<FloorVerificationService>();
       final prefService = di.sl<BranchPreferenceService>();
-      final favorites = prefService.getFavoriteBranches(widget.marketingUser.uid);
+      final favorites = prefService.getFavoriteBranches(
+        widget.marketingUser.uid,
+      );
       _favoriteBranches = favorites;
       _prefsLoaded = true;
       _applyDefaultCollapseIfNeeded(favorites);
@@ -144,7 +150,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
         },
       );
     } catch (e, st) {
-      debugPrint('BranchHomeScreen: initState branch prefs/load failed: $e\n$st');
+      debugPrint(
+        'BranchHomeScreen: initState branch prefs/load failed: $e\n$st',
+      );
     }
   }
 
@@ -189,21 +197,22 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     if (!widget.isActive) return;
     if (RealTestMetrics.enabled || _favoriteBranches.isEmpty) return;
     if (!di.sl.isRegistered<MarketingRemoteDataSource>()) return;
-    _liveSub = di.sl<MarketingRemoteDataSource>()
+    _liveSub = di
+        .sl<MarketingRemoteDataSource>()
         .watchTodayAttendanceChanges(
           branchNames: _favoriteBranches,
           organizationId: widget.marketingUser.organizationUID,
           date: _selectedDate,
         )
         .listen((_) {
-      // Several check-ins in a burst become one reload.
-      _liveDebounce?.cancel();
-      _liveDebounce = Timer(const Duration(seconds: 3), () {
-        if (!mounted || _favoriteBranches.isEmpty) return;
-        _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
-        _syncFloorVerificationsFromCloud();
-      });
-    });
+          // Several check-ins in a burst become one reload.
+          _liveDebounce?.cancel();
+          _liveDebounce = Timer(const Duration(seconds: 3), () {
+            if (!mounted || _favoriteBranches.isEmpty) return;
+            _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
+            _syncFloorVerificationsFromCloud();
+          });
+        });
   }
 
   Future<void> _syncFloorVerificationsFromCloud() async {
@@ -221,9 +230,13 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     } catch (_) {}
   }
 
-  void _toggleFloorVerification(Map<String, dynamic> record, [String? fallbackBranch]) {
+  void _toggleFloorVerification(
+    Map<String, dynamic> record, [
+    String? fallbackBranch,
+  ]) {
     final delegateId = record['delegateId'] as String? ?? '';
-    final branchName = (record['branchName'] as String? ?? fallbackBranch ?? '').trim();
+    final branchName = (record['branchName'] as String? ?? fallbackBranch ?? '')
+        .trim();
     if (delegateId.isEmpty || branchName.isEmpty) return;
 
     final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
@@ -261,9 +274,14 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     }
   }
 
-  void _showFloorVerificationDialog(BuildContext context, Map<String, dynamic> record, [String? fallbackBranch]) {
+  void _showFloorVerificationDialog(
+    BuildContext context,
+    Map<String, dynamic> record, [
+    String? fallbackBranch,
+  ]) {
     final delegateId = record['delegateId'] as String? ?? '';
-    final branchName = (record['branchName'] as String? ?? fallbackBranch ?? '').trim();
+    final branchName = (record['branchName'] as String? ?? fallbackBranch ?? '')
+        .trim();
     final fullName = record['fullName'] as String? ?? 'المندوب';
     if (delegateId.isEmpty || branchName.isEmpty) return;
 
@@ -310,21 +328,20 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                 Text(
                   fullName,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: cs.onSurfaceVariant,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                 ),
                 const SizedBox(height: 16),
 
                 // Option 1: متواجد بالصالة (تم التأكد)
                 ListTile(
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(TashilRadius.medium),
                     side: BorderSide(
                       color: currentItem?.isVerified == true
                           ? const Color(0xFF2E7D32)
-                          : cs.outlineVariant.withValues(alpha: 0.3),
+                          : cs.outlineVariant,
                       width: currentItem?.isVerified == true ? 1.5 : 1,
                     ),
                   ),
@@ -336,17 +353,16 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                     color: Color(0xFF2E7D32),
                     size: 26,
                   ),
-                  title: const Text(
+                  title: Text(
                     'متواجد بالصالة (تم التحقق)',
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
                       color: Color(0xFF1B5E20),
                     ),
                   ),
-                  subtitle: const Text(
+                  subtitle: Text(
                     'المندوب حاضر ومتواجد في مكانه/الستاند',
-                    style: TextStyle(fontSize: 12),
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                   trailing: currentItem?.isVerified == true
                       ? const Icon(Icons.done_rounded, color: Color(0xFF2E7D32))
@@ -376,33 +392,32 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                 // Option 2: غير متواجد بالصالة (غائب عن الستاند)
                 ListTile(
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(TashilRadius.medium),
                     side: BorderSide(
                       color: currentItem?.isMissing == true
                           ? const Color(0xFFC62828)
-                          : cs.outlineVariant.withValues(alpha: 0.3),
+                          : cs.outlineVariant,
                       width: currentItem?.isMissing == true ? 1.5 : 1,
                     ),
                   ),
                   tileColor: currentItem?.isMissing == true
-                       ? const Color(0xFFFFEBEE)
+                      ? const Color(0xFFFFEBEE)
                       : cs.surfaceContainerLow,
                   leading: const Icon(
                     Icons.cancel_rounded,
                     color: Color(0xFFC62828),
                     size: 26,
                   ),
-                  title: const Text(
+                  title: Text(
                     'غير متواجد بالصالة',
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
                       color: Color(0xFFB71C1C),
                     ),
                   ),
-                  subtitle: const Text(
+                  subtitle: Text(
                     'مسجل حضور في التطبيق لكنه غير متواجد فعلياً',
-                    style: TextStyle(fontSize: 12),
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                   trailing: currentItem?.isMissing == true
                       ? const Icon(Icons.done_rounded, color: Color(0xFFC62828))
@@ -433,20 +448,17 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                   // Option 3: إلغاء التحديد
                   ListTile(
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(
-                        color: cs.outlineVariant.withValues(alpha: 0.3),
-                      ),
+                      borderRadius: BorderRadius.circular(TashilRadius.medium),
+                      side: BorderSide(color: cs.outlineVariant),
                     ),
                     leading: Icon(
                       Icons.restart_alt_rounded,
                       color: cs.onSurfaceVariant,
                       size: 24,
                     ),
-                    title: const Text(
+                    title: Text(
                       'إعادة تعيين (لم يتم المرور بعد)',
-                      style: TextStyle(
-                        fontSize: 13,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -477,12 +489,11 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     if (_didApplyDefaultCollapse) return;
     if (favorites.length < 5) return;
     _didApplyDefaultCollapse = true;
-    final active = di
-        .sl<BranchPreferenceService>()
-        .getActiveBranch(widget.marketingUser.uid);
-    final keepOpen = (active != null &&
-            active.isNotEmpty &&
-            favorites.contains(active))
+    final active = di.sl<BranchPreferenceService>().getActiveBranch(
+      widget.marketingUser.uid,
+    );
+    final keepOpen =
+        (active != null && active.isNotEmpty && favorites.contains(active))
         ? active
         : favorites.first;
     _collapsedBranches
@@ -615,7 +626,8 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
           } else {
             body = _buildError(context, state.message, colorScheme);
           }
-        } else if (_lastLoadedState != null && _lastLoadedState!.data.isNotEmpty) {
+        } else if (_lastLoadedState != null &&
+            _lastLoadedState!.data.isNotEmpty) {
           body = _buildAllBranches(
             context,
             _lastLoadedState!.copyWith(favoriteBranches: _favoriteBranches),
@@ -650,10 +662,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
               backgroundColor: colorScheme.surfaceContainer,
               elevation: 0,
               shape: Border(
-                bottom: BorderSide(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-                  width: 1,
-                ),
+                bottom: BorderSide(color: colorScheme.outlineVariant, width: 1),
               ),
               title: Text(
                 'متابعة حضور الفروع',
@@ -668,11 +677,13 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                           ? Icons.unfold_more_rounded
                           : Icons.unfold_less_rounded,
                     ),
-                    tooltip: _collapsedBranches.length >= _favoriteBranches.length
+                    tooltip:
+                        _collapsedBranches.length >= _favoriteBranches.length
                         ? 'فتح الكل'
                         : 'طي الكل',
                     onPressed: () {
-                      if (_collapsedBranches.length >= _favoriteBranches.length) {
+                      if (_collapsedBranches.length >=
+                          _favoriteBranches.length) {
                         _expandAll();
                       } else {
                         _collapseAll(_favoriteBranches);
@@ -687,7 +698,11 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                 IconButton(
                   icon: const Icon(Icons.refresh_rounded),
                   tooltip: 'تحديث',
-                  onPressed: () => _loadAllBranches(context, _favoriteBranches, forceRefresh: true),
+                  onPressed: () => _loadAllBranches(
+                    context,
+                    _favoriteBranches,
+                    forceRefresh: true,
+                  ),
                 ),
               ],
             ),
@@ -721,8 +736,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
           const SizedBox(height: 24),
           Text(
             'لم تضف أي فرع بعد',
-            style: TextStyle(
-              fontSize: 20,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
               color: colorScheme.onSurface,
             ),
@@ -788,7 +802,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     AllBranchesAttendanceLoaded state,
     ColorScheme colorScheme,
   ) {
-    return RefreshIndicator(
+    return PullToRefresh(
       onRefresh: () async {
         _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
         await _syncFloorVerificationsFromCloud();
@@ -812,8 +826,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                     const SizedBox(width: 8),
                     Text(
                       'جاري استكمال الأسماء والصور…',
-                      style: TextStyle(
-                        fontSize: 12,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -821,119 +834,62 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                 ),
               ),
             ),
-          // ─── تاريخ اليوم ──────────────────────────────────────────────
+          // ─── التاريخ وآخر مزامنة (TAS-392) ───────────────────────────
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Card(
-                elevation: 0,
-                color: colorScheme.primaryContainer.withValues(alpha: 0.25),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                  ),
-                ),
-                child: InkWell(
-                  onTap: () => _selectDate(),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 10,
-                      horizontal: 14,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.calendar_month_rounded,
-                          size: 20,
-                          color: colorScheme.primary,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          DateFormat('EEEE، d MMMM yyyy', 'ar').format(_selectedDate),
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.arrow_drop_down_rounded,
-                          color: colorScheme.primary,
-                        ),
-                        const Spacer(),
-                        if (_lastSyncTime != null)
-                          Tooltip(
-                            message: 'آخر مزامنة ناجحة مع السيرفر: ${DateFormat('h:mm:ss a', 'ar').format(_lastSyncTime!)}',
-                            child: Container(
-                              margin: const EdgeInsetsDirectional.only(end: 8),
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: Colors.green.withValues(alpha: 0.35),
-                                  width: 0.8,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFF2E7D32),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'مُتصل (${DateFormat('h:mm a', 'ar').format(_lastSyncTime!)})',
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF2E7D32),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        if (!DateUtils.isSameDay(_selectedDate, DateTime.now()))
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _selectedDate = DateTime.now();
-                              });
-                              _loadAllBranches(context, _favoriteBranches, forceRefresh: true);
-                            },
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 0,
-                              ),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: const Text(
-                              'اليوم',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                      ],
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                TashilSpacing.lg,
+                TashilSpacing.md,
+                TashilSpacing.lg,
+                TashilSpacing.xs,
+              ),
+              child: Row(
+                children: [
+                  FilledButton.tonalIcon(
+                    key: const Key('branch_home_date'),
+                    onPressed: _selectDate,
+                    icon: const Icon(Icons.calendar_month_rounded),
+                    label: Text(
+                      DateFormat('EEEE، d MMMM', 'ar').format(_selectedDate),
                     ),
                   ),
-                ),
+                  if (!DateUtils.isSameDay(_selectedDate, DateTime.now())) ...[
+                    const SizedBox(width: TashilSpacing.xs),
+                    TextButton(
+                      onPressed: () {
+                        setState(() => _selectedDate = DateTime.now());
+                        _loadAllBranches(
+                          context,
+                          _favoriteBranches,
+                          forceRefresh: true,
+                        );
+                      },
+                      child: const Text('اليوم'),
+                    ),
+                  ],
+                  const Spacer(),
+                  if (_lastSyncTime != null)
+                    Tooltip(
+                      message:
+                          'آخر مزامنة ناجحة مع السيرفر: ${DateFormat('h:mm:ss a', 'ar').format(_lastSyncTime!)}',
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.cloud_done_rounded,
+                            size: 18,
+                            color: TashilSemanticColors.of(context).success,
+                          ),
+                          const SizedBox(width: TashilSpacing.xs),
+                          Text(
+                            DateFormat('h:mm a', 'ar').format(_lastSyncTime!),
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(color: colorScheme.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -941,54 +897,30 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
           // ─── شريط البحث عن مندوب أو شركة ────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
-              child: TextField(
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                TashilSpacing.lg,
+                TashilSpacing.sm,
+                TashilSpacing.lg,
+                TashilSpacing.xs,
+              ),
+              child: SearchBar(
+                key: const Key('branch_home_search'),
                 controller: _searchController,
-                onChanged: (val) {
-                  setState(() => _searchQuery = val.trim());
-                },
-                decoration: InputDecoration(
-                  hintText: 'ابحث باسم المندوب أو اسم الشركة...',
-                  hintStyle: TextStyle(
-                    fontSize: 14,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    color: colorScheme.primary,
-                  ),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear_rounded),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                          },
-                        )
-                      : null,
-                  filled: true,
-                  fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                hintText: 'ابحث باسم المندوب أو الشركة',
+                leading: const Icon(Icons.search_rounded),
+                elevation: const WidgetStatePropertyAll(0),
+                trailing: [
+                  if (_searchQuery.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      tooltip: 'مسح البحث',
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
+                      },
                     ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
-                  ),
-                ),
+                ],
+                onChanged: (val) => setState(() => _searchQuery = val.trim()),
               ),
             ),
           ),
@@ -1008,29 +940,33 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                     const SizedBox(width: 6),
                     Text(
                       'الفروع المتابعة (${state.favoriteBranches.length})',
-                      style: TextStyle(
-                        fontSize: 12,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const Spacer(),
                     InkWell(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(TashilRadius.small),
                       onTap: () {
-                        if (_collapsedBranches.length >= state.favoriteBranches.length) {
+                        if (_collapsedBranches.length >=
+                            state.favoriteBranches.length) {
                           _expandAll();
                         } else {
                           _collapseAll(state.favoriteBranches);
                         }
                       },
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              _collapsedBranches.length >= state.favoriteBranches.length
+                              _collapsedBranches.length >=
+                                      state.favoriteBranches.length
                                   ? Icons.unfold_more_rounded
                                   : Icons.unfold_less_rounded,
                               size: 16,
@@ -1038,14 +974,15 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              _collapsedBranches.length >= state.favoriteBranches.length
+                              _collapsedBranches.length >=
+                                      state.favoriteBranches.length
                                   ? 'فتح الكل'
                                   : 'طي الكل',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                              ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.primary,
+                                  ),
                             ),
                           ],
                         ),
@@ -1088,8 +1025,12 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     final isExpanded = !_collapsedBranches.contains(branchName);
 
     // Floor Verification Stats
-    final verifiedCount = records.where((r) => _floorVerifications[r['delegateId']]?.isVerified == true).length;
-    final missingCount = records.where((r) => _floorVerifications[r['delegateId']]?.isMissing == true).length;
+    final verifiedCount = records
+        .where((r) => _floorVerifications[r['delegateId']]?.isVerified == true)
+        .length;
+    final missingCount = records
+        .where((r) => _floorVerifications[r['delegateId']]?.isMissing == true)
+        .length;
     final remainingCount = totalCount - verifiedCount - missingCount;
 
     // Filter by branch floor status
@@ -1100,7 +1041,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
             final name = (r['fullName'] as String? ?? '').toLowerCase();
             final company = (r['companyName'] as String? ?? '').toLowerCase();
             final phone = (r['phoneNumber'] as String? ?? '').toLowerCase();
-            return name.contains(query) || company.contains(query) || phone.contains(query);
+            return name.contains(query) ||
+                company.contains(query) ||
+                phone.contains(query);
           }).toList();
 
     final displayRecords = searchFilteredRecords.where((r) {
@@ -1120,115 +1063,80 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       return true;
     }).toList();
 
-
     final slivers = <Widget>[];
 
     Widget branchHeader() {
-      return AnimatedContainer(
-        duration: AppMotionDurations.short4,
-        curve: AppMotionCurves.emphasized,
-        margin: EdgeInsets.fromLTRB(16, 12, 16, isExpanded ? 0 : 8),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              colorScheme.primaryContainer,
-              colorScheme.secondaryContainer,
-            ],
-            begin: Alignment.topRight,
-            end: Alignment.bottomLeft,
-          ),
-          borderRadius: isExpanded
-              ? const BorderRadius.vertical(
-                  top: Radius.circular(16),
-                  bottom: Radius.circular(4),
-                )
-              : BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
+      final theme = Theme.of(context);
+      final radius = isExpanded
+          ? const BorderRadius.vertical(
+              top: Radius.circular(TashilRadius.large),
+            )
+          : BorderRadius.circular(TashilRadius.large);
+      return Padding(
+        padding: EdgeInsetsDirectional.fromSTEB(
+          TashilSpacing.lg,
+          TashilSpacing.md,
+          TashilSpacing.lg,
+          isExpanded ? 0 : TashilSpacing.sm,
         ),
         child: Material(
-          color: Colors.transparent,
+          key: ValueKey('branch_header_$branchName'),
+          color: colorScheme.surfaceContainerHigh,
+          borderRadius: radius,
+          clipBehavior: Clip.antiAlias,
           child: InkWell(
-            borderRadius: isExpanded
-                ? const BorderRadius.vertical(
-                    top: Radius.circular(16),
-                    bottom: Radius.circular(4),
-                  )
-                : BorderRadius.circular(16),
             onTap: () => _toggleBranchExpansion(branchName),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                TashilSpacing.lg,
+                TashilSpacing.md,
+                TashilSpacing.xs,
+                TashilSpacing.md,
+              ),
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surface.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          Icons.storefront_rounded,
-                          size: 20,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary,
+                      borderRadius: BorderRadius.circular(TashilRadius.medium),
+                    ),
+                    child: Icon(
+                      Icons.storefront_rounded,
+                      color: colorScheme.onPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: TashilSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
                           branchName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onPrimaryContainer,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                      ),
-                      if (totalCount > 0)
-                        Container(
-                          margin: const EdgeInsetsDirectional.only(end: 6),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '$totalCount مندوب',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.primary,
-                            ),
+                        Text(
+                          totalCount == 0
+                              ? 'مفيش حضور'
+                              : '$presentCount حاضر • $checkedOutCount منصرف • اتراجع $verifiedCount من $totalCount',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
-                      // زر تصدير Excel للفرع
-                      IconButton(
-                        icon: const Icon(
-                          Icons.table_chart_rounded,
-                          color: Color(0xFF2E7D32),
-                          size: 20,
-                        ),
-                        tooltip: 'تصدير كشف الفرع إلى Excel',
-                        style: IconButton.styleFrom(
-                          backgroundColor:
-                              colorScheme.surface.withValues(alpha: 0.8),
-                          padding: const EdgeInsets.all(6),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
+                      ],
+                    ),
+                  ),
+                  MenuAnchor(
+                    menuChildren: [
+                      MenuItemButton(
+                        leadingIcon: const Icon(Icons.table_chart_rounded),
                         onPressed: () => _showExportExcelModal(
                           context,
                           preselectedBranch: branchName,
@@ -1236,53 +1144,40 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                           initialOnlyNotCheckedOut:
                               currentFilter == 'not_checked_out',
                         ),
+                        child: const Text('تصدير كشف الفرع (Excel)'),
                       ),
-                      const SizedBox(width: 4),
-                      IconButton(
-                        icon: Icon(
+                      MenuItemButton(
+                        leadingIcon: Icon(
                           Icons.delete_outline_rounded,
                           color: colorScheme.error,
-                          size: 20,
-                        ),
-                        tooltip: 'إزالة الفرع من القائمة',
-                        style: IconButton.styleFrom(
-                          backgroundColor:
-                              colorScheme.surface.withValues(alpha: 0.8),
-                          padding: const EdgeInsets.all(6),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                         onPressed: () =>
                             _confirmRemoveBranch(context, branchName),
-                      ),
-                      const SizedBox(width: 4),
-                      AnimatedRotation(
-                        turns: isExpanded ? 0.5 : 0.0,
-                        duration: AppMotionDurations.short4,
-                        curve: AppMotionCurves.emphasized,
-                        child: Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          color: colorScheme.onPrimaryContainer,
-                          size: 22,
+                        child: Text(
+                          'إزالة الفرع من القائمة',
+                          style: TextStyle(color: colorScheme.error),
                         ),
                       ),
                     ],
-                  ),
-                  if (totalCount > 0) ...[
-                    const SizedBox(height: 6),
-                    Padding(
-                      padding: const EdgeInsetsDirectional.only(start: 44),
-                      child: Text(
-                        '$presentCount حاضر • $checkedOutCount منصرف • تم فحص $verifiedCount من $totalCount',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w500,
-                          color: colorScheme.onPrimaryContainer
-                              .withValues(alpha: 0.8),
-                        ),
-                      ),
+                    builder: (context, controller, _) => IconButton(
+                      key: ValueKey('branch_menu_$branchName'),
+                      icon: const Icon(Icons.more_vert_rounded),
+                      tooltip: 'خيارات الفرع',
+                      onPressed: () => controller.isOpen
+                          ? controller.close()
+                          : controller.open(),
                     ),
-                  ],
+                  ),
+                  AnimatedRotation(
+                    turns: isExpanded ? 0.5 : 0.0,
+                    duration: AppMotionDurations.short4,
+                    curve: AppMotionCurves.emphasized,
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(width: TashilSpacing.sm),
                 ],
               ),
             ),
@@ -1298,60 +1193,69 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     }
 
     if (isBranchLoading && records.isEmpty) {
-      slivers.add(SliverToBoxAdapter(child: _buildBranchLoadingCard(colorScheme)));
+      slivers.add(
+        SliverToBoxAdapter(child: _buildBranchLoadingCard(colorScheme)),
+      );
       return slivers;
     }
     if (records.isEmpty) {
-      slivers.add(SliverToBoxAdapter(
-        child: _buildEmptyBranchPlaceholder(query, colorScheme),
-      ));
+      slivers.add(
+        SliverToBoxAdapter(
+          child: _buildEmptyBranchPlaceholder(query, colorScheme),
+        ),
+      );
       return slivers;
     }
 
     // Filter/progress chrome (not virtualized — small).
-    slivers.add(SliverToBoxAdapter(
-      child: _buildDelegatesContainer(
-        context,
-        branchName,
-        records,
-        displayRecords,
-        colorScheme,
-        verifiedCount: verifiedCount,
-        missingCount: missingCount,
-        remainingCount: remainingCount,
-        presentCount: presentCount,
-        checkedOutCount: checkedOutCount,
-        currentFilter: currentFilter,
-        rowsOnly: false,
-        chromeOnly: true,
+    slivers.add(
+      SliverToBoxAdapter(
+        child: _buildDelegatesContainer(
+          context,
+          branchName,
+          records,
+          displayRecords,
+          colorScheme,
+          verifiedCount: verifiedCount,
+          missingCount: missingCount,
+          remainingCount: remainingCount,
+          presentCount: presentCount,
+          checkedOutCount: checkedOutCount,
+          currentFilter: currentFilter,
+          rowsOnly: false,
+          chromeOnly: true,
+        ),
       ),
-    ));
+    );
 
     if (displayRecords.isEmpty) {
-      slivers.add(SliverToBoxAdapter(
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerLow,
-            border: Border(
-              left: BorderSide(color: colorScheme.outlineVariant),
-              right: BorderSide(color: colorScheme.outlineVariant),
-              bottom: BorderSide(color: colorScheme.outlineVariant),
+      slivers.add(
+        SliverToBoxAdapter(
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerLow,
+              border: Border(
+                left: BorderSide(color: colorScheme.outlineVariant),
+                right: BorderSide(color: colorScheme.outlineVariant),
+                bottom: BorderSide(color: colorScheme.outlineVariant),
+              ),
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(16),
+              ),
             ),
-            borderRadius:
-                const BorderRadius.vertical(bottom: Radius.circular(16)),
-          ),
-          child: _buildEmptyFilterPlaceholder(
-            context,
-            branchName,
-            currentFilter,
-            verifiedCount,
-            missingCount,
-            totalCount,
-            colorScheme,
+            child: _buildEmptyFilterPlaceholder(
+              context,
+              branchName,
+              currentFilter,
+              verifiedCount,
+              missingCount,
+              totalCount,
+              colorScheme,
+            ),
           ),
         ),
-      ));
+      );
       return slivers;
     }
 
@@ -1376,26 +1280,18 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                         : BorderSide.none,
                   ),
                   borderRadius: isLast
-                      ? const BorderRadius.vertical(
-                          bottom: Radius.circular(16),
-                        )
+                      ? const BorderRadius.vertical(bottom: Radius.circular(16))
                       : BorderRadius.zero,
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildDelegateRow(
-                      context,
-                      record,
-                      colorScheme,
-                      branchName,
-                    ),
+                    _buildDelegateRow(context, record, colorScheme, branchName),
                     if (!isLast)
                       Divider(
                         height: 1,
-                        color:
-                            colorScheme.outlineVariant.withValues(alpha: 0.5),
+                        color: colorScheme.outlineVariant,
                         indent: 68,
                       ),
                   ],
@@ -1438,9 +1334,8 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
             const SizedBox(width: 12),
             Text(
               'جاري تحميل بيانات الفرع...',
-              style: TextStyle(
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
-                fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -1475,9 +1370,8 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
             query.isNotEmpty
                 ? 'لا يوجد مندوب مطابق للبحث في هذا الفرع'
                 : 'لا يوجد حضور اليوم',
-            style: TextStyle(
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
-              fontSize: 13,
             ),
           ),
         ],
@@ -1517,171 +1411,89 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ─── شريط تقدم التحقق الميداني بالصالة والفلاتر السريعة ───
+          // ─── المرور على المناديب والفلاتر (TAS-392) ───
           if (totalCount > 0)
-            Container(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                border: Border(
-                  bottom: BorderSide(
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-                  ),
-                ),
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                TashilSpacing.lg,
+                TashilSpacing.md,
+                TashilSpacing.lg,
+                TashilSpacing.sm,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Row: عنوان الفحص ونسبة الإنجاز
                   Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Icon(
-                          Icons.verified_rounded,
-                          size: 15,
-                          color: Color(0xFF2E7D32),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'التحقق الميداني بالصالة',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                      Text(
+                        'المرور على المناديب',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       const Spacer(),
                       Text(
-                        'تم التحقق من $verifiedCount / $totalCount (${(verifiedPercent * 100).toInt()}%)',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: verifiedCount == totalCount && totalCount > 0
-                              ? const Color(0xFF2E7D32)
+                        '$verifiedCount من $totalCount (${Bidi.ltr('${(verifiedPercent * 100).toInt()}%')})',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: verifiedCount == totalCount
+                              ? TashilSemanticColors.of(context).success
                               : colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  // شريط التقدم المرئي
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      value: verifiedPercent,
-                      minHeight: 6,
-                      backgroundColor: colorScheme.surfaceContainerHighest,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        verifiedCount == totalCount && totalCount > 0
-                            ? const Color(0xFF2E7D32)
-                            : colorScheme.primary,
-                      ),
-                    ),
+                  const SizedBox(height: TashilSpacing.sm),
+                  LinearProgressIndicator(
+                    value: verifiedPercent,
+                    color: verifiedCount == totalCount
+                        ? TashilSemanticColors.of(context).success
+                        : null,
                   ),
-                  const SizedBox(height: 10),
-                  // فلاتر سريعة بنقرة واحدة (Quick Filters)
+                  const SizedBox(height: TashilSpacing.sm),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        _buildFloorFilterChip(
-                          label: 'الكل',
-                          count: totalCount,
-                          icon: Icons.group_rounded,
-                          isSelected: currentFilter == 'all',
-                          colorScheme: colorScheme,
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() {
-                              _branchFilter[branchName] = 'all';
-                            });
-                          },
-                        ),
-                        const SizedBox(width: 6),
-                        // فلتر الذين لم يسجلوا انصراف (حاضر بالفرع)
-                        _buildFloorFilterChip(
-                          label: 'لم ينصرف',
-                          count: presentCount,
-                          icon: Icons.pending_actions_rounded,
-                          isSelected: currentFilter == 'not_checked_out',
-                          colorScheme: colorScheme,
-                          badgeColor: presentCount > 0 ? const Color(0xFFE65100) : null,
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() {
-                              _branchFilter[branchName] = 'not_checked_out';
-                            });
-                          },
-                        ),
-                        const SizedBox(width: 6),
-                        _buildFloorFilterChip(
-                          label: 'المتبقي للمرور',
-                          count: remainingCount,
-                          icon: Icons.directions_walk_rounded,
-                          isSelected: currentFilter == 'remaining',
-                          colorScheme: colorScheme,
-                          badgeColor: remainingCount > 0 ? colorScheme.primary : null,
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() {
-                              _branchFilter[branchName] = 'remaining';
-                            });
-                          },
-                        ),
-                        const SizedBox(width: 6),
-                        _buildFloorFilterChip(
-                          label: 'تم التحقق',
-                          count: verifiedCount,
-                          icon: Icons.check_circle_rounded,
-                          isSelected: currentFilter == 'verified',
-                          colorScheme: colorScheme,
-                          badgeColor: verifiedCount > 0 ? const Color(0xFF2E7D32) : null,
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() {
-                              _branchFilter[branchName] = 'verified';
-                            });
-                          },
-                        ),
-                        if (missingCount > 0 || currentFilter == 'missing') ...[
-                          const SizedBox(width: 6),
-                          _buildFloorFilterChip(
-                            label: 'غير متواجد',
-                            count: missingCount,
-                            icon: Icons.cancel_rounded,
-                            isSelected: currentFilter == 'missing',
-                            colorScheme: colorScheme,
-                            badgeColor: const Color(0xFFC62828),
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              setState(() {
-                                _branchFilter[branchName] = 'missing';
-                              });
-                            },
+                        for (final (key, label, count, show) in [
+                          ('all', 'الكل', totalCount, true),
+                          ('not_checked_out', 'لم ينصرف', presentCount, true),
+                          ('remaining', 'المتبقي للمرور', remainingCount, true),
+                          ('verified', 'اتراجع', verifiedCount, true),
+                          (
+                            'missing',
+                            'غير متواجد',
+                            missingCount,
+                            missingCount > 0 || currentFilter == 'missing',
                           ),
-                        ],
-                        if (checkedOutCount > 0 || currentFilter == 'checked_out') ...[
-                          const SizedBox(width: 6),
-                          _buildFloorFilterChip(
-                            label: 'منصرف',
-                            count: checkedOutCount,
-                            icon: Icons.output_rounded,
-                            isSelected: currentFilter == 'checked_out',
-                            colorScheme: colorScheme,
-                            badgeColor: colorScheme.onSurfaceVariant,
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              setState(() {
-                                _branchFilter[branchName] = 'checked_out';
-                              });
-                            },
+                          (
+                            'checked_out',
+                            'منصرف',
+                            checkedOutCount,
+                            checkedOutCount > 0 ||
+                                currentFilter == 'checked_out',
                           ),
-                        ],
+                        ])
+                          if (show)
+                            Padding(
+                              padding: const EdgeInsetsDirectional.only(
+                                end: TashilSpacing.sm,
+                              ),
+                              child: _buildFloorFilterChip(
+                                key: ValueKey(
+                                  'floor_filter_${branchName}_$key',
+                                ),
+                                label: label,
+                                count: count,
+                                isSelected: currentFilter == key,
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  setState(
+                                    () => _branchFilter[branchName] = key,
+                                  );
+                                },
+                              ),
+                            ),
                       ],
                     ),
                   ),
@@ -1716,7 +1528,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                     if (!isLast)
                       Divider(
                         height: 1,
-                        color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                        color: colorScheme.outlineVariant,
                         indent: 68,
                       ),
                   ],
@@ -1755,19 +1567,17 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'اكتمل المرور على جميع مناديب الفرع!',
-              style: TextStyle(
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.bold,
-                fontSize: 14,
                 color: Color(0xFF1B5E20),
               ),
             ),
             const SizedBox(height: 4),
             Text(
               'تم التحقق من $verifiedCount مندوب${missingCount > 0 ? " ورصد $missingCount غير متواجد" : ""}',
-              style: TextStyle(
-                fontSize: 12,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
             ),
@@ -1811,8 +1621,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
           const SizedBox(height: 8),
           Text(
             msg,
-            style: TextStyle(
-              fontSize: 13,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
           ),
@@ -1832,81 +1641,17 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   }
 
   Widget _buildFloorFilterChip({
+    required Key key,
     required String label,
     required int count,
-    required IconData icon,
     required bool isSelected,
-    required ColorScheme colorScheme,
     required VoidCallback onTap,
-    Color? badgeColor,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: AnimatedContainer(
-          duration: AppMotionDurations.short3,
-          curve: AppMotionCurves.standard,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? colorScheme.primary
-                : colorScheme.surface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected
-                  ? colorScheme.primary
-                  : colorScheme.outlineVariant.withValues(alpha: 0.6),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 14,
-                color: isSelected
-                    ? colorScheme.onPrimary
-                    : (badgeColor ?? colorScheme.onSurfaceVariant),
-              ),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected
-                      ? colorScheme.onPrimary
-                      : colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(width: 5),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? colorScheme.onPrimary.withValues(alpha: 0.25)
-                      : (badgeColor?.withValues(alpha: 0.12) ??
-                          colorScheme.surfaceContainerHighest),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '$count',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: isSelected
-                        ? colorScheme.onPrimary
-                        : (badgeColor ?? colorScheme.onSurfaceVariant),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return FilterChip(
+      key: key,
+      label: Text('$label ${Bidi.ltr('$count')}'),
+      selected: isSelected,
+      onSelected: (_) => onTap(),
     );
   }
 
@@ -1917,14 +1662,16 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     ColorScheme colorScheme, [
     String? branchName,
   ]) {
+    final theme = Theme.of(context);
+    final semantic = TashilSemanticColors.of(context);
     final String rawName = (record['fullName'] as String?)?.trim() ?? '';
     final bool incomplete = record['profileIncomplete'] == true;
     final String fullName = rawName.isNotEmpty
         ? rawName
         : (incomplete ? '…' : 'مندوب');
     final String companyName = record['companyName'] as String? ?? '';
-    final String? imageUrl = record['personalPhotoURL'] as String? ??
-        record['imageUrl'] as String?;
+    final String? imageUrl =
+        record['personalPhotoURL'] as String? ?? record['imageUrl'] as String?;
     final checkIn = record['checkInTime'] as Timestamp?;
     final checkOut = record['checkOutTime'] as Timestamp?;
     final bool hasCheckOut = checkOut != null;
@@ -1938,221 +1685,153 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
 
     final hasPhoto = imageUrl != null && imageUrl.isNotEmpty;
 
-    // Floor verification item for this delegate
     final delegateId = record['delegateId'] as String? ?? '';
     final vItem = _floorVerifications[delegateId];
     final isVerified = vItem?.isVerified == true;
     final isMissing = vItem?.isMissing == true;
 
-    Color? rowBgColor;
-    if (isVerified) {
-      rowBgColor = const Color(0xFF2E7D32).withValues(alpha: 0.04);
-    } else if (isMissing) {
-      rowBgColor = const Color(0xFFC62828).withValues(alpha: 0.04);
-    }
+    Widget time(IconData icon, String text) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: colorScheme.onSurfaceVariant),
+        const SizedBox(width: TashilSpacing.xs),
+        Text(
+          text,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
 
-    return Material(
-      color: rowBgColor ?? Colors.transparent,
-      child: InkWell(
-        onTap: () => _openAttendanceHistory(context, record),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            children: [
-              // Avatar (صورة المندوب أو الحرف الأول مع إمكانية التكبير عند الضغط)
-              GestureDetector(
-                onTap: hasPhoto
-                    ? () => _showImagePreview(
-                          context,
-                          imageUrl,
-                          fullName,
-                          companyName,
-                        )
-                    : null,
-                child: AppAvatar(
-                  imageUrl: hasPhoto ? imageUrl : null,
-                  fallbackText: fullName,
-                  radius: 22,
-                  backgroundColor: hasCheckOut
-                      ? colorScheme.surfaceContainerHighest
-                      : colorScheme.primaryContainer,
-                  foregroundColor: hasCheckOut
-                      ? colorScheme.onSurfaceVariant
-                      : colorScheme.onPrimaryContainer,
-                  badge: hasPhoto
-                      ? Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surface,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.15),
-                                blurRadius: 3,
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            Icons.zoom_in_rounded,
-                            size: 10,
-                            color: colorScheme.primary,
-                          ),
-                        )
-                      : null,
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Name & Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
+    return InkWell(
+      onTap: () => _openAttendanceHistory(context, record),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(
+          TashilSpacing.lg,
+          TashilSpacing.md,
+          TashilSpacing.md,
+          TashilSpacing.md,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: hasPhoto
+                  ? () => _showImagePreview(
+                      context,
+                      imageUrl,
                       fullName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                    if (companyName.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        companyName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        _miniChip(
-                          Icons.login_rounded,
-                          checkInStr,
-                          colorScheme.tertiaryContainer,
-                          colorScheme.onTertiaryContainer,
-                        ),
-                        _miniChip(
-                          Icons.logout_rounded,
-                          checkOutStr,
-                          hasCheckOut
-                              ? colorScheme.errorContainer.withValues(alpha: 0.6)
-                              : colorScheme.surfaceContainerHighest,
-                          hasCheckOut
-                              ? colorScheme.onErrorContainer
-                              : colorScheme.onSurfaceVariant,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                      companyName,
+                    )
+                  : null,
+              child: AppAvatar(
+                imageUrl: hasPhoto ? imageUrl : null,
+                fallbackText: fullName,
+                radius: 22,
+                backgroundColor: hasCheckOut
+                    ? colorScheme.surfaceContainerHighest
+                    : colorScheme.primaryContainer,
+                foregroundColor: hasCheckOut
+                    ? colorScheme.onSurfaceVariant
+                    : colorScheme.onPrimaryContainer,
               ),
-              const SizedBox(width: 8),
-
-              // Trailing actions: Call Supervisor + Status Pill + Quick Floor Verification Button
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
+            ),
+            const SizedBox(width: TashilSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // زر اتصال بمشرف المندوب
-                      IconButton(
-                        icon: Icon(
-                          Icons.phone_in_talk_rounded,
-                          color: colorScheme.primary,
-                          size: 18,
-                        ),
-                        tooltip: 'اتصال بمشرف المندوب',
-                        style: IconButton.styleFrom(
-                          backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
-                          padding: const EdgeInsets.all(5),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        onPressed: () => _contactSupervisor(context, record),
-                      ),
-                      const SizedBox(width: 6),
-                      // حالة الحضور (حاضر / منصرف)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: hasCheckOut
-                              ? colorScheme.surfaceContainerHighest
-                              : colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
+                      Flexible(
                         child: Text(
-                          hasCheckOut ? 'منصرف' : 'حاضر',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: hasCheckOut
-                                ? colorScheme.onSurfaceVariant
-                                : colorScheme.onPrimaryContainer,
+                          fullName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      // ── زر الفحص التفاعلي السريع (Floor Verification Button) ──
-                      _buildFloorVerificationButton(
-                        context,
-                        record,
-                        vItem,
-                        colorScheme,
-                        branchName,
+                      const SizedBox(width: TashilSpacing.sm),
+                      // Status: a compact label, never a tinted row.
+                      Text(
+                        hasCheckOut ? 'منصرف' : 'حاضر',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: hasCheckOut
+                              ? colorScheme.onSurfaceVariant
+                              : colorScheme.primary,
+                        ),
                       ),
                     ],
                   ),
-                  // وقت الفحص الميداني
-                  if (vItem != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isVerified
-                                ? Icons.verified_rounded
-                                : Icons.error_outline_rounded,
-                            size: 11,
-                            color: isVerified
-                                ? const Color(0xFF2E7D32)
-                                : const Color(0xFFC62828),
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            '${isVerified ? "تم المرور" : "غير متواجد"} • ${DateFormat('hh:mm a', 'ar').format(vItem.timestamp)}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: isVerified
-                                  ? const Color(0xFF2E7D32)
-                                  : const Color(0xFFC62828),
-                            ),
-                          ),
-                        ],
+                  if (companyName.isNotEmpty)
+                    Text(
+                      companyName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
                       ),
                     ),
+                  const SizedBox(height: TashilSpacing.xs),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Wrap(
+                          spacing: TashilSpacing.md,
+                          runSpacing: TashilSpacing.xs,
+                          children: [
+                            time(Icons.login_rounded, checkInStr),
+                            time(Icons.logout_rounded, checkOutStr),
+                            if (vItem != null)
+                              Text(
+                                '${isVerified ? 'اتراجع' : 'غير متواجد'} ${DateFormat('hh:mm a', 'ar').format(vItem.timestamp)}',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: isVerified
+                                      ? semantic.success
+                                      : (isMissing
+                                            ? colorScheme.error
+                                            : colorScheme.onSurfaceVariant),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: TashilSpacing.sm),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                IconButton.filled(
+                  key: ValueKey('call_supervisor_$delegateId'),
+                  icon: const Icon(Icons.phone_in_talk_rounded),
+                  tooltip: 'اتصال بمشرف المندوب',
+                  onPressed: () => _contactSupervisor(context, record),
+                ),
+                const SizedBox(height: TashilSpacing.xs),
+                _buildFloorVerificationButton(
+                  context,
+                  record,
+                  vItem,
+                  colorScheme,
+                  branchName,
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 
+  /// Floor check toggle: a FilterChip (tap = present, long press = options).
   Widget _buildFloorVerificationButton(
     BuildContext context,
     Map<String, dynamic> record,
@@ -2162,98 +1841,24 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   ]) {
     final isVerified = vItem?.isVerified == true;
     final isMissing = vItem?.isMissing == true;
+    final label = isVerified ? 'تم المرور' : (isMissing ? 'غير متواجد' : 'فحص');
 
-    Color bg;
-    Color border;
-    Color fg;
-    IconData icon;
-    String label;
-
-    if (isVerified) {
-      bg = const Color(0xFFE8F5E9);
-      border = const Color(0xFF2E7D32);
-      fg = const Color(0xFF1B5E20);
-      icon = Icons.check_circle_rounded;
-      label = 'تم المرور';
-    } else if (isMissing) {
-      bg = const Color(0xFFFFEBEE);
-      border = const Color(0xFFC62828);
-      fg = const Color(0xFFB71C1C);
-      icon = Icons.cancel_rounded;
-      label = 'غير متواجد';
-    } else {
-      bg = colorScheme.surfaceContainerHighest.withValues(alpha: 0.6);
-      border = colorScheme.outlineVariant.withValues(alpha: 0.6);
-      fg = colorScheme.onSurfaceVariant;
-      icon = Icons.radio_button_unchecked_rounded;
-      label = 'فحص';
-    }
-
-    return Material(
-      color: Colors.transparent,
-      child: Tooltip(
-        message: isVerified
-            ? 'تم التحقق • اضغط للإلغاء أو ضغطة مطولة لتغيير الحالة'
-            : (isMissing
-                ? 'غير متواجد بالصالة • اضغط للتحقق أو ضغطة مطولة للخيارات'
-                : 'اضغط لتأكيد التواجد بالصالة • ضغطة مطولة لتحديد غير متواجد'),
-        child: InkWell(
-          onTap: () => _toggleFloorVerification(record, branchName),
-          onLongPress: () => _showFloorVerificationDialog(context, record, branchName),
-          borderRadius: BorderRadius.circular(8),
-          child: AnimatedContainer(
-            duration: AppMotionDurations.short3,
-            curve: AppMotionCurves.standard,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: border, width: isVerified || isMissing ? 1.2 : 1),
-              boxShadow: isVerified
-                  ? [
-                      BoxShadow(
-                        color: const Color(0xFF2E7D32).withValues(alpha: 0.18),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 15, color: fg),
-                const SizedBox(width: 4),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: isVerified || isMissing ? FontWeight.bold : FontWeight.w600,
-                    color: fg,
-                  ),
-                ),
-              ],
-            ),
-          ),
+    return Tooltip(
+      message: isVerified
+          ? 'اضغط للإلغاء، أو ضغطة مطولة لتغيير الحالة'
+          : 'اضغط لتأكيد التواجد بالصالة، أو ضغطة مطولة للخيارات',
+      child: GestureDetector(
+        onLongPress: () =>
+            _showFloorVerificationDialog(context, record, branchName),
+        child: FilterChip(
+          key: ValueKey('floor_check_${record['delegateId']}'),
+          avatar: isMissing
+              ? Icon(Icons.cancel_rounded, color: colorScheme.error)
+              : null,
+          label: Text(label),
+          selected: isVerified,
+          onSelected: (_) => _toggleFloorVerification(record, branchName),
         ),
-      ),
-    );
-  }
-
-  Widget _miniChip(IconData icon, String label, Color bg, Color fg) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: fg),
-          const SizedBox(width: 3),
-          Text(label, style: TextStyle(color: fg, fontSize: 11)),
-        ],
       ),
     );
   }
@@ -2268,9 +1873,11 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     final String companyUID = record['companyUID'] as String? ?? '';
     final delegateData = record['delegateData'] as Map<String, dynamic>?;
 
-    String? supName = record['supervisorName'] as String? ??
+    String? supName =
+        record['supervisorName'] as String? ??
         delegateData?['supervisorName'] as String?;
-    String? supPhone = record['supervisorPhone'] as String? ??
+    String? supPhone =
+        record['supervisorPhone'] as String? ??
         delegateData?['supervisorPhone'] as String?;
 
     // If supervisor phone is not directly present, resolve it dynamically
@@ -2285,15 +1892,21 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
         final firestore = di.sl<FirebaseFirestore>();
 
         // 1. Check createdBy in users
-        final createdBy = (record['createdBy'] ?? delegateData?['createdBy']) as String?;
+        final createdBy =
+            (record['createdBy'] ?? delegateData?['createdBy']) as String?;
         if (createdBy != null && createdBy.isNotEmpty) {
-          final supDoc = await firestore.collection('users').doc(createdBy).get();
+          final supDoc = await firestore
+              .collection('users')
+              .doc(createdBy)
+              .get();
           if (supDoc.exists && supDoc.data() != null) {
             final data = supDoc.data()!;
-            final phone = data['phoneNumber'] as String? ?? data['phone'] as String?;
+            final phone =
+                data['phoneNumber'] as String? ?? data['phone'] as String?;
             if (phone != null && phone.isNotEmpty) {
               supPhone = phone;
-              supName ??= data['displayName'] as String? ?? data['name'] as String?;
+              supName ??=
+                  data['displayName'] as String? ?? data['name'] as String?;
             }
           }
         }
@@ -2309,10 +1922,12 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
 
           if (querySnap.docs.isNotEmpty) {
             final data = querySnap.docs.first.data();
-            final phone = data['phoneNumber'] as String? ?? data['phone'] as String?;
+            final phone =
+                data['phoneNumber'] as String? ?? data['phone'] as String?;
             if (phone != null && phone.isNotEmpty) {
               supPhone = phone;
-              supName ??= data['displayName'] as String? ?? data['name'] as String?;
+              supName ??=
+                  data['displayName'] as String? ?? data['name'] as String?;
             }
           }
         }
@@ -2321,8 +1936,8 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
         final effectiveOrg = widget.marketingUser.organizationUID.isNotEmpty
             ? widget.marketingUser.organizationUID
             : (record['organizationId'] as String? ??
-                delegateData?['organizationUID'] as String? ??
-                'PiioBFgxaHAeuRdjlDgj');
+                  delegateData?['organizationUID'] as String? ??
+                  'PiioBFgxaHAeuRdjlDgj');
 
         if ((supPhone == null || supPhone.isEmpty) &&
             companyUID.isNotEmpty &&
@@ -2335,12 +1950,14 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
               .get();
           if (compDoc.exists && compDoc.data() != null) {
             final compData = compDoc.data()!;
-            final phone = compData['supervisorPhone'] as String? ??
+            final phone =
+                compData['supervisorPhone'] as String? ??
                 compData['phone'] as String? ??
                 compData['phoneNumber'] as String?;
             if (phone != null && phone.isNotEmpty) {
               supPhone = phone;
-              supName ??= compData['supervisorName'] as String? ??
+              supName ??=
+                  compData['supervisorName'] as String? ??
                   (companyName.isNotEmpty ? 'مشرف $companyName' : null);
             }
           }
@@ -2378,7 +1995,8 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     required String? supervisorPhone,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
-    final hasPhone = supervisorPhone != null && supervisorPhone.trim().isNotEmpty;
+    final hasPhone =
+        supervisorPhone != null && supervisorPhone.trim().isNotEmpty;
 
     showModalBottomSheet(
       context: context,
@@ -2442,10 +2060,8 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                         ),
                         Text(
                           '$delegateName ${companyName.isNotEmpty ? '• $companyName' : ''}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -2466,11 +2082,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-                    ),
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(TashilRadius.large),
+                    border: Border.all(color: colorScheme.outlineVariant),
                   ),
                   child: Column(
                     children: [
@@ -2485,10 +2099,8 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                           Expanded(
                             child: Text(
                               supervisorName,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                           ),
                           Container(
@@ -2497,16 +2109,18 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: colorScheme.primary.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
+                              color: colorScheme.primary,
+                              borderRadius: BorderRadius.circular(
+                                TashilRadius.small,
+                              ),
                             ),
                             child: Text(
                               'مشرف الشركة',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                              ),
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.primary,
+                                  ),
                             ),
                           ),
                         ],
@@ -2540,7 +2154,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                               );
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('تم نسخ رقم المشرف إلى الحافظة'),
+                                  content: Text(
+                                    'تم نسخ رقم المشرف إلى الحافظة',
+                                  ),
                                   duration: Duration(seconds: 2),
                                 ),
                               );
@@ -2561,7 +2177,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                         style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(
+                              TashilRadius.large,
+                            ),
                           ),
                         ),
                         onPressed: () {
@@ -2584,7 +2202,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                         style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(
+                              TashilRadius.large,
+                            ),
                           ),
                           backgroundColor: Colors.green.withValues(alpha: 0.15),
                           foregroundColor: Colors.green.shade800,
@@ -2593,7 +2213,10 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                           Navigator.pop(sheetCtx);
                           _openWhatsApp(supervisorPhone, delegateName);
                         },
-                        icon: const Icon(Icons.chat_rounded, color: Colors.green),
+                        icon: const Icon(
+                          Icons.chat_rounded,
+                          color: Colors.green,
+                        ),
                         label: Text(
                           'واتساب',
                           style: GoogleFonts.cairo(
@@ -2612,21 +2235,20 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(16),
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(TashilRadius.large),
                   ),
                   child: Column(
                     children: [
                       Icon(
                         Icons.phone_disabled_rounded,
                         size: 40,
-                        color: colorScheme.error.withValues(alpha: 0.8),
+                        color: colorScheme.error,
                       ),
                       const SizedBox(height: 12),
                       Text(
                         'لا يوجد رقم هاتف مسجل لمشرف هذا المندوب',
-                        style: TextStyle(
-                          fontSize: 14,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: colorScheme.onSurface,
                         ),
@@ -2636,10 +2258,8 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                         const SizedBox(height: 4),
                         Text(
                           'شركة: $companyName',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
                         ),
                       ],
                     ],
@@ -2686,13 +2306,16 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
   }
 
   // ─── Open Attendance History ───────────────────────────────────────────────
-  void _openAttendanceHistory(BuildContext context, Map<String, dynamic> record) {
+  void _openAttendanceHistory(
+    BuildContext context,
+    Map<String, dynamic> record,
+  ) {
     final delegateData = record['delegateData'] as Map<String, dynamic>?;
     final delegateId = record['delegateId'] as String? ?? '';
     if (delegateId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لا توجد بيانات للمندوب')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('لا توجد بيانات للمندوب')));
       return;
     }
     try {
@@ -2717,9 +2340,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
         ),
       );
     } catch (_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذّر فتح سجل الحضور')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تعذّر فتح سجل الحضور')));
     }
   }
 
@@ -2736,16 +2359,24 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       builder: (ctx) {
         return Dialog(
           backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 24,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // Header with name & close button
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.75),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -2755,25 +2386,28 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                         children: [
                           Text(
                             name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
                           ),
                           if (company.isNotEmpty)
                             Text(
                               company,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.7),
-                                fontSize: 12,
-                              ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                  ),
                             ),
                         ],
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Colors.white),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                      ),
                       onPressed: () => Navigator.pop(ctx),
                     ),
                   ],
@@ -2782,7 +2416,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
               // Image Container with InteractiveViewer (pinch & zoom)
               Flexible(
                 child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                  borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(16),
+                  ),
                   child: Container(
                     color: Colors.black,
                     constraints: BoxConstraints(
@@ -2798,7 +2434,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                         placeholder: (context, url) => const Center(
                           child: Padding(
                             padding: EdgeInsets.all(40),
-                            child: CircularProgressIndicator(color: Colors.white),
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                         errorWidget: (context, url, error) => const Center(
@@ -2807,7 +2445,11 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.broken_image_rounded, color: Colors.white54, size: 48),
+                                Icon(
+                                  Icons.broken_image_rounded,
+                                  color: Colors.white54,
+                                  size: 48,
+                                ),
                                 SizedBox(height: 8),
                                 Text(
                                   'تعذّر عرض الصورة',
@@ -2848,10 +2490,12 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
           setState(() {
             _collapsedBranches.remove(branchName);
           });
-          bloc.add(AddFavoriteBranch(
-            userId: widget.marketingUser.uid,
-            branchName: branchName,
-          ));
+          bloc.add(
+            AddFavoriteBranch(
+              userId: widget.marketingUser.uid,
+              branchName: branchName,
+            ),
+          );
         },
       ),
     );
@@ -2881,7 +2525,7 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                   width: 38,
                   height: 4.5,
                   decoration: BoxDecoration(
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                    color: colorScheme.outlineVariant,
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
@@ -2892,10 +2536,12 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
               children: [
                 Icon(Icons.delete_rounded, color: colorScheme.error, size: 24),
                 const SizedBox(width: 8),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'حذف الفرع',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -2903,18 +2549,15 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
             const SizedBox(height: 12),
             Text(
               'هل تريد إزالة "$branchName" من قائمة فروعك المتابعة؟',
-              style: const TextStyle(fontSize: 14),
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 20),
             Container(
               height: 48,
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.8),
-                  width: 1,
-                ),
+                borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
+                border: Border.all(color: colorScheme.outlineVariant, width: 1),
               ),
               clipBehavior: Clip.antiAlias,
               child: Row(
@@ -2928,11 +2571,11 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                         child: Center(
                           child: Text(
                             'إلغاء',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
                           ),
                         ),
                       ),
@@ -2941,38 +2584,44 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
                   VerticalDivider(
                     width: 1,
                     thickness: 1,
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.8),
+                    color: colorScheme.outlineVariant,
                   ),
                   Expanded(
                     child: Material(
-                      color: colorScheme.error.withValues(alpha: 0.12),
+                      color: colorScheme.error,
                       child: InkWell(
                         onTap: () {
                           Navigator.pop(modalContext);
                           setState(() {
                             _collapsedBranches.remove(branchName);
                           });
-                          bloc.add(RemoveFavoriteBranch(
-                            userId: widget.marketingUser.uid,
-                            branchName: branchName,
-                          ));
+                          bloc.add(
+                            RemoveFavoriteBranch(
+                              userId: widget.marketingUser.uid,
+                              branchName: branchName,
+                            ),
+                          );
                         },
                         child: Center(
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.delete_rounded, size: 18, color: colorScheme.error),
+                              Icon(
+                                Icons.delete_rounded,
+                                size: 18,
+                                color: colorScheme.error,
+                              ),
                               const SizedBox(width: 6),
                               Flexible(
                                 child: Text(
                                   'حذف',
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    color: colorScheme.error,
-                                  ),
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.error,
+                                      ),
                                 ),
                               ),
                             ],
@@ -2993,7 +2642,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       showDialog(
         context: context,
         builder: (dialogCtx) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
+          ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
             child: buildConfirmContent(dialogCtx),
@@ -3048,8 +2699,8 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
     final branches = preselectedBranch != null
         ? [preselectedBranch]
         : (targetBranchRecords.isNotEmpty
-            ? targetBranchRecords.keys.toList()
-            : _favoriteBranches);
+              ? targetBranchRecords.keys.toList()
+              : _favoriteBranches);
 
     if (branches.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -3064,7 +2715,9 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
         builder: (dialogCtx) => Dialog(
           backgroundColor: colorScheme.surface,
           surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
+          ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
             child: _ExportExcelBottomSheet(
@@ -3118,13 +2771,16 @@ class _BranchSectionSkeleton extends StatelessWidget {
           margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+            color: colorScheme.primaryContainer,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
           ),
           child: Row(
             children: [
-              Icon(Icons.location_on_rounded,
-                  color: colorScheme.primary, size: 20),
+              Icon(
+                Icons.location_on_rounded,
+                color: colorScheme.primary,
+                size: 20,
+              ),
               const SizedBox(width: 10),
               Text(
                 branchName,
@@ -3243,13 +2899,17 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
       // user's own one otherwise).
       final List<Map<String, String>> orgs = [];
       void addOrg(String docId, Map<String, dynamic> d) {
-        final name =
-            (d['name'] ?? d['organizationName'] ?? d['title'] ?? '').toString().trim();
-        final uid = (d['uid'] ?? d['organizationUID'] ?? docId).toString().trim();
+        final name = (d['name'] ?? d['organizationName'] ?? d['title'] ?? '')
+            .toString()
+            .trim();
+        final uid = (d['uid'] ?? d['organizationUID'] ?? docId)
+            .toString()
+            .trim();
         if (name.isNotEmpty) {
           orgs.add({'uid': uid.isNotEmpty ? uid : docId, 'name': name});
         }
       }
+
       try {
         if (isSuperAdminOrTechSupport) {
           final orgSnapshot = await firestore.collection('organizations').get();
@@ -3268,15 +2928,22 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
       }
 
       // Ensure Fathalla Market exists and is placed at the top as default
-      final hasFathalla = orgs.any((o) =>
-          (o['name'] ?? '').toLowerCase().contains('fathalla') ||
-          o['uid'] == 'PiioBFgxaHAeuRdjlDgj');
-      if (!hasFathalla) {
-        orgs.insert(0, {'uid': 'PiioBFgxaHAeuRdjlDgj', 'name': 'fathalla market'});
-      } else {
-        final fIndex = orgs.indexWhere((o) =>
+      final hasFathalla = orgs.any(
+        (o) =>
             (o['name'] ?? '').toLowerCase().contains('fathalla') ||
-            o['uid'] == 'PiioBFgxaHAeuRdjlDgj');
+            o['uid'] == 'PiioBFgxaHAeuRdjlDgj',
+      );
+      if (!hasFathalla) {
+        orgs.insert(0, {
+          'uid': 'PiioBFgxaHAeuRdjlDgj',
+          'name': 'fathalla market',
+        });
+      } else {
+        final fIndex = orgs.indexWhere(
+          (o) =>
+              (o['name'] ?? '').toLowerCase().contains('fathalla') ||
+              o['uid'] == 'PiioBFgxaHAeuRdjlDgj',
+        );
         if (fIndex > 0) {
           final item = orgs.removeAt(fIndex);
           orgs.insert(0, item);
@@ -3289,22 +2956,39 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
       // Reuse the once-per-session branches list (shared with getBranches)
       // instead of a second full-collection get.
       final branchDocs = await BranchesSessionCache.load(firestore);
-      final docs = branchDocs.map((d) {
-        final data = d.data();
-        final name = (data['branchName'] as String?) ??
-            (data['name'] as String?) ??
-            (data['title'] as String?) ??
-            '';
-        return {
-          'id': d.id,
-          'branchName': name,
-          'organizationUID': (data['organizationUID'] ?? data['organizationId'] ?? data['orgId'] ?? '').toString().trim(),
-          'organizationName': (data['organizationName'] ?? data['orgName'] ?? data['organization_name'] ?? '').toString().trim(),
-        };
-      }).where((b) => (b['branchName'] as String).isNotEmpty).toList();
+      final docs = branchDocs
+          .map((d) {
+            final data = d.data();
+            final name =
+                (data['branchName'] as String?) ??
+                (data['name'] as String?) ??
+                (data['title'] as String?) ??
+                '';
+            return {
+              'id': d.id,
+              'branchName': name,
+              'organizationUID':
+                  (data['organizationUID'] ??
+                          data['organizationId'] ??
+                          data['orgId'] ??
+                          '')
+                      .toString()
+                      .trim(),
+              'organizationName':
+                  (data['organizationName'] ??
+                          data['orgName'] ??
+                          data['organization_name'] ??
+                          '')
+                      .toString()
+                      .trim(),
+            };
+          })
+          .where((b) => (b['branchName'] as String).isNotEmpty)
+          .toList();
 
-      docs.sort((a, b) =>
-          (a['branchName'] ?? '').compareTo(b['branchName'] ?? ''));
+      docs.sort(
+        (a, b) => (a['branchName'] ?? '').compareTo(b['branchName'] ?? ''),
+      );
 
       if (mounted) {
         setState(() {
@@ -3328,14 +3012,23 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
     }
   }
 
-  bool _matchesOrg(Map<String, dynamic> branch, String targetOrgUID, String targetOrgName) {
+  bool _matchesOrg(
+    Map<String, dynamic> branch,
+    String targetOrgUID,
+    String targetOrgName,
+  ) {
     final bOrgUID = (branch['organizationUID'] ?? '').toString().trim();
-    final bOrgName = (branch['organizationName'] ?? '').toString().trim().toLowerCase();
+    final bOrgName = (branch['organizationName'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
     final bName = (branch['branchName'] ?? '').toString().trim().toLowerCase();
     final tOrgName = targetOrgName.trim().toLowerCase();
 
     // 1. Direct UID match
-    if (targetOrgUID.isNotEmpty && bOrgUID.isNotEmpty && bOrgUID == targetOrgUID) {
+    if (targetOrgUID.isNotEmpty &&
+        bOrgUID.isNotEmpty &&
+        bOrgUID == targetOrgUID) {
       return true;
     }
 
@@ -3350,9 +3043,11 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
     }
 
     // 4. If target is Fathalla Market:
-    if (tOrgName.contains('fathalla') || targetOrgUID == 'PiioBFgxaHAeuRdjlDgj') {
+    if (tOrgName.contains('fathalla') ||
+        targetOrgUID == 'PiioBFgxaHAeuRdjlDgj') {
       if (bOrgUID.isEmpty && bOrgName.isEmpty) {
-        final isOtherOrg = bName.contains('جملة') ||
+        final isOtherOrg =
+            bName.contains('جملة') ||
             bName.contains('زهران') ||
             bName.contains('كارفور') ||
             bName.contains('بيت الجملة');
@@ -3361,29 +3056,44 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
     }
 
     // 5. If target is Gomla Market:
-    if (tOrgName.contains('جملة') || tOrgName.contains('gomla') || targetOrgUID == '5DE6702w6hFwycJfZyqM') {
-      if (bName.contains('جملة') || bOrgName.contains('جملة') || bOrgUID == '5DE6702w6hFwycJfZyqM') {
+    if (tOrgName.contains('جملة') ||
+        tOrgName.contains('gomla') ||
+        targetOrgUID == '5DE6702w6hFwycJfZyqM') {
+      if (bName.contains('جملة') ||
+          bOrgName.contains('جملة') ||
+          bOrgUID == '5DE6702w6hFwycJfZyqM') {
         return true;
       }
     }
 
     // 6. If target is Zahran Market:
-    if (tOrgName.contains('زهران') || tOrgName.contains('zahran') || targetOrgUID == 'bKmvQOGNjYnfkzuGWq55') {
-      if (bName.contains('زهران') || bOrgName.contains('زهران') || bOrgUID == 'bKmvQOGNjYnfkzuGWq55') {
+    if (tOrgName.contains('زهران') ||
+        tOrgName.contains('zahran') ||
+        targetOrgUID == 'bKmvQOGNjYnfkzuGWq55') {
+      if (bName.contains('زهران') ||
+          bOrgName.contains('زهران') ||
+          bOrgUID == 'bKmvQOGNjYnfkzuGWq55') {
         return true;
       }
     }
 
     // 7. If target is Carrefour:
-    if (tOrgName.contains('كارفور') || tOrgName.contains('carrefour') || targetOrgUID == 'TjdANTbys7alTSahTyb7') {
-      if (bName.contains('كارفور') || bOrgName.contains('كارفور') || bOrgUID == 'TjdANTbys7alTSahTyb7') {
+    if (tOrgName.contains('كارفور') ||
+        tOrgName.contains('carrefour') ||
+        targetOrgUID == 'TjdANTbys7alTSahTyb7') {
+      if (bName.contains('كارفور') ||
+          bOrgName.contains('كارفور') ||
+          bOrgUID == 'TjdANTbys7alTSahTyb7') {
         return true;
       }
     }
 
     // 8. If target is Beit El Gomla:
-    if (tOrgName.contains('بيت الجملة') || targetOrgUID == 'tLU900K8StXVFcn6AgDn') {
-      if (bName.contains('بيت الجملة') || bOrgName.contains('بيت الجملة') || bOrgUID == 'tLU900K8StXVFcn6AgDn') {
+    if (tOrgName.contains('بيت الجملة') ||
+        targetOrgUID == 'tLU900K8StXVFcn6AgDn') {
+      if (bName.contains('بيت الجملة') ||
+          bOrgName.contains('بيت الجملة') ||
+          bOrgUID == 'tLU900K8StXVFcn6AgDn') {
         return true;
       }
     }
@@ -3409,7 +3119,8 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
     } else {
       // For all regular users: strictly locked to their own organization.
       targetOrgUID = _lockedOrgUID;
-      targetOrgName = _organizations.firstWhere(
+      targetOrgName =
+          _organizations.firstWhere(
             (o) => o['uid'] == targetOrgUID,
             orElse: () => {'name': _fallbackOrgName(targetOrgUID)},
           )['name'] ??
@@ -3451,7 +3162,7 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: colorScheme.outline.withValues(alpha: 0.4),
+              color: colorScheme.outline,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -3461,19 +3172,27 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
-                Icon(Icons.add_location_alt_rounded, color: colorScheme.primary),
+                Icon(
+                  Icons.add_location_alt_rounded,
+                  color: colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   'إضافة فرع',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 if (!isSuperAdminOrTechSupport) ...[
                   const SizedBox(width: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(TashilRadius.medium),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -3486,11 +3205,11 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
                         const SizedBox(width: 4),
                         Text(
                           _lockedOrgName,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onPrimaryContainer,
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onPrimaryContainer,
+                              ),
                         ),
                       ],
                     ),
@@ -3510,11 +3229,10 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
                 initialValue: _selectedOrgUID,
                 isExpanded: true,
                 dropdownColor: colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(TashilRadius.large),
                 decoration: InputDecoration(
                   labelText: 'اختر السلسلة / المنظمة',
-                  labelStyle: TextStyle(
-                    fontSize: 13,
+                  labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: colorScheme.primary,
                     fontWeight: FontWeight.w500,
                   ),
@@ -3524,22 +3242,21 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
                     size: 20,
                   ),
                   filled: true,
-                  fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  fillColor: colorScheme.surfaceContainerHighest,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                    ),
+                    borderRadius: BorderRadius.circular(TashilRadius.large),
+                    borderSide: BorderSide(color: colorScheme.outlineVariant),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                    ),
+                    borderRadius: BorderRadius.circular(TashilRadius.large),
+                    borderSide: BorderSide(color: colorScheme.outlineVariant),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(TashilRadius.large),
                     borderSide: BorderSide(
                       color: colorScheme.primary,
                       width: 1.5,
@@ -3555,16 +3272,22 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
                         Icon(
                           Icons.business_rounded,
                           size: 18,
-                          color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                          color: isSelected
+                              ? colorScheme.primary
+                              : colorScheme.onSurfaceVariant,
                         ),
                         const SizedBox(width: 8),
                         Text(
                           chainDisplayName(org['name']!),
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                            color: isSelected ? colorScheme.primary : colorScheme.onSurface,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color: isSelected
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurface,
+                              ),
                         ),
                       ],
                     ),
@@ -3603,7 +3326,7 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
                 filled: true,
                 fillColor: colorScheme.surfaceContainerHighest,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(TashilRadius.large),
                   borderSide: BorderSide.none,
                 ),
               ),
@@ -3615,106 +3338,114 @@ class _BranchPickerBottomSheetState extends State<BranchPickerBottomSheet> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.error_outline_rounded, size: 48, color: colorScheme.error),
-                            const SizedBox(height: 8),
-                            Text(_error!),
-                            TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  _loading = true;
-                                  _error = null;
-                                });
-                                _loadData();
-                              },
-                              child: const Text('إعادة المحاولة'),
-                            ),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline_rounded,
+                          size: 48,
+                          color: colorScheme.error,
                         ),
-                      )
-                    : _filtered.isEmpty
-                        ? const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(24.0),
-                              child: Text(
-                                'لا توجد فروع مطابقة لهذه السلسلة',
-                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-                              ),
-                            ),
-                          )
-                        : ListView.builder(
-                            controller: scrollController,
-                            itemCount: _filtered.length,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            itemBuilder: (context, index) {
-                              final branch = _filtered[index];
-                              final name =
-                                  branch['branchName'] as String? ?? 'فرع';
-                              final isAlreadyAdded =
-                                  widget.currentFavorites.contains(name);
+                        const SizedBox(height: 8),
+                        Text(_error!),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _loading = true;
+                              _error = null;
+                            });
+                            _loadData();
+                          },
+                          child: const Text('إعادة المحاولة'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _filtered.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.0),
+                      child: Text(
+                        'لا توجد فروع مطابقة لهذه السلسلة',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    controller: scrollController,
+                    itemCount: _filtered.length,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    itemBuilder: (context, index) {
+                      final branch = _filtered[index];
+                      final name = branch['branchName'] as String? ?? 'فرع';
+                      final isAlreadyAdded = widget.currentFavorites.contains(
+                        name,
+                      );
 
-                              return ListTile(
-                                leading: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: isAlreadyAdded
-                                        ? colorScheme.primaryContainer
-                                        : colorScheme.surfaceContainerHighest,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Icon(
-                                    Icons.store_rounded,
-                                    color: isAlreadyAdded
-                                        ? colorScheme.onPrimaryContainer
-                                        : colorScheme.onSurfaceVariant,
-                                    size: 20,
-                                  ),
-                                ),
-                                title: Text(
-                                  name,
-                                  style: TextStyle(
-                                    fontWeight: isAlreadyAdded
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                  ),
-                                ),
-                                trailing: isAlreadyAdded
-                                    ? Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.check_circle_rounded,
-                                            color: colorScheme.primary,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'مضاف',
-                                            style: TextStyle(
-                                              color: colorScheme.primary,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
-                                      )
-                                    : null,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                onTap: isAlreadyAdded
-                                    ? null
-                                    : () {
-                                        Navigator.pop(context);
-                                        widget.onBranchSelected(name);
-                                      },
-                              );
-                            },
+                      return ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isAlreadyAdded
+                                ? colorScheme.primaryContainer
+                                : colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(
+                              TashilRadius.medium,
+                            ),
                           ),
+                          child: Icon(
+                            Icons.store_rounded,
+                            color: isAlreadyAdded
+                                ? colorScheme.onPrimaryContainer
+                                : colorScheme.onSurfaceVariant,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          name,
+                          style: TextStyle(
+                            fontWeight: isAlreadyAdded
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                        trailing: isAlreadyAdded
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.check_circle_rounded,
+                                    color: colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'مضاف',
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(color: colorScheme.primary),
+                                  ),
+                                ],
+                              )
+                            : null,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            TashilRadius.medium,
+                          ),
+                        ),
+                        onTap: isAlreadyAdded
+                            ? null
+                            : () {
+                                Navigator.pop(context);
+                                widget.onBranchSelected(name);
+                              },
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -3745,7 +3476,8 @@ class _ExportExcelBottomSheet extends StatefulWidget {
   });
 
   @override
-  State<_ExportExcelBottomSheet> createState() => _ExportExcelBottomSheetState();
+  State<_ExportExcelBottomSheet> createState() =>
+      _ExportExcelBottomSheetState();
 }
 
 class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
@@ -3828,9 +3560,14 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
       buffer.write('\uFEFF');
 
       final dayName = DateFormat('EEEE', 'ar').format(widget.selectedDate);
-      final dateStr = DateFormat('yyyy-MM-dd', 'en').format(widget.selectedDate);
+      final dateStr = DateFormat(
+        'yyyy-MM-dd',
+        'en',
+      ).format(widget.selectedDate);
       final branchTitle = _selectedBranch ?? 'جميع الفروع المتابعة';
-      final filterTitle = _onlyNotCheckedOut ? 'المناديب الذين لم ينصرفوا فقط' : 'كشف الحضور الكامل';
+      final filterTitle = _onlyNotCheckedOut
+          ? 'المناديب الذين لم ينصرفوا فقط'
+          : 'كشف الحضور الكامل';
 
       // Header metadata
       buffer.writeln('كشف متابعة حضور الفروع');
@@ -3843,16 +3580,28 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
 
       // Columns requested by user:
       // اسم الشركة, اسم المندوب, اليوم, رقم التليفون + التفاصيل الميدانية
-      buffer.writeln('م,اسم الشركة,اسم المندوب,اليوم,التاريخ,رقم التليفون,الفرع,وقت الحضور,وقت الانصراف,حالة الانصراف,التحقق الميداني بالصالة');
+      buffer.writeln(
+        'م,اسم الشركة,اسم المندوب,اليوم,التاريخ,رقم التليفون,الفرع,وقت الحضور,وقت الانصراف,حالة الانصراف,التحقق الميداني بالصالة',
+      );
 
       for (var i = 0; i < records.length; i++) {
         final r = records[i];
-        final companyName = (r['companyName'] as String? ?? 'غير محدد').replaceAll('"', '""');
-        final fullName = (r['fullName'] as String? ?? 'مندوب').replaceAll('"', '""');
-        final rawPhone = (r['phoneNumber'] as String? ?? '').replaceAll('"', '""');
+        final companyName = (r['companyName'] as String? ?? 'غير محدد')
+            .replaceAll('"', '""');
+        final fullName = (r['fullName'] as String? ?? 'مندوب').replaceAll(
+          '"',
+          '""',
+        );
+        final rawPhone = (r['phoneNumber'] as String? ?? '').replaceAll(
+          '"',
+          '""',
+        );
         // Prepend tab so Excel strictly preserves leading zero
         final phone = rawPhone.isNotEmpty ? '\t$rawPhone' : 'غير مسجل';
-        final branch = (r['branchName'] as String? ?? branchTitle).replaceAll('"', '""');
+        final branch = (r['branchName'] as String? ?? branchTitle).replaceAll(
+          '"',
+          '""',
+        );
 
         final checkIn = r['checkInTime'] as Timestamp?;
         final checkOut = r['checkOutTime'] as Timestamp?;
@@ -3895,7 +3644,11 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Expanded(child: Text('تم تصدير كشف Excel بنجاح: $fileName')),
               ],
@@ -3908,12 +3661,7 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
     } catch (e) {
       if (mounted) {
         setState(() => _isExporting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('حدث خطأ أثناء التصدير: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        showTashilSnackBar(context, 'حدث خطأ أثناء التصدير: $e');
       }
     }
   }
@@ -3943,7 +3691,7 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
                 width: 38,
                 height: 4.5,
                 decoration: BoxDecoration(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                  color: colorScheme.outlineVariant,
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
@@ -3958,7 +3706,7 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(TashilRadius.medium),
                   border: Border.all(
                     color: const Color(0xFF2E7D32).withValues(alpha: 0.25),
                   ),
@@ -3978,14 +3726,15 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
                       'تصدير كشف الحضور إلى Excel',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        fontSize: 16,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      DateFormat('EEEE، d MMMM yyyy', 'ar').format(widget.selectedDate),
-                      style: TextStyle(
-                        fontSize: 12,
+                      DateFormat(
+                        'EEEE، d MMMM yyyy',
+                        'ar',
+                      ).format(widget.selectedDate),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -3997,11 +3746,11 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
           const SizedBox(height: 16),
 
           // Branch selection dropdown (if multiple branches and not preselected)
-          if (widget.preselectedBranch == null && widget.branches.length > 1) ...[
+          if (widget.preselectedBranch == null &&
+              widget.branches.length > 1) ...[
             Text(
               'الفرع المستهدف:',
-              style: TextStyle(
-                fontSize: 12.5,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: colorScheme.onSurface,
               ),
@@ -4011,7 +3760,7 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(TashilRadius.medium),
                 border: Border.all(color: colorScheme.outlineVariant),
               ),
               child: DropdownButtonHideUnderline(
@@ -4022,13 +3771,13 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
                   items: [
                     DropdownMenuItem<String?>(
                       value: null,
-                      child: Text('جميع الفروع المتابعة (${widget.branches.length})'),
+                      child: Text(
+                        'جميع الفروع المتابعة (${widget.branches.length})',
+                      ),
                     ),
                     ...widget.branches.map(
-                      (b) => DropdownMenuItem<String?>(
-                        value: b,
-                        child: Text(b),
-                      ),
+                      (b) =>
+                          DropdownMenuItem<String?>(value: b, child: Text(b)),
                     ),
                   ],
                   onChanged: (val) {
@@ -4044,8 +3793,7 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
 
           Text(
             'نطاق التصدير:',
-            style: TextStyle(
-              fontSize: 12.5,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.bold,
               color: colorScheme.onSurface,
             ),
@@ -4054,7 +3802,7 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
 
           // Option 1: المناديب الذين لم ينصرفوا فقط (الأولوية لطلب المستخدم)
           InkWell(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(TashilRadius.large),
             onTap: () {
               HapticFeedback.selectionClick();
               setState(() => _onlyNotCheckedOut = true);
@@ -4067,11 +3815,11 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
                 color: _onlyNotCheckedOut
                     ? const Color(0xFFE65100).withValues(alpha: 0.08)
                     : colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(TashilRadius.large),
                 border: Border.all(
                   color: _onlyNotCheckedOut
                       ? const Color(0xFFE65100)
-                      : colorScheme.outlineVariant.withValues(alpha: 0.5),
+                      : colorScheme.outlineVariant,
                   width: _onlyNotCheckedOut ? 1.5 : 1,
                 ),
               ),
@@ -4096,27 +3844,32 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
                       children: [
                         Row(
                           children: [
-                            const Text(
+                            Text(
                               'المناديب الذين لم ينصرفوا فقط',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13.5,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const Spacer(),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFE65100).withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(10),
+                                color: const Color(
+                                  0xFFE65100,
+                                ).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(
+                                  TashilRadius.medium,
+                                ),
                               ),
                               child: Text(
                                 '$presentCount حاضر',
-                                style: const TextStyle(
-                                  color: Color(0xFFE65100),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: Theme.of(context).textTheme.labelMedium
+                                    ?.copyWith(
+                                      color: Color(0xFFE65100),
+                                      fontWeight: FontWeight.bold,
+                                    ),
                               ),
                             ),
                           ],
@@ -4124,10 +3877,8 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
                         const SizedBox(height: 3),
                         Text(
                           'تصدير اسم الشركة، المندوب، اليوم، ورقم التليفون للمتواجدين بالفرع',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
                         ),
                       ],
                     ),
@@ -4150,7 +3901,7 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
 
           // Option 2: كشف الحضور الكامل
           InkWell(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(TashilRadius.large),
             onTap: () {
               HapticFeedback.selectionClick();
               setState(() => _onlyNotCheckedOut = false);
@@ -4163,11 +3914,11 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
                 color: !_onlyNotCheckedOut
                     ? const Color(0xFF2E7D32).withValues(alpha: 0.08)
                     : colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(TashilRadius.large),
                 border: Border.all(
                   color: !_onlyNotCheckedOut
                       ? const Color(0xFF2E7D32)
-                      : colorScheme.outlineVariant.withValues(alpha: 0.5),
+                      : colorScheme.outlineVariant,
                   width: !_onlyNotCheckedOut ? 1.5 : 1,
                 ),
               ),
@@ -4192,27 +3943,32 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
                       children: [
                         Row(
                           children: [
-                            const Text(
+                            Text(
                               'كشف الحضور الكامل (الكل)',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13.5,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const Spacer(),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF2E7D32).withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(10),
+                                color: const Color(
+                                  0xFF2E7D32,
+                                ).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(
+                                  TashilRadius.medium,
+                                ),
                               ),
                               child: Text(
                                 '$totalCount مندوب',
-                                style: const TextStyle(
-                                  color: Color(0xFF2E7D32),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: Theme.of(context).textTheme.labelMedium
+                                    ?.copyWith(
+                                      color: Color(0xFF2E7D32),
+                                      fontWeight: FontWeight.bold,
+                                    ),
                               ),
                             ),
                           ],
@@ -4220,10 +3976,8 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
                         const SizedBox(height: 3),
                         Text(
                           'يشمل كافة المناديب الحاضرين والمنصرفين خلال اليوم',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
                         ),
                       ],
                     ),
@@ -4249,23 +4003,25 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
             height: 48,
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.7),
-                width: 1.0,
-              ),
+              borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
+              border: Border.all(color: colorScheme.outlineVariant, width: 1.0),
             ),
             child: Row(
               children: [
                 // زر التصدير
                 Expanded(
                   child: InkWell(
-                    borderRadius: const BorderRadius.horizontal(right: Radius.circular(24)),
+                    borderRadius: const BorderRadius.horizontal(
+                      right: Radius.circular(24),
+                    ),
                     onTap: _isExporting ? null : _handleExport,
                     child: Center(
                       child: _isExporting
-                          ? const AppLoadingIndicator(size: 20, color: Color(0xFF2E7D32))
-                          : const Row(
+                          ? const AppLoadingIndicator(
+                              size: 20,
+                              color: Color(0xFF2E7D32),
+                            )
+                          : Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -4277,11 +4033,11 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
                                 SizedBox(width: 6),
                                 Text(
                                   'تصدير Excel',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF2E7D32),
-                                  ),
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF2E7D32),
+                                      ),
                                 ),
                               ],
                             ),
@@ -4295,19 +4051,22 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
                   thickness: 1,
                   indent: 8,
                   endIndent: 8,
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                  color: colorScheme.outlineVariant,
                 ),
 
                 // زر الإلغاء
                 Expanded(
                   child: InkWell(
-                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(24)),
-                    onTap: _isExporting ? null : () => Navigator.of(context).pop(),
+                    borderRadius: const BorderRadius.horizontal(
+                      left: Radius.circular(24),
+                    ),
+                    onTap: _isExporting
+                        ? null
+                        : () => Navigator.of(context).pop(),
                     child: Center(
                       child: Text(
                         'إلغاء',
-                        style: TextStyle(
-                          fontSize: 14,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: colorScheme.onSurface,
                         ),
@@ -4330,13 +4089,9 @@ class _ExportExcelBottomSheetState extends State<_ExportExcelBottomSheet> {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-          width: 0.8,
-        ),
+        border: Border.all(color: colorScheme.outlineVariant, width: 0.8),
       ),
       child: contentWidget,
     );
   }
 }
-
