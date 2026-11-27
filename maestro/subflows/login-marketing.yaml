@@ -1,0 +1,19 @@
+appId: com.tashil.delegate.dev
+---
+# TAS-393: fresh launch + staff login with the fake marketing account
+# (TASHIL_MAESTRO_DEV_MARKETING_PHONE / _SECRET), lands on the home tab.
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- runFlow:
+    file: login-staff.yaml
+    env:
+      TASHIL_MAESTRO_DEV_PHONE: ${TASHIL_MAESTRO_DEV_MARKETING_PHONE}
+      TASHIL_MAESTRO_DEV_SECRET: ${TASHIL_MAESTRO_DEV_MARKETING_SECRET}
+- extendedWaitUntil:
+    visible:
+      id: "tashil_main_menu_button"
+    timeout: 120000
+- extendedWaitUntil:
+    visible: "ملخص اليوم"
+    timeout: 30000

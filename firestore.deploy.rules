@@ -1070,7 +1070,8 @@ allow create: if signedIn() && (staffToken()
 ? staffTargetOk(orgId, compId, true)
 : (delegateInOrg(orgId) && delegateInCompany(compId)));
 allow update: if false;
-allow delete: if canManageNestedDelegate(orgId, compId);
+allow delete: if canManageNestedDelegate(orgId, compId)
+&& !roleIs(['marketing']);
 }
 }
 }

@@ -1129,9 +1129,12 @@ class _AdminCreatePenaltyPageState extends State<AdminCreatePenaltyPage> {
                         )
                       : DropdownButtonFormField<String>(
                           key: ValueKey(_selectedBranchId),
+                          // TAS-401: show the hint until the user picks a
+                          // branch; showing the first one looked selected
+                          // while _selectedBranchId stayed null (TAS-267).
                           initialValue: _branches.any((b) => b['id'] == _selectedBranchId)
                               ? _selectedBranchId
-                              : (_branches.isNotEmpty ? _branches.first['id'] : null),
+                              : null,
                           isExpanded: true,
                           decoration: InputDecoration(
                             hintText: 'اختر الفرع...',

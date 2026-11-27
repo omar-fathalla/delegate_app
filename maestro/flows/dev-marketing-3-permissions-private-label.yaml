@@ -1,0 +1,107 @@
+appId: com.tashil.delegate.dev
+---
+# TAS-393 marketing journey 3/5: photo permissions (search, filter, pin,
+# branches dialog, field photos, supervisor dialog, edit dates) and the
+# Private Label tab (locked tools, read-only catalog).
+# Data: seed-fake-tas392-pp1 (approved, Fake Branch Alpha) + 2 field photos.
+- runFlow:
+    file: ../subflows/login-marketing.yaml
+
+- tapOn: "أذونات التصوير(\\n.*)?"
+- extendedWaitUntil:
+    visible: ".*Fake Company Alpha.*"
+    timeout: 60000
+
+# Search by company code, then clear.
+- tapOn: "البحث بكود الشركة أو اسم الشركة"
+- inputText: "FAKE"
+- extendedWaitUntil:
+    visible: ".*Fake Company Alpha.*"
+    timeout: 15000
+- tapOn: "مسح البحث"
+- hideKeyboard
+
+# Department filter: pick «marketing», pin it, unpin it, back to all.
+- tapOn: "كل الأقسام"
+- extendedWaitUntil:
+    visible: "تصفية وتثبيت الأقسام"
+    timeout: 15000
+- tapOn: "معلبات"
+- tapOn: "تطبيق.*"
+- extendedWaitUntil:
+    visible: "معلبات"
+    timeout: 15000
+- tapOn: "تثبيت الفلتر"
+- extendedWaitUntil:
+    visible: "إلغاء تثبيت الفلتر"
+    timeout: 15000
+- tapOn: "إلغاء تثبيت الفلتر"
+- tapOn: "معلبات"
+- extendedWaitUntil:
+    visible: "تصفية وتثبيت الأقسام"
+    timeout: 15000
+- tapOn:
+    text: "كل الأقسام"
+    index: 1
+- tapOn: "عرض كل الأقسام"
+
+# Approved branches dialog.
+- tapOn: "Fake Branch Alpha"
+- extendedWaitUntil:
+    visible: ".*الفروع المعتمدة.*"
+    timeout: 15000
+- tapOn: "إغلاق"
+
+# Field photos of the permission.
+- tapOn: "الصور الميدانية"
+- extendedWaitUntil:
+    visible: ".*تقارير الصور.*"
+    timeout: 30000
+- extendedWaitUntil:
+    visible: ".*Fake Delegate alpha 1.*"
+    timeout: 30000
+- tapOn: "رجوع|Back"
+
+# Company supervisor dialog.
+- tapOn: "تواصل مع مشرف الشركة"
+- extendedWaitUntil:
+    visible: ".*مشرف.*"
+    timeout: 30000
+- tapOn: "إغلاق"
+
+# Edit dates: open and cancel (marketing may edit dates only).
+- tapOn: "خيارات الإذن"
+- tapOn: "تعديل المدة"
+- extendedWaitUntil:
+    visible: "تعديل مدة إذن التصوير"
+    timeout: 15000
+- tapOn: "إلغاء"
+
+# Private Label: a locked tool explains why; the catalog opens read-only.
+- extendedWaitUntil:
+    notVisible: "تعديل مدة إذن التصوير"
+    timeout: 15000
+# The search field takes focus back after dialogs close (keyboard reopens and
+# hides the bottom bar), see the TAS-393 review.
+- hideKeyboard
+- tapOn: "Private Label\\n.*"
+- extendedWaitUntil:
+    visible: "الأدوات"
+    timeout: 30000
+- tapOn: "Private Label Audit(\\n.*)*"
+- extendedWaitUntil:
+    visible: ".*تتطلب صلاحية خاصة.*"
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible: ".*تتطلب صلاحية خاصة.*"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Private Label Catalog(\\n.*)*"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "Private Label Catalog(\\n.*)*"
+- extendedWaitUntil:
+    visible: ".*وضع العرض فقط.*"
+    timeout: 30000
+- assertNotVisible: ".*إضافة منتج.*"
+- tapOn: "رجوع|Back"

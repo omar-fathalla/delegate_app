@@ -1,0 +1,140 @@
+appId: com.tashil.delegate.dev
+---
+# TAS-393 marketing journey 5/5: tasks (start / finish), penalties (list,
+# rules catalog, record a new one), profile, settings and logout.
+# Data: seed-marketing-journey-data.js resets the two tasks every run
+# (task-1 pending, task-2 inProgress). Recording a penalty adds one
+# `penalties` doc per run on Fake Company Alpha (kept, like all fake data).
+- runFlow:
+    file: ../subflows/login-marketing.yaml
+
+# ── Tasks ─────────────────────────────────────────────────────────────
+- runFlow:
+    file: ../subflows/open-main-menu.yaml
+- tapOn: "المهام"
+- extendedWaitUntil:
+    visible: ".*مراجعة رف العروض في Fake Branch Alpha.*"
+    timeout: 30000
+- assertVisible: ".*متابعة حضور مناديب Fake Company Alpha.*"
+
+# Open a task's details and come back.
+- tapOn: ".*مراجعة رف العروض في Fake Branch Alpha.*"
+- extendedWaitUntil:
+    visible: ".*اتأكد إن أسعار العروض ظاهرة.*"
+    timeout: 30000
+- tapOn: "رجوع|Back"
+
+# Both cards' menus: start the pending one, finish the one in progress.
+- repeat:
+    times: 2
+    commands:
+      - tapOn:
+          text: "عرض القائمة|Show menu"
+          index: 0
+      - runFlow:
+          when:
+            visible: "ابدأ المهمة"
+          commands:
+            - tapOn: "ابدأ المهمة"
+            - extendedWaitUntil:
+                visible: ".*بدأت العمل على المهمة.*"
+                timeout: 15000
+      - runFlow:
+          when:
+            visible: "خلّصت المهمة"
+          commands:
+            - tapOn: "خلّصت المهمة"
+            - extendedWaitUntil:
+                visible: ".*تم تأكيد إنجاز المهمة.*"
+                timeout: 15000
+- tapOn: "المنجزة.*"
+- extendedWaitUntil:
+    visible: ".*متابعة حضور مناديب Fake Company Alpha.*"
+    timeout: 15000
+- tapOn: "رجوع|Back"
+
+# ── Penalties ─────────────────────────────────────────────────────────
+- runFlow:
+    file: ../subflows/wait-for-main-menu-button.yaml
+- runFlow:
+    file: ../subflows/open-main-menu.yaml
+- tapOn: "المخالفات والغرامات"
+- extendedWaitUntil:
+    visible: ".*Fake Company Alpha.*"
+    timeout: 30000
+- tapOn: ".*Fake Company Alpha.*المخالفات.*"
+# Each run records one more penalty, so the seeded one can be below the fold.
+- scrollUntilVisible:
+    element: ".*التواجد بدون تصريح \\(تجريبي TAS-393\\).*"
+    direction: DOWN
+    timeout: 30000
+
+# Rules catalog (read-only).
+- tapOn: "لائحة المخالفات"
+- extendedWaitUntil:
+    visible: ".*واقعة سرقة.*"
+    timeout: 30000
+- tapOn: "رجوع|Back"
+
+# Record a new penalty: the company is preselected; pick the branch (it must
+# be an explicit choice, TAS-267 / TAS-401) and a rule.
+- tapOn: "تسجيل مخالفة"
+- extendedWaitUntil:
+    visible: "تسجيل غرامة ومخالفة جديدة"
+    timeout: 30000
+- tapOn: "اختر الفرع.*"
+- tapOn: "Fake Branch Alpha"
+- tapOn: "اختر المخالفة حسب اللائحة.*"
+- tapOn: "5. عدم حيازة \\(id\\)"
+- scrollUntilVisible:
+    element: "تسجيل وإصدار الغرامة"
+    direction: DOWN
+    timeout: 15000
+
+# Evidence file from the gallery (Android photo picker). The runner pushes
+# maestro/assets/tashil-fake-evidence.png to the device first, so it is the
+# newest photo; never a personal one. iOS gallery UI differs: skipped there.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn: "إضافة ملفات"
+      - tapOn: "اختيار من المعرض.*"
+      - extendedWaitUntil:
+          visible: "Photo taken on .*"
+          timeout: 20000
+      - tapOn:
+          text: "Photo taken on .*"
+          index: 0
+      - tapOn: "Add.*|إضافة.*"
+      - extendedWaitUntil:
+          visible: ".*\\.(png|jpg|jpeg)"
+          timeout: 20000
+
+- tapOn: "تسجيل وإصدار الغرامة"
+- extendedWaitUntil:
+    visible: "سجل المخالفات والغرامات"
+    timeout: 60000
+- tapOn: "رجوع|Back"
+
+# ── Profile, settings, logout ────────────────────────────────────────
+- runFlow:
+    file: ../subflows/wait-for-main-menu-button.yaml
+- runFlow:
+    file: ../subflows/open-main-menu.yaml
+- tapOn: "الملف الشخصي"
+- extendedWaitUntil:
+    visible: ".*المعلومات الشخصية.*"
+    timeout: 30000
+- runFlow:
+    file: ../subflows/pop-from-user-profile.yaml
+- runFlow:
+    file: ../subflows/wait-for-main-menu-button.yaml
+- runFlow:
+    file: ../subflows/open-main-menu.yaml
+- tapOn: "الإعدادات"
+- extendedWaitUntil:
+    visible: ".*المظهر.*"
+    timeout: 30000
+- runFlow:
+    file: ../subflows/logout-via-menu.yaml

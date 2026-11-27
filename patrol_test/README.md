@@ -30,6 +30,7 @@ Delegate tests default `PATROL_DEV_PHONE=01500000003` when you pass `--dart-defi
 | Live tracking / check-in path | Patrol `integration_location_checkin_test.dart` |
 | Notification shade / FCM handling | Patrol `integration_push_notification_test.dart` |
 | `offlineSyncTask` delay + app background/foreground | Patrol `integration_offline_sync_lifecycle_test.dart` |
+| Marketing floor check written under live rules + survives background (TAS-393) | Patrol `integration_marketing_floor_check_test.dart` (`PATROL_DEV_MARKETING_SECRET`, skipped without it; data from `functions/scripts/seed-marketing-journey-data.js`) |
 
 ## iOS notes
 

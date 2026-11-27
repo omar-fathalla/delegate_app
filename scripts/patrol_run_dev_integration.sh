@@ -10,6 +10,9 @@ DEFAULT_TARGETS=(
   patrol_test/integration_location_checkin_test.dart
   patrol_test/integration_push_notification_test.dart
   patrol_test/integration_offline_sync_lifecycle_test.dart
+  patrol_test/integration_marketing_floor_check_test.dart
+  patrol_test/integration_marketing_export_and_dates_test.dart
+  patrol_test/integration_marketing_contact_test.dart
 )
 
 targets=()
@@ -60,6 +63,13 @@ if [[ -n "${PATROL_DEV_STAFF_PHONE:-}" ]]; then
 fi
 if [[ -n "${PATROL_DEV_DELEGATE_PHONE:-}" ]]; then
   args+=(--dart-define=PATROL_DEV_DELEGATE_PHONE="$PATROL_DEV_DELEGATE_PHONE")
+fi
+# TAS-393: marketing account (skipped by the test when no secret is passed).
+if [[ -n "${PATROL_DEV_MARKETING_PHONE:-}" ]]; then
+  args+=(--dart-define=PATROL_DEV_MARKETING_PHONE="$PATROL_DEV_MARKETING_PHONE")
+fi
+if [[ -n "${PATROL_DEV_MARKETING_SECRET:-}" ]]; then
+  args+=(--dart-define=PATROL_DEV_MARKETING_SECRET="$PATROL_DEV_MARKETING_SECRET")
 fi
 if [[ -n "${PATROL_DEV_NATIONAL_ID:-}" ]]; then
   args+=(--dart-define=PATROL_DEV_NATIONAL_ID="$PATROL_DEV_NATIONAL_ID")

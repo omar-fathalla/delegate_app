@@ -1,0 +1,85 @@
+appId: com.tashil.delegate.dev
+---
+# TAS-393 marketing journey 1/5: home (duties, quick access cards, floor
+# summary) and notifications. Data: seed-marketing-journey-data.js.
+- runFlow:
+    file: ../subflows/login-marketing.yaml
+
+# Daily duties card opens and shows the three duties.
+- scrollUntilVisible:
+    element: "دليل المهام اليومية(\\n.*)*"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "دليل المهام اليومية(\\n.*)*"
+- scrollUntilVisible:
+    element: "تسجيل المخالفات وتطبيق لائحة الجزاءات(\\n.*)*"
+    direction: DOWN
+    timeout: 15000
+- assertVisible: "المرور الميداني ومتابعة حضور المناديب(\\n.*)*"
+
+# Quick access: penalties opens its own page.
+- scrollUntilVisible:
+    element: "المخالفات(\\n.*)*"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "المخالفات(\\n.*)*"
+- extendedWaitUntil:
+    visible: "سجل المخالفات والغرامات"
+    timeout: 30000
+- tapOn: "رجوع|Back"
+
+# Quick access: search opens the search page.
+- tapOn: "البحث(\\n.*)*"
+- extendedWaitUntil:
+    visible: "بحث عن الشركة"
+    timeout: 30000
+- tapOn: "رجوع|Back"
+
+# Quick access: photo permissions switches tab.
+- tapOn: "أذونات التصوير(\\n.*)*"
+- extendedWaitUntil:
+    visible: "أذونات التصوير النشطة"
+    timeout: 30000
+
+# Quick access: Private Label switches tab (back to home first).
+- tapOn: "الرئيسية(\\n.*)?"
+- scrollUntilVisible:
+    element: "Private Label(\\n.*)*"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "Private Label\\n.*"
+- extendedWaitUntil:
+    visible: "الأدوات"
+    timeout: 30000
+
+# Home floor-check card leads to the branches tab.
+- tapOn: "الرئيسية(\\n.*)?"
+- scrollUntilVisible:
+    element: "ابدأ المرور على المناديب"
+    direction: UP
+    timeout: 15000
+- tapOn: "ابدأ المرور على المناديب"
+- extendedWaitUntil:
+    visible: "إضافة فرع(\\n.*)?|ابحث عن فرع.*"
+    timeout: 30000
+# Fresh install: the branch picker opens; pick the fake branch to close it.
+- runFlow:
+    when:
+      visible: "ابحث عن فرع.*"
+    commands:
+      - tapOn: "Fake Branch Alpha"
+- extendedWaitUntil:
+    visible: "Fake Branch Alpha(\\n.*)*"
+    timeout: 60000
+
+# Notifications: the seeded unread item, then mark all read.
+- tapOn: "الرئيسية(\\n.*)?"
+- tapOn: "الإشعارات"
+- extendedWaitUntil:
+    visible: ".*مهمة جديدة: مراجعة رف العروض.*"
+    timeout: 30000
+- assertVisible: ".*إعلان: جرد آخر الشهر.*"
+- tapOn: "تعليم الكل كمقروء"
+- tapOn: "رجوع|Back"
+- runFlow:
+    file: ../subflows/wait-for-main-menu-button.yaml

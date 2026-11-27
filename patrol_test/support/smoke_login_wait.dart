@@ -143,6 +143,14 @@ Future<void> tapDevLoginStaffModeAndWaitForFields(
   await waitForDevLoginFormFieldsReady($, mode: SmokeDevLoginFieldMode.staff);
 }
 
+/// The login screen remembers the last account type (TAS-393: a second test in
+/// the same Patrol file reopens it on **موظف إداري**), so wait for the fields
+/// of whichever mode is showing.
+SmokeDevLoginFieldMode _visibleLoginMode() =>
+    devLoginStaffPasswordFieldFinder().evaluate().isNotEmpty
+        ? SmokeDevLoginFieldMode.staff
+        : SmokeDevLoginFieldMode.delegate;
+
 /// Waits for splash / auto-login to finish, taps [splash_sign_in] when the stall UI
 /// appears, then asserts the dev login screen submit control is visible.
 Future<void> waitForDevLoginScreenAfterSplash(PatrolIntegrationTester $) async {
@@ -152,7 +160,7 @@ Future<void> waitForDevLoginScreenAfterSplash(PatrolIntegrationTester $) async {
   while (DateTime.now().isBefore(deadline)) {
     await $.tester.pump(smokeSplashPollInterval);
     if (_loginSubmitHitTestable($.tester)) {
-      await waitForDevLoginFormFieldsReady($);
+      await waitForDevLoginFormFieldsReady($, mode: _visibleLoginMode());
       return;
     }
 
@@ -161,7 +169,7 @@ Future<void> waitForDevLoginScreenAfterSplash(PatrolIntegrationTester $) async {
       for (var i = 0; i < smokePostSignInPumpIterations; i++) {
         await $.tester.pump(smokePostSignInPumpStep);
         if (_loginSubmitHitTestable($.tester)) {
-          await waitForDevLoginFormFieldsReady($);
+          await waitForDevLoginFormFieldsReady($, mode: _visibleLoginMode());
           return;
         }
       }
@@ -171,5 +179,5 @@ Future<void> waitForDevLoginScreenAfterSplash(PatrolIntegrationTester $) async {
   await $(devLoginSubmitFinder()).waitUntilVisible(
     timeout: smokeLoginVisibleTimeout,
   );
-  await waitForDevLoginFormFieldsReady($);
+  await waitForDevLoginFormFieldsReady($, mode: _visibleLoginMode());
 }
