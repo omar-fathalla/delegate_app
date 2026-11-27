@@ -210,8 +210,10 @@ class DelegateTrackingService {
       final isInside = distance <= (geofenceRadius + 50.0);
 
       final sessionDoc = await _trackingCollection.doc(delegateId).get();
-      final bool previousEnabled =
-          sessionDoc.exists ? (sessionDoc.data()?['isTrackingEnabled'] == true) : false;
+      // TAS-364: a new shift always starts enabled. The supervisor's switch
+      // (toggleTracking) pauses one shift; a check-out never turns it off,
+      // so an old `false` from the previous shift no longer stops tracking.
+      const bool previousEnabled = true;
       final existingAvatar = sessionDoc.data()?['avatarUrl']?.toString();
       final effectiveAvatar = (avatarUrl != null && avatarUrl.isNotEmpty)
           ? avatarUrl
@@ -461,6 +463,8 @@ class DelegateTrackingService {
           'batteryLevel': ?batteryLevel,
           'distanceMeters': distance,
           'isInside': isNowInside,
+          // TAS-364: the phone's own flag on every point (real detection: TAS-372).
+          if (isMocked) 'isMocked': true,
         });
       } catch (err) {
         debugPrint('Error recording breadcrumb: $err');
