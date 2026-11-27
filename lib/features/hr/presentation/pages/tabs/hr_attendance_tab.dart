@@ -131,7 +131,7 @@ class HRAttendanceRecord {
   /// صياغة نصية مفهومة لصافي ساعات العمل
   String get formattedDuration {
     if (checkInTime == null) return '-';
-    if (isMissingCheckOut) return 'انصراف مش متسجل';
+    if (isMissingCheckOut) return 'انصراف غير مسجل';
     if (checkOutTime == null && !isAutoCheckOut) {
       final now = DateTime.now();
       final isToday = checkInTime!.year == now.year &&

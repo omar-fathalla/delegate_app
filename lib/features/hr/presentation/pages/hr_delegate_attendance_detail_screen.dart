@@ -100,7 +100,7 @@ class DelegateAttendanceSession {
 
   /// Formatted duration string e.g. "8 س و 15 د"
   String get formattedDuration {
-    if (isMissingCheckOut) return 'انصراف مش متسجل';
+    if (isMissingCheckOut) return 'انصراف غير مسجل';
     final d = duration;
     if (d == null) {
       return isOngoing ? 'قيد العمل الآن' : 'غير مسجل';
@@ -2709,7 +2709,7 @@ class _HRDelegateAttendanceDetailScreenState
       borderColor = status.warning.withValues(alpha: 0.5);
       textColor = status.onWarningContainer;
       icon = Icons.schedule_rounded;
-      label = 'انصراف مش متسجل (صفر ساعات)';
+      label = 'انصراف غير مسجل (صفر ساعات)';
     } else if (isWeb && s.isAutoCheckOut) {
       // Web, approved status colors: auto check-out = warning.
       bgColor = status.warningContainer;
