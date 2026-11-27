@@ -207,9 +207,9 @@ job_mac-gate() {
     # TAS-393: today's fake check-ins on Fake Branch Alpha, so the marketing
     # journeys have delegates to floor-check (fixed ids, idempotent per day).
     _seed_marketing_attendance() {
-      [[ -f functions/scripts/seed-marketing-journey-attendance.js ]] || return 0
+      [[ -f functions/scripts/seed-marketing-journey-data.js ]] || return 0
       (cd functions && GOOGLE_CLOUD_PROJECT=tashil-dev \
-        node scripts/seed-marketing-journey-attendance.js --project tashil-dev --apply) \
+        node scripts/seed-marketing-journey-data.js --project tashil-dev --apply) \
         || echo "mac-gate: warning: could not seed the marketing journey attendance" >&2
     }
     trap ci_ios_sim_release EXIT

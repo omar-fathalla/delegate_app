@@ -16,7 +16,7 @@ import 'support/smoke_dummy_login.dart';
 /// reached Firestore under the live tashil-dev rules, survive a trip to the
 /// background, and undo the check so the next run starts clean.
 ///
-/// Data: `functions/scripts/seed-marketing-journey-attendance.js` (the mac-gate
+/// Data: `functions/scripts/seed-marketing-journey-data.js` (the mac-gate
 /// runs it before Patrol). Account: `PATROL_DEV_MARKETING_SECRET`; without it
 /// the test is skipped.
 const _branch = 'Fake Branch Alpha';
