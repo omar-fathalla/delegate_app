@@ -68,8 +68,16 @@ void main() {
       }
 
       final check = find.byKey(const ValueKey('floor_check_$_delegateId'));
-      await _pumpUntilFound($, check, timeout: const Duration(seconds: 90));
-      await $.tester.ensureVisible(check);
+      // Rows are a lazy SliverList (newest check-in first), so the seeded
+      // 08:05 delegate can sit below the fold: wait for the list, then scroll.
+      await _pumpUntilFound(
+        $,
+        find.byKey(const ValueKey('branch_header_$_branch')),
+        timeout: const Duration(seconds: 90),
+      );
+      await $(
+        check,
+      ).scrollTo(maxScrolls: 30, settlePolicy: SettlePolicy.trySettle);
 
       bool selected() => $.tester.widget<FilterChip>(check).selected;
       // Leave a clean state whatever an earlier run left behind.
@@ -93,7 +101,9 @@ void main() {
 
       await patrolBackgroundAndForeground($);
       await $.tester.pump(const Duration(seconds: 2));
-      await _pumpUntilFound($, check);
+      await $(
+        check,
+      ).scrollTo(maxScrolls: 30, settlePolicy: SettlePolicy.trySettle);
       expect(selected(), isTrue, reason: 'check kept after resume');
 
       // Undo so the next run starts unchecked.
