@@ -12,6 +12,19 @@ appId: com.tashil.delegate.dev
       - tapOn:
           id: "tashil_main_menu_button"
 
+# TAS-387: in the redesigned Settings the logout row is the last group,
+# below the fold on a phone; scroll to it first (Maestro does not scroll
+# before tapOn). The drawer item (delegates) is already visible.
+- runFlow:
+    when:
+      notVisible: "تسجيل الخروج(\\n.*)?"
+    commands:
+      - scrollUntilVisible:
+          element:
+            text: "تسجيل الخروج(\\n.*)?"
+          direction: DOWN
+          timeout: 20000
+
 # Optional "\n…" suffix: drawer items (delegates) carry a tab-position label.
 - tapOn: "تسجيل الخروج(\\n.*)?"
 
