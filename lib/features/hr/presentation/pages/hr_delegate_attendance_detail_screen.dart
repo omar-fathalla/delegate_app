@@ -47,6 +47,11 @@ class DelegateAttendanceSession {
   final bool isAutoCheckOut;
   final String? autoCheckOutReason;
 
+  /// Server verdict (TAS-361): the check-out was made outside the branch
+  /// (radius + 50 m). Written by the attendance trigger, never by the app.
+  final bool checkOutOutsideBranch;
+  final double? checkOutDistanceMeters;
+
   const DelegateAttendanceSession({
     required this.id,
     required this.checkInTime,
@@ -67,6 +72,8 @@ class DelegateAttendanceSession {
     this.adjustmentReason,
     this.isAutoCheckOut = false,
     this.autoCheckOutReason,
+    this.checkOutOutsideBranch = false,
+    this.checkOutDistanceMeters,
   });
 
   /// Duration worked in this session (if check-out exists)
@@ -315,6 +322,83 @@ Future<Map<String, Map<String, dynamic>>> fetchDelegateAttendanceDocs({
     for (final snap in results)
       for (final doc in snap.docs) doc.id: doc.data(),
   };
+}
+
+/// The server's check-out verdict for a session (TAS-361 attendance trigger):
+/// stamped on the check-in record (`checkOutOutsideBranch`,
+/// `checkOutVerifiedDistanceMeters`) or on a `type == check_out` record
+/// (`checkOutOutsideBranch`, `verifiedDistanceMeters`). Records the trigger has
+/// not seen (older than the trigger) are never flagged.
+@visibleForTesting
+({bool outside, double? distanceMeters}) serverCheckOutVerdict(
+  Map<String, dynamic> checkIn,
+  Map<String, dynamic>? checkOut,
+) {
+  if (checkIn['checkOutOutsideBranch'] == true) {
+    return (
+      outside: true,
+      distanceMeters: (checkIn['checkOutVerifiedDistanceMeters'] as num?)?.toDouble(),
+    );
+  }
+  if (checkOut != null && checkOut['checkOutOutsideBranch'] == true) {
+    return (
+      outside: true,
+      distanceMeters: (checkOut['verifiedDistanceMeters'] as num?)?.toDouble(),
+    );
+  }
+  return (outside: false, distanceMeters: null);
+}
+
+/// The server's check-in distance (TAS-361), when the trigger computed one.
+@visibleForTesting
+({double distanceMeters, bool inside})? serverCheckInVerdict(
+  Map<String, dynamic> checkIn,
+) {
+  final d = checkIn['verifiedDistanceMeters'];
+  final inside = checkIn['verifiedInsideBranch'];
+  if (checkIn['verifiedReason'] != 'ok' || d is! num || inside is! bool) {
+    return null;
+  }
+  return (distanceMeters: d.toDouble(), inside: inside);
+}
+
+/// Compact label on a session: the check-out was outside the branch.
+/// A value for HR to look at, not an error (warning role).
+class AttendanceOutsideCheckOutLabel extends StatelessWidget {
+  const AttendanceOutsideCheckOutLabel({super.key, this.distanceMeters});
+
+  final double? distanceMeters;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = HrStatusColors.of(context);
+    final meters = distanceMeters == null ? '' : ' (${distanceMeters!.round()} م)';
+    final label = 'انصراف من برّه الفرع$meters';
+    return Tooltip(
+      message: 'السيرفر حسب مكان الانصراف بعيد عن الفرع أكتر من النطاق + 50 م',
+      child: Container(
+        padding: const EdgeInsetsDirectional.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: status.warningContainer,
+          borderRadius: BorderRadius.circular(HrRadius.card),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.wrong_location_rounded, size: 14, color: status.onWarningContainer),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: status.onWarningContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Clear Arabic message for a failed attendance load. Never shows the raw
@@ -605,11 +689,17 @@ class _HRDelegateAttendanceDetailScreenState
         }
       }
 
-      // Calculate distance to branch
+      // Calculate distance to branch: the server's verdict when the trigger
+      // computed one (TAS-361), else the old client-side estimate.
       double? distance;
       bool? isInside;
+      final serverIn = serverCheckInVerdict(checkInData);
+      final serverOut = serverCheckOutVerdict(checkInData, checkOutData);
 
-      if (inLat != null && inLng != null && branchName != 'غير محدد') {
+      if (serverIn != null) {
+        distance = serverIn.distanceMeters;
+        isInside = serverIn.inside;
+      } else if (inLat != null && inLng != null && branchName != 'غير محدد') {
         final matchedBranch = lookupBranchForAttendanceLog(
           branchesByName: _branchesByName,
           log: checkInData,
@@ -662,6 +752,8 @@ class _HRDelegateAttendanceDetailScreenState
           adjustmentReason: adjustmentReason,
           isAutoCheckOut: isAutoCheckOut,
           autoCheckOutReason: autoCheckOutReason,
+          checkOutOutsideBranch: serverOut.outside,
+          checkOutDistanceMeters: serverOut.distanceMeters,
         ),
       );
     }
@@ -2142,7 +2234,21 @@ class _HRDelegateAttendanceDetailScreenState
                 ],
               ),
               const SizedBox(height: 8),
-              Align(alignment: AlignmentDirectional.centerStart, child: _buildStatusBadge(s, colorScheme)),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _buildStatusBadge(s, colorScheme),
+                    if (s.checkOutOutsideBranch)
+                      AttendanceOutsideCheckOutLabel(
+                        key: Key('hr_attendance_outside_checkout_${s.id}'),
+                        distanceMeters: s.checkOutDistanceMeters,
+                      ),
+                  ],
+                ),
+              ),
               const Divider(height: 20),
               // Check-in / check-out / duration
               Padding(
@@ -2449,7 +2555,18 @@ class _HRDelegateAttendanceDetailScreenState
                                   padding: const EdgeInsetsDirectional.only(end: 12),
                                   child: Align(
                                     alignment: AlignmentDirectional.centerStart,
-                                    child: _buildStatusBadge(s, colorScheme),
+                                    child: Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      children: [
+                                        _buildStatusBadge(s, colorScheme),
+                                        if (s.checkOutOutsideBranch)
+                                          AttendanceOutsideCheckOutLabel(
+                                            key: Key('hr_attendance_outside_checkout_${s.id}'),
+                                            distanceMeters: s.checkOutDistanceMeters,
+                                          ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
