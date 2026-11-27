@@ -1,3 +1,5 @@
+import 'package:material_symbols_icons/symbols.dart';
+import 'package:delegate_app/core/design/widgets/skeleton.dart';
 import 'package:delegate_app/core/design/widgets/snackbars.dart';
 import 'package:delegate_app/core/design/widgets/loading_indicator.dart';
 import 'package:delegate_app/core/design/tokens.dart';
@@ -212,7 +214,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 backgroundColor: colorScheme.surface,
               )
             : null,
-        body: const Center(child: CircularProgressIndicator()),
+        // Known layout: skeletons of the header and the info card (P-08).
+        body: ListView(
+          key: const Key('profile_skeleton'),
+          padding: const EdgeInsets.all(TashilSpacing.page),
+          children: const [
+            SummaryCardSkeleton(facts: 0),
+            SizedBox(height: TashilSpacing.xl),
+            SummaryCardSkeleton(facts: 2),
+          ],
+        ),
       );
     }
 
@@ -271,7 +282,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 // Personal Information Card
                 _buildPersonalInfoCard(colorScheme, theme, l10n, effectiveDelegate),
 
-                const SizedBox(height: TashilSpacing.lg),
+                const SizedBox(height: TashilSpacing.xl),
 
                 // Security Card
                 _buildSecurityCard(colorScheme, theme, l10n, effectiveDelegate),
@@ -645,159 +656,157 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     ThemeData theme,
     Delegate? delegate,
   ) {
+    final l10n = AppLocalizations.of(context)!;
+    final tt = theme.textTheme;
     final rawName = _firestoreUserData?['displayName'] ??
         _firestoreUserData?['fullName'] ??
         delegate?.fullName ??
         _currentUser?.displayName ??
         '';
-    final displayName = rawName.isNotEmpty ? rawName : AppLocalizations.of(context)!.defaultUserName;
-
-    final rawEmail = _firestoreUserData?['email'] ??
-        delegate?.email ??
-        _currentUser?.email ??
-        '';
-    final email = rawEmail;
+    final displayName = rawName.isNotEmpty ? rawName : l10n.defaultUserName;
 
     final photoUrl = _userDocPhoto() ??
         delegate?.personalPhotoUrl ??
         _currentUser?.photoURL;
     final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
+    const avatar = 72.0;
 
-    // TAS-355: Card.filled like the rest of the app, no alpha tint.
+    Widget initial() => CircleAvatar(
+      radius: avatar / 2,
+      backgroundColor: colorScheme.primaryContainer,
+      child: Text(
+        displayName.isNotEmpty ? displayName.substring(0, 1) : '؟',
+        style: tt.headlineSmall?.copyWith(
+          color: colorScheme.onPrimaryContainer,
+        ),
+      ),
+    );
+
+    // Read-only values: an icon and text, never a chip (TAS-384).
+    Widget fact(IconData icon, String text, {Key? key}) => Padding(
+      padding: const EdgeInsetsDirectional.only(top: TashilSpacing.xs),
+      child: Row(
+        key: key,
+        children: [
+          Icon(icon, size: 16, color: colorScheme.onSurfaceVariant),
+          const SizedBox(width: TashilSpacing.xs),
+          Flexible(
+            child: Text(
+              text,
+              style: tt.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final org = (delegate?.companyName.isNotEmpty ?? false)
+        ? delegate!.companyName
+        : (delegate?.organizationName ?? '');
+
+    // TAS-387 (user review 27 Nov 2026): a compact header like the home
+    // card: avatar on the start side, the name in titleMedium (was a bold
+    // headline), role and organisation as icon + text.
     return Card.filled(
+      key: const Key('profile_header'),
+      margin: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.all(TashilSpacing.xl),
-        child: Column(
+        padding: const EdgeInsets.all(TashilSpacing.lg),
+        child: Row(
           children: [
-            // Avatar with edit/camera button
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(TashilSpacing.xs),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: colorScheme.primary, width: 3),
-                  ),
-                  child: hasPhoto
-                      ? ClipOval(
-                          child: StorageResolvedImage.wrap(
-                            pathOrUrl: photoUrl,
-                            builder: (context, resolvedUrl) => CachedNetworkImage(
-                            imageUrl: resolvedUrl,
-                            width: 96,
-                            height: 96,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              width: 96,
-                              height: 96,
-                              color: colorScheme.surfaceContainerHighest,
-                              child: const Center(
-                                child: SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(strokeWidth: 2.5),
-                                ),
-                              ),
-                            ),
-                            errorWidget: (context, url, error) => CircleAvatar(
-                              radius: 48,
-                              backgroundColor: colorScheme.primaryContainer,
-                              child: Text(
-                                displayName.isNotEmpty
-                                    ? displayName[0].toUpperCase()
-                                    : 'O',
-                                style: theme.textTheme.headlineLarge?.copyWith(
-                                  color: colorScheme.onPrimaryContainer,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                          ),
-                        )
-                      : CircleAvatar(
-                          radius: 48,
-                          backgroundColor: colorScheme.primaryContainer,
-                          child: Text(
-                            displayName.isNotEmpty
-                                ? displayName[0].toUpperCase()
-                                : 'O',
-                            style: theme.textTheme.headlineLarge?.copyWith(
-                              color: colorScheme.onPrimaryContainer,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+            SizedBox.square(
+              dimension: avatar + TashilSpacing.sm,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  if (hasPhoto)
+                    ClipOval(
+                      child: StorageResolvedImage.wrap(
+                        pathOrUrl: photoUrl,
+                        builder: (context, resolvedUrl) => CachedNetworkImage(
+                          imageUrl: resolvedUrl,
+                          width: avatar,
+                          height: avatar,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) =>
+                              const Skeleton.circle(size: avatar),
+                          errorWidget: (context, url, error) => initial(),
                         ),
-                ),
-                if (_isUploadingPhoto)
-                  Positioned.fill(
-                    // Contained loading indicator over the photo (no scrim).
-                    child: const Center(
-                      child: LoadingIndicator(size: 40, contained: true),
+                      ),
+                    )
+                  else
+                    initial(),
+                  if (_isUploadingPhoto)
+                    const SizedBox.square(
+                      dimension: avatar,
+                      child: Center(
+                        child: LoadingIndicator(size: 40, contained: true),
+                      ),
+                    ),
+                  PositionedDirectional(
+                    bottom: -TashilSpacing.xs,
+                    end: -TashilSpacing.xs,
+                    // Card-icon rule: IconButton.filled with a tooltip.
+                    child: IconButton.filled(
+                      key: const Key('profile_photo_button'),
+                      tooltip: l10n.profilePhoto,
+                      style: IconButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      iconSize: 18,
+                      onPressed: _isUploadingPhoto
+                          ? null
+                          : () => _showPhotoOptionsSheet(context, delegate),
+                      icon: const Icon(Symbols.photo_camera_rounded),
                     ),
                   ),
-                PositionedDirectional(
-                  bottom: 0,
-                  end: 0,
-                  // TAS-355: card-icon rule, IconButton.filled with tooltip.
-                  child: IconButton.filled(
-                    tooltip: AppLocalizations.of(context)!.profilePhoto,
-                    onPressed: _isUploadingPhoto
-                        ? null
-                        : () => _showPhotoOptionsSheet(context, delegate),
-                    icon: const Icon(Icons.camera_alt_rounded),
+                ],
+              ),
+            ),
+            const SizedBox(width: TashilSpacing.lg),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    displayName,
+                    key: const Key('profile_name'),
+                    // Same size as the home greeting (user review 27 Nov).
+                    style: tt.titleMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: TashilSpacing.lg),
-
-            // Display Name
-            Text(
-              displayName,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
-              ),
-              textAlign: TextAlign.center,
-            ),
-
-            const SizedBox(height: TashilSpacing.xs),
-
-            // Role Badge
-            // Read-only role: compact label, container role + on colour.
-            Container(
-              padding: const EdgeInsetsDirectional.symmetric(
-                horizontal: TashilSpacing.md,
-                vertical: TashilSpacing.xs,
-              ),
-              decoration: BoxDecoration(
-                color: colorScheme.secondaryContainer,
-                borderRadius: BorderRadius.circular(TashilRadius.small),
-              ),
-              child: Text(
-                _getRoleDisplayName(delegate, _firestoreUserData),
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: colorScheme.onSecondaryContainer,
-                ),
+                  fact(
+                    Symbols.badge_rounded,
+                    _getRoleDisplayName(delegate, _firestoreUserData),
+                    key: const Key('profile_role'),
+                  ),
+                  if (org.isNotEmpty) fact(Symbols.storefront_rounded, org),
+                ],
               ),
             ),
-
-            const SizedBox(height: TashilSpacing.xs),
-
-            // Email
-            if (email.isNotEmpty)
-              Text(
-                email,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-                textAlign: TextAlign.center,
-              ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// A section title above its card (same as «آخر النشاط» on home).
+  Widget _sectionTitle(IconData icon, String title) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(
+        start: TashilSpacing.xs,
+        bottom: TashilSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: cs.primary),
+          const SizedBox(width: TashilSpacing.sm),
+          Text(title, style: Theme.of(context).textTheme.titleSmall),
+        ],
       ),
     );
   }
@@ -814,141 +823,125 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         delegate?.fullName ??
         _currentUser?.displayName ??
         '';
-    final displayName = rawName.isNotEmpty ? rawName : AppLocalizations.of(context)!.defaultUserName;
-
-    final rawEmail = _firestoreUserData?['email'] ??
+    final displayName = rawName.isNotEmpty ? rawName : l10n.defaultUserName;
+    final String email = _firestoreUserData?['email'] ??
         delegate?.email ??
         _currentUser?.email ??
         '';
-    final email = rawEmail;
-
-    final rawPhone = _firestoreUserData?['phoneNumber'] ??
+    final String phone = _firestoreUserData?['phoneNumber'] ??
         delegate?.phoneNumber ??
         _currentUser?.phoneNumber ??
         '';
-    final phone = rawPhone;
 
     // TAS-72: a delegate cannot change its own name, email or phone on the
-    // delegate documents (the rules only let `editDelegateProfile` do that,
-    // and that callable is staff-only). The users doc alone would succeed and
-    // leave the two out of sync, so the edit buttons are hidden for
-    // delegates and they are told to ask their supervisor. Phone/ID changes
-    // with OTP come with TAS-112.
+    // delegate documents (only the staff callable can); they ask their
+    // supervisor. Phone changes with OTP come with TAS-112.
     final canEditIdentity = profileIdentityEditable(delegate?.role);
 
-    return Card.filled(
-      child: Padding(
-        padding: const EdgeInsets.all(TashilSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Section Title
-            Row(
-              children: [
-                // TAS-384 rule: card icon on primary + onPrimary.
-                Container(
-                  padding: const EdgeInsets.all(TashilSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.person_outline_rounded,
-                    color: colorScheme.onPrimary,
-                    size: 22,
-                  ),
+    final rows = <Widget>[
+      // The name is in the header; it is repeated here only where it can be
+      // edited.
+      if (canEditIdentity)
+        _buildInfoRow(
+          icon: Symbols.badge_rounded,
+          label: l10n.nameLabel,
+          value: displayName,
+          colorScheme: colorScheme,
+          theme: theme,
+          onEdit: () => _showEditInfoSheet(
+            context,
+            fieldType: 'name',
+            initialValue: displayName,
+            delegate: delegate,
+          ),
+        ),
+      _buildInfoRow(
+        icon: Symbols.call_rounded,
+        label: l10n.phoneNumberLabel,
+        value: phone,
+        colorScheme: colorScheme,
+        theme: theme,
+        maestroValueIdentifier: 'tashil_profile_phone_value',
+        // TAS-112: a delegate changes its phone with an OTP on the new
+        // number (server callables); staff keep the direct edit.
+        onEdit: !canEditIdentity
+            ? (delegate?.role == UserRole.delegate
+                ? () => _changeDelegatePhone(context)
+                : null)
+            : () => _showEditInfoSheet(
+                  context,
+                  fieldType: 'phone',
+                  initialValue: phone,
+                  delegate: delegate,
                 ),
-                const SizedBox(width: TashilSpacing.md),
-                Text(
-                  AppLocalizations.of(context)!.personalInfo,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
+      ),
+      // An empty e-mail row said nothing; it shows only when there is one
+      // or it can be added.
+      if (email.isNotEmpty || canEditIdentity)
+        _buildInfoRow(
+          icon: Symbols.mail_rounded,
+          label: l10n.emailLabel,
+          value: email,
+          colorScheme: colorScheme,
+          theme: theme,
+          onEdit: !canEditIdentity
+              ? null
+              : () => _showEditInfoSheet(
+                    context,
+                    fieldType: 'email',
+                    initialValue: email,
+                    delegate: delegate,
+                  ),
+        ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionTitle(Symbols.person_rounded, l10n.personalInfo),
+        Card.filled(
+          key: const Key('profile_info_card'),
+          margin: EdgeInsets.zero,
+          child: Column(
+            children: [
+              for (var i = 0; i < rows.length; i++) ...[
+                if (i > 0)
+                  const Divider(height: 1, indent: TashilSpacing.xxl * 2),
+                rows[i],
+              ],
+            ],
+          ),
+        ),
+        if (!canEditIdentity)
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(
+              TashilSpacing.xs,
+              TashilSpacing.sm,
+              TashilSpacing.xs,
+              0,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Symbols.info_rounded,
+                  size: 16,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: TashilSpacing.xs),
+                Expanded(
+                  child: Text(
+                    l10n.profileIdentityEditViaSupervisor,
+                    key: const Key('profile_identity_locked_hint'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ],
             ),
-
-            const SizedBox(height: TashilSpacing.lg),
-
-            // Display Name
-            _buildInfoRow(
-              icon: Icons.badge_outlined,
-              label: AppLocalizations.of(context)!.nameLabel,
-              value: displayName,
-              colorScheme: colorScheme,
-              theme: theme,
-              onEdit: !canEditIdentity
-                  ? null
-                  : () => _showEditInfoSheet(
-                        context,
-                        fieldType: 'name',
-                        initialValue: displayName,
-                        delegate: delegate,
-                      ),
-            ),
-
-            // Email
-            _buildInfoRow(
-              icon: Icons.email_outlined,
-              label: AppLocalizations.of(context)!.emailLabel,
-              value: email,
-              colorScheme: colorScheme,
-              theme: theme,
-              onEdit: !canEditIdentity
-                  ? null
-                  : () => _showEditInfoSheet(
-                        context,
-                        fieldType: 'email',
-                        initialValue: email,
-                        delegate: delegate,
-                      ),
-            ),
-
-            // Phone Number
-            _buildInfoRow(
-              icon: Icons.phone_outlined,
-              label: AppLocalizations.of(context)!.phoneNumberLabel,
-              value: phone,
-              colorScheme: colorScheme,
-              theme: theme,
-              maestroValueIdentifier: 'tashil_profile_phone_value',
-              // TAS-112: a delegate changes its phone with an OTP on the new
-              // number (server callables); staff keep the direct edit.
-              onEdit: !canEditIdentity
-                  ? (delegate?.role == UserRole.delegate
-                      ? () => _changeDelegatePhone(context)
-                      : null)
-                  : () => _showEditInfoSheet(
-                        context,
-                        fieldType: 'phone',
-                        initialValue: phone,
-                        delegate: delegate,
-                      ),
-              showDivider: false,
-            ),
-            if (!canEditIdentity) ...[
-              const SizedBox(height: TashilSpacing.md),
-              Row(
-                children: [
-                  Icon(Icons.info_outline_rounded,
-                      size: 18, color: colorScheme.onSurfaceVariant),
-                  const SizedBox(width: TashilSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      AppLocalizations.of(context)!.profileIdentityEditViaSupervisor,
-                      key: const Key('profile_identity_locked_hint'),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
+          ),
+      ],
     );
   }
 
@@ -959,62 +952,43 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     AppLocalizations l10n,
     Delegate? delegate,
   ) {
-    return Card.filled(
-      child: Padding(
-        padding: const EdgeInsets.all(TashilSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Section Title
-            Row(
-              children: [
-                // TAS-384 rule: card icon on primary + onPrimary.
-                Container(
-                  padding: const EdgeInsets.all(TashilSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.security_rounded,
-                    color: colorScheme.onPrimary,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: TashilSpacing.md),
-                Text(
-                  AppLocalizations.of(context)!.securitySection,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: TashilSpacing.lg),
-
-            // TAS-355 (C-01): secondary action is tonal, theme shape.
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.tonalIcon(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionTitle(Symbols.shield_rounded, l10n.securitySection),
+        Card.filled(
+          margin: EdgeInsets.zero,
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              // A settings-style list item (C-23) instead of a wide button.
+              ListTile(
                 key: const Key('profileChangePasswordButton'),
-                onPressed: () => _showChangePasswordSheet(context, delegate),
-                icon: const Icon(Icons.lock_reset_rounded),
-                label: Text(AppLocalizations.of(context)!.changePassword),
+                leading: Icon(Symbols.lock_reset_rounded, color: colorScheme.primary),
+                title: Text(l10n.changePassword),
+                // Symbols chevrons mirror in RTL: «forward» points left.
+                trailing: Icon(
+                  Symbols.chevron_right_rounded,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                onTap: () => _showChangePasswordSheet(context, delegate),
               ),
-            ),
-            // TAS-207: TOTP enrollment, super admin only.
-            TwoStepVerificationButton(
-              role: delegate?.role,
-              rawRole: _firestoreUserData?['role']?.toString(),
-            ),
-          ],
+              // TAS-207: TOTP enrollment, super admin only.
+              Padding(
+                padding: const EdgeInsetsDirectional.symmetric(
+                  horizontal: TashilSpacing.lg,
+                ),
+                child: TwoStepVerificationButton(
+                  role: delegate?.role,
+                  rawRole: _firestoreUserData?['role']?.toString(),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
-
 
   // ─── Info Row Widget ────────────────────────────────────────────
   Widget _buildInfoValueText({
@@ -1023,16 +997,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     required ColorScheme colorScheme,
     String? maestroValueIdentifier,
   }) {
-    final text = Text(
-      value,
-      style: theme.textTheme.bodyLarge?.copyWith(
-        fontWeight: FontWeight.w600,
-        color: colorScheme.onSurface,
-      ),
-    );
-    if (maestroValueIdentifier == null) {
-      return text;
-    }
+    final text = Text(value, style: theme.textTheme.bodyLarge);
+    if (maestroValueIdentifier == null) return text;
     return tashilMaestroDevSemantics(
       identifier: maestroValueIdentifier,
       label: value,
@@ -1040,6 +1006,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
+  /// One official list item (C-23): leading icon in primary, the value as
+  /// the headline, the label under it, edit as a trailing icon button.
   Widget _buildInfoRow({
     required IconData icon,
     required String label,
@@ -1047,56 +1015,29 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     required ColorScheme colorScheme,
     required ThemeData theme,
     VoidCallback? onEdit,
-    bool showDivider = true,
     String? maestroValueIdentifier,
   }) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsetsDirectional.symmetric(
-            vertical: TashilSpacing.md,
-          ),
-          child: Row(
-            children: [
-              // List-item leading icon (not a card icon): plain, neutral.
-              Icon(icon, color: colorScheme.onSurfaceVariant, size: 24),
-              const SizedBox(width: TashilSpacing.lg),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: TashilSpacing.xs),
-                    _buildInfoValueText(
-                      value: value,
-                      theme: theme,
-                      colorScheme: colorScheme,
-                      maestroValueIdentifier: maestroValueIdentifier,
-                    ),
-                  ],
-                ),
-              ),
-              if (onEdit != null)
-                IconButton(
-                  icon: Icon(
-                    Icons.edit_outlined,
-                    color: colorScheme.primary,
-                    size: 20,
-                  ),
-                  tooltip: AppLocalizations.of(context)!.editField(label),
-                  onPressed: onEdit,
-                ),
-            ],
-          ),
+    return ListTile(
+      leading: Icon(icon, color: colorScheme.primary),
+      title: _buildInfoValueText(
+        value: value.isEmpty ? '—' : value,
+        theme: theme,
+        colorScheme: colorScheme,
+        maestroValueIdentifier: maestroValueIdentifier,
+      ),
+      subtitle: Text(
+        label,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: colorScheme.onSurfaceVariant,
         ),
-        if (showDivider) Divider(height: 1, color: colorScheme.outlineVariant),
-      ],
+      ),
+      trailing: onEdit == null
+          ? null
+          : IconButton(
+              icon: const Icon(Symbols.edit_rounded),
+              tooltip: AppLocalizations.of(context)!.editField(label),
+              onPressed: onEdit,
+            ),
     );
   }
 
