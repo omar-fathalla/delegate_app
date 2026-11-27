@@ -351,3 +351,13 @@ test("isStaffAccountRecord: staff claim, password account or staff users role", 
   assert.equal(isStaffAccountRecord({claimRole: undefined, hasPassword: false, userDocRole: ""}), false);
   assert.equal(isStaffAccountRecord({claimRole: undefined, hasPassword: false, userDocRole: " Delegate "}), false);
 });
+
+test("TAS-373: a delegate waiting for its ID review gets its own refusal reason", () => {
+  const base = {id: "doc-a", status: "pending", companyId: "c1", orgId: "o1", createdAtMillis: 10, nationalIdMatches: true};
+  const idReview = logic.evaluateCandidates([{...base, statusReason: "supervisor_id_reupload"}]);
+  assert.equal(idReview.outcome, "inactive");
+  assert.equal(idReview.idReview, true);
+  const plain = logic.evaluateCandidates([base]);
+  assert.equal(plain.outcome, "inactive");
+  assert.equal(plain.idReview, undefined);
+});
