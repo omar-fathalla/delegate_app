@@ -98,11 +98,21 @@ void main() {
           Selector(text: 'Save to Files'),
           timeout: const Duration(seconds: 20),
         );
-        await $.native.tap(
-          Selector(text: 'Close'),
-          timeout: const Duration(seconds: 10),
-        );
+        // The sheet has no «Close» button on the simulator's iOS: tap the
+        // dimmed area above it, then swipe it down if it is still there.
+        Future<bool> sheetOpen() async => (await $.native.getNativeViews(
+          Selector(text: 'Save to Files'),
+        )).isNotEmpty;
+        await $.native.tapAt(const Offset(0.5, 0.06));
         await $.tester.pump(const Duration(seconds: 1));
+        if (await sheetOpen()) {
+          await $.native.swipe(
+            from: const Offset(0.5, 0.45),
+            to: const Offset(0.5, 0.98),
+          );
+          await $.tester.pump(const Duration(seconds: 1));
+        }
+        expect(await sheetOpen(), isFalse, reason: 'share sheet still open');
       } else {
         // Android: the OS share sheet takes the foreground, so the app is no
         // longer resumed.
