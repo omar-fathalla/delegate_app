@@ -79,7 +79,7 @@ export type CandidateDecision =
   | { outcome: "ok"; primary: DelegateCandidate; ids: string[] }
   | { outcome: "not_found" }
   | { outcome: "bad_credentials" }
-  | { outcome: "inactive" }
+  | { outcome: "inactive"; idReview?: boolean }
   /** Only ghost docs matched: the profile no longer exists. */
   | { outcome: "profile_missing" }
   /** Every real match has a deleted status. */
@@ -335,7 +335,14 @@ export function evaluateCandidates(candidates: DelegateCandidate[]): CandidateDe
   const allowed = live.filter(
     (candidate) => candidate.phoneMatchesLogin !== false && !isLoginDenied(candidate.status),
   );
-  if (allowed.length === 0) return { outcome: "inactive" };
+  if (allowed.length === 0) {
+    // TAS-373: a supervisor replaced the ID card; the delegate waits for
+    // the admin review (clear message instead of the generic refusal).
+    const idReview = live.some((candidate) =>
+      String(candidate.status ?? "").trim().toLowerCase() === "pending" &&
+      candidate.statusReason === "supervisor_id_reupload");
+    return idReview ? { outcome: "inactive", idReview: true } : { outcome: "inactive" };
+  }
   const primary = selectPrimaryDelegate(allowed);
   const ids = allowed.map((candidate) => candidate.id).sort();
   return { outcome: "ok", primary, ids };

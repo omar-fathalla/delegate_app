@@ -1763,6 +1763,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     durationStr = Bidi.ltr(
                       '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}',
                     );
+                  } else if (item.isMissingCheckOut) {
+                    // TAS-362: zero hours until HR sets the check-out.
+                    durationStr = l10n.missingCheckOut;
                   } else {
                     durationStr = l10n.inProgress;
                   }

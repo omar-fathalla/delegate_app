@@ -162,6 +162,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         return const DelegateAccountInactiveFailure(
           'هذا الحساب موقوف حاليًا. يرجى التواصل مع إدارة تسهيل.',
         );
+      case 'id_under_review':
+        // TAS-373: a supervisor replaced the ID card; review, not suspension.
+        return const AuthFailure(
+          'بطاقتك اتغيرت ومستنية مراجعة الإدارة. هتقدر تدخل أول ما تتراجع.',
+        );
       case 'rate_limited':
         return const DelegateRateLimitFailure(
           'تم تجاوز عدد المحاولات. يرجى المحاولة لاحقاً.',

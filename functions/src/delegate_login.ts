@@ -149,7 +149,7 @@ async function handleDelegateLogin(data: unknown): Promise<{ token: string; dele
     throw new functions.https.HttpsError(
       "permission-denied",
       "This delegate account cannot sign in.",
-      { reason: "account_inactive" },
+      { reason: decision.idReview ? "id_under_review" : "account_inactive" },
     );
   }
 

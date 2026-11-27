@@ -170,4 +170,11 @@ void main() {
       );
     });
   });
+
+  test('TAS-373: only an ID card sends the delegate back to review', () {
+    expect(supervisorReuploadSendsDelegateToReview('nationalIdFront'), isTrue);
+    expect(supervisorReuploadSendsDelegateToReview('nationalIdBack'), isTrue);
+    expect(supervisorReuploadSendsDelegateToReview('personalPhoto'), isFalse);
+    expect(supervisorReuploadSendsDelegateToReview('paymentReceipt'), isFalse);
+  });
 }

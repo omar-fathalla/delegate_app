@@ -46,3 +46,17 @@ test("decideSupervisorDocReupload scope and active delegate", () => {
     delegateUid: "d1", organizationUID: "o1", companyUID: "c1", status: "active",
   }).reason, "caller_not_supervisor");
 });
+// TAS-373: only an ID card sends the delegate back to review.
+test("TAS-373 reuploadSetsDelegatePending and idReviewRestoresActive", () => {
+  const L2 = require("../lib/supervisor_delegate_doc_reupload_logic");
+  assert.equal(L2.reuploadSetsDelegatePending("nationalIdFront"), true);
+  assert.equal(L2.reuploadSetsDelegatePending("nationalIdBack"), true);
+  assert.equal(L2.reuploadSetsDelegatePending("personalPhoto"), false);
+  assert.equal(L2.reuploadSetsDelegatePending("paymentReceipt"), false);
+  const id = (s) => [{documentKey: "nationalityId", documentStatus: s}];
+  const d = {status: "pending", statusReason: "supervisor_id_reupload"};
+  assert.equal(L2.idReviewRestoresActive(d, id("approved")), true);
+  assert.equal(L2.idReviewRestoresActive(d, id("rejected")), false);
+  assert.equal(L2.idReviewRestoresActive({status: "pending"}, id("approved")), false, "new delegate stays pending");
+  assert.equal(L2.idReviewRestoresActive({...d, status: "suspended"}, id("approved")), false);
+});

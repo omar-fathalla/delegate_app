@@ -198,6 +198,8 @@ class FirebaseDelegateLoginApi implements DelegateLoginApi {
       if (detailed == 'not_found') return 'not_found';
       if (detailed == 'bad_credentials') return 'bad_credentials';
       if (detailed == 'account_inactive') return 'account_inactive';
+      // TAS-373: the ID card was replaced and waits for the admin review.
+      if (detailed == 'id_under_review') return 'id_under_review';
       if (detailed == 'rate_limited') return 'rate_limited';
       if (detailed == 'missing_phone' || detailed == 'invalid_phone') {
         return 'invalid_phone';

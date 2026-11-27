@@ -367,6 +367,7 @@ export {createSupervisorPenalty} from "./supervisor_penalty";
 export {onDelegateTrackingWritten} from "./delegate_tracking_verify";
 export {onDeviceUnbindRequestCreated} from "./device_unbind_notify";
 export {onAttendanceLogWritten, onOrgAttendanceLogWritten} from "./attendance_verify";
+export {markForgottenAttendance} from "./attendance_forgotten";
 export {delegateCheckIn, delegateCheckOut} from "./attendance_callables";
 export {requestDelegatePhoneChange, confirmDelegatePhoneChange} from "./delegate_phone_change";
 export {onDelegateStatsWrite} from "./delegate_stats";
