@@ -63,9 +63,11 @@ appId: com.tashil.delegate.dev
     visible: ".*Fake Company Alpha.*"
     timeout: 30000
 - tapOn: ".*Fake Company Alpha.*المخالفات.*"
-- extendedWaitUntil:
-    visible: ".*التواجد بدون تصريح \\(تجريبي TAS-393\\).*"
-    timeout: 15000
+# Each run records one more penalty, so the seeded one can be below the fold.
+- scrollUntilVisible:
+    element: ".*التواجد بدون تصريح \\(تجريبي TAS-393\\).*"
+    direction: DOWN
+    timeout: 30000
 
 # Rules catalog (read-only).
 - tapOn: "لائحة المخالفات"
@@ -88,6 +90,27 @@ appId: com.tashil.delegate.dev
     element: "تسجيل وإصدار الغرامة"
     direction: DOWN
     timeout: 15000
+
+# Evidence file from the gallery (Android photo picker). The runner pushes
+# maestro/assets/tashil-fake-evidence.png to the device first, so it is the
+# newest photo; never a personal one. iOS gallery UI differs: skipped there.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn: "إضافة ملفات"
+      - tapOn: "اختيار من المعرض.*"
+      - extendedWaitUntil:
+          visible: "Photo taken on .*"
+          timeout: 20000
+      - tapOn:
+          text: "Photo taken on .*"
+          index: 0
+      - tapOn: "Add.*|إضافة.*"
+      - extendedWaitUntil:
+          visible: ".*\\.(png|jpg|jpeg)"
+          timeout: 20000
+
 - tapOn: "تسجيل وإصدار الغرامة"
 - extendedWaitUntil:
     visible: "سجل المخالفات والغرامات"

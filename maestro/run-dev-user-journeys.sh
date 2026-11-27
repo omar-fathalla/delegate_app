@@ -38,6 +38,16 @@ run_marketing() {
     return 0
   fi
   local flow
+  # Android device: push the fake evidence image so the gallery picker in
+  # journey 5 picks it (newest photo), never a personal photo.
+  if [[ -n "${MAESTRO_DEVICE_ID:-}" ]] && command -v adb >/dev/null 2>&1 \
+      && adb -s "$MAESTRO_DEVICE_ID" get-state >/dev/null 2>&1; then
+    adb -s "$MAESTRO_DEVICE_ID" push maestro/assets/tashil-fake-evidence.png \
+      /sdcard/Pictures/tashil-fake-evidence-tas393.png >/dev/null
+    adb -s "$MAESTRO_DEVICE_ID" shell am broadcast \
+      -a android.intent.action.MEDIA_SCANNER_SCAN_FILE \
+      -d file:///sdcard/Pictures/tashil-fake-evidence-tas393.png >/dev/null
+  fi
   # Full marketing journey (TAS-393), one file per area so a failure names it.
   for flow in maestro/flows/dev-marketing-[1-5]-*.yaml; do
     run_one "$@" "${MAESTRO_ARGS[@]}" "$flow"

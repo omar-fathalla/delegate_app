@@ -1891,45 +1891,53 @@ class _BranchHomeViewState extends State<_BranchHomeView> {
       try {
         final firestore = di.sl<FirebaseFirestore>();
 
+        // TAS-405: each lookup has its own try. Marketing may not read
+        // `users` (permission-denied); with one shared try that error
+        // skipped the company-document fallback, so no phone was found.
+
         // 1. Check createdBy in users
         final createdBy =
             (record['createdBy'] ?? delegateData?['createdBy']) as String?;
         if (createdBy != null && createdBy.isNotEmpty) {
-          final supDoc = await firestore
-              .collection('users')
-              .doc(createdBy)
-              .get();
-          if (supDoc.exists && supDoc.data() != null) {
-            final data = supDoc.data()!;
-            final phone =
-                data['phoneNumber'] as String? ?? data['phone'] as String?;
-            if (phone != null && phone.isNotEmpty) {
-              supPhone = phone;
-              supName ??=
-                  data['displayName'] as String? ?? data['name'] as String?;
+          try {
+            final supDoc = await firestore
+                .collection('users')
+                .doc(createdBy)
+                .get();
+            if (supDoc.exists && supDoc.data() != null) {
+              final data = supDoc.data()!;
+              final phone =
+                  data['phoneNumber'] as String? ?? data['phone'] as String?;
+              if (phone != null && phone.isNotEmpty) {
+                supPhone = phone;
+                supName ??=
+                    data['displayName'] as String? ?? data['name'] as String?;
+              }
             }
-          }
+          } catch (_) {}
         }
 
         // 2. If still empty, search users for company-admin or supervisor of this company
         if ((supPhone == null || supPhone.isEmpty) && companyUID.isNotEmpty) {
-          final querySnap = await firestore
-              .collection('users')
-              .where('companyUID', isEqualTo: companyUID)
-              .where('role', whereIn: ['company-admin', 'supervisor'])
-              .limit(1)
-              .get();
+          try {
+            final querySnap = await firestore
+                .collection('users')
+                .where('companyUID', isEqualTo: companyUID)
+                .where('role', whereIn: ['company-admin', 'supervisor'])
+                .limit(1)
+                .get();
 
-          if (querySnap.docs.isNotEmpty) {
-            final data = querySnap.docs.first.data();
-            final phone =
-                data['phoneNumber'] as String? ?? data['phone'] as String?;
-            if (phone != null && phone.isNotEmpty) {
-              supPhone = phone;
-              supName ??=
-                  data['displayName'] as String? ?? data['name'] as String?;
+            if (querySnap.docs.isNotEmpty) {
+              final data = querySnap.docs.first.data();
+              final phone =
+                  data['phoneNumber'] as String? ?? data['phone'] as String?;
+              if (phone != null && phone.isNotEmpty) {
+                supPhone = phone;
+                supName ??=
+                    data['displayName'] as String? ?? data['name'] as String?;
+              }
             }
-          }
+          } catch (_) {}
         }
 
         // 3. If still empty, check company document in organizations
