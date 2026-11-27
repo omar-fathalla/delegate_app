@@ -23,6 +23,7 @@ class TaskModel extends TaskEntity {
     super.imagePath,
     super.imagePaths,
     super.editedAt,
+    super.proofRequired,
   });
 
   factory TaskModel.fromFirestore(DocumentSnapshot doc) {
@@ -51,6 +52,7 @@ class TaskModel extends TaskEntity {
       editedAt: data['editedAt'] is Timestamp
           ? (data['editedAt'] as Timestamp).toDate()
           : null,
+      proofRequired: data['proofRequired'] == true,
     );
   }
 
@@ -86,6 +88,8 @@ class TaskModel extends TaskEntity {
         'imagePath': imagePath,
       },
       if (editedAt != null) 'editedAt': Timestamp.fromDate(editedAt!),
+      // TAS-368: only when set, so a delegate's whole-doc save never adds it.
+      if (proofRequired) 'proofRequired': true,
     };
   }
 
@@ -146,6 +150,7 @@ class TaskModel extends TaskEntity {
       imagePath: entity.imagePath,
       imagePaths: entity.imagePaths,
       editedAt: entity.editedAt,
+      proofRequired: entity.proofRequired,
     );
   }
 }

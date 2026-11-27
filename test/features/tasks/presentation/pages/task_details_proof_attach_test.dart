@@ -65,6 +65,10 @@ void main() {
     required String role,
     String company = 'c1',
   }) async {
+    // TAS-368 added a fact on shared tasks; keep the whole page on screen.
+    tester.view.physicalSize = const Size(1080, 4000);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
     final proofs = _MockProofs();
     when(
       () => proofs.getTaskProof(any(), any(), any()),

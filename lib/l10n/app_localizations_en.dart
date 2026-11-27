@@ -1619,6 +1619,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taskDoneAt => 'Done';
 
   @override
+  String get taskSharedForYouOnly =>
+      'A task for everyone: marking it done marks it for you only';
+
+  @override
+  String get taskProofRequiredMessage =>
+      'Photo needed: this task needs a photo proving you did it';
+
+  @override
+  String get taskProofRequiredOption => 'Require a proof photo before «Done»';
+
+  @override
+  String taskCompletedByCount(int count) {
+    return 'Done by: $count';
+  }
+
+  @override
   String get tasksFilterOpen => 'Open';
 
   @override
