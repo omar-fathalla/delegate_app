@@ -5,6 +5,7 @@ import 'package:delegate_app/core/design/widgets/skeleton.dart';
 import 'package:delegate_app/features/photo_permission/domain/entities/captured_photo.dart';
 import 'package:delegate_app/features/photo_permission/presentation/bloc/photo_permission_bloc.dart';
 import 'package:delegate_app/features/photo_permission/presentation/pages/monthly_photo_report_screen.dart';
+import 'package:delegate_app/features/photo_permission/presentation/pages/photo_details_page.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/l10n/app_localizations_delegates.dart';
@@ -56,7 +57,12 @@ Delegate _user({UserRole role = UserRole.delegate}) => Delegate(
   role: role,
 );
 
-CapturedPhoto _photo(String uid, DateTime at, {String branch = 'فرع تجريبي'}) =>
+CapturedPhoto _photo(
+  String uid,
+  DateTime at, {
+  String branch = 'فرع تجريبي',
+  double lat = 0,
+}) =>
     CapturedPhoto(
       uid: uid,
       permissionId: 'seed-fake-p',
@@ -68,13 +74,16 @@ CapturedPhoto _photo(String uid, DateTime at, {String branch = 'فرع تجري�
       delegateName: 'مستخدم تجريبي',
       photoUrl: '',
       comment: 'تعليق تجريبي',
-      latitude: 0,
-      longitude: 0,
+      latitude: lat,
+      longitude: lat,
       capturedAt: at,
     );
 
 void main() {
-  setUpAll(() => registerFallbackValue(_FakePhotoEvent()));
+  setUpAll(() {
+    registerFallbackValue(_FakePhotoEvent());
+    PhotoDetailsPage.mapPreviewEnabled = false;
+  });
 
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day, 10);
@@ -140,18 +149,82 @@ void main() {
     expect(find.byType(FilterChip), findsNothing);
   });
 
-  testWidgets('a photo opens its details page', (t) async {
+  testWidgets('a photo opens its details page: toolbar, list, comment',
+      (t) async {
     final l10n = await pump(
       t,
-      CapturedPhotosLoaded(photos: [_photo('a', today)]),
+      CapturedPhotosLoaded(photos: [_photo('a', today, lat: 30)]),
     );
     await t.tap(find.byKey(const ValueKey('photo_tile_a')));
     await t.pumpAndSettle();
-    expect(find.byKey(const Key('photo_details')), findsOneWidget);
+    expect(find.byKey(const Key('photo_details_pager')), findsOneWidget);
     expect(find.text(l10n.photoDetails), findsOneWidget);
-    expect(find.text('تعليق تجريبي'), findsOneWidget);
-    // A field delegate cannot delete.
+    expect(find.byKey(const Key('photo_details_toolbar')), findsOneWidget);
+    expect(find.byKey(const Key('photo_details_comment')), findsOneWidget);
+    expect(find.byKey(const Key('photo_details_map_chip')), findsOneWidget);
+    expect(find.byKey(const Key('photo_details_time')), findsOneWidget);
+    // A field delegate cannot delete; one photo has no counter.
     expect(find.byKey(const Key('photo_details_menu')), findsNothing);
+    expect(find.byKey(const Key('photo_details_counter')), findsNothing);
+  });
+
+  testWidgets('swipe moves to the next photo and the counter follows',
+      (t) async {
+    await pump(
+      t,
+      CapturedPhotosLoaded(
+        photos: [
+          _photo('a', today),
+          _photo('b', today.subtract(const Duration(minutes: 5))),
+        ],
+      ),
+    );
+    await t.tap(find.byKey(const ValueKey('photo_tile_a')));
+    await t.pumpAndSettle();
+    final counter = find.byKey(const Key('photo_details_counter'));
+    expect(t.widget<Text>(counter).data, contains('1'));
+    // RTL: the next page is to the left, so drag to the right.
+    await t.fling(
+      find.byKey(const Key('photo_details_pager')),
+      const Offset(300, 0),
+      1000,
+    );
+    await t.pumpAndSettle();
+    expect(t.widget<Text>(counter).data, contains('2'));
+  });
+
+  testWidgets('tapping the photo hides everything else, tapping again '
+      'brings it back', (t) async {
+    await pump(t, CapturedPhotosLoaded(photos: [_photo('a', today)]));
+    await t.tap(find.byKey(const ValueKey('photo_tile_a')));
+    await t.pumpAndSettle();
+    final photo = find.bySemanticsLabel(RegExp('فرع تجريبي'));
+    await t.tap(photo.first);
+    await t.pump(const Duration(milliseconds: 400));
+    expect(find.byKey(const Key('photo_details_immersive')), findsOneWidget);
+    expect(find.byKey(const Key('photo_details_toolbar')), findsNothing);
+    await t.tap(find.bySemanticsLabel(RegExp('فرع تجريبي')).first);
+    await t.pump(const Duration(milliseconds: 400));
+    expect(find.byKey(const Key('photo_details_toolbar')), findsOneWidget);
+  });
+
+  testWidgets('a photo still on the phone shows the banner', (t) async {
+    final l10n = await pump(
+      t,
+      CapturedPhotosLoaded(photos: [_photo('pending_x', today)]),
+    );
+    await t.tap(find.byKey(const ValueKey('photo_tile_pending_x')));
+    await t.pumpAndSettle();
+    expect(
+      find.byKey(const Key('photo_details_pending_banner')),
+      findsOneWidget,
+    );
+    await t.tap(find.text(l10n.photoBannerOk));
+    await t.pump();
+    expect(
+      find.byKey(const Key('photo_details_pending_banner')),
+      findsNothing,
+    );
   });
 
   testWidgets('a manager deletes from the ⋮ menu through the kit dialog',

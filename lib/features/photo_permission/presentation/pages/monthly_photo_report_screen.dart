@@ -26,6 +26,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../domain/entities/captured_photo.dart';
 import '../bloc/photo_permission_bloc.dart';
 import '../widgets/sync_status_banner.dart';
+import 'photo_details_page.dart';
 
 enum GroupMode { byDate, byBranch, byDelegate }
 
@@ -661,6 +662,8 @@ class _MonthlyPhotoReportContentState
             : a.compareTo(b),
       );
 
+    // Grid order, so the details page swipes in the same order.
+    final ordered = [for (final k in keys) ...grouped[k]!];
     return [
       for (final k in keys) ...[
         SliverPadding(
@@ -688,7 +691,7 @@ class _MonthlyPhotoReportContentState
             crossAxisCount: 3,
             mainAxisSpacing: TashilSpacing.sm,
             crossAxisSpacing: TashilSpacing.sm,
-            children: [for (final p in grouped[k]!) _photoTile(p)],
+            children: [for (final p in grouped[k]!) _photoTile(p, ordered)],
           ),
         ),
       ],
@@ -724,7 +727,7 @@ class _MonthlyPhotoReportContentState
 
   /// One photo in the grid. A photo still on the phone carries a small
   /// badge; uploaded ones carry nothing. Opens with a container transform.
-  Widget _photoTile(CapturedPhoto photo) {
+  Widget _photoTile(CapturedPhoto photo, List<CapturedPhoto> ordered) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final pending = photo.uid.startsWith('pending_');
@@ -781,15 +784,11 @@ class _MonthlyPhotoReportContentState
           ),
         ),
       ),
-      openBuilder: (context, close) => _PhotoDetailsPage(
-        photo: photo,
+      openBuilder: (context, close) => PhotoDetailsPage(
+        photos: ordered,
+        initialIndex: ordered.indexOf(photo),
         companyFallback: widget.delegate.companyName,
-        onDelete: _canDeletePhoto
-            ? () async {
-                final sent = await _confirmDeletePhoto(context, photo);
-                if (sent) close(returnValue: true);
-              }
-            : null,
+        onDelete: _canDeletePhoto ? _confirmDeletePhoto : null,
       ),
     );
   }
@@ -837,178 +836,6 @@ class _MonthlyPhotoReportContentState
         ),
         Expanded(child: body),
       ],
-    );
-  }
-}
-
-/// One photo, opened from the grid with a container transform: the photo
-/// (pinch to zoom), save in the app bar (small indicator while saving), delete
-/// in the ⋮ menu when allowed, and the details as label-over-value rows.
-class _PhotoDetailsPage extends StatefulWidget {
-  const _PhotoDetailsPage({
-    required this.photo,
-    required this.companyFallback,
-    this.onDelete,
-  });
-
-  final CapturedPhoto photo;
-  final String companyFallback;
-  final Future<void> Function()? onDelete;
-
-  @override
-  State<_PhotoDetailsPage> createState() => _PhotoDetailsPageState();
-}
-
-class _PhotoDetailsPageState extends State<_PhotoDetailsPage> {
-  bool _saving = false;
-
-  Future<void> _save() async {
-    final l10n = AppLocalizations.of(context)!;
-    setState(() => _saving = true);
-    String message;
-    try {
-      final ok = await PhotoCacheManager.savePhotoToGallery(
-        context,
-        photoUrl: widget.photo.photoUrl,
-      );
-      message = ok ? l10n.photoSavedToGallery : l10n.grantPhotosPermission;
-    } catch (e) {
-      message = l10n.photoSaveFailed(e);
-    }
-    if (!mounted) return;
-    setState(() => _saving = false);
-    showTashilSnackBar(context, message);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    final photo = widget.photo;
-    final locale = Localizations.localeOf(context).languageCode;
-
-    Widget detail(IconData icon, String label, String value) => Padding(
-      padding: const EdgeInsetsDirectional.symmetric(
-        vertical: TashilSpacing.sm,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: cs.primary),
-          const SizedBox(width: TashilSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant),
-                ),
-                Text(value, style: tt.bodyLarge),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.photoDetails),
-        actions: [
-          IconButton(
-            key: const Key('photo_details_save'),
-            tooltip: l10n.savePhoto,
-            onPressed: _saving ? null : _save,
-            icon: _saving
-                ? const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2.5),
-                  )
-                : const Icon(Symbols.download_rounded),
-          ),
-          if (widget.onDelete != null)
-            MenuAnchor(
-              builder: (context, controller, _) => IconButton(
-                key: const Key('photo_details_menu'),
-                icon: const Icon(Symbols.more_vert_rounded),
-                tooltip: MaterialLocalizations.of(context).showMenuTooltip,
-                onPressed: () =>
-                    controller.isOpen ? controller.close() : controller.open(),
-              ),
-              menuChildren: [
-                MenuItemButton(
-                  key: const Key('photo_details_delete'),
-                  leadingIcon: const Icon(Symbols.delete_outline_rounded),
-                  onPressed: widget.onDelete,
-                  child: Text(l10n.deletePhoto),
-                ),
-              ],
-            ),
-        ],
-      ),
-      body: ListView(
-        key: const Key('photo_details'),
-        padding: const EdgeInsets.all(TashilSpacing.page),
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(TashilRadius.large),
-            child: ColoredBox(
-              color: cs.surfaceContainerHighest,
-              child: AspectRatio(
-                aspectRatio: 3 / 4,
-                child: InteractiveViewer(
-                  minScale: 1,
-                  maxScale: 4,
-                  child: AppPhotoImage(
-                    photoUrl: photo.photoUrl,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: TashilSpacing.xs),
-          Text(
-            l10n.pinchToZoom,
-            textAlign: TextAlign.center,
-            style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          const SizedBox(height: TashilSpacing.md),
-          detail(
-            Symbols.storefront_rounded,
-            l10n.branchField,
-            BranchDisplayCache.instance.displayName(photo.branchName),
-          ),
-          detail(
-            Symbols.calendar_today_rounded,
-            l10n.capturedAtField,
-            DateFormat(
-              'EEEE، d MMMM • h:mm a',
-              locale,
-            ).format(photo.capturedAt),
-          ),
-          detail(
-            Symbols.person_rounded,
-            l10n.delegateField,
-            photo.delegateName,
-          ),
-          detail(
-            Symbols.business_rounded,
-            l10n.companyLabel,
-            photo.companyName.isNotEmpty
-                ? photo.companyName
-                : widget.companyFallback,
-          ),
-          if (photo.comment.trim().isNotEmpty)
-            detail(
-              Symbols.comment_rounded,
-              l10n.delegateCommentField,
-              photo.comment.trim(),
-            ),
-        ],
-      ),
     );
   }
 }

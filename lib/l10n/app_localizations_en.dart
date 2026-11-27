@@ -1511,6 +1511,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get photosCaptureAction => 'Photograph a display';
 
   @override
+  String get photoLoadFailed => 'Couldn\'t load the photo';
+
+  @override
+  String get photoPendingBanner =>
+      'This photo is still on the phone. It uploads when you are back online.';
+
+  @override
+  String get photoBannerOk => 'OK';
+
+  @override
+  String get photoShare => 'Share';
+
+  @override
+  String get photoShareFailed => 'Couldn\'t share the photo';
+
+  @override
+  String get photoOpenMap => 'Open on the map';
+
+  @override
+  String get photoMapFailed => 'Couldn\'t open the map';
+
+  @override
+  String get photoPrevious => 'Previous photo';
+
+  @override
+  String get photoNext => 'Next photo';
+
+  @override
+  String photoCounter(int index, int total) {
+    return '$index of $total';
+  }
+
+  @override
+  String photoSemantic(String branch, String time) {
+    return 'Photo at $branch, $time';
+  }
+
+  @override
   String get allChains => 'All chains';
 
   @override

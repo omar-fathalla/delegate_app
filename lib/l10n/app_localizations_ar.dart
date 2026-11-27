@@ -1515,6 +1515,44 @@ class AppLocalizationsAr extends AppLocalizations {
   String get photosCaptureAction => 'صوّر عرض';
 
   @override
+  String get photoLoadFailed => 'تعذّر تحميل الصورة';
+
+  @override
+  String get photoPendingBanner =>
+      'الصورة لسه على الموبايل، وهتترفع أول ما النت يرجع.';
+
+  @override
+  String get photoBannerOk => 'تمام';
+
+  @override
+  String get photoShare => 'مشاركة';
+
+  @override
+  String get photoShareFailed => 'تعذّرت مشاركة الصورة';
+
+  @override
+  String get photoOpenMap => 'افتح على الخريطة';
+
+  @override
+  String get photoMapFailed => 'تعذّر فتح الخريطة';
+
+  @override
+  String get photoPrevious => 'الصورة السابقة';
+
+  @override
+  String get photoNext => 'الصورة التالية';
+
+  @override
+  String photoCounter(int index, int total) {
+    return '$index من $total';
+  }
+
+  @override
+  String photoSemantic(String branch, String time) {
+    return 'صورة في $branch، $time';
+  }
+
+  @override
   String get allChains => 'كل السلاسل';
 
   @override

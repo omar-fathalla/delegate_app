@@ -2822,6 +2822,72 @@ abstract class AppLocalizations {
   /// **'Photograph a display'**
   String get photosCaptureAction;
 
+  /// No description provided for @photoLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the photo'**
+  String get photoLoadFailed;
+
+  /// No description provided for @photoPendingBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'This photo is still on the phone. It uploads when you are back online.'**
+  String get photoPendingBanner;
+
+  /// No description provided for @photoBannerOk.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get photoBannerOk;
+
+  /// No description provided for @photoShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get photoShare;
+
+  /// No description provided for @photoShareFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t share the photo'**
+  String get photoShareFailed;
+
+  /// No description provided for @photoOpenMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Open on the map'**
+  String get photoOpenMap;
+
+  /// No description provided for @photoMapFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the map'**
+  String get photoMapFailed;
+
+  /// No description provided for @photoPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous photo'**
+  String get photoPrevious;
+
+  /// No description provided for @photoNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next photo'**
+  String get photoNext;
+
+  /// No description provided for @photoCounter.
+  ///
+  /// In en, this message translates to:
+  /// **'{index} of {total}'**
+  String photoCounter(int index, int total);
+
+  /// No description provided for @photoSemantic.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo at {branch}, {time}'**
+  String photoSemantic(String branch, String time);
+
   /// No description provided for @allChains.
   ///
   /// In en, this message translates to:
