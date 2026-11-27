@@ -7,6 +7,7 @@ import '../../../core/design/motion.dart';
 import '../../../core/design/tokens.dart';
 import '../../../core/design/widgets/dialogs.dart';
 import '../../../core/design/widgets/loading_indicator.dart';
+import '../../../core/design/widgets/pull_to_refresh.dart';
 import '../../../core/design/widgets/snackbars.dart';
 import 'common.dart';
 import 'sheets_demo.dart';
@@ -527,7 +528,6 @@ class _PullToRefreshDemo extends StatefulWidget {
 }
 
 class _PullToRefreshDemoState extends State<_PullToRefreshDemo> {
-  RefreshIndicatorStatus? _status;
   int _version = 1;
 
   Future<void> _refresh() async {
@@ -537,50 +537,25 @@ class _PullToRefreshDemoState extends State<_PullToRefreshDemo> {
 
   @override
   Widget build(BuildContext context) {
-    final showing =
-        _status == RefreshIndicatorStatus.armed ||
-        _status == RefreshIndicatorStatus.refresh;
+    // The kit widget the app uses (PullToRefresh, TAS-387).
     return Card.outlined(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       child: SizedBox(
         height: 220,
-        child: Stack(
-          children: [
-            RefreshIndicator.noSpinner(
-              onRefresh: _refresh,
-              onStatusChange: (s) => setState(() => _status = s),
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                children: [
-                  for (var i = 0; i < 6; i++)
-                    ListTile(
-                      leading: const Icon(Icons.receipt_long_outlined),
-                      title: Text('فاتورة ${1040 + i}'),
-                      subtitle: Text('تحديث رقم $_version'),
-                    ),
-                ],
-              ),
-            ),
-            Positioned(
-              top: TashilSpacing.md,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: AnimatedScale(
-                  scale: showing ? 1 : 0,
-                  duration: TashilMotion.scaled(
-                    context,
-                    TashilMotion.fast.duration,
-                  ),
-                  curve: TashilMotion.fast.curve,
-                  child: showing
-                      ? const LoadingIndicator(contained: true)
-                      : const SizedBox.square(dimension: 48),
+        child: PullToRefresh(
+          onRefresh: _refresh,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              for (var i = 0; i < 6; i++)
+                ListTile(
+                  leading: const Icon(Icons.receipt_long_outlined),
+                  title: Text('فاتورة ${1040 + i}'),
+                  subtitle: Text('تحديث رقم $_version'),
                 ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -455,8 +455,17 @@ Live: playground tab "التنبيهات".
 - Linear: on the top edge of its container or under the app bar.
 - Short task started by a button (printing): small circular indicator
   inside the button, button disabled.
-- Pull to refresh: official `RefreshIndicator.noSpinner` + a contained
-  `LoadingIndicator` on top of the list.
+- Pull to refresh: `PullToRefresh` (P-09): official
+  `RefreshIndicator.noSpinner` + a contained `LoadingIndicator` on top of
+  the list. Flutter reports `snap` and never `refresh`, so the widget
+  treats `snap` as refreshing.
+- Known layout loading (a list of cards, the numbers of a summary):
+  `Skeleton` / `SummaryCardSkeleton` (P-08) in a `SkeletonSwitcher`, never
+  a placeholder `0` that later jumps. Unknown layout: `DelayedLoadingIndicator`.
+  A skeleton and an indicator never show together.
+- Searching for something (location, a branch): `LoadingIndicator` where the
+  result will appear; the button that started it shows the small circular
+  indicator and is disabled.
 - Progress indicators use the M3 2024 look (gap, stop dot, rounded ends):
   `ProgressIndicatorThemeData(year2023: false)` in the theme.
 - Not adopted: the optional Expressive *wavy* progress style. Flutter does
@@ -847,7 +856,7 @@ curve + duration from M3's "Convert springs to curves" table.
 | Lateral | Report tabs (sales, returns, expenses) | `PageTransitionSwitcher` + `TashilTransitions.sharedX` |
 | Top level | Navigation bar destinations | `PageTransitionSwitcher` + `FadeThroughTransition` |
 | Enter and exit | Dialogs and menus inside a screen | `showModal` + `FadeScaleTransitionConfiguration` |
-| Skeleton loaders | Syncing products, loading a report | Grey shapes where content will be, then fade to content |
+| Skeleton loaders | Syncing products, loading a report | `Skeleton` / `SummaryCardSkeleton` in a `SkeletonSwitcher` (P-08): grey shapes where content will be, then fade to content |
 
 **Rules**
 - Never hand-pick a curve or duration (`Curves.easeOutBack`, `200ms`).

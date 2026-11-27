@@ -88,6 +88,8 @@ matches the page to these IDs, compares, and records the result.
 | P-02 | StockBadge, SyncStatusLabel (status, not chips) | F-04 colours | `widgets/pos_widgets.dart` | `chips_test.dart` | مكونات تسهيل / StockBadge | Chips | 2026-11-26 |
 | P-03 | CartLine + CheckoutBar | C-23, C-01 | `widgets/pos_widgets.dart` | `playground_test.dart` | مكونات تسهيل / CartLine | Components | 2026-11-26 |
 | P-07 | SummaryCard + SummaryFact + SummaryLabel (content fills the card: icon, headline, subhead, labels, a prominent value on the end side, label-over-value facts across the width) | C-22 cards, F-05 type roles | `widgets/summary_card.dart` (hand-built composition) | `summary_card_test.dart` | الحاويات / كارت الملخص | Components | 2026-11-27 |
+| P-08 | Skeleton, SummaryCardSkeleton, SkeletonSwitcher (skeleton loader: grey shapes where content will be, gentle pulse, fade to content) | motion transition patterns, C-22 | `widgets/skeleton.dart` | `skeleton_and_refresh_test.dart` | الحركة / هيكل التحميل | Motion | 2026-11-27 |
+| P-09 | PullToRefresh (official `RefreshIndicator.noSpinner` + contained `LoadingIndicator`) | loading indicator | `widgets/pull_to_refresh.dart` | `skeleton_and_refresh_test.dart` | التنبيهات / السحب للتحديث | Loading and progress | 2026-11-27 |
 | P-04 | NumericKeypad (7-8-9 on top) | C-01 | `widgets/pos_widgets.dart` | `playground_test.dart` | مكونات تسهيل / NumericKeypad | Components | 2026-11-26 |
 | P-05 | ReceiptPreview 58mm | F-05, F-13 | `widgets/receipt_preview.dart` | `playground_test.dart` | مكونات تسهيل / ReceiptPreview | Money and numbers | 2026-11-26 |
 | P-06 | EmptyState | foundations | `widgets/pos_widgets.dart` | `playground_test.dart` | مكونات تسهيل / EmptyState | Components | 2026-11-26 |

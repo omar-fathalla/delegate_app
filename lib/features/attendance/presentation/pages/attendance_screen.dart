@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/design/widgets/skeleton.dart';
 import 'package:delegate_app/core/l10n/display_names.dart';
 import 'package:delegate_app/core/widgets/m3/m3_expressive.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -186,6 +187,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     }
     return _formatChainName(raw, branchName: branchName, isArabic: isArabic);
   }
+
+  /// The selected month's sessions are still on their way (month switch):
+  /// numbers and days show skeletons until they land (TAS-387).
+  bool get _monthLoading =>
+      sl.isRegistered<GetHistoryForMonth>() && !_hasMonthSessionsForSelected;
 
   bool get _hasMonthSessionsForSelected =>
       _monthSessions != null &&
@@ -1030,8 +1036,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             children: [
               Icon(icon, size: 24, color: colorScheme.onSurfaceVariant),
               const SizedBox(height: TashilSpacing.xs),
-              AnimatedSwitcher(
-                duration: AppMotionDurations.short4,
+              SkeletonSwitcher(
+                loading: _monthLoading,
+                skeleton: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: TashilSpacing.xs),
+                  child: Skeleton(width: 40, height: 24),
+                ),
                 child: Text(
                   '$value',
                   key: ValueKey(value),
@@ -1170,23 +1180,30 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           style: textTheme.labelLarge,
                         ),
                       ),
-                      Text(
-                        Bidi.ltr(
-                          '$attendedDays / ${MonthlyAttendanceStats.workDaysPerMonth}',
-                        ),
-                        style: textTheme.labelLarge?.copyWith(
-                          color: colorScheme.primary,
+                      SkeletonSwitcher(
+                        loading: _monthLoading,
+                        skeleton: const Skeleton(width: 40, height: 14),
+                        child: Text(
+                          Bidi.ltr(
+                            '$attendedDays / ${MonthlyAttendanceStats.workDaysPerMonth}',
+                          ),
+                          style: textTheme.labelLarge?.copyWith(
+                            color: colorScheme.primary,
+                          ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: TashilSpacing.xs),
-                  LinearProgressIndicator(
-                    key: const Key('attendance_month_progress'),
-                    value: (attendedDays /
-                            MonthlyAttendanceStats.workDaysPerMonth)
-                        .clamp(0.0, 1.0),
-                  ),
+                  if (_monthLoading)
+                    const Skeleton(height: 4)
+                  else
+                    LinearProgressIndicator(
+                      key: const Key('attendance_month_progress'),
+                      value: (attendedDays /
+                              MonthlyAttendanceStats.workDaysPerMonth)
+                          .clamp(0.0, 1.0),
+                    ),
                 ],
               ),
             ),
@@ -1212,13 +1229,28 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   children: [
                     Row(
                       children: [
-                        _GeofenceRadarWidget(
-                          animation: _radarAnimation,
-                          isInside: _isInsideGeofence,
-                          isChecking: isBusy,
-                          statusColor: statusColor,
-                          onStatusColor: onStatusColor,
-                        ),
+                        // Looking for the location: the kit loading
+                        // indicator (unknown wait, playground «مؤشر
+                        // التحميل», TAS-387); the radar shows the result.
+                        if (isBusy)
+                          const SizedBox.square(
+                            dimension: 72,
+                            child: Center(
+                              child: LoadingIndicator(
+                                key: Key('attendance_locating'),
+                                size: 56,
+                                contained: true,
+                              ),
+                            ),
+                          )
+                        else
+                          _GeofenceRadarWidget(
+                            animation: _radarAnimation,
+                            isInside: _isInsideGeofence,
+                            isChecking: false,
+                            statusColor: statusColor,
+                            onStatusColor: onStatusColor,
+                          ),
                         const SizedBox(width: TashilSpacing.md),
                         Expanded(
                           child: Column(
@@ -1485,7 +1517,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               isArabic: isArabic,
             );
 
-      if (_dayKeys.isEmpty) {
+      if (_dayKeys.isEmpty && !_monthLoading) {
         return M3Refresh(
           onRefresh: () async {
             if (_isGeofenceMode) {
@@ -1619,13 +1651,23 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             top: TashilSpacing.md,
             bottom: 80,
           ),
-          itemCount: _dayKeys.length + 2 + (state.hasReachedMax ? 0 : 1),
+          itemCount: _monthLoading
+              ? 2 + 3
+              : _dayKeys.length + 2 + (state.hasReachedMax ? 0 : 1),
           itemBuilder: (context, index) {
             if (index == 0) {
               return _buildUnifiedAttendanceCard(context);
             }
             if (index == 1) {
               return _buildChainFilterBar(context);
+            }
+            if (_monthLoading) {
+              return const Padding(
+                padding: EdgeInsetsDirectional.symmetric(
+                  horizontal: TashilSpacing.page,
+                ),
+                child: SummaryCardSkeleton(),
+              );
             }
             final dayIndex = index - 2;
             if (dayIndex >= _dayKeys.length) {
@@ -2816,104 +2858,19 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     );
   }
 
-  /// Shimmer skeleton that mimics the attendance history cards while loading.
+  /// First load: skeletons of the session cards (kit SummaryCardSkeleton,
+  /// playground «هيكل التحميل», TAS-387).
   Widget _buildShimmerSkeleton() {
     return ListView.builder(
-      padding: const EdgeInsetsDirectional.only(
-        top: 16,
-        bottom: 80,
-        start: 16,
-        end: 16,
+      key: const Key('attendance_skeleton'),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        TashilSpacing.page,
+        TashilSpacing.lg,
+        TashilSpacing.page,
+        80,
       ),
       itemCount: 5,
-      itemBuilder: (context, index) {
-        return Padding(
-          padding: const EdgeInsetsDirectional.only(bottom: TashilSpacing.md),
-          child: _ShimmerCard(),
-        );
-      },
-    );
-  }
-}
-
-/// Animated shimmer card that mimics attendance history card layout.
-class _ShimmerCard extends StatefulWidget {
-  @override
-  State<_ShimmerCard> createState() => _ShimmerCardState();
-}
-
-class _ShimmerCardState extends State<_ShimmerCard>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Card(
-          margin: EdgeInsets.zero,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildShimmerBar(width: 120, height: 12),
-                const SizedBox(height: TashilSpacing.md),
-                _buildShimmerBar(width: 180, height: 14),
-                const SizedBox(height: TashilSpacing.sm),
-                _buildShimmerBar(width: 160, height: 14),
-                const SizedBox(height: TashilSpacing.sm),
-                _buildShimmerBar(width: 100, height: 12),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildShimmerBar({required double width, required double height}) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final baseColor = colorScheme.surfaceContainerHigh;
-    final highlightColor = colorScheme.surface;
-
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(TashilRadius.small),
-            gradient: LinearGradient(
-              colors: [baseColor, highlightColor, baseColor],
-              stops: [
-                (_controller.value - 0.3).clamp(0.0, 1.0),
-                _controller.value,
-                (_controller.value + 0.3).clamp(0.0, 1.0),
-              ],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
-          ),
-        );
-      },
+      itemBuilder: (context, index) => const SummaryCardSkeleton(),
     );
   }
 }

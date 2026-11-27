@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../../core/design/motion.dart';
 import '../../../core/design/tokens.dart';
 import '../../../core/design/widgets/button_group.dart';
+import '../../../core/design/widgets/skeleton.dart';
 import '../sample_widgets.dart';
 import 'common.dart';
 
@@ -505,76 +506,56 @@ class _SkeletonDemo extends StatefulWidget {
   State<_SkeletonDemo> createState() => _SkeletonDemoState();
 }
 
-class _SkeletonDemoState extends State<_SkeletonDemo>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulse = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  );
+class _SkeletonDemoState extends State<_SkeletonDemo> {
   bool _loading = false;
   Timer? _timer;
 
   @override
   void dispose() {
     _timer?.cancel();
-    _pulse.dispose();
     super.dispose();
   }
 
   void _reload() {
     _timer?.cancel();
     setState(() => _loading = true);
-    _pulse.repeat(reverse: true);
     _timer = Timer(const Duration(milliseconds: 1800), () {
-      if (!mounted) return;
-      _pulse.stop();
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final s = Theme.of(context).colorScheme;
-    Widget bar(double w, double h) => Container(
-      width: w,
-      height: h,
-      decoration: BoxDecoration(
-        color: s.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(TashilRadius.small),
-      ),
-    );
-
-    final skeleton = FadeTransition(
-      key: const ValueKey('skeleton'),
-      opacity: Tween(begin: 0.5, end: 1.0).animate(_pulse),
-      child: Column(
-        children: [
-          for (var i = 0; i < 3; i++)
-            Padding(
-              padding: const EdgeInsets.all(TashilSpacing.md),
-              child: Row(
-                children: [
-                  bar(TashilSizes.thumbnail, TashilSizes.thumbnail),
-                  const SizedBox(width: TashilSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        bar(160, 14),
-                        const SizedBox(height: TashilSpacing.sm),
-                        bar(90, 12),
-                      ],
-                    ),
+    // The kit widgets the app uses (Skeleton, SkeletonSwitcher, TAS-387).
+    final skeleton = Column(
+      children: [
+        for (var i = 0; i < 3; i++)
+          const Padding(
+            padding: EdgeInsets.all(TashilSpacing.md),
+            child: Row(
+              children: [
+                Skeleton(
+                  width: TashilSizes.thumbnail,
+                  height: TashilSizes.thumbnail,
+                ),
+                SizedBox(width: TashilSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Skeleton(width: 160, height: 14),
+                      SizedBox(height: TashilSpacing.sm),
+                      Skeleton(width: 90, height: 12),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-        ],
-      ),
+          ),
+      ],
     );
 
     const content = Column(
-      key: ValueKey('content'),
       children: [
         ProductTile(
           name: 'سكر أبيض 1 كجم',
@@ -608,12 +589,14 @@ class _SkeletonDemoState extends State<_SkeletonDemo>
         const SizedBox(height: TashilSpacing.sm),
         Card.outlined(
           clipBehavior: Clip.antiAlias,
-          child: AnimatedSwitcher(
-            duration: TashilMotion.scaled(context, TashilMotion.fade.duration),
-            switchInCurve: TashilMotion.fade.curve,
-            child: _loading ? skeleton : content,
+          child: SkeletonSwitcher(
+            loading: _loading,
+            skeleton: skeleton,
+            child: content,
           ),
         ),
+        const SizedBox(height: TashilSpacing.md),
+        const SummaryCardSkeleton(margin: EdgeInsets.zero),
       ],
     );
   }

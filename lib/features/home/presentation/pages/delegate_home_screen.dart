@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/design/widgets/skeleton.dart';
 import 'package:delegate_app/core/l10n/display_names.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/core/design/bidi.dart';
@@ -58,6 +59,11 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
   int _approvedLeavesThisMonth = 0;
 
   List<Attendance> _recentSessions = [];
+
+  /// Skeletons until the first numbers / sessions arrive (playground «هيكل
+  /// التحميل», TAS-387), so the card never flashes «0» first.
+  bool _statsLoaded = false;
+  bool _recentLoaded = false;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userSub;
   DocumentSnapshot<Map<String, dynamic>>? _userDoc;
   static final Map<String, String> _orgNamesCache = {
@@ -538,7 +544,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
               const SizedBox(height: TashilSpacing.lg),
               M3StaggeredItem(
                   index: 1, child: _buildMonthlyAttendanceSummaryCard(context)),
-              if (_recentSessions.isNotEmpty)
+              if (_recentSessions.isNotEmpty || !_recentLoaded)
                 const SizedBox(height: TashilSpacing.lg),
               M3StaggeredItem(
                   index: 2, child: _buildRecentActivityBriefCard(context)),
@@ -1183,6 +1189,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         );
       }
     } catch (_) {}
+    // Nothing came back (offline, error): show the numbers we have.
+    if (mounted && !_statsLoaded) setState(() => _statsLoaded = true);
   }
 
   void _computeStats(List<Attendance> history, {int? approvedLeavesCount}) {
@@ -1217,6 +1225,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         _attendedDays = attended;
         _absentDays = absent;
         _approvedLeavesThisMonth = leavesThisMonth;
+        _statsLoaded = true;
       });
     }
   }
@@ -1380,6 +1389,8 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
       }
     } catch (e) {
       debugPrint('Error loading recent activity: $e');
+    } finally {
+      if (mounted && !_recentLoaded) setState(() => _recentLoaded = true);
     }
   }
 
@@ -1439,7 +1450,7 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final locale = isArabic ? 'ar' : 'en';
 
-    if (_recentSessions.isEmpty) {
+    if (_recentSessions.isEmpty && _recentLoaded) {
       return const SizedBox.shrink();
     }
 
@@ -1478,6 +1489,10 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
           ],
         ),
         const SizedBox(height: TashilSpacing.sm),
+        if (!_recentLoaded) ...const [
+          SummaryCardSkeleton(key: Key('home_recent_skeleton')),
+          SummaryCardSkeleton(),
+        ],
         for (final session in _recentSessions.take(3))
           Builder(
             builder: (context) {
@@ -1556,15 +1571,22 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
         children: [
           Icon(icon, size: 24, color: iconColor),
           const SizedBox(height: TashilSpacing.xs),
-          Text(
-            value,
-            style: tt.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: textColor,
+          SkeletonSwitcher(
+            loading: !_statsLoaded,
+            skeleton: const Padding(
+              padding: EdgeInsets.symmetric(vertical: TashilSpacing.xs),
+              child: Skeleton(width: 40, height: 24),
             ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            child: Text(
+              value,
+              style: tt.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: textColor,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           const SizedBox(height: TashilSpacing.xs),
           Text(
