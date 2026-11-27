@@ -1,4 +1,5 @@
 import 'package:delegate_app/config/theme/color_schemes.dart';
+import 'package:delegate_app/core/design/tokens.dart';
 import 'package:equatable/equatable.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -10,6 +11,7 @@ part 'theme_state.dart';
 class ThemeCubit extends Cubit<ThemeState> {
   static const _kThemeKey = 'app_theme_mode';
   static const _kSeedColorKey = 'app_seed_color';
+  static const _kContrastKey = 'app_contrast';
   static const _kMigratedPurpleKey = 'migrated_to_purple_default_v3';
   final SharedPreferences _prefs;
 
@@ -43,7 +45,12 @@ class ThemeCubit extends Cubit<ThemeState> {
       }
     }
 
-    emit(state.copyWith(themeMode: mode, seedColor: color));
+    final contrast = TashilContrast.values.firstWhere(
+      (c) => c.name == _prefs.getString(_kContrastKey),
+      orElse: () => TashilContrast.standard,
+    );
+
+    emit(state.copyWith(themeMode: mode, seedColor: color, contrast: contrast));
   }
 
   void toggleTheme() {
@@ -62,5 +69,12 @@ class ThemeCubit extends Cubit<ThemeState> {
     // ignore: deprecated_member_use
     _prefs.setInt(_kSeedColorKey, color.value);
     emit(state.copyWith(seedColor: color));
+  }
+
+  /// Contrast level for the whole app (saved per device).
+  void setContrast(TashilContrast contrast) {
+    if (state.contrast == contrast) return;
+    _prefs.setString(_kContrastKey, contrast.name);
+    emit(state.copyWith(contrast: contrast));
   }
 }

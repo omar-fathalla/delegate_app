@@ -1670,6 +1670,58 @@ class AppLocalizationsAr extends AppLocalizations {
       'دوس على أي صورة علشان تشوفها كبيرة، أو تعيدها، أو تمسحها.';
 
   @override
+  String get settingsAppearance => 'المظهر';
+
+  @override
+  String get settingsAuto => 'تلقائي';
+
+  @override
+  String get settingsContrast => 'التباين';
+
+  @override
+  String get settingsContrastHint => 'للنص والحدود. «عالي» أوضح في الشمس.';
+
+  @override
+  String get settingsContrastStandard => 'عادي';
+
+  @override
+  String get settingsContrastMedium => 'متوسط';
+
+  @override
+  String get settingsContrastHigh => 'عالي';
+
+  @override
+  String get settingsColorHint => 'كل ألوان التطبيق بتتولّد من اللون ده.';
+
+  @override
+  String get settingsAbout => 'عن التطبيق';
+
+  @override
+  String get feedbackOpen => 'مفتوحة';
+
+  @override
+  String get feedbackAnswered => 'اتردّ عليها';
+
+  @override
+  String get feedbackSentAt => 'اتبعتت';
+
+  @override
+  String get feedbackHasAnswer => 'فيه رد';
+
+  @override
+  String get feedbackNoAnswer => 'لسه';
+
+  @override
+  String get feedbackYourMessage => 'رسالتك';
+
+  @override
+  String get feedbackScreenshot => 'الصورة المرفقة';
+
+  @override
+  String get feedbackNoAnswerYet =>
+      'لسه مفيش رد. هيوصلك إشعار أول ما الإدارة ترد.';
+
+  @override
   String get allChains => 'كل السلاسل';
 
   @override

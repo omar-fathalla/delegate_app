@@ -1,3 +1,4 @@
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -221,7 +222,8 @@ void main() {
     );
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.feedback_rounded));
+    // TAS-387: the settings rows use Symbols icons.
+    await tester.tap(find.byIcon(Symbols.rate_review_rounded));
     await tester.pumpAndSettle();
 
     expect(find.byType(SubmitFeedbackScreen), findsOneWidget);

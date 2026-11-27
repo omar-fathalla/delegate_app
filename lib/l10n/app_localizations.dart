@@ -3056,6 +3056,108 @@ abstract class AppLocalizations {
   /// **'Tap a photo to view it large, retake or remove it.'**
   String get captureTapToReview;
 
+  /// No description provided for @settingsAppearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get settingsAppearance;
+
+  /// No description provided for @settingsAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get settingsAuto;
+
+  /// No description provided for @settingsContrast.
+  ///
+  /// In en, this message translates to:
+  /// **'Contrast'**
+  String get settingsContrast;
+
+  /// No description provided for @settingsContrastHint.
+  ///
+  /// In en, this message translates to:
+  /// **'For text and borders. «High» reads better in sunlight.'**
+  String get settingsContrastHint;
+
+  /// No description provided for @settingsContrastStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get settingsContrastStandard;
+
+  /// No description provided for @settingsContrastMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'Medium'**
+  String get settingsContrastMedium;
+
+  /// No description provided for @settingsContrastHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'High'**
+  String get settingsContrastHigh;
+
+  /// No description provided for @settingsColorHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Every app colour is generated from this one.'**
+  String get settingsColorHint;
+
+  /// No description provided for @settingsAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get settingsAbout;
+
+  /// No description provided for @feedbackOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get feedbackOpen;
+
+  /// No description provided for @feedbackAnswered.
+  ///
+  /// In en, this message translates to:
+  /// **'Answered'**
+  String get feedbackAnswered;
+
+  /// No description provided for @feedbackSentAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent'**
+  String get feedbackSentAt;
+
+  /// No description provided for @feedbackHasAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'Answered'**
+  String get feedbackHasAnswer;
+
+  /// No description provided for @feedbackNoAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'Not yet'**
+  String get feedbackNoAnswer;
+
+  /// No description provided for @feedbackYourMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your message'**
+  String get feedbackYourMessage;
+
+  /// No description provided for @feedbackScreenshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Attached screenshot'**
+  String get feedbackScreenshot;
+
+  /// No description provided for @feedbackNoAnswerYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No answer yet. You will get a notification when the team replies.'**
+  String get feedbackNoAnswerYet;
+
   /// No description provided for @allChains.
   ///
   /// In en, this message translates to:

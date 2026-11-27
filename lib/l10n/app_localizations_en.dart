@@ -1660,6 +1660,60 @@ class AppLocalizationsEn extends AppLocalizations {
       'Tap a photo to view it large, retake or remove it.';
 
   @override
+  String get settingsAppearance => 'Appearance';
+
+  @override
+  String get settingsAuto => 'Auto';
+
+  @override
+  String get settingsContrast => 'Contrast';
+
+  @override
+  String get settingsContrastHint =>
+      'For text and borders. «High» reads better in sunlight.';
+
+  @override
+  String get settingsContrastStandard => 'Standard';
+
+  @override
+  String get settingsContrastMedium => 'Medium';
+
+  @override
+  String get settingsContrastHigh => 'High';
+
+  @override
+  String get settingsColorHint =>
+      'Every app colour is generated from this one.';
+
+  @override
+  String get settingsAbout => 'About';
+
+  @override
+  String get feedbackOpen => 'Open';
+
+  @override
+  String get feedbackAnswered => 'Answered';
+
+  @override
+  String get feedbackSentAt => 'Sent';
+
+  @override
+  String get feedbackHasAnswer => 'Answered';
+
+  @override
+  String get feedbackNoAnswer => 'Not yet';
+
+  @override
+  String get feedbackYourMessage => 'Your message';
+
+  @override
+  String get feedbackScreenshot => 'Attached screenshot';
+
+  @override
+  String get feedbackNoAnswerYet =>
+      'No answer yet. You will get a notification when the team replies.';
+
+  @override
   String get allChains => 'All chains';
 
   @override

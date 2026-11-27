@@ -258,8 +258,14 @@ class _MyAppState extends State<MyApp> {
         builder: (context, themeState) {
           return MaterialApp.router(
             title: 'Tashil Employee',
-            theme: AppTheme.lightTheme(themeState.seedColor),
-            darkTheme: AppTheme.darkTheme(themeState.seedColor),
+            theme: AppTheme.lightTheme(
+              themeState.seedColor,
+              themeState.contrast,
+            ),
+            darkTheme: AppTheme.darkTheme(
+              themeState.seedColor,
+              themeState.contrast,
+            ),
             highContrastTheme: AppTheme.highContrastLightTheme(
               themeState.seedColor,
             ),

@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/design/tokens.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -86,18 +87,33 @@ void main() {
   });
 
   group('SettingsScreen', () {
+    // The list is lazy; a tall view builds every row (TAS-387 layout).
+    setUp(() {
+      final binding = TestWidgetsFlutterBinding.ensureInitialized();
+      binding.platformDispatcher.views.first.physicalSize = const Size(800, 2600);
+      binding.platformDispatcher.views.first.devicePixelRatio = 1;
+    });
+    tearDown(() {
+      TestWidgetsFlutterBinding.ensureInitialized()
+          .platformDispatcher
+          .views
+          .first
+          .resetPhysicalSize();
+    });
+
     testWidgets('renders settings screen with key elements', (
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(buildSettingsScreen());
       await tester.pumpAndSettle();
 
-      // Language tile is visible
-      expect(find.byIcon(Icons.translate_rounded), findsOneWidget);
-      // Appearance (theme mode) tile is visible
-      expect(find.byIcon(Symbols.dark_mode_rounded), findsOneWidget);
+      // TAS-387: language, theme mode, contrast and colour on the page.
+      expect(find.byKey(const Key('settings_language')), findsOneWidget);
+      expect(find.byKey(const Key('settings_theme_mode')), findsOneWidget);
+      expect(find.byKey(const Key('settings_contrast')), findsOneWidget);
+      expect(find.byKey(const Key('settings_colors')), findsOneWidget);
       // Logout tile is visible
-      expect(find.byIcon(Icons.logout_rounded), findsAtLeastNWidgets(1));
+      expect(find.byKey(const Key('settings_logout')), findsOneWidget);
     });
 
     testWidgets('renders AppBar with back button by default', (
@@ -111,63 +127,42 @@ void main() {
       expect(find.byType(BackButton), findsOneWidget);
     });
 
-    testWidgets('appearance sheet sets System/Light/Dark', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('theme mode is chosen on the page (TAS-387)', (tester) async {
       await tester.pumpWidget(buildSettingsScreen());
       await tester.pumpAndSettle();
       final themeCubit = sl<ThemeCubit>();
-
-      for (final m in [ThemeMode.dark, ThemeMode.light, ThemeMode.system]) {
-        final tile = find.byIcon(Symbols.dark_mode_rounded).first;
-        await tester.ensureVisible(tile);
-        await tester.tap(tile);
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(ValueKey('theme_mode_${m.name}')));
+      for (final (m, icon) in [
+        (ThemeMode.dark, Symbols.dark_mode_rounded),
+        (ThemeMode.light, Symbols.light_mode_rounded),
+        (ThemeMode.system, Symbols.brightness_auto_rounded),
+      ]) {
+        final item = find.descendant(
+          of: find.byKey(const Key('settings_theme_mode')),
+          matching: find.byIcon(icon),
+        );
+        await tester.ensureVisible(item);
+        await tester.tap(item);
         await tester.pumpAndSettle();
         expect(themeCubit.state.themeMode, m);
       }
+      // No sheet or dialog any more.
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.byType(Dialog), findsNothing);
     });
 
-    group('appearance opens adaptively (TAS-158)', () {
-      tearDown(WebRuntimePolicy.debugReset);
-
-      Future<void> openAppearance(WidgetTester tester, {required bool web}) async {
-        WebRuntimePolicy.debugIsWebOverride = web;
-        tester.view.physicalSize =
-            web ? const Size(1440, 900) : const Size(390, 844);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.reset);
-        await tester.pumpWidget(buildSettingsScreen());
-        await tester.pumpAndSettle();
-        final tile = find.byIcon(Symbols.dark_mode_rounded).first;
-        await tester.ensureVisible(tile);
-        await tester.tap(tile);
-        await tester.pumpAndSettle();
-      }
-
-      testWidgets('wide web opens a dialog, not a bottom sheet', (
-        tester,
-      ) async {
-        await openAppearance(tester, web: true);
-        expect(find.byType(Dialog), findsOneWidget);
-        expect(find.byType(BottomSheet), findsNothing);
-        expect(find.byKey(const ValueKey('hr_sheet_close')), findsOneWidget);
-
-        final themeCubit = sl<ThemeCubit>();
-        await tester.tap(find.byKey(const ValueKey('theme_mode_dark')));
-        await tester.pumpAndSettle();
-        expect(themeCubit.state.themeMode, ThemeMode.dark);
-        expect(find.byType(Dialog), findsNothing);
-        themeCubit.setThemeMode(ThemeMode.system);
-      });
-
-      testWidgets('mobile still opens a bottom sheet', (tester) async {
-        await openAppearance(tester, web: false);
-        expect(find.byType(BottomSheet), findsOneWidget);
-        expect(find.byType(Dialog), findsNothing);
-        expect(find.byKey(const ValueKey('theme_mode_light')), findsOneWidget);
-      });
+    testWidgets('contrast is saved on the cubit (TAS-387)', (tester) async {
+      await tester.pumpWidget(buildSettingsScreen());
+      await tester.pumpAndSettle();
+      final themeCubit = sl<ThemeCubit>();
+      final high = find.descendant(
+        of: find.byKey(const Key('settings_contrast')),
+        matching: find.text('High'),
+      );
+      await tester.ensureVisible(high);
+      await tester.tap(high);
+      await tester.pumpAndSettle();
+      expect(themeCubit.state.contrast, TashilContrast.high);
+      themeCubit.setContrast(TashilContrast.standard);
     });
 
     testWidgets('tapping logout shows confirmation dialog', (
@@ -176,7 +171,7 @@ void main() {
       await tester.pumpWidget(buildSettingsScreen());
       await tester.pumpAndSettle();
 
-      final logoutTile = find.byIcon(Icons.logout_rounded).last;
+      final logoutTile = find.byKey(const Key('settings_logout'));
       await tester.ensureVisible(logoutTile);
       await tester.pumpAndSettle();
 
@@ -194,7 +189,7 @@ void main() {
       await tester.pumpWidget(buildSettingsScreen());
       await tester.pumpAndSettle();
 
-      final logoutTile = find.byIcon(Icons.logout_rounded).last;
+      final logoutTile = find.byKey(const Key('settings_logout'));
       await tester.ensureVisible(logoutTile);
       await tester.pumpAndSettle();
 
@@ -211,7 +206,7 @@ void main() {
       await tester.pumpWidget(buildSettingsScreen());
       await tester.pumpAndSettle();
 
-      final logoutTile = find.byIcon(Icons.logout_rounded).last;
+      final logoutTile = find.byKey(const Key('settings_logout'));
       await tester.ensureVisible(logoutTile);
       await tester.pumpAndSettle();
 
@@ -232,8 +227,14 @@ void main() {
       await tester.pumpWidget(buildSettingsScreen());
       await tester.pumpAndSettle();
 
-      // Color option circles should be present
-      expect(find.byType(GestureDetector), findsWidgets);
+      // Five seed colours as 48dp icon buttons.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('settings_colors')),
+          matching: find.byType(IconButton),
+        ),
+        findsNWidgets(5),
+      );
     });
 
     testWidgets('TAS-358: no logout row for the field delegate', (
