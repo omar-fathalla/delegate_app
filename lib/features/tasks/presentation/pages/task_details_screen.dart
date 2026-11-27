@@ -5,6 +5,8 @@ import 'package:delegate_app/core/design/widgets/dialogs.dart';
 import 'package:delegate_app/core/design/widgets/snackbars.dart';
 import 'package:delegate_app/features/tasks/data/services/task_image_storage.dart';
 import 'package:delegate_app/features/tasks/data/datasources/task_remote_data_source.dart';
+import 'package:delegate_app/features/tasks/data/datasources/task_completions.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:delegate_app/features/tasks/domain/entities/task_proof.dart';
 import 'package:delegate_app/features/tasks/domain/task_proof_paths.dart';
 
@@ -56,6 +58,10 @@ class TaskDetailsScreen extends StatefulWidget {
     this.proofSource,
   });
 
+  /// Tests swap in a fake Firestore for the completions reads (TAS-368).
+  @visibleForTesting
+  static TaskCompletions? debugCompletions;
+
   @override
   State<TaskDetailsScreen> createState() => _TaskDetailsScreenState();
 }
@@ -81,6 +87,57 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   bool _proofUploading = false;
   bool _proofSaved = false;
   int _proofViewEpoch = 0;
+
+  /// TAS-368: how many recipients marked a shared task done (staff view).
+  int? _completedCount;
+
+  bool get _isShared => TaskCompletions.isShared(_task.assignedTo);
+
+  TaskCompletions? get _completions {
+    final debug = TaskDetailsScreen.debugCompletions;
+    if (debug != null) return debug;
+    try {
+      return TaskCompletions(FirebaseFirestore.instance);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Shared task: the staff see how many finished it; a delegate sees its
+  /// own progress, not a colleague's.
+  Future<void> _loadCompletions() async {
+    final comp = _completions;
+    if (comp == null || !_isShared) return;
+    try {
+      if (widget.isAdmin) {
+        final n = await comp.completedCount(
+          organizationId: widget.organizationId,
+          taskId: _task.uid,
+        );
+        if (mounted) setState(() => _completedCount = n);
+        return;
+      }
+      final self = _viewerId;
+      if (self == null || _task.status == TaskStatus.cancelled) return;
+      final mine = await comp.mine(
+        organizationId: widget.organizationId,
+        taskId: _task.uid,
+        selfId: self,
+      );
+      if (!mounted) return;
+      setState(() {
+        _task = _task.copyWith(
+          status: mine?.status ?? TaskStatus.pending,
+          notes: mine?.notes ?? '',
+          completedAt: mine?.completedAt,
+        );
+        _currentStatus = _task.status;
+        _notesController.text = _task.notes ?? '';
+      });
+    } catch (_) {
+      // Keep what the list showed.
+    }
+  }
 
   /// Only the supervisor who sent the task may edit or delete it.
   bool get _isSender {
@@ -151,6 +208,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     _currentPriority = _task.priority;
     _dueDate = _task.dueDate;
     _loadProofs();
+    _loadCompletions();
   }
 
   @override
@@ -539,6 +597,28 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
           l10n.taskDoneAt,
           DateFormat('d MMMM • h:mm a', locale).format(_task.completedAt!),
         ),
+      // TAS-368 (message 6.2): a shared task is marked for the delegate only.
+      if (_isShared && !widget.isAdmin)
+        fact(
+          Symbols.group_rounded,
+          l10n.taskAssignedAll,
+          l10n.taskSharedForYouOnly,
+          key: const Key('task_shared_for_you_only'),
+        ),
+      if (_isShared && widget.isAdmin && _completedCount != null)
+        fact(
+          Symbols.task_alt_rounded,
+          l10n.taskAssignedAll,
+          l10n.taskCompletedByCount(_completedCount!),
+          key: const Key('task_completed_count'),
+        ),
+      if (_task.proofRequired)
+        fact(
+          Symbols.photo_camera_rounded,
+          l10n.taskProofRequiredOption,
+          l10n.taskProofRequiredMessage,
+          key: const Key('task_proof_required_fact'),
+        ),
     ];
 
     final proofs = _buildProofSection(l10n, theme, ownLabel: false);
@@ -694,6 +774,13 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
             onPressed: _proofUploading
                 ? null
                 : () {
+                    // TAS-368 (message 6.1): proof first when required.
+                    if (next == TaskStatus.completed &&
+                        _task.proofRequired &&
+                        _ownProofPaths.isEmpty) {
+                      showTashilSnackBar(context, l10n.taskProofRequiredMessage);
+                      return;
+                    }
                     setState(() => _currentStatus = next);
                     _saveChanges(context);
                   },

@@ -3002,6 +3002,30 @@ abstract class AppLocalizations {
   /// **'Done'**
   String get taskDoneAt;
 
+  /// No description provided for @taskSharedForYouOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'A task for everyone: marking it done marks it for you only'**
+  String get taskSharedForYouOnly;
+
+  /// No description provided for @taskProofRequiredMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo needed: this task needs a photo proving you did it'**
+  String get taskProofRequiredMessage;
+
+  /// No description provided for @taskProofRequiredOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Require a proof photo before «Done»'**
+  String get taskProofRequiredOption;
+
+  /// No description provided for @taskCompletedByCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Done by: {count}'**
+  String taskCompletedByCount(int count);
+
   /// No description provided for @tasksFilterOpen.
   ///
   /// In en, this message translates to:

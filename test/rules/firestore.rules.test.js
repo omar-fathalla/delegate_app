@@ -755,8 +755,11 @@ describe("firestore tightened rules", () => {
       const delegate = dbFor("del-1", DELEGATE);
       await assertSucceeds(delegate.doc("organizations/o1/tasks/sent").get());
       await assertSucceeds(delegate.doc("organizations/o1/tasks/sent").update({
-        status: "completed", completedBy: "del-1", notes: "done",
+        status: "completed", notes: "done",
       }));
+      // TAS-368: never someone else as the finisher, never cancelled.
+      await assertFails(delegate.doc("organizations/o1/tasks/sent").update({completedBy: "del-2"}));
+      await assertFails(delegate.doc("organizations/o1/tasks/sent").update({status: "cancelled"}));
       await assertFails(delegate.doc("organizations/o1/tasks/sent").update({description: "x"}));
       await assertFails(delegate.doc("organizations/o1/tasks/sent").update({imageUrl: "x"}));
       await assertFails(delegate.doc("organizations/o1/tasks/sent").delete());

@@ -1630,6 +1630,22 @@ class AppLocalizationsAr extends AppLocalizations {
   String get taskDoneAt => 'اتنفذت';
 
   @override
+  String get taskSharedForYouOnly =>
+      'دي مهمة للكل: لما تعلّمها تم بتتعلم ليك إنت بس';
+
+  @override
+  String get taskProofRequiredMessage =>
+      'محتاج صورة: المهمة دي لازم صورة تثبت إنك عملتها';
+
+  @override
+  String get taskProofRequiredOption => 'لازم صورة إثبات قبل «تم»';
+
+  @override
+  String taskCompletedByCount(int count) {
+    return 'خلّصوها: $count';
+  }
+
+  @override
   String get tasksFilterOpen => 'المفتوحة';
 
   @override

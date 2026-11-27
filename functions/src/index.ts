@@ -365,6 +365,7 @@ export {
 export {getMySupervisorCards} from "./supervisor_cards";
 export {createSupervisorPenalty} from "./supervisor_penalty";
 export {onDelegateTrackingWritten} from "./delegate_tracking_verify";
+export {onDeviceUnbindRequestCreated} from "./device_unbind_notify";
 export {onAttendanceLogWritten, onOrgAttendanceLogWritten} from "./attendance_verify";
 export {markForgottenAttendance} from "./attendance_forgotten";
 export {delegateCheckIn, delegateCheckOut} from "./attendance_callables";

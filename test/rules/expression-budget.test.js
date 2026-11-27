@@ -300,7 +300,7 @@ describe("expression budget headroom (TAS-105)", () => {
         });
       },
       request: (e) => e.authenticatedContext("del-1", DELEGATE_TOKEN).firestore()
-        .doc("organizations/o1/tasks/sent").update({status: "completed", completedBy: "del-1", notes: "done"}),
+        .doc("organizations/o1/tasks/sent").update({status: "completed", notes: "done"}),
     });
   });
 });

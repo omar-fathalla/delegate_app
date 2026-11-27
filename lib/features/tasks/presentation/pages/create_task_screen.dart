@@ -39,6 +39,9 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   String _selectedAssignedToName = '';
   List<String> _images = [];
   bool _imageUploading = false;
+
+  /// TAS-368: the recipient must attach a proof photo before «تم».
+  bool _proofRequired = false;
   bool _createSubmitted = false;
 
   @override
@@ -457,7 +460,16 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                           );
                         },
                       ),
-                      const SizedBox(height: 48),
+                      const SizedBox(height: 16),
+                      SwitchListTile(
+                        key: const Key('create_task_proof_required'),
+                        contentPadding: EdgeInsetsDirectional.zero,
+                        value: _proofRequired,
+                        onChanged: (v) => setState(() => _proofRequired = v),
+                        secondary: const Icon(Icons.photo_camera_rounded),
+                        title: Text(l10n.taskProofRequiredOption),
+                      ),
+                      const SizedBox(height: 32),
                       BlocBuilder<CreateTaskBloc, CreateTaskState>(
                         builder: (context, state) {
                           return FilledButton.icon(
@@ -491,6 +503,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                                               ? null
                                               : _images.first,
                                           imagePaths: _images,
+                                          proofRequired: _proofRequired,
                                         ),
                                       );
                                     }
