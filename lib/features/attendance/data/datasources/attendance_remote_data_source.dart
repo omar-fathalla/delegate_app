@@ -5,7 +5,9 @@ import 'package:delegate_app/features/attendance/domain/attendance_auto_close.da
 import 'package:delegate_app/features/attendance/domain/missing_check_out_rule.dart';
 import 'package:delegate_app/features/attendance/domain/attendance_action_messages.dart';
 import 'package:delegate_app/core/services/branch_display_cache.dart';
+
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -21,6 +23,7 @@ import 'package:delegate_app/features/attendance/data/models/attendance_model.da
 import 'package:delegate_app/features/tracking/data/services/delegate_tracking_engine.dart';
 import 'package:delegate_app/injection_container.dart';
 import 'package:delegate_app/core/security/delegate_identity.dart';
+import 'package:delegate_app/features/attendance/data/datasources/attendance_server_api.dart';
 
 abstract class AttendanceRemoteDataSource {
   Future<AttendanceModel> checkIn(
@@ -122,7 +125,16 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
   /// back to the delegate's user id when no auth is available (tests).
   final FirebaseAuth? auth;
 
-  AttendanceRemoteDataSourceImpl({required this.firestore, this.auth});
+  /// Server side of attendance (TAS-361). Null in tests and until the app is
+  /// wired: the old direct write is used then, and also when the callable is
+  /// not deployed on the project yet.
+  final AttendanceServerApi? serverApi;
+
+  AttendanceRemoteDataSourceImpl({
+    required this.firestore,
+    this.auth,
+    this.serverApi,
+  });
 
   /// Helper: Get the attendance_logs collection
   /// Path: /attendance_logs
@@ -171,7 +183,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           return existingActive;
         }
 
-        final isSameDay = existingActive.checkInTime.year == trustedNow.year &&
+        final isSameDay =
+            existingActive.checkInTime.year == trustedNow.year &&
             existingActive.checkInTime.month == trustedNow.month &&
             existingActive.checkInTime.day == trustedNow.day;
 
@@ -184,8 +197,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           });
           final incomingRef = AttendanceBranchRef(
             branchId: branchId,
-            branchOrganizationUID:
-                (branchOrganizationUID ?? organizationId).trim(),
+            branchOrganizationUID: (branchOrganizationUID ?? organizationId)
+                .trim(),
             branchName: branchName ?? '',
           );
           if (attendanceSameBranch(activeRef, incomingRef)) {
@@ -201,21 +214,21 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       }
 
       final Map<String, dynamic> checkInPayload = {
-            'delegateId': userId,
-            'userId': userId,
-            'companyId': companyId,
-            'organizationId': organizationId,
-            'timestamp': FieldValue.serverTimestamp(),
-            'type': 'check_in',
-            'location': {'latitude': lat, 'longitude': long},
-            'deviceInfo': deviceInfo,
-            'branchName': branchName,
-            if (branchId != null && branchId.trim().isNotEmpty)
-              'branchId': branchId.trim(),
-            if ((branchOrganizationUID ?? organizationId).trim().isNotEmpty)
-              'branchOrganizationUID':
-                  (branchOrganizationUID ?? organizationId).trim(),
-          };
+        'delegateId': userId,
+        'userId': userId,
+        'companyId': companyId,
+        'organizationId': organizationId,
+        'timestamp': FieldValue.serverTimestamp(),
+        'type': 'check_in',
+        'location': {'latitude': lat, 'longitude': long},
+        'deviceInfo': deviceInfo,
+        'branchName': branchName,
+        if (branchId != null && branchId.trim().isNotEmpty)
+          'branchId': branchId.trim(),
+        if ((branchOrganizationUID ?? organizationId).trim().isNotEmpty)
+          'branchOrganizationUID': (branchOrganizationUID ?? organizationId)
+              .trim(),
+      };
       // Fix3: denormalize display fields so marketing cards skip N+1 profile reads.
       final trimmedName = delegateName?.trim();
       if (trimmedName != null && trimmedName.isNotEmpty) {
@@ -237,15 +250,35 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       // Idempotent write: a retry after an unconfirmed attempt reuses the same
       // document ID, so a queued (offline-persisted) write can never become a
       // second check-in.
-      final docId =
-          pendingId ?? _attendanceCollection(organizationId).doc().id;
+      final docId = pendingId ?? _attendanceCollection(organizationId).doc().id;
       _pendingCheckInIds[pendingKey] = docId;
       final docRef = _attendanceCollection(organizationId).doc(docId);
-      try {
-        await docRef.set(checkInPayload).timeout(const Duration(seconds: 15));
-      } on TimeoutException {
-        if (!await _existsOnServer(docRef)) {
-          throw const ServerFailure(kCheckInUnknownMessage);
+      final byServer = await _serverCheckIn(
+        docRef: docRef,
+        data: {
+          'requestId': docId,
+          'organizationId': organizationId,
+          'companyId': companyId,
+          'branchId': ?branchId?.trim(),
+          'branchOrganizationUID': (branchOrganizationUID ?? organizationId)
+              .trim(),
+          'branchName': branchName ?? '',
+          'lat': lat,
+          'lng': long,
+          'deviceInfo': deviceInfo,
+          'delegateName': ?trimmedName,
+          'phoneNumber': ?trimmedPhone,
+          'companyName': ?trimmedCompany,
+          'personalPhotoURL': ?trimmedPhoto,
+        },
+      );
+      if (!byServer) {
+        try {
+          await docRef.set(checkInPayload).timeout(const Duration(seconds: 15));
+        } on TimeoutException {
+          if (!await _existsOnServer(docRef)) {
+            throw const ServerFailure(kCheckInUnknownMessage);
+          }
         }
       }
       _pendingCheckInIds.remove(pendingKey);
@@ -275,8 +308,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           organizationId: organizationId,
           branchRef: AttendanceBranchRef(
             branchId: branchId,
-            branchOrganizationUID:
-                (branchOrganizationUID ?? organizationId).trim(),
+            branchOrganizationUID: (branchOrganizationUID ?? organizationId)
+                .trim(),
             branchName: branchName ?? '',
           ),
           lat: lat,
@@ -315,7 +348,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     double long,
   ) async {
     try {
-      final checkInRef = _attendanceCollection(organizationId).doc(attendanceId);
+      final checkInRef = _attendanceCollection(organizationId)
+          .doc(attendanceId);
       // Deterministic ID: repeating the same check-out can't add a 2nd record.
       final outRef = _attendanceCollection(organizationId)
           .doc('${attendanceId}_out');
@@ -345,46 +379,57 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       final userId = lastData['delegateId'] ?? lastData['userId'];
       final companyId = lastData['companyId'];
 
+      // TAS-361: the server writes the check-out (never refused for the
+      // distance, flagged for HR instead). Old direct write when the
+      // callable is not deployed yet.
+      final byServer = await _serverCheckOut(
+        checkInRef: checkInRef,
+        outDocId: outRef.id,
+        data: {'attendanceId': attendanceId, 'lat': lat, 'lng': long},
+      );
+
       // Keep a separate check_out log for history/HR, and denormalize
       // checkOutTime onto the check-in doc so marketing today-views skip
       // the historical follow-up query.
-      final batch = firestore.batch();
-      batch.set(outRef, {
-        'delegateId': userId,
-        'userId': userId,
-        'companyId': companyId,
-        'organizationId': organizationId,
-        'timestamp': FieldValue.serverTimestamp(),
-        'type': 'check_out',
-        'location': {'latitude': lat, 'longitude': long},
-        'relatedCheckInId': attendanceId,
-        if (lastData['branchName'] != null) 'branchName': lastData['branchName'],
-        if (lastData['branchId'] != null) 'branchId': lastData['branchId'],
-        if (lastData['branchOrganizationUID'] != null)
-          'branchOrganizationUID': lastData['branchOrganizationUID'],
-      });
-      batch.update(checkInRef, {
-        'checkOutTime': FieldValue.serverTimestamp(),
-        'checkOutLocation': {'latitude': lat, 'longitude': long},
-        'checkOutDocId': outRef.id,
-      });
-      try {
-        await batch.commit().timeout(const Duration(seconds: 15));
-      } on TimeoutException {
-        final confirmed = await _serverDocData(checkInRef);
-        if (confirmed?['checkOutDocId'] != outRef.id) {
-          throw const ServerFailure(kCheckOutUnknownMessage);
+      if (!byServer) {
+        final batch = firestore.batch();
+        batch.set(outRef, {
+          'delegateId': userId,
+          'userId': userId,
+          'companyId': companyId,
+          'organizationId': organizationId,
+          'timestamp': FieldValue.serverTimestamp(),
+          'type': 'check_out',
+          'location': {'latitude': lat, 'longitude': long},
+          'relatedCheckInId': attendanceId,
+          if (lastData['branchName'] != null)
+            'branchName': lastData['branchName'],
+          if (lastData['branchId'] != null) 'branchId': lastData['branchId'],
+          if (lastData['branchOrganizationUID'] != null)
+            'branchOrganizationUID': lastData['branchOrganizationUID'],
+        });
+        batch.update(checkInRef, {
+          'checkOutTime': FieldValue.serverTimestamp(),
+          'checkOutLocation': {'latitude': lat, 'longitude': long},
+          'checkOutDocId': outRef.id,
+        });
+        try {
+          await batch.commit().timeout(const Duration(seconds: 15));
+        } on TimeoutException {
+          final confirmed = await _serverDocData(checkInRef);
+          if (confirmed?['checkOutDocId'] != outRef.id) {
+            throw const ServerFailure(kCheckOutUnknownMessage);
+          }
         }
       }
 
       // Auto-resolve any orphaned unclosed check-in for the same user and branch today
       try {
         final lastBranchId = lastData['branchId']?.toString().trim();
-        Query<Map<String, dynamic>> orphanQuery = _attendanceCollection(
-          organizationId,
-        )
-            .where('delegateId', isEqualTo: userId)
-            .where('type', isEqualTo: 'check_in');
+        Query<Map<String, dynamic>> orphanQuery =
+            _attendanceCollection(organizationId)
+                .where('delegateId', isEqualTo: userId)
+                .where('type', isEqualTo: 'check_in');
         if (lastBranchId != null && lastBranchId.isNotEmpty) {
           orphanQuery = orphanQuery.where('branchId', isEqualTo: lastBranchId);
         } else if (lastData['branchName'] != null) {
@@ -419,8 +464,10 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
                 'type': 'check_out',
                 'location': {'latitude': lat, 'longitude': long},
                 'relatedCheckInId': doc.id,
-                if (lastData['branchName'] != null) 'branchName': lastData['branchName'],
-                if (lastData['branchId'] != null) 'branchId': lastData['branchId'],
+                if (lastData['branchName'] != null)
+                  'branchName': lastData['branchName'],
+                if (lastData['branchId'] != null)
+                  'branchId': lastData['branchId'],
                 if (lastData['branchOrganizationUID'] != null)
                   'branchOrganizationUID': lastData['branchOrganizationUID'],
                 'autoClosedDuplicate': true,
@@ -457,11 +504,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         ),
       );
 
-      unawaited(
-        _syncDelegateTrackingCheckOut(
-          userId: userId,
-        ),
-      );
+      unawaited(_syncDelegateTrackingCheckOut(userId: userId));
 
       return AttendanceModel(
         id: attendanceId,
@@ -568,11 +611,14 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           forceServer: true,
         );
       } catch (err) {
-        debugPrint('Query with organizationId fallback to in-memory filter: $err');
-        Query<Map<String, dynamic>> fallbackQuery = _attendanceCollection(organizationId)
-            .where('delegateId', whereIn: queryList)
-            .orderBy('timestamp', descending: true)
-            .limit(limit * 2);
+        debugPrint(
+          'Query with organizationId fallback to in-memory filter: $err',
+        );
+        Query<Map<String, dynamic>> fallbackQuery =
+            _attendanceCollection(organizationId)
+                .where('delegateId', whereIn: queryList)
+                .orderBy('timestamp', descending: true)
+                .limit(limit * 2);
         if (startAfter != null) {
           fallbackQuery = fallbackQuery.startAfterDocument(startAfter);
         }
@@ -645,7 +691,10 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     while (true) {
       Query<Map<String, dynamic>> query = _attendanceCollection('')
           .where('delegateId', whereIn: queryList)
-          .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(monthStart))
+          .where(
+            'timestamp',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(monthStart),
+          )
           .where('timestamp', isLessThan: Timestamp.fromDate(upper))
           .orderBy('timestamp', descending: true)
           .limit(pageSize);
@@ -660,9 +709,11 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     }
 
     return _pairAttendanceDocs(docs, userId, '')
-        .where((a) =>
-            !a.checkInTime.isBefore(monthStart) &&
-            a.checkInTime.isBefore(monthEnd))
+        .where(
+          (a) =>
+              !a.checkInTime.isBefore(monthStart) &&
+              a.checkInTime.isBefore(monthEnd),
+        )
         .toList();
   }
 
@@ -725,7 +776,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     for (var doc in checkIns) {
       final checkInId = doc.id;
       final data = doc.data();
-      final docOrg = (data['organizationId'] as String?)?.trim() ??
+      final docOrg =
+          (data['organizationId'] as String?)?.trim() ??
           (data['organizationUID'] as String?)?.trim() ??
           '';
 
@@ -785,7 +837,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         );
       } else {
         // إذا مر أكثر من 11.5 ساعة على وقت تسجيل الحضور ولم يسجل انصراف، يتم إغلاقه ديناميكياً
-        final isExpired = DateTime.now().difference(checkInTime) >= kAttendanceAutoCloseAfter;
+        final isExpired =
+            DateTime.now().difference(checkInTime) >= kAttendanceAutoCloseAfter;
         if (isExpired) {
           history.add(
             AttendanceModel(
@@ -887,7 +940,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
               (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0,
           branchName: data['branchName'],
           branchId: data['branchId'] as String?,
-          branchOrganizationUID: (data['branchOrganizationUID'] as String?) ??
+          branchOrganizationUID:
+              (data['branchOrganizationUID'] as String?) ??
               data['organizationId'] as String?,
         );
       }
@@ -933,10 +987,50 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     }
   }
 
+  /// TAS-361: check-in through `delegateCheckIn`. Returns false when the
+  /// old direct write must be used (no server API, no branch id, callable not
+  /// deployed). Refusals throw the server's message as a [ServerFailure].
+  Future<bool> _serverCheckIn({
+    required DocumentReference<Map<String, dynamic>> docRef,
+    required Map<String, dynamic> data,
+  }) async {
+    final api = serverApi;
+    final branchId = data['branchId'];
+    if (api == null || branchId is! String || branchId.isEmpty) return false;
+    try {
+      await api.checkIn(data);
+      return true;
+    } on AttendanceServerUnavailable {
+      return false;
+    } on AttendanceServerUncertain {
+      if (await _existsOnServer(docRef)) return true;
+      throw const ServerFailure(kCheckInUnknownMessage);
+    }
+  }
+
+  /// TAS-361: check-out through `delegateCheckOut` (see [_serverCheckIn]).
+  Future<bool> _serverCheckOut({
+    required DocumentReference<Map<String, dynamic>> checkInRef,
+    required String outDocId,
+    required Map<String, dynamic> data,
+  }) async {
+    final api = serverApi;
+    if (api == null) return false;
+    try {
+      await api.checkOut(data);
+      return true;
+    } on AttendanceServerUnavailable {
+      return false;
+    } on AttendanceServerUncertain {
+      final confirmed = await _serverDocData(checkInRef);
+      if (confirmed?['checkOutDocId'] == outDocId) return true;
+      throw const ServerFailure(kCheckOutUnknownMessage);
+    }
+  }
+
   Future<bool> _existsOnServer(
     DocumentReference<Map<String, dynamic>> ref,
-  ) async =>
-      await _serverDocData(ref) != null;
+  ) async => await _serverDocData(ref) != null;
 
   AttendanceModel _checkedOutModel(
     String attendanceId,
@@ -954,7 +1048,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       longitude: (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0,
       branchName: data['branchName'],
       branchId: data['branchId'] as String?,
-      branchOrganizationUID: (data['branchOrganizationUID'] as String?) ??
+      branchOrganizationUID:
+          (data['branchOrganizationUID'] as String?) ??
           data['organizationId'] as String?,
     );
   }
@@ -996,9 +1091,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       });
       await autoBatch.commit();
 
-      unawaited(
-        _syncDelegateTrackingCheckOut(userId: userId),
-      );
+      unawaited(_syncDelegateTrackingCheckOut(userId: userId));
     } catch (e) {
       debugPrint('Error auto checking out expired session: $e');
     }
@@ -1029,7 +1122,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
               checkInTime: data['timestamp'] != null
                   ? (data['timestamp'] as Timestamp).toDate()
                   : DateTime.now(),
-              latitude: (data['location']?['latitude'] as num?)?.toDouble() ?? 0.0,
+              latitude:
+                  (data['location']?['latitude'] as num?)?.toDouble() ?? 0.0,
               longitude:
                   (data['location']?['longitude'] as num?)?.toDouble() ?? 0.0,
               branchName: data['branchName'],
@@ -1095,14 +1189,12 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             action['relatedCheckInId'] is String &&
             (action['relatedCheckInId'] as String).isNotEmpty) {
           final relatedId = action['relatedCheckInId'] as String;
-          batch.update(
-            _attendanceCollection(organizationId).doc(relatedId),
-            {
-              'checkOutTime': FieldValue.serverTimestamp(),
-              'checkOutDocId': newDocRef.id,
-              if (action['location'] != null) 'checkOutLocation': action['location'],
-            },
-          );
+          batch.update(_attendanceCollection(organizationId).doc(relatedId), {
+            'checkOutTime': FieldValue.serverTimestamp(),
+            'checkOutDocId': newDocRef.id,
+            if (action['location'] != null)
+              'checkOutLocation': action['location'],
+          });
         }
       }
 
@@ -1140,10 +1232,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           if (nestedSnap.exists && nestedSnap.data() != null) {
             return ResolvedBranchDocument(
               documentId: nestedSnap.id,
-              data: {
-                ...nestedSnap.data()!,
-                'organizationUID': trimmedOrg,
-              },
+              data: {...nestedSnap.data()!, 'organizationUID': trimmedOrg},
             );
           }
         }
@@ -1194,17 +1283,17 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           final doc = nestedSnap.docs.first;
           return ResolvedBranchDocument(
             documentId: doc.id,
-            data: {
-              ...doc.data(),
-              'organizationUID': trimmedOrg,
-            },
+            data: {...doc.data(), 'organizationUID': trimmedOrg},
           );
         }
       }
 
       return null;
     } on FirebaseException catch (e) {
-      throwFirestoreFailure(e, 'فشل في جلب بيانات الفرع. يرجى المحاولة مرة أخرى.');
+      throwFirestoreFailure(
+        e,
+        'فشل في جلب بيانات الفرع. يرجى المحاولة مرة أخرى.',
+      );
     } on TimeoutException {
       throwTimeoutFailure('انتهت مهلة الاتصال بالخادم أثناء جلب بيانات الفرع.');
     } catch (_) {
@@ -1296,7 +1385,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         final userDoc = await firestore.collection('users').doc(userId).get();
         if (userDoc.exists) {
           final data = userDoc.data();
-          final name = data?['fullName'] ??
+          final name =
+              data?['fullName'] ??
               data?['name'] ??
               '${data?['firstName'] ?? ''} ${data?['lastName'] ?? ''}'.trim();
           if (name is String && name.trim().isNotEmpty) {
@@ -1307,13 +1397,17 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
 
       // Format time in Arabic: e.g. 02:00 م
       final isAm = time.hour < 12;
-      final hour12 = time.hour == 0 ? 12 : (time.hour > 12 ? time.hour - 12 : time.hour);
+      final hour12 = time.hour == 0
+          ? 12
+          : (time.hour > 12 ? time.hour - 12 : time.hour);
       final hourStr = hour12.toString().padLeft(2, '0');
       final minStr = time.minute.toString().padLeft(2, '0');
       final periodStr = isAm ? 'ص' : 'م';
       final formattedTime = '$hourStr:$minStr $periodStr';
       final safeBranchName =
-          (branchName != null && branchName.trim().isNotEmpty) ? branchName.trim() : 'الفرع';
+          (branchName != null && branchName.trim().isNotEmpty)
+          ? branchName.trim()
+          : 'الفرع';
 
       final bool isCheckIn = type == 'check_in';
       final title = isCheckIn
@@ -1322,7 +1416,9 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       final body = isCheckIn
           ? 'قام المندوب $delegateName بتسجيل الحضور بنجاح في فرع ($safeBranchName) الساعة $formattedTime.'
           : 'قام المندوب $delegateName بتسجيل الانصراف بنجاح من فرع ($safeBranchName) الساعة $formattedTime.';
-      final notifType = isCheckIn ? 'attendance_check_in' : 'attendance_check_out';
+      final notifType = isCheckIn
+          ? 'attendance_check_in'
+          : 'attendance_check_out';
 
       // TAS-71: one broadcast to the company's supervisors. A delegate cannot
       // list `users` under the rules, and the per-supervisor fan-out needed
@@ -1347,7 +1443,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
         'senderRole': 'delegate',
         'delegateUid': 'supervisor_$companyId',
         // TAS-28: own delegate id (delegateId claim), not the Auth uid.
-        'createdBy': (auth != null ? DelegateIdentity.current(auth) : null) ?? userId,
+        'createdBy':
+            (auth != null ? DelegateIdentity.current(auth) : null) ?? userId,
         'isRead': false,
         'read': false,
         'createdAt': FieldValue.serverTimestamp(),
@@ -1383,34 +1480,63 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
               .get();
           if (nestedDoc.exists) {
             final data = nestedDoc.data();
-            final rawFull = (data?['fullName'] ?? data?['name'])?.toString().trim();
-            final combined = '${data?['firstName'] ?? ''} ${data?['lastName'] ?? ''}'.trim();
-            delegateName = (rawFull != null && rawFull.isNotEmpty) ? rawFull : (combined.isNotEmpty ? combined : 'مندوب');
-            delegatePhone = (data?['phoneNumber'] ?? data?['phone'] ?? data?['mobileNumber'] ?? '').toString();
+            final rawFull = (data?['fullName'] ?? data?['name'])
+                ?.toString()
+                .trim();
+            final combined =
+                '${data?['firstName'] ?? ''} ${data?['lastName'] ?? ''}'.trim();
+            delegateName = (rawFull != null && rawFull.isNotEmpty)
+                ? rawFull
+                : (combined.isNotEmpty ? combined : 'مندوب');
+            delegatePhone =
+                (data?['phoneNumber'] ??
+                        data?['phone'] ??
+                        data?['mobileNumber'] ??
+                        '')
+                    .toString();
           }
         }
 
         if (delegateName == 'مندوب') {
-          final delDoc = await firestore.collection('delegates').doc(userId).get();
+          final delDoc = await firestore
+              .collection('delegates')
+              .doc(userId)
+              .get();
           if (delDoc.exists) {
             final data = delDoc.data();
-            final rawFull = (data?['fullName'] ?? data?['name'])?.toString().trim();
-            final combined = '${data?['firstName'] ?? ''} ${data?['lastName'] ?? ''}'.trim();
-            delegateName = (rawFull != null && rawFull.isNotEmpty) ? rawFull : (combined.isNotEmpty ? combined : 'مندوب');
-            delegatePhone = (data?['phoneNumber'] ?? data?['phone'] ?? data?['mobileNumber'] ?? '').toString();
+            final rawFull = (data?['fullName'] ?? data?['name'])
+                ?.toString()
+                .trim();
+            final combined =
+                '${data?['firstName'] ?? ''} ${data?['lastName'] ?? ''}'.trim();
+            delegateName = (rawFull != null && rawFull.isNotEmpty)
+                ? rawFull
+                : (combined.isNotEmpty ? combined : 'مندوب');
+            delegatePhone =
+                (data?['phoneNumber'] ??
+                        data?['phone'] ??
+                        data?['mobileNumber'] ??
+                        '')
+                    .toString();
           } else {
-            final userDoc = await firestore.collection('users').doc(userId).get();
+            final userDoc = await firestore
+                .collection('users')
+                .doc(userId)
+                .get();
             if (userDoc.exists) {
               final data = userDoc.data();
-              delegateName = (data?['fullName'] ??
-                      data?['name'] ??
-                      '${data?['firstName'] ?? ''} ${data?['lastName'] ?? ''}'.trim())
-                  .toString();
-              delegatePhone = (data?['phoneNumber'] ??
-                      data?['phone'] ??
-                      data?['mobileNumber'] ??
-                      '')
-                  .toString();
+              delegateName =
+                  (data?['fullName'] ??
+                          data?['name'] ??
+                          '${data?['firstName'] ?? ''} ${data?['lastName'] ?? ''}'
+                              .trim())
+                      .toString();
+              delegatePhone =
+                  (data?['phoneNumber'] ??
+                          data?['phone'] ??
+                          data?['mobileNumber'] ??
+                          '')
+                      .toString();
             }
           }
         }
@@ -1436,10 +1562,12 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
           final bData = resolved.data;
           final loc = bData['location'];
           if (loc is Map) {
-            branchLat = (loc['latitude'] as num?)?.toDouble() ??
+            branchLat =
+                (loc['latitude'] as num?)?.toDouble() ??
                 (loc['lat'] as num?)?.toDouble() ??
                 0.0;
-            branchLng = (loc['longitude'] as num?)?.toDouble() ??
+            branchLng =
+                (loc['longitude'] as num?)?.toDouble() ??
                 (loc['lng'] as num?)?.toDouble() ??
                 0.0;
           }
@@ -1461,8 +1589,12 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       final branchName = branchRef.branchName;
 
       // احتساب المسافة الدقيقة عن الفرع ونسبة البطارية الحقيقية
-      final exactDist =
-          Geolocator.distanceBetween(lat, long, branchLat, branchLng);
+      final exactDist = Geolocator.distanceBetween(
+        lat,
+        long,
+        branchLat,
+        branchLng,
+      );
       final isInside = exactDist <= (geofenceRadius + 50.0);
 
       int? batteryLevel;
@@ -1507,14 +1639,14 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
             .doc(userId)
             .collection('breadcrumbs')
             .add({
-          'latitude': lat,
-          'longitude': long,
-          'timestamp': FieldValue.serverTimestamp(),
-          'speed': 0.0,
-          'batteryLevel': ?batteryLevel,
-          'distanceMeters': exactDist,
-          'isInside': isInside,
-        });
+              'latitude': lat,
+              'longitude': long,
+              'timestamp': FieldValue.serverTimestamp(),
+              'speed': 0.0,
+              'batteryLevel': ?batteryLevel,
+              'distanceMeters': exactDist,
+              'isInside': isInside,
+            });
       } catch (e, st) {
         debugPrint(
           'AttendanceTrackingSync: failed writing check-in breadcrumb: $e\n$st',
@@ -1539,9 +1671,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     }
   }
 
-  Future<void> _syncDelegateTrackingCheckOut({
-    required String userId,
-  }) async {
+  Future<void> _syncDelegateTrackingCheckOut({required String userId}) async {
     try {
       DelegateTrackingEngine().stopTrackingSession();
       await firestore.collection('delegate_tracking').doc(userId).update({
