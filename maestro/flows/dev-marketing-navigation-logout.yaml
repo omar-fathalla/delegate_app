@@ -40,8 +40,9 @@ appId: com.tashil.delegate.dev
             visible: "Fake Branch Alpha"
           commands:
             - tapOn: "Fake Branch Alpha"
+# The branch header reads its name plus a counts line ("…\n4 حاضر • …").
 - extendedWaitUntil:
-    visible: "Fake Branch Alpha"
+    visible: "Fake Branch Alpha(\\n.*)*"
     timeout: 60000
 
 # Photo permissions tab.
