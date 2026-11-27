@@ -212,6 +212,8 @@ jobs:
         run: bash scripts/maestro_check_flow_headers.sh
       - name: Patrol integration guard
         run: bash scripts/patrol_check_integration_targets.sh
+      - name: Patrol -t per target + ran-targets guard (TAS-394)
+        run: bash test/scripts/patrol_targets.test.sh
 
   android-dev-config-check:
     name: Android dev config (static)

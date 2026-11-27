@@ -104,6 +104,7 @@ job_ios-guards() {
   bash scripts/ios_dev_config_check.sh
   bash scripts/maestro_check_flow_headers.sh
   bash scripts/patrol_check_integration_targets.sh
+  bash test/scripts/patrol_targets.test.sh
   bash patrol_test/manifest/test_xctestrun_resolve.sh
   bash scripts/holds_authority_mode_trap_test.sh
   python3 scripts/holds_authority_mode_payload_test.py
