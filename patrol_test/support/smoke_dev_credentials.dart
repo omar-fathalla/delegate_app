@@ -106,6 +106,21 @@ class SmokeDevPatrolCredentials {
     );
   }
 
+  /// Seeded fake marketing account (`seed-fake-marketing-alpha`, role
+  /// `marketing`, chain `seed-fake-hr-org`), TAS-393.
+  static const String seededMarketingAlphaPhone = '01000000007';
+
+  /// Marketing staff account for the marketing journey (TAS-393). The secret
+  /// comes from `PATROL_DEV_MARKETING_SECRET`; without it the test skips.
+  static SmokeDevPatrolCredentials marketingFromEnvironment() {
+    const phone = String.fromEnvironment(
+      'PATROL_DEV_MARKETING_PHONE',
+      defaultValue: seededMarketingAlphaPhone,
+    );
+    const secret = String.fromEnvironment('PATROL_DEV_MARKETING_SECRET');
+    return const SmokeDevPatrolCredentials(phone: phone, secret: secret);
+  }
+
   /// From `dart-define` / Patrol CLI (never hard-code passwords in git).
   static SmokeDevPatrolCredentials fromEnvironment() => staffFromEnvironment();
 }

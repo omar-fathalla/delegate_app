@@ -1,0 +1,77 @@
+appId: com.tashil.delegate.dev
+---
+# Maestro — marketing (role `marketing`, staff login) journey (TAS-393):
+# login, the four bottom tabs, search mode switch, logout.
+# Account: TASHIL_MAESTRO_DEV_MARKETING_PHONE / _SECRET (fake
+# seed-fake-marketing-alpha on tashil-dev). No OS permission dialogs
+# (Patrol owns those). Tab labels can carry a tab-position line, hence the
+# optional "\n…" suffix.
+
+- launchApp:
+    clearState: true
+    clearKeychain: true
+
+- runFlow:
+    file: ../subflows/login-staff.yaml
+    env:
+      TASHIL_MAESTRO_DEV_PHONE: ${TASHIL_MAESTRO_DEV_MARKETING_PHONE}
+      TASHIL_MAESTRO_DEV_SECRET: ${TASHIL_MAESTRO_DEV_MARKETING_SECRET}
+
+- extendedWaitUntil:
+    visible:
+      id: "tashil_main_menu_button"
+    timeout: 120000
+
+# Home (TAS-392): the day summary and quick access sections.
+- extendedWaitUntil:
+    visible: "ملخص اليوم"
+    timeout: 30000
+- assertVisible: "الوصول السريع"
+
+# Branches tab. A fresh install has no favourite branch, so the tab opens the
+# branch picker: add Fake Branch Alpha.
+- tapOn: "الفروع(\\n.*)?"
+- runFlow:
+    when:
+      visible: "إضافة فرع(\\n.*)?"
+    commands:
+      - runFlow:
+          when:
+            visible: "Fake Branch Alpha"
+          commands:
+            - tapOn: "Fake Branch Alpha"
+- extendedWaitUntil:
+    visible: "Fake Branch Alpha"
+    timeout: 60000
+
+# Photo permissions tab.
+- tapOn: "أذونات التصوير(\\n.*)?"
+- extendedWaitUntil:
+    visible: "أذونات التصوير النشطة"
+    timeout: 30000
+
+# Private Label tab.
+- tapOn: "Private Label(\\n.*)?"
+- extendedWaitUntil:
+    visible: "الأدوات"
+    timeout: 30000
+
+# Search from the menu: one search at a time (ButtonGroup company / delegate).
+- runFlow:
+    file: ../subflows/open-main-menu.yaml
+- tapOn: "بحث"
+- extendedWaitUntil:
+    visible: "بحث عن الشركة"
+    timeout: 30000
+- tapOn: "مندوب"
+- extendedWaitUntil:
+    visible: "بحث عن المندوب"
+    timeout: 15000
+- assertNotVisible: "بحث عن الشركة"
+- tapOn: "رجوع|Back"
+
+- runFlow:
+    file: ../subflows/wait-for-main-menu-button.yaml
+
+- runFlow:
+    file: ../subflows/logout-via-menu.yaml

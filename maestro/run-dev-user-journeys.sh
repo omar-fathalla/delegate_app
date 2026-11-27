@@ -19,12 +19,26 @@ PHONE="${TASHIL_MAESTRO_DEV_PHONE:-01500000002}"
 DELEGATE_PHONE="${TASHIL_MAESTRO_DEV_DELEGATE_PHONE:-01500000003}"
 DELEGATE_NID="${TASHIL_MAESTRO_DEV_DELEGATE_NATIONAL_ID:-29901015740919}"
 
+MARKETING_PHONE="${TASHIL_MAESTRO_DEV_MARKETING_PHONE:-01000000007}"
 MAESTRO_ARGS=(
   -e "TASHIL_MAESTRO_DEV_PHONE=${PHONE}"
   -e "TASHIL_MAESTRO_DEV_SECRET=${TASHIL_MAESTRO_DEV_SECRET}"
   -e "TASHIL_MAESTRO_DEV_DELEGATE_PHONE=${DELEGATE_PHONE}"
   -e "TASHIL_MAESTRO_DEV_DELEGATE_NATIONAL_ID=${DELEGATE_NID}"
+  -e "TASHIL_MAESTRO_DEV_MARKETING_PHONE=${MARKETING_PHONE}"
+  -e "TASHIL_MAESTRO_DEV_MARKETING_SECRET=${TASHIL_MAESTRO_DEV_MARKETING_SECRET:-}"
 )
+
+# TAS-393: the marketing journey needs its own fake account secret; without it
+# the flow is skipped with a notice (the gate does not fail on a missing
+# optional account).
+run_marketing() {
+  if [[ -z "${TASHIL_MAESTRO_DEV_MARKETING_SECRET:-}" ]]; then
+    echo "maestro: TASHIL_MAESTRO_DEV_MARKETING_SECRET not set, skipping dev-marketing-navigation-logout" | tee -a "$LOG"
+    return 0
+  fi
+  run_one "$@" "${MAESTRO_ARGS[@]}" maestro/flows/dev-marketing-navigation-logout.yaml
+}
 
 run_one() {
   maestro test "$@" 2>&1 | tee -a "$LOG"
@@ -35,7 +49,9 @@ if [[ -n "${MAESTRO_DEVICE_ID:-}" ]]; then
     maestro/flows/dev-staff-navigation-logout.yaml
   run_one --device "$MAESTRO_DEVICE_ID" "${MAESTRO_ARGS[@]}" \
     maestro/flows/dev-delegate-navigation-logout.yaml
+  run_marketing --device "$MAESTRO_DEVICE_ID"
 else
   run_one "${MAESTRO_ARGS[@]}" maestro/flows/dev-staff-navigation-logout.yaml
   run_one "${MAESTRO_ARGS[@]}" maestro/flows/dev-delegate-navigation-logout.yaml
+  run_marketing
 fi

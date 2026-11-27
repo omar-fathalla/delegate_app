@@ -204,6 +204,14 @@ job_mac-gate() {
         node scripts/hr-web-fake-accounts.js --project tashil-dev --reset-device-bindings --apply) \
         || echo "mac-gate: warning: could not reset fake delegates' device bindings" >&2
     }
+    # TAS-393: today's fake check-ins on Fake Branch Alpha, so the marketing
+    # journeys have delegates to floor-check (fixed ids, idempotent per day).
+    _seed_marketing_attendance() {
+      [[ -f functions/scripts/seed-marketing-journey-attendance.js ]] || return 0
+      (cd functions && GOOGLE_CLOUD_PROJECT=tashil-dev \
+        node scripts/seed-marketing-journey-attendance.js --project tashil-dev --apply) \
+        || echo "mac-gate: warning: could not seed the marketing journey attendance" >&2
+    }
     trap ci_ios_sim_release EXIT
     local step
     for step in $steps; do
@@ -221,10 +229,12 @@ job_mac-gate() {
           flutter build apk --flavor dev --dart-define=ENV=dev --dart-define=GIT_SHA="$sha" ;;
         maestro)
           _reset_fake_delegates
+          _seed_marketing_attendance
           TASHIL_CAPTURE_LOGIN_ROLES=0 TASHIL_MAESTRO_LOG_DIR="$art/maestro" \
             bash maestro/run-dev-user-journeys.sh ;;
         patrol)
           _reset_fake_delegates
+          _seed_marketing_attendance
           bash scripts/patrol_run_dev_integration.sh -- -d "$CI_SIM_UDID" ;;
         *) echo "mac-gate: unknown step $step" >&2; exit 2 ;;
       esac
