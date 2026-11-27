@@ -2754,6 +2754,10 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                             create: (_) => di.sl<PhotoPermissionBloc>(),
                             child: CapturedPhotosViewScreen(
                               photoPermission: permission,
+                              // TAS-402: branch marketing may not delete field photos.
+                              canDeletePhotos:
+                                  widget.marketingDelegate.role !=
+                                  UserRole.marketing,
                             ),
                           ),
                         ),
@@ -2783,6 +2787,10 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                                   create: (_) => di.sl<PhotoPermissionBloc>(),
                                   child: CapturedPhotosViewScreen(
                                     photoPermission: permission,
+                                    // TAS-402: branch marketing may not delete field photos.
+                                    canDeletePhotos:
+                                        widget.marketingDelegate.role !=
+                                        UserRole.marketing,
                                   ),
                                 ),
                               ),

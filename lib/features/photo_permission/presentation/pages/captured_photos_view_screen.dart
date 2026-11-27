@@ -14,7 +14,15 @@ import 'package:delegate_app/injection_container.dart' as di;
 class CapturedPhotosViewScreen extends StatelessWidget {
   final PhotoPermission photoPermission;
 
-  const CapturedPhotosViewScreen({super.key, required this.photoPermission});
+  /// TAS-402: false hides every delete control (branch marketing may not
+  /// delete field photos; the rules refuse it too).
+  final bool canDeletePhotos;
+
+  const CapturedPhotosViewScreen({
+    super.key,
+    required this.photoPermission,
+    this.canDeletePhotos = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -26,26 +34,38 @@ class CapturedPhotosViewScreen extends StatelessWidget {
     }
 
     if (existingBloc != null) {
-      return _CapturedPhotosViewContent(photoPermission: photoPermission);
+      return _CapturedPhotosViewContent(
+        photoPermission: photoPermission,
+        canDeletePhotos: canDeletePhotos,
+      );
     }
 
     return BlocProvider<PhotoPermissionBloc>(
       create: (_) => di.sl<PhotoPermissionBloc>(),
-      child: _CapturedPhotosViewContent(photoPermission: photoPermission),
+      child: _CapturedPhotosViewContent(
+        photoPermission: photoPermission,
+        canDeletePhotos: canDeletePhotos,
+      ),
     );
   }
 }
 
 class _CapturedPhotosViewContent extends StatefulWidget {
   final PhotoPermission photoPermission;
+  final bool canDeletePhotos;
 
-  const _CapturedPhotosViewContent({required this.photoPermission});
+  const _CapturedPhotosViewContent({
+    required this.photoPermission,
+    required this.canDeletePhotos,
+  });
 
   @override
-  State<_CapturedPhotosViewContent> createState() => _CapturedPhotosViewContentState();
+  State<_CapturedPhotosViewContent> createState() =>
+      _CapturedPhotosViewContentState();
 }
 
-class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> {
+class _CapturedPhotosViewContentState
+    extends State<_CapturedPhotosViewContent> {
   String? _selectedBranchId;
   String? _selectedDelegateUID;
   int _visibleCount = 24;
@@ -67,7 +87,8 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
 
   void _onScroll() {
     if (_scrollController.hasClients &&
-        _scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 400) {
+        _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 400) {
       if (mounted) {
         setState(() {
           _visibleCount += 24;
@@ -78,12 +99,12 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
 
   void _loadPhotos() {
     context.read<PhotoPermissionBloc>().add(
-          LoadCapturedPhotosRequested(
-            organizationUID: widget.photoPermission.organizationUID,
-            companyUID: widget.photoPermission.companyUID,
-            permissionId: widget.photoPermission.uid,
-          ),
-        );
+      LoadCapturedPhotosRequested(
+        organizationUID: widget.photoPermission.organizationUID,
+        companyUID: widget.photoPermission.companyUID,
+        permissionId: widget.photoPermission.uid,
+      ),
+    );
   }
 
   Future<void> _confirmDeletePhoto(CapturedPhoto photo) async {
@@ -94,7 +115,11 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 28),
+            Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.red.shade700,
+              size: 28,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -109,7 +134,10 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              AppLocalizations.of(context)!.deletePhotoFromConfirm(photo.delegateName, BranchDisplayCache.instance.displayName(photo.branchName)),
+              AppLocalizations.of(context)!.deletePhotoFromConfirm(
+                photo.delegateName,
+                BranchDisplayCache.instance.displayName(photo.branchName),
+              ),
               style: const TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 12),
@@ -122,7 +150,11 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline_rounded, size: 18, color: Colors.red.shade700),
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 18,
+                    color: Colors.red.shade700,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -144,7 +176,9 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             onPressed: () => Navigator.pop(dialogContext, true),
             icon: const Icon(Icons.delete_forever_rounded, size: 18),
@@ -185,12 +219,17 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              AppLocalizations.of(context)!.photoReportsOf(permission.companyName),
+              AppLocalizations.of(
+                context,
+              )!.photoReportsOf(permission.companyName),
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             Text(
               'من: ${DateFormat('MM-dd').format(permission.startDate)} إلى ${DateFormat('MM-dd').format(permission.endDate)}',
-              style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -242,7 +281,9 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                     Icon(
                       Icons.image_search_rounded,
                       size: 72,
-                      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                      color: colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.4,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -264,17 +305,20 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
               if (photo.branchId.isNotEmpty && photo.branchName.isNotEmpty) {
                 availableBranches[photo.branchId] = photo.branchName;
               }
-              if (photo.delegateUID.isNotEmpty && photo.delegateName.isNotEmpty) {
+              if (photo.delegateUID.isNotEmpty &&
+                  photo.delegateName.isNotEmpty) {
                 availableDelegates[photo.delegateUID] = photo.delegateName;
               }
             }
 
             // Filter photos
             final filteredPhotos = photos.where((photo) {
-              if (_selectedBranchId != null && photo.branchId != _selectedBranchId) {
+              if (_selectedBranchId != null &&
+                  photo.branchId != _selectedBranchId) {
                 return false;
               }
-              if (_selectedDelegateUID != null && photo.delegateUID != _selectedDelegateUID) {
+              if (_selectedDelegateUID != null &&
+                  photo.delegateUID != _selectedDelegateUID) {
                 return false;
               }
               return true;
@@ -284,10 +328,19 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
               children: [
                 // Filter Header
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: colorScheme.surfaceContainerLow,
-                    border: Border(bottom: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5))),
+                    border: Border(
+                      bottom: BorderSide(
+                        color: colorScheme.outlineVariant.withValues(
+                          alpha: 0.5,
+                        ),
+                      ),
+                    ),
                   ),
                   child: Column(
                     children: [
@@ -298,21 +351,43 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                               isExpanded: true,
                               initialValue: _selectedBranchId,
                               decoration: InputDecoration(
-                                labelText: AppLocalizations.of(context)!.filterByBranch,
-                                prefixIcon: const Icon(Icons.store_rounded, size: 20),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                labelText: AppLocalizations.of(
+                                  context,
+                                )!.filterByBranch,
+                                prefixIcon: const Icon(
+                                  Icons.store_rounded,
+                                  size: 20,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 8,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                                 isDense: true,
                               ),
                               items: [
                                 DropdownMenuItem<String?>(
                                   value: null,
-                                  child: Text(AppLocalizations.of(context)!.allBranches, style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                                  child: Text(
+                                    AppLocalizations.of(context)!.allBranches,
+                                    style: TextStyle(fontSize: 12),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                                ...availableBranches.entries.map((e) => DropdownMenuItem<String?>(
-                                      value: e.key,
-                                      child: Text(BranchDisplayCache.instance.displayName(e.value), style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
-                                    )),
+                                ...availableBranches.entries.map(
+                                  (e) => DropdownMenuItem<String?>(
+                                    value: e.key,
+                                    child: Text(
+                                      BranchDisplayCache.instance.displayName(
+                                        e.value,
+                                      ),
+                                      style: const TextStyle(fontSize: 12),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
                               ],
                               onChanged: (val) => setState(() {
                                 _selectedBranchId = val;
@@ -326,21 +401,41 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                               isExpanded: true,
                               initialValue: _selectedDelegateUID,
                               decoration: InputDecoration(
-                                labelText: AppLocalizations.of(context)!.filterByDelegate,
-                                prefixIcon: const Icon(Icons.badge_rounded, size: 20),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                labelText: AppLocalizations.of(
+                                  context,
+                                )!.filterByDelegate,
+                                prefixIcon: const Icon(
+                                  Icons.badge_rounded,
+                                  size: 20,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 8,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                                 isDense: true,
                               ),
                               items: [
                                 DropdownMenuItem<String?>(
                                   value: null,
-                                  child: Text(AppLocalizations.of(context)!.allDelegates2, style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                                  child: Text(
+                                    AppLocalizations.of(context)!.allDelegates2,
+                                    style: TextStyle(fontSize: 12),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                                ...availableDelegates.entries.map((e) => DropdownMenuItem<String?>(
-                                      value: e.key,
-                                      child: Text(e.value, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
-                                    )),
+                                ...availableDelegates.entries.map(
+                                  (e) => DropdownMenuItem<String?>(
+                                    value: e.key,
+                                    child: Text(
+                                      e.value,
+                                      style: const TextStyle(fontSize: 12),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
                               ],
                               onChanged: (val) => setState(() {
                                 _selectedDelegateUID = val;
@@ -350,13 +445,17 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                           ),
                         ],
                       ),
-                      if (_selectedBranchId != null || _selectedDelegateUID != null) ...[
+                      if (_selectedBranchId != null ||
+                          _selectedDelegateUID != null) ...[
                         const SizedBox(height: 8),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              AppLocalizations.of(context)!.shownResults(filteredPhotos.length, photos.length),
+                              AppLocalizations.of(context)!.shownResults(
+                                filteredPhotos.length,
+                                photos.length,
+                              ),
                               style: theme.textTheme.labelMedium?.copyWith(
                                 color: colorScheme.primary,
                                 fontWeight: FontWeight.bold,
@@ -384,7 +483,7 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                     ],
                   ),
                 ),
-                
+
                 // Grid Content with pagination
                 Expanded(
                   child: filteredPhotos.isEmpty
@@ -392,21 +491,34 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.filter_list_off_rounded, size: 64, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
+                              Icon(
+                                Icons.filter_list_off_rounded,
+                                size: 64,
+                                color: colorScheme.onSurfaceVariant.withValues(
+                                  alpha: 0.4,
+                                ),
+                              ),
                               const SizedBox(height: 16),
-                              Text(AppLocalizations.of(context)!.noResults, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurfaceVariant)),
+                              Text(
+                                AppLocalizations.of(context)!.noResults,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
                             ],
                           ),
                         )
                       : GridView.builder(
                           controller: _scrollController,
                           padding: const EdgeInsets.all(16),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            childAspectRatio: 0.75,
-                          ),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                                childAspectRatio: 0.75,
+                              ),
                           itemCount: filteredPhotos.take(_visibleCount).length,
                           itemBuilder: (context, index) {
                             final photo = filteredPhotos[index];
@@ -415,9 +527,12 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                               child: Card(
                                 clipBehavior: Clip.antiAlias,
                                 elevation: 3,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
                                   children: [
                                     Expanded(
                                       child: Stack(
@@ -437,72 +552,121 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                                                 gradient: LinearGradient(
                                                   begin: Alignment.bottomCenter,
                                                   end: Alignment.topCenter,
-                                                  colors: [Colors.black.withValues(alpha: 0.8), Colors.transparent],
+                                                  colors: [
+                                                    Colors.black.withValues(
+                                                      alpha: 0.8,
+                                                    ),
+                                                    Colors.transparent,
+                                                  ],
                                                 ),
                                               ),
                                               padding: const EdgeInsets.all(8),
                                               child: Text(
-                                                BranchDisplayCache.instance.displayName(photo.branchName),
-                                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                                BranchDisplayCache.instance
+                                                    .displayName(
+                                                      photo.branchName,
+                                                    ),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
                                           ),
                                           // زر حذف الصورة السريع
-                                          Positioned(
-                                            top: 6,
-                                            left: 6,
-                                            child: Material(
-                                              color: Colors.black.withValues(alpha: 0.6),
-                                              shape: const CircleBorder(),
-                                              child: InkWell(
-                                                customBorder: const CircleBorder(),
-                                                onTap: () => _confirmDeletePhoto(photo),
-                                                child: const Padding(
-                                                  padding: EdgeInsets.all(6),
-                                                  child: Icon(
-                                                    Icons.delete_outline_rounded,
-                                                    color: Colors.redAccent,
-                                                    size: 18,
+                                          if (widget.canDeletePhotos)
+                                            Positioned(
+                                              top: 6,
+                                              left: 6,
+                                              child: Material(
+                                                color: Colors.black.withValues(
+                                                  alpha: 0.6,
+                                                ),
+                                                shape: const CircleBorder(),
+                                                child: InkWell(
+                                                  customBorder:
+                                                      const CircleBorder(),
+                                                  onTap: () =>
+                                                      _confirmDeletePhoto(
+                                                        photo,
+                                                      ),
+                                                  child: const Padding(
+                                                    padding: EdgeInsets.all(6),
+                                                    child: Icon(
+                                                      Icons
+                                                          .delete_outline_rounded,
+                                                      color: Colors.redAccent,
+                                                      size: 18,
+                                                    ),
                                                   ),
                                                 ),
                                               ),
                                             ),
-                                          ),
                                         ],
                                       ),
                                     ),
                                     Padding(
                                       padding: const EdgeInsets.all(8),
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Row(
                                             children: [
-                                              Icon(Icons.person_rounded, size: 12, color: colorScheme.primary),
+                                              Icon(
+                                                Icons.person_rounded,
+                                                size: 12,
+                                                color: colorScheme.primary,
+                                              ),
                                               const SizedBox(width: 4),
                                               Expanded(
                                                 child: Text(
                                                   photo.delegateName,
-                                                  style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold),
+                                                  style: theme
+                                                      .textTheme
+                                                      .labelSmall
+                                                      ?.copyWith(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
                                                   maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                               ),
                                             ],
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            photo.comment.isEmpty ? AppLocalizations.of(context)!.noComment : photo.comment,
-                                            style: theme.textTheme.bodySmall?.copyWith(fontSize: 11, color: colorScheme.onSurfaceVariant),
+                                            photo.comment.isEmpty
+                                                ? AppLocalizations.of(
+                                                    context,
+                                                  )!.noComment
+                                                : photo.comment,
+                                            style: theme.textTheme.bodySmall
+                                                ?.copyWith(
+                                                  fontSize: 11,
+                                                  color: colorScheme
+                                                      .onSurfaceVariant,
+                                                ),
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            DateFormat('MM-dd HH:mm').format(photo.capturedAt),
-                                            style: theme.textTheme.labelSmall?.copyWith(fontSize: 9, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6)),
+                                            DateFormat(
+                                              'MM-dd HH:mm',
+                                            ).format(photo.capturedAt),
+                                            style: theme.textTheme.labelSmall
+                                                ?.copyWith(
+                                                  fontSize: 9,
+                                                  color: colorScheme
+                                                      .onSurfaceVariant
+                                                      .withValues(alpha: 0.6),
+                                                ),
                                           ),
                                         ],
                                       ),
@@ -517,10 +681,19 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                 if (filteredPhotos.length > _visibleCount)
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerLow,
-                      border: Border(top: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5))),
+                      border: Border(
+                        top: BorderSide(
+                          color: colorScheme.outlineVariant.withValues(
+                            alpha: 0.5,
+                          ),
+                        ),
+                      ),
                     ),
                     child: TextButton.icon(
                       onPressed: () {
@@ -530,7 +703,9 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                       },
                       icon: const Icon(Icons.expand_more_rounded),
                       label: Text(
-                        AppLocalizations.of(context)!.showMorePhotos(filteredPhotos.length - _visibleCount),
+                        AppLocalizations.of(context)!.showMorePhotos(
+                          filteredPhotos.length - _visibleCount,
+                        ),
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -539,7 +714,9 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
             );
           }
 
-          return Center(child: Text(AppLocalizations.of(context)!.loadingPhotosReports));
+          return Center(
+            child: Text(AppLocalizations.of(context)!.loadingPhotosReports),
+          );
         },
       ),
     );
@@ -572,31 +749,41 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                     ),
                     child: InteractiveViewer(
                       maxScale: 4.0,
-                      child: AppPhotoImage(
-                        photoUrl: url,
-                        fit: BoxFit.contain,
-                      ),
+                      child: AppPhotoImage(photoUrl: url, fit: BoxFit.contain),
                     ),
                   ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(dialogContext);
-                          _confirmDeletePhoto(photo);
-                        },
-                        icon: Icon(Icons.delete_outline_rounded, color: colorScheme.error, size: 18),
-                        label: Text(
-                          AppLocalizations.of(context)!.deletePhoto,
-                          style: TextStyle(color: colorScheme.error, fontWeight: FontWeight.bold),
+                      if (widget.canDeletePhotos)
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(dialogContext);
+                            _confirmDeletePhoto(photo);
+                          },
+                          icon: Icon(
+                            Icons.delete_outline_rounded,
+                            color: colorScheme.error,
+                            size: 18,
+                          ),
+                          label: Text(
+                            AppLocalizations.of(context)!.deletePhoto,
+                            style: TextStyle(
+                              color: colorScheme.error,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: colorScheme.error),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 16,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
                         ),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: colorScheme.error),
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: FilledButton.icon(
@@ -608,17 +795,22 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                                     statusText = null;
                                   });
                                   try {
-                                    final success = await PhotoCacheManager.savePhotoToGallery(
-                                      context,
-                                      photoUrl: url,
-                                    );
+                                    final success =
+                                        await PhotoCacheManager.savePhotoToGallery(
+                                          context,
+                                          photoUrl: url,
+                                        );
                                     if (dialogContext.mounted) {
                                       setDialogState(() {
                                         isSaving = false;
                                         saveSuccess = success;
                                         statusText = success
-                                            ? AppLocalizations.of(context)!.photoSavedToGallery
-                                            : AppLocalizations.of(context)!.grantPhotosPermission;
+                                            ? AppLocalizations.of(
+                                                context,
+                                              )!.photoSavedToGallery
+                                            : AppLocalizations.of(
+                                                context,
+                                              )!.grantPhotosPermission;
                                       });
                                     }
                                   } catch (e) {
@@ -626,7 +818,9 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                                       setDialogState(() {
                                         isSaving = false;
                                         saveSuccess = false;
-                                        statusText = AppLocalizations.of(context)!.photoSaveFailed(e);
+                                        statusText = AppLocalizations.of(
+                                          context,
+                                        )!.photoSaveFailed(e);
                                       });
                                     }
                                   }
@@ -635,24 +829,36 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
                                 )
                               : Icon(
-                                  saveSuccess ? Icons.check_circle_rounded : Icons.download_rounded,
+                                  saveSuccess
+                                      ? Icons.check_circle_rounded
+                                      : Icons.download_rounded,
                                   size: 18,
                                 ),
                           label: Text(
                             isSaving
                                 ? AppLocalizations.of(context)!.savingPhoto
                                 : saveSuccess
-                                    ? AppLocalizations.of(context)!.savedToPhone
-                                    : AppLocalizations.of(context)!.savePhoto,
+                                ? AppLocalizations.of(context)!.savedToPhone
+                                : AppLocalizations.of(context)!.savePhoto,
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           style: FilledButton.styleFrom(
-                            backgroundColor: saveSuccess ? colorScheme.primary : null,
-                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            backgroundColor: saveSuccess
+                                ? colorScheme.primary
+                                : null,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 16,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
                       ),
@@ -661,15 +867,22 @@ class _CapturedPhotosViewContentState extends State<_CapturedPhotosViewContent> 
                   if (statusText != null) ...[
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
-                        color: saveSuccess ? colorScheme.primaryContainer : colorScheme.errorContainer,
+                        color: saveSuccess
+                            ? colorScheme.primaryContainer
+                            : colorScheme.errorContainer,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         statusText!,
                         style: TextStyle(
-                          color: saveSuccess ? colorScheme.onPrimaryContainer : colorScheme.onErrorContainer,
+                          color: saveSuccess
+                              ? colorScheme.onPrimaryContainer
+                              : colorScheme.onErrorContainer,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),

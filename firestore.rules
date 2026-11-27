@@ -1739,7 +1739,11 @@ service cloud.firestore {
               ? staffTargetOk(orgId, compId, true)
               : (delegateInOrg(orgId) && delegateInCompany(compId)));
             allow update: if false;
-            allow delete: if canManageNestedDelegate(orgId, compId);
+            // TAS-402 (user decision 2026-11-27): branch marketing (`marketing`)
+            // may not delete delegates' field photos, though it is org-scoped
+            // staff. Promotion marketing and admins keep the delete.
+            allow delete: if canManageNestedDelegate(orgId, compId)
+              && !roleIs(['marketing']);
           }
         }
       }
