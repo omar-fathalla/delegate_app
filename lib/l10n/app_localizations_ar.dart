@@ -251,6 +251,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get inProgress => 'جاري...';
 
   @override
+  String get missingCheckOut => 'انصراف مش متسجل';
+
+  @override
   String get fullName => 'الاسم الكامل';
 
   @override

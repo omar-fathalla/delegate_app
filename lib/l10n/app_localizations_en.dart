@@ -251,6 +251,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get inProgress => 'In progress...';
 
   @override
+  String get missingCheckOut => 'Check-out not recorded';
+
+  @override
   String get fullName => 'Full Name';
 
   @override
