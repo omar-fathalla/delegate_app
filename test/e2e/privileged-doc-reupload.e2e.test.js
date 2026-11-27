@@ -170,3 +170,39 @@ test("supervisor cannot call privileged reupload", async () => {
   assert.equal(r.ok, false);
   assert.match(String(r.code), /permission-denied/);
 });
+// TAS-373: a delegate a supervisor sent back to review (new ID card) is
+// restored by approving the ID document, and only that.
+test("approving the replaced ID card restores the delegate; reject keeps it pending", async () => {
+  const idPending = (uid) => ({
+    uid,
+    status: "pending",
+    statusReason: "supervisor_id_reupload",
+    organizationUID: "o1",
+    companyUID: "c1",
+    documents: [{documentKey: "nationalityId", documentStatus: "pending", documentURL: "x", uploadedAt: "2026-11-28"}],
+  });
+  await db.doc(delPath("o1", "c1", "d-id-ok")).set(idPending("d-id-ok"));
+  await db.doc(delPath("o1", "c1", "d-id-no")).set(idPending("d-id-no"));
+
+  const ok = await callTech({uid: "d-id-ok", organizationUID: "o1", companyUID: "c1", docType: "nationalIdFront", approve: true});
+  assert.equal(ok.delegateStatus, "active");
+  const a = (await db.doc(delPath("o1", "c1", "d-id-ok")).get()).data();
+  assert.equal(a.status, "active");
+  assert.equal(a.statusReason, undefined);
+
+  await callTech({uid: "d-id-no", organizationUID: "o1", companyUID: "c1", docType: "nationalIdFront",
+    approve: false, rejectionReason: "صورة مش واضحة"});
+  const b = (await db.doc(delPath("o1", "c1", "d-id-no")).get()).data();
+  assert.equal(b.status, "pending");
+  assert.equal(b.statusReason, "supervisor_id_reupload");
+});
+
+test("approving a document of a new pending delegate does not activate it", async () => {
+  await db.doc(delPath("o1", "c1", "d-new")).set({
+    uid: "d-new", status: "pending", organizationUID: "o1", companyUID: "c1",
+    documents: [{documentKey: "nationalityId", documentStatus: "pending", documentURL: "x", uploadedAt: "2026-11-28"}],
+  });
+  const r = await callTech({uid: "d-new", organizationUID: "o1", companyUID: "c1", docType: "nationalIdFront", approve: true});
+  assert.equal(r.delegateStatus, undefined);
+  assert.equal((await db.doc(delPath("o1", "c1", "d-new")).get()).get("status"), "pending");
+});

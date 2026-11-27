@@ -1,5 +1,6 @@
 import 'package:delegate_app/features/hr/domain/payroll_penalty_policy.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:delegate_app/features/attendance/domain/missing_check_out_rule.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
@@ -224,6 +225,9 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
     });
 
     try {
+      // TAS-362: start date of the «forgotten session = zero» rule.
+      await MissingCheckOutRule.ensureLoaded(HRMonthlyPayrollScreen._firestore);
+
       // 1. Fetch Company Payroll Configuration
       try {
         final configDoc = await HRMonthlyPayrollScreen._firestore
@@ -400,6 +404,9 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
         for (final logs in daysMap.values) {
           DateTime? inTime;
           DateTime? outTime;
+          // TAS-362: a forgotten session counts zero (from the rule date).
+          final forgottenFlag = MissingCheckOutRule.flaggedIn(logs);
+          final manuallyAdjusted = MissingCheckOutRule.adjustedIn(logs);
           for (final log in logs) {
             final type = log['type']?.toString();
             final ts = log['timestamp'];
@@ -421,6 +428,8 @@ class _HRMonthlyPayrollScreenState extends State<HRMonthlyPayrollScreen> {
               checkOut: outTime,
               now: now,
               shiftHours: delegateShiftHours,
+              forgottenFlag: forgottenFlag,
+              manuallyAdjusted: manuallyAdjusted,
             );
           }
         }

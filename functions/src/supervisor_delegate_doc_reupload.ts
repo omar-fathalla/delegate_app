@@ -1,6 +1,12 @@
 /**
- * Callable supervisorReuploadDelegateDocument — supervisor active→pending doc
- * replace server-side (Mohamed 2026-11-15 / expression-budget).
+ * Callable supervisorReuploadDelegateDocument: a supervisor replaces a
+ * document of an active delegate in its company (server-side, budget).
+ *
+ * TAS-373 (user decision 2026-11-27, replaces 2026-11-15): only a new ID card
+ * (nationalIdFront/Back) sends the delegate back to `pending`, with
+ * statusReason `supervisor_id_reupload`; a privileged review that approves
+ * the ID document restores `active`. A new personal photo or payment receipt
+ * keeps the delegate `active`; the document itself waits for review.
  *
  * Deploy: functions:tashil-mobile-notifications:supervisorReuploadDelegateDocument
  */
@@ -8,9 +14,11 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import {FieldValue} from "firebase-admin/firestore";
 import {
+  SUPERVISOR_ID_REUPLOAD_REASON,
   decideSupervisorDocReupload,
   isKnownSupervisorReuploadDocType,
   mergeReuploadedDocument,
+  reuploadSetsDelegatePending,
 } from "./supervisor_delegate_doc_reupload_logic";
 import {validateDelegateDocumentObjectPath} from "./privileged_delegate_doc_reupload_logic";
 import {refFieldsForDocType} from "./delegate_doc_ref_fields";
@@ -95,10 +103,11 @@ export const supervisorReuploadDelegateDocument = functions
     const at = new Date().toISOString();
     const refFields = refFieldsForDocType(docType, newUrl, newPath);
     const documents = mergeReuploadedDocument(delegateData.documents, docType, newUrl, at, newPath);
+    const toPending = reuploadSetsDelegatePending(docType);
     const batch = db.batch();
     batch.update(delegateRef, {
       ...refFields,
-      status: "pending",
+      ...(toPending ? {status: "pending", statusReason: SUPERVISOR_ID_REUPLOAD_REASON} : {}),
       documents,
       updatedAt: FieldValue.serverTimestamp(),
     });
@@ -128,5 +137,5 @@ export const supervisorReuploadDelegateDocument = functions
     }
 
     await batch.commit();
-    return {ok: true, status: "pending"};
+    return {ok: true, status: toPending ? "pending" : "active"};
   });

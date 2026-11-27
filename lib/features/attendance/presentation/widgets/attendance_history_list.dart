@@ -41,7 +41,7 @@ class AttendanceHistoryList extends StatelessWidget {
                     DateFormat('HH:mm').format(item.checkInTime),
                     item.effectiveCheckOutTime != null
                         ? DateFormat('HH:mm').format(item.effectiveCheckOutTime!)
-                        : l10n.active,
+                        : (item.isMissingCheckOut ? l10n.missingCheckOut : l10n.active),
                   ),
                 ),
                 if (item.isEffectiveAutoCheckOut) ...[

@@ -155,3 +155,33 @@ export function decideSupervisorDocReupload(
   if (caller.uid === target.delegateUid) return {ok: false, reason: "self"};
   return {ok: true};
 }
+/**
+ * TAS-373 (user decision 2026-11-27, replaces the 2026-11-15 rule): a
+ * supervisor replacing the delegate's ID card sends the delegate back to
+ * review (`pending` + this reason); a new personal photo or payment receipt
+ * keeps the delegate `active` (the document itself is still `pending`).
+ */
+export const SUPERVISOR_ID_REUPLOAD_REASON = "supervisor_id_reupload";
+
+export function reuploadSetsDelegatePending(docType: string): boolean {
+  return docType === "nationalIdFront" || docType === "nationalIdBack";
+}
+
+/**
+ * After a privileged review of a document: the delegate goes back to
+ * `active` when it is `pending` only because a supervisor replaced the ID
+ * card and that ID document is now approved.
+ */
+export function idReviewRestoresActive(
+  delegate: Record<string, unknown> | null | undefined,
+  documentsAfterReview: unknown,
+): boolean {
+  const d = delegate || {};
+  if (String(d.status || "").trim().toLowerCase() !== "pending") return false;
+  if (String(d.statusReason || "") !== SUPERVISOR_ID_REUPLOAD_REASON) return false;
+  const docs = Array.isArray(documentsAfterReview) ? documentsAfterReview : [];
+  const id = docs.find((e) => e && typeof e === "object" &&
+    String((e as Record<string, unknown>).documentKey || "") === "nationalityId") as
+    Record<string, unknown> | undefined;
+  return !!id && String(id.documentStatus || "").trim().toLowerCase() === "approved";
+}
