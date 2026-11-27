@@ -48,9 +48,13 @@ if ! command -v patrol >/dev/null 2>&1; then
   exit 1
 fi
 
-args=(-t)
+# TAS-394: every target needs its own -t. With one -t followed by bare paths,
+# patrol_cli keeps only the first path (the rest go to argResults.rest, which
+# `patrol test` ignores), so from #228 (8 Nov) until this fix only the first
+# file ever ran.
+args=()
 for t in "${targets[@]}"; do
-  args+=("$t")
+  args+=(-t "$t")
 done
 args+=(--flavor dev --dart-define=ENV=dev)
 if [[ -n "${PATROL_DEV_SECRET:-}" ]]; then
@@ -74,6 +78,22 @@ fi
 if [[ -n "${PATROL_DEV_NATIONAL_ID:-}" ]]; then
   args+=(--dart-define=PATROL_DEV_NATIONAL_ID="$PATROL_DEV_NATIONAL_ID")
 fi
-args+=("${extra[@]}")
+args+=(${extra[@]+"${extra[@]}"})  # bash 3.2 + set -u: empty array
 
-exec patrol test "${args[@]}"
+if [[ "${PATROL_RUN_DRY:-0}" == "1" ]]; then
+  # Prints the command (secrets masked) for the -t regression test.
+  printf '%s\n' "patrol test ${args[*]}" | sed -E 's/(SECRET=)[^ ]*/\1***/g'
+  exit 0
+fi
+
+# TAS-394 guard: patrol prints one result line per test ending in
+# "(/<file>.dart)". A target with no such line never ran, which must fail the
+# gate even when everything that did run passed.
+log="$(mktemp -t patrol-run.XXXXXX)"
+set +e
+patrol test "${args[@]}" 2>&1 | tee "$log"
+status=${PIPESTATUS[0]}
+set -e
+bash "$ROOT/scripts/patrol_check_ran_targets.sh" "$log" "${targets[@]}" || status=1
+rm -f "$log"
+exit "$status"

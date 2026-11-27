@@ -104,6 +104,7 @@ job_ios-guards() {
   bash scripts/ios_dev_config_check.sh
   bash scripts/maestro_check_flow_headers.sh
   bash scripts/patrol_check_integration_targets.sh
+  bash test/scripts/patrol_targets.test.sh
   bash patrol_test/manifest/test_xctestrun_resolve.sh
   bash scripts/holds_authority_mode_trap_test.sh
   python3 scripts/holds_authority_mode_payload_test.py
@@ -235,7 +236,8 @@ job_mac-gate() {
         patrol)
           _reset_fake_delegates
           _seed_marketing_attendance
-          bash scripts/patrol_run_dev_integration.sh -- -d "$CI_SIM_UDID" ;;
+          PATROL_RAN_TARGETS_PLATFORM=ios \
+            bash scripts/patrol_run_dev_integration.sh -- -d "$CI_SIM_UDID" ;;
         *) echo "mac-gate: unknown step $step" >&2; exit 2 ;;
       esac
       echo "::endgroup::"

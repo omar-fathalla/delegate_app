@@ -1,3 +1,4 @@
+// patrol-ran-targets: may-skip-on ios (Android-only: skipped on iOS, TAS-394)
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
