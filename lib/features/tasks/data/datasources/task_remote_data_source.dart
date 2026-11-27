@@ -96,6 +96,7 @@ class TaskRemoteDataSourceImpl implements TaskRemoteDataSource {
       imageUrl: task.imageUrl,
       imagePath: task.imagePath,
       imagePaths: task.imagePaths,
+      proofRequired: task.proofRequired,
     );
     await docRef.set(taskWithId.toFirestore());
     return taskWithId;

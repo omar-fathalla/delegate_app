@@ -1917,11 +1917,17 @@ service cloud.firestore {
           return !request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(['createdBy', 'createdByName']);
         }
+        // TAS-368: a delegate never cancels (that is the sender's call) and
+        // never names someone else as the one who finished it.
         function taskDelegateCanUpdate() {
+          let ch = request.resource.data.diff(resource.data).affectedKeys();
           return taskDelegateTarget()
             && taskKeepsSender()
-            && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['status', 'notes', 'completedAt', 'completedBy']);
+            && ch.hasOnly(['status', 'notes', 'completedAt', 'completedBy'])
+            // The app's whole-doc save sends completedBy: null; a name is not allowed.
+            && (!ch.hasAny(['completedBy']) || request.resource.data.completedBy == null)
+            && (!ch.hasAny(['status'])
+              || request.resource.data.status in ['pending', 'inProgress', 'completed']);
         }
         function taskStaffCanUpdate() {
           let scope = taskStaffScope(resource.data.get('companyId', ''));
@@ -1961,6 +1967,40 @@ service cloud.firestore {
         allow update: if signedIn() && taskCanUpdate();
         // Hard delete: the sender (or global staff). Delegates only their own.
         allow delete: if signedIn() && taskCanDelete();
+
+        // TAS-368: each recipient's own progress on a shared task («الكل»).
+        // A delegate marks it done for itself only; the shared task doc and
+        // its status stay the sender's. Same doc id as proofs/{uid}, so a
+        // task with proofRequired needs the caller's own proof first.
+        match /completions/{completerUid} {
+          function compTask() {
+            return get(/databases/$(database)/documents/organizations/$(orgId)/tasks/$(taskId)).data;
+          }
+          function compWriteOk() {
+            let task = compTask();
+            let taskCo = task.get('companyId', '');
+            let d = request.resource.data;
+            return claimString('role') == 'delegate'
+              && delegateInOrg(orgId)
+              && taskCo is string && taskCo != ''
+              && (claimString('companyId') == taskCo || claimListHas('companyIds', taskCo))
+              && task.get('assignedTo', '') in ['all', 'الكل', 'all_marketing_promotion', 'all_branch_marketing']
+              && task.get('status', '') != 'cancelled'
+              && d.keys().hasOnly(['status', 'notes', 'completedAt', 'updatedAt'])
+              && d.get('status', '') in ['pending', 'inProgress', 'completed']
+              && d.get('updatedAt', null) == request.time
+              && (d.status != 'completed' || d.get('completedAt', null) == request.time)
+              && (d.status != 'completed' || task.get('proofRequired', false) != true
+                || exists(/databases/$(database)/documents/organizations/$(orgId)/tasks/$(taskId)/proofs/$(completerUid)));
+          }
+          allow get: if signedIn() && (
+            isSelfId(completerUid)
+            || taskStaffScope(compTask().get('companyId', '')) > 0
+          );
+          allow list: if signedIn() && taskStaffScope(compTask().get('companyId', '')) > 0;
+          allow create, update: if signedIn() && isSelfId(completerUid) && compWriteOk();
+          allow delete: if false;
+        }
 
         // Phase 4: per-uploader proof photos. Isolated from supervisor
         // imagePaths so a title-only or sender edit cannot wipe them.

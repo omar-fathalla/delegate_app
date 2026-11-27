@@ -54,12 +54,35 @@ class SessionManagementService {
     return s == 'suspended' || s == 'rejected';
   }
 
-  /// True when [status] is held or the holds map has any entry.
+  /// TAS-367 (user decision 2026-11-27): the app follows the server's sign-in
+  /// rule, `status` only. In `shadow` mode the holds are written without
+  /// changing `status`, and the server lets the delegate in; the app used to
+  /// sign them out on any hold. In `authoritative` mode `status` is derived
+  /// from the holds, so nothing is lost. The holds only pick the message.
   static bool isHeldSnapshot(Map<String, dynamic>? data) {
     if (data == null) return false;
-    if (isHeldStatus(data['status']?.toString())) return true;
-    final holds = data['holds'];
-    return holds is Map && holds.isNotEmpty;
+    return isHeldStatus(data['status']?.toString());
+  }
+
+  /// The reason the delegate sees when [isHeldSnapshot] is true, picked from
+  /// the holds (or the legacy statusReason).
+  static String heldMessageFor(Map<String, dynamic>? data) {
+    final holds = data?['holds'];
+    final keys = holds is Map ? holds.keys.map((k) => '$k').toSet() : <String>{};
+    final reason = (data?['statusReason'] ?? '').toString();
+    if (keys.contains('subscription_expired') || reason == 'subscription_expired') {
+      return 'اشتراك شركتك خلص، فحسابك واقف لحد ما الشركة تجدد. كلّم المشرف.';
+    }
+    if (keys.contains('billing_cycle_reset') || reason == 'billing_cycle_reset') {
+      return 'حسابك واقف لحد ما دورة الفوترة الجديدة تتدفع. كلّم المشرف.';
+    }
+    if ((data?['status'] ?? '').toString().trim().toLowerCase() == 'rejected') {
+      return 'طلب حسابك اترفض. كلّم المشرف علشان تعرف السبب.';
+    }
+    if (keys.contains('admin_suspend') || reason == 'suspend') {
+      return 'الإدارة أوقفت حسابك. كلّم المشرف علشان تعرف السبب.';
+    }
+    return heldSessionMessage;
   }
 
   /// Live listener: signs the delegate out when the document becomes held.
@@ -95,7 +118,7 @@ class SessionManagementService {
       final data = snap.data();
       if (data == null) return;
       if (isHeldSnapshot(data)) {
-        onHeld(heldSessionMessage);
+        onHeld(heldMessageFor(data));
       }
     }, onError: (_) {});
     FirestoreSessionSubscriptions.instance
@@ -183,8 +206,8 @@ class SessionManagementService {
         if (delegateDoc.exists && delegateDoc.data() != null) {
           final data = delegateDoc.data()!;
           if (isHeldSnapshot(data)) {
-            return const SessionVerificationResult.invalid(
-              reason: heldSessionMessage,
+            return SessionVerificationResult.invalid(
+              reason: heldMessageFor(data),
             );
           }
 
