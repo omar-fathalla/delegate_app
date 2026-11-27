@@ -5,6 +5,18 @@ import 'package:delegate_app/l10n/app_localizations.dart';
 import 'package:delegate_app/l10n/app_localizations_delegates.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:delegate_app/core/services/sync_manager.dart';
+import 'package:delegate_app/features/photo_permission/data/datasources/photo_offline_datasource.dart';
+import 'package:delegate_app/features/photo_permission/data/datasources/photo_permission_remote_datasource.dart';
+import 'package:delegate_app/injection_container.dart';
+import 'package:mocktail/mocktail.dart';
+
+class _MockRemote extends Mock implements PhotoPermissionRemoteDataSource {}
+
+class _EmptyQueue extends PhotoOfflineDataSource {
+  @override
+  Future<List<Map<String, dynamic>>> getPendingPhotosForDelegates(Set<String> ids) async => const [];
+}
 
 /// TAS-350 (m3-kit C-27): the logout confirmation is a basic M3 AlertDialog,
 /// not a bottom sheet: question as the headline, two text buttons, cancel
@@ -94,5 +106,23 @@ void main() {
     await t.tap(find.widgetWithText(TextButton, 'إلغاء'));
     await t.pumpAndSettle();
     expect(find.byType(AlertDialog), findsNothing);
+  });
+
+  testWidgets('TAS-369: photos still on the phone -> warning, «استنى» and «اخرج برضه»', (t) async {
+    final sync = SyncManager(
+      offlineDataSource: _EmptyQueue(),
+      remoteDataSource: _MockRemote(),
+      isBackground: true,
+      selfIds: () => {'seed-fake-d'},
+    );
+    sl.registerSingleton<SyncManager>(sync);
+    addTearDown(() => sl.unregister<SyncManager>());
+    await t.pump();
+    sync.statusNotifier.value = const SyncState(pendingCount: 3);
+    await open(t);
+    expect(find.byKey(const Key('logout_pending_photos_warning')), findsOneWidget);
+    expect(find.textContaining('3 صور لسه على الموبايل'), findsOneWidget);
+    expect(find.text('استنى'), findsOneWidget);
+    expect(find.text('اخرج برضه'), findsOneWidget);
   });
 }

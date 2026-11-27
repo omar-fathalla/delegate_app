@@ -125,7 +125,10 @@ class SyncStatusBanner extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      AppLocalizations.of(context)!.waitingToUpload,
+                      // TAS-369: rows past the attempt limit wait for a tap.
+                      syncState.failedCount > 0
+                          ? AppLocalizations.of(context)!.photoSyncFailedRetry(syncState.failedCount)
+                          : AppLocalizations.of(context)!.waitingToUpload,
                       style: TextStyle(
                         fontSize: 11,
                         color: Colors.amber.shade900.withValues(alpha: 0.8),
@@ -137,7 +140,9 @@ class SyncStatusBanner extends StatelessWidget {
               const SizedBox(width: 8),
               FilledButton.tonal(
                 onPressed: () {
-                  syncManager.syncPendingPhotos();
+                  syncState.failedCount > 0
+                      ? syncManager.retryFailed()
+                      : syncManager.syncPendingPhotos();
                 },
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.amber.shade200,

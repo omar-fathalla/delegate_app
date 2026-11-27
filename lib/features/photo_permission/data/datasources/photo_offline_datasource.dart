@@ -7,6 +7,25 @@ class PhotoOfflineDataSource {
   static Database? _database;
   static const String tableName = 'pending_photos';
 
+  /// TAS-369: v3 adds the capture time, the watermark flag and the retry
+  /// bookkeeping. Existing rows keep their data (columns are nullable or
+  /// have defaults).
+  static const int schemaVersion = 3;
+
+  /// SQL run by [_onUpgrade] from [oldVersion] (pure, unit-tested).
+  static List<String> upgradeStatements(int oldVersion) => [
+        if (oldVersion < 2) ...[
+          'ALTER TABLE $tableName ADD COLUMN companyName TEXT',
+          'ALTER TABLE $tableName ADD COLUMN companyCode INTEGER',
+        ],
+        if (oldVersion < 3) ...[
+          'ALTER TABLE $tableName ADD COLUMN capturedAtMs INTEGER',
+          'ALTER TABLE $tableName ADD COLUMN watermarkFailed INTEGER NOT NULL DEFAULT 0',
+          'ALTER TABLE $tableName ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0',
+          'ALTER TABLE $tableName ADD COLUMN lastError TEXT',
+        ],
+      ];
+
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDB('photo_offline.db');
@@ -19,7 +38,7 @@ class PhotoOfflineDataSource {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: schemaVersion,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -42,19 +61,22 @@ class PhotoOfflineDataSource {
         comment TEXT,
         latitude REAL,
         longitude REAL,
-        timestamp INTEGER NOT NULL
+        timestamp INTEGER NOT NULL,
+        capturedAtMs INTEGER,
+        watermarkFailed INTEGER NOT NULL DEFAULT 0,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        lastError TEXT
       )
     ''');
   }
 
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
+    for (final sql in upgradeStatements(oldVersion)) {
       try {
-        await db.execute('ALTER TABLE $tableName ADD COLUMN companyName TEXT');
-      } catch (_) {}
-      try {
-        await db.execute('ALTER TABLE $tableName ADD COLUMN companyCode INTEGER');
-      } catch (_) {}
+        await db.execute(sql);
+      } catch (_) {
+        // Column already there (a half-applied earlier upgrade).
+      }
     }
   }
 
@@ -96,6 +118,41 @@ class PhotoOfflineDataSource {
       where: 'delegateUID = ?',
       whereArgs: [delegateUID],
       orderBy: 'timestamp DESC',
+    );
+  }
+
+  /// TAS-369: the rows of the signed-in delegate only (any of its ids), so a
+  /// second account on the same phone never uploads someone else's photos.
+  Future<List<Map<String, dynamic>>> getPendingPhotosForDelegates(Set<String> ids) async {
+    if (ids.isEmpty) return const [];
+    final db = await database;
+    final marks = List.filled(ids.length, '?').join(',');
+    return db.query(
+      tableName,
+      where: 'delegateUID IN ($marks)',
+      whereArgs: ids.toList(),
+      orderBy: 'timestamp ASC',
+    );
+  }
+
+  /// Records a failed attempt. [countAttempt] is false for network errors
+  /// (they retry freely) and true for errors a retry will not fix.
+  Future<void> recordFailure(int id, String error, {required bool countAttempt}) async {
+    final db = await database;
+    await db.rawUpdate(
+      'UPDATE $tableName SET lastError = ?, attempts = attempts + ? WHERE id = ?',
+      [error.length > 300 ? error.substring(0, 300) : error, countAttempt ? 1 : 0, id],
+    );
+  }
+
+  /// «فشلت، اضغط لإعادة المحاولة»: the delegate retries the stuck rows.
+  Future<void> resetAttempts(Set<String> ids) async {
+    if (ids.isEmpty) return;
+    final db = await database;
+    final marks = List.filled(ids.length, '?').join(',');
+    await db.rawUpdate(
+      'UPDATE $tableName SET attempts = 0 WHERE delegateUID IN ($marks)',
+      ids.toList(),
     );
   }
 

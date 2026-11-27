@@ -1346,6 +1346,22 @@ class AppLocalizationsAr extends AppLocalizations {
   String get logoutDialogBody => 'بياناتك المحلية هتتحفظ قبل الخروج';
 
   @override
+  String logoutPendingPhotosWarning(int count) {
+    return 'استنى! $count صور لسه على الموبايل، لو خرجت دلوقتي مش هيترفعوا لحد ما تدخل تاني بنفس الحساب.';
+  }
+
+  @override
+  String get logoutWaitForPhotos => 'استنى';
+
+  @override
+  String get logoutAnyway => 'اخرج برضه';
+
+  @override
+  String photoSyncFailedRetry(int count) {
+    return '$count صور فشل رفعها، اضغط لإعادة المحاولة';
+  }
+
+  @override
   String logoutFailed(Object error) {
     return 'تعذّر تسجيل الخروج: $error';
   }

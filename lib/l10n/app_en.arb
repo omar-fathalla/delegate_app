@@ -1495,6 +1495,12 @@
   "logoutConfirm": "Log out?\nYour local data will be saved first.",
   "logoutDialogTitle": "Log out?",
   "logoutDialogBody": "Your local data is saved first",
+  "logoutPendingPhotosWarning": "Wait! {count} photos are still on this phone. If you sign out now they will not upload until you sign in again with this account.",
+  "@logoutPendingPhotosWarning": {"placeholders": {"count": {"type": "int"}}},
+  "logoutWaitForPhotos": "Wait",
+  "logoutAnyway": "Sign out anyway",
+  "photoSyncFailedRetry": "{count} photos failed to upload, tap to retry",
+  "@photoSyncFailedRetry": {"placeholders": {"count": {"type": "int"}}},
   "logoutFailed": "Couldn't log out: {error}",
   "@logoutFailed": {
     "placeholders": {
