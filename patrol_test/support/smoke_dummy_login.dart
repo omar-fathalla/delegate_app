@@ -101,8 +101,11 @@ Future<void> submitDevDelegateDummyLogin(
     reason: 'Set PATROL_DEV_NATIONAL_ID for delegate Patrol setup',
   );
 
+  // Waits for the fields of whichever mode is showing. The screen remembers
+  // the last account type, so after a staff or marketing test it opens on
+  // «موظف إداري» and the national ID field only appears after the switch
+  // below (TAS-394).
   await waitForDevLoginScreenAfterSplash($);
-  await waitForDevLoginFormFieldsReady($);
 
   final delegateMode = devLoginDelegateModeFinder();
   if ($.tester.any(delegateMode)) {

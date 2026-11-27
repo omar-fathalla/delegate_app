@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -88,16 +90,32 @@ void main() {
       await $.tester.pump(const Duration(milliseconds: 400));
       await $.tester.tap(find.text('تصدير Excel'));
 
-      // The OS share sheet takes the foreground: the app is no longer resumed.
-      await _pumpUntil(
-        $,
-        () =>
-            WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed,
-        timeout: const Duration(seconds: 20),
-        what: 'the OS share sheet',
-      );
-
-      await $.native.pressBack();
+      if (Platform.isIOS) {
+        // TAS-394: on iOS the share sheet is a view controller inside the
+        // app, so the lifecycle stays resumed and there is no Back button.
+        // Find the sheet natively and close it with its own button.
+        await $.native.waitUntilVisible(
+          Selector(text: 'Save to Files'),
+          timeout: const Duration(seconds: 20),
+        );
+        await $.native.tap(
+          Selector(text: 'Close'),
+          timeout: const Duration(seconds: 10),
+        );
+        await $.tester.pump(const Duration(seconds: 1));
+      } else {
+        // Android: the OS share sheet takes the foreground, so the app is no
+        // longer resumed.
+        await _pumpUntil(
+          $,
+          () =>
+              WidgetsBinding.instance.lifecycleState !=
+              AppLifecycleState.resumed,
+          timeout: const Duration(seconds: 20),
+          what: 'the OS share sheet',
+        );
+        await $.native.pressBack();
+      }
       await _pumpUntil(
         $,
         () =>

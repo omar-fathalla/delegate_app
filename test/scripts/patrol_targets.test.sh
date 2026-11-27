@@ -42,3 +42,27 @@ if out="$(bash scripts/patrol_check_ran_targets.sh "$tmp/ok.log" \
 fi
 grep -q 'integration_c_test.dart' <<<"$out" || fail "guard did not name the missing target: $out"
 echo "ok: ran-targets guard"
+
+# 4. A may-skip-on ios file may be absent on iOS when the summary has a skip,
+#    but not on Android, and not when nothing was skipped.
+printf '// patrol-ran-targets: may-skip-on ios (test)\n' >"$tmp/integration_d_test.dart"
+printf '%s\n' '✅ dev: a (/integration_a_test.dart)' '⏩ Skipped: 1' >"$tmp/skip.log"
+PATROL_RAN_TARGETS_PLATFORM=ios bash scripts/patrol_check_ran_targets.sh "$tmp/skip.log" \
+  patrol_test/integration_a_test.dart "$tmp/integration_d_test.dart" >/dev/null \
+  || fail "may-skip file rejected on ios"
+PATROL_RAN_TARGETS_PLATFORM=android bash scripts/patrol_check_ran_targets.sh "$tmp/skip.log" \
+  patrol_test/integration_a_test.dart "$tmp/integration_d_test.dart" >/dev/null 2>&1 \
+  && fail "may-skip-on ios file allowed on android"
+printf '%s\n' '✅ dev: a (/integration_a_test.dart)' '⏩ Skipped: 0' >"$tmp/noskip.log"
+PATROL_RAN_TARGETS_PLATFORM=ios bash scripts/patrol_check_ran_targets.sh "$tmp/noskip.log" \
+  patrol_test/integration_a_test.dart "$tmp/integration_d_test.dart" >/dev/null 2>&1 \
+  && fail "may-skip file allowed with zero skips"
+# 5. The real gate log shape: many result lines, early match (SIGPIPE case).
+{ for i in $(seq 1 3000); do echo "✅ $i. tap (native)"; done
+  echo '✅ dev: a (/integration_a_test.dart)'
+  for i in $(seq 1 3000); do echo "✅ $i. tap (native)"; done
+  echo '✅ dev: b (/integration_b_test.dart)'; } >"$tmp/big.log"
+bash scripts/patrol_check_ran_targets.sh "$tmp/big.log" \
+  patrol_test/integration_a_test.dart patrol_test/integration_b_test.dart >/dev/null \
+  || fail "guard missed a target in a long log"
+echo "ok: may-skip + long log"

@@ -236,7 +236,8 @@ job_mac-gate() {
         patrol)
           _reset_fake_delegates
           _seed_marketing_attendance
-          bash scripts/patrol_run_dev_integration.sh -- -d "$CI_SIM_UDID" ;;
+          PATROL_RAN_TARGETS_PLATFORM=ios \
+            bash scripts/patrol_run_dev_integration.sh -- -d "$CI_SIM_UDID" ;;
         *) echo "mac-gate: unknown step $step" >&2; exit 2 ;;
       esac
       echo "::endgroup::"
