@@ -108,9 +108,11 @@ async function docEntry(org, co, uid, key) {
 test("photo at index 0 on [photo, nationalityId, receipt]", async () => {
   const url = "https://cdn.example/p-new.jpg";
   const r = await call({uid: "d1", organizationUID: "o1", companyUID: "c1", docType: "personalPhoto", newUrl: url});
-  assert.equal(r.status, "pending");
+  // TAS-373: a new personal photo keeps the delegate active; the document waits.
+  assert.equal(r.status, "active");
   const data = (await db.doc(delPath("o1", "c1", "d1")).get()).data();
-  assert.equal(data.status, "pending");
+  assert.equal(data.status, "active");
+  assert.equal(data.statusReason, undefined);
   const e = await docEntry("o1", "c1", "d1", "personalPhoto");
   assert.equal(e.documentStatus, "pending");
   assert.equal(e.documentURL, url);
@@ -120,10 +122,15 @@ test("photo at index 0 on [photo, nationalityId, receipt]", async () => {
 test("ID front replace", async () => {
   await db.doc(delPath("o1", "c1", "d1")).set(baseActive("o1", "c1", "d1", [...DOCS_3]));
   const url = "https://cdn.example/id-f-new.jpg";
-  await call({uid: "d1", docType: "nationalIdFront", newUrl: url});
+  const r = await call({uid: "d1", docType: "nationalIdFront", newUrl: url});
   const e = await docEntry("o1", "c1", "d1", "nationalityId");
   assert.equal(e.documentStatus, "pending");
   assert.equal(e.documentURL, url);
+  // TAS-373: a new ID card sends the delegate back to review, with a reason.
+  assert.equal(r.status, "pending");
+  const data = (await db.doc(delPath("o1", "c1", "d1")).get()).data();
+  assert.equal(data.status, "pending");
+  assert.equal(data.statusReason, "supervisor_id_reupload");
 });
 
 test("ID back replace", async () => {
@@ -141,7 +148,7 @@ test("photo not at index 0", async () => {
   const e = await docEntry("o1", "c1", "d-mid", "personalPhoto");
   assert.equal(e.documentStatus, "pending");
   assert.equal(e.documentURL, url);
-  assert.equal((await db.doc(delPath("o1", "c1", "d-mid")).get()).get("status"), "pending");
+  assert.equal((await db.doc(delPath("o1", "c1", "d-mid")).get()).get("status"), "active");
 });
 
 test("five-document list", async () => {
