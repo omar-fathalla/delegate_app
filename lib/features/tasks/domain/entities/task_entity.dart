@@ -37,6 +37,10 @@ class TaskEntity extends Equatable {
   /// Set when the sender edits the title, description or image.
   final DateTime? editedAt;
 
+  /// TAS-368: the sender asked for a proof photo before «تم». Missing on old
+  /// tasks = false. The rules enforce it on shared-task completions.
+  final bool proofRequired;
+
   /// Paths to show or edit, from [imagePaths] or the legacy [imagePath].
   List<String> get resolvedImagePaths =>
       resolveTaskImagePaths(imagePath: imagePath, imagePaths: imagePaths);
@@ -66,6 +70,7 @@ class TaskEntity extends Equatable {
     this.imagePath,
     this.imagePaths = const [],
     this.editedAt,
+    this.proofRequired = false,
   });
 
   TaskEntity copyWith({
@@ -88,6 +93,7 @@ class TaskEntity extends Equatable {
     String? imagePath,
     List<String>? imagePaths,
     DateTime? editedAt,
+    bool? proofRequired,
     bool clearImage = false,
     bool clearImageUrl = false,
   }) {
@@ -113,6 +119,7 @@ class TaskEntity extends Equatable {
       imagePath: clearImage ? null : (imagePath ?? this.imagePath),
       imagePaths: clearImage ? const [] : (imagePaths ?? this.imagePaths),
       editedAt: editedAt ?? this.editedAt,
+      proofRequired: proofRequired ?? this.proofRequired,
     );
   }
 
@@ -137,5 +144,6 @@ class TaskEntity extends Equatable {
     imagePath,
     imagePaths,
     editedAt,
+    proofRequired,
   ];
 }

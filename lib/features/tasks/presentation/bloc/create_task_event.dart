@@ -23,6 +23,9 @@ class CreateTaskSubmitted extends CreateTaskEvent {
   final String? imagePath;
   final List<String> imagePaths;
 
+  /// TAS-368: a proof photo is required before «تم».
+  final bool proofRequired;
+
   const CreateTaskSubmitted({
     required this.organizationId,
     required this.title,
@@ -37,6 +40,7 @@ class CreateTaskSubmitted extends CreateTaskEvent {
     this.imageUrl,
     this.imagePath,
     this.imagePaths = const [],
+    this.proofRequired = false,
   });
 
   @override
