@@ -1,7 +1,11 @@
 import 'dart:convert';
 import 'package:material_ui/material_ui.dart';
 import 'package:delegate_app/l10n/app_localizations.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide Bidi, TextDirection;
+import 'package:delegate_app/core/design/bidi.dart';
+import 'package:delegate_app/core/design/tokens.dart';
+import 'package:delegate_app/core/design/widgets/pull_to_refresh.dart';
+import 'package:delegate_app/core/design/widgets/skeleton.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delegate_app/features/profile/domain/entities/delegate.dart';
 import 'package:delegate_app/features/marketing_search/presentation/pages/marketing_search_screen.dart';
@@ -73,7 +77,9 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
         _favoriteBranches = favs;
       } else {
         final active = _prefService.getActiveBranch(widget.delegate.uid);
-        _favoriteBranches = (active != null && active.isNotEmpty) ? [active] : [];
+        _favoriteBranches = (active != null && active.isNotEmpty)
+            ? [active]
+            : [];
       }
 
       final today = DateTime.now();
@@ -88,7 +94,9 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
         final cached = prefs.getString(cacheKey);
         if (cached != null && cached.isNotEmpty) {
           final decoded = json.decode(cached) as List<dynamic>;
-          _todayRecords = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          _todayRecords = decoded
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
           _isLoadingAttendance = false;
           if (mounted) setState(() {});
         }
@@ -137,11 +145,13 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
 
       // Cache minimal records for 0ms next load
       final minimal = allRecs
-          .map((r) => {
-                'delegateId': r['delegateId'] ?? '',
-                'fullName': r['fullName'] ?? '',
-                'branchName': r['branchName'] ?? '',
-              })
+          .map(
+            (r) => {
+              'delegateId': r['delegateId'] ?? '',
+              'fullName': r['fullName'] ?? '',
+              'branchName': r['branchName'] ?? '',
+            },
+          )
           .toList();
       await prefs.setString(cacheKey, json.encode(minimal));
 
@@ -162,427 +172,156 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        await _loadFloorData(forceRefresh: true);
-      },
-      child: SingleChildScrollView(
+    // TAS-392: same page skeleton as the delegate home (round 2): one hero,
+    // section titles, kit cards (Card.filled + primary icons), kit refresh.
+    return PullToRefresh(
+      onRefresh: () => _loadFloorData(forceRefresh: true),
+      child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. الكارت الترحيبي والتعريفي الرئيسي مع دليل المهام
-            _buildWelcomeDutiesBanner(context, colorScheme, isArabic),
+        padding: const EdgeInsetsDirectional.fromSTEB(
+          TashilSpacing.lg,
+          TashilSpacing.md,
+          TashilSpacing.lg,
+          TashilSpacing.xxl,
+        ),
+        children: [
+          _buildWelcomeHeroCard(context, isArabic),
+          const SizedBox(height: TashilSpacing.lg),
+          _buildSectionTitle(context, isArabic ? 'ملخص اليوم' : 'Today'),
+          _buildDailyFloorInspectionOverview(context, isArabic),
+          const SizedBox(height: TashilSpacing.lg),
+          _buildSectionTitle(
+            context,
+            isArabic ? 'الوصول السريع' : 'Quick access',
+          ),
+          _buildQuickOperations(context, isArabic),
+          const SizedBox(height: TashilSpacing.lg),
+          _buildDutiesCard(context, isArabic),
+          const SizedBox(height: TashilSpacing.sm),
+          _buildFieldGuidanceCard(context, isArabic),
+        ],
+      ),
+    );
+  }
 
-            const SizedBox(height: 16),
-
-            // 1.1 مدخل وصول سريع لتبويب العلامة الخاصة الموحد (Private Label)
-            _buildPrivateLabelShortcutCard(context, colorScheme, isArabic),
-            const SizedBox(height: 16),
-
-            // 2. عنوان لوحة العمليات والوصول السريع
-            Row(
-              children: [
-                Icon(
-                  Icons.dashboard_customize_rounded,
-                  color: colorScheme.primary,
-                  size: 22,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  isArabic ? 'لوحة العمليات والوصول السريع' : 'Quick Operations Hub',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            // 3. شبكة كروت العمليات السريعة (4 كروت)
-            _buildQuickOperationsGrid(context, colorScheme, isArabic),
-
-            const SizedBox(height: 20),
-
-            // 4. عنوان ملخص الميداني اليومي
-            Row(
-              children: [
-                Icon(
-                  Icons.assignment_turned_in_rounded,
-                  color: colorScheme.primary,
-                  size: 22,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  isArabic ? 'ملخص الميداني اليومي' : 'Daily Field Summary',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            // كارت التحقق الميداني بالصالة (اليومي)
-            _buildDailyFloorInspectionOverview(context, colorScheme, isArabic),
-
-            const SizedBox(height: 16),
-
-            // 5. نصيحة وتوجيه ميداني
-            _buildFieldGuidanceCard(context, colorScheme, isArabic),
-          ],
+  Widget _buildSectionTitle(BuildContext context, String title) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(
+        start: TashilSpacing.xs,
+        bottom: TashilSpacing.sm,
+      ),
+      child: Text(
+        title,
+        style: theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: theme.colorScheme.onSurface,
         ),
       ),
     );
   }
 
-  /// 1. الكارت الترحيبي الشامل مع المهام اليومية الثلاث
-  Widget _buildWelcomeDutiesBanner(
-    BuildContext context,
-    ColorScheme colorScheme,
-    bool isArabic,
-  ) {
+  Color _heroOn(BuildContext context) {
+    final theme = Theme.of(context);
+    return theme.brightness == Brightness.dark
+        ? theme.colorScheme.onPrimaryContainer
+        : theme.colorScheme.onPrimary;
+  }
+
+  /// Hero card: greeting on one line, then the role and the chain as icon +
+  /// text labels (read-only values are not chips, TAS-384).
+  Widget _buildWelcomeHeroCard(BuildContext context, bool isArabic) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final delegate = widget.delegate;
     final displayName = delegate.firstName.isNotEmpty
         ? delegate.firstName
         : delegate.fullName;
+    final on = _heroOn(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    String? photoUrl =
+        delegate.personalPhotoUrl ??
+        (delegate.documents
+            .where(
+              (d) =>
+                  d.documentKey == DocumentKey.personalPhoto &&
+                  d.displayUrl.isNotEmpty,
+            )
+            .firstOrNull
+            ?.displayUrl);
+    if (photoUrl == null) {
+      try {
+        photoUrl = FirebaseAuth.instance.currentUser?.photoURL;
+      } catch (_) {}
+    }
+
+    Widget label(IconData icon, String text) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: on),
+        const SizedBox(width: TashilSpacing.xs),
+        Flexible(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelLarge?.copyWith(color: on),
+          ),
+        ),
+      ],
+    );
 
     return Container(
-      width: double.infinity,
+      key: const Key('marketing_home_hero'),
+      padding: const EdgeInsets.all(TashilSpacing.xl),
       decoration: BoxDecoration(
-        color: colorScheme.primaryContainer.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.primary.withValues(alpha: 0.18),
-        ),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // رأس الكارت: الترحيب والاسم وشارة الوظيفة
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isArabic ? 'أهلاً بك، $displayName' : 'Welcome, $displayName',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    // شارة المنظمة
-                    if (delegate.organizationName.isNotEmpty) ...[
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.corporate_fare_rounded,
-                            size: 14,
-                            color: colorScheme.primary,
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              delegate.organizationName,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                    ],
-                    // شارة المسمى الوظيفي
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: colorScheme.primary.withValues(alpha: 0.25),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.storefront_rounded,
-                            size: 14,
-                            color: colorScheme.primary,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            l10n.roleBranchMarketing,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // صورة الأفاتار الدائرية لمسؤول التسويق
-              Builder(
-                builder: (context) {
-                  String? photoUrl = widget.delegate.personalPhotoUrl ??
-                      (widget.delegate.documents
-                          .where((d) =>
-                              d.documentKey == DocumentKey.personalPhoto &&
-                              d.displayUrl.isNotEmpty)
-                          .firstOrNull
-                          ?.displayUrl);
-                  if (photoUrl == null) {
-                    try {
-                      photoUrl = FirebaseAuth.instance.currentUser?.photoURL;
-                    } catch (_) {}
-                  }
-
-                  return Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: colorScheme.primary.withValues(alpha: 0.3),
-                        width: 2,
-                      ),
-                    ),
-                    child: AppAvatar(
-                      imageUrl: photoUrl,
-                      fallbackText: widget.delegate.firstName,
-                      radius: 26,
-                      backgroundColor: colorScheme.primary.withValues(alpha: 0.15),
-                      foregroundColor: colorScheme.primary,
-                      fallbackIcon: Icons.campaign_rounded,
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-          Divider(color: colorScheme.outlineVariant.withValues(alpha: 0.35), height: 1),
-          const SizedBox(height: 14),
-
-          // عنوان دليل المهام والمسؤوليات
-          Text(
-            isArabic
-                ? 'دليل المهام والمسؤوليات اليومية لفرعك:'
-                : 'Your Daily Branch Responsibilities:',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // المهمة 1: المرور اليومي وفحص المناديب
-          _buildDutyBullet(
-            icon: Icons.directions_walk_rounded,
-            title: isArabic
-                ? '1. المرور الميداني ومتابعة حضور المناديب:'
-                : '1. Daily walk & delegate check-in review:',
-            desc: isArabic
-                ? 'المرور على أقسام الفرع والتأكد من تواجد مناديب الشركات ومطابقة تسجيل حضورهم الفعلي.'
-                : 'Inspect branch aisles, check vendor delegates attendance, and ensure physical presence.',
-            colorScheme: colorScheme,
-          ),
-
-          const SizedBox(height: 8),
-
-          // المهمة 2: مراجعة وتدقيق أذونات التصوير
-          _buildDutyBullet(
-            icon: Icons.camera_enhance_rounded,
-            title: isArabic
-                ? '2. مراجعة وتدقيق أذونات وتصاريح التصوير:'
-                : '2. Audit & verify photo permissions:',
-            desc: isArabic
-                ? 'التحقق من تصاريح التصوير الممنوحة للشركات داخل الفرع واعتمادها قبل بدء أي جلسة تصوير ترويجي.'
-                : 'Review, approve, and verify vendor marketing photo permits before capturing displays.',
-            colorScheme: colorScheme,
-          ),
-
-          const SizedBox(height: 8),
-
-          // المهمة 3: تسجيل وضبط الغرامات والمخالفات
-          _buildDutyBullet(
-            icon: Icons.gavel_rounded,
-            title: isArabic
-                ? '3. تسجيل وضبط المخالفات وتطبيق لائحة الجزاءات:'
-                : '3. Record violations & apply penalty rules:',
-            desc: isArabic
-                ? 'رصد التجاوزات الميدانية (عدم الالتزام بالزي، التواجد بدون تصريح، مخالفة التعليمات) وتوثيق الغرامة فورياً.'
-                : 'Record field violations on delegates or companies instantly according to official penalty regulations.',
-            colorScheme: colorScheme,
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// بطاقة وصول سريعة وأنيقة لتبويب Private Label الموحد الجديد
-  Widget _buildPrivateLabelShortcutCard(
-    BuildContext context,
-    ColorScheme colorScheme,
-    bool isArabic,
-  ) {
-    final theme = Theme.of(context);
-    return Material(
-      color: colorScheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        hoverColor: colorScheme.primary.withValues(alpha: 0.05),
-        onTap: () => widget.onNavigateTab(3), // الانتقال لتبويب Private Label الموحد
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(9),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(Icons.sell_rounded, size: 20, color: colorScheme.onPrimaryContainer),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          isArabic ? 'مركز العلامة الخاصة' : 'Private Label Hub',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'Private Label',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      isArabic
-                          ? 'كافة أدوات التوثيق الميداني والتدقيق والتقارير في مكان واحد'
-                          : 'All capture, audit, and report tools unified in one tab',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontSize: 11.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 14,
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDutyBullet({
-    required IconData icon,
-    required String title,
-    required String desc,
-    required ColorScheme colorScheme,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.3),
-        ),
+        color: isDark ? colorScheme.primaryContainer : colorScheme.primary,
+        borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 14, color: colorScheme.primary),
+          AppAvatar(
+            imageUrl: photoUrl,
+            fallbackText: delegate.firstName,
+            radius: 26,
+            backgroundColor: isDark
+                ? colorScheme.primary
+                : colorScheme.primaryContainer,
+            foregroundColor: isDark
+                ? colorScheme.onPrimary
+                : colorScheme.onPrimaryContainer,
+            fallbackIcon: Icons.campaign_rounded,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: TashilSpacing.lg),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
+                  isArabic ? 'أهلاً بك، $displayName' : 'Welcome, $displayName',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: on,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  desc,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: colorScheme.onSurfaceVariant,
-                    height: 1.35,
-                  ),
+                const SizedBox(height: TashilSpacing.sm),
+                Wrap(
+                  spacing: TashilSpacing.lg,
+                  runSpacing: TashilSpacing.xs,
+                  children: [
+                    label(Icons.storefront_rounded, l10n.roleBranchMarketing),
+                    if (delegate.organizationName.isNotEmpty)
+                      label(
+                        Icons.corporate_fare_rounded,
+                        delegate.organizationName,
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -592,170 +331,246 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
     );
   }
 
-  /// 2. شبكة كروت العمليات السريعة (4 كروت تفاعلية)
-  Widget _buildQuickOperationsGrid(
-    BuildContext context,
-    ColorScheme colorScheme,
-    bool isArabic,
-  ) {
-    return GridView.count(
-      crossAxisCount: 2,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.15,
-      children: [
-        // كارت 1: الفروع ومتابعة الحضور
-        _buildActionCard(
-          context: context,
-          icon: Icons.storefront_rounded,
-          iconColor: colorScheme.primary,
-          cardColor: colorScheme.primaryContainer.withValues(alpha: 0.5),
-          borderColor: colorScheme.primary.withValues(alpha: 0.25),
-          title: isArabic ? 'متابعة الفروع' : 'Branch Attendance',
-          subtitle: isArabic
-              ? 'حضور وتواجد المناديب'
-              : 'Monitor daily attendance',
-          onTap: () => widget.onNavigateTab(1),
-        ),
+  /// Daily duties: collapsed by default so the day's numbers come first.
+  Widget _buildDutiesCard(BuildContext context, bool isArabic) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final duties = <(IconData, String, String)>[
+      (
+        Icons.directions_walk_rounded,
+        isArabic
+            ? 'المرور الميداني ومتابعة حضور المناديب'
+            : 'Daily walk & delegate check-in review',
+        isArabic
+            ? 'المرور على أقسام الفرع والتأكد من تواجد مناديب الشركات ومطابقة تسجيل حضورهم الفعلي.'
+            : 'Inspect branch aisles, check vendor delegates attendance, and ensure physical presence.',
+      ),
+      (
+        Icons.camera_enhance_rounded,
+        isArabic
+            ? 'مراجعة أذونات وتصاريح التصوير'
+            : 'Audit & verify photo permissions',
+        isArabic
+            ? 'التحقق من تصاريح التصوير الممنوحة للشركات داخل الفرع قبل بدء أي جلسة تصوير ترويجي.'
+            : 'Review vendor marketing photo permits before capturing displays.',
+      ),
+      (
+        Icons.gavel_rounded,
+        isArabic
+            ? 'تسجيل المخالفات وتطبيق لائحة الجزاءات'
+            : 'Record violations & apply penalty rules',
+        isArabic
+            ? 'رصد التجاوزات الميدانية (الزي، التواجد بدون تصريح، مخالفة التعليمات) وتوثيقها فوراً.'
+            : 'Record field violations instantly according to the official penalty rules.',
+      ),
+    ];
 
-        // كارت 2: أذونات التصوير
-        _buildActionCard(
-          context: context,
-          icon: Icons.photo_library_rounded,
-          iconColor: colorScheme.tertiary,
-          cardColor: colorScheme.tertiaryContainer.withValues(alpha: 0.5),
-          borderColor: colorScheme.tertiary.withValues(alpha: 0.25),
-          title: isArabic ? 'أذونات التصوير' : 'Photo Permissions',
-          subtitle: isArabic
-              ? 'اعتماد تصاريح الشركات'
-              : 'Review & approve permits',
-          onTap: () => widget.onNavigateTab(2),
+    return Card.filled(
+      key: const Key('marketing_home_duties'),
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        shape: const Border(),
+        collapsedShape: const Border(),
+        leading: _primaryIcon(context, Icons.checklist_rounded),
+        title: Text(
+          isArabic ? 'دليل المهام اليومية' : 'Daily duties',
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
         ),
-
-        // كارت 3: تسجيل الغرامات والمخالفات
-        _buildActionCard(
-          context: context,
-          icon: Icons.gavel_rounded,
-          iconColor: colorScheme.error,
-          cardColor: colorScheme.errorContainer.withValues(alpha: 0.5),
-          borderColor: colorScheme.error.withValues(alpha: 0.25),
-          title: isArabic ? 'تسجيل مخالفة' : 'Penalties System',
-          subtitle: isArabic
-              ? 'تطبيق لائحة الجزاءات'
-              : 'Record fines & violations',
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => BlocProvider(
-                  create: (_) => di.sl<PenaltyBloc>(),
-                  child: CompanyPenaltiesSettingsPage(
-                    delegate: widget.delegate,
-                    showAppBar: true,
-                  ),
+        subtitle: Text(
+          isArabic ? '3 مهام لفرعك كل يوم' : '3 duties for your branch',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        childrenPadding: const EdgeInsetsDirectional.fromSTEB(
+          TashilSpacing.lg,
+          0,
+          TashilSpacing.lg,
+          TashilSpacing.md,
+        ),
+        children: [
+          for (final (icon, title, desc) in duties)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(icon, color: colorScheme.primary),
+              title: Text(
+                title,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            );
-          },
-        ),
-
-        // كارت 4: البحث والاستعلام السريع
-        _buildActionCard(
-          context: context,
-          icon: Icons.person_search_rounded,
-          iconColor: colorScheme.secondary,
-          cardColor: colorScheme.secondaryContainer.withValues(alpha: 0.5),
-          borderColor: colorScheme.secondary.withValues(alpha: 0.25),
-          title: isArabic ? 'البحث والتحقق' : 'Search & Verify',
-          subtitle: isArabic
-              ? 'ملفات المناديب والشركات'
-              : 'Find delegate or company',
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => MarketingSearchScreen(
-                  organizationUID: widget.delegate.organizationUID,
+              subtitle: Text(
+                desc,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ),
-            );
-          },
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Icon in a rounded square on a surface card: primary + onPrimary (TAS-384).
+  Widget _primaryIcon(BuildContext context, IconData icon) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: colorScheme.primary,
+        borderRadius: BorderRadius.circular(TashilRadius.medium),
+      ),
+      child: Icon(icon, size: 22, color: colorScheme.onPrimary),
+    );
+  }
+
+  /// Quick access: one card style and one icon colour for every destination
+  /// (no per-card tertiary / error tints).
+  Widget _buildQuickOperations(BuildContext context, bool isArabic) {
+    void openPenalties() {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => di.sl<PenaltyBloc>(),
+            child: CompanyPenaltiesSettingsPage(
+              delegate: widget.delegate,
+              showAppBar: true,
+            ),
+          ),
         ),
-      ],
+      );
+    }
+
+    void openSearch() {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => MarketingSearchScreen(
+            organizationUID: widget.delegate.organizationUID,
+          ),
+        ),
+      );
+    }
+
+    final items = <(Key, IconData, String, String, VoidCallback)>[
+      (
+        const Key('marketing_quick_branches'),
+        Icons.storefront_rounded,
+        isArabic ? 'متابعة الفروع' : 'Branches',
+        isArabic ? 'حضور المناديب اليوم' : 'Today\'s attendance',
+        () => widget.onNavigateTab(1),
+      ),
+      (
+        const Key('marketing_quick_permissions'),
+        Icons.photo_library_rounded,
+        isArabic ? 'أذونات التصوير' : 'Photo permissions',
+        isArabic ? 'تصاريح الشركات' : 'Company permits',
+        () => widget.onNavigateTab(2),
+      ),
+      (
+        const Key('marketing_quick_penalties'),
+        Icons.gavel_rounded,
+        isArabic ? 'المخالفات' : 'Penalties',
+        isArabic ? 'تسجيل ومتابعة' : 'Record & follow up',
+        openPenalties,
+      ),
+      (
+        const Key('marketing_quick_search'),
+        Icons.person_search_rounded,
+        isArabic ? 'البحث' : 'Search',
+        isArabic ? 'مناديب وشركات' : 'Delegates & companies',
+        openSearch,
+      ),
+      (
+        const Key('marketing_quick_private_label'),
+        Icons.sell_rounded,
+        'Private Label',
+        isArabic ? 'توثيق وتدقيق وتقارير' : 'Capture, audit, reports',
+        () => widget.onNavigateTab(3),
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 600 ? 3 : 2;
+        final width =
+            (constraints.maxWidth - TashilSpacing.sm * (columns - 1)) / columns;
+        return Wrap(
+          spacing: TashilSpacing.sm,
+          runSpacing: TashilSpacing.sm,
+          children: [
+            for (final (i, (key, icon, title, subtitle, onTap))
+                in items.indexed)
+              SizedBox(
+                // An odd last card takes the whole row on phones.
+                width: columns == 2 &&
+                        items.length.isOdd &&
+                        i == items.length - 1
+                    ? constraints.maxWidth
+                    : width,
+                child: _buildActionCard(
+                  context: context,
+                  key: key,
+                  icon: icon,
+                  title: title,
+                  subtitle: subtitle,
+                  onTap: onTap,
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 
   Widget _buildActionCard({
     required BuildContext context,
+    required Key key,
     required IconData icon,
-    required Color iconColor,
-    required Color cardColor,
-    required Color borderColor,
     required String title,
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return Material(
-      color: cardColor,
-      borderRadius: BorderRadius.circular(18),
+    return Card.filled(
+      key: key,
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: borderColor, width: 1.2),
-          ),
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Padding(
+          padding: const EdgeInsets.all(TashilSpacing.md),
+          child: Row(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(9),
-                    decoration: BoxDecoration(
-                      color: iconColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
+              _primaryIcon(context, icon),
+              const SizedBox(width: TashilSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                    child: Icon(icon, color: iconColor, size: 22),
-                  ),
-                  Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 13,
-                    color: colorScheme.outline,
-                  ),
-                ],
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -764,13 +579,15 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
     );
   }
 
-  /// 3. ملخص الميداني اليومي (التحقق الميداني بالصالة)
+  /// Today's floor check: progress of the walk over today's checked-in
+  /// delegates in the favourite branches.
   Widget _buildDailyFloorInspectionOverview(
     BuildContext context,
-    ColorScheme colorScheme,
     bool isArabic,
   ) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final semantic = TashilSemanticColors.of(context);
     final totalCount = _todayRecords.length;
     final verifiedCount = _todayRecords
         .where((r) => _floorVerifications[r['delegateId']]?.isVerified == true)
@@ -778,253 +595,194 @@ class _MarketingHomeScreenState extends State<MarketingHomeScreen> {
     final missingCount = _todayRecords
         .where((r) => _floorVerifications[r['delegateId']]?.isMissing == true)
         .length;
-    final remainingCount = (totalCount - verifiedCount - missingCount).clamp(0, totalCount);
+    final remainingCount = (totalCount - verifiedCount - missingCount).clamp(
+      0,
+      totalCount,
+    );
     final percent = totalCount > 0 ? (verifiedCount / totalCount) : 0.0;
     final percentInt = (percent * 100).toInt();
     final isComplete = totalCount > 0 && verifiedCount == totalCount;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.outlineVariant,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+    final scope = _favoriteBranches.isNotEmpty
+        ? (_favoriteBranches.length == 1
+              ? _favoriteBranches.first
+              : (isArabic
+                    ? '${_favoriteBranches.length} فروع مفضلة'
+                    : '${_favoriteBranches.length} favourite branches'))
+        : (isArabic ? 'لسه ماختارتش فروع' : 'No branches picked yet');
+
+    Widget fact(String label, String value, {Color? color}) => Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: color ?? colorScheme.onSurface,
+            ),
+          ),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
+    );
+
+    return Card.filled(
+      key: const Key('marketing_home_floor_card'),
+      margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          hoverColor: colorScheme.primary.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(20),
-          onTap: () => widget.onNavigateTab(1),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // رأس الكارت: الأيقونة + العنوان + النسبة
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(9),
-                      decoration: BoxDecoration(
-                        color: isComplete
-                            ? const Color(0xFF2E7D32).withValues(alpha: 0.14)
-                            : colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        isComplete
-                            ? Icons.verified_rounded
-                            : Icons.fact_check_rounded,
-                        size: 20,
-                        color: isComplete
-                            ? const Color(0xFF2E7D32)
-                            : colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isArabic ? 'التحقق الميداني بالصالة' : 'Floor Verification',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                          Text(
-                            _favoriteBranches.isNotEmpty
-                                ? (_favoriteBranches.length == 1
-                                    ? (isArabic
-                                        ? 'فرع ${_favoriteBranches.first}'
-                                        : 'Branch ${_favoriteBranches.first}')
-                                    : (isArabic
-                                        ? 'عبر ${_favoriteBranches.length} فروع مفضلة'
-                                        : 'Across ${_favoriteBranches.length} favorite branches'))
-                                : (isArabic
-                                    ? 'معدل المرور اليومي على المناديب'
-                                    : 'Daily floor check progress'),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // نسبة التحقق الميداني
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isComplete
-                            ? const Color(0xFF2E7D32).withValues(alpha: 0.12)
-                            : colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '$percentInt%',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: isComplete
-                              ? const Color(0xFF2E7D32)
-                              : (percentInt == 0
-                                  ? colorScheme.onSurfaceVariant
-                                  : colorScheme.primary),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 14),
-
-                // شريط التقدم المرئي
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: percent,
-                    minHeight: 7,
-                    backgroundColor: colorScheme.surfaceContainerHighest,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      isComplete
-                          ? const Color(0xFF2E7D32)
-                          : colorScheme.primary,
-                    ),
+      child: InkWell(
+        onTap: () => widget.onNavigateTab(1),
+        child: Padding(
+          padding: const EdgeInsets.all(TashilSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _primaryIcon(
+                    context,
+                    isComplete
+                        ? Icons.verified_rounded
+                        : Icons.fact_check_rounded,
                   ),
-                ),
-
-                const SizedBox(height: 10),
-
-                // سطر الإحصائيات والتفاصيل
-                Row(
-                  children: [
-                    Text(
-                      totalCount > 0
-                          ? (isArabic
-                              ? 'تم المرور على $verifiedCount من $totalCount مندوب'
-                              : '$verifiedCount of $totalCount delegates checked')
-                          : (_isLoadingAttendance
-                              ? (isArabic ? 'جاري تحميل الحضور...' : 'Loading attendance...')
-                              : (isArabic ? 'لا يوجد حضور مسجل اليوم' : 'No attendance recorded today')),
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (totalCount > 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: remainingCount > 0
-                              ? colorScheme.secondaryContainer.withValues(alpha: 0.6)
-                              : const Color(0xFF2E7D32).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          remainingCount > 0
-                              ? (isArabic ? 'المتبقي: $remainingCount' : '$remainingCount remaining')
-                              : (isArabic ? 'اكتمل المرور' : 'All checked'),
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: remainingCount > 0
-                                ? colorScheme.onSecondaryContainer
-                                : const Color(0xFF2E7D32),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-
-                const SizedBox(height: 12),
-
-                // زر الانتقال لصفحة الفروع لبدء/استكمال المرور
-                Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: FilledButton.tonal(
-                    onPressed: () => widget.onNavigateTab(1),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 38),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                  const SizedBox(width: TashilSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isArabic ? 'متابعة المرور اليومي للمناديب' : 'Daily Delegates Tour',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                          isArabic
+                              ? 'المرور اليومي على المناديب'
+                              : 'Daily floor check',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        const Icon(
-                          Icons.arrow_forward_rounded,
-                          size: 16,
+                        Text(
+                          scope,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ],
                     ),
                   ),
+                  Text(
+                    Bidi.ltr('$percentInt%'),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: isComplete
+                          ? semantic.success
+                          : (percentInt == 0
+                                ? colorScheme.onSurfaceVariant
+                                : colorScheme.primary),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: TashilSpacing.md),
+              LinearProgressIndicator(
+                value: percent,
+                color: isComplete ? semantic.success : null,
+              ),
+              const SizedBox(height: TashilSpacing.md),
+              SkeletonSwitcher(
+                loading: _isLoadingAttendance && totalCount == 0,
+                skeleton: const Row(
+                  children: [
+                    Expanded(child: Skeleton(height: 36)),
+                    SizedBox(width: TashilSpacing.md),
+                    Expanded(child: Skeleton(height: 36)),
+                    SizedBox(width: TashilSpacing.md),
+                    Expanded(child: Skeleton(height: 36)),
+                  ],
                 ),
-              ],
-            ),
+                child: totalCount == 0
+                    ? Text(
+                        isArabic
+                            ? 'مفيش حضور متسجل النهارده في فروعك'
+                            : 'No attendance recorded today',
+                        key: const Key('marketing_home_floor_empty'),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      )
+                    : Row(
+                        children: [
+                          fact(
+                            isArabic ? 'حاضر' : 'Present',
+                            Bidi.ltr('$totalCount'),
+                          ),
+                          fact(
+                            isArabic ? 'اتراجع' : 'Checked',
+                            Bidi.ltr('$verifiedCount'),
+                            color: verifiedCount > 0
+                                ? semantic.success
+                                : colorScheme.onSurfaceVariant,
+                          ),
+                          fact(
+                            isArabic ? 'متبقي' : 'Remaining',
+                            Bidi.ltr('$remainingCount'),
+                            color: remainingCount > 0
+                                ? colorScheme.primary
+                                : colorScheme.onSurfaceVariant,
+                          ),
+                        ],
+                      ),
+              ),
+              const SizedBox(height: TashilSpacing.md),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonalIcon(
+                  key: const Key('marketing_home_floor_cta'),
+                  onPressed: () => widget.onNavigateTab(1),
+                  icon: const Icon(Icons.directions_walk_rounded),
+                  label: Text(
+                    isArabic
+                        ? 'ابدأ المرور على المناديب'
+                        : 'Start the floor check',
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  /// 4. نصيحة وتوجيه ميداني
-  Widget _buildFieldGuidanceCard(
-    BuildContext context,
-    ColorScheme colorScheme,
-    bool isArabic,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: colorScheme.secondaryContainer.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: colorScheme.secondary.withValues(alpha: 0.25),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.lightbulb_rounded,
-            color: colorScheme.secondary,
-            size: 20,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              isArabic
-                  ? 'تنبيه ميداني: يرجى مراجعة وتدقيق بطاقة المندوب وتاريخ سريان تصريح التصوير قبل السماح بأي تصوير ترويجي داخل الفرع.'
-                  : 'Field Reminder: Please inspect the delegate ID and permission expiry date before permitting promotional captures.',
-              style: TextStyle(
-                fontSize: 12,
-                color: colorScheme.onSecondaryContainer,
-                fontWeight: FontWeight.w500,
-                height: 1.35,
+  /// Field reminder: a plain outlined note, no tinted card.
+  Widget _buildFieldGuidanceCard(BuildContext context, bool isArabic) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Card.outlined(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(TashilSpacing.lg),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.lightbulb_outline_rounded, color: colorScheme.primary),
+            const SizedBox(width: TashilSpacing.md),
+            Expanded(
+              child: Text(
+                isArabic
+                    ? 'قبل أي تصوير ترويجي في الفرع، راجع كارنيه المندوب وتاريخ سريان إذن التصوير.'
+                    : 'Before any promotional capture, check the delegate ID and the permission expiry date.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

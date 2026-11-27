@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/design/tokens.dart';
 import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:delegate_app/core/widgets/app_snack_bar.dart';
@@ -42,8 +43,10 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
 
   bool get _isSuperAdmin => widget.delegate.role == UserRole.superAdmin;
   bool get _canCapture => _isSuperAdmin || (_permissions?.canCapture ?? false);
-  bool get _canViewReports => _isSuperAdmin || (_permissions?.canViewReports ?? false);
-  bool get _canReviewAudit => _isSuperAdmin || (_permissions?.canReviewAudit ?? false);
+  bool get _canViewReports =>
+      _isSuperAdmin || (_permissions?.canViewReports ?? false);
+  bool get _canReviewAudit =>
+      _isSuperAdmin || (_permissions?.canReviewAudit ?? false);
 
   @override
   void initState() {
@@ -52,15 +55,16 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
   }
 
   void _listenToPermissions() {
-    _permissionsSubscription = di.sl<PrivateLabelPermissionsRemoteDataSource>()
+    _permissionsSubscription = di
+        .sl<PrivateLabelPermissionsRemoteDataSource>()
         .streamUserPermissions(widget.delegate.uid)
         .listen((perms) {
-      if (mounted) {
-        setState(() {
-          _permissions = perms;
-        });
-      }
-    }, onError: (_) {});
+          if (mounted) {
+            setState(() {
+              _permissions = perms;
+            });
+          }
+        }, onError: (_) {});
   }
 
   @override
@@ -87,7 +91,9 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
       appBar: widget.showAppBar
           ? AppBar(
               title: Text(
-                isArabic ? 'مركز العلامة الخاصة (Private Label)' : 'Private Label Hub',
+                isArabic
+                    ? 'مركز العلامة الخاصة (Private Label)'
+                    : 'Private Label Hub',
               ),
               centerTitle: false,
             )
@@ -128,7 +134,9 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          isArabic ? 'أدوات وعمليات العلامة الخاصة' : 'Private Label Tools & Modules',
+                          isArabic
+                              ? 'أدوات وعمليات العلامة الخاصة'
+                              : 'Private Label Tools & Modules',
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: colorScheme.onSurface,
@@ -136,26 +144,33 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: colorScheme.primary.withValues(alpha: 0.25),
+                          color: colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(
+                            TashilRadius.medium,
                           ),
+                          border: Border.all(color: colorScheme.primary),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.sell_rounded, size: 13, color: colorScheme.primary),
+                            Icon(
+                              Icons.sell_rounded,
+                              size: 13,
+                              color: colorScheme.primary,
+                            ),
                             const SizedBox(width: 5),
                             Text(
                               isArabic ? 'مساحة العمل' : 'Workspace',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.onPrimaryContainer,
-                              ),
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.onPrimaryContainer,
+                                  ),
                             ),
                           ],
                         ),
@@ -177,19 +192,23 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
   }
 
   /// 1. الكارت التعريفي الرئيسي لـ Private Label Hub
-  Widget _buildHubBanner(BuildContext context, ColorScheme colorScheme, bool isArabic) {
+  Widget _buildHubBanner(
+    BuildContext context,
+    ColorScheme colorScheme,
+    bool isArabic,
+  ) {
     final theme = Theme.of(context);
     final delegate = widget.delegate;
-    final displayName = delegate.firstName.isNotEmpty ? delegate.firstName : delegate.fullName;
+    final displayName = delegate.firstName.isNotEmpty
+        ? delegate.firstName
+        : delegate.fullName;
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: colorScheme.primaryContainer.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.primary.withValues(alpha: 0.18),
-        ),
+        color: colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
+        border: Border.all(color: colorScheme.primary),
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -202,10 +221,10 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: colorScheme.primary,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(TashilRadius.large),
                   boxShadow: [
                     BoxShadow(
-                      color: colorScheme.primary.withValues(alpha: 0.25),
+                      color: colorScheme.primary,
                       blurRadius: 8,
                       offset: const Offset(0, 3),
                     ),
@@ -226,7 +245,9 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
                       children: [
                         Flexible(
                           child: Text(
-                            isArabic ? 'مركز العلامة الخاصة' : 'Private Label Hub',
+                            isArabic
+                                ? 'مركز العلامة الخاصة'
+                                : 'Private Label Hub',
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: colorScheme.onSurface,
@@ -235,18 +256,23 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
-                            color: colorScheme.primary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
+                            color: colorScheme.primary,
+                            borderRadius: BorderRadius.circular(
+                              TashilRadius.small,
+                            ),
                           ),
                           child: Text(
                             'Private Label',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.primary,
-                            ),
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: colorScheme.primary,
+                                ),
                           ),
                         ),
                       ],
@@ -315,12 +341,10 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
       decoration: BoxDecoration(
         color: isActive
             ? colorScheme.surfaceContainerHigh
-            : colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(10),
+            : colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(TashilRadius.medium),
         border: Border.all(
-          color: isActive
-              ? colorScheme.primary.withValues(alpha: 0.3)
-              : colorScheme.outlineVariant.withValues(alpha: 0.4),
+          color: isActive ? colorScheme.primary : colorScheme.outlineVariant,
         ),
       ),
       child: Row(
@@ -329,22 +353,27 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
           Icon(
             icon,
             size: 13,
-            color: isActive ? colorScheme.primary : colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            color: isActive
+                ? colorScheme.primary
+                : colorScheme.onSurfaceVariant,
           ),
           const SizedBox(width: 5),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 11,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
               fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-              color: isActive ? colorScheme.onSurface : colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+              color: isActive
+                  ? colorScheme.onSurface
+                  : colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(width: 4),
           Icon(
             isActive ? Icons.check_circle_rounded : Icons.lock_outline_rounded,
             size: 12,
-            color: isActive ? colorScheme.primary : colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            color: isActive
+                ? colorScheme.primary
+                : colorScheme.onSurfaceVariant,
           ),
         ],
       ),
@@ -352,7 +381,11 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
   }
 
   /// 2. كارت الـ KPI الشهري وحالة اليوم
-  Widget _buildKpiSection(BuildContext context, ColorScheme colorScheme, bool isArabic) {
+  Widget _buildKpiSection(
+    BuildContext context,
+    ColorScheme colorScheme,
+    bool isArabic,
+  ) {
     if (!di.sl.isRegistered<PrivateLabelBloc>()) {
       return const SizedBox.shrink();
     }
@@ -361,14 +394,20 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
       children: [
         Row(
           children: [
-            Icon(Icons.calendar_today_rounded, size: 18, color: colorScheme.primary),
+            Icon(
+              Icons.calendar_today_rounded,
+              size: 18,
+              color: colorScheme.primary,
+            ),
             const SizedBox(width: 8),
             Text(
-              isArabic ? 'إنجاز التوثيق والـ KPI الشهري' : 'Monthly KPI & Documentation',
+              isArabic
+                  ? 'إنجاز التوثيق والـ KPI الشهري'
+                  : 'Monthly KPI & Documentation',
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                  ),
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
+              ),
             ),
           ],
         ),
@@ -379,7 +418,11 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
   }
 
   /// 4. شبكة وقائمة الأدوات والميزات
-  Widget _buildToolsList(BuildContext context, ColorScheme colorScheme, bool isArabic) {
+  Widget _buildToolsList(
+    BuildContext context,
+    ColorScheme colorScheme,
+    bool isArabic,
+  ) {
     return Column(
       children: [
         // أداة 1: Private Label Audit
@@ -390,13 +433,16 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
           iconColor: colorScheme.onPrimaryContainer,
           title: 'Private Label Audit',
           arabicSubtitle: 'مراجعة وتدقيق المنتجات',
-          statusPillText: _canReviewAudit ? (isArabic ? 'متاح للاعتماد' : 'Active') : (isArabic ? 'يتطلب صلاحية' : 'Restricted'),
+          statusPillText: _canReviewAudit
+              ? (isArabic ? 'متاح للاعتماد' : 'Active')
+              : (isArabic ? 'يتطلب صلاحية' : 'Restricted'),
           isPermitted: _canReviewAudit,
           onTap: () {
             if (_canReviewAudit) {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => PrivateLabelReviewScreen(delegate: widget.delegate),
+                  builder: (_) =>
+                      PrivateLabelReviewScreen(delegate: widget.delegate),
                 ),
               );
             } else {
@@ -415,13 +461,16 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
           iconColor: colorScheme.onSecondaryContainer,
           title: 'Private Label Report',
           arabicSubtitle: 'مؤشر ونسب إنجاز الفروع',
-          statusPillText: _canViewReports ? (isArabic ? 'تقارير شهرية' : 'Reports') : (isArabic ? 'يتطلب صلاحية' : 'Restricted'),
+          statusPillText: _canViewReports
+              ? (isArabic ? 'تقارير شهرية' : 'Reports')
+              : (isArabic ? 'يتطلب صلاحية' : 'Restricted'),
           isPermitted: _canViewReports,
           onTap: () {
             if (_canViewReports) {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => PrivateLabelReportScreen(delegate: widget.delegate),
+                  builder: (_) =>
+                      PrivateLabelReportScreen(delegate: widget.delegate),
                 ),
               );
             } else {
@@ -440,7 +489,9 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
           iconColor: colorScheme.onTertiaryContainer,
           title: 'Private Label Capture',
           arabicSubtitle: 'التوثيق الميداني اليومي للمنتجات',
-          statusPillText: _canCapture ? (isArabic ? 'توثيق يومي' : 'Capture') : (isArabic ? 'يتطلب صلاحية' : 'Restricted'),
+          statusPillText: _canCapture
+              ? (isArabic ? 'توثيق يومي' : 'Capture')
+              : (isArabic ? 'يتطلب صلاحية' : 'Restricted'),
           isPermitted: _canCapture,
           onTap: () {
             if (_canCapture) {
@@ -460,8 +511,11 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
         // أداة 4: Private Label Catalog
         Builder(
           builder: (context) {
-            final canEdit = PrivateLabelCatalogScreen.canEditCatalog(widget.delegate);
-            final canOpenCatalog = _canReviewAudit ||
+            final canEdit = PrivateLabelCatalogScreen.canEditCatalog(
+              widget.delegate,
+            );
+            final canOpenCatalog =
+                _canReviewAudit ||
                 _canCapture ||
                 widget.delegate.role == UserRole.marketing ||
                 widget.delegate.role == UserRole.branchesMarketingManager ||
@@ -503,10 +557,11 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
           _buildToolCard(
             context: context,
             icon: Icons.admin_panel_settings_rounded,
-            iconBgColor: colorScheme.errorContainer.withValues(alpha: 0.6),
+            iconBgColor: colorScheme.errorContainer,
             iconColor: colorScheme.onErrorContainer,
             title: 'إدارة صلاحيات Private Label',
-            arabicSubtitle: 'توزيع وتعديل صلاحيات التوثيق والتدقيق والتقارير لمسؤولي التسويق في النظام',
+            arabicSubtitle:
+                'توزيع وتعديل صلاحيات التوثيق والتدقيق والتقارير لمسؤولي التسويق في النظام',
             statusPillText: 'Super Admin',
             isPermitted: true,
             onTap: () {
@@ -542,16 +597,16 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
     return Material(
       color: colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
         side: BorderSide(
           color: isPermitted
               ? colorScheme.outlineVariant
-              : colorScheme.outlineVariant.withValues(alpha: 0.4),
+              : colorScheme.outlineVariant,
         ),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        hoverColor: colorScheme.primary.withValues(alpha: 0.05),
+        hoverColor: colorScheme.primary,
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -560,12 +615,14 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: isPermitted ? iconBgColor : colorScheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(16),
+                  color: isPermitted
+                      ? iconBgColor
+                      : colorScheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(TashilRadius.large),
                 ),
                 child: Icon(
                   icon,
-                  color: isPermitted ? iconColor : colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                  color: isPermitted ? iconColor : colorScheme.onSurfaceVariant,
                   size: 24,
                 ),
               ),
@@ -581,34 +638,41 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
                             title,
                             style: theme.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: isPermitted ? colorScheme.onSurface : colorScheme.onSurface.withValues(alpha: 0.7),
+                              color: isPermitted
+                                  ? colorScheme.onSurface
+                                  : colorScheme.onSurface,
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: isPermitted
-                                ? colorScheme.primary.withValues(alpha: 0.08)
+                                ? colorScheme.primary
                                 : colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(
+                              TashilRadius.small,
+                            ),
                             border: Border.all(
                               color: isPermitted
-                                  ? colorScheme.primary.withValues(alpha: 0.2)
-                                  : colorScheme.outlineVariant.withValues(alpha: 0.5),
+                                  ? colorScheme.primary
+                                  : colorScheme.outlineVariant,
                               width: 0.8,
                             ),
                           ),
                           child: Text(
                             statusPillText,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: isPermitted
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurfaceVariant,
-                            ),
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: isPermitted
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurfaceVariant,
+                                ),
                           ),
                         ),
                       ],
@@ -626,9 +690,13 @@ class _PrivateLabelHubScreenState extends State<PrivateLabelHubScreen> {
               ),
               const SizedBox(width: 8),
               Icon(
-                isPermitted ? Icons.arrow_forward_ios_rounded : Icons.lock_outline_rounded,
+                isPermitted
+                    ? Icons.arrow_forward_ios_rounded
+                    : Icons.lock_outline_rounded,
                 size: 15,
-                color: isPermitted ? colorScheme.onSurfaceVariant : colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                color: isPermitted
+                    ? colorScheme.onSurfaceVariant
+                    : colorScheme.onSurfaceVariant,
               ),
             ],
           ),

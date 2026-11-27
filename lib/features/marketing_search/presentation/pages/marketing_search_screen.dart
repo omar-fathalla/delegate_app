@@ -1,3 +1,4 @@
+import 'package:delegate_app/core/design/widgets/snackbars.dart';
 import 'dart:developer' as developer;
 
 import 'package:material_ui/material_ui.dart';
@@ -120,7 +121,9 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
       return;
     }
 
-    developer.log('🔍 [Marketing Search] البحث عن مندوب: name="$name", phone="$phoneNumber"');
+    developer.log(
+      '🔍 [Marketing Search] البحث عن مندوب: name="$name", phone="$phoneNumber"',
+    );
 
     context.read<MarketingSearchBloc>().add(
       SearchDelegateRequested(
@@ -144,13 +147,7 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
 
   /// Show snackbar message
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showTashilSnackBar(context, message);
   }
 
   @override
@@ -167,17 +164,18 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
           backgroundColor: colorScheme.surfaceContainer,
           elevation: 0,
           shape: Border(
-            bottom: BorderSide(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-              width: 1,
-            ),
+            bottom: BorderSide(color: colorScheme.outlineVariant, width: 1),
           ),
         ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline_rounded, size: 64, color: colorScheme.error),
+              Icon(
+                Icons.error_outline_rounded,
+                size: 64,
+                color: colorScheme.error,
+              ),
               const SizedBox(height: 16),
               Text(
                 'لم يتم العثور على معرف المنظمة',
@@ -202,22 +200,17 @@ class _MarketingSearchViewState extends State<_MarketingSearchView> {
       backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: AppBar(
         titleSpacing: 0,
-        title: const Text(
+        title: Text(
           'البحث',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
-            letterSpacing: -0.2,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
         ),
         backgroundColor: colorScheme.surfaceContainer,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         shape: Border(
-          bottom: BorderSide(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-            width: 1,
-          ),
+          bottom: BorderSide(color: colorScheme.outlineVariant, width: 1),
         ),
         scrolledUnderElevation: 0,
         iconTheme: IconThemeData(color: colorScheme.onSurface),

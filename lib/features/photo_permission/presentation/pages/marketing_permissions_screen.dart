@@ -1,3 +1,5 @@
+import 'package:delegate_app/core/design/widgets/snackbars.dart';
+import 'package:delegate_app/core/design/tokens.dart';
 import 'package:delegate_app/config/theme/app_motion.dart';
 import 'package:delegate_app/core/widgets/branch_name_label.dart';
 import 'supervisor_permissions_screen.dart';
@@ -19,18 +21,24 @@ import 'package:delegate_app/injection_container.dart' as di;
 class MarketingPermissionsScreen extends StatefulWidget {
   final Delegate marketingDelegate;
 
-  const MarketingPermissionsScreen({super.key, required this.marketingDelegate});
+  const MarketingPermissionsScreen({
+    super.key,
+    required this.marketingDelegate,
+  });
 
   @override
-  State<MarketingPermissionsScreen> createState() => _MarketingPermissionsScreenState();
+  State<MarketingPermissionsScreen> createState() =>
+      _MarketingPermissionsScreenState();
 }
 
-class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen> with SingleTickerProviderStateMixin {
+class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   final Set<String> _expandedPermissionIds = {};
   String _selectedStatusFilter = 'active'; // افتراضياً الأذونات النشطة فقط
-  Set<String> _selectedDepartments = {}; // مجموعة الأقسام المحددة (فارغة = الكل)
+  Set<String> _selectedDepartments =
+      {}; // مجموعة الأقسام المحددة (فارغة = الكل)
   bool _isPinned = false; // هل الفلتر الحالي مثبت كافتراضي
   String _searchQuery = '';
 
@@ -39,7 +47,8 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       widget.marketingDelegate.role == UserRole.branchesMarketingManager ||
       widget.marketingDelegate.role == UserRole.superAdmin;
 
-  bool get _isSuperAdmin => widget.marketingDelegate.role == UserRole.superAdmin;
+  bool get _isSuperAdmin =>
+      widget.marketingDelegate.role == UserRole.superAdmin;
   bool get _isTechnicalSupport =>
       widget.marketingDelegate.role == UserRole.technicalSupport;
 
@@ -83,7 +92,8 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
   String get _approverText {
     final approverName = widget.marketingDelegate.fullName.isNotEmpty
         ? widget.marketingDelegate.fullName
-        : '${widget.marketingDelegate.firstName} ${widget.marketingDelegate.lastName}'.trim();
+        : '${widget.marketingDelegate.firstName} ${widget.marketingDelegate.lastName}'
+              .trim();
     if (approverName.isNotEmpty) return approverName;
     if (widget.marketingDelegate.role == UserRole.technicalSupport) {
       return 'الدعم الفني';
@@ -163,13 +173,9 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         setState(() {
           _isPinned = true;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تم تثبيت (${_selectedDepartments.length}) قسم كفلتر افتراضي'),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-          ),
+        showTashilSnackBar(
+          context,
+          'تم تثبيت (${_selectedDepartments.length}) قسم كفلتر افتراضي',
         );
       }
     }
@@ -182,7 +188,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         height: 4.5,
         margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+          color: colorScheme.outlineVariant,
           borderRadius: BorderRadius.circular(3),
         ),
       ),
@@ -203,7 +209,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       height: 48,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
@@ -224,7 +230,11 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
             ),
           ),
           if (primaryLabel != null) ...[
-            VerticalDivider(width: 1, thickness: 1, color: colorScheme.outlineVariant),
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              color: colorScheme.outlineVariant,
+            ),
             Expanded(
               child: InkWell(
                 onTap: onPrimary,
@@ -242,7 +252,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                           size: 18,
                           color: onPrimary != null
                               ? activePrimaryColor
-                              : colorScheme.onSurface.withValues(alpha: 0.38),
+                              : colorScheme.onSurface,
                         ),
                         const SizedBox(width: 6),
                       ],
@@ -253,7 +263,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                             fontWeight: FontWeight.bold,
                             color: onPrimary != null
                                 ? activePrimaryColor
-                                : colorScheme.onSurface.withValues(alpha: 0.38),
+                                : colorScheme.onSurface,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -269,7 +279,11 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
     );
   }
 
-  void _showBranchesDialog(BuildContext context, String companyName, List<String> branchNames) {
+  void _showBranchesDialog(
+    BuildContext context,
+    String companyName,
+    List<String> branchNames,
+  ) {
     final isDesktop = MediaQuery.sizeOf(context).width > 768;
 
     Widget buildContent(BuildContext modalContext) {
@@ -293,9 +307,13 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(TashilRadius.medium),
                   ),
-                  child: Icon(Icons.store_rounded, color: colorScheme.primary, size: 22),
+                  child: Icon(
+                    Icons.store_rounded,
+                    color: colorScheme.primary,
+                    size: 22,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -304,11 +322,14 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                     children: [
                       Text(
                         'الفروع المعتمدة (${branchNames.length})',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       Text(
                         companyName,
-                        style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -329,26 +350,32 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: branchNames.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  separatorBuilder: (context, index) =>
+                      const Divider(height: 1),
                   itemBuilder: (context, index) {
                     return ListTile(
                       dense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 0,
+                      ),
                       leading: CircleAvatar(
                         radius: 12,
-                        backgroundColor: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                        backgroundColor: colorScheme.primaryContainer,
                         child: Text(
                           '${index + 1}',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.primary,
-                          ),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.primary,
+                              ),
                         ),
                       ),
                       title: BranchNameLabel(
                         branchName: branchNames[index],
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     );
                   },
@@ -369,7 +396,9 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       showDialog(
         context: context,
         builder: (dialogContext) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
+          ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: buildContent(dialogContext),
@@ -396,9 +425,14 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
 
       Map<String, dynamic>? extractInfo(Map<String, dynamic>? data) {
         if (data == null) return null;
-        final name = (data['fullName'] ??
-            '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}').toString().trim();
-        final phone = (data['phoneNumber'] ?? data['phone'] ?? '').toString().trim();
+        final name =
+            (data['fullName'] ??
+                    '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}')
+                .toString()
+                .trim();
+        final phone = (data['phoneNumber'] ?? data['phone'] ?? '')
+            .toString()
+            .trim();
         if (name.isNotEmpty || phone.isNotEmpty) {
           return {
             'name': name.isNotEmpty ? name : 'مشرف الشركة',
@@ -412,7 +446,10 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       try {
         // Strategy 1: Look in users/{requestedBy}
         if (permission.requestedBy.isNotEmpty) {
-          final userDoc = await firestore.collection('users').doc(permission.requestedBy).get();
+          final userDoc = await firestore
+              .collection('users')
+              .doc(permission.requestedBy)
+              .get();
           if (userDoc.exists) {
             final res = extractInfo(userDoc.data());
             if (res != null) return res;
@@ -420,7 +457,9 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         }
 
         // Strategy 2: Look in organizations/{orgId}/companies/{compId}/delegates/{requestedBy}
-        if (permission.organizationUID.isNotEmpty && permission.companyUID.isNotEmpty && permission.requestedBy.isNotEmpty) {
+        if (permission.organizationUID.isNotEmpty &&
+            permission.companyUID.isNotEmpty &&
+            permission.requestedBy.isNotEmpty) {
           final delegateDoc = await firestore
               .collection('organizations')
               .doc(permission.organizationUID)
@@ -436,7 +475,8 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         }
 
         // Strategy 3: Query any delegate with role 'companySupervisor' in this company
-        if (permission.organizationUID.isNotEmpty && permission.companyUID.isNotEmpty) {
+        if (permission.organizationUID.isNotEmpty &&
+            permission.companyUID.isNotEmpty) {
           final supDocs = await firestore
               .collection('organizations')
               .doc(permission.organizationUID)
@@ -453,7 +493,8 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         }
 
         // Strategy 4: Fallback search in company document
-        if (permission.organizationUID.isNotEmpty && permission.companyUID.isNotEmpty) {
+        if (permission.organizationUID.isNotEmpty &&
+            permission.companyUID.isNotEmpty) {
           final compDoc = await firestore
               .collection('organizations')
               .doc(permission.organizationUID)
@@ -462,8 +503,13 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
               .get();
           if (compDoc.exists) {
             final data = compDoc.data();
-            final phone = (data?['supervisorPhone'] ?? data?['phone'] ?? '').toString().trim();
-            final name = (data?['supervisorName'] ?? data?['contactPerson'] ?? '').toString().trim();
+            final phone = (data?['supervisorPhone'] ?? data?['phone'] ?? '')
+                .toString()
+                .trim();
+            final name =
+                (data?['supervisorName'] ?? data?['contactPerson'] ?? '')
+                    .toString()
+                    .trim();
             if (phone.isNotEmpty || name.isNotEmpty) {
               return {
                 'name': name.isNotEmpty ? name : 'مشرف الشركة',
@@ -504,7 +550,11 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                     color: colorScheme.primaryContainer,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.person_rounded, color: colorScheme.primary, size: 28),
+                  child: Icon(
+                    Icons.person_rounded,
+                    color: colorScheme.primary,
+                    size: 28,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -560,7 +610,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: colorScheme.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(TashilRadius.large),
                         border: Border.all(color: colorScheme.outlineVariant),
                       ),
                       child: Column(
@@ -568,17 +618,24 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.badge_rounded, size: 18, color: colorScheme.primary),
+                              Icon(
+                                Icons.badge_rounded,
+                                size: 18,
+                                color: colorScheme.primary,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 'اسم المشرف:',
-                                style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
                               ),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
                                   name,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                               ),
                             ],
@@ -586,45 +643,64 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                           const SizedBox(height: 12),
                           Row(
                             children: [
-                              Icon(Icons.phone_rounded, size: 18, color: colorScheme.primary),
+                              Icon(
+                                Icons.phone_rounded,
+                                size: 18,
+                                color: colorScheme.primary,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 'رقم الهاتف:',
-                                style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
                               ),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  phone.isNotEmpty ? phone : 'غير مسجل بالمنظومة',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    color: phone.isNotEmpty ? null : colorScheme.error,
-                                  ),
+                                  phone.isNotEmpty
+                                      ? phone
+                                      : 'غير مسجل بالمنظومة',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: phone.isNotEmpty
+                                            ? null
+                                            : colorScheme.error,
+                                      ),
                                   textDirection: TextDirection.ltr,
                                 ),
                               ),
                             ],
                           ),
-                          if (permission.department != null && permission.department!.isNotEmpty) ...[
+                          if (permission.department != null &&
+                              permission.department!.isNotEmpty) ...[
                             const SizedBox(height: 12),
                             Row(
                               children: [
-                                Icon(Icons.category_rounded, size: 18, color: colorScheme.primary),
+                                Icon(
+                                  Icons.category_rounded,
+                                  size: 18,
+                                  color: colorScheme.primary,
+                                ),
                                 const SizedBox(width: 8),
                                 Text(
                                   'القسم المصرح:',
-                                  style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
                                 ),
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
                                     permission.department!,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: colorScheme.primary,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: colorScheme.primary,
+                                        ),
                                   ),
                                 ),
                               ],
@@ -642,15 +718,24 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.green,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    TashilRadius.medium,
+                                  ),
+                                ),
                               ),
                               onPressed: () {
                                 Navigator.pop(modalContext);
                                 _openPhone(phone);
                               },
                               icon: const Icon(Icons.call_rounded, size: 20),
-                              label: const Text('اتصال هاتف', style: TextStyle(fontWeight: FontWeight.bold)),
+                              label: const Text(
+                                'اتصال هاتف',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -659,15 +744,27 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF25D366),
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    TashilRadius.medium,
+                                  ),
+                                ),
                               ),
                               onPressed: () {
                                 Navigator.pop(modalContext);
                                 _openWhatsApp(phone);
                               },
-                              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 20),
-                              label: const Text('واتساب', style: TextStyle(fontWeight: FontWeight.bold)),
+                              icon: const Icon(
+                                Icons.chat_bubble_outline_rounded,
+                                size: 20,
+                              ),
+                              label: const Text(
+                                'واتساب',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
                             ),
                           ),
                         ],
@@ -677,17 +774,24 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: Colors.orange.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(
+                            TashilRadius.medium,
+                          ),
                           border: Border.all(color: Colors.orange.shade300),
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
-                            Icon(Icons.info_outline_rounded, color: Colors.orange, size: 20),
+                            Icon(
+                              Icons.info_outline_rounded,
+                              color: Colors.orange,
+                              size: 20,
+                            ),
                             SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 'لا يتوفر رقم هاتف مسجل لهذا المشرف في الوقت الحالي.',
-                                style: TextStyle(fontSize: 12, color: Colors.orange),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: Colors.orange),
                               ),
                             ),
                           ],
@@ -713,7 +817,9 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       showDialog(
         context: context,
         builder: (dialogContext) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
+          ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: buildContent(dialogContext),
@@ -741,13 +847,16 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
     Function(DateTime) onSelect,
   ) {
     final targetDate = startDate.add(Duration(days: days));
-    final isSelected = currentEndDate.year == targetDate.year &&
+    final isSelected =
+        currentEndDate.year == targetDate.year &&
         currentEndDate.month == targetDate.month &&
         currentEndDate.day == targetDate.day;
 
     return ActionChip(
       label: Text(label),
-      backgroundColor: isSelected ? Theme.of(context).colorScheme.primaryContainer : null,
+      backgroundColor: isSelected
+          ? Theme.of(context).colorScheme.primaryContainer
+          : null,
       labelStyle: TextStyle(
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         color: isSelected ? Theme.of(context).colorScheme.primary : null,
@@ -760,7 +869,10 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
     );
   }
 
-  void _showEditDatesDialog(BuildContext parentContext, PhotoPermission permission) {
+  void _showEditDatesDialog(
+    BuildContext parentContext,
+    PhotoPermission permission,
+  ) {
     final bloc = parentContext.read<PhotoPermissionBloc>();
     DateTime tempStart = permission.startDate;
     DateTime tempEnd = permission.endDate;
@@ -792,15 +904,20 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(TashilRadius.medium),
                     ),
-                    child: Icon(Icons.edit_calendar_rounded, color: colorScheme.primary),
+                    child: Icon(
+                      Icons.edit_calendar_rounded,
+                      color: colorScheme.primary,
+                    ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'تعديل مدة إذن التصوير',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -813,7 +930,8 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
-              if (permission.department != null && permission.department!.isNotEmpty) ...[
+              if (permission.department != null &&
+                  permission.department!.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Text(
                   'القسم: ${permission.department}',
@@ -826,7 +944,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
               const SizedBox(height: 16),
               // كرت اختيار تاريخ البداية
               InkWell(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(TashilRadius.medium),
                 onTap: () async {
                   final picked = await showDatePicker(
                     context: modalContext,
@@ -845,10 +963,13 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                   }
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     border: Border.all(color: colorScheme.outlineVariant),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(TashilRadius.medium),
                     color: colorScheme.surfaceContainerLow,
                   ),
                   child: Row(
@@ -859,16 +980,23 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                         children: [
                           Text(
                             'تاريخ البداية:',
-                            style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             dateFormat.format(tempStart),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
-                      Icon(Icons.calendar_today_rounded, size: 20, color: colorScheme.primary),
+                      Icon(
+                        Icons.calendar_today_rounded,
+                        size: 20,
+                        color: colorScheme.primary,
+                      ),
                     ],
                   ),
                 ),
@@ -876,11 +1004,13 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
               const SizedBox(height: 12),
               // كرت اختيار تاريخ النهاية
               InkWell(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(TashilRadius.medium),
                 onTap: () async {
                   final picked = await showDatePicker(
                     context: modalContext,
-                    initialDate: tempEnd.isBefore(tempStart) ? tempStart : tempEnd,
+                    initialDate: tempEnd.isBefore(tempStart)
+                        ? tempStart
+                        : tempEnd,
                     firstDate: tempStart,
                     lastDate: DateTime(2035),
                     locale: const Locale('ar'),
@@ -892,10 +1022,13 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                   }
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     border: Border.all(color: colorScheme.outlineVariant),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(TashilRadius.medium),
                     color: colorScheme.surfaceContainerLow,
                   ),
                   child: Row(
@@ -906,16 +1039,23 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                         children: [
                           Text(
                             'تاريخ النهاية:',
-                            style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             dateFormat.format(tempEnd),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
-                      Icon(Icons.event_available_rounded, size: 20, color: colorScheme.primary),
+                      Icon(
+                        Icons.event_available_rounded,
+                        size: 20,
+                        color: colorScheme.primary,
+                      ),
                     ],
                   ),
                 ),
@@ -924,52 +1064,94 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
               // اختصارات المدد الشائعة
               Text(
                 'مدد سريعة محددة:',
-                style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 6),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    _buildPresetChip(setModalState, '30 يوم', 30, tempStart, tempEnd, (d) => tempEnd = d),
+                    _buildPresetChip(
+                      setModalState,
+                      '30 يوم',
+                      30,
+                      tempStart,
+                      tempEnd,
+                      (d) => tempEnd = d,
+                    ),
                     const SizedBox(width: 6),
-                    _buildPresetChip(setModalState, '60 يوم', 60, tempStart, tempEnd, (d) => tempEnd = d),
+                    _buildPresetChip(
+                      setModalState,
+                      '60 يوم',
+                      60,
+                      tempStart,
+                      tempEnd,
+                      (d) => tempEnd = d,
+                    ),
                     const SizedBox(width: 6),
-                    _buildPresetChip(setModalState, '90 يوم', 90, tempStart, tempEnd, (d) => tempEnd = d),
+                    _buildPresetChip(
+                      setModalState,
+                      '90 يوم',
+                      90,
+                      tempStart,
+                      tempEnd,
+                      (d) => tempEnd = d,
+                    ),
                     const SizedBox(width: 6),
-                    _buildPresetChip(setModalState, '6 شهور', 180, tempStart, tempEnd, (d) => tempEnd = d),
+                    _buildPresetChip(
+                      setModalState,
+                      '6 شهور',
+                      180,
+                      tempStart,
+                      tempEnd,
+                      (d) => tempEnd = d,
+                    ),
                     const SizedBox(width: 6),
-                    _buildPresetChip(setModalState, 'سنة', 365, tempStart, tempEnd, (d) => tempEnd = d),
+                    _buildPresetChip(
+                      setModalState,
+                      'سنة',
+                      365,
+                      tempStart,
+                      tempEnd,
+                      (d) => tempEnd = d,
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 14),
               // كرت عرض ملخص المدة المحتسبة
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: isInvalid
-                      ? colorScheme.errorContainer.withValues(alpha: 0.4)
-                      : colorScheme.primaryContainer.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(10),
+                      ? colorScheme.errorContainer
+                      : colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(TashilRadius.medium),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      isInvalid ? 'تاريخ النهاية يسبق البداية!' : 'إجمالي عدد الأيام:',
-                      style: TextStyle(
+                      isInvalid
+                          ? 'تاريخ النهاية يسبق البداية!'
+                          : 'إجمالي عدد الأيام:',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: isInvalid ? colorScheme.error : colorScheme.primary,
+                        color: isInvalid
+                            ? colorScheme.error
+                            : colorScheme.primary,
                       ),
                     ),
                     if (!isInvalid)
                       Text(
                         '$diffDays يوم',
-                        style: TextStyle(
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.bold,
-                          fontSize: 14,
                           color: colorScheme.primary,
                         ),
                       ),
@@ -1008,11 +1190,14 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       showDialog(
         context: parentContext,
         builder: (dialogContext) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
+          ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: StatefulBuilder(
-              builder: (context, setModalState) => buildContent(dialogContext, setModalState),
+              builder: (context, setModalState) =>
+                  buildContent(dialogContext, setModalState),
             ),
           ),
         ),
@@ -1025,7 +1210,8 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
         builder: (sheetContext) => StatefulBuilder(
-          builder: (context, setModalState) => buildContent(sheetContext, setModalState),
+          builder: (context, setModalState) =>
+              buildContent(sheetContext, setModalState),
         ),
       );
     }
@@ -1056,7 +1242,8 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
     });
   }
 
-  PhotoPermissionQueryScope get _queryScope => PhotoPermissionQueryScope.forRole(
+  PhotoPermissionQueryScope get _queryScope =>
+      PhotoPermissionQueryScope.forRole(
         role: widget.marketingDelegate.role,
         organizationUID: widget.marketingDelegate.organizationUID,
         companyUID: widget.marketingDelegate.companyUID,
@@ -1069,14 +1256,17 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       return;
     }
     context.read<PhotoPermissionBloc>().add(
-          LoadPermissionsRequested(
-            organizationUID: scope.organizationUID,
-            companyUID: scope.companyUID,
-          ),
-        );
+      LoadPermissionsRequested(
+        organizationUID: scope.organizationUID,
+        companyUID: scope.companyUID,
+      ),
+    );
   }
 
-  Future<void> _confirmDeletePermission(BuildContext context, PhotoPermission permission) async {
+  Future<void> _confirmDeletePermission(
+    BuildContext context,
+    PhotoPermission permission,
+  ) async {
     final isDesktop = MediaQuery.sizeOf(context).width > 768;
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -1095,12 +1285,18 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
             if (!isDesktop) _buildDragHandlePill(colorScheme),
             Row(
               children: [
-                Icon(Icons.warning_amber_rounded, color: colorScheme.error, size: 28),
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: colorScheme.error,
+                  size: 28,
+                ),
                 const SizedBox(width: 8),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'تأكيد حذف إذن التصوير',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -1108,24 +1304,30 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
             const SizedBox(height: 12),
             Text(
               'هل أنت متأكد من رغبتك في حذف إذن التصوير لشركة "${permission.companyName}" نهائياً؟',
-              style: const TextStyle(fontSize: 14),
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: colorScheme.errorContainer.withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: colorScheme.error.withValues(alpha: 0.4)),
+                color: colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(TashilRadius.medium),
+                border: Border.all(color: colorScheme.error),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline_rounded, size: 18, color: colorScheme.error),
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 18,
+                    color: colorScheme.error,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'سيتم حذف هذا الإذن وجميع الصور الميدانية المرفوعة داخله بشكل نهائي لا يمكن التراجع عنه.',
-                      style: TextStyle(fontSize: 12, color: colorScheme.error),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: colorScheme.error),
                     ),
                   ),
                 ],
@@ -1151,7 +1353,9 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       confirmed = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
+          ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: buildContent(dialogContext),
@@ -1171,12 +1375,12 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
 
     if (confirmed == true && context.mounted) {
       context.read<PhotoPermissionBloc>().add(
-            DeletePhotoPermissionRequested(
-              organizationUID: permission.organizationUID,
-              companyUID: permission.companyUID,
-              permissionId: permission.uid,
-            ),
-          );
+        DeletePhotoPermissionRequested(
+          organizationUID: permission.organizationUID,
+          companyUID: permission.companyUID,
+          permissionId: permission.uid,
+        ),
+      );
     }
   }
 
@@ -1197,10 +1401,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         backgroundColor: colorScheme.surfaceContainer,
         elevation: 0,
         shape: Border(
-          bottom: BorderSide(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-            width: 1,
-          ),
+          bottom: BorderSide(color: colorScheme.outlineVariant, width: 1),
         ),
         actions: [
           IconButton(
@@ -1239,35 +1440,17 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                 previous is! PhotoPermissionError),
         listener: (context, state) {
           if (state is PermissionActionSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: colorScheme.primary,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+            showTashilSnackBar(context, state.message);
             _loadData();
           } else if (state is PhotoPermissionActionSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: colorScheme.primary,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+            showTashilSnackBar(context, state.message);
             _loadData();
           } else if (state is PhotoPermissionError ||
               state is PhotoPermissionActionFailure) {
             final message = state is PhotoPermissionError
                 ? state.message
                 : (state as PhotoPermissionActionFailure).message;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(message),
-                backgroundColor: colorScheme.error,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+            showTashilSnackBar(context, message);
           }
         },
         builder: (context, state) {
@@ -1286,14 +1469,20 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
     );
   }
 
-  Future<void> _showDepartmentFilterPicker(BuildContext context, ThemeData theme) async {
+  Future<void> _showDepartmentFilterPicker(
+    BuildContext context,
+    ThemeData theme,
+  ) async {
     final colorScheme = theme.colorScheme;
     final isDesktop = MediaQuery.sizeOf(context).width > 768;
 
     Set<String> tempSelected = Set<String>.from(_selectedDepartments);
     bool tempPinned = _isPinned;
 
-    Widget buildPickerContent(BuildContext modalContext, StateSetter setSheetState) {
+    Widget buildPickerContent(
+      BuildContext modalContext,
+      StateSetter setSheetState,
+    ) {
       final isAll = tempSelected.isEmpty;
       return Padding(
         padding: EdgeInsets.fromLTRB(
@@ -1315,7 +1504,11 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
               // Header Row
               Row(
                 children: [
-                  Icon(Icons.tune_rounded, color: colorScheme.primary, size: 22),
+                  Icon(
+                    Icons.tune_rounded,
+                    color: colorScheme.primary,
+                    size: 22,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'تصفية وتثبيت الأقسام',
@@ -1330,15 +1523,17 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                         setSheetState(() => tempSelected.clear());
                       },
                       icon: const Icon(Icons.clear_all_rounded, size: 16),
-                      label: const Text('كل الأقسام', style: TextStyle(fontSize: 12)),
+                      label: Text(
+                        'كل الأقسام',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     ),
                 ],
               ),
               const SizedBox(height: 4),
               Text(
                 'يمكنك اختيار أكثر من قسم معاً لعرضها وتثبيتها كفلتر افتراضي:',
-                style: TextStyle(
-                  fontSize: 12,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
@@ -1358,7 +1553,9 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                     selectedColor: colorScheme.primaryContainer,
                     checkmarkColor: colorScheme.primary,
                     labelStyle: TextStyle(
-                      color: isAll ? colorScheme.primary : colorScheme.onSurface,
+                      color: isAll
+                          ? colorScheme.primary
+                          : colorScheme.onSurface,
                       fontWeight: isAll ? FontWeight.bold : FontWeight.normal,
                     ),
                     onSelected: (val) {
@@ -1373,8 +1570,12 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                       selectedColor: colorScheme.primary,
                       checkmarkColor: Colors.white,
                       labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : colorScheme.onSurface,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                        color: isSelected
+                            ? Colors.white
+                            : colorScheme.onSurface,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.w500,
                       ),
                       onSelected: (val) {
                         setSheetState(() {
@@ -1393,16 +1594,19 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
 
               // Pin toggle card inside the selector
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: tempPinned
                       ? Colors.amber.withValues(alpha: 0.15)
-                      : colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(14),
+                      : colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(TashilRadius.large),
                   border: Border.all(
                     color: tempPinned
                         ? Colors.amber.shade700
-                        : colorScheme.outlineVariant.withValues(alpha: 0.5),
+                        : colorScheme.outlineVariant,
                   ),
                 ),
                 child: Row(
@@ -1410,7 +1614,9 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                     Icon(
                       Icons.push_pin_rounded,
                       size: 20,
-                      color: tempPinned ? Colors.amber.shade900 : colorScheme.onSurfaceVariant,
+                      color: tempPinned
+                          ? Colors.amber.shade900
+                          : colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -1418,21 +1624,23 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            tempPinned ? 'تثبيت الفلتر مفعل' : 'تثبيت الفلتر كافتراضي',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: tempPinned ? Colors.amber.shade900 : colorScheme.onSurface,
-                            ),
+                            tempPinned
+                                ? 'تثبيت الفلتر مفعل'
+                                : 'تثبيت الفلتر كافتراضي',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: tempPinned
+                                      ? Colors.amber.shade900
+                                      : colorScheme.onSurface,
+                                ),
                           ),
                           Text(
                             tempSelected.isEmpty
                                 ? 'سيتم فتح الشاشة دائماً على كل الأقسام'
                                 : 'سيتم حفظ (${tempSelected.length}) أقسام كافتراضي عند فتح التطبيق',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(color: colorScheme.onSurfaceVariant),
                           ),
                         ],
                       ),
@@ -1471,7 +1679,8 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                     _isPinned = tempPinned;
                   });
                   final prefs = await SharedPreferences.getInstance();
-                  final key = 'pinned_photo_departments_${widget.marketingDelegate.uid}';
+                  final key =
+                      'pinned_photo_departments_${widget.marketingDelegate.uid}';
                   if (tempPinned && tempSelected.isNotEmpty) {
                     await prefs.setStringList(key, tempSelected.toList());
                   } else {
@@ -1483,18 +1692,14 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                   if (modalContext.mounted) {
                     Navigator.pop(modalContext);
                   }
-                  if (context.mounted && tempPinned && tempSelected.isNotEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          tempSelected.length == 1
-                              ? 'تم تثبيت قسم (${tempSelected.first}) كفلتر افتراضي'
-                              : 'تم تثبيت (${tempSelected.length}) أقسام كفلتر افتراضي',
-                        ),
-                        backgroundColor: colorScheme.primary,
-                        behavior: SnackBarBehavior.floating,
-                        duration: const Duration(seconds: 2),
-                      ),
+                  if (context.mounted &&
+                      tempPinned &&
+                      tempSelected.isNotEmpty) {
+                    showTashilSnackBar(
+                      context,
+                      tempSelected.length == 1
+                          ? 'تم تثبيت قسم (${tempSelected.first}) كفلتر افتراضي'
+                          : 'تم تثبيت (${tempSelected.length}) أقسام كفلتر افتراضي',
                     );
                   }
                 },
@@ -1509,11 +1714,14 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       await showDialog(
         context: context,
         builder: (dialogCtx) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(TashilRadius.extraLarge),
+          ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: StatefulBuilder(
-              builder: (ctx, setSheetState) => buildPickerContent(dialogCtx, setSheetState),
+              builder: (ctx, setSheetState) =>
+                  buildPickerContent(dialogCtx, setSheetState),
             ),
           ),
         ),
@@ -1526,7 +1734,8 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
         builder: (sheetCtx) => StatefulBuilder(
-          builder: (ctx, setSheetState) => buildPickerContent(sheetCtx, setSheetState),
+          builder: (ctx, setSheetState) =>
+              buildPickerContent(sheetCtx, setSheetState),
         ),
       );
     }
@@ -1552,19 +1761,19 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         Expanded(
           child: InkWell(
             onTap: () => _showDepartmentFilterPicker(context, theme),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(TashilRadius.large),
             child: Container(
               height: 44,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
                 color: !isSelectedAll
-                    ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                    ? colorScheme.primaryContainer
                     : colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(TashilRadius.large),
                 border: Border.all(
                   color: !isSelectedAll
-                      ? colorScheme.primary.withValues(alpha: 0.5)
-                      : colorScheme.outlineVariant.withValues(alpha: 0.6),
+                      ? colorScheme.primary
+                      : colorScheme.outlineVariant,
                   width: 1.0,
                 ),
               ),
@@ -1573,16 +1782,19 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                   Icon(
                     Icons.category_rounded,
                     size: 18,
-                    color: !isSelectedAll ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                    color: !isSelectedAll
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       currentLabel,
-                      style: TextStyle(
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: !isSelectedAll ? colorScheme.primary : colorScheme.onSurface,
+                        color: !isSelectedAll
+                            ? colorScheme.primary
+                            : colorScheme.onSurface,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1592,7 +1804,9 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                   Icon(
                     Icons.expand_more_rounded,
                     size: 18,
-                    color: !isSelectedAll ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                    color: !isSelectedAll
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
                   ),
                 ],
               ),
@@ -1603,7 +1817,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         // زر التثبيت في نفس الصف الأفقي
         InkWell(
           onTap: _togglePinCurrentFilter,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(TashilRadius.large),
           child: AnimatedContainer(
             duration: AppMotionDurations.short3,
             curve: AppMotionCurves.standard,
@@ -1613,11 +1827,11 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
               color: _isPinned
                   ? Colors.amber.withValues(alpha: 0.15)
                   : colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(TashilRadius.large),
               border: Border.all(
                 color: _isPinned
                     ? Colors.amber.shade700
-                    : colorScheme.outlineVariant.withValues(alpha: 0.6),
+                    : colorScheme.outlineVariant,
                 width: 1.0,
               ),
             ),
@@ -1627,21 +1841,24 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                 Icon(
                   Icons.push_pin_rounded,
                   size: 18,
-                  color: _isPinned ? Colors.amber.shade900 : colorScheme.onSurfaceVariant,
+                  color: _isPinned
+                      ? Colors.amber.shade900
+                      : colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(width: 6),
                 Text(
                   _isPinned
                       ? (_selectedDepartments.length > 1
-                          ? 'مثبت (${_selectedDepartments.length})'
-                          : 'مثبت')
+                            ? 'مثبت (${_selectedDepartments.length})'
+                            : 'مثبت')
                       : (_selectedDepartments.length > 1
-                          ? 'تثبيت (${_selectedDepartments.length})'
-                          : 'تثبيت الفلتر'),
-                  style: TextStyle(
-                    fontSize: 12,
+                            ? 'تثبيت (${_selectedDepartments.length})'
+                            : 'تثبيت الفلتر'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     fontWeight: _isPinned ? FontWeight.bold : FontWeight.w600,
-                    color: _isPinned ? Colors.amber.shade900 : colorScheme.onSurfaceVariant,
+                    color: _isPinned
+                        ? Colors.amber.shade900
+                        : colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -1652,7 +1869,11 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
     );
   }
 
-  Widget _buildPendingReviewTab(BuildContext context, PhotoPermissionState state, ThemeData theme) {
+  Widget _buildPendingReviewTab(
+    BuildContext context,
+    PhotoPermissionState state,
+    ThemeData theme,
+  ) {
     if (state is PhotoPermissionLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -1668,11 +1889,19 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
 
     if (state is PhotoPermissionsLoaded) {
       // فلترة الطلبات المعلقة فقط
-      var pendingPermissions = state.permissions.where((p) => p.status == 'pending').toList();
+      var pendingPermissions = state.permissions
+          .where((p) => p.status == 'pending')
+          .toList();
 
       // فلترة حسب مجموعة الأقسام المحددة
       if (_selectedDepartments.isNotEmpty) {
-        pendingPermissions = pendingPermissions.where((p) => p.department != null && _selectedDepartments.contains(p.department)).toList();
+        pendingPermissions = pendingPermissions
+            .where(
+              (p) =>
+                  p.department != null &&
+                  _selectedDepartments.contains(p.department),
+            )
+            .toList();
       }
 
       return Column(
@@ -1707,7 +1936,11 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
     return const Center(child: Text('جاري تحميل البيانات...'));
   }
 
-  Widget _buildOngoingTab(BuildContext context, PhotoPermissionState state, ThemeData theme) {
+  Widget _buildOngoingTab(
+    BuildContext context,
+    PhotoPermissionState state,
+    ThemeData theme,
+  ) {
     if (state is PhotoPermissionLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -1730,18 +1963,28 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       final todayStart = DateTime(now.year, now.month, now.day);
       final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
 
-      final activeList = permissions.where((p) =>
-          p.status.toLowerCase() == 'approved' &&
-          p.isSupervisorEnabled != false &&
-          !p.startDate.isAfter(todayEnd) &&
-          !p.endDate.isBefore(todayStart)).toList();
+      final activeList = permissions
+          .where(
+            (p) =>
+                p.status.toLowerCase() == 'approved' &&
+                p.isSupervisorEnabled != false &&
+                !p.startDate.isAfter(todayEnd) &&
+                !p.endDate.isBefore(todayStart),
+          )
+          .toList();
 
-      final pendingList = permissions.where((p) => p.status.toLowerCase() == 'pending').toList();
+      final pendingList = permissions
+          .where((p) => p.status.toLowerCase() == 'pending')
+          .toList();
 
-      final expiredList = permissions.where((p) =>
-          p.status.toLowerCase() == 'rejected' ||
-          p.endDate.isBefore(todayStart) ||
-          p.isSupervisorEnabled == false).toList();
+      final expiredList = permissions
+          .where(
+            (p) =>
+                p.status.toLowerCase() == 'rejected' ||
+                p.endDate.isBefore(todayStart) ||
+                p.isSupervisorEnabled == false,
+          )
+          .toList();
 
       List<PhotoPermission> filtered = [];
       if (!_canApproveOrReject) {
@@ -1759,7 +2002,13 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
 
       // تصفية حسب مجموعة الأقسام المحددة
       if (_selectedDepartments.isNotEmpty) {
-        filtered = filtered.where((p) => p.department != null && _selectedDepartments.contains(p.department)).toList();
+        filtered = filtered
+            .where(
+              (p) =>
+                  p.department != null &&
+                  _selectedDepartments.contains(p.department),
+            )
+            .toList();
       }
 
       // تصفية نتائج البحث باسم الشركة أو كود الشركة أو اسم الفرع أو القسم
@@ -1767,9 +2016,14 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         final query = _searchQuery.trim().toLowerCase();
         filtered = filtered.where((p) {
           final matchName = p.companyName.toLowerCase().contains(query);
-          final matchCode = p.companyCode != null && p.companyCode.toString().contains(query);
-          final matchBranch = p.branchNames.any((b) => b.toLowerCase().contains(query));
-          final matchDept = p.department != null && p.department!.toLowerCase().contains(query);
+          final matchCode =
+              p.companyCode != null && p.companyCode.toString().contains(query);
+          final matchBranch = p.branchNames.any(
+            (b) => b.toLowerCase().contains(query),
+          );
+          final matchDept =
+              p.department != null &&
+              p.department!.toLowerCase().contains(query);
           return matchName || matchCode || matchBranch || matchDept;
         }).toList();
       }
@@ -1784,7 +2038,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
               hintText: 'البحث بكود الشركة أو اسم الشركة',
               hintStyle: WidgetStatePropertyAll(
                 theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               textStyle: WidgetStatePropertyAll(
@@ -1809,17 +2063,14 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
               ],
               elevation: const WidgetStatePropertyAll(0),
               backgroundColor: WidgetStatePropertyAll(
-                theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                theme.colorScheme.surfaceContainerHighest,
               ),
               side: WidgetStatePropertyAll(
-                BorderSide(
-                  color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-                  width: 1.0,
-                ),
+                BorderSide(color: theme.colorScheme.outlineVariant, width: 1.0),
               ),
               shape: WidgetStatePropertyAll(
                 RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(TashilRadius.large),
                 ),
               ),
               padding: const WidgetStatePropertyAll(
@@ -1850,11 +2101,14 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                       selected: _selectedStatusFilter == 'active',
                       selectedColor: Colors.green.withValues(alpha: 0.2),
                       labelStyle: TextStyle(
-                        color: _selectedStatusFilter == 'active' ? Colors.green.shade800 : null,
+                        color: _selectedStatusFilter == 'active'
+                            ? Colors.green.shade800
+                            : null,
                         fontWeight: FontWeight.bold,
                       ),
                       onSelected: (val) {
-                        if (val) setState(() => _selectedStatusFilter = 'active');
+                        if (val)
+                          setState(() => _selectedStatusFilter = 'active');
                       },
                     ),
                     const SizedBox(width: 8),
@@ -1863,24 +2117,32 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                       selected: _selectedStatusFilter == 'pending',
                       selectedColor: Colors.orange.withValues(alpha: 0.2),
                       labelStyle: TextStyle(
-                        color: _selectedStatusFilter == 'pending' ? Colors.orange.shade800 : null,
+                        color: _selectedStatusFilter == 'pending'
+                            ? Colors.orange.shade800
+                            : null,
                         fontWeight: FontWeight.bold,
                       ),
                       onSelected: (val) {
-                        if (val) setState(() => _selectedStatusFilter = 'pending');
+                        if (val)
+                          setState(() => _selectedStatusFilter = 'pending');
                       },
                     ),
                     const SizedBox(width: 8),
                     ChoiceChip(
-                      label: Text('المنتهية / المرفوضة (${expiredList.length})'),
+                      label: Text(
+                        'المنتهية / المرفوضة (${expiredList.length})',
+                      ),
                       selected: _selectedStatusFilter == 'expired',
                       selectedColor: Colors.red.withValues(alpha: 0.2),
                       labelStyle: TextStyle(
-                        color: _selectedStatusFilter == 'expired' ? Colors.red.shade800 : null,
+                        color: _selectedStatusFilter == 'expired'
+                            ? Colors.red.shade800
+                            : null,
                         fontWeight: FontWeight.bold,
                       ),
                       onSelected: (val) {
-                        if (val) setState(() => _selectedStatusFilter = 'expired');
+                        if (val)
+                          setState(() => _selectedStatusFilter = 'expired');
                       },
                     ),
                   ],
@@ -1901,10 +2163,10 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                     _searchQuery.isNotEmpty
                         ? 'لا توجد نتائج تطابق "$_searchQuery"'
                         : (_selectedDepartments.isNotEmpty
-                            ? 'لا توجد أذونات تصوير في الأقسام المحددة'
-                            : (!_canApproveOrReject
-                                ? 'لا توجد أذونات تصوير نشطة في الوقت الحالي'
-                                : 'لا توجد أذونات تصوير في الوقت الحالي')),
+                              ? 'لا توجد أذونات تصوير في الأقسام المحددة'
+                              : (!_canApproveOrReject
+                                    ? 'لا توجد أذونات تصوير نشطة في الوقت الحالي'
+                                    : 'لا توجد أذونات تصوير في الوقت الحالي')),
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),
@@ -1930,7 +2192,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
           Icon(
             Icons.inbox_rounded,
             size: 64,
-            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+            color: theme.colorScheme.onSurfaceVariant,
           ),
           const SizedBox(height: 16),
           Text(
@@ -1944,10 +2206,16 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
     );
   }
 
-  Widget _buildPendingCard(BuildContext context, PhotoPermission permission, ThemeData theme) {
+  Widget _buildPendingCard(
+    BuildContext context,
+    PhotoPermission permission,
+    ThemeData theme,
+  ) {
     final colorScheme = theme.colorScheme;
     final dateFormat = DateFormat('yyyy-MM-dd');
-    final daysCount = permission.endDate.difference(permission.startDate).inDays;
+    final daysCount = permission.endDate
+        .difference(permission.startDate)
+        .inDays;
     final isExpanded = _expandedPermissionIds.contains(permission.uid);
 
     return Card(
@@ -1955,18 +2223,16 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       color: colorScheme.surfaceContainerLow,
       elevation: isExpanded ? 2.5 : 1,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(TashilRadius.large),
         side: BorderSide(
-          color: isExpanded
-              ? colorScheme.primary.withValues(alpha: 0.4)
-              : colorScheme.outlineVariant.withValues(alpha: 0.4),
+          color: isExpanded ? colorScheme.primary : colorScheme.outlineVariant,
           width: isExpanded ? 1.2 : 1.0,
         ),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _toggleExpandPermission(permission.uid),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(TashilRadius.large),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -1988,13 +2254,12 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                       twoLines: true,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        fontSize: 14.5,
                       ),
-                      codeStyle: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w500,
-                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
-                      ),
+                      codeStyle: Theme.of(context).textTheme.labelSmall
+                          ?.copyWith(
+                            fontWeight: FontWeight.w500,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -2003,20 +2268,33 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.orange.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(
+                            TashilRadius.small,
+                          ),
                           border: Border.all(color: Colors.orange.shade300),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.schedule_rounded, size: 13, color: Colors.orange),
+                            Icon(
+                              Icons.schedule_rounded,
+                              size: 13,
+                              color: Colors.orange,
+                            ),
                             SizedBox(width: 4),
                             Text(
                               'في انتظار الاعتماد',
-                              style: TextStyle(color: Colors.orange, fontSize: 11, fontWeight: FontWeight.bold),
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                             ),
                           ],
                         ),
@@ -2028,7 +2306,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                         curve: AppMotionCurves.emphasized,
                         child: Icon(
                           Icons.expand_more_rounded,
-                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                          color: colorScheme.onSurfaceVariant,
                           size: 22,
                         ),
                       ),
@@ -2038,45 +2316,63 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
               ),
 
               // السطر الثاني: القسم على اليمين وشيبس "بواسطة" على أقصى الشمال
-              if ((permission.department != null && permission.department!.isNotEmpty) ||
-                  (permission.approvedBy != null && permission.approvedBy!.trim().isNotEmpty)) ...[
+              if ((permission.department != null &&
+                      permission.department!.isNotEmpty) ||
+                  (permission.approvedBy != null &&
+                      permission.approvedBy!.trim().isNotEmpty)) ...[
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    if (permission.department != null && permission.department!.isNotEmpty)
+                    if (permission.department != null &&
+                        permission.department!.isNotEmpty)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2.5,
+                        ),
                         decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.25)),
+                          color: colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(
+                            TashilRadius.small,
+                          ),
+                          border: Border.all(color: colorScheme.primary),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.category_rounded, size: 11, color: colorScheme.primary),
+                            Icon(
+                              Icons.category_rounded,
+                              size: 11,
+                              color: colorScheme.primary,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               'القسم: ${permission.department}',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                              ),
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.primary,
+                                  ),
                             ),
                           ],
                         ),
                       ),
                     const Spacer(),
-                    if (permission.approvedBy != null && permission.approvedBy!.trim().isNotEmpty)
+                    if (permission.approvedBy != null &&
+                        permission.approvedBy!.trim().isNotEmpty)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2.5,
+                        ),
                         decoration: BoxDecoration(
                           color: colorScheme.primary,
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(
+                            TashilRadius.small,
+                          ),
                           boxShadow: [
                             BoxShadow(
-                              color: colorScheme.primary.withValues(alpha: 0.25),
+                              color: colorScheme.primary,
                               blurRadius: 3,
                               offset: const Offset(0, 1),
                             ),
@@ -2085,28 +2381,35 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.person_rounded, size: 11, color: Colors.white),
+                            const Icon(
+                              Icons.person_rounded,
+                              size: 11,
+                              color: Colors.white,
+                            ),
                             const SizedBox(width: 4),
                             ConstrainedBox(
                               constraints: BoxConstraints(
-                                maxWidth: MediaQuery.sizeOf(context).width * 0.48,
+                                maxWidth:
+                                    MediaQuery.sizeOf(context).width * 0.48,
                               ),
                               child: ApproverNameText(
                                 approvedBy: permission.approvedBy!,
-                                organizationUID: permission.organizationUID.isNotEmpty
+                                organizationUID:
+                                    permission.organizationUID.isNotEmpty
                                     ? permission.organizationUID
                                     : widget.marketingDelegate.organizationUID,
                                 companyUID: permission.companyUID,
                                 currentUserUid: widget.marketingDelegate.uid,
-                                currentUserName: widget.marketingDelegate.fullName,
+                                currentUserName:
+                                    widget.marketingDelegate.fullName,
                                 prefix: '',
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                               ),
                             ),
                           ],
@@ -2125,26 +2428,40 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                     const Divider(height: 18),
                     // سطر التواريخ وتعديل المدة
                     InkWell(
-                      onTap: _canEditDatesFor(permission) ? () => _showEditDatesDialog(context, permission) : null,
-                      borderRadius: BorderRadius.circular(8),
+                      onTap: _canEditDatesFor(permission)
+                          ? () => _showEditDatesDialog(context, permission)
+                          : null,
+                      borderRadius: BorderRadius.circular(TashilRadius.small),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 2),
                         child: Row(
                           children: [
-                            Icon(Icons.date_range_rounded, size: 16, color: colorScheme.primary),
+                            Icon(
+                              Icons.date_range_rounded,
+                              size: 16,
+                              color: colorScheme.primary,
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               'من: ${dateFormat.format(permission.startDate)}  -  إلى: ${dateFormat.format(permission.endDate)}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(width: 6),
                             Text(
                               '($daysCount يوم)',
-                              style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11.5),
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
                             ),
                             if (_canEditDatesFor(permission)) ...[
                               const Spacer(),
-                              Icon(Icons.edit_calendar_rounded, size: 16, color: colorScheme.primary),
+                              Icon(
+                                Icons.edit_calendar_rounded,
+                                size: 16,
+                                color: colorScheme.primary,
+                              ),
                             ],
                           ],
                         ),
@@ -2153,30 +2470,47 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                     const SizedBox(height: 8),
                     // زر الفروع المعتمدة المدمج
                     InkWell(
-                      onTap: () => _showBranchesDialog(context, permission.companyName, permission.branchNames),
-                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => _showBranchesDialog(
+                        context,
+                        permission.companyName,
+                        permission.branchNames,
+                      ),
+                      borderRadius: BorderRadius.circular(TashilRadius.small),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(
+                            TashilRadius.small,
+                          ),
+                          border: Border.all(color: colorScheme.outlineVariant),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.store_rounded, size: 15, color: colorScheme.primary),
+                            Icon(
+                              Icons.store_rounded,
+                              size: 15,
+                              color: colorScheme.primary,
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               'الفروع المطلوبة للتصوير (${permission.branchNames.length})',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                              ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.primary,
+                                  ),
                             ),
                             const SizedBox(width: 4),
-                            Icon(Icons.visibility_rounded, size: 14, color: colorScheme.primary),
+                            Icon(
+                              Icons.visibility_rounded,
+                              size: 14,
+                              color: colorScheme.primary,
+                            ),
                           ],
                         ),
                       ),
@@ -2189,11 +2523,16 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                         Row(
                           children: [
                             IconButton(
-                              onPressed: () => _showSupervisorDialog(context, permission),
-                              icon: Icon(Icons.phone_in_talk_rounded, color: colorScheme.primary, size: 20),
+                              onPressed: () =>
+                                  _showSupervisorDialog(context, permission),
+                              icon: Icon(
+                                Icons.phone_in_talk_rounded,
+                                color: colorScheme.primary,
+                                size: 20,
+                              ),
                               tooltip: 'تواصل مع مشرف الشركة',
                               style: IconButton.styleFrom(
-                                backgroundColor: colorScheme.primaryContainer.withValues(alpha: 0.35),
+                                backgroundColor: colorScheme.primaryContainer,
                                 padding: const EdgeInsets.all(8),
                                 minimumSize: const Size(36, 36),
                               ),
@@ -2201,11 +2540,20 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                             if (_canDeleteFor(permission)) ...[
                               const SizedBox(width: 6),
                               IconButton(
-                                onPressed: () => _confirmDeletePermission(context, permission),
+                                onPressed: () => _confirmDeletePermission(
+                                  context,
+                                  permission,
+                                ),
                                 tooltip: 'حذف الإذن نهائياً',
-                                icon: Icon(Icons.delete_forever_rounded, color: Colors.red.shade700, size: 20),
+                                icon: Icon(
+                                  Icons.delete_forever_rounded,
+                                  color: Colors.red.shade700,
+                                  size: 20,
+                                ),
                                 style: IconButton.styleFrom(
-                                  backgroundColor: Colors.red.withValues(alpha: 0.1),
+                                  backgroundColor: Colors.red.withValues(
+                                    alpha: 0.1,
+                                  ),
                                   padding: const EdgeInsets.all(8),
                                   minimumSize: const Size(36, 36),
                                 ),
@@ -2219,30 +2567,43 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                               OutlinedButton.icon(
                                 onPressed: () {
                                   context.read<PhotoPermissionBloc>().add(
-                                        ApprovePermissionRequested(
-                                          organizationUID: permission.organizationUID,
-                                          companyUID: permission.companyUID,
-                                          permissionId: permission.uid,
-                                          status: 'rejected',
-                                          approvedBy: _approverText,
-                                        ),
-                                      );
+                                    ApprovePermissionRequested(
+                                      organizationUID:
+                                          permission.organizationUID,
+                                      companyUID: permission.companyUID,
+                                      permissionId: permission.uid,
+                                      status: 'rejected',
+                                      approvedBy: _approverText,
+                                    ),
+                                  );
                                 },
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: Colors.red,
                                   side: const BorderSide(color: Colors.red),
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      TashilRadius.small,
+                                    ),
+                                  ),
                                 ),
                                 icon: const Icon(Icons.close_rounded, size: 16),
-                                label: const Text('رفض', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                label: Text(
+                                  'رفض',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                ),
                               ),
                               const SizedBox(width: 8),
                               ElevatedButton.icon(
                                 onPressed: () {
                                   context.read<PhotoPermissionBloc>().add(
                                     ApprovePermissionRequested(
-                                      organizationUID: permission.organizationUID,
+                                      organizationUID:
+                                          permission.organizationUID,
                                       companyUID: permission.companyUID,
                                       permissionId: permission.uid,
                                       status: 'approved',
@@ -2253,11 +2614,22 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.green,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      TashilRadius.small,
+                                    ),
+                                  ),
                                 ),
                                 icon: const Icon(Icons.check_rounded, size: 16),
-                                label: const Text('اعتماد', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                label: Text(
+                                  'اعتماد',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                ),
                               ),
                             ],
                           ),
@@ -2265,7 +2637,9 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                     ),
                   ],
                 ),
-                crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                crossFadeState: isExpanded
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
                 duration: AppMotionDurations.medium2,
                 reverseDuration: AppMotionDurations.short4,
                 firstCurve: AppMotionCurves.emphasizedAccelerate,
@@ -2279,10 +2653,16 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
     );
   }
 
-  Widget _buildOngoingCard(BuildContext context, PhotoPermission permission, ThemeData theme) {
+  Widget _buildOngoingCard(
+    BuildContext context,
+    PhotoPermission permission,
+    ThemeData theme,
+  ) {
     final colorScheme = theme.colorScheme;
     final dateFormat = DateFormat('yyyy-MM-dd');
-    final daysCount = permission.endDate.difference(permission.startDate).inDays;
+    final daysCount = permission.endDate
+        .difference(permission.startDate)
+        .inDays;
     final isExpanded = _expandedPermissionIds.contains(permission.uid);
 
     return Card(
@@ -2290,18 +2670,16 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       color: colorScheme.surfaceContainerLow,
       elevation: isExpanded ? 2.5 : 1,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(TashilRadius.large),
         side: BorderSide(
-          color: isExpanded
-              ? colorScheme.primary.withValues(alpha: 0.4)
-              : colorScheme.outlineVariant.withValues(alpha: 0.4),
+          color: isExpanded ? colorScheme.primary : colorScheme.outlineVariant,
           width: isExpanded ? 1.2 : 1.0,
         ),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _toggleExpandPermission(permission.uid),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(TashilRadius.large),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -2323,13 +2701,12 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                       twoLines: true,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        fontSize: 14.5,
                       ),
-                      codeStyle: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w500,
-                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
-                      ),
+                      codeStyle: Theme.of(context).textTheme.labelSmall
+                          ?.copyWith(
+                            fontWeight: FontWeight.w500,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -2340,7 +2717,11 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                       _buildStatusBadge(permission),
                       if (permission.status.toLowerCase() == 'approved' &&
                           _canReview(permission))
-                        _buildEnableToggle(context, permission, theme.colorScheme),
+                        _buildEnableToggle(
+                          context,
+                          permission,
+                          theme.colorScheme,
+                        ),
                       const SizedBox(width: 4),
                       AnimatedRotation(
                         turns: isExpanded ? 0.5 : 0.0,
@@ -2348,7 +2729,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                         curve: AppMotionCurves.emphasized,
                         child: Icon(
                           Icons.expand_more_rounded,
-                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                          color: colorScheme.onSurfaceVariant,
                           size: 22,
                         ),
                       ),
@@ -2358,45 +2739,63 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
               ),
 
               // السطر الثاني: القسم على اليمين وشيبس "بواسطة" على أقصى الشمال
-              if ((permission.department != null && permission.department!.isNotEmpty) ||
-                  (permission.approvedBy != null && permission.approvedBy!.trim().isNotEmpty)) ...[
+              if ((permission.department != null &&
+                      permission.department!.isNotEmpty) ||
+                  (permission.approvedBy != null &&
+                      permission.approvedBy!.trim().isNotEmpty)) ...[
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    if (permission.department != null && permission.department!.isNotEmpty)
+                    if (permission.department != null &&
+                        permission.department!.isNotEmpty)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2.5,
+                        ),
                         decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.25)),
+                          color: colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(
+                            TashilRadius.small,
+                          ),
+                          border: Border.all(color: colorScheme.primary),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.category_rounded, size: 11, color: colorScheme.primary),
+                            Icon(
+                              Icons.category_rounded,
+                              size: 11,
+                              color: colorScheme.primary,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               'القسم: ${permission.department}',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                              ),
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.primary,
+                                  ),
                             ),
                           ],
                         ),
                       ),
                     const Spacer(),
-                    if (permission.approvedBy != null && permission.approvedBy!.trim().isNotEmpty)
+                    if (permission.approvedBy != null &&
+                        permission.approvedBy!.trim().isNotEmpty)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2.5,
+                        ),
                         decoration: BoxDecoration(
                           color: colorScheme.primary,
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(
+                            TashilRadius.small,
+                          ),
                           boxShadow: [
                             BoxShadow(
-                              color: colorScheme.primary.withValues(alpha: 0.25),
+                              color: colorScheme.primary,
                               blurRadius: 3,
                               offset: const Offset(0, 1),
                             ),
@@ -2405,28 +2804,35 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.person_rounded, size: 11, color: Colors.white),
+                            const Icon(
+                              Icons.person_rounded,
+                              size: 11,
+                              color: Colors.white,
+                            ),
                             const SizedBox(width: 4),
                             ConstrainedBox(
                               constraints: BoxConstraints(
-                                maxWidth: MediaQuery.sizeOf(context).width * 0.48,
+                                maxWidth:
+                                    MediaQuery.sizeOf(context).width * 0.48,
                               ),
                               child: ApproverNameText(
                                 approvedBy: permission.approvedBy!,
-                                organizationUID: permission.organizationUID.isNotEmpty
+                                organizationUID:
+                                    permission.organizationUID.isNotEmpty
                                     ? permission.organizationUID
                                     : widget.marketingDelegate.organizationUID,
                                 companyUID: permission.companyUID,
                                 currentUserUid: widget.marketingDelegate.uid,
-                                currentUserName: widget.marketingDelegate.fullName,
+                                currentUserName:
+                                    widget.marketingDelegate.fullName,
                                 prefix: '',
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                               ),
                             ),
                           ],
@@ -2445,26 +2851,40 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                     const Divider(height: 18),
                     // سطر التواريخ وتعديل المدة
                     InkWell(
-                      onTap: _canEditDatesFor(permission) ? () => _showEditDatesDialog(context, permission) : null,
-                      borderRadius: BorderRadius.circular(8),
+                      onTap: _canEditDatesFor(permission)
+                          ? () => _showEditDatesDialog(context, permission)
+                          : null,
+                      borderRadius: BorderRadius.circular(TashilRadius.small),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 2),
                         child: Row(
                           children: [
-                            Icon(Icons.date_range_rounded, size: 16, color: colorScheme.primary),
+                            Icon(
+                              Icons.date_range_rounded,
+                              size: 16,
+                              color: colorScheme.primary,
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               'من: ${dateFormat.format(permission.startDate)}  -  إلى: ${dateFormat.format(permission.endDate)}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(width: 6),
                             Text(
                               '($daysCount يوم)',
-                              style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11.5),
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
                             ),
                             if (_canEditDatesFor(permission)) ...[
                               const Spacer(),
-                              Icon(Icons.edit_calendar_rounded, size: 16, color: colorScheme.primary),
+                              Icon(
+                                Icons.edit_calendar_rounded,
+                                size: 16,
+                                color: colorScheme.primary,
+                              ),
                             ],
                           ],
                         ),
@@ -2473,35 +2893,53 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                     const SizedBox(height: 8),
                     // زر الفروع المعتمدة المدمج
                     InkWell(
-                      onTap: () => _showBranchesDialog(context, permission.companyName, permission.branchNames),
-                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => _showBranchesDialog(
+                        context,
+                        permission.companyName,
+                        permission.branchNames,
+                      ),
+                      borderRadius: BorderRadius.circular(TashilRadius.small),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(
+                            TashilRadius.small,
+                          ),
+                          border: Border.all(color: colorScheme.outlineVariant),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.store_rounded, size: 15, color: colorScheme.primary),
+                            Icon(
+                              Icons.store_rounded,
+                              size: 15,
+                              color: colorScheme.primary,
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               'الفروع المعتمدة (${permission.branchNames.length})',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                              ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.primary,
+                                  ),
                             ),
                             const SizedBox(width: 4),
-                            Icon(Icons.visibility_rounded, size: 14, color: colorScheme.primary),
+                            Icon(
+                              Icons.visibility_rounded,
+                              size: 14,
+                              color: colorScheme.primary,
+                            ),
                           ],
                         ),
                       ),
                     ),
-                    if (permission.status.toLowerCase() == 'pending' && _canReview(permission)) ...[
+                    if (permission.status.toLowerCase() == 'pending' &&
+                        _canReview(permission)) ...[
                       const Divider(height: 16),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
@@ -2509,45 +2947,67 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                           OutlinedButton.icon(
                             onPressed: () {
                               context.read<PhotoPermissionBloc>().add(
-                                    ApprovePermissionRequested(
-                                      organizationUID: permission.organizationUID,
-                                      companyUID: permission.companyUID,
-                                      permissionId: permission.uid,
-                                      status: 'rejected',
-                                      approvedBy: _approverText,
-                                    ),
-                                  );
+                                ApprovePermissionRequested(
+                                  organizationUID: permission.organizationUID,
+                                  companyUID: permission.companyUID,
+                                  permissionId: permission.uid,
+                                  status: 'rejected',
+                                  approvedBy: _approverText,
+                                ),
+                              );
                             },
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.red,
                               side: const BorderSide(color: Colors.red),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  TashilRadius.small,
+                                ),
+                              ),
                             ),
                             icon: const Icon(Icons.close_rounded, size: 16),
-                            label: const Text('رفض', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            label: Text(
+                              'رفض',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
                           ),
                           const SizedBox(width: 8),
                           ElevatedButton.icon(
                             onPressed: () {
                               context.read<PhotoPermissionBloc>().add(
-                                    ApprovePermissionRequested(
-                                      organizationUID: permission.organizationUID,
-                                      companyUID: permission.companyUID,
-                                      permissionId: permission.uid,
-                                      status: 'approved',
-                                      approvedBy: _approverText,
-                                    ),
-                                  );
+                                ApprovePermissionRequested(
+                                  organizationUID: permission.organizationUID,
+                                  companyUID: permission.companyUID,
+                                  permissionId: permission.uid,
+                                  status: 'approved',
+                                  approvedBy: _approverText,
+                                ),
+                              );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  TashilRadius.small,
+                                ),
+                              ),
                             ),
                             icon: const Icon(Icons.check_rounded, size: 16),
-                            label: const Text('الموافقة', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            label: Text(
+                              'الموافقة',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ],
                       ),
@@ -2561,11 +3021,16 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                           children: [
                             // أيقونة الاتصال بمشرف الشركة جنب الـ Delete
                             IconButton(
-                              onPressed: () => _showSupervisorDialog(context, permission),
-                              icon: Icon(Icons.phone_in_talk_rounded, color: colorScheme.primary, size: 20),
+                              onPressed: () =>
+                                  _showSupervisorDialog(context, permission),
+                              icon: Icon(
+                                Icons.phone_in_talk_rounded,
+                                color: colorScheme.primary,
+                                size: 20,
+                              ),
                               tooltip: 'تواصل مع مشرف الشركة',
                               style: IconButton.styleFrom(
-                                backgroundColor: colorScheme.primaryContainer.withValues(alpha: 0.35),
+                                backgroundColor: colorScheme.primaryContainer,
                                 padding: const EdgeInsets.all(8),
                                 minimumSize: const Size(36, 36),
                               ),
@@ -2573,11 +3038,18 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                             if (_canDeleteFor(permission)) ...[
                               const SizedBox(width: 6),
                               IconButton(
-                                onPressed: () => _confirmDeletePermission(context, permission),
-                                icon: Icon(Icons.delete_rounded, color: colorScheme.error, size: 20),
+                                onPressed: () => _confirmDeletePermission(
+                                  context,
+                                  permission,
+                                ),
+                                icon: Icon(
+                                  Icons.delete_rounded,
+                                  color: colorScheme.error,
+                                  size: 20,
+                                ),
                                 tooltip: 'حذف الإذن',
                                 style: IconButton.styleFrom(
-                                  backgroundColor: colorScheme.error.withValues(alpha: 0.1),
+                                  backgroundColor: colorScheme.error,
                                   padding: const EdgeInsets.all(8),
                                   minimumSize: const Size(36, 36),
                                 ),
@@ -2600,13 +3072,18 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                             );
                           },
                           icon: const Icon(Icons.collections_rounded, size: 17),
-                          label: const Text('عرض الصور الميدانية', style: TextStyle(fontSize: 12)),
+                          label: Text(
+                            'عرض الصور الميدانية',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
                         ),
                       ],
                     ),
                   ],
                 ),
-                crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                crossFadeState: isExpanded
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
                 duration: AppMotionDurations.medium2,
                 reverseDuration: AppMotionDurations.short4,
                 firstCurve: AppMotionCurves.emphasizedAccelerate,
@@ -2630,8 +3107,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       children: [
         Text(
           permission.isSupervisorEnabled ? 'مفعّل' : 'معطّل',
-          style: TextStyle(
-            fontSize: 10.5,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
             color: permission.isSupervisorEnabled
                 ? colorScheme.primary
                 : colorScheme.onSurfaceVariant,
@@ -2643,13 +3119,13 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
             value: permission.isSupervisorEnabled,
             onChanged: (val) {
               context.read<PhotoPermissionBloc>().add(
-                    TogglePermissionRequested(
-                      organizationUID: permission.organizationUID,
-                      companyUID: permission.companyUID,
-                      permissionId: permission.uid,
-                      isEnabled: val,
-                    ),
-                  );
+                TogglePermissionRequested(
+                  organizationUID: permission.organizationUID,
+                  companyUID: permission.companyUID,
+                  permissionId: permission.uid,
+                  isEnabled: val,
+                ),
+              );
             },
           ),
         ),
@@ -2668,26 +3144,32 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
       badge = Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: colorScheme.tertiaryContainer.withValues(alpha: 0.7),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: colorScheme.tertiary.withValues(alpha: 0.3)),
+          color: colorScheme.tertiaryContainer,
+          borderRadius: BorderRadius.circular(TashilRadius.small),
+          border: Border.all(color: colorScheme.tertiary),
         ),
         child: Text(
           'في انتظار الاعتماد',
-          style: TextStyle(color: colorScheme.onTertiaryContainer, fontSize: 11, fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: colorScheme.onTertiaryContainer,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       );
     } else if (status == 'rejected') {
       badge = Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: colorScheme.errorContainer.withValues(alpha: 0.7),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: colorScheme.error.withValues(alpha: 0.3)),
+          color: colorScheme.errorContainer,
+          borderRadius: BorderRadius.circular(TashilRadius.small),
+          border: Border.all(color: colorScheme.error),
         ),
         child: Text(
           'مرفوض',
-          style: TextStyle(color: colorScheme.onErrorContainer, fontSize: 11, fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: colorScheme.onErrorContainer,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       );
     } else if (permission.endDate.isBefore(todayStart)) {
@@ -2695,38 +3177,47 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(TashilRadius.small),
           border: Border.all(color: colorScheme.outlineVariant),
         ),
         child: Text(
           'منتهي',
-          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       );
     } else if (permission.isSupervisorEnabled == false) {
       badge = Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: colorScheme.secondaryContainer.withValues(alpha: 0.7),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.3)),
+          color: colorScheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(TashilRadius.small),
+          border: Border.all(color: colorScheme.secondary),
         ),
         child: Text(
           'معطل مؤقتاً',
-          style: TextStyle(color: colorScheme.onSecondaryContainer, fontSize: 11, fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: colorScheme.onSecondaryContainer,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       );
     } else {
       badge = Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: colorScheme.primaryContainer.withValues(alpha: 0.7),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
+          color: colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(TashilRadius.small),
+          border: Border.all(color: colorScheme.primary),
         ),
         child: Text(
           'نشط',
-          style: TextStyle(color: colorScheme.onPrimaryContainer, fontSize: 11, fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: colorScheme.onPrimaryContainer,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       );
     }
@@ -2741,7 +3232,11 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline_rounded, size: 40, color: colorScheme.error),
+            Icon(
+              Icons.error_outline_rounded,
+              size: 40,
+              color: colorScheme.error,
+            ),
             const SizedBox(height: 12),
             Text(
               message,
