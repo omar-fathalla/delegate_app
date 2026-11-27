@@ -1549,6 +1549,27 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get profileWorkInfo => 'Work details';
+
+  @override
+  String get profileDelegateCode => 'Delegate code';
+
+  @override
+  String get profileChains => 'Chains';
+
+  @override
+  String get profileCopy => 'Copy';
+
+  @override
+  String get profileCopied => 'Code copied';
+
+  @override
+  String get profileShowId => 'Show number';
+
+  @override
+  String get profileHideId => 'Hide number';
+
+  @override
   String get allChains => 'All chains';
 
   @override

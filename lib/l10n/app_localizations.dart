@@ -2888,6 +2888,48 @@ abstract class AppLocalizations {
   /// **'Photo at {branch}, {time}'**
   String photoSemantic(String branch, String time);
 
+  /// No description provided for @profileWorkInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Work details'**
+  String get profileWorkInfo;
+
+  /// No description provided for @profileDelegateCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Delegate code'**
+  String get profileDelegateCode;
+
+  /// No description provided for @profileChains.
+  ///
+  /// In en, this message translates to:
+  /// **'Chains'**
+  String get profileChains;
+
+  /// No description provided for @profileCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get profileCopy;
+
+  /// No description provided for @profileCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Code copied'**
+  String get profileCopied;
+
+  /// No description provided for @profileShowId.
+  ///
+  /// In en, this message translates to:
+  /// **'Show number'**
+  String get profileShowId;
+
+  /// No description provided for @profileHideId.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide number'**
+  String get profileHideId;
+
   /// No description provided for @allChains.
   ///
   /// In en, this message translates to:

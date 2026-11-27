@@ -1,3 +1,6 @@
+import 'package:delegate_app/core/design/bidi.dart';
+import 'package:intl/intl.dart' hide TextDirection, Bidi;
+import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:delegate_app/core/design/widgets/skeleton.dart';
 import 'package:delegate_app/core/design/widgets/snackbars.dart';
@@ -56,6 +59,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   final _auth = FirebaseAuth.instance;
   User? _currentUser;
   Delegate? _delegate;
+
+  /// The national ID is masked until the person asks to see it.
+  bool _showNationalId = false;
   Map<String, dynamic>? _firestoreUserData;
   bool _isLoading = true;
   bool _isUploadingPhoto = false;
@@ -281,6 +287,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
                 // Personal Information Card
                 _buildPersonalInfoCard(colorScheme, theme, l10n, effectiveDelegate),
+
+                // TAS-387: the delegate's own data that was stored but never
+                // shown (code, national ID, city, chains, join date).
+                ..._buildWorkInfo(colorScheme, theme, l10n, effectiveDelegate),
 
                 const SizedBox(height: TashilSpacing.xl),
 
@@ -943,6 +953,129 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           ),
       ],
     );
+  }
+
+  /// «بيانات العمل»: only for a field delegate or supervisor with data.
+  /// Read-only list items (C-23); the code can be copied, the national ID
+  /// is masked with a show/hide button.
+  List<Widget> _buildWorkInfo(
+    ColorScheme colorScheme,
+    ThemeData theme,
+    AppLocalizations l10n,
+    Delegate? delegate,
+  ) {
+    if (delegate == null || delegate.role != UserRole.delegate) return const [];
+    final locale = Localizations.localeOf(context).languageCode;
+
+    // Every chain this person works in (cached memberships), own first.
+    final chains = <String>[];
+    void addChain(String name) {
+      final n = name.trim();
+      if (n.isNotEmpty && !chains.contains(n)) chains.add(n);
+    }
+
+    addChain(delegate.organizationName);
+    try {
+      if (di.sl.isRegistered<AuthLocalDataSource>()) {
+        for (final d in di.sl<AuthLocalDataSource>().getCachedAllDelegatesData()) {
+          if (d.uid == delegate.uid ||
+              (delegate.nationalityID.isNotEmpty &&
+                  d.nationalityID == delegate.nationalityID)) {
+            addChain(d.organizationName);
+          }
+        }
+      }
+    } catch (_) {}
+
+    final id = delegate.nationalityID.trim();
+    final maskedId = id.length > 4
+        ? '${'•' * (id.length - 4)}${id.substring(id.length - 4)}'
+        : id;
+
+    Widget tile(IconData icon, String label, String value,
+            {Widget? trailing, Key? key}) =>
+        ListTile(
+          key: key,
+          leading: Icon(icon, color: colorScheme.primary),
+          title: Text(value, style: theme.textTheme.bodyLarge),
+          subtitle: Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          trailing: trailing,
+        );
+
+    final rows = <Widget>[
+      if (delegate.delegatePublicId.trim().isNotEmpty)
+        tile(
+          Symbols.tag_rounded,
+          l10n.profileDelegateCode,
+          delegate.delegatePublicId.trim(),
+          key: const Key('profile_delegate_code'),
+          trailing: IconButton(
+            tooltip: l10n.profileCopy,
+            icon: const Icon(Symbols.content_copy_rounded),
+            onPressed: () async {
+              await Clipboard.setData(
+                ClipboardData(text: delegate.delegatePublicId.trim()),
+              );
+              if (mounted) showTashilSnackBar(context, l10n.profileCopied);
+            },
+          ),
+        ),
+      if (id.isNotEmpty)
+        tile(
+          Symbols.id_card_rounded,
+          l10n.nationalId,
+          // A number reads left to right inside Arabic text (F-13).
+          Bidi.ltr(_showNationalId ? id : maskedId),
+          key: const Key('profile_national_id'),
+          trailing: IconButton(
+            tooltip: _showNationalId ? l10n.profileHideId : l10n.profileShowId,
+            icon: Icon(
+              _showNationalId
+                  ? Symbols.visibility_off_rounded
+                  : Symbols.visibility_rounded,
+            ),
+            onPressed: () =>
+                setState(() => _showNationalId = !_showNationalId),
+          ),
+        ),
+      if (delegate.city.trim().isNotEmpty)
+        tile(Symbols.location_city_rounded, l10n.cityLabel, delegate.city.trim()),
+      if (chains.isNotEmpty)
+        tile(
+          Symbols.hub_rounded,
+          l10n.profileChains,
+          chains.join('، '),
+          key: const Key('profile_chains'),
+        ),
+      tile(
+        Symbols.event_available_rounded,
+        l10n.joinDate,
+        DateFormat('d MMMM y', locale).format(delegate.createdAt),
+        key: const Key('profile_join_date'),
+      ),
+    ];
+
+    return [
+      const SizedBox(height: TashilSpacing.xl),
+      _sectionTitle(Symbols.work_rounded, l10n.profileWorkInfo),
+      Card.filled(
+        key: const Key('profile_work_card'),
+        margin: EdgeInsets.zero,
+        child: Column(
+          children: [
+            for (var i = 0; i < rows.length; i++) ...[
+              if (i > 0) const Divider(height: 1, indent: TashilSpacing.xxl * 2),
+              rows[i],
+            ],
+          ],
+        ),
+      ),
+    ];
   }
 
   // ─── Security Card ──────────────────────────────────────────────

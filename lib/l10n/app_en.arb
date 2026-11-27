@@ -1587,6 +1587,13 @@
   "@photoCounter": {"placeholders": {"index": {"type": "int"}, "total": {"type": "int"}}},
   "photoSemantic": "Photo at {branch}, {time}",
   "@photoSemantic": {"placeholders": {"branch": {"type": "String"}, "time": {"type": "String"}}},
+  "profileWorkInfo": "Work details",
+  "profileDelegateCode": "Delegate code",
+  "profileChains": "Chains",
+  "profileCopy": "Copy",
+  "profileCopied": "Code copied",
+  "profileShowId": "Show number",
+  "profileHideId": "Hide number",
   "allChains": "All chains",
   "attNoSessionsInChain": "No attendance records for {chain} this month",
   "@attNoSessionsInChain": {

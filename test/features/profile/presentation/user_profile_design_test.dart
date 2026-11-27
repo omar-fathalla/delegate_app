@@ -34,4 +34,21 @@ void main() {
     expect(src, contains("Key('profile_skeleton')"));
     expect(src, isNot(contains('Center(child: CircularProgressIndicator())')));
   });
+
+  test('work details: code (copy), masked national ID, city, chains, join date',
+      () {
+    final work = src.substring(
+      src.indexOf('List<Widget> _buildWorkInfo('),
+      src.indexOf('// ─── Security Card'),
+    );
+    expect(work, contains("Key('profile_work_card')"));
+    expect(work, contains("Key('profile_delegate_code')"));
+    expect(work, contains('Clipboard.setData'));
+    expect(work, contains("Key('profile_national_id')"));
+    expect(work, contains('Bidi.ltr(_showNationalId ? id : maskedId)'));
+    expect(work, contains("Key('profile_chains')"));
+    expect(work, contains("Key('profile_join_date')"));
+    // Only for a field delegate / supervisor.
+    expect(work, contains('delegate.role != UserRole.delegate'));
+  });
 }

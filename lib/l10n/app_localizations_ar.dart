@@ -1553,6 +1553,27 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get profileWorkInfo => 'بيانات العمل';
+
+  @override
+  String get profileDelegateCode => 'كود المندوب';
+
+  @override
+  String get profileChains => 'السلاسل';
+
+  @override
+  String get profileCopy => 'نسخ';
+
+  @override
+  String get profileCopied => 'اتنسخ الكود';
+
+  @override
+  String get profileShowId => 'إظهار الرقم';
+
+  @override
+  String get profileHideId => 'إخفاء الرقم';
+
+  @override
   String get allChains => 'كل السلاسل';
 
   @override
