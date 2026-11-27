@@ -1390,18 +1390,11 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerLowest,
       appBar: AppBar(
         title: Text(
           !_canApproveOrReject
               ? 'أذونات التصوير النشطة'
               : 'إدارة واعتماد أذونات التصوير',
-        ),
-        centerTitle: true,
-        backgroundColor: colorScheme.surfaceContainer,
-        elevation: 0,
-        shape: Border(
-          bottom: BorderSide(color: colorScheme.outlineVariant, width: 1),
         ),
         actions: [
           IconButton(
@@ -1742,7 +1735,6 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
   }
 
   Widget _buildDepartmentDropdownToolbar(ThemeData theme) {
-    final colorScheme = theme.colorScheme;
     final isSelectedAll = _selectedDepartments.isEmpty;
     final String currentLabel;
     if (isSelectedAll) {
@@ -1752,118 +1744,43 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
     } else if (_selectedDepartments.length == 2) {
       currentLabel = _selectedDepartments.join(' + ');
     } else {
-      currentLabel = '${_selectedDepartments.length} أقسام محددة';
+      currentLabel = '${_selectedDepartments.length} أقسام';
     }
 
+    // TAS-392: the department filter is a FilterChip that opens the picker,
+    // and pinning is a toggle icon button (no amber, no hand-made pills).
     return Row(
       children: [
-        // زر القائمة المنسدلة لاختيار الأقسام
-        Expanded(
-          child: InkWell(
-            onTap: () => _showDepartmentFilterPicker(context, theme),
-            borderRadius: BorderRadius.circular(TashilRadius.large),
-            child: Container(
-              height: 44,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: !isSelectedAll
-                    ? colorScheme.primaryContainer
-                    : colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(TashilRadius.large),
-                border: Border.all(
-                  color: !isSelectedAll
-                      ? colorScheme.primary
-                      : colorScheme.outlineVariant,
-                  width: 1.0,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.category_rounded,
-                    size: 18,
-                    color: !isSelectedAll
-                        ? colorScheme.primary
-                        : colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      currentLabel,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: !isSelectedAll
-                            ? colorScheme.primary
-                            : colorScheme.onSurface,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.expand_more_rounded,
-                    size: 18,
-                    color: !isSelectedAll
-                        ? colorScheme.primary
-                        : colorScheme.onSurfaceVariant,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        // زر التثبيت في نفس الصف الأفقي
-        InkWell(
-          onTap: _togglePinCurrentFilter,
-          borderRadius: BorderRadius.circular(TashilRadius.large),
-          child: AnimatedContainer(
-            duration: AppMotionDurations.short3,
-            curve: AppMotionCurves.standard,
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: BoxDecoration(
-              color: _isPinned
-                  ? Colors.amber.withValues(alpha: 0.15)
-                  : colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(TashilRadius.large),
-              border: Border.all(
-                color: _isPinned
-                    ? Colors.amber.shade700
-                    : colorScheme.outlineVariant,
-                width: 1.0,
-              ),
-            ),
-            child: Row(
+        Flexible(
+          child: FilterChip(
+            key: const Key('permissions_department_filter'),
+            avatar: const Icon(Icons.category_rounded),
+            label: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.push_pin_rounded,
-                  size: 18,
-                  color: _isPinned
-                      ? Colors.amber.shade900
-                      : colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  _isPinned
-                      ? (_selectedDepartments.length > 1
-                            ? 'مثبت (${_selectedDepartments.length})'
-                            : 'مثبت')
-                      : (_selectedDepartments.length > 1
-                            ? 'تثبيت (${_selectedDepartments.length})'
-                            : 'تثبيت الفلتر'),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontWeight: _isPinned ? FontWeight.bold : FontWeight.w600,
-                    color: _isPinned
-                        ? Colors.amber.shade900
-                        : colorScheme.onSurfaceVariant,
+                Flexible(
+                  child: Text(
+                    currentLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                const Icon(Icons.arrow_drop_down_rounded),
               ],
             ),
+            selected: !isSelectedAll,
+            showCheckmark: false,
+            onSelected: (_) => _showDepartmentFilterPicker(context, theme),
           ),
+        ),
+        const Spacer(),
+        IconButton(
+          key: const Key('permissions_pin_filter'),
+          isSelected: _isPinned,
+          icon: const Icon(Icons.push_pin_outlined),
+          selectedIcon: const Icon(Icons.push_pin_rounded),
+          tooltip: _isPinned ? 'إلغاء تثبيت الفلتر' : 'تثبيت الفلتر',
+          onPressed: _togglePinCurrentFilter,
         ),
       ],
     );
@@ -2036,20 +1953,7 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
             child: SearchBar(
               controller: _searchController,
               hintText: 'البحث بكود الشركة أو اسم الشركة',
-              hintStyle: WidgetStatePropertyAll(
-                theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              textStyle: WidgetStatePropertyAll(
-                theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-              leading: Icon(
-                Icons.search_rounded,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+              leading: const Icon(Icons.search_rounded),
               trailing: [
                 if (_searchQuery.isNotEmpty)
                   IconButton(
@@ -2062,20 +1966,6 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                   ),
               ],
               elevation: const WidgetStatePropertyAll(0),
-              backgroundColor: WidgetStatePropertyAll(
-                theme.colorScheme.surfaceContainerHighest,
-              ),
-              side: WidgetStatePropertyAll(
-                BorderSide(color: theme.colorScheme.outlineVariant, width: 1.0),
-              ),
-              shape: WidgetStatePropertyAll(
-                RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(TashilRadius.large),
-                ),
-              ),
-              padding: const WidgetStatePropertyAll(
-                EdgeInsets.symmetric(horizontal: 16),
-              ),
               onChanged: (val) => setState(() => _searchQuery = val),
             ),
           ),
@@ -2653,411 +2543,234 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
     );
   }
 
+  /// TAS-392: one flat card per permission (no expand step): company and
+  /// status on top, the facts as icon + text, actions at the bottom.
   Widget _buildOngoingCard(
     BuildContext context,
     PhotoPermission permission,
     ThemeData theme,
   ) {
     final colorScheme = theme.colorScheme;
-    final dateFormat = DateFormat('yyyy-MM-dd');
+    final dateFormat = DateFormat('d MMMM', 'ar');
     final daysCount = permission.endDate
         .difference(permission.startDate)
         .inDays;
-    final isExpanded = _expandedPermissionIds.contains(permission.uid);
+    final orgUid = permission.organizationUID.isNotEmpty
+        ? permission.organizationUID
+        : widget.marketingDelegate.organizationUID;
+    final canEditDates = _canEditDatesFor(permission);
+    final canDelete = _canDeleteFor(permission);
+    final isPendingReview =
+        permission.status.toLowerCase() == 'pending' && _canReview(permission);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      color: colorScheme.surfaceContainerLow,
-      elevation: isExpanded ? 2.5 : 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(TashilRadius.large),
-        side: BorderSide(
-          color: isExpanded ? colorScheme.primary : colorScheme.outlineVariant,
-          width: isExpanded ? 1.2 : 1.0,
-        ),
+    Widget fact(IconData icon, Widget child) => Padding(
+      padding: const EdgeInsetsDirectional.only(top: TashilSpacing.xs),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: colorScheme.onSurfaceVariant),
+          const SizedBox(width: TashilSpacing.sm),
+          Expanded(child: child),
+        ],
       ),
+    );
+    final factStyle = theme.textTheme.bodyMedium?.copyWith(
+      color: colorScheme.onSurfaceVariant,
+    );
+
+    return Card.filled(
+      key: ValueKey('permission_card_${permission.uid}'),
+      margin: const EdgeInsetsDirectional.only(bottom: TashilSpacing.sm),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => _toggleExpandPermission(permission.uid),
-        borderRadius: BorderRadius.circular(TashilRadius.large),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // السطر الرئيسي: اسم الشركة والكود على اليمين وشارة الحالة مع سهم التوسيع على اليسار
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: CompanyNameWithCode(
-                      organizationUID: permission.organizationUID.isNotEmpty
-                          ? permission.organizationUID
-                          : widget.marketingDelegate.organizationUID,
-                      companyUID: permission.companyUID,
-                      companyName: permission.companyName,
-                      companyCode: permission.companyCode,
-                      twoLines: true,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                      codeStyle: Theme.of(context).textTheme.labelSmall
-                          ?.copyWith(
-                            fontWeight: FontWeight.w500,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(
+          TashilSpacing.lg,
+          TashilSpacing.lg,
+          TashilSpacing.md,
+          TashilSpacing.sm,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary,
+                    borderRadius: BorderRadius.circular(TashilRadius.medium),
+                  ),
+                  child: Icon(
+                    Icons.photo_camera_rounded,
+                    color: colorScheme.onPrimary,
+                  ),
+                ),
+                const SizedBox(width: TashilSpacing.md),
+                Expanded(
+                  child: CompanyNameWithCode(
+                    organizationUID: orgUid,
+                    companyUID: permission.companyUID,
+                    companyName: permission.companyName,
+                    companyCode: permission.companyCode,
+                    twoLines: true,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                    codeStyle: theme.textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildStatusBadge(permission),
-                      if (permission.status.toLowerCase() == 'approved' &&
-                          _canReview(permission))
-                        _buildEnableToggle(
-                          context,
-                          permission,
-                          theme.colorScheme,
+                ),
+                const SizedBox(width: TashilSpacing.sm),
+                _buildStatusBadge(permission),
+              ],
+            ),
+            const SizedBox(height: TashilSpacing.sm),
+            fact(
+              Icons.date_range_rounded,
+              Text(
+                '${dateFormat.format(permission.startDate)} ← ${dateFormat.format(permission.endDate)} · $daysCount يوم',
+                style: factStyle,
+              ),
+            ),
+            fact(
+              Icons.storefront_rounded,
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: InkWell(
+                  onTap: () => _showBranchesDialog(
+                    context,
+                    permission.companyName,
+                    permission.branchNames,
+                  ),
+                  child: Text(
+                    permission.branchNames.length == 1
+                        ? permission.branchNames.first
+                        : '${permission.branchNames.length} فروع',
+                    style: factStyle?.copyWith(
+                      color: colorScheme.primary,
+                      decoration: TextDecoration.underline,
+                      decorationColor: colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (permission.department != null &&
+                permission.department!.isNotEmpty)
+              fact(
+                Icons.category_rounded,
+                Text('القسم: ${permission.department}', style: factStyle),
+              ),
+            if (permission.approvedBy != null &&
+                permission.approvedBy!.trim().isNotEmpty)
+              fact(
+                Icons.verified_user_rounded,
+                ApproverNameText(
+                  approvedBy: permission.approvedBy!,
+                  organizationUID: orgUid,
+                  companyUID: permission.companyUID,
+                  currentUserUid: widget.marketingDelegate.uid,
+                  currentUserName: widget.marketingDelegate.fullName,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: factStyle,
+                ),
+              ),
+            if (permission.status.toLowerCase() == 'approved' &&
+                _canReview(permission))
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'مفعّل للمشرف',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                  Switch(
+                    value: permission.isSupervisorEnabled,
+                    onChanged: (val) {
+                      context.read<PhotoPermissionBloc>().add(
+                        TogglePermissionRequested(
+                          organizationUID: permission.organizationUID,
+                          companyUID: permission.companyUID,
+                          permissionId: permission.uid,
+                          isEnabled: val,
                         ),
-                      const SizedBox(width: 4),
-                      AnimatedRotation(
-                        turns: isExpanded ? 0.5 : 0.0,
-                        duration: AppMotionDurations.short4,
-                        curve: AppMotionCurves.emphasized,
-                        child: Icon(
-                          Icons.expand_more_rounded,
-                          color: colorScheme.onSurfaceVariant,
-                          size: 22,
-                        ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ],
               ),
-
-              // السطر الثاني: القسم على اليمين وشيبس "بواسطة" على أقصى الشمال
-              if ((permission.department != null &&
-                      permission.department!.isNotEmpty) ||
-                  (permission.approvedBy != null &&
-                      permission.approvedBy!.trim().isNotEmpty)) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    if (permission.department != null &&
-                        permission.department!.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 2.5,
+            const SizedBox(height: TashilSpacing.sm),
+            Row(
+              children: [
+                if (isPendingReview) ...[
+                  TextButton(
+                    onPressed: () {
+                      context.read<PhotoPermissionBloc>().add(
+                        ApprovePermissionRequested(
+                          organizationUID: permission.organizationUID,
+                          companyUID: permission.companyUID,
+                          permissionId: permission.uid,
+                          status: 'rejected',
+                          approvedBy: _approverText,
                         ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(
-                            TashilRadius.small,
-                          ),
-                          border: Border.all(color: colorScheme.primary),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.category_rounded,
-                              size: 11,
-                              color: colorScheme.primary,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'القسم: ${permission.department}',
-                              style: Theme.of(context).textTheme.labelSmall
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.primary,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    const Spacer(),
-                    if (permission.approvedBy != null &&
-                        permission.approvedBy!.trim().isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2.5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary,
-                          borderRadius: BorderRadius.circular(
-                            TashilRadius.small,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: colorScheme.primary,
-                              blurRadius: 3,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.person_rounded,
-                              size: 11,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(width: 4),
-                            ConstrainedBox(
-                              constraints: BoxConstraints(
-                                maxWidth:
-                                    MediaQuery.sizeOf(context).width * 0.48,
-                              ),
-                              child: ApproverNameText(
-                                approvedBy: permission.approvedBy!,
-                                organizationUID:
-                                    permission.organizationUID.isNotEmpty
-                                    ? permission.organizationUID
-                                    : widget.marketingDelegate.organizationUID,
-                                companyUID: permission.companyUID,
-                                currentUserUid: widget.marketingDelegate.uid,
-                                currentUserName:
-                                    widget.marketingDelegate.fullName,
-                                prefix: '',
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                                style: Theme.of(context).textTheme.labelSmall
-                                    ?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-
-              // التفاصيل المنسدلة عند النقر عبر M3 Motion
-              AnimatedCrossFade(
-                firstChild: const SizedBox(width: double.infinity, height: 0),
-                secondChild: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Divider(height: 18),
-                    // سطر التواريخ وتعديل المدة
-                    InkWell(
-                      onTap: _canEditDatesFor(permission)
-                          ? () => _showEditDatesDialog(context, permission)
-                          : null,
-                      borderRadius: BorderRadius.circular(TashilRadius.small),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.date_range_rounded,
-                              size: 16,
-                              color: colorScheme.primary,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'من: ${dateFormat.format(permission.startDate)}  -  إلى: ${dateFormat.format(permission.endDate)}',
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '($daysCount يوم)',
-                              style: Theme.of(context).textTheme.labelMedium
-                                  ?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                            ),
-                            if (_canEditDatesFor(permission)) ...[
-                              const Spacer(),
-                              Icon(
-                                Icons.edit_calendar_rounded,
-                                size: 16,
-                                color: colorScheme.primary,
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
+                      );
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: colorScheme.error,
                     ),
-                    const SizedBox(height: 8),
-                    // زر الفروع المعتمدة المدمج
-                    InkWell(
-                      onTap: () => _showBranchesDialog(
+                    child: const Text('رفض'),
+                  ),
+                  const SizedBox(width: TashilSpacing.sm),
+                  FilledButton(
+                    onPressed: () {
+                      context.read<PhotoPermissionBloc>().add(
+                        ApprovePermissionRequested(
+                          organizationUID: permission.organizationUID,
+                          companyUID: permission.companyUID,
+                          permissionId: permission.uid,
+                          status: 'approved',
+                          approvedBy: _approverText,
+                        ),
+                      );
+                    },
+                    child: const Text('موافقة'),
+                  ),
+                ] else
+                  FilledButton.tonalIcon(
+                    key: ValueKey('permission_photos_${permission.uid}'),
+                    onPressed: () {
+                      Navigator.push(
                         context,
-                        permission.companyName,
-                        permission.branchNames,
-                      ),
-                      borderRadius: BorderRadius.circular(TashilRadius.small),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(
-                            TashilRadius.small,
-                          ),
-                          border: Border.all(color: colorScheme.outlineVariant),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.store_rounded,
-                              size: 15,
-                              color: colorScheme.primary,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'الفروع المعتمدة (${permission.branchNames.length})',
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.primary,
-                                  ),
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.visibility_rounded,
-                              size: 14,
-                              color: colorScheme.primary,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    if (permission.status.toLowerCase() == 'pending' &&
-                        _canReview(permission)) ...[
-                      const Divider(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          OutlinedButton.icon(
-                            onPressed: () {
-                              context.read<PhotoPermissionBloc>().add(
-                                ApprovePermissionRequested(
-                                  organizationUID: permission.organizationUID,
-                                  companyUID: permission.companyUID,
-                                  permissionId: permission.uid,
-                                  status: 'rejected',
-                                  approvedBy: _approverText,
-                                ),
-                              );
-                            },
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.red,
-                              side: const BorderSide(color: Colors.red),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                  TashilRadius.small,
-                                ),
-                              ),
-                            ),
-                            icon: const Icon(Icons.close_rounded, size: 16),
-                            label: Text(
-                              'رفض',
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(fontWeight: FontWeight.bold),
+                        MaterialPageRoute(
+                          builder: (routeContext) => BlocProvider(
+                            create: (_) => di.sl<PhotoPermissionBloc>(),
+                            child: CapturedPhotosViewScreen(
+                              photoPermission: permission,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              context.read<PhotoPermissionBloc>().add(
-                                ApprovePermissionRequested(
-                                  organizationUID: permission.organizationUID,
-                                  companyUID: permission.companyUID,
-                                  permissionId: permission.uid,
-                                  status: 'approved',
-                                  approvedBy: _approverText,
-                                ),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                  TashilRadius.small,
-                                ),
-                              ),
-                            ),
-                            icon: const Icon(Icons.check_rounded, size: 16),
-                            label: Text(
-                              'الموافقة',
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    // صف أزرار الإجراءات والاتصال
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            // أيقونة الاتصال بمشرف الشركة جنب الـ Delete
-                            IconButton(
-                              onPressed: () =>
-                                  _showSupervisorDialog(context, permission),
-                              icon: Icon(
-                                Icons.phone_in_talk_rounded,
-                                color: colorScheme.primary,
-                                size: 20,
-                              ),
-                              tooltip: 'تواصل مع مشرف الشركة',
-                              style: IconButton.styleFrom(
-                                backgroundColor: colorScheme.primaryContainer,
-                                padding: const EdgeInsets.all(8),
-                                minimumSize: const Size(36, 36),
-                              ),
-                            ),
-                            if (_canDeleteFor(permission)) ...[
-                              const SizedBox(width: 6),
-                              IconButton(
-                                onPressed: () => _confirmDeletePermission(
-                                  context,
-                                  permission,
-                                ),
-                                icon: Icon(
-                                  Icons.delete_rounded,
-                                  color: colorScheme.error,
-                                  size: 20,
-                                ),
-                                tooltip: 'حذف الإذن',
-                                style: IconButton.styleFrom(
-                                  backgroundColor: colorScheme.error,
-                                  padding: const EdgeInsets.all(8),
-                                  minimumSize: const Size(36, 36),
-                                ),
-                              ),
-                            ],
-                          ],
                         ),
-                        TextButton.icon(
+                      );
+                    },
+                    icon: const Icon(Icons.collections_rounded),
+                    label: const Text('الصور الميدانية'),
+                  ),
+                const Spacer(),
+                IconButton.filled(
+                  key: ValueKey('permission_call_${permission.uid}'),
+                  onPressed: () => _showSupervisorDialog(context, permission),
+                  icon: const Icon(Icons.phone_in_talk_rounded),
+                  tooltip: 'تواصل مع مشرف الشركة',
+                ),
+                if (canEditDates || canDelete || isPendingReview)
+                  MenuAnchor(
+                    menuChildren: [
+                      if (isPendingReview)
+                        MenuItemButton(
+                          leadingIcon: const Icon(Icons.collections_rounded),
                           onPressed: () {
                             Navigator.push(
                               context,
@@ -3071,157 +2784,99 @@ class _MarketingPermissionsScreenState extends State<MarketingPermissionsScreen>
                               ),
                             );
                           },
-                          icon: const Icon(Icons.collections_rounded, size: 17),
-                          label: Text(
-                            'عرض الصور الميدانية',
-                            style: Theme.of(context).textTheme.bodySmall,
+                          child: const Text('الصور الميدانية'),
+                        ),
+                      if (canEditDates)
+                        MenuItemButton(
+                          leadingIcon: const Icon(Icons.edit_calendar_rounded),
+                          onPressed: () =>
+                              _showEditDatesDialog(context, permission),
+                          child: const Text('تعديل المدة'),
+                        ),
+                      if (canDelete)
+                        MenuItemButton(
+                          leadingIcon: Icon(
+                            Icons.delete_outline_rounded,
+                            color: colorScheme.error,
+                          ),
+                          onPressed: () =>
+                              _confirmDeletePermission(context, permission),
+                          child: Text(
+                            'حذف الإذن',
+                            style: TextStyle(color: colorScheme.error),
                           ),
                         ),
-                      ],
+                    ],
+                    builder: (context, controller, _) => IconButton(
+                      key: ValueKey('permission_menu_${permission.uid}'),
+                      icon: const Icon(Icons.more_vert_rounded),
+                      tooltip: 'خيارات الإذن',
+                      onPressed: () => controller.isOpen
+                          ? controller.close()
+                          : controller.open(),
                     ),
-                  ],
-                ),
-                crossFadeState: isExpanded
-                    ? CrossFadeState.showSecond
-                    : CrossFadeState.showFirst,
-                duration: AppMotionDurations.medium2,
-                reverseDuration: AppMotionDurations.short4,
-                firstCurve: AppMotionCurves.emphasizedAccelerate,
-                secondCurve: AppMotionCurves.emphasizedDecelerate,
-                sizeCurve: AppMotionCurves.emphasized,
-              ),
-            ],
-          ),
+                  ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildEnableToggle(
-    BuildContext context,
-    PhotoPermission permission,
-    ColorScheme colorScheme,
-  ) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          permission.isSupervisorEnabled ? 'مفعّل' : 'معطّل',
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: permission.isSupervisorEnabled
-                ? colorScheme.primary
-                : colorScheme.onSurfaceVariant,
-          ),
-        ),
-        Transform.scale(
-          scale: 0.75,
-          child: Switch(
-            value: permission.isSupervisorEnabled,
-            onChanged: (val) {
-              context.read<PhotoPermissionBloc>().add(
-                TogglePermissionRequested(
-                  organizationUID: permission.organizationUID,
-                  companyUID: permission.companyUID,
-                  permissionId: permission.uid,
-                  isEnabled: val,
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
+  /// Compact status pill (TAS-392): container role + its on colour, no
+  /// border. Pending is the only state that asks for attention.
   Widget _buildStatusBadge(PhotoPermission permission) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
     final status = permission.status.toLowerCase();
 
-    Widget badge;
-    if (status == 'pending') {
-      badge = Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: colorScheme.tertiaryContainer,
-          borderRadius: BorderRadius.circular(TashilRadius.small),
-          border: Border.all(color: colorScheme.tertiary),
+    final (String label, Color bg, Color fg) = switch (status) {
+      'pending' => (
+        'في انتظار الاعتماد',
+        colorScheme.tertiaryContainer,
+        colorScheme.onTertiaryContainer,
+      ),
+      'rejected' => (
+        'مرفوض',
+        colorScheme.errorContainer,
+        colorScheme.onErrorContainer,
+      ),
+      _ when permission.endDate.isBefore(todayStart) => (
+        'منتهي',
+        colorScheme.surfaceContainerHighest,
+        colorScheme.onSurfaceVariant,
+      ),
+      _ when !permission.isSupervisorEnabled => (
+        'معطل مؤقتاً',
+        colorScheme.surfaceContainerHighest,
+        colorScheme.onSurfaceVariant,
+      ),
+      _ => (
+        'نشط',
+        colorScheme.primaryContainer,
+        colorScheme.onPrimaryContainer,
+      ),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: TashilSpacing.sm,
+        vertical: TashilSpacing.xs / 2,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(TashilRadius.full),
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: fg,
+          fontWeight: FontWeight.w700,
         ),
-        child: Text(
-          'في انتظار الاعتماد',
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: colorScheme.onTertiaryContainer,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      );
-    } else if (status == 'rejected') {
-      badge = Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: colorScheme.errorContainer,
-          borderRadius: BorderRadius.circular(TashilRadius.small),
-          border: Border.all(color: colorScheme.error),
-        ),
-        child: Text(
-          'مرفوض',
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: colorScheme.onErrorContainer,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      );
-    } else if (permission.endDate.isBefore(todayStart)) {
-      badge = Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(TashilRadius.small),
-          border: Border.all(color: colorScheme.outlineVariant),
-        ),
-        child: Text(
-          'منتهي',
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      );
-    } else if (permission.isSupervisorEnabled == false) {
-      badge = Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: colorScheme.secondaryContainer,
-          borderRadius: BorderRadius.circular(TashilRadius.small),
-          border: Border.all(color: colorScheme.secondary),
-        ),
-        child: Text(
-          'معطل مؤقتاً',
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: colorScheme.onSecondaryContainer,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      );
-    } else {
-      badge = Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(TashilRadius.small),
-          border: Border.all(color: colorScheme.primary),
-        ),
-        child: Text(
-          'نشط',
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: colorScheme.onPrimaryContainer,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      );
-    }
-    return badge;
+      ),
+    );
   }
 
   Widget _buildPermissionsLoadError(ThemeData theme, String message) {
