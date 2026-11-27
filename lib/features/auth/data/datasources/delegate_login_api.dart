@@ -14,7 +14,11 @@ class DelegateLoginException implements Exception {
   final String reason;
   final String? message;
 
-  const DelegateLoginException(this.reason, [this.message]);
+  /// TAS-367: extra server details (e.g. the supervisor to call on a device
+  /// mismatch). Empty when the server sent none.
+  final Map<String, dynamic> details;
+
+  const DelegateLoginException(this.reason, [this.message, this.details = const {}]);
 
   @override
   String toString() => 'DelegateLoginException($reason)';
@@ -174,7 +178,12 @@ class FirebaseDelegateLoginApi implements DelegateLoginApi {
         delegateIds: ids.map((id) => id.toString()).where((id) => id.isNotEmpty).toList(),
       );
     } on FirebaseFunctionsException catch (error) {
-      throw DelegateLoginException(_reasonFor(error), error.message);
+      final raw = error.details;
+      throw DelegateLoginException(
+        _reasonFor(error),
+        error.message,
+        raw is Map ? Map<String, dynamic>.from(raw) : const {},
+      );
     }
   }
 

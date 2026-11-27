@@ -28,6 +28,7 @@ import {
   validateDeviceId,
   validateLoginInput,
   isStaffAccountRecord,
+  deviceMismatchDetails,
 } from "./delegate_login_logic";
 import {IP_WINDOW_MS, callerIp, ipWindowNext} from "./staff_phone_lookup_logic";
 import {hasDelegateIdentity, isDeletedDelegateStatus} from "./delegate_identity";
@@ -178,7 +179,8 @@ async function handleDelegateLogin(data: unknown): Promise<{ token: string; dele
     throw new functions.https.HttpsError(
       "failed-precondition",
       "This account is bound to another device.",
-      { reason: "device_mismatch", requestStatus: "pending" },
+      // TAS-367: who to call and how long the request has waited.
+      deviceMismatchDetails(decision.primary, deviceDecision.requestCreatedAtMs),
     );
   }
 
@@ -353,7 +355,9 @@ async function enforceDeviceBinding(input: {
   phone: string;
   legacyDeviceId?: string;
 }): Promise<
-  { action: "bind" | "allow"; deviceId: string } | { action: "mismatch" } | { action: "profile_missing" }
+  { action: "bind" | "allow"; deviceId: string } |
+  { action: "mismatch"; requestCreatedAtMs: number } |
+  { action: "profile_missing" }
 > {
   const db = admin.firestore();
   const bindingRef = db.collection(DEVICE_BINDINGS).doc(input.uid);
@@ -418,7 +422,7 @@ async function enforceDeviceBinding(input: {
       requestedDeviceModel: input.deviceModel,
       boundDeviceId: outcome.boundDeviceId,
     });
-    return { action: "mismatch" };
+    return { action: "mismatch", requestCreatedAtMs: pending?.createdAtMs ?? Date.now() };
   }
 
   await mirrorBoundDevice(
@@ -432,7 +436,7 @@ async function enforceDeviceBinding(input: {
 
 async function loadOpenUnbindRequests(
   delegateIds: string[],
-): Promise<Array<{ id: string; status: string }>> {
+): Promise<Array<{ id: string; status: string; createdAtMs: number | null }>> {
   const ids = Array.from(new Set(delegateIds.filter((id) => id))).slice(0, 10);
   if (ids.length === 0) return [];
   try {
@@ -445,6 +449,7 @@ async function loadOpenUnbindRequests(
       .map((doc) => ({
         id: doc.id,
         status: readString(doc.data(), ["status"]),
+        createdAtMs: createdAtMillis(doc.data().createdAt),
       }))
       .filter((request) => request.status === "pending" || request.status === "approved");
   } catch {
@@ -549,6 +554,8 @@ async function findCandidates(
       boundDeviceId: readString(data, ["boundDeviceId"]),
       boundDeviceModel: readString(data, ["boundDeviceModel"]),
       fullName: readString(data, ["fullName", "name"]),
+      supervisorName: readString(data, ["supervisorName"]),
+      supervisorPhone: readString(data, ["supervisorPhone"]),
       hasIdentity: hasDelegateIdentity(data),
       createdAtMillis: createdAtMillis(data.createdAt ?? data.hiredAt ?? data.startDate),
       nationalIdMatches,

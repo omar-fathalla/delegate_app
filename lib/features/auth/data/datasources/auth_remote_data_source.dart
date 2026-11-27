@@ -167,10 +167,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           'تم تجاوز عدد المحاولات. يرجى المحاولة لاحقاً.',
         );
       case 'device_mismatch':
-        return const AuthFailure(
-          'هذا الحساب مقترن بجهاز آخر. تم إرسال طلب تغيير الجهاز إلى إدارة الشركة. بعد الموافقة، سجّل الدخول من هذا الجهاز ليتم اعتماده.',
-          'device_mismatch',
-        );
+        return AuthFailure(deviceMismatchMessage(error.details), 'device_mismatch');
       case 'invalid_device':
         return const AuthFailure(
           'تعذر قراءة معرّف هذا الجهاز. أعد فتح التطبيق وحاول مرة أخرى.',
@@ -731,4 +728,27 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
     return 0;
   }
+}
+
+/// TAS-367: the device-mismatch message, with the supervisor to call and
+/// how long the request has waited when the server sent them.
+String deviceMismatchMessage(Map<String, dynamic> details, {DateTime? now}) {
+  final buf = StringBuffer(
+    'هذا الحساب مقترن بجهاز آخر. تم إرسال طلب تغيير الجهاز إلى إدارة الشركة. بعد الموافقة، سجّل الدخول من هذا الجهاز ليتم اعتماده.',
+  );
+  final name = (details['supervisorName'] ?? '').toString().trim();
+  final phone = (details['supervisorPhone'] ?? '').toString().trim();
+  if (name.isNotEmpty || phone.isNotEmpty) {
+    buf.write(' كلّم المشرف${name.isNotEmpty ? ' $name' : ''}');
+    if (phone.isNotEmpty) buf.write(' على \u2066$phone\u2069');
+    buf.write(' علشان يوافق.');
+  }
+  final at = details['requestCreatedAtMs'];
+  if (at is num) {
+    final hours = (now ?? DateTime.now())
+        .difference(DateTime.fromMillisecondsSinceEpoch(at.toInt()))
+        .inHours;
+    if (hours >= 1) buf.write(' الطلب مستني بقاله $hours ساعة.');
+  }
+  return buf.toString();
 }

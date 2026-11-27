@@ -68,6 +68,9 @@ export interface DelegateCandidate {
   boundDeviceId?: string;
   boundDeviceModel?: string;
   fullName?: string;
+  /** TAS-367: shown to a delegate locked on a new device (who to call). */
+  supervisorName?: string;
+  supervisorPhone?: string;
   /** False for a ghost doc (no name, national ID or phone). Missing = true. */
   hasIdentity?: boolean;
 }
@@ -608,4 +611,22 @@ export function isStaffAccountRecord(input: {
   if (input.hasPassword && claim !== "delegate") return true;
   const role = String(input.userDocRole ?? "").trim().toLowerCase();
   return role !== "" && role !== "delegate";
+}
+
+
+/**
+ * TAS-367: what a delegate refused on a new device may see. Sent only after
+ * the phone and the national ID matched, so nothing leaks to strangers.
+ */
+export function deviceMismatchDetails(
+  primary: { supervisorName?: string; supervisorPhone?: string },
+  requestCreatedAtMs: number | null,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { reason: "device_mismatch", requestStatus: "pending" };
+  const name = String(primary.supervisorName || "").trim();
+  const phone = String(primary.supervisorPhone || "").trim();
+  if (name) out.supervisorName = name;
+  if (phone) out.supervisorPhone = phone;
+  if (requestCreatedAtMs != null) out.requestCreatedAtMs = requestCreatedAtMs;
+  return out;
 }
