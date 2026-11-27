@@ -268,16 +268,20 @@ class _MainScreenState extends State<MainScreen> {
                     ? state.unreadCount
                     : 0;
 
-                return Badge(
-                  label: Text('$unreadCount'),
-                  isLabelVisible: unreadCount > 0,
-                  child: IconButton(
-                    icon: const Icon(Symbols.notifications_rounded),
+                // M3: the badge sits on the icon, not on the 48dp button
+                // corner (it was far from the bell, and under the DEV ribbon).
+                return IconButton(
+                    key: const Key('header_notifications_button'),
+                    icon: Badge(
+                      key: const Key('header_notifications_badge'),
+                      label: Text(unreadCount > 99 ? '99+' : '$unreadCount'),
+                      isLabelVisible: unreadCount > 0,
+                      child: const Icon(Symbols.notifications_rounded),
+                    ),
                     tooltip: l10n.notifications,
                     onPressed: () {
                       context.push('/notifications', extra: delegate);
                     },
-                  ),
                 );
               },
             ),
