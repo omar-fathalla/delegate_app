@@ -41,6 +41,7 @@ import 'package:delegate_app/features/admin/presentation/bloc/manage_marketing_b
 import 'package:delegate_app/features/admin/presentation/bloc/company_search_bloc.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_local_data_source.dart';
 import 'package:delegate_app/features/attendance/data/datasources/attendance_remote_data_source.dart';
+import 'package:delegate_app/features/attendance/data/datasources/attendance_server_api.dart';
 import 'package:delegate_app/features/marketing/data/datasources/marketing_remote_data_source.dart';
 import 'package:delegate_app/features/marketing/data/repositories/marketing_repository_impl.dart';
 import 'package:delegate_app/features/marketing/data/services/branch_preference_service.dart';
@@ -309,7 +310,13 @@ Future<void> init({required SharedPreferences sharedPreferences}) async {
     () => AttendanceOfflineQueueImpl(sharedPreferences: sl()),
   );
   sl.registerLazySingleton<AttendanceRemoteDataSource>(
-    () => AttendanceRemoteDataSourceImpl(firestore: sl()),
+    () => AttendanceRemoteDataSourceImpl(
+      firestore: sl(),
+      // TAS-361: check-in / check-out through the server.
+      serverApi: FirebaseAttendanceServerApi(
+        FirebaseFunctions.instanceFor(region: 'us-central1'),
+      ),
+    ),
   );
 
   // ! Features - Admin
