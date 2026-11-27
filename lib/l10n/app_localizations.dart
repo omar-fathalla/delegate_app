@@ -2816,6 +2816,12 @@ abstract class AppLocalizations {
   /// **'Pending'**
   String get reqFilterPending;
 
+  /// No description provided for @photosCaptureAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Photograph a display'**
+  String get photosCaptureAction;
+
   /// No description provided for @allChains.
   ///
   /// In en, this message translates to:

@@ -1512,6 +1512,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get reqFilterPending => 'معلّق';
 
   @override
+  String get photosCaptureAction => 'صوّر عرض';
+
+  @override
   String get allChains => 'كل السلاسل';
 
   @override

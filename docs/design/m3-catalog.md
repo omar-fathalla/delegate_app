@@ -92,7 +92,7 @@ matches the page to these IDs, compares, and records the result.
 | P-09 | PullToRefresh (official `RefreshIndicator.noSpinner` + contained `LoadingIndicator`) | loading indicator | `widgets/pull_to_refresh.dart` | `skeleton_and_refresh_test.dart` | التنبيهات / السحب للتحديث | Loading and progress | 2026-11-27 |
 | P-04 | NumericKeypad (7-8-9 on top) | C-01 | `widgets/pos_widgets.dart` | `playground_test.dart` | مكونات تسهيل / NumericKeypad | Components | 2026-11-26 |
 | P-05 | ReceiptPreview 58mm | F-05, F-13 | `widgets/receipt_preview.dart` | `playground_test.dart` | مكونات تسهيل / ReceiptPreview | Money and numbers | 2026-11-26 |
-| P-06 | EmptyState | foundations | `widgets/pos_widgets.dart` | `playground_test.dart` | مكونات تسهيل / EmptyState | Components | 2026-11-26 |
+| P-06 | EmptyState (empty list, and a failed load with retry) | foundations | `widgets/empty_state.dart` (app; m3-kit: `widgets/pos_widgets.dart`) | `playground_test.dart` | مكونات تسهيل / EmptyState | Components | 2026-11-26 |
 
 ## Open gaps
 

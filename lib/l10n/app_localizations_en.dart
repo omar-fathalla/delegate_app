@@ -1508,6 +1508,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reqFilterPending => 'Pending';
 
   @override
+  String get photosCaptureAction => 'Photograph a display';
+
+  @override
   String get allChains => 'All chains';
 
   @override

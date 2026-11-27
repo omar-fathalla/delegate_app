@@ -1427,6 +1427,7 @@
   "@reqDaysWord": {"placeholders": {"count": {"type": "int"}}},
   "reqDurationLabel": "المدة",
   "reqFilterPending": "معلّق",
+  "photosCaptureAction": "صوّر عرض",
   "allChains": "كل السلاسل",
   "attNoSessionsInChain": "لا توجد سجلات حضور في {chain} هذا الشهر",
   "attDaysInOtherChains": "لديك {count} يوم حضور مسجّل في السلاسل الأخرى.",

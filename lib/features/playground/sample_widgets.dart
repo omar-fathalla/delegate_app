@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/design/money.dart';
 import '../../core/design/tokens.dart';
+export '../../core/design/widgets/empty_state.dart';
 
 /// Money shown with tabular (fixed-width) digits so columns line up.
 class MoneyText extends StatelessWidget {
@@ -447,47 +448,3 @@ class _Key extends StatelessWidget {
   }
 }
 
-/// Centered placeholder for empty lists (no products, empty cart, …).
-class EmptyState extends StatelessWidget {
-  const EmptyState({
-    super.key,
-    required this.icon,
-    required this.title,
-    this.message,
-    this.action,
-  });
-
-  final IconData icon;
-  final String title;
-  final String? message;
-  final Widget? action;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.all(TashilSpacing.xl),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 48, color: scheme.onSurfaceVariant),
-          const SizedBox(height: TashilSpacing.md),
-          Text(title, style: text.titleMedium, textAlign: TextAlign.center),
-          if (message != null) ...[
-            const SizedBox(height: TashilSpacing.xs),
-            Text(
-              message!,
-              style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-              textAlign: TextAlign.center,
-            ),
-          ],
-          if (action != null) ...[
-            const SizedBox(height: TashilSpacing.lg),
-            action!,
-          ],
-        ],
-      ),
-    );
-  }
-}
