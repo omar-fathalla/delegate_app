@@ -610,8 +610,22 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(AppLocalizations.of(context)!.homeGreeting(firstNameForLocale(widget.delegate.fullName, widget.delegate.firstName, isArabic: Localizations.localeOf(context).languageCode == 'ar')),
-                      style: theme.textTheme.titleLarge?.copyWith(
+                    // User review 27 Nov: one line only, smaller; a long name
+                    // ends with «…» instead of wrapping and pushing the card.
+                    Text(
+                      AppLocalizations.of(context)!.homeGreeting(
+                        firstNameForLocale(
+                          widget.delegate.fullName,
+                          widget.delegate.firstName,
+                          isArabic:
+                              Localizations.localeOf(context).languageCode ==
+                              'ar',
+                        ),
+                      ),
+                      key: const Key('home_greeting'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: _heroOn(context),
                       ),
@@ -1054,7 +1068,6 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                       children: [
                         Text(AppLocalizations.of(context)!.offerPhotosTitle,
                           style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
                             color: colorScheme.onSurface,
                           ),
                         ),
@@ -1762,7 +1775,6 @@ class _DelegateHomeScreenState extends State<DelegateHomeScreen>
                     Text(
                       l10n.sendFeedback,
                       style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
                         color: colorScheme.onSurface,
                       ),
                     ),
